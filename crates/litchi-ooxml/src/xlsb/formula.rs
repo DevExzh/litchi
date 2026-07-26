@@ -341,6 +341,70 @@ pub struct XlsbExternalLink {
 }
 
 impl XlsbExternalLink {
+    const MAX_COLLECTION_ITEMS: usize = 65_535;
+    const MAX_WIDE_STRING_UNITS: usize = 32_767;
+
+    /// Create inert metadata for an external workbook link.
+    ///
+    /// `source` is stored as an external relationship target and is never
+    /// opened or fetched. Declared names are emitted as undefined external
+    /// names unless a future richer API supplies formula/cache records.
+    pub fn workbook(
+        source: impl Into<String>,
+        sheet_names: Vec<String>,
+        declared_names: Vec<String>,
+    ) -> XlsbResult<Self> {
+        let link = Self {
+            kind: XlsbExternalLinkKind::Workbook,
+            source: source.into(),
+            detail: None,
+            sheet_names,
+            declared_names,
+        };
+        link.validate()?;
+        Ok(link)
+    }
+
+    /// Create inert metadata for a DDE server/topic link.
+    ///
+    /// No process is started and no DDE request is sent. Data-item names are
+    /// emitted without cached values.
+    pub fn dde(
+        server: impl Into<String>,
+        topic: impl Into<String>,
+        item_names: Vec<String>,
+    ) -> XlsbResult<Self> {
+        let link = Self {
+            kind: XlsbExternalLinkKind::Dde,
+            source: server.into(),
+            detail: Some(topic.into()),
+            sheet_names: Vec::new(),
+            declared_names: item_names,
+        };
+        link.validate()?;
+        Ok(link)
+    }
+
+    /// Create inert metadata for an OLE data-source link.
+    ///
+    /// `source` is retained as an external relationship target. The object is
+    /// never instantiated and item names are emitted without cached values.
+    pub fn ole(
+        source: impl Into<String>,
+        program_id: impl Into<String>,
+        item_names: Vec<String>,
+    ) -> XlsbResult<Self> {
+        let link = Self {
+            kind: XlsbExternalLinkKind::Ole,
+            source: source.into(),
+            detail: Some(program_id.into()),
+            sheet_names: Vec::new(),
+            declared_names: item_names,
+        };
+        link.validate()?;
+        Ok(link)
+    }
+
     /// Return the stored external-link kind.
     pub const fn kind(&self) -> XlsbExternalLinkKind {
         self.kind
@@ -390,6 +454,74 @@ impl XlsbExternalLink {
     pub const fn is_workbook(&self) -> bool {
         matches!(self.kind, XlsbExternalLinkKind::Workbook)
     }
+
+    pub(crate) fn validate(&self) -> XlsbResult<()> {
+        validate_external_link_string(&self.source, "external-link source")?;
+        match self.kind {
+            XlsbExternalLinkKind::Workbook => {
+                if self.detail.is_some() {
+                    return Err(XlsbError::InvalidFormula(
+                        "external workbook link cannot have DDE/OLE detail".to_string(),
+                    ));
+                }
+            },
+            XlsbExternalLinkKind::Dde | XlsbExternalLinkKind::Ole => {
+                validate_external_link_string(
+                    self.detail.as_deref().unwrap_or_default(),
+                    match self.kind {
+                        XlsbExternalLinkKind::Dde => "DDE topic",
+                        XlsbExternalLinkKind::Ole => "OLE program ID",
+                        XlsbExternalLinkKind::Workbook => unreachable!(),
+                    },
+                )?;
+                if !self.sheet_names.is_empty() {
+                    return Err(XlsbError::InvalidFormula(
+                        "DDE/OLE links cannot declare workbook sheet names".to_string(),
+                    ));
+                }
+            },
+        }
+        if self.sheet_names.len() > Self::MAX_COLLECTION_ITEMS
+            || self.declared_names.len() > Self::MAX_COLLECTION_ITEMS
+        {
+            return Err(XlsbError::InvalidFormula(
+                "external-link collection exceeds 65,535 items".to_string(),
+            ));
+        }
+        for (index, sheet_name) in self.sheet_names.iter().enumerate() {
+            validate_external_link_string(sheet_name, "external sheet name")?;
+            if self.sheet_names[..index]
+                .iter()
+                .any(|existing| excel_name_eq(existing, sheet_name))
+            {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "duplicate external sheet name {sheet_name:?}"
+                )));
+            }
+        }
+        for (index, name) in self.declared_names.iter().enumerate() {
+            crate::xlsb::named_ranges::validate_defined_name(name)?;
+            if self.declared_names[..index]
+                .iter()
+                .any(|existing| excel_name_eq(existing, name))
+            {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "duplicate external declared name {name:?}"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_external_link_string(value: &str, context: &str) -> XlsbResult<()> {
+    let units = value.encode_utf16().count();
+    if units == 0 || units > XlsbExternalLink::MAX_WIDE_STRING_UNITS || value.contains('\0') {
+        return Err(XlsbError::InvalidFormula(format!(
+            "{context} is empty, too long, or contains NUL"
+        )));
+    }
+    Ok(())
 }
 
 /// Formula-resolution metadata from one XLSB External Link part.

@@ -19,6 +19,8 @@ use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::io::{Seek, Write};
 
+const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
+
 /// XLSB workbook writer
 ///
 /// Creates complete XLSB workbook files with support for:
@@ -55,6 +57,7 @@ pub struct XlsbWorkbookWriter {
     calculation_properties: CalculationProperties,
     is_1904: bool,
     connections: Option<crate::xlsb::connections::XlsbConnections>,
+    external_links: Vec<crate::xlsb::formula::XlsbExternalLink>,
     pivot_caches: Vec<AuthoredPivotCache>,
     vba_project: Option<(Vec<u8>, crate::vba::VbaLimits)>,
 }
@@ -101,6 +104,7 @@ impl XlsbWorkbookWriter {
             calculation_properties: CalculationProperties::default(),
             is_1904: false,
             connections: None,
+            external_links: Vec::new(),
             pivot_caches: Vec::new(),
             vba_project: None,
         }
@@ -227,6 +231,29 @@ impl XlsbWorkbookWriter {
         self.connections.as_ref()
     }
 
+    /// Add inert Workbook, DDE, or OLE external-link metadata.
+    ///
+    /// External targets are stored but never followed, contacted, refreshed,
+    /// instantiated, evaluated, or executed.
+    pub fn add_external_link(
+        &mut self,
+        link: crate::xlsb::formula::XlsbExternalLink,
+    ) -> XlsbResult<&mut Self> {
+        link.validate()?;
+        if self.external_links.len() >= MAX_AUTHORED_EXTERNAL_LINKS {
+            return Err(XlsbError::InvalidFormula(
+                "XLSB external-link count exceeds the safety limit".to_string(),
+            ));
+        }
+        self.external_links.push(link);
+        Ok(self)
+    }
+
+    /// External links scheduled for authoring, in workbook support-link order.
+    pub fn external_links(&self) -> &[crate::xlsb::formula::XlsbExternalLink] {
+        &self.external_links
+    }
+
     /// Attach a PivotCache definition (MS-XLSB 2.1.7.38) to the workbook.
     ///
     /// The definition is serialized immediately, so model content the
@@ -326,6 +353,15 @@ impl XlsbWorkbookWriter {
         // so that relationships are created with full knowledge of which parts
         // actually exist.
         self.add_workbook_part(&mut package, &formula_sheet_ranges)?;
+
+        for (index, link) in self.external_links.iter().enumerate() {
+            let one_based_index = index.checked_add(1).ok_or_else(|| {
+                XlsbError::InvalidFormula("external-link part index overflow".to_string())
+            })?;
+            package.add_part(Box::new(
+                crate::xlsb::external_link_write::author_external_link_part(link, one_based_index)?,
+            ));
+        }
 
         if let Some((payload, limits)) = &self.vba_project {
             crate::xlsb::vba_project::store_vba_project(
@@ -679,6 +715,7 @@ impl XlsbWorkbookWriter {
 
         // Add relationships from workbook to worksheets and styles
         let mut pivot_cache_rel_ids = Vec::with_capacity(self.pivot_caches.len());
+        let mut external_link_rel_ids = Vec::with_capacity(self.external_links.len());
         {
             let rels = workbook_part.rels_mut();
             for slot in &self.sheet_order {
@@ -728,12 +765,25 @@ impl XlsbWorkbookWriter {
                 );
                 pivot_cache_rel_ids.push((cache.id, relationship.r_id().to_string()));
             }
+
+            for (index, _) in self.external_links.iter().enumerate() {
+                let relationship = rels.get_or_add(
+                    rel::EXTERNAL_LINK,
+                    &format!("externalLinks/externalLink{}.bin", index + 1),
+                );
+                external_link_rel_ids.push(relationship.r_id().to_string());
+            }
         }
 
         // Write workbook structure
         let mut workbook_data = Vec::new();
         let mut writer = RecordWriter::new(&mut workbook_data);
-        self.write_workbook(&mut writer, formula_sheet_ranges, &pivot_cache_rel_ids)?;
+        self.write_workbook(
+            &mut writer,
+            formula_sheet_ranges,
+            &pivot_cache_rel_ids,
+            &external_link_rel_ids,
+        )?;
         workbook_part.set_blob(workbook_data);
 
         // Add part to package
@@ -772,6 +822,7 @@ impl XlsbWorkbookWriter {
         writer: &mut RecordWriter<W>,
         formula_sheet_ranges: &[(u32, u32)],
         pivot_cache_rel_ids: &[(u32, String)],
+        external_link_rel_ids: &[String],
     ) -> XlsbResult<()> {
         // BrtBeginBook
         writer.write_record(record_types::BEGIN_BOOK, &[])?;
@@ -796,7 +847,7 @@ impl XlsbWorkbookWriter {
         // EXTERNALS block with self-references, mirroring SheetJS and
         // [MS-XLSB] examples. This creates a minimal but fully valid
         // extern sheet table for the workbook.
-        self.write_externals(writer, formula_sheet_ranges)?;
+        self.write_externals(writer, formula_sheet_ranges, external_link_rel_ids)?;
 
         // Defined names (named ranges), if any.
         self.write_named_ranges(writer)?;
@@ -980,12 +1031,19 @@ impl XlsbWorkbookWriter {
         &self,
         writer: &mut RecordWriter<W>,
         formula_sheet_ranges: &[(u32, u32)],
+        external_link_rel_ids: &[String],
     ) -> XlsbResult<()> {
         // BrtBeginExternals - no data
         writer.write_record(record_types::BEGIN_EXTERNALS, &[])?;
 
         // BrtSupSelf - no data
         writer.write_record(record_types::SUP_SELF, &[])?;
+
+        for relationship_id in external_link_rel_ids {
+            let mut data = Vec::with_capacity(4 + relationship_id.len() * 2);
+            RecordWriter::new(&mut data).write_wide_string(relationship_id)?;
+            writer.write_record(record_types::SUP_BOOK_SRC, &data)?;
+        }
 
         // BrtExternSheet - self-references data
         let mut data = Vec::new();
@@ -1540,6 +1598,149 @@ mod tests {
         let sheet = MutableXlsbWorksheet::new("Sheet1");
         workbook.add_worksheet(sheet);
         assert_eq!(workbook.worksheet_count(), 1);
+    }
+
+    #[test]
+    fn external_links_round_trip_with_inert_package_topology() {
+        use crate::xlsb::formula::{XlsbExternalLink, XlsbExternalLinkKind};
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(MutableXlsbWorksheet::new("Host"));
+        workbook
+            .add_external_link(
+                XlsbExternalLink::workbook(
+                    "file:///data/Budget.xlsx",
+                    vec!["Data".to_string(), "Rates".to_string()],
+                    vec!["ExchangeRate".to_string()],
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        workbook
+            .add_external_link(
+                XlsbExternalLink::dde("Excel", "System", vec!["StatusItem".to_string()]).unwrap(),
+            )
+            .unwrap();
+        workbook
+            .add_external_link(
+                XlsbExternalLink::ole(
+                    "file:///data/Model.xlsx",
+                    "Excel.Sheet.12",
+                    vec!["ModelItem".to_string()],
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let bytes = output.into_inner();
+        let package = OpcPackage::from_bytes(&bytes).unwrap();
+        let workbook_part = package
+            .get_part(&PackURI::new("/xl/workbook.bin").unwrap())
+            .unwrap();
+        let external_relationships = workbook_part
+            .rels()
+            .iter()
+            .filter(|relationship| relationship.reltype() == rel::EXTERNAL_LINK)
+            .collect::<Vec<_>>();
+        assert_eq!(external_relationships.len(), 3);
+        let relationships = (1..=3)
+            .map(|index| {
+                let expected =
+                    PackURI::new(format!("/xl/externalLinks/externalLink{index}.bin")).unwrap();
+                external_relationships
+                    .iter()
+                    .copied()
+                    .find(|relationship| relationship.target_partname().unwrap() == expected)
+                    .expect("external-link relationship missing")
+            })
+            .collect::<Vec<_>>();
+        let mut support_relationship_ids = Vec::new();
+        for record in crate::xlsb::records::XlsbRecordIter::new(workbook_part.blob()) {
+            let record = record.unwrap();
+            if record.header.record_type == record_types::SUP_BOOK_SRC {
+                let (relationship_id, consumed) =
+                    crate::xlsb::records::wide_str_with_len(&record.data).unwrap();
+                assert_eq!(consumed, record.data.len());
+                support_relationship_ids.push(relationship_id);
+            }
+        }
+        assert_eq!(
+            support_relationship_ids,
+            relationships
+                .iter()
+                .map(|relationship| relationship.r_id().to_string())
+                .collect::<Vec<_>>()
+        );
+        for (index, relationship) in relationships.iter().enumerate() {
+            assert!(!relationship.is_external());
+            assert_eq!(
+                relationship.target_partname().unwrap(),
+                PackURI::new(format!("/xl/externalLinks/externalLink{}.bin", index + 1)).unwrap()
+            );
+        }
+        let workbook_link = package
+            .get_part(&relationships[0].target_partname().unwrap())
+            .unwrap();
+        assert_eq!(workbook_link.rels().len(), 1);
+        assert!(
+            workbook_link
+                .rels()
+                .iter()
+                .all(|relationship| relationship.is_external()
+                    && relationship.reltype() == rel::EXTERNAL_LINK_PATH)
+        );
+        let dde_link = package
+            .get_part(&relationships[1].target_partname().unwrap())
+            .unwrap();
+        assert!(dde_link.rels().is_empty());
+        let ole_link = package
+            .get_part(&relationships[2].target_partname().unwrap())
+            .unwrap();
+        assert_eq!(ole_link.rels().len(), 1);
+        assert!(
+            ole_link
+                .rels()
+                .iter()
+                .all(|relationship| relationship.is_external()
+                    && relationship.reltype() == rel::OLE_OBJECT)
+        );
+
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(bytes)).unwrap();
+        let links = reader.external_links();
+        assert_eq!(links.len(), 3);
+        assert_eq!(links[0].kind(), XlsbExternalLinkKind::Workbook);
+        assert_eq!(links[0].source(), "file:///data/Budget.xlsx");
+        assert_eq!(links[0].sheet_names(), ["Data", "Rates"]);
+        assert_eq!(links[0].declared_names(), ["ExchangeRate"]);
+        assert_eq!(links[1].kind(), XlsbExternalLinkKind::Dde);
+        assert_eq!(links[1].source(), "Excel");
+        assert_eq!(links[1].dde_topic(), Some("System"));
+        assert_eq!(links[1].declared_names(), ["StatusItem"]);
+        assert_eq!(links[2].kind(), XlsbExternalLinkKind::Ole);
+        assert_eq!(links[2].source(), "file:///data/Model.xlsx");
+        assert_eq!(links[2].ole_program_id(), Some("Excel.Sheet.12"));
+        assert_eq!(links[2].declared_names(), ["ModelItem"]);
+    }
+
+    #[test]
+    fn external_link_constructors_refuse_malformed_metadata() {
+        use crate::xlsb::formula::XlsbExternalLink;
+
+        assert!(XlsbExternalLink::workbook("", Vec::new(), Vec::new()).is_err());
+        assert!(
+            XlsbExternalLink::workbook(
+                "Book.xlsx",
+                vec!["Data".to_string(), "data".to_string()],
+                Vec::new(),
+            )
+            .is_err()
+        );
+        assert!(XlsbExternalLink::dde("Excel", "", vec!["Item".to_string()]).is_err());
+        assert!(
+            XlsbExternalLink::ole("Model.xlsx", "Excel.Sheet", vec!["A1".to_string()],).is_err()
+        );
     }
 
     #[test]

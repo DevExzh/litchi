@@ -162,6 +162,7 @@ pub mod pivot;
 
 /// Lossless PivotTable definition parts (MS-XLSB 2.1.7.40)
 pub mod pivot_view;
+mod external_link_write;
 
 /// Table (ListObject) stream parsing (MS-XLSB 2.1.7.51)
 pub mod table;

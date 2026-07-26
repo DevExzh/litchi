@@ -1006,6 +1006,15 @@ impl XlsbWorkbook {
                         "BrtSupBookSrc relationship {rel_id:?} is external"
                     )));
                 }
+                if !matches!(
+                    relationship.reltype(),
+                    relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
+                ) {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                        "BrtSupBookSrc relationship {rel_id:?} has invalid type {:?}",
+                        relationship.reltype()
+                    )));
+                }
                 relationship.target_partname().map_err(Into::into)
             })
             .collect::<XlsbResult<Vec<_>>>()?;
@@ -1616,6 +1625,12 @@ impl XlsbWorkbook {
 
     fn load_external_book(&self, uri: &litchi_opc::PackURI) -> XlsbResult<FormulaExternalBook> {
         let part = self.package.get_part(uri)?;
+        if part.content_type() != "application/vnd.ms-excel.externalLink" {
+            return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                "external link part {uri} has invalid content type {:?}",
+                part.content_type()
+            )));
+        }
         let mut iter = XlsbRecordIter::new(BufReader::new(part.blob()));
         let mut link_type = None;
         let mut target_key = String::new();
@@ -1802,6 +1817,12 @@ impl XlsbWorkbook {
                 )
             },
             0 | 2 => {
+                if part.rels().len() != 1 {
+                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(
+                        "external workbook/OLE link must have exactly one data-source relationship"
+                            .to_string(),
+                    ));
+                }
                 let relationship = part.rels().get(&target_key).ok_or_else(|| {
                     crate::xlsb::error::XlsbError::InvalidFormula(format!(
                         "external data relationship {target_key:?} is missing"
