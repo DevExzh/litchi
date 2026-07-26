@@ -9,7 +9,9 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDecimalPlaces,
     TableCellFixedDecimalPlaces, TableCellFractionAccuracy, TableCellFractionFormat,
-    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellPercentageFormat,
+    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellNumeralSystemBase,
+    TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
+    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
     TableCellScientificFormat, TableCellThousandsSeparator,
 };
 
@@ -19,11 +21,13 @@ const PERCENTAGE_COLUMN: usize = 2;
 const CURRENCY_COLUMN: usize = 3;
 const SCIENTIFIC_COLUMN: usize = 4;
 const FRACTION_COLUMN: usize = 5;
+const NUMERAL_SYSTEM_COLUMN: usize = 6;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
 const SCIENTIFIC_VALUE: f64 = -1_234.5;
 const FRACTION_VALUE: f64 = -12.375;
+const NUMERAL_SYSTEM_VALUE: f64 = -1_234.5;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -74,10 +78,18 @@ const fn fraction_format() -> TableCellFractionFormat {
     TableCellFractionFormat::new(TableCellFractionAccuracy::Eighths)
 }
 
+fn numeral_system_format() -> Result<TableCellNumeralSystemFormat, litchi_iwa::Error> {
+    TableCellNumeralSystemFormat::new(
+        TableCellNumeralSystemBase::HEXADECIMAL,
+        TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
+        TableCellNumeralSystemNegativeStyle::TwosComplement,
+    )
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 6)
+        .table_dimensions(3, 7)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -125,6 +137,18 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Number(FRACTION_VALUE),
     )?;
     editor.set_table_cell_fraction_format(table_id, ROW, FRACTION_COLUMN, fraction_format())?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        NUMERAL_SYSTEM_COLUMN,
+        CellValue::Number(NUMERAL_SYSTEM_VALUE),
+    )?;
+    editor.set_table_cell_numeral_system_format(
+        table_id,
+        ROW,
+        NUMERAL_SYSTEM_COLUMN,
+        numeral_system_format()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -132,7 +156,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with a native decimal table-cell format.\n")
-        .body_table("Number Formats", 3, 6)
+        .body_table("Number Formats", 3, 7)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -180,6 +204,18 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Number(FRACTION_VALUE),
     )?;
     editor.set_table_cell_fraction_format(table_id, ROW, FRACTION_COLUMN, fraction_format())?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        NUMERAL_SYSTEM_COLUMN,
+        CellValue::Number(NUMERAL_SYSTEM_VALUE),
+    )?;
+    editor.set_table_cell_numeral_system_format(
+        table_id,
+        ROW,
+        NUMERAL_SYSTEM_COLUMN,
+        numeral_system_format()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -192,7 +228,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        6,
+        7,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -268,6 +304,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         FRACTION_COLUMN,
         fraction_format(),
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        NUMERAL_SYSTEM_COLUMN,
+        CellValue::Number(NUMERAL_SYSTEM_VALUE),
+    )?;
+    editor.set_slide_table_cell_numeral_system_format(
+        0,
+        table.model_object_id,
+        ROW,
+        NUMERAL_SYSTEM_COLUMN,
+        numeral_system_format()?,
     )?;
     editor.save(output)?;
     Ok(())

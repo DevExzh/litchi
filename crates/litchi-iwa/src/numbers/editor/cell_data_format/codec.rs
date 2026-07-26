@@ -5,7 +5,9 @@ use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDataFormat,
     TableCellDecimalPlaces, TableCellFixedDecimalPlaces, TableCellFractionAccuracy,
     TableCellFractionFormat, TableCellNegativeNumberStyle, TableCellNumberFormat,
-    TableCellPercentageFormat, TableCellScientificFormat, TableCellThousandsSeparator,
+    TableCellNumeralSystemBase, TableCellNumeralSystemFormat, TableCellNumeralSystemNegativeStyle,
+    TableCellNumeralSystemPlaces, TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -14,6 +16,7 @@ pub(super) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+pub(super) const NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE: u32 = 269;
 pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
 const NATIVE_FRACTION_UP_TO_ONE_DIGIT: i32 = -1;
 const NATIVE_FRACTION_UP_TO_TWO_DIGITS: i32 = -2;
@@ -26,6 +29,21 @@ const NATIVE_FRACTION_TENTHS: i32 = 10;
 const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
 pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<FormatStructArchive> {
+    if let TableCellDataFormat::NumeralSystem(format) = format {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE),
+            base: Some(u32::from(format.base().value())),
+            base_places: Some(match format.places() {
+                TableCellNumeralSystemPlaces::Minimum => 0,
+                TableCellNumeralSystemPlaces::Fixed(places) => u32::from(places.value()),
+            }),
+            base_use_minus_sign: Some(matches!(
+                format.negative_style(),
+                TableCellNumeralSystemNegativeStyle::MinusSign
+            )),
+            ..Default::default()
+        });
+    }
     if let TableCellDataFormat::Fraction(format) = format {
         return Ok(FormatStructArchive {
             format_type: Some(NATIVE_FRACTION_FORMAT_TYPE),
@@ -79,6 +97,7 @@ pub(super) fn data_format_to_native(format: TableCellDataFormat) -> Result<Forma
             None,
         ),
         TableCellDataFormat::Fraction(_) => unreachable!("handled above"),
+        TableCellDataFormat::NumeralSystem(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -106,6 +125,53 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     let format_type = native.format_type.ok_or_else(|| {
         Error::InvalidFormat("Table cell has no native data-format type".to_owned())
     })?;
+    if format_type == NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE {
+        if native.decimal_places.is_some()
+            || native.negative_style.is_some()
+            || native.show_thousands_separator.is_some()
+            || native.currency_code.is_some()
+            || native.use_accounting_style.is_some()
+            || native.fraction_accuracy.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Numeral System cell format contains non-canonical numeric options".to_owned(),
+            ));
+        }
+        let base = native.base.ok_or_else(|| {
+            Error::InvalidFormat("Numeral System cell format has no base".to_owned())
+        })?;
+        let base = u8::try_from(base).map_err(|_| {
+            Error::InvalidFormat(format!(
+                "Numeral System cell format has invalid base {base}"
+            ))
+        })?;
+        let base = TableCellNumeralSystemBase::new(base)?;
+        let places = native.base_places.ok_or_else(|| {
+            Error::InvalidFormat("Numeral System cell format has no places setting".to_owned())
+        })?;
+        let places = match places {
+            0 => TableCellNumeralSystemPlaces::Minimum,
+            value => {
+                let value = u8::try_from(value).map_err(|_| {
+                    Error::InvalidFormat(format!(
+                        "Numeral System cell format has invalid places setting {value}"
+                    ))
+                })?;
+                TableCellNumeralSystemPlaces::fixed(value)?
+            },
+        };
+        let negative_style = match native.base_use_minus_sign {
+            Some(true) => TableCellNumeralSystemNegativeStyle::MinusSign,
+            Some(false) => TableCellNumeralSystemNegativeStyle::TwosComplement,
+            None => {
+                return Err(Error::InvalidFormat(
+                    "Numeral System cell format has no negative-style setting".to_owned(),
+                ));
+            },
+        };
+        return TableCellNumeralSystemFormat::new(base, places, negative_style)
+            .map(TableCellDataFormat::NumeralSystem);
+    }
     if format_type == NATIVE_FRACTION_FORMAT_TYPE {
         let accuracy = native.fraction_accuracy.ok_or_else(|| {
             Error::InvalidFormat("Fraction cell format has no accuracy setting".to_owned())
@@ -115,6 +181,9 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
             || native.show_thousands_separator.is_some()
             || native.currency_code.is_some()
             || native.use_accounting_style.is_some()
+            || native.base.is_some()
+            || native.base_places.is_some()
+            || native.base_use_minus_sign.is_some()
         {
             return Err(Error::InvalidFormat(
                 "Fraction cell format contains non-canonical decimal options".to_owned(),
@@ -138,6 +207,12 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     if native.fraction_accuracy.is_some() {
         return Err(Error::InvalidFormat(
             "Non-Fraction cell format contains a fraction-accuracy setting".to_owned(),
+        ));
+    }
+    if native.base.is_some() || native.base_places.is_some() || native.base_use_minus_sign.is_some()
+    {
+        return Err(Error::InvalidFormat(
+            "Non-Numeral-System cell format contains numeral-system options".to_owned(),
         ));
     }
     let decimal_places = match native.decimal_places {

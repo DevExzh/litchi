@@ -2225,6 +2225,53 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read an explicit positional numeral-system format for one table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_numeral_system_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<crate::table_cell_data_format::TableCellNumeralSystemFormat>> {
+        cell_data_format::cell_numeral_system_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit positional numeral-system format transactionally.
+    pub fn set_table_cell_numeral_system_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: crate::table_cell_data_format::TableCellNumeralSystemFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Numeral System cell.
+    pub fn reset_table_cell_numeral_system_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_numeral_system_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers numeral-system reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective text layout for one zero-based table cell.
     pub fn table_cell_layout(
         &self,
@@ -3404,6 +3451,24 @@ pub(crate) fn reset_table_cell_fraction_format_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_data_format::reset_cell_fraction_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_numeral_system_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<crate::table_cell_data_format::TableCellNumeralSystemFormat>> {
+    cell_data_format::cell_numeral_system_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_numeral_system_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_numeral_system_format(package, table_id, row, column)
 }
 
 pub(crate) fn set_table_cell_layout_in_package(

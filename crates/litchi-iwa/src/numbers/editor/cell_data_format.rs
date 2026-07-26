@@ -10,7 +10,7 @@ use crate::table_cell_data_format::{
 };
 use crate::table_cell_data_format::{
     TableCellCurrencyFormat, TableCellDataFormat, TableCellFractionFormat, TableCellNumberFormat,
-    TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellNumeralSystemFormat, TableCellPercentageFormat, TableCellScientificFormat,
 };
 
 mod codec;
@@ -66,7 +66,8 @@ pub(super) fn cell_number_format(
         TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
         )),
     }
@@ -84,7 +85,8 @@ pub(super) fn cell_currency_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
     }
@@ -102,7 +104,8 @@ pub(super) fn reset_cell_currency_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
     }
@@ -120,7 +123,8 @@ pub(super) fn cell_percentage_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
     }
@@ -138,7 +142,8 @@ pub(super) fn cell_scientific_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
     }
@@ -158,7 +163,8 @@ pub(super) fn reset_cell_scientific_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
     }
@@ -176,7 +182,8 @@ pub(super) fn cell_fraction_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Scientific(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
     }
@@ -194,8 +201,49 @@ pub(super) fn reset_cell_fraction_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
-        | TableCellDataFormat::Scientific(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Scientific(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn cell_numeral_system_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellNumeralSystemFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::NumeralSystem(format) => Ok(Some(format)),
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_)
+        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+            "Table cell does not use the Numeral System data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_numeral_system_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::NumeralSystem(_) => {
+            reset_cell_data_format(package, table_id, row, column)
+        },
+        TableCellDataFormat::Number(_)
+        | TableCellDataFormat::Currency(_)
+        | TableCellDataFormat::Percentage(_)
+        | TableCellDataFormat::Scientific(_)
+        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+            "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
         )),
     }
 }
@@ -244,7 +292,8 @@ pub(super) fn set_cell_data_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => bnc::DecimalCellFormatKind::NumberOrPercentage,
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => bnc::DecimalCellFormatKind::NumberOrPercentage,
         TableCellDataFormat::Automatic => unreachable!("handled above"),
     };
     let native = data_format_to_native(format)?;
@@ -336,7 +385,8 @@ pub(super) fn reset_cell_number_format(
         TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
     }
@@ -356,7 +406,8 @@ pub(super) fn reset_cell_percentage_format(
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Currency(_)
         | TableCellDataFormat::Scientific(_)
-        | TableCellDataFormat::Fraction(_) => Err(Error::InvalidFormat(
+        | TableCellDataFormat::Fraction(_)
+        | TableCellDataFormat::NumeralSystem(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
     }
@@ -704,7 +755,11 @@ fn number_format_from_native(native: &FormatStructArchive) -> Result<TableCellNu
 mod tests {
     use super::*;
     use crate::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
-    use crate::table_cell_data_format::{TableCellFractionAccuracy, TableCellFractionFormat};
+    use crate::table_cell_data_format::{
+        TableCellFractionAccuracy, TableCellFractionFormat, TableCellNumeralSystemBase,
+        TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
+        TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
+    };
 
     #[test]
     fn number_format_native_codec_is_strict_and_roundtrips() {
@@ -804,6 +859,94 @@ mod tests {
         invalid = data_format_to_native(TableCellFractionFormat::default().into()).unwrap();
         invalid.decimal_places = Some(2);
         assert!(data_format_from_native(&invalid).is_err());
+
+        let numeral_system = TableCellNumeralSystemFormat::new(
+            TableCellNumeralSystemBase::HEXADECIMAL,
+            TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
+            TableCellNumeralSystemNegativeStyle::TwosComplement,
+        )
+        .unwrap();
+        let mut native = data_format_to_native(numeral_system.into()).unwrap();
+        assert_eq!(native.format_type, Some(NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE));
+        assert_eq!(native.base, Some(16));
+        assert_eq!(native.base_places, Some(8));
+        assert_eq!(native.base_use_minus_sign, Some(false));
+        assert_eq!(
+            data_format_from_native(&native).unwrap(),
+            TableCellDataFormat::NumeralSystem(numeral_system)
+        );
+        native.base = Some(37);
+        assert!(data_format_from_native(&native).is_err());
+        native = data_format_to_native(numeral_system.into()).unwrap();
+        native.base_places = Some(33);
+        assert!(data_format_from_native(&native).is_err());
+        native = data_format_to_native(numeral_system.into()).unwrap();
+        native.base = Some(10);
+        assert!(data_format_from_native(&native).is_err());
+        native = data_format_to_native(numeral_system.into()).unwrap();
+        native.decimal_places = Some(2);
+        assert!(data_format_from_native(&native).is_err());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_resets_numeral_system_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Numeral Systems")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let numeral_system = TableCellNumeralSystemFormat::new(
+            TableCellNumeralSystemBase::HEXADECIMAL,
+            TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
+            TableCellNumeralSystemNegativeStyle::TwosComplement,
+        )
+        .unwrap();
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
+            .unwrap();
+        editor
+            .set_table_cell_numeral_system_format(table_id, 1, 1, numeral_system)
+            .unwrap();
+        editor
+            .set_table_cell_numeral_system_format(table_id, 1, 2, numeral_system)
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_numeral_system_format(table_id, 1, 1)
+                .unwrap(),
+            Some(numeral_system)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_numeral_system_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened
+                .table_cell_numeral_system_format(table_id, 1, 2)
+                .unwrap(),
+            Some(numeral_system)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_numeral_system_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
+        assert!(
+            resolve_format_table(reopened.package(), &location)
+                .unwrap()
+                .entries
+                .is_empty()
+        );
     }
 
     #[test]

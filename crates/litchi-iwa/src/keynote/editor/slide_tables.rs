@@ -64,6 +64,7 @@ pub use crate::table_cell_data_format::{
     TableCellCurrencyFormat as KeynoteTableCellCurrencyFormat,
     TableCellDataFormat as KeynoteTableCellDataFormat,
     TableCellFractionFormat as KeynoteTableCellFractionFormat,
+    TableCellNumeralSystemFormat as KeynoteTableCellNumeralSystemFormat,
     TableCellPercentageFormat as KeynoteTableCellPercentageFormat,
     TableCellScientificFormat as KeynoteTableCellScientificFormat,
 };
@@ -842,6 +843,72 @@ impl KeynoteEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Keynote fraction-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit positional numeral-system format for one slide-table cell.
+    pub fn slide_table_cell_numeral_system_format(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<KeynoteTableCellNumeralSystemFormat>> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_numeral_system_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit positional numeral-system format transactionally.
+    pub fn set_slide_table_cell_numeral_system_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: KeynoteTableCellNumeralSystemFormat,
+    ) -> Result<()> {
+        self.set_slide_table_cell_data_format(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            format.into(),
+        )
+    }
+
+    /// Restore Automatic from an explicit Numeral System slide-table cell.
+    pub fn reset_slide_table_cell_numeral_system_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_numeral_system_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
+                != KeynoteTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Keynote numeral-system reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;

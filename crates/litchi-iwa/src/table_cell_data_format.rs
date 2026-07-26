@@ -6,6 +6,12 @@ use std::str::FromStr;
 
 const MAXIMUM_DECIMAL_PLACES: u8 = 30;
 
+mod numeral_system;
+pub use numeral_system::{
+    TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
+    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
+};
+
 /// A fixed fractional-digit count accepted by the iWork cell inspector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TableCellFixedDecimalPlaces(u8);
@@ -445,6 +451,8 @@ pub enum TableCellDataFormat {
     Scientific(TableCellScientificFormat),
     /// Display the value as a whole number and native fraction.
     Fraction(TableCellFractionFormat),
+    /// Display the rounded integer in a positional numeral system.
+    NumeralSystem(TableCellNumeralSystemFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -551,6 +559,47 @@ mod tests {
         assert_eq!(
             TableCellDataFormat::from(format),
             TableCellDataFormat::Fraction(format)
+        );
+    }
+
+    #[test]
+    fn numeral_system_bounds_and_signed_invariants_are_strict() {
+        assert!(TableCellNumeralSystemBase::new(1).is_err());
+        assert_eq!(
+            TableCellNumeralSystemBase::new(36).unwrap(),
+            TableCellNumeralSystemBase::MAXIMUM
+        );
+        assert!(TableCellNumeralSystemBase::new(37).is_err());
+        assert!(TableCellNumeralSystemFixedPlaces::new(0).is_err());
+        assert_eq!(
+            TableCellNumeralSystemFixedPlaces::new(32).unwrap(),
+            TableCellNumeralSystemFixedPlaces::MAXIMUM
+        );
+        assert!(TableCellNumeralSystemFixedPlaces::new(33).is_err());
+
+        let hexadecimal = TableCellNumeralSystemFormat::new(
+            TableCellNumeralSystemBase::HEXADECIMAL,
+            TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
+            TableCellNumeralSystemNegativeStyle::TwosComplement,
+        )
+        .unwrap();
+        assert_eq!(
+            TableCellDataFormat::from(hexadecimal),
+            TableCellDataFormat::NumeralSystem(hexadecimal)
+        );
+        assert!(
+            hexadecimal
+                .with_base(TableCellNumeralSystemBase::DECIMAL)
+                .is_err()
+        );
+        assert!(
+            hexadecimal
+                .with_places(TableCellNumeralSystemPlaces::Minimum)
+                .is_err()
+        );
+        assert_eq!(
+            TableCellNumeralSystemFormat::default().negative_style(),
+            TableCellNumeralSystemNegativeStyle::MinusSign
         );
     }
 }

@@ -66,6 +66,7 @@ pub use crate::table_cell_data_format::{
     TableCellCurrencyFormat as PagesTableCellCurrencyFormat,
     TableCellDataFormat as PagesTableCellDataFormat,
     TableCellFractionFormat as PagesTableCellFractionFormat,
+    TableCellNumeralSystemFormat as PagesTableCellNumeralSystemFormat,
     TableCellPercentageFormat as PagesTableCellPercentageFormat,
     TableCellScientificFormat as PagesTableCellScientificFormat,
 };
@@ -589,6 +590,63 @@ impl PagesEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Pages fraction-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit positional numeral-system format for one body-table cell.
+    pub fn table_cell_numeral_system_format(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<PagesTableCellNumeralSystemFormat>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_numeral_system_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit positional numeral-system format transactionally.
+    pub fn set_table_cell_numeral_system_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: PagesTableCellNumeralSystemFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(model_object_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Numeral System body-table cell.
+    pub fn reset_table_cell_numeral_system_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_numeral_system_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            if verified.table_cell_data_format(model_object_id, row, column)?
+                != PagesTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Pages numeral-system reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;
@@ -1523,6 +1581,8 @@ mod tests {
     use crate::pages::PagesDocumentBuilder;
     use crate::table_cell_data_format::{
         TableCellCurrencyCode, TableCellCurrencyStyle, TableCellFractionAccuracy,
+        TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
+        TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
     };
 
     const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
@@ -1773,6 +1833,44 @@ mod tests {
         assert!(
             reopened
                 .reset_table_cell_fraction_format(model_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
+            PagesTableCellDataFormat::Automatic
+        );
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_numeral_system_format_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Numeral Systems", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let format = PagesTableCellNumeralSystemFormat::new(
+            TableCellNumeralSystemBase::HEXADECIMAL,
+            TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
+            TableCellNumeralSystemNegativeStyle::TwosComplement,
+        )
+        .unwrap();
+        editor
+            .set_table_cell(model_id, 1, 1, PagesCellValue::Number(-1_234.5))
+            .unwrap();
+        editor
+            .set_table_cell_numeral_system_format(model_id, 1, 1, format)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_numeral_system_format(model_id, 1, 1)
+                .unwrap(),
+            Some(format)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_numeral_system_format(model_id, 1, 1)
                 .unwrap()
         );
         assert_eq!(
