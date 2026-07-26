@@ -232,7 +232,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         ws.set_cell_value(2, 1, "Check Print Preview to see headers/footers");
 
         // Configure page setup
-        ws.set_page_setup_with_options("landscape", 9, Some(100), None, None);
+        ws.set_page_setup_with_options("landscape", 9, Some(100), None, None)?;
 
         // Set headers and footers
         let hf = HeaderFooter {

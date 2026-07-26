@@ -123,17 +123,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Write complex footnote example
     println!("Adding complex footnote with formatting...");
     writer.write_str("{\\fs24 Advanced features")?;
-    let complex_footnote = Note {
-        is_footnote: true,
-        reference: Cow::Borrowed("2"),
-        content: Cow::Borrowed(
+    let mut complex_footnote = Note::footnote(
+        Cow::Borrowed("2"),
+        Cow::Borrowed(
             "This footnote includes detailed technical information about RTF 1.9.1 specification compliance.",
         ),
-        formatting: Formatting {
-            italic: true,
-            font_size: std::num::NonZeroU16::new(16).unwrap(),
-            ..Default::default()
-        },
+    );
+    complex_footnote.formatting = Formatting {
+        italic: true,
+        font_size: std::num::NonZeroU16::new(16).unwrap(),
+        ..Default::default()
     };
     writer.write_note(&complex_footnote)?;
     writer.write_str(" are fully supported.\\par}\\par")?;

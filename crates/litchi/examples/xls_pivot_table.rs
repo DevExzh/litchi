@@ -145,6 +145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cache_name: "Region".to_string(),
                 cache_items: vec!["North".into(), "South".into(), "East".into(), "West".into()],
                 is_numeric: false,
+                grouping: None,
             },
             // Field 1: Product — column axis
             XlsPivotFieldConfig {
@@ -175,6 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cache_name: "Product".to_string(),
                 cache_items: vec!["Widget A".into(), "Widget B".into()],
                 is_numeric: false,
+                grouping: None,
             },
             // Field 2: Quarter — page axis
             XlsPivotFieldConfig {
@@ -205,6 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cache_name: "Quarter".to_string(),
                 cache_items: vec!["Q1".into(), "Q2".into()],
                 is_numeric: false,
+                grouping: None,
             },
             // Field 3: Revenue — data axis (aggregated)
             XlsPivotFieldConfig {
@@ -216,6 +219,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cache_name: "Revenue".to_string(),
                 cache_items: vec![], // numeric field, no string cache items
                 is_numeric: true,
+                grouping: None,
             },
         ],
         data_items: vec![

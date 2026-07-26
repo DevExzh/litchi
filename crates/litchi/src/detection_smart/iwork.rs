@@ -5,12 +5,13 @@
 //!
 //! Uses soapberry-zip for high-performance ZIP reading.
 
-use soapberry_zip::office::ArchiveReader;
 use std::path::Path;
 
-use litchi_core::Error;
-use litchi_core::Result;
 use litchi_core::detection::FileFormat;
+#[cfg(feature = "iwa")]
+use litchi_core::{Error, Result};
+#[cfg(feature = "iwa")]
+use soapberry_zip::office::ArchiveReader;
 
 /// Detect iWork format from a ZIP archive.
 ///
@@ -24,6 +25,7 @@ use litchi_core::detection::FileFormat;
 /// # Returns
 ///
 /// * `Result<FileFormat>` - The detected iWork format flavor, or an error if not recognized
+#[cfg(feature = "iwa")]
 pub fn detect_iwork_format(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
     // First, check for specific marker files that definitively identify each format
     if let Ok(flavor) = detect_from_marker_files(archive) {
@@ -40,6 +42,7 @@ pub fn detect_iwork_format(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
 }
 
 /// Detect from marker files that definitively identify the iWork application.
+#[cfg(feature = "iwa")]
 fn detect_from_marker_files(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
     // Check for Keynote-specific files
     if archive.contains("Index/MasterSlide.iwa") || archive.contains("Index/Slide.iwa") {
@@ -96,11 +99,6 @@ fn detect_from_iwa_messages(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
     }
 }
 
-#[cfg(not(feature = "iwa"))]
-fn detect_from_iwa_messages(_archive: &ArchiveReader<'_>) -> Result<FileFormat> {
-    Err(Error::InvalidFormat("IWA feature not enabled".to_string()))
-}
-
 /// Detect from file structure patterns.
 #[cfg(feature = "iwa")]
 fn detect_from_file_structure(archive: &ArchiveReader<'_>) -> Result<FileFormat> {
@@ -124,11 +122,6 @@ fn detect_from_file_structure(archive: &ArchiveReader<'_>) -> Result<FileFormat>
     Err(Error::InvalidFormat(
         "Could not detect iWork format from file structure".to_string(),
     ))
-}
-
-#[cfg(not(feature = "iwa"))]
-fn detect_from_file_structure(_archive: &ArchiveReader<'_>) -> Result<FileFormat> {
-    Err(Error::InvalidFormat("IWA feature not enabled".to_string()))
 }
 
 /// Detect iWork format from bytes.
