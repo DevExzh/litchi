@@ -344,6 +344,22 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
     assert!(parse_connections_part(&build(&records)).is_err());
+    // Duplicate connection ids are rejected after the complete part is parsed.
+    records = vec![
+        record(rt::BEGIN_EXT_CONNECTIONS, &[]),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(1, 7, "first").payload(),
+        ),
+        record(rt::END_EXT_CONNECTION, &[]),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(1, 7, "second").payload(),
+        ),
+        record(rt::END_EXT_CONNECTION, &[]),
+        record(rt::END_EXT_CONNECTIONS, &[]),
+    ];
+    assert!(parse_connections_part(&build(&records)).is_err());
     // Unterminated connection collection.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),

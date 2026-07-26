@@ -13,11 +13,11 @@ use crate::xlsb::records::record_types as rt;
 use crate::xlsb::walker::{PayloadCursor, RecordWalker, malformed};
 
 /// Maximum number of connections in one part.
-const MAX_CONNECTIONS: usize = 4_096;
+const MAX_CONNECTIONS: usize = super::write::MAX_CONNECTIONS;
 /// Maximum number of parameters on one connection.
-const MAX_PARAMETERS: usize = 1_024;
+const MAX_PARAMETERS: usize = super::write::MAX_PARAMETERS;
 /// Maximum number of Web query table items on one connection.
-const MAX_WEB_TABLE_ITEMS: usize = 1_024;
+const MAX_WEB_TABLE_ITEMS: usize = super::write::MAX_WEB_TABLE_ITEMS;
 
 /// `BrtPCDIMissing` / `BrtPCDIString` / `BrtPCDIIndex` payload sizes.
 const PCDI_MISSING_TYPE: u16 = 20;
@@ -110,6 +110,7 @@ pub fn parse_connections_part(data: &[u8]) -> XlsbResult<XlsbConnections> {
             },
             rt::END_EXT_CONNECTIONS => {
                 PayloadCursor::new(&record.data, "BrtEndExtConnections").finish()?;
+                super::write::validate_connections(&connections)?;
                 return Ok(connections);
             },
             other => walker.skip_unhandled(other, CONTEXT)?,

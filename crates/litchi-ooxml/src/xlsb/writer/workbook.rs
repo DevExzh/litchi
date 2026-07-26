@@ -165,38 +165,7 @@ impl XlsbWorkbookWriter {
         &mut self,
         connections: crate::xlsb::connections::XlsbConnections,
     ) -> XlsbResult<()> {
-        for (index, connection) in connections.connections.iter().enumerate() {
-            if connection.name.is_empty() {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
-                    "connection {} has an empty name",
-                    index + 1
-                )));
-            }
-            if connection.connection_id == 0 {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
-                    "connection '{}' has id 0 (ids must be greater than 0)",
-                    connection.name
-                )));
-            }
-            if connections.connections[..index]
-                .iter()
-                .any(|existing| existing.connection_id == connection.connection_id)
-            {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
-                    "duplicate connection id {}",
-                    connection.connection_id
-                )));
-            }
-            if connections.connections[..index]
-                .iter()
-                .any(|existing| existing.name.eq_ignore_ascii_case(&connection.name))
-            {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
-                    "duplicate connection name '{}'",
-                    connection.name
-                )));
-            }
-        }
+        crate::xlsb::connections::write::validate_connections(&connections)?;
         self.connections = Some(connections);
         Ok(())
     }

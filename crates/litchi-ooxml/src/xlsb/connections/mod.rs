@@ -8,6 +8,7 @@
 //! refreshed, or executed.
 
 mod model;
+pub(crate) mod package;
 mod parse;
 pub(crate) mod write;
 #[cfg(test)]

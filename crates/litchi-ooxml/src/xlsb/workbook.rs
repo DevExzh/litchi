@@ -245,6 +245,39 @@ impl XlsbWorkbook {
         self.connections.as_ref()
     }
 
+    /// Atomically add or replace the inert External Data Connections part.
+    ///
+    /// Existing package content is preserved. Connection strings, commands,
+    /// URLs, paths, and credential metadata are never resolved or executed.
+    pub fn set_connections(
+        &mut self,
+        connections: crate::xlsb::connections::XlsbConnections,
+    ) -> XlsbResult<()> {
+        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
+        let canonical = crate::xlsb::connections::package::store_on_workbook(
+            &mut self.package,
+            &workbook_uri,
+            &connections,
+        )?;
+        self.connections = Some(canonical);
+        Ok(())
+    }
+
+    /// Remove the External Data Connections relationship and part.
+    ///
+    /// Returns `true` when a graph was removed.
+    pub fn remove_connections(&mut self) -> XlsbResult<bool> {
+        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
+        let removed = crate::xlsb::connections::package::remove_from_workbook(
+            &mut self.package,
+            &workbook_uri,
+        )?;
+        if removed {
+            self.connections = None;
+        }
+        Ok(removed)
+    }
+
     /// Typed structured-table (ListObject) definitions paired with their
     /// worksheet indexes, in worksheet discovery order (MS-XLSB 2.1.7.51).
     ///
@@ -908,32 +941,10 @@ impl XlsbWorkbook {
             pivot_cache_definitions.push((*cache_id, definition));
         }
 
-        // External Data Connections part (MS-XLSB 2.1.7.24): at most one per
-        // package, related from the workbook part.
-        let mut connections = None;
-        for relationship in workbook_part.rels().iter() {
-            if !relationship
-                .reltype()
-                .to_ascii_lowercase()
-                .ends_with("/connections")
-            {
-                continue;
-            }
-            if relationship.is_external() {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
-                    "connections relationship is external".to_string(),
-                ));
-            }
-            if connections.is_some() {
-                return Err(crate::xlsb::error::XlsbError::InvalidFormula(
-                    "workbook declares multiple connections parts".to_string(),
-                ));
-            }
-            let part = self.package.get_part(&relationship.target_partname()?)?;
-            connections = Some(crate::xlsb::connections::parse_connections_part(
-                part.blob(),
-            )?);
-        }
+        let connections = crate::xlsb::connections::package::load_from_workbook(
+            &self.package,
+            workbook_part.partname(),
+        )?;
 
         let mut tables = Vec::new();
         let mut pivot_views = Vec::new();

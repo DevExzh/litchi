@@ -9,6 +9,15 @@ use crate::xlsb::connections::model::*;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::records::record_types as rt;
 use crate::xlsb::writer::RecordWriter;
+use std::collections::HashSet;
+
+pub(crate) const MAX_CONNECTIONS: usize = 4_096;
+pub(crate) const MAX_PARAMETERS: usize = 1_024;
+pub(crate) const MAX_WEB_TABLE_ITEMS: usize = 1_024;
+const MAX_SHORT_STRING_UTF16_UNITS: usize = 255;
+const MAX_STRING_UTF16_UNITS: usize = 1_048_576;
+const MAX_FORMULA_TOKEN_BYTES: usize = 16 * 1024 * 1024;
+const MAX_CONNECTIONS_PART_BYTES: usize = 32 * 1024 * 1024;
 
 /// `BrtPCDIMissing` / `BrtPCDIString` / `BrtPCDIIndex` record types.
 const PCDI_MISSING_TYPE: u16 = 20;
@@ -73,6 +82,158 @@ fn malformed(context: &str, detail: impl Into<String>) -> XlsbError {
         typ: context.to_string(),
         val: detail.into(),
     }
+}
+
+fn validate_string(value: &str, context: &str, max_utf16_units: usize) -> XlsbResult<()> {
+    if value.encode_utf16().count() > max_utf16_units {
+        return Err(malformed(
+            context,
+            format!("string exceeds {max_utf16_units} UTF-16 code units"),
+        ));
+    }
+    Ok(())
+}
+
+/// Validate model invariants shared by parsed-package and new-workbook authors.
+pub(crate) fn validate_connections(connections: &XlsbConnections) -> XlsbResult<()> {
+    if connections.connections.len() > MAX_CONNECTIONS {
+        return Err(malformed(
+            "ExternalDataConnections",
+            "connection count limit exceeded",
+        ));
+    }
+    let mut ids = HashSet::with_capacity(connections.connections.len());
+    let mut names = HashSet::with_capacity(connections.connections.len());
+    for connection in &connections.connections {
+        if connection.connection_id == 0 {
+            return Err(malformed(
+                "BrtBeginExtConnection",
+                "connection id must be greater than zero",
+            ));
+        }
+        if !ids.insert(connection.connection_id) {
+            return Err(malformed(
+                "BrtBeginExtConnection",
+                format!("duplicate connection id {}", connection.connection_id),
+            ));
+        }
+        let name_len = connection.name.encode_utf16().count();
+        if name_len == 0 || name_len > MAX_SHORT_STRING_UTF16_UNITS {
+            return Err(malformed(
+                "BrtBeginExtConnection",
+                "connection name must contain 1 to 255 UTF-16 code units",
+            ));
+        }
+        if !names.insert(connection.name.to_lowercase()) {
+            return Err(malformed(
+                "BrtBeginExtConnection",
+                format!("duplicate connection name '{}'", connection.name),
+            ));
+        }
+        for (context, value) in [
+            ("data file", connection.data_file.as_deref()),
+            ("connection file", connection.connection_file.as_deref()),
+            ("description", connection.description.as_deref()),
+            ("SSO identifier", connection.sso_id.as_deref()),
+        ] {
+            if let Some(value) = value {
+                validate_string(value, context, MAX_SHORT_STRING_UTF16_UNITS)?;
+            }
+        }
+        if connection.refresh_interval_minutes >= 32_768 {
+            return Err(malformed(
+                "BrtBeginExtConnection",
+                "refresh interval must be less than 32768 minutes",
+            ));
+        }
+        match &connection.properties {
+            XlsbConnectionProperties::Database(properties) => {
+                validate_string(
+                    &properties.connection_string,
+                    "database connection string",
+                    MAX_STRING_UTF16_UNITS,
+                )?;
+                for (context, value) in [
+                    ("database command", properties.command.as_deref()),
+                    (
+                        "database server command",
+                        properties.server_command.as_deref(),
+                    ),
+                ] {
+                    if let Some(value) = value {
+                        validate_string(value, context, MAX_STRING_UTF16_UNITS)?;
+                    }
+                }
+            },
+            XlsbConnectionProperties::Olap(properties) => {
+                if let Some(value) = &properties.local_connection_string {
+                    validate_string(
+                        value,
+                        "OLAP local connection string",
+                        MAX_STRING_UTF16_UNITS,
+                    )?;
+                }
+            },
+            XlsbConnectionProperties::Web(properties) => {
+                for (context, value) in [
+                    ("Web connection URL", properties.url.as_deref()),
+                    ("Web POST body", properties.web_post.as_deref()),
+                    ("Web edit-page URL", properties.edit_web_page.as_deref()),
+                ] {
+                    if let Some(value) = value {
+                        validate_string(value, context, MAX_STRING_UTF16_UNITS)?;
+                    }
+                }
+            },
+            XlsbConnectionProperties::None => {},
+        }
+        if connection.parameters.len() > MAX_PARAMETERS {
+            return Err(malformed(
+                "BrtBeginECParams",
+                "parameter count limit exceeded",
+            ));
+        }
+        for parameter in &connection.parameters {
+            validate_string(
+                &parameter.name,
+                "connection parameter name",
+                MAX_STRING_UTF16_UNITS,
+            )?;
+            if let Some(prompt) = &parameter.prompt {
+                validate_string(
+                    prompt,
+                    "connection parameter prompt",
+                    MAX_STRING_UTF16_UNITS,
+                )?;
+            }
+            match &parameter.value {
+                Some(XlsbParameterValue::Text(value)) => {
+                    validate_string(value, "connection parameter value", MAX_STRING_UTF16_UNITS)?
+                },
+                Some(XlsbParameterValue::CellFormula(tokens))
+                    if tokens.len() > MAX_FORMULA_TOKEN_BYTES =>
+                {
+                    return Err(malformed(
+                        "BrtBeginECParam",
+                        "cell formula token limit exceeded",
+                    ));
+                },
+                _ => {},
+            }
+        }
+        if connection.web_tables.len() > MAX_WEB_TABLE_ITEMS {
+            return Err(malformed(
+                "BrtBeginEcWpTables",
+                "Web table item count limit exceeded",
+            ));
+        }
+        for item in &connection.web_tables {
+            if let XlsbWebTableItem::Named(name) = item {
+                validate_string(name, "Web table name", MAX_STRING_UTF16_UNITS)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn write_wide_string(data: &mut Vec<u8>, value: &str) {
@@ -335,13 +496,7 @@ fn param_payload(parameter: &XlsbConnectionParameter) -> XlsbResult<Vec<u8>> {
 
 /// Serialize the complete External Data Connections part.
 pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResult<Vec<u8>> {
-    const MAX_CONNECTIONS: usize = 4_096;
-    if connections.connections.len() > MAX_CONNECTIONS {
-        return Err(malformed(
-            "ExternalDataConnections",
-            "connection count limit exceeded",
-        ));
-    }
+    validate_connections(connections)?;
     let mut data = Vec::with_capacity(512);
     let mut writer = RecordWriter::new(&mut data);
     writer.write_record(rt::BEGIN_EXT_CONNECTIONS, &[])?;
@@ -352,7 +507,10 @@ pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResul
                 "connection requires a name",
             ));
         }
-        writer.write_record(rt::BEGIN_EXT_CONNECTION, &ext_connection_payload(connection))?;
+        writer.write_record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ext_connection_payload(connection),
+        )?;
         match &connection.properties {
             XlsbConnectionProperties::Database(props) => {
                 writer.write_record(rt::BEGIN_EC_DB_PROPS, &db_props_payload(props))?;
@@ -396,6 +554,12 @@ pub(crate) fn write_connections_part(connections: &XlsbConnections) -> XlsbResul
         writer.write_record(rt::END_EXT_CONNECTION, &[])?;
     }
     writer.write_record(rt::END_EXT_CONNECTIONS, &[])?;
+    if data.len() > MAX_CONNECTIONS_PART_BYTES {
+        return Err(malformed(
+            "ExternalDataConnections",
+            "serialized part size limit exceeded",
+        ));
+    }
     Ok(data)
 }
 
