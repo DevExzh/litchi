@@ -955,14 +955,15 @@ pub fn insert_ruby_annotation_xml(
     Err(bad("paragraph index does not exist"))
 }
 
-/// Replace a UTF-8 range in one paragraph text node with a ruby annotation.
+/// Replace a UTF-8 range in one paragraph with a ruby annotation.
 ///
 /// `range` is measured over the concatenated values of text, CDATA, and entity
 /// reference nodes in the selected `text:p`, in document order. Existing ruby
 /// annotations are excluded from that coordinate space. The range must be
-/// non-empty, lie wholly within one eligible text node, and exactly match a
-/// plain-text `RubyBase::from_text` base. This preserves surrounding inline
-/// structure while refusing to split elements or cross markup boundaries.
+/// non-empty, lie within adjacent character-data nodes under one eligible
+/// parent, and exactly match a plain-text `RubyBase::from_text` base. This
+/// preserves surrounding inline structure while refusing to split elements or
+/// cross markup boundaries.
 ///
 /// The mutation is structural only: it does not resolve links, run scripts, or
 /// execute macros embedded elsewhere in the document.
@@ -989,6 +990,7 @@ pub fn wrap_ruby_annotation_xml(
     let mut text_offset = 0usize;
     let mut previous_end = 0usize;
     let mut events = 0usize;
+    let mut pending = None;
 
     loop {
         events += 1;
@@ -1030,7 +1032,7 @@ pub fn wrap_ruby_annotation_xml(
                 let content = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| bad(format!("invalid ruby range text: {error}")))?;
-                if let Some(output) = wrap_ruby_text_node(
+                if let Some(output) = collect_ruby_text_node(
                     xml,
                     previous_end..event_end,
                     content.as_ref(),
@@ -1040,6 +1042,7 @@ pub fn wrap_ruby_annotation_xml(
                     value,
                     &fragment,
                     target_depth,
+                    &mut pending,
                 )? {
                     parse_ruby_entries(&output)?;
                     return Ok(output);
@@ -1049,7 +1052,7 @@ pub fn wrap_ruby_annotation_xml(
                 let content = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| bad(format!("invalid ruby range CDATA: {error}")))?;
-                if let Some(output) = wrap_ruby_text_node(
+                if let Some(output) = collect_ruby_text_node(
                     xml,
                     previous_end..event_end,
                     content.as_ref(),
@@ -1059,6 +1062,7 @@ pub fn wrap_ruby_annotation_xml(
                     value,
                     &fragment,
                     target_depth,
+                    &mut pending,
                 )? {
                     parse_ruby_entries(&output)?;
                     return Ok(output);
@@ -1066,7 +1070,7 @@ pub fn wrap_ruby_annotation_xml(
             },
             Event::GeneralRef(ref reference) => {
                 let content = crate::elements::xml::decode_reference(reference, "ruby range")?;
-                if let Some(output) = wrap_ruby_text_node(
+                if let Some(output) = collect_ruby_text_node(
                     xml,
                     previous_end..event_end,
                     &content,
@@ -1076,6 +1080,7 @@ pub fn wrap_ruby_annotation_xml(
                     value,
                     &fragment,
                     target_depth,
+                    &mut pending,
                 )? {
                     parse_ruby_entries(&output)?;
                     return Ok(output);
@@ -1106,11 +1111,21 @@ pub fn wrap_ruby_annotation_xml(
     if range.end > text_offset {
         return Err(bad("ruby text range is out of bounds"));
     }
-    Err(bad("ruby text range must fit inside one text node"))
+    Err(bad(
+        "ruby text range must fit inside adjacent character-data nodes",
+    ))
+}
+
+struct PendingRubyRange {
+    xml_start: usize,
+    xml_end: usize,
+    prefix: String,
+    selected: String,
+    stack: Vec<(Ns, Vec<u8>)>,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn wrap_ruby_text_node(
+fn collect_ruby_text_node(
     xml: &str,
     span: Range<usize>,
     text: &str,
@@ -1120,6 +1135,7 @@ fn wrap_ruby_text_node(
     value: &RubyAnnotation,
     fragment: &str,
     target_depth: Option<usize>,
+    pending: &mut Option<PendingRubyRange>,
 ) -> Result<Option<String>> {
     let Some(target_depth) = target_depth else {
         return Ok(None);
@@ -1136,33 +1152,64 @@ fn wrap_ruby_text_node(
         .checked_add(text.len())
         .ok_or_else(|| bad("ruby text range offset overflow"))?;
     *text_offset = end;
-    if range.start >= start && range.end <= end {
-        if !ruby_parent(stack.last()) {
-            return Err(bad("ruby text range has unsupported inline parent"));
-        }
-        let local_start = range.start - start;
-        let local_end = range.end - start;
-        if !text.is_char_boundary(local_start) || !text.is_char_boundary(local_end) {
-            return Err(bad("ruby text range is not on a UTF-8 character boundary"));
-        }
-        let selected = &text[local_start..local_end];
-        if value.base.xml != escape_xml(selected) {
-            return Err(bad(
-                "ruby annotation base must equal the selected plain-text range",
-            ));
-        }
-        let mut output = String::with_capacity(xml.len() + fragment.len());
-        output.push_str(&xml[..span.start]);
-        output.push_str(&escape_xml(&text[..local_start]));
-        output.push_str(fragment);
-        output.push_str(&escape_xml(&text[local_end..]));
-        output.push_str(&xml[span.end..]);
-        return Ok(Some(output));
+    if range.start >= end || range.end <= start {
+        return Ok(None);
     }
-    if range.start < end && range.end > start {
-        return Err(bad("ruby text range must fit inside one text node"));
+    if !ruby_parent(stack.last()) {
+        return Err(bad("ruby text range has unsupported inline parent"));
     }
-    Ok(None)
+    let local_start = range.start.saturating_sub(start);
+    let local_end = range.end.min(end) - start;
+    if !text.is_char_boundary(local_start) || !text.is_char_boundary(local_end) {
+        return Err(bad("ruby text range is not on a UTF-8 character boundary"));
+    }
+
+    let state = if let Some(state) = pending.as_mut() {
+        if state.xml_end != span.start || state.stack != stack {
+            return Err(bad("ruby text range crosses an inline markup boundary"));
+        }
+        state
+    } else {
+        pending.insert(PendingRubyRange {
+            xml_start: span.start,
+            xml_end: span.start,
+            prefix: escape_xml(&text[..local_start]),
+            selected: String::new(),
+            stack: stack.to_vec(),
+        })
+    };
+    let selected_len = local_end - local_start;
+    let total_len = state
+        .selected
+        .len()
+        .checked_add(selected_len)
+        .ok_or_else(|| bad("ruby text range size overflow"))?;
+    if total_len > MAX_BASE {
+        return Err(bad("ruby text range exceeds the base-size limit"));
+    }
+    state
+        .selected
+        .try_reserve(selected_len)
+        .map_err(|_| bad("ruby text range allocation failed"))?;
+    state.selected.push_str(&text[local_start..local_end]);
+    state.xml_end = span.end;
+
+    if range.end > end {
+        return Ok(None);
+    }
+    if value.base.xml != escape_xml(&state.selected) {
+        return Err(bad(
+            "ruby annotation base must equal the selected plain-text range",
+        ));
+    }
+    let suffix = escape_xml(&text[local_end..]);
+    let mut output = String::with_capacity(xml.len() + fragment.len());
+    output.push_str(&xml[..state.xml_start]);
+    output.push_str(&state.prefix);
+    output.push_str(fragment);
+    output.push_str(&suffix);
+    output.push_str(&xml[state.xml_end..]);
+    Ok(Some(output))
 }
 
 #[derive(Clone)]
@@ -1459,5 +1506,30 @@ mod tests {
         assert!(
             wrap_ruby_annotation_xml(paragraph, 0, start..start + "字".len(), &wrong_base).is_err()
         );
+    }
+    #[test]
+    fn wraps_adjacent_text_cdata_and_entity_nodes() {
+        let paragraph = r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">A<![CDATA[漢]]>&amp;字Z</text:p>"#;
+        let base = String::from("漢&字");
+        let ruby =
+            RubyAnnotation::new(None, RubyBase::from_text(&base).unwrap(), "かんじ", None).unwrap();
+        let wrapped = wrap_ruby_annotation_xml(paragraph, 0, 1..1 + base.len(), &ruby).unwrap();
+
+        assert!(wrapped.starts_with(
+            r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">A<text:ruby"#
+        ));
+        assert!(wrapped.ends_with("</text:ruby>Z</text:p>"));
+        assert_eq!(
+            parse_ruby_annotations(&wrapped).unwrap().annotations,
+            vec![ruby]
+        );
+    }
+
+    #[test]
+    fn adjacent_node_range_still_refuses_inline_markup_boundaries() {
+        let paragraph = r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">A<![CDATA[B]]><text:span>C</text:span>D</text:p>"#;
+        let ruby =
+            RubyAnnotation::new(None, RubyBase::from_text("BCD").unwrap(), "base", None).unwrap();
+        assert!(wrap_ruby_annotation_xml(paragraph, 0, 1..4, &ruby).is_err());
     }
 }
