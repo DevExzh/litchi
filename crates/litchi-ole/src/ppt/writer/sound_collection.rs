@@ -1,8 +1,8 @@
 //! SoundCollection writer for PowerPoint binary format.
 //!
-//! PowerPoint's `AnimationInfoAtom.nSoundRef` is matched against `CString` instance 2
+//! PowerPoint sound references are matched against `CString` instance 2
 //! inside each `Sound` container in the `SoundCollection`. The `SoundData` atom MUST
-//! contain actual WAV audio data — PowerPoint extracts and plays it directly.
+//! contain actual WAV or AIFF audio data — PowerPoint extracts and plays it directly.
 //! An empty `SoundData` results in silence (no sound played).
 //!
 //! Per LibreOffice `pptin.cxx` `ReadSound()`:
@@ -13,32 +13,186 @@
 
 use super::records::{PptError, RecordBuilder};
 use crate::consts::PptRecordType;
-use std::collections::{HashMap, HashSet};
+use crate::ppt::animation::{BuiltinSound, SoundType};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-/// Built-in PowerPoint sound names per specification.
-fn get_builtin_sound_name(id: u32) -> &'static str {
-    match id {
-        1 => "Applause",
-        2 => "Arrow",
-        3 => "Bomb",
-        4 => "Breeze",
-        5 => "Camera",
-        6 => "Cash Register",
-        7 => "Chime",
-        8 => "Click",
-        9 => "Coin",
-        10 => "Drum Roll",
-        11 => "Explosion",
-        12 => "Hammer",
-        13 => "Laser",
-        14 => "Push",
-        15 => "Suction",
-        16 => "Swoosh",
-        17 => "Type",
-        18 => "Voltage",
-        19 => "Whoosh",
-        20 => "Wind",
-        _ => "",
+/// Resource limits for sound collection authoring.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SoundCollectionLimits {
+    pub max_sounds: usize,
+    pub max_sound_bytes: usize,
+    pub max_aggregate_sound_bytes: usize,
+    pub max_name_units: usize,
+}
+
+impl Default for SoundCollectionLimits {
+    fn default() -> Self {
+        Self {
+            max_sounds: 4_096,
+            max_sound_bytes: 64 * 1_048_576,
+            max_aggregate_sound_bytes: 256 * 1_048_576,
+            max_name_units: 1_024,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PlannedSound<'a> {
+    Builtin(BuiltinSound),
+    Embedded { name: &'a str, data: &'a [u8] },
+}
+
+/// Deterministic, bounded sound-resource planner.
+///
+/// Input IDs are writer-local handles. `build` maps them to the dense positive
+/// identifiers required by `SoundCollectionContainer`.
+pub(crate) struct SoundCollectionBuilder<'a> {
+    sounds: BTreeMap<u32, PlannedSound<'a>>,
+    aggregate_sound_bytes: usize,
+    limits: SoundCollectionLimits,
+}
+
+impl<'a> SoundCollectionBuilder<'a> {
+    pub(crate) fn new(limits: SoundCollectionLimits) -> Self {
+        Self {
+            sounds: BTreeMap::new(),
+            aggregate_sound_bytes: 0,
+            limits,
+        }
+    }
+
+    /// Register an explicit built-in or embedded resource for a writer-local ID.
+    pub(crate) fn register(
+        &mut self,
+        source_id: u32,
+        sound_type: &'a SoundType,
+    ) -> Result<(), PptError> {
+        let sound = match sound_type {
+            SoundType::Builtin(sound) => PlannedSound::Builtin(*sound),
+            SoundType::Embedded { name, data } => {
+                self.validate_name(name)?;
+                self.validate_audio(data)?;
+                PlannedSound::Embedded { name, data }
+            },
+            SoundType::Linked { .. } => {
+                return invalid(
+                    "linked animation sounds require external-media records and cannot be embedded in SoundCollection",
+                );
+            },
+        };
+        self.insert(source_id, sound)
+    }
+
+    /// Register a reference without an explicit resource.
+    ///
+    /// IDs 1 through 20 use the library's typed built-in sound catalog. Other
+    /// IDs must already have an explicit embedded resource.
+    pub(crate) fn register_reference(&mut self, source_id: u32) -> Result<(), PptError> {
+        if source_id == 0 {
+            return Ok(());
+        }
+        if self.sounds.contains_key(&source_id) {
+            return Ok(());
+        }
+        let sound = BuiltinSound::from_id(source_id).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("sound reference {source_id} has no registered embedded resource"),
+            )
+        })?;
+        self.insert(source_id, PlannedSound::Builtin(sound))
+    }
+
+    /// Serialize the collection and return writer-local ID to file-ID mapping.
+    pub(crate) fn build(self) -> Result<(Vec<u8>, HashMap<u32, u32>), PptError> {
+        if self.sounds.is_empty() {
+            return Ok((Vec::new(), HashMap::new()));
+        }
+        let seed = u32::try_from(self.sounds.len())
+            .map_err(|_| invalid_error("sound collection count exceeds u32"))?;
+        let mut mapping = HashMap::with_capacity(self.sounds.len());
+        let mut children = Vec::new();
+        let mut seed_atom = RecordBuilder::new(0x00, 0, PptRecordType::SoundCollectionAtom as u16);
+        seed_atom.write_data(&seed.to_le_bytes());
+        children.extend(seed_atom.build()?);
+
+        for (index, (source_id, sound)) in self.sounds.into_iter().enumerate() {
+            let file_id = u32::try_from(index + 1)
+                .map_err(|_| invalid_error("sound identifier exceeds u32"))?;
+            mapping.insert(source_id, file_id);
+            match sound {
+                PlannedSound::Builtin(sound) => {
+                    let wav_data = generate_wav_tone(get_builtin_sound_freq(sound.id()));
+                    children.extend(build_sound_container(
+                        sound.name(),
+                        ".WAV",
+                        file_id,
+                        builtin_description_id(sound),
+                        &wav_data,
+                    )?);
+                },
+                PlannedSound::Embedded { name, data } => {
+                    children.extend(build_sound_container(
+                        name,
+                        audio_extension(data)?,
+                        file_id,
+                        None,
+                        data,
+                    )?);
+                },
+            }
+        }
+
+        let mut container = RecordBuilder::new(0x0F, 5, PptRecordType::SoundCollection as u16);
+        container.write_data(&children);
+        Ok((container.build()?, mapping))
+    }
+
+    fn insert(&mut self, source_id: u32, sound: PlannedSound<'a>) -> Result<(), PptError> {
+        if source_id == 0 {
+            return invalid("sound resource IDs must be positive");
+        }
+        if let Some(existing) = self.sounds.get(&source_id) {
+            if existing != &sound {
+                return invalid(format!(
+                    "sound resource ID {source_id} has conflicting definitions"
+                ));
+            }
+            return Ok(());
+        }
+        if self.sounds.len() >= self.limits.max_sounds {
+            return invalid("sound collection exceeds the configured sound count");
+        }
+        if let PlannedSound::Embedded { data, .. } = sound {
+            self.aggregate_sound_bytes = self
+                .aggregate_sound_bytes
+                .checked_add(data.len())
+                .ok_or_else(|| invalid_error("sound collection byte count overflows"))?;
+            if self.aggregate_sound_bytes > self.limits.max_aggregate_sound_bytes {
+                return invalid("sound collection exceeds the configured aggregate byte limit");
+            }
+        }
+        self.sounds.insert(source_id, sound);
+        Ok(())
+    }
+
+    fn validate_name(&self, name: &str) -> Result<(), PptError> {
+        let units = name.encode_utf16().count();
+        if units == 0 || units > self.limits.max_name_units {
+            return invalid("embedded sound name is empty or exceeds the configured limit");
+        }
+        if name.chars().any(char::is_control) {
+            return invalid("embedded sound name contains a control character");
+        }
+        Ok(())
+    }
+
+    fn validate_audio(&self, data: &[u8]) -> Result<(), PptError> {
+        if data.len() > self.limits.max_sound_bytes {
+            return invalid("embedded sound exceeds the configured byte limit");
+        }
+        let _ = audio_extension(data)?;
+        Ok(())
     }
 }
 
@@ -133,7 +287,7 @@ fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, PptError> {
     atom.build()
 }
 
-/// Build a Sound container with embedded WAV data.
+/// Build a Sound container with embedded WAV or AIFF data.
 ///
 /// Structure per LibreOffice `pptexsoundcollection.cxx` `ExSoundEntry::Write`:
 /// - Sound container (0x0F, type 0x07E6)
@@ -141,21 +295,31 @@ fn write_cstring(instance: u16, text: &str) -> Result<Vec<u8>, PptError> {
 ///   - CString (instance 1): extension (".wav")
 ///   - CString (instance 2): reference ID string — matched by `AnimationInfoAtom.nSoundRef`
 ///   - SoundData (type 0x07E7): actual WAV binary data
-fn build_sound_container(name: &str, ref_id: u32, wav_data: &[u8]) -> Result<Vec<u8>, PptError> {
+fn build_sound_container(
+    name: &str,
+    extension: &str,
+    ref_id: u32,
+    builtin_id: Option<crate::ppt::PowerPointBuiltinSoundId>,
+    sound_data: &[u8],
+) -> Result<Vec<u8>, PptError> {
     let mut children = Vec::new();
 
     // CString instance 0 — sound name
     children.extend(write_cstring(0, name)?);
 
-    // CString instance 1 — file extension
-    children.extend(write_cstring(1, ".WAV")?);
+    // CString instance 1 — four-code-unit file extension
+    children.extend(write_cstring(1, extension)?);
 
     // CString instance 2 — reference ID (matched against AnimationInfoAtom.nSoundRef)
     children.extend(write_cstring(2, &ref_id.to_string())?);
 
-    // SoundData atom with actual WAV binary data
+    if let Some(builtin_id) = builtin_id {
+        children.extend(write_cstring(3, &builtin_id.value().to_string())?);
+    }
+
+    // SoundData atom with actual WAV or AIFF binary data
     let mut data_atom = RecordBuilder::new(0x00, 0, PptRecordType::SoundData as u16);
-    data_atom.write_data(wav_data);
+    data_atom.write_data(sound_data);
     children.extend(data_atom.build()?);
 
     // Sound container
@@ -164,7 +328,7 @@ fn build_sound_container(name: &str, ref_id: u32, wav_data: &[u8]) -> Result<Vec
     container.build()
 }
 
-/// Build a SoundCollection container with embedded WAV data for each sound.
+/// Build a SoundCollection container for the selected built-in sounds.
 ///
 /// `AnimationInfoAtom.nSoundRef` is the 1-based index into this collection, which is
 /// matched against CString instance 2 of each Sound container (the reference ID string).
@@ -173,50 +337,56 @@ fn build_sound_container(name: &str, ref_id: u32, wav_data: &[u8]) -> Result<Vec
 pub fn build_sound_collection(
     sound_ids: &HashSet<u32>,
 ) -> Result<(Vec<u8>, HashMap<u32, u32>), PptError> {
-    if sound_ids.is_empty() {
-        return Ok((Vec::new(), HashMap::new()));
+    let mut builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
+    for sound_id in sound_ids {
+        builder.register_reference(*sound_id)?;
     }
+    builder.build()
+}
 
-    // Collect and sort built-in sound IDs (1-20)
-    let mut builtin_ids: Vec<u32> = sound_ids
-        .iter()
-        .filter(|&&id| id > 0 && id <= 20)
-        .copied()
-        .collect();
-
-    if builtin_ids.is_empty() {
-        return Ok((Vec::new(), HashMap::new()));
+fn audio_extension(data: &[u8]) -> Result<&'static str, PptError> {
+    if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WAVE" {
+        Ok(".WAV")
+    } else if data.len() >= 12 && &data[..4] == b"FORM" && matches!(&data[8..12], b"AIFF" | b"AIFC")
+    {
+        Ok(".AIF")
+    } else {
+        invalid("embedded sound is not a RIFF/WAVE or FORM/AIFF container")
     }
+}
 
-    builtin_ids.sort_unstable();
-
-    // Build mapping: original sound ID → 1-based collection ref ID
-    let mut id_to_ref = HashMap::new();
-    for (idx, &id) in builtin_ids.iter().enumerate() {
-        id_to_ref.insert(id, (idx + 1) as u32);
+fn builtin_description_id(sound: BuiltinSound) -> Option<crate::ppt::PowerPointBuiltinSoundId> {
+    use crate::ppt::PowerPointBuiltinSoundId as Id;
+    match sound {
+        BuiltinSound::Applause => Some(Id::Applause),
+        BuiltinSound::Arrow => Some(Id::Arrow),
+        BuiltinSound::Bomb => Some(Id::Bomb),
+        BuiltinSound::Breeze => Some(Id::Breeze),
+        BuiltinSound::Camera => Some(Id::Camera),
+        BuiltinSound::CashRegister => Some(Id::CashRegister),
+        BuiltinSound::Chime => Some(Id::Chime),
+        BuiltinSound::Click => Some(Id::Click),
+        BuiltinSound::Coin => Some(Id::Coin),
+        BuiltinSound::DrumRoll => Some(Id::DrumRoll),
+        BuiltinSound::Explosion => Some(Id::Explosion),
+        BuiltinSound::Hammer => Some(Id::Hammer),
+        BuiltinSound::Laser => Some(Id::Laser),
+        BuiltinSound::Push => Some(Id::Push),
+        BuiltinSound::Suction => Some(Id::Suction),
+        BuiltinSound::Swoosh => None,
+        BuiltinSound::Typewriter => Some(Id::Typewriter),
+        BuiltinSound::Voltage => Some(Id::Voltage),
+        BuiltinSound::Whoosh => Some(Id::Whoosh),
+        BuiltinSound::Wind => Some(Id::Wind),
     }
+}
 
-    let mut children = Vec::new();
+fn invalid<T>(message: impl Into<String>) -> Result<T, PptError> {
+    Err(invalid_error(message))
+}
 
-    // SoundCollectionAtom — contains count of sounds
-    let mut count_atom = RecordBuilder::new(0x00, 0, PptRecordType::SoundCollectionAtom as u16);
-    count_atom.write_data(&(builtin_ids.len() as u32).to_le_bytes());
-    children.extend(count_atom.build()?);
-
-    // Sound container for each built-in sound, WITH actual WAV data
-    for (idx, &id) in builtin_ids.iter().enumerate() {
-        let ref_id = (idx + 1) as u32;
-        let name = get_builtin_sound_name(id);
-        let freq = get_builtin_sound_freq(id);
-        let wav_data = generate_wav_tone(freq);
-        children.extend(build_sound_container(name, ref_id, &wav_data)?);
-    }
-
-    // SoundCollection container
-    let mut container = RecordBuilder::new(0x0F, 5, PptRecordType::SoundCollection as u16);
-    container.write_data(&children);
-
-    Ok((container.build()?, id_to_ref))
+fn invalid_error(message: impl Into<String>) -> PptError {
+    std::io::Error::new(std::io::ErrorKind::InvalidInput, message.into())
 }
 
 #[cfg(test)]
@@ -271,5 +441,36 @@ mod tests {
         assert_eq!(&wav[12..16], b"fmt ");
         // Total: 12 (RIFF header) + 24 (fmt chunk) + 8 (data header) + 1200 (samples)
         assert_eq!(wav.len(), 1244);
+    }
+
+    #[test]
+    fn planner_preserves_embedded_aiff_and_rejects_conflicts_and_limits() {
+        let aiff = b"FORM\x00\x00\x00\x04AIFF";
+        let embedded = SoundType::Embedded {
+            name: "Custom tone".to_string(),
+            data: aiff.to_vec(),
+        };
+        let conflicting = SoundType::Builtin(BuiltinSound::Click);
+        let mut builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
+        builder.register(42, &embedded).unwrap();
+        assert!(builder.register(42, &conflicting).is_err());
+
+        let mut builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
+        builder.register(42, &embedded).unwrap();
+        let (bytes, mapping) = builder.build().unwrap();
+        let (record, consumed) = crate::ppt::PptRecord::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        let collection = crate::ppt::PowerPointSoundCollection::parse(&record).unwrap();
+        assert_eq!(collection.sounds[0].id, mapping[&42]);
+        assert_eq!(collection.sounds[0].name, "Custom tone");
+        assert_eq!(collection.sounds[0].extension.as_deref(), Some(".AIF"));
+        assert_eq!(collection.sounds[0].data, aiff);
+
+        let mut limited = SoundCollectionBuilder::new(SoundCollectionLimits {
+            max_sound_bytes: aiff.len() - 1,
+            ..Default::default()
+        });
+        assert!(limited.register(42, &embedded).is_err());
+        assert!(limited.register_reference(42).is_err());
     }
 }

@@ -290,6 +290,45 @@ impl Presentation {
         PowerPointSoundCollection::parse(collection).map(Some)
     }
 
+    /// Validate every shape, text-range, and outline-text sound reference.
+    ///
+    /// This performs no audio decoding or playback. Null references are valid;
+    /// every non-null reference must resolve in the document SoundCollection.
+    pub fn validate_interaction_sound_references(&self) -> Result<()> {
+        let sounds = self.embedded_sounds()?;
+        let validate = |interaction: &crate::ppt::PowerPointInteraction| -> Result<()> {
+            if interaction.sound_id == 0 {
+                return Ok(());
+            }
+            let sounds = sounds.as_ref().ok_or_else(|| {
+                PptError::Corrupted(
+                    "interaction references a sound but the document has no SoundCollection"
+                        .to_string(),
+                )
+            })?;
+            interaction.validate_sound_collection(sounds)
+        };
+
+        for slide in self.slides()? {
+            for entry in slide.shape_interactions()? {
+                for interaction in &entry.interactions {
+                    validate(interaction)?;
+                }
+            }
+            for entry in slide.shape_text_interactions()? {
+                for interaction in &entry.interactions {
+                    validate(&interaction.interaction)?;
+                }
+            }
+            for body in slide.outline_text_interactions() {
+                for interaction in &body.interactions {
+                    validate(&interaction.interaction)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Return strictly validated inert audio/video metadata from `ExObjListContainer`.
     ///
     /// Paths are never accessed and embedded sound bytes are never decoded or played.

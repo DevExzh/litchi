@@ -90,26 +90,21 @@ pub fn write_animation_info(info: &AnimationInfo) -> Result<(Vec<u8>, u32)> {
     let atom = if let Some(atom) = &info.legacy_atom {
         atom.clone()
     } else {
-        let (fly_method, fly_direction, sound_ref, has_sound) = if let Some(ref build_list) =
-            info.build_list
+        let (fly_method, fly_direction, build_sound) = if let Some(ref build_list) = info.build_list
         {
             if let Some(first_build) = build_list.builds.first() {
                 let (method, dir) = map_effect_to_ppt97(first_build.effect, first_build.direction);
-                let (snd_ref, has_snd) = if let Some(ref sound) = first_build.sound {
-                    (sound.sound_ref, true)
-                } else {
-                    (0, false)
-                };
-                (method, dir, snd_ref, has_snd)
+                (method, dir, first_build.sound.as_ref())
             } else {
-                (0x00, 0, 0, false)
+                (0x00, 0, None)
             }
         } else {
-            (0x00, 0, 0, false)
+            (0x00, 0, None)
         };
+        let sound = info.sound.as_ref().or(build_sound);
         LegacyAnimationAtom {
-            has_sound,
-            sound_id_ref: sound_ref,
+            has_sound: sound.is_some(),
+            sound_id_ref: sound.map_or(0, |sound| sound.sound_ref),
             build_type: if info.has_animations() {
                 LegacyAnimationBuild::OneBuild
             } else {
@@ -2003,7 +1998,16 @@ fn serialize_raw_record(record: &crate::ppt::records::PptRecord) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ppt::animation::{ChartBuildAtom, ChartBuildType};
+    use crate::ppt::animation::{AnimationSound, BuiltinSound, ChartBuildAtom, ChartBuildType};
+
+    #[test]
+    fn animation_level_sound_is_serialized_without_a_build_list() {
+        let mut info = AnimationInfo::new();
+        info.sound = Some(AnimationSound::builtin(BuiltinSound::Whoosh));
+
+        let (_, sound_ref) = write_animation_info(&info).unwrap();
+        assert_eq!(sound_ref, BuiltinSound::Whoosh.id());
+    }
 
     #[test]
     fn test_write_build_list_empty() {

@@ -11,13 +11,83 @@ const MAX_AGGREGATE_SOUND_BYTES: usize = 256 * 1_048_576;
 const MAX_NAME_UNITS: usize = 1_024;
 const MAX_ID_DIGITS: usize = 10;
 
+/// MS-PPT `SoundBuiltinIdAtom` description values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u16)]
+pub enum PowerPointBuiltinSoundId {
+    CashRegister = 100,
+    Typewriter = 101,
+    ScreechingBrakes = 102,
+    Whoosh = 103,
+    Laser = 104,
+    Camera = 105,
+    Chime = 106,
+    Clapping = 107,
+    Applause = 108,
+    DriveBy = 109,
+    DrumRoll = 110,
+    Explosion = 111,
+    BreakingGlass = 112,
+    Gunshot = 113,
+    SlideProjector = 114,
+    Ricochet = 115,
+    Arrow = 116,
+    Bomb = 117,
+    Breeze = 118,
+    Click = 119,
+    Coin = 120,
+    Hammer = 121,
+    Push = 122,
+    Suction = 123,
+    Voltage = 124,
+    Wind = 125,
+}
+
+impl PowerPointBuiltinSoundId {
+    pub const fn value(self) -> u16 {
+        self as u16
+    }
+
+    fn parse(value: u16) -> Result<Self> {
+        match value {
+            100 => Ok(Self::CashRegister),
+            101 => Ok(Self::Typewriter),
+            102 => Ok(Self::ScreechingBrakes),
+            103 => Ok(Self::Whoosh),
+            104 => Ok(Self::Laser),
+            105 => Ok(Self::Camera),
+            106 => Ok(Self::Chime),
+            107 => Ok(Self::Clapping),
+            108 => Ok(Self::Applause),
+            109 => Ok(Self::DriveBy),
+            110 => Ok(Self::DrumRoll),
+            111 => Ok(Self::Explosion),
+            112 => Ok(Self::BreakingGlass),
+            113 => Ok(Self::Gunshot),
+            114 => Ok(Self::SlideProjector),
+            115 => Ok(Self::Ricochet),
+            116 => Ok(Self::Arrow),
+            117 => Ok(Self::Bomb),
+            118 => Ok(Self::Breeze),
+            119 => Ok(Self::Click),
+            120 => Ok(Self::Coin),
+            121 => Ok(Self::Hammer),
+            122 => Ok(Self::Push),
+            123 => Ok(Self::Suction),
+            124 => Ok(Self::Voltage),
+            125 => Ok(Self::Wind),
+            _ => corrupted("SoundBuiltinIdAtom is outside the specified value domain"),
+        }
+    }
+}
+
 /// One embedded sound. Its media payload borrows the PowerPoint document stream.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EmbeddedPowerPointSound<'a> {
     pub id: u32,
     pub name: String,
     pub extension: Option<String>,
-    pub builtin_id: Option<String>,
+    pub builtin_id: Option<PowerPointBuiltinSoundId>,
     pub data: &'a [u8],
 }
 
@@ -183,7 +253,14 @@ fn parse_sound(data: &[u8]) -> Result<EmbeddedPowerPointSound<'_>> {
 
     child = next_record(data, &mut offset, "SoundContainer")?;
     let builtin_id = if child.record_type == PptRecordType::CString as u16 && child.instance == 3 {
-        let value = parse_cstring(child, 3, "SoundBuiltinIdAtom", MAX_NAME_UNITS, true)?;
+        let value = parse_cstring(child, 3, "SoundBuiltinIdAtom", 3, false)?;
+        if value.len() != 3 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+            return corrupted("SoundBuiltinIdAtom must be a canonical three-digit integer");
+        }
+        let value = value.parse::<u16>().map_err(|_| {
+            PptError::Corrupted("SoundBuiltinIdAtom is outside the u16 range".to_string())
+        })?;
+        let value = PowerPointBuiltinSoundId::parse(value)?;
         child = next_record(data, &mut offset, "SoundContainer")?;
         Some(value)
     } else {
@@ -319,6 +396,20 @@ mod tests {
         record(0x0f, 0, PptRecordType::Sound, &data)
     }
 
+    fn sound_with_builtin(id: &str, builtin: &str) -> Vec<u8> {
+        let mut data = cstring(0, "tone.wav");
+        data.extend(cstring(1, ".WAV"));
+        data.extend(cstring(2, id));
+        data.extend(cstring(3, builtin));
+        data.extend(record(
+            0,
+            0,
+            PptRecordType::SoundData,
+            b"RIFF\x04\0\0\0WAVE",
+        ));
+        record(0x0f, 0, PptRecordType::Sound, &data)
+    }
+
     fn collection(seed: u32, sounds: &[Vec<u8>]) -> PptRecord {
         let mut data = record(
             0,
@@ -349,5 +440,15 @@ mod tests {
         );
         assert!(PowerPointSoundCollection::parse(&collection(1, &[sound("01")])).is_err());
         assert!(PowerPointSoundCollection::parse(&collection(1, &[sound("2")])).is_err());
+        assert!(
+            PowerPointSoundCollection::parse(&collection(1, &[sound_with_builtin("1", "099")]))
+                .is_err()
+        );
+        let valid_builtin = collection(1, &[sound_with_builtin("1", "119")]);
+        let parsed = PowerPointSoundCollection::parse(&valid_builtin).unwrap();
+        assert_eq!(
+            parsed.sounds[0].builtin_id,
+            Some(PowerPointBuiltinSoundId::Click)
+        );
     }
 }

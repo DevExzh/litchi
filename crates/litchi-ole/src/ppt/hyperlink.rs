@@ -234,6 +234,23 @@ impl PowerPointInteraction {
         Ok(self)
     }
 
+    /// Play one typed built-in sound when the interaction executes.
+    ///
+    /// The writer resolves this catalog ID to the document's emitted sound
+    /// identifier. Audio remains inert and is never played by the library.
+    pub fn with_builtin_sound(mut self, sound: crate::ppt::animation::BuiltinSound) -> Self {
+        self.sound_id = sound.id();
+        self.stop_sound = false;
+        self
+    }
+
+    /// Bind this interaction to an explicitly registered embedded sound.
+    pub fn with_sound_reference(mut self, sound_id: std::num::NonZeroU32) -> Self {
+        self.sound_id = sound_id.get();
+        self.stop_sound = false;
+        self
+    }
+
     /// Parse an `InteractiveInfo` click or mouse-over container.
     pub fn parse(record: &PptRecord) -> Result<Self> {
         Self::parse_with_limits(record, PowerPointInteractionLimits::default())
@@ -451,6 +468,28 @@ impl PowerPointInteraction {
         hyperlinks: &'a PowerPointHyperlinks,
     ) -> Option<&'a PowerPointHyperlink> {
         hyperlinks.get(self.hyperlink_id)
+    }
+
+    /// Resolve this action's embedded sound reference.
+    pub fn sound<'collection, 'data>(
+        &self,
+        sounds: &'collection crate::ppt::PowerPointSoundCollection<'data>,
+    ) -> Option<&'collection crate::ppt::EmbeddedPowerPointSound<'data>> {
+        sounds.get(self.sound_id)
+    }
+
+    /// Validate this action's non-null sound reference.
+    pub fn validate_sound_collection(
+        &self,
+        sounds: &crate::ppt::PowerPointSoundCollection<'_>,
+    ) -> Result<()> {
+        if self.sound_id != 0 && sounds.get(self.sound_id).is_none() {
+            return corrupted(format!(
+                "interaction references missing sound ID {}",
+                self.sound_id
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn parse_client_data_payload(

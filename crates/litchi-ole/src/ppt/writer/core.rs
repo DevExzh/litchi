@@ -81,7 +81,7 @@ use crate::ppt::modify_password::{
 use crate::ppt::view_info::{PowerPointSlideViewInfo, PowerPointViewKind};
 use litchi_cfb::writer::OleWriter;
 use litchi_core::unit::pt_to_emu_i32;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use zeroize::Zeroizing;
 
 /// Error type for PPT writing
@@ -445,6 +445,86 @@ impl WritableSlide {
     }
 }
 
+fn build_writer_sound_collection(
+    slides: &[WritableSlide],
+    sound_resources: &BTreeMap<u32, crate::ppt::animation::SoundType>,
+) -> Result<(Vec<u8>, HashMap<u32, u32>), PptWriteError> {
+    let mut builder = super::sound_collection::SoundCollectionBuilder::new(
+        super::sound_collection::SoundCollectionLimits::default(),
+    );
+
+    // Register explicit resources before resolving raw action/legacy references,
+    // so an interaction can share a non-built-in embedded animation sound.
+    for (sound_id, sound_type) in sound_resources {
+        builder
+            .register(*sound_id, sound_type)
+            .map_err(sound_collection_error)?;
+    }
+    for slide in slides {
+        for shape in &slide.shapes {
+            let Some(animation) = &shape.animation_info else {
+                continue;
+            };
+            if let Some(sound) = &animation.sound {
+                builder
+                    .register(sound.sound_ref, &sound.sound_type)
+                    .map_err(sound_collection_error)?;
+            }
+            if let Some(builds) = &animation.build_list {
+                for build in &builds.builds {
+                    if let Some(sound) = &build.sound {
+                        builder
+                            .register(sound.sound_ref, &sound.sound_type)
+                            .map_err(sound_collection_error)?;
+                    }
+                }
+            }
+        }
+    }
+
+    for slide in slides {
+        for shape in &slide.shapes {
+            if let Some(animation) = &shape.animation_info {
+                if let Some(atom) = &animation.legacy_atom {
+                    builder
+                        .register_reference(atom.sound_id_ref)
+                        .map_err(sound_collection_error)?;
+                }
+                if let Some(sound) = &animation.sound {
+                    builder
+                        .register_reference(sound.sound_ref)
+                        .map_err(sound_collection_error)?;
+                }
+                if let Some(builds) = &animation.build_list {
+                    for build in &builds.builds {
+                        if let Some(sound) = &build.sound {
+                            builder
+                                .register_reference(sound.sound_ref)
+                                .map_err(sound_collection_error)?;
+                        }
+                    }
+                }
+            }
+            for interaction in &shape.properties.interactions {
+                builder
+                    .register_reference(interaction.sound_id)
+                    .map_err(sound_collection_error)?;
+            }
+            for interaction in &shape.properties.text_interactions {
+                builder
+                    .register_reference(interaction.interaction.sound_id)
+                    .map_err(sound_collection_error)?;
+            }
+        }
+    }
+
+    builder.build().map_err(sound_collection_error)
+}
+
+fn sound_collection_error(error: std::io::Error) -> PptWriteError {
+    PptWriteError::InvalidData(error.to_string())
+}
+
 fn append_child_to_built_container(
     container: &mut Vec<u8>,
     child: &[u8],
@@ -490,9 +570,18 @@ fn shape_type_to_escher(shape_type: ShapeType) -> u16 {
 }
 
 /// Convert WritableShape to UserShapeData for Escher serialization
+#[cfg(test)]
 fn convert_shape_to_escher(
     shape: &WritableShape,
     hyperlinks: &HyperlinkCollection,
+) -> UserShapeData {
+    convert_shape_to_escher_with_sound_mapping(shape, hyperlinks, &HashMap::new())
+}
+
+fn convert_shape_to_escher_with_sound_mapping(
+    shape: &WritableShape,
+    hyperlinks: &HyperlinkCollection,
+    sound_id_mapping: &HashMap<u32, u32>,
 ) -> UserShapeData {
     let props = &shape.properties;
 
@@ -599,6 +688,31 @@ fn convert_shape_to_escher(
         props.text.clone()
     };
 
+    let mut interactions = props.interactions.clone();
+    for interaction in &mut interactions {
+        remap_sound_reference(&mut interaction.sound_id, sound_id_mapping);
+    }
+    let mut text_interactions = props.text_interactions.clone();
+    for interaction in &mut text_interactions {
+        remap_sound_reference(&mut interaction.interaction.sound_id, sound_id_mapping);
+    }
+    let mut animation_info = shape.animation_info.clone();
+    if let Some(animation) = &mut animation_info {
+        if let Some(atom) = &mut animation.legacy_atom {
+            remap_sound_reference(&mut atom.sound_id_ref, sound_id_mapping);
+        }
+        if let Some(sound) = &mut animation.sound {
+            remap_sound_reference(&mut sound.sound_ref, sound_id_mapping);
+        }
+        if let Some(builds) = &mut animation.build_list {
+            for build in &mut builds.builds {
+                if let Some(sound) = &mut build.sound {
+                    remap_sound_reference(&mut sound.sound_ref, sound_id_mapping);
+                }
+            }
+        }
+    }
+
     UserShapeData {
         shape_type: shape_type_to_escher(props.shape_type),
         x: props.x,
@@ -638,16 +752,22 @@ fn convert_shape_to_escher(
         hyperlink_action: get_hyperlink_info(props.hyperlink_id, hyperlinks).0,
         hyperlink_jump: get_hyperlink_info(props.hyperlink_id, hyperlinks).1,
         hyperlink_type: get_hyperlink_info(props.hyperlink_id, hyperlinks).2,
-        interactions: props.interactions.clone(),
-        text_interactions: props.text_interactions.clone(),
+        interactions,
+        text_interactions,
         picture_index: props.picture_index,
         freeform_geometry: props.freeform_geometry.clone(),
-        animation_info: shape.animation_info.clone(),
+        animation_info,
         shadow_color,
         shadow_offset_x,
         shadow_offset_y,
         shadow_opacity,
         shadow_type,
+    }
+}
+
+fn remap_sound_reference(sound_id: &mut u32, mapping: &HashMap<u32, u32>) {
+    if let Some(mapped) = mapping.get(sound_id) {
+        *sound_id = *mapped;
     }
 }
 
@@ -790,6 +910,10 @@ pub struct PptWriter {
     hyperlinks: HyperlinkCollection,
     /// Font collection
     fonts: Vec<FontEntity>,
+    /// Explicit embedded sound resources keyed by writer-local IDs.
+    sound_resources: BTreeMap<u32, crate::ppt::animation::SoundType>,
+    /// Next writer-local sound ID; built-in catalog IDs occupy 1 through 20.
+    next_sound_resource_id: u32,
     /// Custom slide shows (named shows)
     custom_shows: Vec<CustomShow>,
     /// Document-wide PowerPoint 11 smart-tag property bags.
@@ -857,6 +981,8 @@ impl PptWriter {
             blip_store: BlipStoreBuilder::new(),
             hyperlinks: HyperlinkCollection::new(),
             fonts: vec![FontEntity::arial()], // Default font
+            sound_resources: BTreeMap::new(),
+            next_sound_resource_id: 21,
             custom_shows: Vec::new(),
             smart_tags: Vec::new(),
             slide_view_info: None,
@@ -2310,6 +2436,84 @@ impl PptWriter {
         self.fonts.len()
     }
 
+    /// Register an exact embedded WAV or AIFF resource for interactions or animations.
+    ///
+    /// Validation is atomic. The returned non-zero writer-local ID can be
+    /// passed to [`crate::ppt::PowerPointInteraction::with_sound_reference`].
+    pub fn add_embedded_sound(
+        &mut self,
+        name: impl Into<String>,
+        data: Vec<u8>,
+    ) -> Result<std::num::NonZeroU32, PptWriteError> {
+        if self.sound_resources.len()
+            >= super::sound_collection::SoundCollectionLimits::default().max_sounds
+        {
+            return Err(PptWriteError::InvalidData(
+                "sound collection exceeds the configured sound count".to_string(),
+            ));
+        }
+        let next = self
+            .next_sound_resource_id
+            .checked_add(1)
+            .ok_or_else(|| PptWriteError::InvalidData("sound resource ID overflow".to_string()))?;
+        let id = std::num::NonZeroU32::new(self.next_sound_resource_id)
+            .expect("writer sound IDs start above zero");
+        let sound_type = crate::ppt::animation::SoundType::Embedded {
+            name: name.into(),
+            data,
+        };
+        let mut validator = super::sound_collection::SoundCollectionBuilder::new(
+            super::sound_collection::SoundCollectionLimits::default(),
+        );
+        validator
+            .register(id.get(), &sound_type)
+            .map_err(sound_collection_error)?;
+
+        self.sound_resources.insert(id.get(), sound_type);
+        self.next_sound_resource_id = next;
+        Ok(id)
+    }
+
+    /// Atomically replace one explicitly registered embedded sound.
+    pub fn replace_embedded_sound(
+        &mut self,
+        id: std::num::NonZeroU32,
+        name: impl Into<String>,
+        data: Vec<u8>,
+    ) -> Result<(), PptWriteError> {
+        if !self.sound_resources.contains_key(&id.get()) {
+            return Err(PptWriteError::InvalidData(format!(
+                "sound resource {} does not exist",
+                id
+            )));
+        }
+        let sound_type = crate::ppt::animation::SoundType::Embedded {
+            name: name.into(),
+            data,
+        };
+        let mut validator = super::sound_collection::SoundCollectionBuilder::new(
+            super::sound_collection::SoundCollectionLimits::default(),
+        );
+        validator
+            .register(id.get(), &sound_type)
+            .map_err(sound_collection_error)?;
+        self.sound_resources.insert(id.get(), sound_type);
+        Ok(())
+    }
+
+    /// Remove one explicit sound resource.
+    ///
+    /// Any remaining reference to this ID causes serialization to fail rather
+    /// than producing a dangling `SoundIdRef`.
+    pub fn remove_embedded_sound(&mut self, id: std::num::NonZeroU32) -> bool {
+        self.sound_resources.remove(&id.get()).is_some()
+    }
+
+    /// Number of explicitly registered embedded sound resources.
+    pub fn embedded_sound_count(&self) -> usize {
+        self.sound_resources.len()
+    }
+
     /// Add a comment to a slide.
     ///
     /// # Arguments
@@ -2583,44 +2787,11 @@ impl PptWriter {
             doc_container.write_child(&ex_obj_list);
         }
 
-        // 2.5.3) SoundCollection with embedded WAV data
-        // Collect all sound IDs referenced by animations
-        let mut sound_ids = std::collections::HashSet::new();
-        for slide in &self.slides {
-            for shape in &slide.shapes {
-                if let Some(ref anim_info) = shape.animation_info
-                    && let Some(ref build_list) = anim_info.build_list
-                {
-                    for build in &build_list.builds {
-                        if let Some(ref sound) = build.sound {
-                            sound_ids.insert(sound.sound_ref);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Build SoundCollection with actual WAV data and get ID→ref mapping
-        let (sound_collection, sound_id_mapping) = super::build_sound_collection(&sound_ids)?;
+        // 2.5.3) SoundCollection for animation, shape, and text-action references.
+        let (sound_collection, sound_id_mapping) =
+            build_writer_sound_collection(&self.slides, &self.sound_resources)?;
         if !sound_collection.is_empty() {
             doc_container.write_child(&sound_collection);
-        }
-
-        // Remap soundRef in animations to match CString instance 2 in SoundCollection
-        for slide in &mut self.slides {
-            for shape in &mut slide.shapes {
-                if let Some(ref mut anim_info) = shape.animation_info
-                    && let Some(ref mut build_list) = anim_info.build_list
-                {
-                    for build in &mut build_list.builds {
-                        if let Some(ref mut sound) = build.sound
-                            && let Some(&mapped_ref) = sound_id_mapping.get(&sound.sound_ref)
-                        {
-                            sound.sound_ref = mapped_ref;
-                        }
-                    }
-                }
-            }
         }
 
         // 2.5.4) NamedShows (custom slide shows) in Document container
@@ -2688,7 +2859,13 @@ impl PptWriter {
             let escher_shapes: Vec<UserShapeData> = slide
                 .shapes
                 .iter()
-                .map(|s| convert_shape_to_escher(s, &self.hyperlinks))
+                .map(|s| {
+                    convert_shape_to_escher_with_sound_mapping(
+                        s,
+                        &self.hyperlinks,
+                        &sound_id_mapping,
+                    )
+                })
                 .collect();
             // Chart frames referencing this slide's embedded chart objects
             let chart_frames: Vec<super::chart::ChartFrame> = chart_plans
@@ -2990,43 +3167,11 @@ impl PptWriter {
             doc_container.write_child(&ex_obj_list);
         }
 
-        // SoundCollection with embedded WAV data
-        let mut sound_ids = std::collections::HashSet::new();
-        for slide in &self.slides {
-            for shape in &slide.shapes {
-                if let Some(ref anim_info) = shape.animation_info
-                    && let Some(ref build_list) = anim_info.build_list
-                {
-                    for build in &build_list.builds {
-                        if let Some(ref sound) = build.sound {
-                            sound_ids.insert(sound.sound_ref);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Build SoundCollection with actual WAV data and get ID→ref mapping
-        let (sound_collection, sound_id_mapping) = super::build_sound_collection(&sound_ids)?;
+        // SoundCollection for animation, shape, and text-action references.
+        let (sound_collection, sound_id_mapping) =
+            build_writer_sound_collection(&self.slides, &self.sound_resources)?;
         if !sound_collection.is_empty() {
             doc_container.write_child(&sound_collection);
-        }
-
-        // Remap soundRef in animations to match CString instance 2 in SoundCollection
-        for slide in &mut self.slides {
-            for shape in &mut slide.shapes {
-                if let Some(ref mut anim_info) = shape.animation_info
-                    && let Some(ref mut build_list) = anim_info.build_list
-                {
-                    for build in &mut build_list.builds {
-                        if let Some(ref mut sound) = build.sound
-                            && let Some(&mapped_ref) = sound_id_mapping.get(&sound.sound_ref)
-                        {
-                            sound.sound_ref = mapped_ref;
-                        }
-                    }
-                }
-            }
         }
 
         // NamedShows (custom slide shows) in Document container
@@ -3080,7 +3225,13 @@ impl PptWriter {
             let escher_shapes: Vec<UserShapeData> = slide
                 .shapes
                 .iter()
-                .map(|s| convert_shape_to_escher(s, &self.hyperlinks))
+                .map(|s| {
+                    convert_shape_to_escher_with_sound_mapping(
+                        s,
+                        &self.hyperlinks,
+                        &sound_id_mapping,
+                    )
+                })
                 .collect();
             // Chart frames referencing this slide's embedded chart objects
             let chart_frames: Vec<super::chart::ChartFrame> = chart_plans
