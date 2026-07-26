@@ -56,7 +56,7 @@ conversion, fonts, and image conversion are optional.
 | ODF digital signatures | ✅ | ✅ | ✅ | Sign and verify package documents with RSA or ECDSA |
 | Core/extended/custom properties | ✅ | ✅ | ✅ | OOXML properties and OLE property-set editing; ODF metadata has its own model |
 | Spreadsheet formula evaluation | 🟡 | ✅ | N/A | Shared async evaluator for workbook-trait adapters; broad function set but not complete Excel semantics |
-| Equation parsing and conversion | 🟡 | ✅ | N/A | OMML/MTEF-to-LaTeX conversion plus semantic ODF MathML parsing; reverse conversion and layout are not implemented |
+| Equation parsing and conversion | 🟡 | ✅ | 🟡 | OMML/MTEF-to-LaTeX conversion, semantic ODF MathML parsing, and AST-to-OMML serialization covering fractions, radicals, scripts and pre-scripts, n-ary operators, delimiters, functions, limits, matrices/equation arrays, accents, bars, boxes, phantoms, group characters, and run properties, which makes `mtef_to_omml` a working conversion; LaTeX-to-AST parsing, OMML-to-MTEF, and layout are not implemented |
 | Markdown export | 🟡 | ✅ | ✅ | Document/presentation conversion with optional parallel processing; fidelity varies by source format |
 | Image conversion | 🟡 | ✅ | ✅ | Feature-gated EMF, WMF, and PICT conversion to common raster outputs |
 | Font discovery/embedding helpers | 🟡 | ✅ | ✅ | Feature-gated system-font lookup plus format-specific embedded-font models |
@@ -175,6 +175,7 @@ conversion, fonts, and image conversion are optional.
 | Threaded comments | ✅ | ✅ | ✅ | People, mentions, replies, resolution state, and graph-safe CRUD |
 | Images and drawing anchors | ✅ | ✅ | ✅ | Pictures, drawing resources, and worksheet anchors |
 | Arbitrary DrawingML shapes/text boxes | ✅ | ✅ | ✅ | Typed inert worksheet drawing inventory: two-cell/one-cell/absolute anchors with typed EMU coordinates, ~100 typed preset geometries, hidden/locked flags, text bodies with bodyPr properties and basic run formatting, connection shapes, nested groups, and inert legacy OLE object metadata; `xdr:sp` text-box shape authoring with anchors/bodyPr/runs round-trips through the inventory; group/connection-shape and styling authoring are not covered |
+| Custom shape geometry | ✅ | ✅ | ✅ | Typed `a:custGeom` adjust values, guides with a parsed formula model, XY/polar adjust handles, connection sites, text rectangle, and path lists over moveTo/lnTo/arcTo/quadBezTo/cubicBezTo/close commands with per-path fill/stroke/extrusion and width/height; authoring validates path structure and guide references, and geometry round-trips byte-identically through the parser |
 | Hyperlinks | ✅ | ✅ | ✅ | Internal/external links and tooltips |
 | Auto-filter and sort state | ✅ | ✅ | ✅ | Values, custom/dynamic/color/icon filters, Top10, and multi-key sorts |
 | Sparklines | ✅ | ✅ | ✅ | Groups, axes, colors, and extension markup |
@@ -317,7 +318,7 @@ conversion, fonts, and image conversion are optional.
 | Data validation | ✅ | ✅ | ✅ | Validation collections, prompts, and ranges |
 | Hyperlinks | ✅ | ✅ | ✅ | URL, file, and internal monikers |
 | Comments/notes | ✅ | ✅ | ✅ | NOTE/OBJ/TXO text and object records |
-| Images and primitive drawing shapes | 🟡 | ✅ | ✅ | OfficeArt extraction plus bounded primitive shape CRUD |
+| Images and primitive drawing shapes | 🟡 | ✅ | ✅ | OfficeArt extraction plus bounded primitive shape CRUD; `add_shape_group`/`remove_shape_group` author `SpgrContainer` groups with an explicit child coordinate space, per-child child anchors, collision-free OBJ identifiers, and the spec-required ftGmo group record, and groups reparse through the existing group-aware reader |
 | Charts and chart sheets | 🟡 | ✅ | ✅ | Typed embedded/chart-sheet substreams and transactional CRUD; no renderer |
 | Pivot tables and caches | ✅ | ✅ | ✅ | Cache values, grouping, fields, filters, and view/editor support |
 | Structured tables/ListObjects | ✅ | ✅ | ✅ | ListObject, AutoFilter12, web/XML, and external-source metadata |
@@ -455,7 +456,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Comments/annotations | ✅ | ✅ | ✅ | Rich text/lists, creator/date, geometry, extensions, and CRUD |
 | Hyperlinks | ✅ | ✅ | ✅ | Typed inert `text:a` anchors preserve and author non-overlapping UTF-8 ranges across namespace-aware mixed paragraph trees, retaining spans, fields, whitespace, extension nodes, and XLink/office/text metadata; links are never followed |
 | Images | ✅ | ✅ | ✅ | Sheet image resources, alternatives, and mutation |
-| General drawing shapes | 🟡 | ✅ | 🟡 | Semantic frames/shapes with bounded authoring compared with ODG/ODP |
+| General drawing shapes | ✅ | ✅ | ✅ | `table:shapes` drawing shapes reuse the shared ODG/ODP shape model: rectangles, ellipses, lines, polylines, polygons, paths, connectors, measures, captions, custom shapes with enhanced geometry (equations and handles), groups with nested children, and frames/text boxes. `SheetShape` pairs each shape with a validated ODS `SheetShapeAnchor` (`table:end-cell-address`, `table:end-x`, `table:end-y`, `table:table-background`); builder and mutable APIs add/insert/replace/remove shapes, and both writers emit `table:shapes` in the ODF 1.3 position ahead of the column and row groups |
 | Embedded charts | ✅ | ✅ | ✅ | Chart add, replace, and remove with package or inline storage |
 | Embedded objects | 🟡 | ✅ | 🟡 | Semantic discovery and resource replacement/removal; payloads remain inert |
 | Database ranges, filters, and sorts | ✅ | ✅ | ✅ | Recursive filters, sort keys, subtotals, and inert query/source metadata |

@@ -94,6 +94,7 @@ pub(crate) mod parser;
 mod protection;
 mod row;
 mod scenario;
+mod shape;
 mod sheet;
 mod sheet_image;
 mod source;
@@ -148,6 +149,7 @@ pub use protection::{
 };
 pub use row::Row;
 pub use scenario::SheetScenario;
+pub use shape::{SheetShape, SheetShapeAnchor};
 pub use sheet::Sheet;
 pub use source::{CellRangeSource, SheetTableSource, TableSourceMode};
 pub use spreadsheet::Spreadsheet;

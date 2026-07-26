@@ -37,6 +37,8 @@ pub struct Sheet {
     pub scenario: Option<SheetScenario>,
     /// Inert images anchored in the sheet's `table:shapes` container.
     pub images: Vec<crate::OdfImage>,
+    /// General drawing shapes anchored in the sheet's `table:shapes` container.
+    pub shapes: Vec<super::SheetShape>,
     /// Sheet protection metadata and edit permissions.
     pub protection: SheetProtection,
 }
@@ -107,6 +109,11 @@ impl Sheet {
         &self.images
     }
 
+    /// Get general drawing shapes anchored at sheet level.
+    pub fn shapes(&self) -> &[super::SheetShape] {
+        &self.shapes
+    }
+
     /// Get the number of rows in the sheet.
     ///
     /// Returns the total number of rows, including empty rows.
@@ -149,6 +156,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![],
@@ -172,6 +180,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: SheetProtection::default(),
             name: "Test Sheet".to_string(),
             rows: vec![],
@@ -193,6 +202,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -231,6 +241,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: SheetProtection::default(),
             name: "Sheet1".to_string(),
             rows: vec![
@@ -360,6 +371,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: SheetProtection::default(),
             name: "Empty".to_string(),
             rows: vec![],
@@ -381,6 +393,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: SheetProtection::default(),
             name: "Data".to_string(),
             rows: vec![
@@ -499,6 +512,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: SheetProtection::default(),
             name: "Original".to_string(),
             rows: vec![],

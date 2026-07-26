@@ -242,6 +242,9 @@ pub enum DrawingAttributeNamespace {
     Svg,
     /// OpenDocument 3D namespace (`dr3d:*`).
     Dr3d,
+    /// OpenDocument table namespace (`table:*`), used by spreadsheet
+    /// shape anchoring attributes such as `table:end-cell-address`.
+    Table,
 }
 
 impl DrawingAttributeNamespace {
@@ -250,6 +253,7 @@ impl DrawingAttributeNamespace {
             Self::Drawing => "draw",
             Self::Svg => "svg",
             Self::Dr3d => "dr3d",
+            Self::Table => "table",
         }
     }
 }

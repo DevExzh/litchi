@@ -27,7 +27,7 @@ use crate::ods::{
     scenario::{validate_scenario, write_sheet_preamble},
     sheet_image::{
         MAX_IMAGES_PER_SHEET, append_sheet_image_alternative, insert_sheet_image_alternative,
-        normalize_sheet_image, remove_sheet_image_alternative, write_sheet_images,
+        normalize_sheet_image, remove_sheet_image_alternative,
     },
     source::validate_table_source,
     structure::{
@@ -843,6 +843,7 @@ impl MutableSpreadsheet {
             dde_source: None,
             scenario: None,
             images: Vec::new(),
+            shapes: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
         };
         self.sheets.push(sheet);
@@ -1937,6 +1938,100 @@ impl MutableSpreadsheet {
         )
     }
 
+    /// Return the general drawing shapes anchored at sheet level.
+    pub fn sheet_shapes(&self, sheet_index: usize) -> Result<&[crate::ods::SheetShape]> {
+        let sheet = self.sheets.get(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok(&sheet.shapes)
+    }
+
+    /// Add a general drawing shape to a sheet's `table:shapes` container.
+    ///
+    /// The shape is inert authoring metadata: styles it references are not
+    /// resolved and geometry is not rendered. Picture and embedded-object
+    /// frames must use their dedicated APIs instead.
+    pub fn add_sheet_shape(
+        &mut self,
+        sheet_index: usize,
+        shape: crate::ods::SheetShape,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        if sheet.shapes.len() >= super::shape::MAX_SHAPES_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "sheet exceeds {} drawing shapes",
+                super::shape::MAX_SHAPES_PER_SHEET
+            )));
+        }
+        super::shape::validate_sheet_shape(&shape)?;
+        sheet.shapes.push(shape);
+        Ok(())
+    }
+
+    /// Insert a general drawing shape at a sheet-local shape index.
+    pub fn insert_sheet_shape(
+        &mut self,
+        sheet_index: usize,
+        shape_index: usize,
+        shape: crate::ods::SheetShape,
+    ) -> Result<()> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        if shape_index > sheet.shapes.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "Sheet shape index {shape_index} out of bounds"
+            )));
+        }
+        if sheet.shapes.len() >= super::shape::MAX_SHAPES_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "sheet exceeds {} drawing shapes",
+                super::shape::MAX_SHAPES_PER_SHEET
+            )));
+        }
+        super::shape::validate_sheet_shape(&shape)?;
+        sheet.shapes.insert(shape_index, shape);
+        Ok(())
+    }
+
+    /// Replace a general drawing shape at a sheet-local shape index.
+    pub fn set_sheet_shape(
+        &mut self,
+        sheet_index: usize,
+        shape_index: usize,
+        shape: crate::ods::SheetShape,
+    ) -> Result<crate::ods::SheetShape> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        let slot = sheet.shapes.get_mut(shape_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!(
+                "Sheet shape index {shape_index} out of bounds"
+            ))
+        })?;
+        super::shape::validate_sheet_shape(&shape)?;
+        Ok(std::mem::replace(slot, shape))
+    }
+
+    /// Remove a general drawing shape from a sheet.
+    pub fn remove_sheet_shape(
+        &mut self,
+        sheet_index: usize,
+        shape_index: usize,
+    ) -> Result<crate::ods::SheetShape> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        if shape_index >= sheet.shapes.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "Sheet shape index {shape_index} out of bounds"
+            )));
+        }
+        Ok(sheet.shapes.remove(shape_index))
+    }
+
     /// Merge a rectangular cell range in a sheet.
     pub fn merge_cells(
         &mut self,
@@ -2126,6 +2221,8 @@ impl MutableSpreadsheet {
                 sheet.scenario.as_ref(),
             )?;
             write_sheet_options(&mut body, &sheet.protection.options);
+            // ODF 1.3 orders `table:shapes` ahead of the column and row groups.
+            super::shape::write_table_shapes(&mut body, &sheet.images, &sheet.shapes)?;
 
             let total_columns = Self::sheet_max_cols(sheet).max(sheet.columns.len()).max(1);
             write_table_structure(
@@ -2156,8 +2253,6 @@ impl MutableSpreadsheet {
                     }
                 },
             )?;
-
-            write_sheet_images(&mut body, &sheet.images)?;
 
             write_named_definitions(
                 &mut body,
@@ -2194,7 +2289,18 @@ impl MutableSpreadsheet {
         out.push_str(of_ns);
         let has_annotations = self.has_annotations();
         let has_hyperlinks = self.has_hyperlinks();
-        let has_sheet_images = self.sheets.iter().any(|sheet| !sheet.images.is_empty());
+        let has_sheet_drawings = self
+            .sheets
+            .iter()
+            .any(|sheet| !sheet.images.is_empty() || !sheet.shapes.is_empty());
+        let has_3d_shapes = self
+            .sheets
+            .iter()
+            .any(|sheet| super::shape::sheet_shapes_use_3d(&sheet.shapes));
+        let has_shape_event_listeners = self
+            .sheets
+            .iter()
+            .any(|sheet| super::shape::sheet_shapes_have_event_listeners(&sheet.shapes));
         let has_validation_event_listeners = self.has_validation_event_listeners();
         let has_table_sources = self.sheets.iter().any(|sheet| {
             sheet.table_source.is_some()
@@ -2218,15 +2324,18 @@ impl MutableSpreadsheet {
         if self.tracked_changes.is_some() && !has_annotations {
             out.push_str(r#" xmlns:dc="http://purl.org/dc/elements/1.1/""#);
         }
-        if has_sheet_images && !has_annotations {
+        if has_sheet_drawings && !has_annotations {
             out.push_str(r#" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink""#);
         }
-        if has_validation_event_listeners {
+        if has_3d_shapes {
+            out.push_str(r#" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0""#);
+        }
+        if has_validation_event_listeners || has_shape_event_listeners {
             out.push_str(r#" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0""#);
         }
         if (has_validation_event_listeners || has_table_sources || has_hyperlinks)
             && !has_annotations
-            && !has_sheet_images
+            && !has_sheet_drawings
         {
             out.push_str(r#" xmlns:xlink="http://www.w3.org/1999/xlink""#);
         }
@@ -2244,15 +2353,18 @@ impl MutableSpreadsheet {
             if self.tracked_changes.is_some() && !has_annotations {
                 declared.push("dc");
             }
-            if has_sheet_images && !has_annotations {
+            if has_sheet_drawings && !has_annotations {
                 declared.extend(["draw", "svg", "xlink"]);
             }
-            if has_validation_event_listeners {
+            if has_3d_shapes {
+                declared.push("dr3d");
+            }
+            if has_validation_event_listeners || has_shape_event_listeners {
                 declared.extend(["script", "presentation"]);
             }
             if (has_validation_event_listeners || has_table_sources || has_hyperlinks)
                 && !has_annotations
-                && !has_sheet_images
+                && !has_sheet_drawings
             {
                 declared.push("xlink");
             }

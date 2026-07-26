@@ -248,12 +248,11 @@ pub(crate) fn remove_sheet_image_alternative(
     Ok(removed)
 }
 
-pub(crate) fn write_sheet_images(out: &mut String, images: &[crate::OdfImage]) -> Result<()> {
+pub(crate) fn write_sheet_images_content(out: &mut String, images: &[crate::OdfImage]) -> Result<()> {
     if images.is_empty() {
         return Ok(());
     }
     validate_sheet_images(images)?;
-    out.push_str("<table:shapes>");
     for (index, image) in images.iter().enumerate() {
         let frame = image.frame.as_ref().expect("validated frame");
         if image.alternative_index == 0 {
@@ -308,7 +307,6 @@ pub(crate) fn write_sheet_images(out: &mut String, images: &[crate::OdfImage]) -
             out.push_str("</draw:frame>");
         }
     }
-    out.push_str("</table:shapes>");
     Ok(())
 }
 
@@ -322,7 +320,7 @@ fn attribute(out: &mut String, name: &str, value: Option<&str>) {
     }
 }
 
-fn validate_length(value: &str, name: &str, nonnegative: bool) -> Result<()> {
+pub(crate) fn validate_length(value: &str, name: &str, nonnegative: bool) -> Result<()> {
     validate_text(value, name, false)?;
     let number = ["cm", "mm", "in", "pt", "pc", "px"]
         .into_iter()
@@ -337,7 +335,7 @@ fn validate_length(value: &str, name: &str, nonnegative: bool) -> Result<()> {
     Ok(())
 }
 
-fn validate_text(value: &str, name: &str, allow_empty: bool) -> Result<()> {
+pub(crate) fn validate_text(value: &str, name: &str, allow_empty: bool) -> Result<()> {
     if !allow_empty && value.is_empty() {
         return invalid(format!("{name} cannot be empty"));
     }
@@ -391,11 +389,11 @@ mod tests {
             image(1, "Pictures/fallback.png"),
         ];
         let mut xml = String::new();
-        write_sheet_images(&mut xml, &images).unwrap();
+        write_sheet_images_content(&mut xml, &images).unwrap();
         assert_eq!(xml.matches("<draw:frame").count(), 1);
         assert_eq!(xml.matches("<draw:image").count(), 2);
         assert!(xml.find("vector.svg").unwrap() < xml.find("fallback.png").unwrap());
-        assert!(xml.ends_with("</draw:frame></table:shapes>"));
+        assert!(xml.ends_with("</draw:frame>"));
     }
 
     #[test]

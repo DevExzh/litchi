@@ -71,10 +71,21 @@ enum ShapeElement {
     ThreeDimensionalRotate,
 }
 
+/// Container scope that supplies top-level drawing shapes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ShapeContainerScope {
+    /// `draw:page` elements in presentations and drawings.
+    DrawPages,
+    /// `table:shapes` children of top-level spreadsheet tables.
+    SpreadsheetTables,
+}
+
 #[derive(Clone, Copy)]
 enum OdpElement {
     Page,
     Notes,
+    SheetShapes,
+    SpreadsheetRoot,
     Shape(ShapeElement),
     Image,
     Table,
@@ -250,6 +261,17 @@ impl OdpParser {
         matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
     }
 
+    /// Rewinds the running element depth for a subtree consumed in place.
+    ///
+    /// Nested parsers such as [`Self::parse_enhanced_geometry`] read through
+    /// their own element's `Event::End`, so the main event loop never observes
+    /// it and would otherwise keep counting that element as open. Spreadsheet
+    /// `table:shapes` container tracking compares depths exactly, so the
+    /// increment taken on `Event::Start` has to be given back here.
+    const fn rewind_consumed_subtree(element_depth: usize) -> usize {
+        element_depth.saturating_sub(1)
+    }
+
     fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> OdpElement {
         if Self::is_namespace(namespace, ANIMATION_NAMESPACE_BYTES) {
             AnimationKind::from_local_name(local_name)
@@ -294,10 +316,12 @@ impl OdpParser {
                 b"rotate" => OdpElement::Shape(ShapeElement::ThreeDimensionalRotate),
                 _ => OdpElement::Other,
             }
-        } else if Self::is_namespace(namespace, OFFICE_NAMESPACE)
-            && local_name == b"event-listeners"
-        {
-            OdpElement::EventListeners
+        } else if Self::is_namespace(namespace, OFFICE_NAMESPACE) {
+            match local_name {
+                b"event-listeners" => OdpElement::EventListeners,
+                b"spreadsheet" => OdpElement::SpreadsheetRoot,
+                _ => OdpElement::Other,
+            }
         } else if Self::is_namespace(namespace, PRESENTATION_NAMESPACE) {
             if local_name == b"notes" {
                 OdpElement::Notes
@@ -313,8 +337,12 @@ impl OdpParser {
         } else if Self::is_namespace(namespace, SCRIPT_NAMESPACE) && local_name == b"event-listener"
         {
             OdpElement::ScriptEventListener
-        } else if Self::is_namespace(namespace, TABLE_NAMESPACE) && local_name == b"table" {
-            OdpElement::Table
+        } else if Self::is_namespace(namespace, TABLE_NAMESPACE) {
+            match local_name {
+                b"table" => OdpElement::Table,
+                b"shapes" => OdpElement::SheetShapes,
+                _ => OdpElement::Other,
+            }
         } else if Self::is_namespace(namespace, TEXT_NAMESPACE) {
             match local_name {
                 b"p" | b"h" => OdpElement::TextParagraph,
@@ -826,6 +854,8 @@ impl OdpParser {
                 DrawingAttributeNamespace::Svg
             } else if Self::is_namespace(&namespace, DR3D_NAMESPACE) {
                 DrawingAttributeNamespace::Dr3d
+            } else if Self::is_namespace(&namespace, TABLE_NAMESPACE) {
+                DrawingAttributeNamespace::Table
             } else {
                 continue;
             };
@@ -839,7 +869,7 @@ impl OdpParser {
                     local_name,
                     b"x" | b"y" | b"width" | b"height" | b"x1" | b"y1" | b"x2" | b"y2"
                 ),
-                DrawingAttributeNamespace::Dr3d => false,
+                DrawingAttributeNamespace::Dr3d | DrawingAttributeNamespace::Table => false,
             };
             if modeled {
                 continue;
@@ -1743,7 +1773,12 @@ impl OdpParser {
         xml_content: &str,
         styles_xml: Option<&str>,
     ) -> Result<Vec<Slide>> {
-        Self::parse_pages_with_styles(xml_content, styles_xml, false)
+        Self::parse_pages_with_styles(
+            xml_content,
+            styles_xml,
+            false,
+            ShapeContainerScope::DrawPages,
+        )
     }
 
     /// Parse drawing pages while retaining title and text-box frames as shapes.
@@ -1751,14 +1786,36 @@ impl OdpParser {
         xml_content: &str,
         styles_xml: Option<&str>,
     ) -> Result<Vec<Slide>> {
-        Self::parse_pages_with_styles(xml_content, styles_xml, true)
+        Self::parse_pages_with_styles(
+            xml_content,
+            styles_xml,
+            true,
+            ShapeContainerScope::DrawPages,
+        )
+    }
+
+    /// Parse `table:shapes` drawing shapes from spreadsheet content.
+    ///
+    /// Returns one shape list per top-level `table:table` element, in
+    /// document order, retaining text-box frames as shapes. Shapes anchored
+    /// inside individual table cells are not collected.
+    pub(crate) fn parse_sheet_shape_tables(xml_content: &str) -> Result<Vec<Vec<Shape>>> {
+        let tables = Self::parse_pages_with_styles(
+            xml_content,
+            None,
+            true,
+            ShapeContainerScope::SpreadsheetTables,
+        )?;
+        Ok(tables.into_iter().map(|table| table.shapes).collect())
     }
 
     fn parse_pages_with_styles(
         xml_content: &str,
         styles_xml: Option<&str>,
         retain_text_shapes: bool,
+        container_scope: ShapeContainerScope,
     ) -> Result<Vec<Slide>> {
+        let sheet_scope = container_scope == ShapeContainerScope::SpreadsheetTables;
         let (transition_styles, default_transition) =
             Self::resolved_transition_styles(xml_content, styles_xml)?;
         let mut reader = NsReader::from_str(xml_content);
@@ -1791,12 +1848,22 @@ impl OdpParser {
         let mut hyperlink_parent_depth = None;
         let mut hyperlink_shape_seen = false;
 
+        // Spreadsheet `table:shapes` container state
+        let mut element_depth = 0usize;
+        let mut spreadsheet_depth: Option<usize> = None;
+        let mut sheet_table_depth: Option<usize> = None;
+        let mut sheet_shapes_depth: Option<usize> = None;
+        let mut sheet_table_has_shapes = false;
+
         loop {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buf)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
             match event {
                 Event::Start(ref element) => {
+                    element_depth = element_depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("XML element depth overflow".to_string())
+                    })?;
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
                     Self::validate_three_dimensional_child_element(
                         shape_stack.last(),
@@ -1813,7 +1880,7 @@ impl OdpParser {
                         ));
                     }
                     match element_type {
-                        OdpElement::Page => {
+                        OdpElement::Page if !sheet_scope => {
                             if in_slide {
                                 slides.push(Slide {
                                     title: current_slide_title.take(),
@@ -1856,6 +1923,7 @@ impl OdpParser {
                                 ));
                             }
                             let geometry = Self::parse_enhanced_geometry(&mut reader, element)?;
+                            element_depth = Self::rewind_consumed_subtree(element_depth);
                             shape_stack
                                 .last_mut()
                                 .expect("shape checked above")
@@ -1895,6 +1963,7 @@ impl OdpParser {
                                 1,
                                 &mut legacy_animation_node_count,
                             )?;
+                            element_depth = Self::rewind_consumed_subtree(element_depth);
                             validate_legacy_animation_root(&root)?;
                             current_legacy_animation = Some(root);
                         },
@@ -1962,6 +2031,7 @@ impl OdpParser {
                                 ));
                             }
                             builder.event_listeners = Self::parse_event_listeners(&mut reader)?;
+                            element_depth = Self::rewind_consumed_subtree(element_depth);
                             builder.event_listeners_seen = true;
                         },
                         OdpElement::EventListeners
@@ -2007,7 +2077,7 @@ impl OdpParser {
                         OdpElement::UnknownAnimation if in_slide => {
                             return Err(Error::InvalidFormat(format!(
                                 "unknown ODF animation element '{}'",
-                                String::from_utf8_lossy(element.local_name().as_ref())
+                                String::from_utf8_lossy(element.local_name().as_ref()),
                             )));
                         },
                         OdpElement::Animation(kind)
@@ -2027,6 +2097,34 @@ impl OdpParser {
                                 1,
                                 &mut animation_node_count,
                             )?);
+                            element_depth = Self::rewind_consumed_subtree(element_depth);
+                        },
+                        OdpElement::SpreadsheetRoot if sheet_scope => {
+                            spreadsheet_depth = Some(element_depth);
+                        },
+                        OdpElement::Table
+                            if sheet_scope
+                                && shape_stack.is_empty()
+                                && spreadsheet_depth
+                                    .is_some_and(|depth| element_depth == depth + 1) =>
+                        {
+                            sheet_table_depth = Some(element_depth);
+                            sheet_table_has_shapes = false;
+                        },
+                        OdpElement::SheetShapes
+                            if sheet_scope
+                                && sheet_table_depth
+                                    .is_some_and(|depth| element_depth == depth + 1) =>
+                        {
+                            if sheet_table_has_shapes {
+                                return Err(Error::InvalidFormat(
+                                    "table:table contains multiple table:shapes containers"
+                                        .to_string(),
+                                ));
+                            }
+                            sheet_table_has_shapes = true;
+                            sheet_shapes_depth = Some(element_depth);
+                            in_slide = true;
                         },
                         OdpElement::Shape(shape_element) => {
                             let drawing_kind = Self::drawing_kind(shape_element);
@@ -2214,7 +2312,7 @@ impl OdpParser {
                         ));
                     }
                     match element_type {
-                        OdpElement::Page if !in_slide => {
+                        OdpElement::Page if !sheet_scope && !in_slide => {
                             let style_name =
                                 Self::get_attr(&reader, element, DRAW_NAMESPACE, b"style-name")?;
                             let transition = style_name
@@ -2391,7 +2489,7 @@ impl OdpParser {
                         OdpElement::UnknownAnimation if in_slide => {
                             return Err(Error::InvalidFormat(format!(
                                 "unknown ODF animation element '{}'",
-                                String::from_utf8_lossy(element.local_name().as_ref())
+                                String::from_utf8_lossy(element.local_name().as_ref()),
                             )));
                         },
                         OdpElement::Animation(kind)
@@ -2420,6 +2518,37 @@ impl OdpParser {
                                 Self::animation_attributes(&reader, element)?,
                                 Vec::new(),
                             ));
+                        },
+                        OdpElement::Table
+                            if sheet_scope
+                                && shape_stack.is_empty()
+                                && spreadsheet_depth
+                                    .is_some_and(|depth| element_depth == depth) =>
+                        {
+                            slides.push(Slide {
+                                title: None,
+                                text: String::new(),
+                                index: slide_index,
+                                notes: None,
+                                transition: None,
+                                animations: Vec::new(),
+                                legacy_animation: None,
+                                shapes: Vec::new(),
+                            });
+                            slide_index += 1;
+                        },
+                        OdpElement::SheetShapes
+                            if sheet_scope
+                                && sheet_table_depth
+                                    .is_some_and(|depth| element_depth == depth) =>
+                        {
+                            if sheet_table_has_shapes {
+                                return Err(Error::InvalidFormat(
+                                    "table:table contains multiple table:shapes containers"
+                                        .to_string(),
+                                ));
+                            }
+                            sheet_table_has_shapes = true;
                         },
                         OdpElement::Image => {
                             if let Some(builder) = shape_stack.last_mut() {
@@ -2495,6 +2624,7 @@ impl OdpParser {
                     }
                 },
                 Event::End(ref element) => {
+                    element_depth = element_depth.saturating_sub(1);
                     let element_type = Self::classify(&namespace, element.local_name().as_ref());
                     if matches!(element_type, OdpElement::TextParagraph)
                         && current_paragraph.is_some()
@@ -2548,7 +2678,7 @@ impl OdpParser {
                             hyperlink_parent_depth = None;
                             hyperlink_shape_seen = false;
                         },
-                        OdpElement::Page => {
+                        OdpElement::Page if !sheet_scope => {
                             if in_slide {
                                 if current_hyperlink.is_some() {
                                     return Err(Error::InvalidFormat(
@@ -2571,6 +2701,45 @@ impl OdpParser {
                             current_slide_has_segment = false;
                             current_notes_has_paragraph = false;
                             in_slide = false;
+                        },
+                        OdpElement::SpreadsheetRoot
+                            if sheet_scope
+                                && spreadsheet_depth
+                                    .is_some_and(|depth| element_depth + 1 == depth) =>
+                        {
+                            spreadsheet_depth = None;
+                        },
+                        OdpElement::SheetShapes
+                            if sheet_scope
+                                && sheet_shapes_depth
+                                    .is_some_and(|depth| element_depth + 1 == depth) =>
+                        {
+                            if current_hyperlink.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "unterminated draw:a drawing hyperlink".to_string(),
+                                ));
+                            }
+                            sheet_shapes_depth = None;
+                            in_slide = false;
+                        },
+                        OdpElement::Table
+                            if sheet_scope
+                                && sheet_table_depth
+                                    .is_some_and(|depth| element_depth + 1 == depth) =>
+                        {
+                            slides.push(Slide {
+                                title: None,
+                                text: std::mem::take(&mut current_slide_text),
+                                index: slide_index,
+                                notes: None,
+                                transition: None,
+                                animations: Vec::new(),
+                                legacy_animation: None,
+                                shapes: std::mem::take(&mut current_shapes),
+                            });
+                            slide_index += 1;
+                            sheet_table_depth = None;
+                            current_slide_has_segment = false;
                         },
                         OdpElement::Shape(_) => {
                             if let Some(builder) = shape_stack.pop() {

@@ -1060,6 +1060,23 @@ impl OdsParser {
         for sheet in &sheets {
             super::sheet_image::validate_sheet_images(&sheet.images)?;
         }
+
+        let shape_tables = crate::odp::OdpParser::parse_sheet_shape_tables(xml_content)?;
+        if shape_tables.len() != sheets.len() {
+            return Err(Error::InvalidFormat(format!(
+                "spreadsheet table structure changed during shape parsing: {} shape container(s) for {} table(s)",
+                shape_tables.len(),
+                sheets.len()
+            )));
+        }
+        for (sheet, shapes) in sheets.iter_mut().zip(shape_tables) {
+            for shape in shapes {
+                if let Some(sheet_shape) = super::shape::sheet_shape_from_parsed(shape)? {
+                    sheet.shapes.push(sheet_shape);
+                }
+            }
+            super::shape::validate_sheet_shapes(&sheet.shapes)?;
+        }
         Ok(sheets)
     }
 
@@ -2612,6 +2629,7 @@ impl SheetBuilder {
             dde_source: self.dde_source,
             scenario: self.scenario,
             images: self.images,
+            shapes: Vec::new(),
             protection: super::SheetProtection::default(),
         })
     }

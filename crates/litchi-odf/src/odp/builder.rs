@@ -702,7 +702,8 @@ impl PresentationBuilder {
                     attribute.local_name.as_str(),
                     "x" | "y" | "width" | "height" | "x1" | "y1" | "x2" | "y2"
                 ),
-                crate::odp::DrawingAttributeNamespace::Dr3d => false,
+                crate::odp::DrawingAttributeNamespace::Dr3d
+                | crate::odp::DrawingAttributeNamespace::Table => false,
             };
             if modeled {
                 return Err(litchi_core::Error::InvalidFormat(format!(
