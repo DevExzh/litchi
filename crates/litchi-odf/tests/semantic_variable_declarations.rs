@@ -50,6 +50,8 @@ fn package(mimetype: &str, content: &str, styles: Option<&str>) -> Vec<u8> {
 }
 
 #[test]
+// The fixture value 3.1400 exercises lexical round-tripping; it is not the constant PI.
+#[allow(clippy::approx_constant)]
 fn parses_ordered_typed_inert_declarations_and_sequence_defaults() {
     let xml = flat(concat!(
         r#"<t:variable-decls><t:variable-decl t:name="simple" o:value-type="float"/></t:variable-decls>"#,
