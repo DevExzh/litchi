@@ -1237,8 +1237,8 @@ impl DocWriter {
     /// # Errors
     ///
     /// Returns an error for nested or independently encrypted glossary
-    /// documents, independent VBA projects, and drawing-layer content. Those
-    /// configurations cannot be relocated into the shared DOC streams safely.
+    /// documents and independent VBA projects. Those configurations cannot be
+    /// represented by the shared DOC stream topology.
     pub fn set_attached_glossary(
         &mut self,
         glossary: DocWriter,
@@ -1284,16 +1284,6 @@ impl DocWriter {
         if self.vba_project.is_some() {
             return Err(DocWriteError::InvalidData(
                 "an attached DOC glossary cannot contain an independent VBA project".to_string(),
-            ));
-        }
-        if !self.pictures.is_empty()
-            || !self.shapes.is_empty()
-            || !self.header_pictures.is_empty()
-            || !self.header_shapes.is_empty()
-        {
-            return Err(DocWriteError::InvalidData(
-                "pictures and drawing-layer shapes in attached DOC glossaries are not supported"
-                    .to_string(),
             ));
         }
         Ok(())
@@ -3491,6 +3481,14 @@ impl DocWriter {
 
     /// Build and validate the three core DOC streams.
     fn build_output_streams(&mut self) -> Result<DocOutputStreams, DocWriteError> {
+        self.build_output_streams_with_data_prefix(Vec::new())
+    }
+
+    /// Build the DOC streams while retaining an existing shared Data prefix.
+    fn build_output_streams_with_data_prefix(
+        &mut self,
+        data_prefix: Vec<u8>,
+    ) -> Result<DocOutputStreams, DocWriteError> {
         if self.attached_glossary.is_some() && self.glossary_metadata.is_some() {
             return Err(DocWriteError::InvalidData(
                 "a DOC template cannot be both glossary-only and contain an attached glossary"
@@ -3513,7 +3511,7 @@ impl DocWriter {
 
         // Build text stream and piece table
         let mut text_stream = Vec::new();
-        let mut data_stream: Vec<u8> = Vec::new();
+        let mut data_stream = data_prefix;
         let mut floating_anchors: Vec<(u32, FloatingAnchorKind)> = Vec::new();
         let mut current_cp = 0u32;
         let mut pieces = Vec::new();
@@ -4352,13 +4350,16 @@ impl DocWriter {
         };
         if let Some(glossary) = self.attached_glossary.as_mut() {
             glossary.validate_as_attached_glossary()?;
-            let mut glossary_streams = glossary.build_output_streams()?;
+            let data_prefix = std::mem::take(&mut data_stream);
+            let mut glossary_streams =
+                glossary.build_output_streams_with_data_prefix(data_prefix)?;
             super::attached_glossary::merge_attached_glossary(
                 &mut word_document_stream,
                 &mut table_stream,
                 &mut glossary_streams.word_document,
                 &mut glossary_streams.table,
             )?;
+            data_stream = glossary_streams.data;
         }
         self.encrypt_output_streams(
             &mut word_document_stream,

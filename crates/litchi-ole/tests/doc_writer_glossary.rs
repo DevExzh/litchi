@@ -1,5 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_ole::doc::writer::DocEncryptionProfile;
+use litchi_ole::doc::writer::{
+    DocDrawingShape, DocEncryptionProfile, DocPicture, DocShapeKind, FloatingPosition,
+};
 use litchi_ole::doc::{
     DocOpenOptions, DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
     Package,
@@ -50,6 +52,51 @@ fn writer() -> DocWriter {
     writer.add_paragraph("").unwrap();
     writer.add_paragraph("").unwrap();
     writer.set_glossary_metadata(metadata());
+    writer
+}
+
+fn image_fixture(relative: &str) -> Vec<u8> {
+    std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/images")
+            .join(relative),
+    )
+    .unwrap()
+}
+
+fn glossary_with_drawings() -> DocWriter {
+    let mut writer = DocWriter::new();
+    writer.add_paragraph("Greeting").unwrap();
+    writer
+        .insert_picture(DocPicture::new(image_fixture("png/lena.png")).unwrap())
+        .unwrap();
+    writer
+        .insert_floating_shape(
+            DocDrawingShape::new(DocShapeKind::Rectangle, 1440, 720)
+                .unwrap()
+                .with_fill(0x80, 0x40, 0x20),
+            FloatingPosition::new(720, 360),
+        )
+        .unwrap();
+    writer.add_paragraph("").unwrap();
+    writer.add_paragraph("").unwrap();
+    writer.set_glossary_metadata(
+        GlossaryMetadata::try_new(
+            vec![
+                GlossaryItem::try_new("greeting", GlossaryItemKind::NamedAutoText, Some(0), 0, 9)
+                    .unwrap(),
+                GlossaryItem::try_new("logo", GlossaryItemKind::NamedAutoText, None, 9, 11)
+                    .unwrap(),
+                GlossaryItem::try_new("shape", GlossaryItemKind::NamedAutoText, None, 11, 13)
+                    .unwrap(),
+            ],
+            vec![GlossaryStyle::try_new("Normal", 1).unwrap()],
+            13,
+            14,
+            15,
+        )
+        .unwrap(),
+    );
     writer
 }
 
@@ -289,6 +336,72 @@ fn attached_glossary_round_trips_inside_encrypted_template() {
     let attached = document.attached_glossary().unwrap().unwrap();
     assert_eq!(attached.item_text(0), Some("Greeting"));
     assert_eq!(attached.item_text(1), Some("World"));
+}
+
+#[test]
+fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
+    const DGG_INFO_INDEX: usize = 50;
+    const PLCF_SPA_MOM_INDEX: usize = 40;
+    const PIC_LOCATION_OPCODE: [u8; 2] = 0x6A03u16.to_le_bytes();
+
+    let parent_image = image_fixture("jpg/abstract1.jpg");
+    let child_image = image_fixture("png/lena.png");
+    let mut template = DocWriter::new();
+    template.add_paragraph("Template").unwrap();
+    template
+        .insert_picture(DocPicture::new(parent_image.clone()).unwrap())
+        .unwrap();
+    template
+        .set_attached_glossary(glossary_with_drawings())
+        .unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    template.write_to(&mut output).unwrap();
+    let bytes = output.into_inner();
+    let mut ole = OleFile::open(Cursor::new(&bytes)).unwrap();
+    let word_document = ole.open_stream(&["WordDocument"]).unwrap();
+    let data = ole.open_stream(&["Data"]).unwrap();
+
+    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let document = package.document().unwrap();
+    assert!(document.text().unwrap().starts_with("Template\r"));
+    let attached = document.attached_glossary().unwrap().unwrap();
+    assert_eq!(attached.item_text(0), Some("Greeting"));
+    assert_eq!(attached.item_text(1), Some("\u{0001}"));
+    assert_eq!(attached.item_text(2), Some("\u{0008}"));
+    assert!(
+        attached
+            .fib()
+            .get_table_pointer(DGG_INFO_INDEX)
+            .is_some_and(|(_, length)| length > 0)
+    );
+    assert!(
+        attached
+            .fib()
+            .get_table_pointer(PLCF_SPA_MOM_INDEX)
+            .is_some_and(|(_, length)| length > 0)
+    );
+
+    assert!(
+        data.windows(parent_image.len())
+            .any(|window| window == parent_image)
+    );
+    assert!(
+        data.windows(child_image.len())
+            .any(|window| window == child_image)
+    );
+    let picture_locations: Vec<u32> = word_document
+        .windows(6)
+        .filter(|window| window[..2] == PIC_LOCATION_OPCODE)
+        .map(|window| u32::from_le_bytes(window[2..6].try_into().unwrap()))
+        .filter(|offset| (*offset as usize) < data.len())
+        .collect();
+    assert!(picture_locations.contains(&0));
+    assert!(
+        picture_locations
+            .iter()
+            .any(|offset| *offset as usize >= 4096)
+    );
 }
 
 #[test]
