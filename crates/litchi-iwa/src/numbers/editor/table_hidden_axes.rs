@@ -78,4 +78,49 @@ mod tests {
             .unwrap();
         assert!(editor.table_hidden_axes(table_id).unwrap().is_empty());
     }
+
+    #[test]
+    fn hidden_axes_follow_table_insertion_and_deletion() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(4, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_table_hidden_axes(
+                table_id,
+                &TableHiddenAxes::new([TableAxisIndex::row(2), TableAxisIndex::column(1)]).unwrap(),
+            )
+            .unwrap();
+
+        editor
+            .insert_table_row(table_id, TableRowInsertion::Body { index: 0 })
+            .unwrap();
+        editor
+            .insert_table_column(table_id, TableColumnInsertion::Body { index: 0 })
+            .unwrap();
+        assert_eq!(
+            editor.table_hidden_axes(table_id).unwrap(),
+            TableHiddenAxes::new([TableAxisIndex::row(3), TableAxisIndex::column(2),]).unwrap()
+        );
+
+        editor
+            .remove_table_row(table_id, TableRowDeletion::Body { index: 0 })
+            .unwrap();
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::Body { index: 0 })
+            .unwrap();
+        assert_eq!(
+            editor.table_hidden_axes(table_id).unwrap(),
+            TableHiddenAxes::new([TableAxisIndex::row(2), TableAxisIndex::column(1),]).unwrap()
+        );
+
+        editor
+            .remove_table_row(table_id, TableRowDeletion::Body { index: 1 })
+            .unwrap();
+        editor
+            .remove_table_column(table_id, TableColumnDeletion::Body { index: 0 })
+            .unwrap();
+        assert!(editor.table_hidden_axes(table_id).unwrap().is_empty());
+    }
 }

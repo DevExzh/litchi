@@ -162,9 +162,7 @@ fn validate_column_insertion_features(
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
 ) -> Result<()> {
-    if model.number_of_hidden_columns.unwrap_or(0) != 0
-        || model.number_of_user_hidden_columns.unwrap_or(0) != 0
-        || model.number_of_filtered_rows.unwrap_or(0) != 0
+    if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.pivot_owner.is_some()
         || model
             .sort_order
@@ -174,7 +172,7 @@ fn validate_column_insertion_features(
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(
-            "Cannot yet insert a column into a sorted, filtered, hidden, grouped, pivot, or spill iWork table"
+            "Cannot yet insert a column into a sorted, filtered, grouped, pivot, or spill iWork table"
                 .to_owned(),
         ));
     }

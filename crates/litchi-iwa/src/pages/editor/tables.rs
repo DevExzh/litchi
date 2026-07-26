@@ -3,7 +3,6 @@
 mod appearance;
 mod comments;
 mod formula;
-mod hidden_axes;
 mod layout;
 mod lock;
 mod sort;

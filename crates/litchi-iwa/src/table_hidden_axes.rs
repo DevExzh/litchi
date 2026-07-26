@@ -1,4 +1,4 @@
-//! Typed hidden-row and hidden-column state shared by native iWork tables.
+//! Typed hidden-row and hidden-column state for native Numbers tables.
 
 use std::collections::{HashMap, HashSet};
 
@@ -23,6 +23,7 @@ const TABLE_MODEL_HIDDEN_STATES_OWNER_FIELD: u32 = 70;
 pub(crate) const HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE: u32 = 6_204;
 pub(crate) const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
+const TABLE_HIDDEN_STATES_UID_OFFSET: u64 = 4;
 const COLUMN_HIDDEN_EXTENT_UID_OFFSET: u64 = 7;
 
 /// One zero-based row or column position in a native iWork table.
@@ -133,13 +134,8 @@ pub(crate) fn set_table_hidden_axes(
             return Ok(());
         }
         let object_ids = HiddenStateObjectIds::allocate(package)?;
-        let hidden_states_uid = graph.formula_owner_uid;
-        let column_extent_uid = tsp::Uuid {
-            lower: hidden_states_uid
-                .lower
-                .wrapping_add(COLUMN_HIDDEN_EXTENT_UID_OFFSET),
-            upper: hidden_states_uid.upper,
-        };
+        let hidden_states_uid = hidden_states_uid_for_formula_owner(&graph.formula_owner_uid)?;
+        let column_extent_uid = column_hidden_extent_uid(&hidden_states_uid)?;
         info_uuid = Some(hidden_states_uid);
         owner = Some(tst::HiddenStatesOwnerArchive {
             owner_uid: hidden_states_uid,
@@ -204,6 +200,59 @@ pub(crate) fn set_table_hidden_axes(
         ));
     }
     *package = staged;
+    Ok(())
+}
+
+/// Remove the user-hidden marker for an axis immediately before its UUID is deleted.
+///
+/// Remaining hidden states keep their stable UUIDs, so deleting the matching
+/// entry before compacting the UID map preserves their logical positions.
+pub(crate) fn remove_table_hidden_axis(
+    package: &mut IWorkPackage,
+    model_object_id: u64,
+    axis: TableAxisIndex,
+) -> Result<()> {
+    let graph = table_hidden_graph(package, model_object_id)?;
+    let hidden = hidden_axes_from_graph(&graph)?;
+    if !hidden.contains(axis) {
+        return Ok(());
+    }
+    validate_axis_bounds(&graph.model, &TableHiddenAxes::new([axis])?)?;
+    let retained = TableHiddenAxes::new(hidden.iter().filter(|candidate| *candidate != axis))?;
+    let mut owner = graph.model.hidden_states_owner.clone().ok_or_else(|| {
+        Error::InvalidFormat("iWork table hidden-state owner is absent".to_owned())
+    })?;
+    let active_uuid = graph.info.hidden_states_uuid.as_ref().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork table info {} has no active hidden-state UUID",
+            graph.info_object_id
+        ))
+    })?;
+    let active = unique_active_state_mut(&mut owner, active_uuid)?;
+    update_extent(
+        &mut active.row_hidden_state_extent,
+        &graph.row_uids,
+        retained.iter().filter_map(|candidate| match candidate {
+            TableAxisIndex::Row(index) => Some(index),
+            TableAxisIndex::Column(_) => None,
+        }),
+        "row",
+    )?;
+    update_extent(
+        &mut active.column_hidden_state_extent,
+        &graph.column_uids,
+        retained.iter().filter_map(|candidate| match candidate {
+            TableAxisIndex::Column(index) => Some(index),
+            TableAxisIndex::Row(_) => None,
+        }),
+        "column",
+    )?;
+    patch_model(package, &graph, &owner, active_uuid, None)?;
+    if table_hidden_axes(package, model_object_id)? != retained {
+        return Err(Error::InvalidFormat(
+            "iWork table hidden-axis deletion failed round-trip validation".to_owned(),
+        ));
+    }
     Ok(())
 }
 
@@ -426,7 +475,7 @@ fn hidden_axes_from_graph(graph: &TableHiddenGraph) -> Result<TableHiddenAxes> {
         }
         return Ok(TableHiddenAxes::empty());
     };
-    if owner.owner_uid != graph.formula_owner_uid {
+    if owner.owner_uid != hidden_states_uid_for_formula_owner(&graph.formula_owner_uid)? {
         return Err(Error::InvalidFormat(format!(
             "iWork table hidden-state owner does not match formula owner {}",
             graph.info_object_id
@@ -874,6 +923,30 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
+fn hidden_states_uid_for_formula_owner(formula_owner: &tsp::Uuid) -> Result<tsp::Uuid> {
+    Ok(tsp::Uuid {
+        lower: formula_owner
+            .lower
+            .checked_add(TABLE_HIDDEN_STATES_UID_OFFSET)
+            .ok_or_else(|| {
+                Error::InvalidFormat("iWork table hidden-state UUID overflow".to_owned())
+            })?,
+        upper: formula_owner.upper,
+    })
+}
+
+fn column_hidden_extent_uid(hidden_states: &tsp::Uuid) -> Result<tsp::Uuid> {
+    Ok(tsp::Uuid {
+        lower: hidden_states
+            .lower
+            .checked_add(COLUMN_HIDDEN_EXTENT_UID_OFFSET)
+            .ok_or_else(|| {
+                Error::InvalidFormat("iWork column hidden-state UUID overflow".to_owned())
+            })?,
+        upper: hidden_states.upper,
+    })
+}
+
 fn uuid_as_cfuuid(uuid: &tsp::Uuid) -> tsp::CfuuidArchive {
     tsp::CfuuidArchive {
         uuid_bytes: None,
@@ -927,5 +1000,29 @@ mod tests {
             ]
         );
         assert!(TableHiddenAxes::new([TableAxisIndex::row(1), TableAxisIndex::row(1)]).is_err());
+    }
+
+    #[test]
+    fn native_hidden_state_uids_follow_the_table_owner_family() {
+        let formula_owner = tsp::Uuid {
+            lower: 100,
+            upper: 200,
+        };
+        let hidden_states = hidden_states_uid_for_formula_owner(&formula_owner).unwrap();
+
+        assert_eq!(
+            hidden_states,
+            tsp::Uuid {
+                lower: 104,
+                upper: 200,
+            }
+        );
+        assert_eq!(
+            column_hidden_extent_uid(&hidden_states).unwrap(),
+            tsp::Uuid {
+                lower: 111,
+                upper: 200,
+            }
+        );
     }
 }

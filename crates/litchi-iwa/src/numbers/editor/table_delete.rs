@@ -7,6 +7,7 @@ mod dimension;
 mod row;
 mod uid;
 
+use crate::table_hidden_axes::{TableAxisIndex, remove_table_hidden_axis};
 use cell_merge::{
     MergeAnchorRelocation, MergeAxis, merge_anchor_relocations_for_axis_deletion,
     regions_in_package, shift_merges_for_axis_deletion,
@@ -124,6 +125,9 @@ pub(super) fn remove_attached_table_row(
                 "Cannot safely delete an iWork row without a stable row UID map".to_owned(),
             )
         })?;
+    if descriptor.model.hidden_states_owner.is_some() {
+        remove_table_hidden_axis(package, table_id, TableAxisIndex::row(row))?;
+    }
     delete_row_uid(package, &locations, uid.identifier, old_rows, row)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {
         delete_stroke_layers(
@@ -212,6 +216,9 @@ pub(super) fn remove_attached_table_column(
                 "Cannot safely delete an iWork column without a stable column UID map".to_owned(),
             )
         })?;
+    if descriptor.model.hidden_states_owner.is_some() {
+        remove_table_hidden_axis(package, table_id, TableAxisIndex::column(column))?;
+    }
     delete_column_uid(package, &locations, uid.identifier, old_columns, column)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {
         delete_stroke_layers(
@@ -256,18 +263,7 @@ fn validate_deletion_features(
             axis.noun()
         )));
     }
-    let hidden = match axis {
-        TableAxis::Row => {
-            model.number_of_hidden_rows.unwrap_or(0) != 0
-                || model.number_of_user_hidden_rows.unwrap_or(0) != 0
-        },
-        TableAxis::Column => {
-            model.number_of_hidden_columns.unwrap_or(0) != 0
-                || model.number_of_user_hidden_columns.unwrap_or(0) != 0
-        },
-    };
-    if hidden
-        || model.number_of_filtered_rows.unwrap_or(0) != 0
+    if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.pivot_owner.is_some()
         || model
             .sort_order
@@ -277,7 +273,7 @@ fn validate_deletion_features(
         || category_grouping_is_enabled(package, locations, model.category_owner.as_ref())?
     {
         return Err(Error::ParseError(format!(
-            "Cannot yet delete a {} from a sorted, filtered, hidden, grouped, pivot, or spill iWork table",
+            "Cannot yet delete a {} from a sorted, filtered, grouped, pivot, or spill iWork table",
             axis.noun()
         )));
     }
