@@ -1,23 +1,25 @@
-//! Decimal-number format storage for native table cells.
+//! Typed data-format storage for native table cells.
 
 use super::*;
 use crate::numbers::bnc;
 use crate::protobuf::tsk::FormatStructArchive;
-use crate::table_cell_number_format::{
-    TableCellDecimalPlaces, TableCellFixedDecimalPlaces, TableCellNegativeNumberStyle,
-    TableCellNumberFormat, TableCellThousandsSeparator,
+use crate::table_cell_data_format::{
+    TableCellDataFormat, TableCellDecimalPlaces, TableCellFixedDecimalPlaces,
+    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellPercentageFormat,
+    TableCellThousandsSeparator,
 };
 
-const EXPLICIT_NUMBER_FORMAT: u16 = 1;
+const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
 const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
+const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
 
-pub(super) fn cell_number_format(
+pub(super) fn cell_data_format(
     package: &IWorkPackage,
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<TableCellNumberFormat>> {
+) -> Result<TableCellDataFormat> {
     let location = model::locate_attached_cell(package, table_id, row, column)?;
     let Some(data) = storage::read_tile_cell(
         package,
@@ -27,21 +29,56 @@ pub(super) fn cell_number_format(
         column,
     )?
     else {
-        return Ok(None);
+        return Ok(TableCellDataFormat::Automatic);
     };
     let cell = BncCell::parse(&data)?;
     match format_reference(&cell)? {
-        CellFormatReference::Automatic { .. } => Ok(None),
-        CellFormatReference::Number(identifier) => {
+        CellFormatReference::Automatic { .. } => Ok(TableCellDataFormat::Automatic),
+        CellFormatReference::Explicit(identifier) => {
             let resolved = resolve_format_table(package, &location)?;
             let entry = required_format_entry(&resolved, identifier)?;
             entry
                 .entry
                 .format
                 .as_ref()
-                .map(number_format_from_native)
-                .transpose()
+                .map(data_format_from_native)
+                .transpose()?
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers format-table entry {identifier} has no format payload"
+                    ))
+                })
         },
+    }
+}
+
+pub(super) fn cell_number_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellNumberFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Number(format) => Ok(Some(format)),
+        TableCellDataFormat::Percentage(_) => Err(Error::InvalidFormat(
+            "Table cell uses Percentage rather than Number data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn cell_percentage_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellPercentageFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Percentage(format) => Ok(Some(format)),
+        TableCellDataFormat::Number(_) => Err(Error::InvalidFormat(
+            "Table cell uses Number rather than Percentage data format".to_owned(),
+        )),
     }
 }
 
@@ -52,6 +89,20 @@ pub(super) fn set_cell_number_format(
     column: usize,
     format: TableCellNumberFormat,
 ) -> Result<()> {
+    set_cell_data_format(package, table_id, row, column, format.into())
+}
+
+pub(super) fn set_cell_data_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: TableCellDataFormat,
+) -> Result<()> {
+    if format == TableCellDataFormat::Automatic {
+        reset_cell_data_format(package, table_id, row, column)?;
+        return Ok(());
+    }
     table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
     ensure_current_format_table(package, table_id, row, column)?;
     let location = model::locate_attached_cell(package, table_id, row, column)?;
@@ -69,13 +120,13 @@ pub(super) fn set_cell_number_format(
         .unwrap_or_else(BncCell::minimal);
     let old_reference = format_reference(&cell)?;
     let old_identifier = old_reference.identifier();
-    let native = number_format_to_native(format);
+    let native = data_format_to_native(format)?;
     let resolved = resolve_format_table(package, &location)?;
     let old_entry = old_identifier
         .map(|identifier| required_format_entry(&resolved, identifier))
         .transpose()?;
 
-    if matches!(old_reference, CellFormatReference::Number(_))
+    if matches!(old_reference, CellFormatReference::Explicit(_))
         && old_entry.and_then(|entry| entry.entry.format.as_ref()) == Some(&native)
     {
         return Ok(());
@@ -105,7 +156,7 @@ pub(super) fn set_cell_number_format(
         append_format_entry(package, &resolved, native)?
     };
 
-    cell.set_number_format_identifier(new_identifier);
+    cell.set_data_format_identifier(new_identifier);
     let cell_count = storage::update_tile(
         package,
         &location.tile_archive,
@@ -143,6 +194,38 @@ pub(super) fn reset_cell_number_format(
     row: usize,
     column: usize,
 ) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Number(_) => reset_cell_data_format(package, table_id, row, column),
+        TableCellDataFormat::Percentage(_) => Err(Error::InvalidFormat(
+            "Cannot reset Number format from a Percentage cell".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_percentage_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Percentage(_) => {
+            reset_cell_data_format(package, table_id, row, column)
+        },
+        TableCellDataFormat::Number(_) => Err(Error::InvalidFormat(
+            "Cannot reset Percentage format from a Number cell".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_data_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
     let location = model::locate_attached_cell(package, table_id, row, column)?;
     let Some(data) = storage::read_tile_cell(
         package,
@@ -155,7 +238,7 @@ pub(super) fn reset_cell_number_format(
         return Ok(false);
     };
     let mut cell = BncCell::parse(&data)?;
-    let CellFormatReference::Number(identifier) = format_reference(&cell)? else {
+    let CellFormatReference::Explicit(identifier) = format_reference(&cell)? else {
         return Ok(false);
     };
     let resolved = resolve_format_table(package, &location)?;
@@ -191,14 +274,14 @@ pub(super) fn reset_cell_number_format(
 #[derive(Clone, Copy)]
 enum CellFormatReference {
     Automatic { identifier: Option<u32> },
-    Number(u32),
+    Explicit(u32),
 }
 
 impl CellFormatReference {
     const fn identifier(self) -> Option<u32> {
         match self {
             Self::Automatic { identifier } => identifier,
-            Self::Number(identifier) => Some(identifier),
+            Self::Explicit(identifier) => Some(identifier),
         }
     }
 }
@@ -209,15 +292,15 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
     let identifier = cell.format_identifier();
     match (explicit, kind, identifier) {
         (0, None, None) => Ok(CellFormatReference::Automatic { identifier: None }),
-        (0, Some(bnc::NUMBER_CELL_FORMAT_KIND), Some(identifier)) => {
+        (0, Some(bnc::DECIMAL_CELL_FORMAT_KIND), Some(identifier)) => {
             Ok(CellFormatReference::Automatic {
                 identifier: Some(identifier),
             })
         },
-        (EXPLICIT_NUMBER_FORMAT, Some(bnc::NUMBER_CELL_FORMAT_KIND), Some(identifier)) => {
-            Ok(CellFormatReference::Number(identifier))
+        (EXPLICIT_DECIMAL_FORMAT, Some(bnc::DECIMAL_CELL_FORMAT_KIND), Some(identifier)) => {
+            Ok(CellFormatReference::Explicit(identifier))
         },
-        (EXPLICIT_NUMBER_FORMAT, Some(kind), _) => Err(Error::InvalidFormat(format!(
+        (EXPLICIT_DECIMAL_FORMAT, Some(kind), _) => Err(Error::InvalidFormat(format!(
             "Table cell uses unsupported explicit format kind {kind}"
         ))),
         _ => Err(Error::InvalidFormat(
@@ -414,32 +497,56 @@ fn append_format_entry(
     Ok(key)
 }
 
-fn number_format_to_native(format: TableCellNumberFormat) -> FormatStructArchive {
-    FormatStructArchive {
-        format_type: Some(NATIVE_NUMBER_FORMAT_TYPE),
-        decimal_places: Some(match format.decimal_places() {
+fn data_format_to_native(format: TableCellDataFormat) -> Result<FormatStructArchive> {
+    let (format_type, decimal_places, negative_style, thousands_separator) = match format {
+        TableCellDataFormat::Automatic => {
+            return Err(Error::InvalidFormat(
+                "Automatic table-cell data format has no explicit payload".to_owned(),
+            ));
+        },
+        TableCellDataFormat::Number(format) => (
+            NATIVE_NUMBER_FORMAT_TYPE,
+            format.decimal_places(),
+            format.negative_style(),
+            format.thousands_separator(),
+        ),
+        TableCellDataFormat::Percentage(format) => (
+            NATIVE_PERCENTAGE_FORMAT_TYPE,
+            format.decimal_places(),
+            format.negative_style(),
+            format.thousands_separator(),
+        ),
+    };
+    Ok(FormatStructArchive {
+        format_type: Some(format_type),
+        decimal_places: Some(match decimal_places {
             TableCellDecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
             TableCellDecimalPlaces::Fixed(places) => u32::from(places.value()),
         }),
-        negative_style: Some(match format.negative_style() {
+        negative_style: Some(match negative_style {
             TableCellNegativeNumberStyle::MinusSign => 0,
             TableCellNegativeNumberStyle::Red => 1,
             TableCellNegativeNumberStyle::Parentheses => 2,
             TableCellNegativeNumberStyle::RedParentheses => 3,
         }),
         show_thousands_separator: Some(matches!(
-            format.thousands_separator(),
+            thousands_separator,
             TableCellThousandsSeparator::Shown
         )),
         ..Default::default()
-    }
+    })
 }
 
-fn number_format_from_native(native: &FormatStructArchive) -> Result<TableCellNumberFormat> {
-    if native.format_type != Some(NATIVE_NUMBER_FORMAT_TYPE) {
+fn data_format_from_native(native: &FormatStructArchive) -> Result<TableCellDataFormat> {
+    let format_type = native.format_type.ok_or_else(|| {
+        Error::InvalidFormat("Table cell has no native data-format type".to_owned())
+    })?;
+    if !matches!(
+        format_type,
+        NATIVE_NUMBER_FORMAT_TYPE | NATIVE_PERCENTAGE_FORMAT_TYPE
+    ) {
         return Err(Error::InvalidFormat(format!(
-            "Table cell uses unsupported native number-format type {:?}",
-            native.format_type
+            "Table cell uses unsupported native data-format type {format_type}"
         )));
     }
     let decimal_places = match native.decimal_places {
@@ -454,7 +561,7 @@ fn number_format_from_native(native: &FormatStructArchive) -> Result<TableCellNu
         },
         None => {
             return Err(Error::InvalidFormat(
-                "Table-cell number format has no decimal-place setting".to_owned(),
+                "Table-cell data format has no decimal-place setting".to_owned(),
             ));
         },
     };
@@ -474,15 +581,36 @@ fn number_format_from_native(native: &FormatStructArchive) -> Result<TableCellNu
         Some(true) => TableCellThousandsSeparator::Shown,
         None => {
             return Err(Error::InvalidFormat(
-                "Table-cell number format has no thousands-separator setting".to_owned(),
+                "Table-cell data format has no thousands-separator setting".to_owned(),
             ));
         },
     };
-    Ok(TableCellNumberFormat::new(
-        decimal_places,
-        negative_style,
-        thousands_separator,
-    ))
+    Ok(match format_type {
+        NATIVE_NUMBER_FORMAT_TYPE => TableCellDataFormat::Number(TableCellNumberFormat::new(
+            decimal_places,
+            negative_style,
+            thousands_separator,
+        )),
+        NATIVE_PERCENTAGE_FORMAT_TYPE => TableCellDataFormat::Percentage(
+            TableCellPercentageFormat::new(decimal_places, negative_style, thousands_separator),
+        ),
+        _ => unreachable!("validated native data-format type"),
+    })
+}
+
+#[cfg(test)]
+fn number_format_to_native(format: TableCellNumberFormat) -> FormatStructArchive {
+    data_format_to_native(format.into()).expect("number format is explicit")
+}
+
+#[cfg(test)]
+fn number_format_from_native(native: &FormatStructArchive) -> Result<TableCellNumberFormat> {
+    match data_format_from_native(native)? {
+        TableCellDataFormat::Number(format) => Ok(format),
+        format => Err(Error::InvalidFormat(format!(
+            "Expected a Number cell format, found {format:?}"
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -508,6 +636,18 @@ mod tests {
         invalid = number_format_to_native(format);
         invalid.format_type = Some(999);
         assert!(number_format_from_native(&invalid).is_err());
+
+        let percentage = TableCellPercentageFormat::new(
+            TableCellDecimalPlaces::fixed(3).unwrap(),
+            TableCellNegativeNumberStyle::RedParentheses,
+            TableCellThousandsSeparator::Hidden,
+        );
+        let native = data_format_to_native(percentage.into()).unwrap();
+        assert_eq!(native.format_type, Some(NATIVE_PERCENTAGE_FORMAT_TYPE));
+        assert_eq!(
+            data_format_from_native(&native).unwrap(),
+            TableCellDataFormat::Percentage(percentage)
+        );
     }
 
     #[test]
@@ -596,5 +736,80 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn source_built_table_converts_and_reuses_percentage_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Percentages")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let number = TableCellNumberFormat::new(
+            TableCellDecimalPlaces::fixed(1).unwrap(),
+            TableCellNegativeNumberStyle::MinusSign,
+            TableCellThousandsSeparator::Hidden,
+        );
+        let percentage = TableCellPercentageFormat::new(
+            TableCellDecimalPlaces::fixed(2).unwrap(),
+            TableCellNegativeNumberStyle::Parentheses,
+            TableCellThousandsSeparator::Shown,
+        );
+        editor
+            .set_table_cell_data_format(table_id, 1, 1, number.into())
+            .unwrap();
+        editor
+            .set_cell(table_id, 1, 2, CellValue::Number(-12.345))
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_data_format(table_id, 1, 2).unwrap(),
+            TableCellDataFormat::Automatic
+        );
+        editor
+            .set_table_cell_percentage_format(table_id, 1, 1, percentage)
+            .unwrap();
+        editor
+            .set_table_cell_percentage_format(table_id, 1, 2, percentage)
+            .unwrap();
+
+        assert_eq!(
+            editor.table_cell_data_format(table_id, 1, 1).unwrap(),
+            TableCellDataFormat::Percentage(percentage)
+        );
+        assert!(editor.table_cell_number_format(table_id, 1, 1).is_err());
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+        assert_eq!(
+            formats.entries[0]
+                .entry
+                .format
+                .as_ref()
+                .and_then(|format| format.format_type),
+            Some(NATIVE_PERCENTAGE_FORMAT_TYPE)
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .table_cell_percentage_format(table_id, 1, 1)
+                .unwrap(),
+            Some(percentage)
+        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 1, TableCellDataFormat::Automatic)
+            .unwrap();
+        assert_eq!(
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            TableCellDataFormat::Automatic
+        );
+        assert_eq!(
+            reopened
+                .table_cell_percentage_format(table_id, 1, 2)
+                .unwrap(),
+            Some(percentage)
+        );
     }
 }

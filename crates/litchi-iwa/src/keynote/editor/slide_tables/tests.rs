@@ -185,6 +185,61 @@ fn source_built_table_roundtrips_number_format_crud() {
 }
 
 #[test]
+fn source_built_table_roundtrips_percentage_data_format() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Percentages", 3, 3, position, size)
+        .unwrap();
+    let format = KeynoteTableCellPercentageFormat::new(
+        KeynoteTableCellDecimalPlaces::fixed(2).unwrap(),
+        KeynoteTableCellNegativeNumberStyle::Parentheses,
+        KeynoteTableCellThousandsSeparator::Shown,
+    );
+    editor
+        .set_slide_table_cell(
+            0,
+            table.model_object_id,
+            1,
+            1,
+            KeynoteTableCellValue::Number(-12.345),
+        )
+        .unwrap();
+    editor
+        .set_slide_table_cell_percentage_format(0, table.model_object_id, 1, 1, format)
+        .unwrap();
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        KeynoteTableCellDataFormat::Percentage(format)
+    );
+    assert_eq!(
+        reopened
+            .slide_table_cell_percentage_format(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        Some(format)
+    );
+    reopened
+        .set_slide_table_cell_data_format(
+            0,
+            table.model_object_id,
+            1,
+            1,
+            KeynoteTableCellDataFormat::Automatic,
+        )
+        .unwrap();
+    assert_eq!(
+        reopened
+            .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
+            .unwrap(),
+        KeynoteTableCellDataFormat::Automatic
+    );
+}
+
+#[test]
 fn source_built_table_roundtrips_full_crud() {
     let editor = KeynoteDocumentBuilder::new().build().unwrap();
     assert!(editor.slide_tables(0).unwrap().is_empty());

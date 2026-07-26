@@ -62,6 +62,10 @@ pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::table_cell_border::{
     TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,
 };
+pub use crate::table_cell_data_format::{
+    TableCellDataFormat as PagesTableCellDataFormat,
+    TableCellPercentageFormat as PagesTableCellPercentageFormat,
+};
 pub use crate::table_cell_layout::{
     TableCellInset as PagesTableCellInset, TableCellInsets as PagesTableCellInsets,
     TableCellLayout as PagesTableCellLayout, TableCellTextWrap as PagesTableCellTextWrap,
@@ -240,6 +244,50 @@ impl PagesEditor {
         self.set_table_cell(model_object_id, row, column, PagesCellValue::Empty)
     }
 
+    /// Read the explicit typed data format for one body-table cell.
+    pub fn table_cell_data_format(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellDataFormat> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_data_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create, replace, or reset one body-table cell's data format.
+    pub fn set_table_cell_data_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: PagesTableCellDataFormat,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_data_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            format,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_data_format(model_object_id, row, column)? != format {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell data format failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Read an explicit decimal-number format for one body-table cell.
     ///
     /// `None` means the cell uses iWork's automatic data format.
@@ -310,6 +358,63 @@ impl PagesEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Pages table-cell number-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit percentage format for one body-table cell.
+    pub fn table_cell_percentage_format(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<PagesTableCellPercentageFormat>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_percentage_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit percentage format transactionally.
+    pub fn set_table_cell_percentage_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: PagesTableCellPercentageFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(model_object_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Percentage body-table cell.
+    pub fn reset_table_cell_percentage_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_percentage_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            if verified.table_cell_data_format(model_object_id, row, column)?
+                != PagesTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Pages percentage-format reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;
@@ -1355,6 +1460,45 @@ mod tests {
         assert_eq!(
             reopened.table_cell_number_format(model_id, 1, 1).unwrap(),
             None
+        );
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_percentage_data_format() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Percentages", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let format = PagesTableCellPercentageFormat::new(
+            PagesTableCellDecimalPlaces::fixed(2).unwrap(),
+            PagesTableCellNegativeNumberStyle::Parentheses,
+            PagesTableCellThousandsSeparator::Shown,
+        );
+        editor
+            .set_table_cell(model_id, 1, 1, PagesCellValue::Number(-12.345))
+            .unwrap();
+        editor
+            .set_table_cell_percentage_format(model_id, 1, 1, format)
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
+            PagesTableCellDataFormat::Percentage(format)
+        );
+        assert_eq!(
+            reopened
+                .table_cell_percentage_format(model_id, 1, 1)
+                .unwrap(),
+            Some(format)
+        );
+        reopened
+            .set_table_cell_data_format(model_id, 1, 1, PagesTableCellDataFormat::Automatic)
+            .unwrap();
+        assert_eq!(
+            reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
+            PagesTableCellDataFormat::Automatic
         );
     }
 

@@ -6,14 +6,16 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::table_cell_number_format::{
+use litchi_iwa::table_cell_data_format::{
     TableCellDecimalPlaces, TableCellNegativeNumberStyle, TableCellNumberFormat,
-    TableCellThousandsSeparator,
+    TableCellPercentageFormat, TableCellThousandsSeparator,
 };
 
 const ROW: usize = 1;
-const COLUMN: usize = 1;
-const CELL_VALUE: f64 = -1_234.5;
+const NUMBER_COLUMN: usize = 1;
+const PERCENTAGE_COLUMN: usize = 2;
+const NUMBER_VALUE: f64 = -1_234.5;
+const PERCENTAGE_VALUE: f64 = -12.345;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -36,14 +38,39 @@ fn format() -> Result<TableCellNumberFormat, litchi_iwa::Error> {
     ))
 }
 
+fn percentage_format() -> Result<TableCellPercentageFormat, litchi_iwa::Error> {
+    Ok(TableCellPercentageFormat::new(
+        TableCellDecimalPlaces::fixed(2)?,
+        TableCellNegativeNumberStyle::Parentheses,
+        TableCellThousandsSeparator::Shown,
+    ))
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
         .table_dimensions(3, 3)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
-    editor.set_cell(table_id, ROW, COLUMN, CellValue::Number(CELL_VALUE))?;
-    editor.set_table_cell_number_format(table_id, ROW, COLUMN, format()?)?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        NUMBER_COLUMN,
+        CellValue::Number(NUMBER_VALUE),
+    )?;
+    editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, format()?)?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        PERCENTAGE_COLUMN,
+        CellValue::Number(PERCENTAGE_VALUE),
+    )?;
+    editor.set_table_cell_percentage_format(
+        table_id,
+        ROW,
+        PERCENTAGE_COLUMN,
+        percentage_format()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -54,8 +81,25 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .body_table("Number Formats", 3, 3)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
-    editor.set_table_cell(table_id, ROW, COLUMN, CellValue::Number(CELL_VALUE))?;
-    editor.set_table_cell_number_format(table_id, ROW, COLUMN, format()?)?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        NUMBER_COLUMN,
+        CellValue::Number(NUMBER_VALUE),
+    )?;
+    editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, format()?)?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        PERCENTAGE_COLUMN,
+        CellValue::Number(PERCENTAGE_VALUE),
+    )?;
+    editor.set_table_cell_percentage_format(
+        table_id,
+        ROW,
+        PERCENTAGE_COLUMN,
+        percentage_format()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -79,10 +123,30 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         table.model_object_id,
         ROW,
-        COLUMN,
-        CellValue::Number(CELL_VALUE),
+        NUMBER_COLUMN,
+        CellValue::Number(NUMBER_VALUE),
     )?;
-    editor.set_slide_table_cell_number_format(0, table.model_object_id, ROW, COLUMN, format()?)?;
+    editor.set_slide_table_cell_number_format(
+        0,
+        table.model_object_id,
+        ROW,
+        NUMBER_COLUMN,
+        format()?,
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        PERCENTAGE_COLUMN,
+        CellValue::Number(PERCENTAGE_VALUE),
+    )?;
+    editor.set_slide_table_cell_percentage_format(
+        0,
+        table.model_object_id,
+        ROW,
+        PERCENTAGE_COLUMN,
+        percentage_format()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }

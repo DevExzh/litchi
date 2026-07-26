@@ -1959,6 +1959,36 @@ impl NumbersEditor {
         self.set_cell(table_id, row, column, CellValue::Empty)
     }
 
+    /// Read the explicit data format for one zero-based table cell.
+    pub fn table_cell_data_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<crate::table_cell_data_format::TableCellDataFormat> {
+        cell_data_format::cell_data_format(&self.package, table_id, row, column)
+    }
+
+    /// Create, replace, or reset one cell's typed data format transactionally.
+    pub fn set_table_cell_data_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: crate::table_cell_data_format::TableCellDataFormat,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, format)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_data_format(table_id, row, column)? != format {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell data format failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Read an explicit decimal-number format for one zero-based table cell.
     ///
     /// `None` means the cell uses iWork's automatic data format.
@@ -1968,7 +1998,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
     ) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
-        cell_number_format::cell_number_format(&self.package, table_id, row, column)
+        cell_data_format::cell_number_format(&self.package, table_id, row, column)
     }
 
     /// Create or replace an explicit decimal-number format transactionally.
@@ -1979,16 +2009,7 @@ impl NumbersEditor {
         column: usize,
         format: crate::table_cell_number_format::TableCellNumberFormat,
     ) -> Result<()> {
-        let mut staged = self.package.clone();
-        cell_number_format::set_cell_number_format(&mut staged, table_id, row, column, format)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_cell_number_format(table_id, row, column)? != Some(format) {
-            return Err(Error::InvalidFormat(
-                "Numbers table-cell number format failed package validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
+        self.set_table_cell_data_format(table_id, row, column, format.into())
     }
 
     /// Restore iWork's automatic data format for one table cell.
@@ -2000,7 +2021,7 @@ impl NumbersEditor {
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed =
-            cell_number_format::reset_cell_number_format(&mut staged, table_id, row, column)?;
+            cell_data_format::reset_cell_number_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             if verified
@@ -2009,6 +2030,53 @@ impl NumbersEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Numbers table-cell number-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit percentage format for one zero-based table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_percentage_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<crate::table_cell_data_format::TableCellPercentageFormat>> {
+        cell_data_format::cell_percentage_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit percentage format transactionally.
+    pub fn set_table_cell_percentage_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: crate::table_cell_data_format::TableCellPercentageFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore iWork's automatic format from an explicit Percentage cell.
+    pub fn reset_table_cell_percentage_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_percentage_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers percentage-format reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;
@@ -3084,7 +3152,7 @@ pub(crate) fn table_cell_number_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
-    cell_number_format::cell_number_format(package, table_id, row, column)
+    cell_data_format::cell_number_format(package, table_id, row, column)
 }
 
 pub(crate) fn set_table_cell_number_format_in_package(
@@ -3094,7 +3162,7 @@ pub(crate) fn set_table_cell_number_format_in_package(
     column: usize,
     format: crate::table_cell_number_format::TableCellNumberFormat,
 ) -> Result<()> {
-    cell_number_format::set_cell_number_format(package, table_id, row, column, format)
+    cell_data_format::set_cell_number_format(package, table_id, row, column, format)
 }
 
 pub(crate) fn reset_table_cell_number_format_in_package(
@@ -3103,7 +3171,44 @@ pub(crate) fn reset_table_cell_number_format_in_package(
     row: usize,
     column: usize,
 ) -> Result<bool> {
-    cell_number_format::reset_cell_number_format(package, table_id, row, column)
+    cell_data_format::reset_cell_number_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_data_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<crate::table_cell_data_format::TableCellDataFormat> {
+    cell_data_format::cell_data_format(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_data_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: crate::table_cell_data_format::TableCellDataFormat,
+) -> Result<()> {
+    cell_data_format::set_cell_data_format(package, table_id, row, column, format)
+}
+
+pub(crate) fn table_cell_percentage_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<crate::table_cell_data_format::TableCellPercentageFormat>> {
+    cell_data_format::cell_percentage_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_percentage_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_percentage_format(package, table_id, row, column)
 }
 
 pub(crate) fn set_table_cell_layout_in_package(
@@ -3443,10 +3548,10 @@ pub(crate) fn create_empty_table_graph_in_package(
     Ok((graph.info_object_id, graph.model_object_id))
 }
 
+mod cell_data_format;
 mod cell_fill;
 mod cell_layout;
 mod cell_merge;
-mod cell_number_format;
 mod cell_style;
 mod column_insert;
 mod date_time_fields;

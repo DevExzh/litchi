@@ -33,8 +33,8 @@ const CELL_FORMAT_KIND_FLAG: u32 = 0x001000;
 const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x002000;
 const EXPLICIT_FORMAT_FLAGS_START: usize = 6;
 const EXPLICIT_FORMAT_FLAGS_END: usize = 8;
-const EXPLICIT_NUMBER_FORMAT: u16 = 1;
-pub(crate) const NUMBER_CELL_FORMAT_KIND: u32 = 1;
+const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
+pub(crate) const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
 
 const VALUE_FLAGS: u32 = DECIMAL_FLAG
     | NUMBER_FLAG
@@ -343,12 +343,12 @@ impl BncCell {
         self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG)
     }
 
-    pub(crate) fn set_number_format_identifier(&mut self, identifier: u32) {
+    pub(crate) fn set_data_format_identifier(&mut self, identifier: u32) {
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
-            .copy_from_slice(&EXPLICIT_NUMBER_FORMAT.to_le_bytes());
+            .copy_from_slice(&EXPLICIT_DECIMAL_FORMAT.to_le_bytes());
         self.fields.insert(
             CELL_FORMAT_KIND_FLAG,
-            NUMBER_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+            DECIMAL_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
         );
         self.fields.insert(
             CELL_FORMAT_IDENTIFIER_FLAG,
@@ -607,10 +607,10 @@ mod tests {
         let mut cell = BncCell::minimal();
         cell.set_number(1_234.5).unwrap();
         cell.set_style_identifier(Some(7));
-        cell.set_number_format_identifier(2);
+        cell.set_data_format_identifier(2);
 
-        assert_eq!(cell.explicit_format_flags(), EXPLICIT_NUMBER_FORMAT);
-        assert_eq!(cell.cell_format_kind(), Some(NUMBER_CELL_FORMAT_KIND));
+        assert_eq!(cell.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(cell.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
         assert_eq!(cell.format_identifier(), Some(2));
 
         let reparsed = BncCell::parse(&cell.encode()).unwrap();

@@ -3925,18 +3925,19 @@ pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableAxisIndex, PagesTableCellComment,
-    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo, PagesTableCellDecimalPlaces,
-    PagesTableCellFixedDecimalPlaces, PagesTableCellInset, PagesTableCellInsets,
-    PagesTableCellLayout, PagesTableCellNegativeNumberStyle, PagesTableCellNumberFormat,
-    PagesTableCellRegion, PagesTableCellTextWrap, PagesTableCellThousandsSeparator,
-    PagesTableCellUpdate, PagesTableCellVerticalAlignment, PagesTableColumnDeletion,
-    PagesTableColumnInsertion, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableHiddenAxes, PagesTableInfo, PagesTablePoints,
-    PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
-    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
-    PagesTableSortScope, PagesTableTitleSettings,
+    PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo, PagesTableCellDataFormat,
+    PagesTableCellDecimalPlaces, PagesTableCellFixedDecimalPlaces, PagesTableCellInset,
+    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellNegativeNumberStyle,
+    PagesTableCellNumberFormat, PagesTableCellPercentageFormat, PagesTableCellRegion,
+    PagesTableCellTextWrap, PagesTableCellThousandsSeparator, PagesTableCellUpdate,
+    PagesTableCellVerticalAlignment, PagesTableColumnDeletion, PagesTableColumnInsertion,
+    PagesTableDimension, PagesTableDimensionSize, PagesTableFormulaAxisReference,
+    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
+    PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings,
+    PagesTableHiddenAxes, PagesTableInfo, PagesTablePoints, PagesTableRowDeletion,
+    PagesTableRowInsertion, PagesTableSortColumnIndex, PagesTableSortDirection,
+    PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
+    PagesTableTitleSettings,
 };
 
 #[cfg(test)]

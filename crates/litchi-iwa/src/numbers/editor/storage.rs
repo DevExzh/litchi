@@ -2907,7 +2907,6 @@ pub(super) fn update_tile(
                     .as_deref()
                     .map(BncCell::parse)
                     .transpose()?
-                    .or_else(|| find_template_cell(&tile, row, column).ok().flatten())
                     .unwrap_or_else(BncCell::minimal);
                 match value {
                     EncodedValue::Number(number) => cell.set_number(number)?,
@@ -3199,27 +3198,6 @@ pub(super) fn encode_row(
         }
     }
     Ok((storage, offsets, wide))
-}
-
-pub(super) fn find_template_cell(
-    tile: &Tile,
-    target_row: u32,
-    column: usize,
-) -> Result<Option<BncCell>> {
-    let mut rows = tile.row_infos.iter().collect::<Vec<_>>();
-    rows.sort_by_key(|row| row.tile_row_index.abs_diff(target_row));
-    for row in &rows {
-        let cells = split_row(row)?;
-        if let Some(Some(data)) = cells.get(column) {
-            return BncCell::parse(data).map(Some);
-        }
-    }
-    for row in rows {
-        if let Some(data) = split_row(row)?.into_iter().flatten().next() {
-            return BncCell::parse(&data).map(Some);
-        }
-    }
-    Ok(None)
 }
 
 pub(super) fn row_offset_capacity(tile: &Tile, table_columns: usize) -> usize {

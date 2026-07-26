@@ -278,6 +278,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+            if let Some(format_table_id) = model
+                .base_data_store
+                .format_table
+                .as_ref()
+                .map(|reference| reference.identifier)
+                && let Some((archive_name, format_object)) = objects.get(&format_table_id)
+            {
+                println!(" format table archive={archive_name}");
+                for format_message in &format_object.messages {
+                    if let Ok(list) = tst::TableDataList::decode(format_message.data.as_slice()) {
+                        println!(
+                            "  list_type={} next={} segmented={} entries={}",
+                            list.list_type,
+                            list.next_list_id,
+                            list.segments.len(),
+                            list.entries.len()
+                        );
+                        for entry in list.entries {
+                            println!(
+                                "   key={} refs={} format={:?}",
+                                entry.key, entry.refcount, entry.format
+                            );
+                        }
+                    }
+                }
+            }
             if let Some(rich_text_id) = model
                 .base_data_store
                 .rich_text_table
