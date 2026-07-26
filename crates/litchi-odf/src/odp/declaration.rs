@@ -548,7 +548,7 @@ fn parse_declaration_start(
                     && kind == DeclarationKind::DateTime
                     && data_style_name.is_none() =>
             {
-                validate_name(&value, "style:data-style-name")?;
+                validate_name_reference(&value, "style:data-style-name")?;
                 data_style_name = Some(value);
             },
             _ => {
@@ -662,7 +662,7 @@ fn validate_date_time(value: &PresentationDateTimeDeclaration) -> Result<()> {
     validate_name(&value.name, "presentation date-time declaration name")?;
     validate_text(&value.text, "presentation date-time declaration text", true)?;
     if let Some(style) = &value.data_style_name {
-        validate_name(style, "style:data-style-name")?;
+        validate_name_reference(style, "style:data-style-name")?;
     }
     Ok(())
 }
@@ -678,6 +678,18 @@ fn validate_reference(name: Option<&str>, kind: &str, names: &HashSet<&str>) -> 
         )));
     }
     Ok(())
+}
+
+/// Validate a `styleNameRef` attribute value.
+///
+/// ODF types style references as `styleNameRef`, which is either an `NCName` or
+/// the empty string meaning "no referenced style". Empty values are therefore
+/// preserved verbatim instead of being rejected.
+fn validate_name_reference(value: &str, description: &str) -> Result<()> {
+    if value.is_empty() {
+        return Ok(());
+    }
+    validate_name(value, description)
 }
 
 fn validate_name(value: &str, description: &str) -> Result<()> {

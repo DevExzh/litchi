@@ -5,6 +5,7 @@
 
 use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
 use crate::odp::animation::validate_animation_roots;
+use crate::odp::content_source::PresentationContentSource;
 use crate::odp::legacy_animation::validate_legacy_animation_root;
 use crate::odp::media::{EmbeddedMedia, embed_media, validate_package_media_path};
 use crate::odp::{MediaReference, Presentation, Shape, Slide};
@@ -57,6 +58,50 @@ pub struct MutablePresentation {
     declarations: Option<crate::odp::PresentationDeclarations>,
     /// Static page names, IDs, and layout/master references.
     page_metadata: Option<crate::odp::PresentationPageMetadataCollection>,
+    /// Verbatim fragments of the source `content.xml`, when one was opened.
+    ///
+    /// Slides the caller never touched are re-emitted from these fragments so
+    /// constructs outside the model — nested tables, image text alternatives,
+    /// automatic styles, font declarations — survive a save.
+    content_source: Option<PresentationContentSource>,
+    /// Slides exactly as parsed, used to detect which pages are still pristine.
+    source_slides: Vec<Slide>,
+    /// Declarations exactly as parsed; changing them rewrites every page.
+    source_declarations: Option<crate::odp::PresentationDeclarations>,
+    /// Page metadata exactly as parsed; changing it rewrites every page.
+    source_page_metadata: Option<crate::odp::PresentationPageMetadataCollection>,
+}
+
+/// Largest source slide count that is linearly rescanned for a match.
+///
+/// Beyond this, only the slide's own position is checked, keeping the retained
+/// page lookup linear in the slide count.
+const MAX_SOURCE_PAGE_SCAN: usize = 4_096;
+
+/// Compare two slides ignoring their position in the deck.
+///
+/// Removing or reordering slides renumbers [`Slide::index`] without changing
+/// the authored markup, so position is excluded from the comparison. The
+/// destructuring binding makes any future field a compile error rather than a
+/// silently ignored difference.
+fn slide_content_eq(left: &Slide, right: &Slide) -> bool {
+    let Slide {
+        title,
+        text,
+        index: _,
+        notes,
+        transition,
+        animations,
+        legacy_animation,
+        shapes,
+    } = left;
+    *title == right.title
+        && *text == right.text
+        && *notes == right.notes
+        && *transition == right.transition
+        && *animations == right.animations
+        && *legacy_animation == right.legacy_animation
+        && *shapes == right.shapes
 }
 
 impl MutablePresentation {
@@ -88,7 +133,19 @@ impl MutablePresentation {
         let mimetype = "application/vnd.oasis.opendocument.presentation".to_string();
 
         let styles_xml = presentation.styles_xml().map(str::to_owned);
+        let content_source = PresentationContentSource::parse(presentation.content_xml())?;
         let source_package = Some(presentation.into_package());
+
+        let declarations = (!declarations.is_empty()).then_some(declarations);
+        let page_metadata = (!page_metadata.is_empty()).then_some(page_metadata);
+        let source_slides = match &content_source {
+            // Only pages the scanner actually recovered can be retained; a
+            // mismatch means the model and the markup disagree, so fall back to
+            // regenerating every page.
+            Some(source) if source.page_count() == slides.len() => slides.clone(),
+            _ => Vec::new(),
+        };
+        let content_source = content_source.filter(|_| !source_slides.is_empty());
 
         Ok(Self {
             slides,
@@ -99,8 +156,12 @@ impl MutablePresentation {
             media_files: BTreeMap::new(),
             next_frame_number: 1,
             settings,
-            declarations: (!declarations.is_empty()).then_some(declarations),
-            page_metadata: (!page_metadata.is_empty()).then_some(page_metadata),
+            source_declarations: declarations.clone(),
+            declarations,
+            source_page_metadata: page_metadata.clone(),
+            page_metadata,
+            content_source,
+            source_slides,
         })
     }
 
@@ -125,6 +186,10 @@ impl MutablePresentation {
             settings: None,
             declarations: None,
             page_metadata: None,
+            content_source: None,
+            source_slides: Vec::new(),
+            source_declarations: None,
+            source_page_metadata: None,
         }
     }
 
@@ -641,7 +706,6 @@ impl MutablePresentation {
         Ok(path)
     }
 
-
     /// Remove a shape from a slide.
     ///
     /// # Arguments
@@ -708,6 +772,68 @@ impl MutablePresentation {
         }
     }
 
+    /// Locate the verbatim source markup for a slide that has not been edited.
+    ///
+    /// Returns `None` whenever the model cannot prove the slide is byte-identical
+    /// in meaning to one of the source slides, in which case the caller
+    /// regenerates it from the model.
+    fn retained_page(&self, slide_index: usize, slide: &Slide) -> Option<&str> {
+        let source = self.content_source.as_ref()?;
+        if self.declarations != self.source_declarations
+            || self.page_metadata != self.source_page_metadata
+        {
+            return None;
+        }
+        if self
+            .source_slides
+            .get(slide_index)
+            .is_some_and(|candidate| slide_content_eq(candidate, slide))
+        {
+            return source.page(slide_index);
+        }
+        if self.source_slides.len() > MAX_SOURCE_PAGE_SCAN {
+            return None;
+        }
+        let matched = self
+            .source_slides
+            .iter()
+            .position(|candidate| slide_content_eq(candidate, slide))?;
+        source.page(matched)
+    }
+
+    /// Build the `office:automatic-styles` payload for a retained document.
+    ///
+    /// Only slides that were regenerated need synthesised drawing-page styles,
+    /// and any name the source already defines is left untouched so retained
+    /// markup keeps referring to the original definition.
+    fn generate_page_styles(&self, regenerated: &[usize]) -> String {
+        let defines = |name: &str| {
+            self.content_source
+                .as_ref()
+                .is_some_and(|source| source.defines_style(name))
+        };
+        let mut output = String::new();
+        let needs_default = regenerated.iter().any(|index| {
+            self.slides.get(*index).is_some_and(|slide| {
+                super::builder::slide_style_name(slide, *index)
+                    == super::builder::DEFAULT_DRAWING_PAGE_STYLE_NAME
+            })
+        });
+        if needs_default && !defines(super::builder::DEFAULT_DRAWING_PAGE_STYLE_NAME) {
+            output.push_str(super::builder::DEFAULT_DRAWING_PAGE_STYLE);
+        }
+        for &index in regenerated {
+            let Some(slide) = self.slides.get(index) else {
+                continue;
+            };
+            if defines(&super::builder::slide_style_name(slide, index)) {
+                continue;
+            }
+            super::builder::push_transition_style(&mut output, slide, index);
+        }
+        output
+    }
+
     /// Generate content.xml from the current mutable state.
     fn generate_content_xml(&self) -> Result<String> {
         let mut extension_uris = BTreeSet::new();
@@ -762,6 +888,9 @@ impl MutablePresentation {
             self.declarations.as_ref(),
             self.slides.len(),
         )?);
+        if let Some(source) = &self.content_source {
+            source.write_leading_extras(&mut body);
+        }
 
         let page_names = super::page_metadata::effective_page_names(
             self.page_metadata.as_ref(),
@@ -772,7 +901,13 @@ impl MutablePresentation {
             &page_names,
         )?;
 
+        let mut regenerated = Vec::new();
         for (i, slide) in self.slides.iter().enumerate() {
+            if let Some(page) = self.retained_page(i, slide) {
+                body.push_str(page);
+                continue;
+            }
+            regenerated.push(i);
             let page_num = i + 1;
             let slide_style = super::builder::slide_style_name(slide, i);
             if let Some(metadata) = &self.page_metadata {
@@ -846,9 +981,26 @@ impl MutablePresentation {
             body.push_str("</draw:page>");
         }
 
+        if let Some(source) = &self.content_source {
+            source.write_trailing_extras(&mut body);
+        }
         body.push_str(&super::settings::write_presentation_settings(
             self.settings.as_ref(),
         )?);
+
+        if let Some(source) = &self.content_source {
+            let styles = self.generate_page_styles(&regenerated);
+            let synthesised = !regenerated.is_empty() || !styles.is_empty();
+            let mut output = String::with_capacity(body.len() + estimated);
+            source.write_prolog(&mut output);
+            output.push_str(&source.root_start_tag(&extension_declarations, synthesised)?);
+            source.write_prologue(&mut output, &styles);
+            output.push_str(source.body_start_tag());
+            output.push_str(source.presentation_start_tag());
+            output.push_str(&body);
+            output.push_str(&source.close_tags());
+            return Ok(output);
+        }
 
         let transition_styles = super::builder::generate_transition_styles(&self.slides);
         Ok(format!(
@@ -1126,11 +1278,13 @@ mod tests {
         let bytes = mutable.to_bytes().unwrap();
         let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
         let regenerated = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
-        assert!(regenerated.contains("<draw:enhanced-geometry"));
-        assert!(regenerated.contains(r#"draw:enhanced-path="M 0 0 L ?f0 21600 Z""#));
-        assert!(regenerated.contains(r#"dr3d:projection="parallel""#));
-        assert!(regenerated.contains(r#"draw:formula="$0 + 1200""#));
-        assert!(regenerated.contains(r#"draw:handle-position="$0 10800""#));
+        // The slide was never edited, so it is re-emitted byte for byte,
+        // keeping the source's namespace prefixes.
+        assert!(regenerated.contains("<d:enhanced-geometry"));
+        assert!(regenerated.contains(r#"d:enhanced-path="M 0 0 L ?f0 21600 Z""#));
+        assert!(regenerated.contains(r#"r:projection="parallel""#));
+        assert!(regenerated.contains(r#"d:formula="$0 + 1200""#));
+        assert!(regenerated.contains(r#"d:handle-position="$0 10800""#));
 
         let reparsed = Presentation::from_bytes(bytes).unwrap();
         let slides = reparsed.slides().unwrap();
@@ -1163,10 +1317,12 @@ mod tests {
         let bytes = mutable.to_bytes().unwrap();
         let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
         let regenerated = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
-        assert!(regenerated.contains("<dr3d:scene"));
-        assert!(regenerated.contains(r##"dr3d:ambient-color="#102030""##));
-        assert!(regenerated.contains(r#"dr3d:min-edge="(-1 -1 -1)""#));
-        assert!(regenerated.contains(r#"dr3d:shade-mode="gouraud""#));
+        // The slide was never edited, so it is re-emitted byte for byte,
+        // keeping the source's namespace prefixes.
+        assert!(regenerated.contains("<r:scene"));
+        assert!(regenerated.contains(r##"r:ambient-color="#102030""##));
+        assert!(regenerated.contains(r#"r:min-edge="(-1 -1 -1)""#));
+        assert!(regenerated.contains(r#"r:shade-mode="gouraud""#));
 
         let reparsed = Presentation::from_bytes(bytes).unwrap();
         let scene = &reparsed.slides().unwrap()[0].shapes[0];
@@ -1428,5 +1584,34 @@ mod tests {
         let parsed = &reparsed.slides().unwrap()[0].shapes[0];
         assert_eq!(parsed.hyperlink(), shape.hyperlink());
         assert_eq!(parsed.event_listeners(), shape.event_listeners());
+    }
+
+    #[test]
+    fn regenerated_media_frame_keeps_its_fallback_image() {
+        let content = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="page1"><draw:frame draw:name="Movie"><draw:plugin xlink:href="Models/duck.json" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad" draw:mime-type="model/vnd.gltf+json"/><draw:image xlink:href="Pictures/fallback.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.presentation")
+            .unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        let presentation = Presentation::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+        let mut mutable = MutablePresentation::from_presentation(presentation).unwrap();
+
+        // Editing the slide forces the page to be rebuilt from the model, which
+        // is where a media frame used to be rejected outright.
+        mutable.slides_mut()[0].text = "Edited".to_string();
+        let bytes = mutable.to_bytes().unwrap();
+        let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
+        let regenerated = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
+        assert!(regenerated.contains(r#"xlink:href="Models/duck.json""#));
+        assert!(regenerated.contains(r#"xlink:href="Pictures/fallback.png""#));
+
+        let reparsed = Presentation::from_bytes(bytes).unwrap();
+        let shapes = reparsed.slides().unwrap().remove(0).shapes;
+        let frame = shapes
+            .iter()
+            .find(|shape| shape.media().is_some())
+            .expect("media frame");
+        assert_eq!(frame.image_href(), Some("Pictures/fallback.png"));
     }
 }

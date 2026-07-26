@@ -426,6 +426,7 @@ fn attached_glossary_round_trips_inside_encrypted_template() {
     let document = package
         .document_with_options(DocOpenOptions {
             password: Some("secret"),
+            ..Default::default()
         })
         .unwrap();
 

@@ -233,85 +233,99 @@ pub(super) fn slide_style_name(slide: &Slide, index: usize) -> String {
     {
         format!("dpTransition{}", index + 1)
     } else {
-        "dp1".to_string()
+        DEFAULT_DRAWING_PAGE_STYLE_NAME.to_string()
     }
 }
 
+/// Name of the fallback drawing-page style referenced by generated slides.
+pub(super) const DEFAULT_DRAWING_PAGE_STYLE_NAME: &str = "dp1";
+
+/// Definition of [`DEFAULT_DRAWING_PAGE_STYLE_NAME`].
+pub(super) const DEFAULT_DRAWING_PAGE_STYLE: &str = r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#;
+
 pub(super) fn generate_transition_styles(slides: &[Slide]) -> String {
-    let mut output = String::from(
-        r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#,
-    );
+    let mut output = String::from(DEFAULT_DRAWING_PAGE_STYLE);
     for (index, slide) in slides.iter().enumerate() {
-        let Some(transition) = slide.transition.as_ref().filter(|value| !value.is_empty()) else {
-            continue;
-        };
-        output.push_str(r#"<style:style style:name=""#);
-        output.push_str(&slide_style_name(slide, index));
-        output.push_str(r#"" style:family="drawing-page"><style:drawing-page-properties"#);
-        push_optional_attribute(
-            &mut output,
-            "presentation:transition-type",
-            transition.transition_type.map(|value| value.as_str()),
-        );
-        push_optional_attribute(
-            &mut output,
-            "presentation:transition-style",
-            transition.style.as_ref().map(|value| value.as_str()),
-        );
-        push_optional_attribute(
-            &mut output,
-            "presentation:transition-speed",
-            transition.speed.map(|value| value.as_str()),
-        );
-        push_optional_attribute(&mut output, "smil:type", transition.smil_type.as_deref());
-        push_optional_attribute(
-            &mut output,
-            "smil:subtype",
-            transition.smil_subtype.as_deref(),
-        );
-        push_optional_attribute(
-            &mut output,
-            "smil:direction",
-            transition.direction.map(|value| value.as_str()),
-        );
-        push_optional_attribute(
-            &mut output,
-            "smil:fadeColor",
-            transition.fade_color.as_deref(),
-        );
-        push_optional_attribute(
-            &mut output,
-            "presentation:duration",
-            transition.duration.as_deref(),
-        );
-        if let Some(sound) = transition.sound.as_ref() {
-            output.push('>');
-            output.push_str(r#"<presentation:sound xlink:type="simple" xlink:href=""#);
-            output.push_str(&escape_xml(&sound.href));
-            output.push('"');
-            if sound.actuate_on_request {
-                output.push_str(r#" xlink:actuate="onRequest""#);
-            }
-            push_optional_attribute(
-                &mut output,
-                "xlink:show",
-                sound.show.map(|value| value.as_str()),
-            );
-            push_optional_attribute(&mut output, "xml:id", sound.xml_id.as_deref());
-            push_optional_attribute(
-                &mut output,
-                "presentation:play-full",
-                sound
-                    .play_full
-                    .map(|value| if value { "true" } else { "false" }),
-            );
-            output.push_str("/></style:drawing-page-properties>");
-        } else {
-            output.push_str("/>");
-        }
-        output.push_str("</style:style>");
+        push_transition_style(&mut output, slide, index);
     }
     output
+}
+
+/// Append the drawing-page style for one slide's transition, if it has one.
+///
+/// Slides without a transition reference [`DEFAULT_DRAWING_PAGE_STYLE_NAME`]
+/// and therefore need no dedicated definition.
+pub(super) fn push_transition_style(target: &mut String, slide: &Slide, index: usize) {
+    let Some(transition) = slide.transition.as_ref().filter(|value| !value.is_empty()) else {
+        return;
+    };
+    let mut output = String::new();
+    output.push_str(r#"<style:style style:name=""#);
+    output.push_str(&slide_style_name(slide, index));
+    output.push_str(r#"" style:family="drawing-page"><style:drawing-page-properties"#);
+    push_optional_attribute(
+        &mut output,
+        "presentation:transition-type",
+        transition.transition_type.map(|value| value.as_str()),
+    );
+    push_optional_attribute(
+        &mut output,
+        "presentation:transition-style",
+        transition.style.as_ref().map(|value| value.as_str()),
+    );
+    push_optional_attribute(
+        &mut output,
+        "presentation:transition-speed",
+        transition.speed.map(|value| value.as_str()),
+    );
+    push_optional_attribute(&mut output, "smil:type", transition.smil_type.as_deref());
+    push_optional_attribute(
+        &mut output,
+        "smil:subtype",
+        transition.smil_subtype.as_deref(),
+    );
+    push_optional_attribute(
+        &mut output,
+        "smil:direction",
+        transition.direction.map(|value| value.as_str()),
+    );
+    push_optional_attribute(
+        &mut output,
+        "smil:fadeColor",
+        transition.fade_color.as_deref(),
+    );
+    push_optional_attribute(
+        &mut output,
+        "presentation:duration",
+        transition.duration.as_deref(),
+    );
+    if let Some(sound) = transition.sound.as_ref() {
+        output.push('>');
+        output.push_str(r#"<presentation:sound xlink:type="simple" xlink:href=""#);
+        output.push_str(&escape_xml(&sound.href));
+        output.push('"');
+        if sound.actuate_on_request {
+            output.push_str(r#" xlink:actuate="onRequest""#);
+        }
+        push_optional_attribute(
+            &mut output,
+            "xlink:show",
+            sound.show.map(|value| value.as_str()),
+        );
+        push_optional_attribute(&mut output, "xml:id", sound.xml_id.as_deref());
+        push_optional_attribute(
+            &mut output,
+            "presentation:play-full",
+            sound
+                .play_full
+                .map(|value| if value { "true" } else { "false" }),
+        );
+        output.push_str("/></style:drawing-page-properties>");
+    } else {
+        output.push_str("/>");
+    }
+    output.push_str("</style:style>");
+    target.push_str(&output);
 }
 
 impl Default for PresentationBuilder {
@@ -728,9 +742,17 @@ impl PresentationBuilder {
             shape_attributes.push('"');
         }
 
-        if shape.media.is_some() && shape.shape_type != ShapeType::GraphicFrame {
+        // `draw:plugin` is only serialized inside `draw:frame`. Pictures qualify
+        // because ODF allows a frame to pair a plugin with a fallback image;
+        // every other shape type would silently drop the media reference.
+        if shape.media.is_some()
+            && !matches!(
+                shape.shape_type,
+                ShapeType::GraphicFrame | ShapeType::Picture
+            )
+        {
             return Err(litchi_core::Error::InvalidFormat(format!(
-                "ODP media shape '{}' must use the graphic-frame shape type",
+                "ODP media shape '{}' must use the graphic-frame or picture shape type",
                 name
             )));
         }
@@ -866,18 +888,26 @@ impl PresentationBuilder {
                 }
             },
             ShapeType::Picture => {
-                let image = shape.image_href.as_deref().map_or_else(
-                    || "<draw:image/>".to_string(),
-                    |href| {
-                        format!(
-                            r#"<draw:image xlink:href="{}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>"#,
-                            escape_xml(href)
-                        )
+                // A plugin precedes its fallback image, matching how ODF
+                // producers order the alternatives inside one frame.
+                let mut contents = String::new();
+                if let Some(media) = shape.media.as_ref() {
+                    media.write_xml(&mut contents)?;
+                }
+                match shape.image_href.as_deref() {
+                    Some(href) => {
+                        contents.push_str(r#"<draw:image xlink:href=""#);
+                        contents.push_str(&escape_xml(href));
+                        contents.push_str(
+                            r#"" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>"#,
+                        );
                     },
-                );
+                    None if contents.is_empty() => contents.push_str("<draw:image/>"),
+                    None => {},
+                }
                 format!(
                     r#"<draw:frame{}{}>{}</draw:frame>"#,
-                    shape_attributes, position_attributes, image
+                    shape_attributes, position_attributes, contents
                 )
             },
             ShapeType::Line | ShapeType::Connector => {

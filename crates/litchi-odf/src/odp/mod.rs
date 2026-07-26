@@ -53,12 +53,13 @@
 mod action;
 mod animation;
 mod builder;
+mod content_source;
 mod declaration;
+mod layout_master_mutation;
 mod legacy_animation;
 mod media;
 mod mutable;
 mod page_layout_definition;
-mod layout_master_mutation;
 mod page_metadata;
 mod parser;
 mod presentation;
@@ -82,6 +83,7 @@ pub use declaration::{
     PresentationDeclarationTarget, PresentationDeclarations, PresentationTextDeclaration,
     parse_presentation_declarations,
 };
+pub use layout_master_mutation::PresentationMasterPage;
 pub use legacy_animation::{LegacyAnimationKind, LegacyAnimationNode};
 pub use media::{MediaActuate, MediaParameter, MediaReference, MediaShow};
 pub use mutable::MutablePresentation;
@@ -90,7 +92,6 @@ pub use page_layout_definition::{
     PresentationPlaceholder, PresentationPlaceholderClass, parse_presentation_page_layouts,
     remove_presentation_page_layout_xml, set_presentation_page_layout_xml,
 };
-pub use layout_master_mutation::PresentationMasterPage;
 pub use page_metadata::{
     PresentationPageMetadata, PresentationPageMetadataCollection, parse_presentation_page_metadata,
 };

@@ -76,6 +76,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
     let document = package
         .document_with_options(DocOpenOptions {
             password: Some("secret"),
+            ..Default::default()
         })
         .unwrap();
     assert!(document.text().unwrap().contains("Encrypted body"));

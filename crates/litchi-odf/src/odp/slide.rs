@@ -10,7 +10,7 @@ use litchi_core::Result;
 /// A slide in an ODP presentation.
 ///
 /// Slides contain text content, optional titles, and shape elements.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Slide {
     /// Optional slide title
     pub title: Option<String>,
@@ -399,7 +399,7 @@ fn is_xml_local_name(value: &str) -> bool {
         })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape {
     /// Shape type (text box, image, frame, etc.)
     pub shape_type: litchi_core::ShapeType,

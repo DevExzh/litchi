@@ -29,13 +29,15 @@ fn assert_round_trip(profile: DocEncryptionProfile, password: &str) -> Vec<u8> {
     assert!(matches!(package.document(), Err(DocError::PasswordRequired)));
     assert!(matches!(
         package.document_with_options(DocOpenOptions {
-            password: Some("wrong")
+            password: Some("wrong"),
+            ..Default::default()
         }),
         Err(DocError::InvalidPassword)
     ));
     let document = package
         .document_with_options(DocOpenOptions {
             password: Some(password),
+            ..Default::default()
         })
         .unwrap();
     assert!(document.text().unwrap().contains("Main 文本"));
