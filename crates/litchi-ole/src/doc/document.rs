@@ -14,18 +14,17 @@ use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
 use super::parts::fib::FileInformationBlock;
 use super::parts::fields::{
-    non_plcf_field_texts, ActiveContentField, AdvanceField, AutoNumberField, AutoTextField,
-    AutoTextListField, BarcodeField, BidiOutlineField, CompareField, DdeField,
-    DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
-    EmbedField, EquationField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable,
-    FormulaField, GoToButtonField, HyperlinkField, IfField, IndexEntryField, IndexField,
-    InfoField, LegacyFormField, LinkField, ListNumberField, MacroButtonField,
+    ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
+    BarcodeField, BidiOutlineField, CompareField, DdeField, DocumentContextField,
+    DocumentInformationField, DocumentPropertyField, DocumentVariableField, EmbedField,
+    EquationField, ExternalIncludeField, Field, FieldStory, FieldText, FieldsTable, FormulaField,
+    GoToButtonField, HyperlinkField, IfField, IndexEntryField, IndexField, InfoField,
+    LegacyFormField, LinkField, ListNumberField, MacroButtonField,
     MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PrivateField,
-    PromptField, QuoteField, ReferenceField, ReferencedDocumentField, SequenceField, SetField,
-    StyleReferenceField, SymbolField,
-    ShapeField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsEntryField,
-    TableOfContentsField, UserIdentityField,
+    MailMergeNextField, MailMergeRecipientField, MergeField, PrintField, PrivateField, PromptField,
+    QuoteField, ReferenceField, ReferencedDocumentField, SequenceField, SetField, ShapeField,
+    StyleReferenceField, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
+    TableOfContentsEntryField, TableOfContentsField, UserIdentityField, non_plcf_field_texts,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
 use super::parts::glossary::{AttachedGlossary, GlossaryMetadata};
@@ -252,12 +251,8 @@ impl Document {
             }
             Ok(metadata)
         });
-        let attached_glossary = AttachedGlossary::parse(
-            &fib,
-            &word_document,
-            &table_stream,
-            data_stream.as_deref(),
-        );
+        let attached_glossary =
+            AttachedGlossary::parse(&fib, &word_document, &table_stream, data_stream.as_deref());
         let sections =
             SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
@@ -703,9 +698,7 @@ impl Document {
         self.attached_glossary
             .as_ref()
             .map(Option::as_ref)
-            .map_err(|error| {
-                DocError::Corrupted(format!("invalid attached glossary: {error}"))
-            })
+            .map_err(|error| DocError::Corrupted(format!("invalid attached glossary: {error}")))
     }
 
     /// Get access to the fields table (if parsed).
@@ -1680,15 +1673,7 @@ impl Document {
     }
 
     fn field_story_range_if_present(&self, story: FieldStory) -> Option<(u32, u32)> {
-        match story {
-            FieldStory::Main => Some(self.fib.get_main_doc_range()),
-            FieldStory::Header => self.fib.get_header_range(),
-            FieldStory::Footnote => self.fib.get_footnote_range(),
-            FieldStory::Comment => self.fib.get_comment_range(),
-            FieldStory::Endnote => self.fib.get_endnote_range(),
-            FieldStory::Textbox => self.fib.get_textbox_range(),
-            FieldStory::HeaderTextbox => self.fib.get_header_textbox_range(),
-        }
+        story.range(&self.fib)
     }
 
     fn field_story_range(&self, story: FieldStory) -> Result<(u32, u32)> {
@@ -2195,7 +2180,10 @@ impl Document {
 
     /// Map a header-story-relative character position to the header it
     /// belongs to.
-    fn header_kind_at_cp(&self, story_relative_cp: u32) -> Option<super::parts::headers::HeaderFooterType> {
+    fn header_kind_at_cp(
+        &self,
+        story_relative_cp: u32,
+    ) -> Option<super::parts::headers::HeaderFooterType> {
         let (story_base, _) = self.fib.get_header_range()?;
         let absolute_cp = story_base.checked_add(story_relative_cp)?;
         self.headers_table.as_ref().and_then(|table| {
@@ -2243,10 +2231,9 @@ impl Document {
         entries
             .iter()
             .map(|entry| {
-                let raw = self.text_extractor.text_at_range(
-                    story_start + entry.start_cp,
-                    story_start + entry.end_cp,
-                );
+                let raw = self
+                    .text_extractor
+                    .text_at_range(story_start + entry.start_cp, story_start + entry.end_cp);
                 // The range of each text box ends with a trailing CR.
                 let text = raw.strip_suffix('\r').unwrap_or(raw);
                 let header_kind = if in_header_story {

@@ -58,8 +58,8 @@ impl FieldStory {
         }
     }
 
-    fn character_count(self, fib: &FileInformationBlock) -> u32 {
-        let range = match self {
+    pub(crate) fn range(self, fib: &FileInformationBlock) -> Option<(u32, u32)> {
+        match self {
             Self::Main => Some(fib.get_main_doc_range()),
             Self::Header => fib.get_header_range(),
             Self::Footnote => fib.get_footnote_range(),
@@ -67,8 +67,12 @@ impl FieldStory {
             Self::Endnote => fib.get_endnote_range(),
             Self::Textbox => fib.get_textbox_range(),
             Self::HeaderTextbox => fib.get_header_textbox_range(),
-        };
-        range.map_or(0, |(start, end)| end.saturating_sub(start))
+        }
+    }
+
+    fn character_count(self, fib: &FileInformationBlock) -> u32 {
+        self.range(fib)
+            .map_or(0, |(start, end)| end.saturating_sub(start))
     }
 }
 
@@ -562,10 +566,7 @@ struct OpenNonPlcfField {
 /// field kinds MS-DOC explicitly omits from that table. Unbalanced marker
 /// characters are ignored so malformed opaque text does not prevent the
 /// document from opening.
-pub(crate) fn non_plcf_field_texts(
-    story: FieldStory,
-    text: &str,
-) -> Vec<NonPlcfFieldText<'_>> {
+pub(crate) fn non_plcf_field_texts(story: FieldStory, text: &str) -> Vec<NonPlcfFieldText<'_>> {
     let mut fields = Vec::new();
     let mut open_fields = Vec::new();
     let mut cp = 0u32;
@@ -3390,8 +3391,8 @@ impl DocumentContextFieldKind {
             Self::Section,
             Self::SectionPages,
         ]
-            .into_iter()
-            .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
+        .into_iter()
+        .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
     }
 }
 
@@ -4748,8 +4749,7 @@ impl FieldText {
             FieldType::FormDropdown => (LegacyFormFieldKind::DropDown, "FORMDROPDOWN"),
             _ => return None,
         };
-        let opaque_instructions =
-            parse_legacy_form_field_instructions(&self.instruction, keyword)?;
+        let opaque_instructions = parse_legacy_form_field_instructions(&self.instruction, keyword)?;
         Some(LegacyFormField {
             field: self.field.clone(),
             instruction: self.instruction.clone(),
@@ -6019,7 +6019,10 @@ fn parse_table_of_contents_entry_field_parts(
     }
 
     skip_field_whitespace(instruction, &mut position);
-    if matches!(peek_field_character(instruction, position), None | Some('\\')) {
+    if matches!(
+        peek_field_character(instruction, position),
+        None | Some('\\')
+    ) {
         return None;
     }
     let entry = next_field_argument(instruction, &mut position).ok()??;
@@ -6035,8 +6038,7 @@ fn parse_table_of_contents_entry_field_parts(
             break;
         };
         if introducer != '\\'
-            || options.len() + unknown_switches.len()
-                >= MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_SWITCHES
+            || options.len() + unknown_switches.len() >= MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_SWITCHES
         {
             return None;
         }
@@ -6149,7 +6151,10 @@ fn parse_index_entry_field_parts(instruction: &str) -> Option<IndexEntryFieldPar
     }
 
     skip_field_whitespace(instruction, &mut position);
-    if matches!(peek_field_character(instruction, position), None | Some('\\')) {
+    if matches!(
+        peek_field_character(instruction, position),
+        None | Some('\\')
+    ) {
         return None;
     }
     let entry = next_field_argument(instruction, &mut position).ok()??;
@@ -6234,9 +6239,7 @@ fn parse_referenced_document_field_parts(
         let Some(introducer) = next_field_character(instruction, &mut position) else {
             break;
         };
-        if introducer != '\\'
-            || switches.len() >= MAX_REFERENCED_DOCUMENT_FIELD_SWITCHES
-        {
+        if introducer != '\\' || switches.len() >= MAX_REFERENCED_DOCUMENT_FIELD_SWITCHES {
             return None;
         }
 
@@ -8536,10 +8539,7 @@ mod tests {
 
     #[test]
     fn unrecognized_field_type_is_preserved_with_valid_boundaries() {
-        let data = plcf(
-            &[1, 3, 5, 7],
-            &[[0x13, 0x4E], [0x14, 0], [0x15, 0x80]],
-        );
+        let data = plcf(&[1, 3, 5, 7], &[[0x13, 0x4E], [0x14, 0], [0x15, 0x80]]);
         let table = FieldStoryTable::parse_plcf(FieldStory::Main, 7, &data).unwrap();
 
         assert_eq!(table.fields().len(), 1);
@@ -8791,10 +8791,7 @@ mod tests {
         }
 
         let too_long = FieldText {
-            instruction: format!(
-                "PRINT {}",
-                "x".repeat(MAX_PRINT_FIELD_INSTRUCTION_BYTES)
-            ),
+            instruction: format!("PRINT {}", "x".repeat(MAX_PRINT_FIELD_INSTRUCTION_BYTES)),
             ..text.clone()
         };
         assert!(too_long.print_field().is_none());
@@ -8849,10 +8846,7 @@ mod tests {
             ..text.clone()
         };
         let equation = equation.embed_field().unwrap();
-        assert_eq!(
-            equation.object_instructions(),
-            r#""Equation.DSMT4" \d"#
-        );
+        assert_eq!(equation.object_instructions(), r#""Equation.DSMT4" \d"#);
         assert_eq!(equation.cached_result(), Some("cached equation object"));
 
         let bare = FieldText {
@@ -8862,10 +8856,7 @@ mod tests {
         };
         assert_eq!(bare.embed_field().unwrap().object_instructions(), "");
 
-        for instruction in [
-            r#"EMBEDS Excel.Sheet.12"#,
-            r#"EMBEDDED Excel.Sheet.12"#,
-        ] {
+        for instruction in [r#"EMBEDS Excel.Sheet.12"#, r#"EMBEDDED Excel.Sheet.12"#] {
             let malformed = FieldText {
                 instruction: instruction.to_string(),
                 ..text.clone()
@@ -8874,10 +8865,7 @@ mod tests {
         }
 
         let too_long = FieldText {
-            instruction: format!(
-                "EMBED {}",
-                "x".repeat(MAX_EMBED_FIELD_INSTRUCTION_BYTES)
-            ),
+            instruction: format!("EMBED {}", "x".repeat(MAX_EMBED_FIELD_INSTRUCTION_BYTES)),
             ..text.clone()
         };
         assert!(too_long.embed_field().is_none());
@@ -8932,10 +8920,7 @@ mod tests {
             ..text.clone()
         };
         let code_39 = code_39.barcode_field().unwrap();
-        assert_eq!(
-            code_39.barcode_instructions(),
-            r#""ABC-123" CODE39 \d"#
-        );
+        assert_eq!(code_39.barcode_instructions(), r#""ABC-123" CODE39 \d"#);
         assert_eq!(code_39.cached_result(), Some("cached Code39 barcode"));
 
         let bare = FieldText {
@@ -8945,10 +8930,7 @@ mod tests {
         };
         assert_eq!(bare.barcode_field().unwrap().barcode_instructions(), "");
 
-        for instruction in [
-            r#"BARCODES 4901234567894"#,
-            r#"BARCODED 4901234567894"#,
-        ] {
+        for instruction in [r#"BARCODES 4901234567894"#, r#"BARCODED 4901234567894"#] {
             let malformed = FieldText {
                 instruction: instruction.to_string(),
                 ..text.clone()
@@ -9002,10 +8984,7 @@ mod tests {
         assert_eq!(outline.field(), &field);
         assert_eq!(outline.instruction(), text.instruction);
         assert_eq!(outline.opaque_instructions(), r#"\* MERGEFORMAT"#);
-        assert_eq!(
-            outline.cached_result(),
-            Some("cached bidi outline number")
-        );
+        assert_eq!(outline.cached_result(), Some("cached bidi outline number"));
         assert!(outline.is_dirty());
         assert!(outline.is_locked());
 
@@ -9094,10 +9073,7 @@ mod tests {
         }
 
         let too_long = FieldText {
-            instruction: format!(
-                "SHAPE {}",
-                "x".repeat(MAX_SHAPE_FIELD_INSTRUCTION_BYTES)
-            ),
+            instruction: format!("SHAPE {}", "x".repeat(MAX_SHAPE_FIELD_INSTRUCTION_BYTES)),
             ..text.clone()
         };
         assert!(too_long.shape_field().is_none());
@@ -9314,7 +9290,10 @@ mod tests {
         let entry = &entries[0];
         assert_eq!(entry.story(), FieldStory::Textbox);
         assert_eq!(entry.start_position(), 0);
-        assert_eq!(entry.instruction(), " TC \"Illustration 1\" \\f i \\l 4 \\n \\* MERGEFORMAT ");
+        assert_eq!(
+            entry.instruction(),
+            " TC \"Illustration 1\" \\f i \\l 4 \\n \\* MERGEFORMAT "
+        );
         assert_eq!(entry.entry(), "Illustration 1");
         assert_eq!(
             entry.options(),
@@ -9395,9 +9374,7 @@ mod tests {
         assert_eq!(
             entry.options(),
             &[
-                TableOfAuthoritiesEntryOption::LongCitation(
-                    "Baldwin v. Alberti".to_string()
-                ),
+                TableOfAuthoritiesEntryOption::LongCitation("Baldwin v. Alberti".to_string()),
                 TableOfAuthoritiesEntryOption::Category("1".to_string()),
                 TableOfAuthoritiesEntryOption::ShortCitation("Baldwin".to_string()),
                 TableOfAuthoritiesEntryOption::BoldPageNumber,
@@ -9417,8 +9394,7 @@ mod tests {
         assert!(entry.end_position() > entry.start_position());
 
         let no_options = non_plcf_field_texts(FieldStory::Main, "\u{0013} TA\u{0015}");
-        let no_options =
-            TableOfAuthoritiesEntryField::from_non_plcf_field(&no_options[0]).unwrap();
+        let no_options = TableOfAuthoritiesEntryField::from_non_plcf_field(&no_options[0]).unwrap();
         assert!(no_options.options().is_empty());
 
         for instruction in [
@@ -9434,7 +9410,9 @@ mod tests {
             assert!(
                 non_plcf_field_texts(FieldStory::Main, &text)
                     .iter()
-                    .all(|field| TableOfAuthoritiesEntryField::from_non_plcf_field(field).is_none()),
+                    .all(
+                        |field| TableOfAuthoritiesEntryField::from_non_plcf_field(field).is_none()
+                    ),
                 "{instruction}"
             );
         }
@@ -9574,10 +9552,8 @@ mod tests {
         assert!(reference.separator_position().is_some());
         assert!(reference.end_position() > reference.start_position());
 
-        let absolute = non_plcf_field_texts(
-            FieldStory::Main,
-            "\u{0013} RD \"appendix.doc\"\u{0015}",
-        );
+        let absolute =
+            non_plcf_field_texts(FieldStory::Main, "\u{0013} RD \"appendix.doc\"\u{0015}");
         let absolute = ReferencedDocumentField::from_non_plcf_field(&absolute[0]).unwrap();
         assert_eq!(absolute.source(), "appendix.doc");
         assert!(!absolute.uses_relative_path());
@@ -10184,10 +10160,7 @@ mod tests {
         }
 
         let too_long = FieldText {
-            instruction: format!(
-                "EQ {}",
-                "x".repeat(MAX_EQUATION_FIELD_INSTRUCTION_BYTES)
-            ),
+            instruction: format!("EQ {}", "x".repeat(MAX_EQUATION_FIELD_INSTRUCTION_BYTES)),
             ..text.clone()
         };
         assert!(too_long.equation_field().is_none());
@@ -10435,10 +10408,7 @@ mod tests {
         }
 
         let too_long = FieldText {
-            instruction: format!(
-                "SYMBOL {}",
-                "x".repeat(MAX_SYMBOL_FIELD_INSTRUCTION_BYTES)
-            ),
+            instruction: format!("SYMBOL {}", "x".repeat(MAX_SYMBOL_FIELD_INSTRUCTION_BYTES)),
             ..text.clone()
         };
         assert!(too_long.symbol_field().is_none());
@@ -10488,10 +10458,7 @@ mod tests {
         assert_eq!(automatic.switches()[0].name(), 's');
         assert_eq!(automatic.switches()[0].argument(), Some("."));
         assert_eq!(automatic.switches()[1].name(), '*');
-        assert_eq!(
-            automatic.switches()[1].argument(),
-            Some("MERGEFORMAT")
-        );
+        assert_eq!(automatic.switches()[1].argument(), Some("MERGEFORMAT"));
 
         let legal = FieldText {
             field: Field {
@@ -10537,10 +10504,7 @@ mod tests {
                 instruction: instruction.to_string(),
                 ..text.clone()
             };
-            assert!(
-                malformed.auto_number_field().is_none(),
-                "{instruction}"
-            );
+            assert!(malformed.auto_number_field().is_none(), "{instruction}");
         }
 
         let too_long = FieldText {
@@ -10608,10 +10572,7 @@ mod tests {
         assert_eq!(numbered.switches()[1].name(), 's');
         assert_eq!(numbered.switches()[1].argument(), Some("3"));
         assert_eq!(numbered.switches()[2].name(), '*');
-        assert_eq!(
-            numbered.switches()[2].argument(),
-            Some("MERGEFORMAT")
-        );
+        assert_eq!(numbered.switches()[2].argument(), Some("MERGEFORMAT"));
 
         let outline = FieldText {
             instruction: r#"listnum "Outline Default" \l 4"#.to_string(),
@@ -11424,8 +11385,9 @@ mod tests {
         };
         let text = FieldText {
             field: field.clone(),
-            instruction: r#" INFO TITLE "Stored title override" \* MERGEFORMAT \@ "opaque format" "#
-                .to_string(),
+            instruction:
+                r#" INFO TITLE "Stored title override" \* MERGEFORMAT \@ "opaque format" "#
+                    .to_string(),
             result: Some("cached title".to_string()),
         };
 
@@ -11441,10 +11403,7 @@ mod tests {
         assert_eq!(information.switches()[0].name(), '*');
         assert_eq!(information.switches()[0].argument(), Some("MERGEFORMAT"));
         assert_eq!(information.switches()[1].name(), '@');
-        assert_eq!(
-            information.switches()[1].argument(),
-            Some("opaque format")
-        );
+        assert_eq!(information.switches()[1].argument(), Some("opaque format"));
 
         let implicit = FieldText {
             instruction: r#" COMMENTS "Stored comment" \* MERGEFORMAT "#.to_string(),
@@ -11454,10 +11413,7 @@ mod tests {
         let implicit_information = implicit.info_field().unwrap();
         assert_eq!(implicit_information.information_type(), "COMMENTS");
         assert_eq!(implicit_information.new_value(), Some("Stored comment"));
-        assert_eq!(
-            implicit_information.cached_result(),
-            Some("cached comment")
-        );
+        assert_eq!(implicit_information.cached_result(), Some("cached comment"));
         assert_eq!(
             implicit_information.switches()[0].argument(),
             Some("MERGEFORMAT")
@@ -11484,10 +11440,7 @@ mod tests {
         }
 
         let too_long = FieldText {
-            instruction: format!(
-                "INFO {}",
-                "x".repeat(MAX_INFO_FIELD_INSTRUCTION_BYTES)
-            ),
+            instruction: format!("INFO {}", "x".repeat(MAX_INFO_FIELD_INSTRUCTION_BYTES)),
             ..text.clone()
         };
         assert!(too_long.info_field().is_none());
@@ -11536,10 +11489,7 @@ mod tests {
         assert_eq!(information.switches()[0].name(), '*');
         assert_eq!(information.switches()[0].argument(), Some("MERGEFORMAT"));
         assert_eq!(information.switches()[1].name(), '@');
-        assert_eq!(
-            information.switches()[1].argument(),
-            Some("opaque format")
-        );
+        assert_eq!(information.switches()[1].argument(), Some("opaque format"));
 
         for (field_type, instruction, kind) in [
             (
@@ -11647,10 +11597,7 @@ mod tests {
                 instruction: instruction.to_string(),
                 ..text.clone()
             };
-            assert!(
-                malformed.document_information().is_none(),
-                "{instruction}"
-            );
+            assert!(malformed.document_information().is_none(), "{instruction}");
         }
 
         let wrong_type = FieldText {

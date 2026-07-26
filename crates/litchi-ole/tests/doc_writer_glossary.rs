@@ -1,6 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole::doc::writer::{
     DocDrawingShape, DocEncryptionProfile, DocPicture, DocShapeKind, FloatingPosition,
+    ParagraphFormatting,
 };
 use litchi_ole::doc::{
     DocOpenOptions, DocWriter, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
@@ -95,6 +96,44 @@ fn glossary_with_drawings() -> DocWriter {
             13,
             14,
             15,
+        )
+        .unwrap(),
+    );
+    writer
+}
+
+fn glossary_with_hyperlink() -> DocWriter {
+    const DISPLAY_TEXT: &str = "OpenAI";
+    const TARGET: &str = "https://example.com";
+
+    let mut writer = DocWriter::new();
+    writer
+        .add_hyperlink(DISPLAY_TEXT, TARGET, ParagraphFormatting::default())
+        .unwrap();
+    writer.add_paragraph("").unwrap();
+    writer.add_paragraph("").unwrap();
+
+    let instruction = format!("HYPERLINK \"{TARGET}\"");
+    let item_end = u32::try_from(
+        1 + instruction.encode_utf16().count() + 1 + DISPLAY_TEXT.encode_utf16().count() + 1 + 1,
+    )
+    .unwrap();
+    writer.set_glossary_metadata(
+        GlossaryMetadata::try_new(
+            vec![
+                GlossaryItem::try_new(
+                    "website",
+                    GlossaryItemKind::NamedAutoText,
+                    None,
+                    0,
+                    item_end,
+                )
+                .unwrap(),
+            ],
+            vec![],
+            item_end,
+            item_end + 1,
+            item_end + 2,
         )
         .unwrap(),
     );
@@ -432,8 +471,36 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
 }
 
 #[test]
+fn attached_glossary_exposes_typed_inert_fields() {
+    let mut template = DocWriter::new();
+    template.add_paragraph("Template").unwrap();
+    template
+        .set_attached_glossary(glossary_with_hyperlink())
+        .unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    template.write_to(&mut output).unwrap();
+    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    let attached = document.attached_glossary().unwrap().unwrap();
+
+    let main_fields = attached.fields_table().main_document_fields();
+    assert_eq!(main_fields.len(), 1);
+    let field = attached.field_text(&main_fields[0]).unwrap();
+    assert_eq!(field.instruction, r#"HYPERLINK "https://example.com""#);
+    assert_eq!(field.result.as_deref(), Some("OpenAI"));
+    assert_eq!(attached.fields().unwrap(), vec![field]);
+
+    let links = attached.hyperlink_fields().unwrap();
+    assert_eq!(links.len(), 1);
+    assert_eq!(links[0].external_target(), Some("https://example.com"));
+    assert_eq!(links[0].cached_result(), Some("OpenAI"));
+}
+
+#[test]
 fn malformed_attached_fib_topologies_are_deferred_and_rejected() {
     const DGG_INFO_INDEX: usize = 50;
+    const PLCF_FLD_MOM_INDEX: usize = 16;
     let cases = [
         attached_template_bytes(|word, _| {
             word[FIB_FLAGS_OFFSET..FIB_FLAGS_OFFSET + 2].copy_from_slice(&0x12F4u16.to_le_bytes());
@@ -457,6 +524,11 @@ fn malformed_attached_fib_topologies_are_deferred_and_rejected() {
             let pointer = secondary + FIB_POINTERS_OFFSET + DGG_INFO_INDEX * FIB_POINTER_BYTES;
             word[pointer..pointer + 4].copy_from_slice(&u32::MAX.to_le_bytes());
             word[pointer + 4..pointer + 8].copy_from_slice(&1u32.to_le_bytes());
+        }),
+        attached_template_bytes(|word, secondary| {
+            let pointer = secondary + FIB_POINTERS_OFFSET + PLCF_FLD_MOM_INDEX * FIB_POINTER_BYTES;
+            word[pointer..pointer + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+            word[pointer + 4..pointer + 8].copy_from_slice(&4u32.to_le_bytes());
         }),
         attached_template_bytes(|word, _| {
             word[FIB_PN_NEXT_OFFSET..FIB_PN_NEXT_OFFSET + 2].copy_from_slice(&1u16.to_le_bytes());

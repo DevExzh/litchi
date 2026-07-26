@@ -4,6 +4,7 @@ use super::super::package::{DocError, Result};
 use super::super::paragraph::{Paragraph, Run};
 use super::chp_bin_table::ChpBinTable;
 use super::fib::FileInformationBlock;
+use super::fields::{Field, FieldStory, FieldText, FieldsTable, HyperlinkField};
 use super::pap_bin_table::PapBinTable;
 use super::paragraph_extractor::ParagraphExtractor;
 use super::piece_table::PieceTable;
@@ -183,6 +184,7 @@ pub struct AttachedGlossary {
     fib: FileInformationBlock,
     metadata: GlossaryMetadata,
     text_extractor: TextExtractor,
+    fields_table: FieldsTable,
     chp_bin_table: Option<ChpBinTable>,
     pap_bin_table: Option<PapBinTable>,
     stylesheet: Option<StyleSheet>,
@@ -279,6 +281,7 @@ impl AttachedGlossary {
             .ok_or_else(|| corrupted("attached glossary metadata is absent"))?;
         let text_extractor = TextExtractor::new(&fib, word_document, table_stream)?;
         metadata.validate_text_boundaries(&text_extractor)?;
+        let fields_table = FieldsTable::parse(&fib, table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, table_stream)?;
         let mut stylesheet = (fib.version() >= 0x00C1)
             .then(|| StyleSheet::parse(&fib, table_stream))
@@ -328,6 +331,7 @@ impl AttachedGlossary {
             fib,
             metadata,
             text_extractor,
+            fields_table,
             chp_bin_table,
             pap_bin_table,
             stylesheet,
@@ -363,6 +367,44 @@ impl AttachedGlossary {
             self.text_extractor
                 .text_at_range(item.start_cp(), item.end_cp().saturating_sub(1)),
         )
+    }
+
+    /// Return the strictly parsed field-character tables for all attached stories.
+    ///
+    /// Field instructions, cached results, external targets, controls, and
+    /// macro names remain inert and are never resolved, activated, refreshed,
+    /// or executed.
+    pub fn fields_table(&self) -> &FieldsTable {
+        &self.fields_table
+    }
+
+    /// Return stored instruction and cached-result text for every attached story.
+    ///
+    /// Ranges are resolved against the secondary FIB's story character counts.
+    /// This reads existing text only and performs no field evaluation or
+    /// external action.
+    pub fn fields(&self) -> Result<Vec<FieldText>> {
+        self.fields_table
+            .field_texts(|story, start, end| self.field_story_text(story, start, end))
+    }
+
+    /// Return stored instruction and cached-result text for one attached field.
+    pub fn field_text(&self, field: &Field) -> Result<FieldText> {
+        FieldText::from_field(field, |start, end| {
+            self.field_story_text(field.story, start, end)
+        })
+    }
+
+    /// Return typed, inert `HYPERLINK` fields from all attached stories.
+    ///
+    /// Targets and bookmarks are returned exactly as stored. They are never
+    /// opened, followed, resolved, or refreshed.
+    pub fn hyperlink_fields(&self) -> Result<Vec<HyperlinkField>> {
+        Ok(self
+            .fields()?
+            .iter()
+            .filter_map(FieldText::hyperlink_field)
+            .collect())
     }
 
     /// Extract formatted paragraphs from every stored glossary subdocument.
@@ -445,6 +487,27 @@ impl AttachedGlossary {
             &self.header_textbox_entries,
             self.fib.get_header_textbox_range(),
         )
+    }
+
+    fn field_story_text(&self, story: FieldStory, start: u32, end: u32) -> Result<String> {
+        if start > end {
+            return Err(corrupted("field text range has its start after its end"));
+        }
+        let (story_start, story_end) = story
+            .range(&self.fib)
+            .ok_or_else(|| corrupted("field table refers to an absent attached story"))?;
+        let start = story_start
+            .checked_add(start)
+            .ok_or_else(|| corrupted("field text range start overflows"))?;
+        let end = story_start
+            .checked_add(end)
+            .ok_or_else(|| corrupted("field text range end overflows"))?;
+        if end > story_end {
+            return Err(corrupted(
+                "field text range exceeds its attached document story",
+            ));
+        }
+        Ok(self.text_extractor.text_at_range(start, end).to_string())
     }
 }
 
