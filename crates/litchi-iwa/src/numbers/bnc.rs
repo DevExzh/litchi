@@ -31,10 +31,19 @@ pub(crate) const FORMULA_ERROR_FLAG: u32 = 0x000800;
 pub(crate) const COMMENT_FLAG: u32 = 0x080000;
 const CELL_FORMAT_KIND_FLAG: u32 = 0x001000;
 const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x002000;
+const CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x004000;
 const EXPLICIT_FORMAT_FLAGS_START: usize = 6;
 const EXPLICIT_FORMAT_FLAGS_END: usize = 8;
-const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
+pub(crate) const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
+pub(crate) const EXPLICIT_CURRENCY_FORMAT: u16 = 0x0803;
 pub(crate) const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
+pub(crate) const CURRENCY_CELL_FORMAT_KIND: u32 = 2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DecimalCellFormatKind {
+    NumberOrPercentage,
+    Currency,
+}
 
 const VALUE_FLAGS: u32 = DECIMAL_FLAG
     | NUMBER_FLAG
@@ -191,11 +200,12 @@ impl BncCell {
                 "Numbers cells cannot store a non-finite numeric value".to_string(),
             ));
         }
-        self.replace_value(
-            CELL_TYPE_NUMBER,
-            DECIMAL_FLAG,
-            decimal128_le(value)?.to_vec(),
-        );
+        let cell_type = if self.cell_format_kind() == Some(CURRENCY_CELL_FORMAT_KIND) {
+            CELL_TYPE_ALTERNATE_NUMBER
+        } else {
+            CELL_TYPE_NUMBER
+        };
+        self.replace_value(cell_type, DECIMAL_FLAG, decimal128_le(value)?.to_vec());
         Ok(())
     }
 
@@ -340,26 +350,63 @@ impl BncCell {
     }
 
     pub(crate) fn format_identifier(&self) -> Option<u32> {
-        self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG)
+        match self.cell_format_kind() {
+            Some(CURRENCY_CELL_FORMAT_KIND) => self.u32_field(CURRENCY_FORMAT_IDENTIFIER_FLAG),
+            _ => self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG),
+        }
     }
 
-    pub(crate) fn set_data_format_identifier(&mut self, identifier: u32) {
+    pub(crate) fn secondary_format_identifier(&self) -> Option<u32> {
+        if self.cell_format_kind() == Some(CURRENCY_CELL_FORMAT_KIND) {
+            self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn set_data_format_identifier(
+        &mut self,
+        identifier: u32,
+        kind: DecimalCellFormatKind,
+    ) {
+        let (explicit_flags, format_kind) = match kind {
+            DecimalCellFormatKind::NumberOrPercentage => {
+                if self.prefix[1] == CELL_TYPE_ALTERNATE_NUMBER {
+                    self.prefix[1] = CELL_TYPE_NUMBER;
+                }
+                self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
+                self.fields.insert(
+                    CELL_FORMAT_IDENTIFIER_FLAG,
+                    identifier.to_le_bytes().to_vec(),
+                );
+                (EXPLICIT_DECIMAL_FORMAT, DECIMAL_CELL_FORMAT_KIND)
+            },
+            DecimalCellFormatKind::Currency => {
+                if self.prefix[1] == CELL_TYPE_NUMBER {
+                    self.prefix[1] = CELL_TYPE_ALTERNATE_NUMBER;
+                }
+                self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
+                self.fields.insert(
+                    CURRENCY_FORMAT_IDENTIFIER_FLAG,
+                    identifier.to_le_bytes().to_vec(),
+                );
+                (EXPLICIT_CURRENCY_FORMAT, CURRENCY_CELL_FORMAT_KIND)
+            },
+        };
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
-            .copy_from_slice(&EXPLICIT_DECIMAL_FORMAT.to_le_bytes());
-        self.fields.insert(
-            CELL_FORMAT_KIND_FLAG,
-            DECIMAL_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
-        );
-        self.fields.insert(
-            CELL_FORMAT_IDENTIFIER_FLAG,
-            identifier.to_le_bytes().to_vec(),
-        );
+            .copy_from_slice(&explicit_flags.to_le_bytes());
+        self.fields
+            .insert(CELL_FORMAT_KIND_FLAG, format_kind.to_le_bytes().to_vec());
     }
 
     pub(crate) fn clear_explicit_format(&mut self) {
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END].fill(0);
         self.fields.remove(&CELL_FORMAT_KIND_FLAG);
         self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
+        self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
+        if self.prefix[1] == CELL_TYPE_ALTERNATE_NUMBER {
+            self.prefix[1] = CELL_TYPE_NUMBER;
+        }
     }
 
     pub(crate) fn set_style_identifier(&mut self, identifier: Option<u32>) {
@@ -607,7 +654,7 @@ mod tests {
         let mut cell = BncCell::minimal();
         cell.set_number(1_234.5).unwrap();
         cell.set_style_identifier(Some(7));
-        cell.set_data_format_identifier(2);
+        cell.set_data_format_identifier(2, DecimalCellFormatKind::NumberOrPercentage);
 
         assert_eq!(cell.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
         assert_eq!(cell.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
@@ -624,6 +671,36 @@ mod tests {
         assert_eq!(cell.format_identifier(), None);
         assert_eq!(cell.stored_value(), StoredValue::Number);
         assert_eq!(cell.style_identifier(), Some(7));
+    }
+
+    #[test]
+    fn currency_formats_use_native_alternate_number_metadata() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(-12.345).unwrap();
+        cell.set_data_format_identifier(4, DecimalCellFormatKind::Currency);
+
+        assert_eq!(cell.explicit_format_flags(), EXPLICIT_CURRENCY_FORMAT);
+        assert_eq!(cell.cell_format_kind(), Some(CURRENCY_CELL_FORMAT_KIND));
+        assert_eq!(cell.format_identifier(), Some(4));
+        assert_eq!(cell.stored_value(), StoredValue::Number);
+
+        let converted_native = BncCell::parse(&hex(
+            "050a0000000003080170000039300000000000000000000000003ab0020000000200000004000000",
+        ))
+        .unwrap();
+        assert_eq!(converted_native.format_identifier(), Some(4));
+        assert_eq!(converted_native.secondary_format_identifier(), Some(2));
+
+        cell.set_number(42.0).unwrap();
+        let reparsed = BncCell::parse(&cell.encode()).unwrap();
+        assert_eq!(reparsed.explicit_format_flags(), EXPLICIT_CURRENCY_FORMAT);
+        assert_eq!(reparsed.format_identifier(), Some(4));
+
+        cell.clear_explicit_format();
+        assert_eq!(cell.explicit_format_flags(), 0);
+        assert_eq!(cell.cell_format_kind(), None);
+        assert_eq!(cell.format_identifier(), None);
+        assert_eq!(cell.stored_value(), StoredValue::Number);
     }
 
     fn hex(value: &str) -> Vec<u8> {

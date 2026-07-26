@@ -1,6 +1,8 @@
 //! Strongly typed data formats shared by native iWork table cells.
 
 use crate::{Error, Result};
+use std::fmt;
+use std::str::FromStr;
 
 const MAXIMUM_DECIMAL_PLACES: u8 = 30;
 
@@ -174,6 +176,176 @@ decimal_format!(
     "Explicit percentage display format for one native table cell."
 );
 
+/// Three-letter ISO 4217-style currency code stored by native iWork.
+///
+/// The compact inline representation avoids allocating for every formatted
+/// cell while rejecting locale labels and malformed archive values.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TableCellCurrencyCode([u8; 3]);
+
+impl TableCellCurrencyCode {
+    /// United States dollar.
+    pub const USD: Self = Self(*b"USD");
+    /// Euro.
+    pub const EUR: Self = Self(*b"EUR");
+    /// British pound sterling.
+    pub const GBP: Self = Self(*b"GBP");
+    /// Japanese yen.
+    pub const JPY: Self = Self(*b"JPY");
+
+    /// Validate a three-letter uppercase ASCII currency code.
+    pub fn new(value: &str) -> Result<Self> {
+        let bytes = value.as_bytes();
+        if bytes.len() != 3 || !bytes.iter().all(u8::is_ascii_uppercase) {
+            return Err(Error::InvalidFormat(format!(
+                "table-cell currency code must contain exactly three uppercase ASCII letters, found {value:?}"
+            )));
+        }
+        Ok(Self([bytes[0], bytes[1], bytes[2]]))
+    }
+
+    /// Borrow the validated code without allocation.
+    pub fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.0).expect("validated ASCII currency code")
+    }
+}
+
+impl Default for TableCellCurrencyCode {
+    fn default() -> Self {
+        Self::USD
+    }
+}
+
+impl fmt::Debug for TableCellCurrencyCode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("TableCellCurrencyCode")
+            .field(&self.as_str())
+            .finish()
+    }
+}
+
+impl fmt::Display for TableCellCurrencyCode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for TableCellCurrencyCode {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
+impl TryFrom<&str> for TableCellCurrencyCode {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
+/// Whether Currency uses ordinary or accounting alignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TableCellCurrencyStyle {
+    /// Place the currency symbol next to the number.
+    #[default]
+    Standard,
+    /// Align currency symbols separately at the leading edge of the cell.
+    Accounting,
+}
+
+/// Explicit currency display format for one native table cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TableCellCurrencyFormat {
+    decimal: DecimalFormat,
+    currency_code: TableCellCurrencyCode,
+    style: TableCellCurrencyStyle,
+}
+
+impl TableCellCurrencyFormat {
+    /// Construct a complete currency display format.
+    pub const fn new(
+        currency_code: TableCellCurrencyCode,
+        decimal_places: TableCellDecimalPlaces,
+        negative_style: TableCellNegativeNumberStyle,
+        thousands_separator: TableCellThousandsSeparator,
+        style: TableCellCurrencyStyle,
+    ) -> Self {
+        Self {
+            decimal: DecimalFormat::new(decimal_places, negative_style, thousands_separator),
+            currency_code,
+            style,
+        }
+    }
+
+    /// Return the native three-letter currency code.
+    pub const fn currency_code(self) -> TableCellCurrencyCode {
+        self.currency_code
+    }
+
+    /// Return the automatic or fixed fractional-digit setting.
+    pub const fn decimal_places(self) -> TableCellDecimalPlaces {
+        self.decimal.decimal_places
+    }
+
+    /// Return the stored negative-number presentation.
+    ///
+    /// iWork retains this value but disables its inspector control while
+    /// accounting style is active.
+    pub const fn negative_style(self) -> TableCellNegativeNumberStyle {
+        self.decimal.negative_style
+    }
+
+    /// Return whether digit grouping is displayed.
+    pub const fn thousands_separator(self) -> TableCellThousandsSeparator {
+        self.decimal.thousands_separator
+    }
+
+    /// Return the standard or accounting presentation.
+    pub const fn style(self) -> TableCellCurrencyStyle {
+        self.style
+    }
+
+    /// Replace the native currency code.
+    pub const fn with_currency_code(mut self, currency_code: TableCellCurrencyCode) -> Self {
+        self.currency_code = currency_code;
+        self
+    }
+
+    /// Replace the fractional-digit setting.
+    pub const fn with_decimal_places(mut self, decimal_places: TableCellDecimalPlaces) -> Self {
+        self.decimal.decimal_places = decimal_places;
+        self
+    }
+
+    /// Replace the stored negative-number presentation.
+    pub const fn with_negative_style(
+        mut self,
+        negative_style: TableCellNegativeNumberStyle,
+    ) -> Self {
+        self.decimal.negative_style = negative_style;
+        self
+    }
+
+    /// Show or hide locale-aware digit grouping.
+    pub const fn with_thousands_separator(
+        mut self,
+        thousands_separator: TableCellThousandsSeparator,
+    ) -> Self {
+        self.decimal.thousands_separator = thousands_separator;
+        self
+    }
+
+    /// Replace the standard or accounting presentation.
+    pub const fn with_style(mut self, style: TableCellCurrencyStyle) -> Self {
+        self.style = style;
+        self
+    }
+}
+
 /// Data format stored explicitly on one native iWork table cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum TableCellDataFormat {
@@ -182,6 +354,8 @@ pub enum TableCellDataFormat {
     Automatic,
     /// Display the value as a decimal number.
     Number(TableCellNumberFormat),
+    /// Display the value using a native currency and optional accounting style.
+    Currency(TableCellCurrencyFormat),
     /// Multiply the displayed value by one hundred and append a percent sign.
     Percentage(TableCellPercentageFormat),
 }
@@ -195,6 +369,12 @@ impl From<TableCellNumberFormat> for TableCellDataFormat {
 impl From<TableCellPercentageFormat> for TableCellDataFormat {
     fn from(value: TableCellPercentageFormat) -> Self {
         Self::Percentage(value)
+    }
+}
+
+impl From<TableCellCurrencyFormat> for TableCellDataFormat {
+    fn from(value: TableCellCurrencyFormat) -> Self {
+        Self::Currency(value)
     }
 }
 
@@ -228,6 +408,27 @@ mod tests {
         assert_eq!(
             TableCellDataFormat::from(percentage),
             TableCellDataFormat::Percentage(percentage)
+        );
+    }
+
+    #[test]
+    fn currency_codes_are_inline_strict_and_ergonomic() {
+        assert_eq!(std::mem::size_of::<TableCellCurrencyCode>(), 3);
+        assert_eq!(TableCellCurrencyCode::new("EUR").unwrap().as_str(), "EUR");
+        assert_eq!(
+            "JPY".parse::<TableCellCurrencyCode>().unwrap(),
+            TableCellCurrencyCode::JPY
+        );
+        assert!(TableCellCurrencyCode::new("usd").is_err());
+        assert!(TableCellCurrencyCode::new("US").is_err());
+
+        let currency = TableCellCurrencyFormat::default()
+            .with_currency_code(TableCellCurrencyCode::EUR)
+            .with_style(TableCellCurrencyStyle::Accounting);
+        assert_eq!(currency.currency_code(), TableCellCurrencyCode::EUR);
+        assert_eq!(
+            TableCellDataFormat::from(currency),
+            TableCellDataFormat::Currency(currency)
         );
     }
 }

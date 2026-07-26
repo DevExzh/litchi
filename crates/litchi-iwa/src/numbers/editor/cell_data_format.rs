@@ -3,16 +3,17 @@
 use super::*;
 use crate::numbers::bnc;
 use crate::protobuf::tsk::FormatStructArchive;
+#[cfg(test)]
 use crate::table_cell_data_format::{
-    TableCellDataFormat, TableCellDecimalPlaces, TableCellFixedDecimalPlaces,
-    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellPercentageFormat,
-    TableCellThousandsSeparator,
+    TableCellCurrencyCode, TableCellCurrencyStyle, TableCellDecimalPlaces,
+    TableCellNegativeNumberStyle, TableCellThousandsSeparator,
+};
+use crate::table_cell_data_format::{
+    TableCellCurrencyFormat, TableCellDataFormat, TableCellNumberFormat, TableCellPercentageFormat,
 };
 
-const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
-const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
-const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
-const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
+mod codec;
+use codec::*;
 
 pub(super) fn cell_data_format(
     package: &IWorkPackage,
@@ -34,7 +35,7 @@ pub(super) fn cell_data_format(
     let cell = BncCell::parse(&data)?;
     match format_reference(&cell)? {
         CellFormatReference::Automatic { .. } => Ok(TableCellDataFormat::Automatic),
-        CellFormatReference::Explicit(identifier) => {
+        CellFormatReference::Explicit { identifier, .. } => {
             let resolved = resolve_format_table(package, &location)?;
             let entry = required_format_entry(&resolved, identifier)?;
             entry
@@ -61,9 +62,41 @@ pub(super) fn cell_number_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(None),
         TableCellDataFormat::Number(format) => Ok(Some(format)),
-        TableCellDataFormat::Percentage(_) => Err(Error::InvalidFormat(
-            "Table cell uses Percentage rather than Number data format".to_owned(),
-        )),
+        TableCellDataFormat::Currency(_) | TableCellDataFormat::Percentage(_) => Err(
+            Error::InvalidFormat("Table cell does not use the Number data format".to_owned()),
+        ),
+    }
+}
+
+pub(super) fn cell_currency_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellCurrencyFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Currency(format) => Ok(Some(format)),
+        TableCellDataFormat::Number(_) | TableCellDataFormat::Percentage(_) => Err(
+            Error::InvalidFormat("Table cell does not use the Currency data format".to_owned()),
+        ),
+    }
+}
+
+pub(super) fn reset_cell_currency_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Currency(_) => reset_cell_data_format(package, table_id, row, column),
+        TableCellDataFormat::Number(_) | TableCellDataFormat::Percentage(_) => {
+            Err(Error::InvalidFormat(
+                "Cannot reset Currency format from a non-Currency cell".to_owned(),
+            ))
+        },
     }
 }
 
@@ -76,9 +109,9 @@ pub(super) fn cell_percentage_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(None),
         TableCellDataFormat::Percentage(format) => Ok(Some(format)),
-        TableCellDataFormat::Number(_) => Err(Error::InvalidFormat(
-            "Table cell uses Number rather than Percentage data format".to_owned(),
-        )),
+        TableCellDataFormat::Number(_) | TableCellDataFormat::Currency(_) => Err(
+            Error::InvalidFormat("Table cell does not use the Percentage data format".to_owned()),
+        ),
     }
 }
 
@@ -119,14 +152,31 @@ pub(super) fn set_cell_data_format(
         .transpose()?
         .unwrap_or_else(BncCell::minimal);
     let old_reference = format_reference(&cell)?;
-    let old_identifier = old_reference.identifier();
+    let old_identifier = old_reference.primary_identifier();
+    let old_identifiers = old_reference.identifiers();
+    let cell_format_kind = match format {
+        TableCellDataFormat::Currency(_) => bnc::DecimalCellFormatKind::Currency,
+        TableCellDataFormat::Number(_) | TableCellDataFormat::Percentage(_) => {
+            bnc::DecimalCellFormatKind::NumberOrPercentage
+        },
+        TableCellDataFormat::Automatic => unreachable!("handled above"),
+    };
     let native = data_format_to_native(format)?;
     let resolved = resolve_format_table(package, &location)?;
-    let old_entry = old_identifier
+    let old_entries = old_identifiers
+        .into_iter()
+        .flatten()
         .map(|identifier| required_format_entry(&resolved, identifier))
-        .transpose()?;
+        .collect::<Result<Vec<_>>>()?;
+    let old_entry = old_identifier
+        .and_then(|identifier| {
+            old_entries
+                .iter()
+                .find(|entry| entry.entry.key == identifier)
+        })
+        .copied();
 
-    if matches!(old_reference, CellFormatReference::Explicit(_))
+    if matches!(old_reference, CellFormatReference::Explicit { .. })
         && old_entry.and_then(|entry| entry.entry.format.as_ref()) == Some(&native)
     {
         return Ok(());
@@ -142,7 +192,7 @@ pub(super) fn set_cell_data_format(
         ));
     }
     let new_identifier = if let Some(reusable) = reusable {
-        if old_identifier != Some(reusable.entry.key) {
+        if !old_identifiers.contains(&Some(reusable.entry.key)) {
             storage::increment_table_data_list_entry(
                 package,
                 &location.object_locations,
@@ -156,7 +206,7 @@ pub(super) fn set_cell_data_format(
         append_format_entry(package, &resolved, native)?
     };
 
-    cell.set_data_format_identifier(new_identifier);
+    cell.set_data_format_identifier(new_identifier, cell_format_kind);
     let cell_count = storage::update_tile(
         package,
         &location.tile_archive,
@@ -174,16 +224,16 @@ pub(super) fn set_cell_data_format(
         cell_count,
     )?;
 
-    if let Some(old_entry) = old_entry
-        && old_entry.entry.key != new_identifier
-    {
-        storage::decrement_table_data_list_entry(
-            package,
-            &location.object_locations,
-            &resolved,
-            old_entry,
-            tst::table_data_list::ListType::Format,
-        )?;
+    for old_entry in old_entries {
+        if old_entry.entry.key != new_identifier {
+            storage::decrement_table_data_list_entry(
+                package,
+                &location.object_locations,
+                &resolved,
+                old_entry,
+                tst::table_data_list::ListType::Format,
+            )?;
+        }
     }
     Ok(())
 }
@@ -197,9 +247,9 @@ pub(super) fn reset_cell_number_format(
     match cell_data_format(package, table_id, row, column)? {
         TableCellDataFormat::Automatic => Ok(false),
         TableCellDataFormat::Number(_) => reset_cell_data_format(package, table_id, row, column),
-        TableCellDataFormat::Percentage(_) => Err(Error::InvalidFormat(
-            "Cannot reset Number format from a Percentage cell".to_owned(),
-        )),
+        TableCellDataFormat::Currency(_) | TableCellDataFormat::Percentage(_) => Err(
+            Error::InvalidFormat("Cannot reset Number format from a non-Number cell".to_owned()),
+        ),
     }
 }
 
@@ -214,9 +264,11 @@ pub(super) fn reset_cell_percentage_format(
         TableCellDataFormat::Percentage(_) => {
             reset_cell_data_format(package, table_id, row, column)
         },
-        TableCellDataFormat::Number(_) => Err(Error::InvalidFormat(
-            "Cannot reset Percentage format from a Number cell".to_owned(),
-        )),
+        TableCellDataFormat::Number(_) | TableCellDataFormat::Currency(_) => {
+            Err(Error::InvalidFormat(
+                "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
+            ))
+        },
     }
 }
 
@@ -238,11 +290,17 @@ pub(super) fn reset_cell_data_format(
         return Ok(false);
     };
     let mut cell = BncCell::parse(&data)?;
-    let CellFormatReference::Explicit(identifier) = format_reference(&cell)? else {
+    let reference = format_reference(&cell)?;
+    let CellFormatReference::Explicit { .. } = reference else {
         return Ok(false);
     };
     let resolved = resolve_format_table(package, &location)?;
-    let old_entry = required_format_entry(&resolved, identifier)?;
+    let old_entries = reference
+        .identifiers()
+        .into_iter()
+        .flatten()
+        .map(|identifier| required_format_entry(&resolved, identifier))
+        .collect::<Result<Vec<_>>>()?;
 
     cell.clear_explicit_format();
     let cell_count = storage::update_tile(
@@ -261,27 +319,48 @@ pub(super) fn reset_cell_data_format(
         row,
         cell_count,
     )?;
-    storage::decrement_table_data_list_entry(
-        package,
-        &location.object_locations,
-        &resolved,
-        old_entry,
-        tst::table_data_list::ListType::Format,
-    )?;
+    for old_entry in old_entries {
+        storage::decrement_table_data_list_entry(
+            package,
+            &location.object_locations,
+            &resolved,
+            old_entry,
+            tst::table_data_list::ListType::Format,
+        )?;
+    }
     Ok(true)
 }
 
 #[derive(Clone, Copy)]
 enum CellFormatReference {
-    Automatic { identifier: Option<u32> },
-    Explicit(u32),
+    Automatic {
+        identifier: Option<u32>,
+        secondary: Option<u32>,
+    },
+    Explicit {
+        identifier: u32,
+        secondary: Option<u32>,
+    },
 }
 
 impl CellFormatReference {
-    const fn identifier(self) -> Option<u32> {
+    const fn primary_identifier(self) -> Option<u32> {
         match self {
-            Self::Automatic { identifier } => identifier,
-            Self::Explicit(identifier) => Some(identifier),
+            Self::Automatic { identifier, .. } => identifier,
+            Self::Explicit { identifier, .. } => Some(identifier),
+        }
+    }
+
+    const fn identifiers(self) -> [Option<u32>; 2] {
+        match self {
+            Self::Automatic {
+                identifier,
+                secondary,
+            } => [identifier, secondary],
+            Self::Explicit {
+                identifier,
+                secondary,
+            } => [Some(identifier), secondary],
         }
     }
 }
@@ -290,21 +369,40 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
     let explicit = cell.explicit_format_flags();
     let kind = cell.cell_format_kind();
     let identifier = cell.format_identifier();
+    let secondary = cell.secondary_format_identifier();
     match (explicit, kind, identifier) {
-        (0, None, None) => Ok(CellFormatReference::Automatic { identifier: None }),
-        (0, Some(bnc::DECIMAL_CELL_FORMAT_KIND), Some(identifier)) => {
+        (0, None, None) if secondary.is_none() => Ok(CellFormatReference::Automatic {
+            identifier: None,
+            secondary: None,
+        }),
+        (0, Some(bnc::DECIMAL_CELL_FORMAT_KIND), Some(identifier)) if secondary.is_none() => {
             Ok(CellFormatReference::Automatic {
                 identifier: Some(identifier),
+                secondary: None,
             })
         },
-        (EXPLICIT_DECIMAL_FORMAT, Some(bnc::DECIMAL_CELL_FORMAT_KIND), Some(identifier)) => {
-            Ok(CellFormatReference::Explicit(identifier))
+        (0, Some(bnc::CURRENCY_CELL_FORMAT_KIND), Some(identifier)) => {
+            Ok(CellFormatReference::Automatic {
+                identifier: Some(identifier),
+                secondary,
+            })
         },
-        (EXPLICIT_DECIMAL_FORMAT, Some(kind), _) => Err(Error::InvalidFormat(format!(
-            "Table cell uses unsupported explicit format kind {kind}"
-        ))),
+        (bnc::EXPLICIT_DECIMAL_FORMAT, Some(bnc::DECIMAL_CELL_FORMAT_KIND), Some(identifier))
+            if secondary.is_none() =>
+        {
+            Ok(CellFormatReference::Explicit {
+                identifier,
+                secondary: None,
+            })
+        },
+        (bnc::EXPLICIT_CURRENCY_FORMAT, Some(bnc::CURRENCY_CELL_FORMAT_KIND), Some(identifier)) => {
+            Ok(CellFormatReference::Explicit {
+                identifier,
+                secondary,
+            })
+        },
         _ => Err(Error::InvalidFormat(
-            "Table cell contains inconsistent number-format metadata".to_owned(),
+            "Table cell contains inconsistent data-format metadata".to_owned(),
         )),
     }
 }
@@ -497,107 +595,6 @@ fn append_format_entry(
     Ok(key)
 }
 
-fn data_format_to_native(format: TableCellDataFormat) -> Result<FormatStructArchive> {
-    let (format_type, decimal_places, negative_style, thousands_separator) = match format {
-        TableCellDataFormat::Automatic => {
-            return Err(Error::InvalidFormat(
-                "Automatic table-cell data format has no explicit payload".to_owned(),
-            ));
-        },
-        TableCellDataFormat::Number(format) => (
-            NATIVE_NUMBER_FORMAT_TYPE,
-            format.decimal_places(),
-            format.negative_style(),
-            format.thousands_separator(),
-        ),
-        TableCellDataFormat::Percentage(format) => (
-            NATIVE_PERCENTAGE_FORMAT_TYPE,
-            format.decimal_places(),
-            format.negative_style(),
-            format.thousands_separator(),
-        ),
-    };
-    Ok(FormatStructArchive {
-        format_type: Some(format_type),
-        decimal_places: Some(match decimal_places {
-            TableCellDecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
-            TableCellDecimalPlaces::Fixed(places) => u32::from(places.value()),
-        }),
-        negative_style: Some(match negative_style {
-            TableCellNegativeNumberStyle::MinusSign => 0,
-            TableCellNegativeNumberStyle::Red => 1,
-            TableCellNegativeNumberStyle::Parentheses => 2,
-            TableCellNegativeNumberStyle::RedParentheses => 3,
-        }),
-        show_thousands_separator: Some(matches!(
-            thousands_separator,
-            TableCellThousandsSeparator::Shown
-        )),
-        ..Default::default()
-    })
-}
-
-fn data_format_from_native(native: &FormatStructArchive) -> Result<TableCellDataFormat> {
-    let format_type = native.format_type.ok_or_else(|| {
-        Error::InvalidFormat("Table cell has no native data-format type".to_owned())
-    })?;
-    if !matches!(
-        format_type,
-        NATIVE_NUMBER_FORMAT_TYPE | NATIVE_PERCENTAGE_FORMAT_TYPE
-    ) {
-        return Err(Error::InvalidFormat(format!(
-            "Table cell uses unsupported native data-format type {format_type}"
-        )));
-    }
-    let decimal_places = match native.decimal_places {
-        Some(NATIVE_AUTOMATIC_DECIMAL_PLACES) => TableCellDecimalPlaces::Automatic,
-        Some(value) => {
-            let value = u8::try_from(value).map_err(|_| {
-                Error::InvalidFormat(format!(
-                    "Table cell has invalid decimal-place count {value}"
-                ))
-            })?;
-            TableCellDecimalPlaces::Fixed(TableCellFixedDecimalPlaces::new(value)?)
-        },
-        None => {
-            return Err(Error::InvalidFormat(
-                "Table-cell data format has no decimal-place setting".to_owned(),
-            ));
-        },
-    };
-    let negative_style = match native.negative_style {
-        Some(0) => TableCellNegativeNumberStyle::MinusSign,
-        Some(1) => TableCellNegativeNumberStyle::Red,
-        Some(2) => TableCellNegativeNumberStyle::Parentheses,
-        Some(3) => TableCellNegativeNumberStyle::RedParentheses,
-        value => {
-            return Err(Error::InvalidFormat(format!(
-                "Table cell has invalid negative-number style {value:?}"
-            )));
-        },
-    };
-    let thousands_separator = match native.show_thousands_separator {
-        Some(false) => TableCellThousandsSeparator::Hidden,
-        Some(true) => TableCellThousandsSeparator::Shown,
-        None => {
-            return Err(Error::InvalidFormat(
-                "Table-cell data format has no thousands-separator setting".to_owned(),
-            ));
-        },
-    };
-    Ok(match format_type {
-        NATIVE_NUMBER_FORMAT_TYPE => TableCellDataFormat::Number(TableCellNumberFormat::new(
-            decimal_places,
-            negative_style,
-            thousands_separator,
-        )),
-        NATIVE_PERCENTAGE_FORMAT_TYPE => TableCellDataFormat::Percentage(
-            TableCellPercentageFormat::new(decimal_places, negative_style, thousands_separator),
-        ),
-        _ => unreachable!("validated native data-format type"),
-    })
-}
-
 #[cfg(test)]
 fn number_format_to_native(format: TableCellNumberFormat) -> FormatStructArchive {
     data_format_to_native(format.into()).expect("number format is explicit")
@@ -647,6 +644,86 @@ mod tests {
         assert_eq!(
             data_format_from_native(&native).unwrap(),
             TableCellDataFormat::Percentage(percentage)
+        );
+
+        let currency = TableCellCurrencyFormat::new(
+            TableCellCurrencyCode::EUR,
+            TableCellDecimalPlaces::fixed(2).unwrap(),
+            TableCellNegativeNumberStyle::Parentheses,
+            TableCellThousandsSeparator::Shown,
+            TableCellCurrencyStyle::Accounting,
+        );
+        let mut native = data_format_to_native(currency.into()).unwrap();
+        assert_eq!(native.format_type, Some(NATIVE_CURRENCY_FORMAT_TYPE));
+        assert_eq!(native.currency_code.as_deref(), Some("EUR"));
+        assert_eq!(native.use_accounting_style, Some(true));
+        assert_eq!(
+            data_format_from_native(&native).unwrap(),
+            TableCellDataFormat::Currency(currency)
+        );
+
+        native.currency_code = Some("euro".to_owned());
+        assert!(data_format_from_native(&native).is_err());
+        native = data_format_to_native(currency.into()).unwrap();
+        native.use_accounting_style = None;
+        assert!(data_format_from_native(&native).is_err());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_resets_currency_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Currencies")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let currency = TableCellCurrencyFormat::new(
+            TableCellCurrencyCode::USD,
+            TableCellDecimalPlaces::fixed(2).unwrap(),
+            TableCellNegativeNumberStyle::Parentheses,
+            TableCellThousandsSeparator::Shown,
+            TableCellCurrencyStyle::Accounting,
+        );
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Number(-1_234.5))
+            .unwrap();
+        editor
+            .set_table_cell_currency_format(table_id, 1, 1, currency)
+            .unwrap();
+        editor
+            .set_table_cell_currency_format(table_id, 1, 2, currency)
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_currency_format(table_id, 1, 1).unwrap(),
+            Some(currency)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_currency_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened.table_cell_currency_format(table_id, 1, 2).unwrap(),
+            Some(currency)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_currency_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
+        assert!(
+            resolve_format_table(reopened.package(), &location)
+                .unwrap()
+                .entries
+                .is_empty()
         );
     }
 

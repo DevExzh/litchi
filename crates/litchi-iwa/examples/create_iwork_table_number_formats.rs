@@ -7,15 +7,18 @@ use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
-    TableCellDecimalPlaces, TableCellNegativeNumberStyle, TableCellNumberFormat,
-    TableCellPercentageFormat, TableCellThousandsSeparator,
+    TableCellCurrencyCode, TableCellCurrencyFormat, TableCellCurrencyStyle, TableCellDecimalPlaces,
+    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellPercentageFormat,
+    TableCellThousandsSeparator,
 };
 
 const ROW: usize = 1;
 const NUMBER_COLUMN: usize = 1;
 const PERCENTAGE_COLUMN: usize = 2;
+const CURRENCY_COLUMN: usize = 3;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
+const CURRENCY_VALUE: f64 = -1_234.5;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -46,10 +49,20 @@ fn percentage_format() -> Result<TableCellPercentageFormat, litchi_iwa::Error> {
     ))
 }
 
+fn currency_format() -> Result<TableCellCurrencyFormat, litchi_iwa::Error> {
+    Ok(TableCellCurrencyFormat::new(
+        TableCellCurrencyCode::USD,
+        TableCellDecimalPlaces::fixed(2)?,
+        TableCellNegativeNumberStyle::Parentheses,
+        TableCellThousandsSeparator::Shown,
+        TableCellCurrencyStyle::Accounting,
+    ))
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 3)
+        .table_dimensions(3, 4)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -71,6 +84,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         PERCENTAGE_COLUMN,
         percentage_format()?,
     )?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        CURRENCY_COLUMN,
+        CellValue::Number(CURRENCY_VALUE),
+    )?;
+    editor.set_table_cell_currency_format(table_id, ROW, CURRENCY_COLUMN, currency_format()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -78,7 +98,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with a native decimal table-cell format.\n")
-        .body_table("Number Formats", 3, 3)
+        .body_table("Number Formats", 3, 4)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -100,6 +120,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         PERCENTAGE_COLUMN,
         percentage_format()?,
     )?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        CURRENCY_COLUMN,
+        CellValue::Number(CURRENCY_VALUE),
+    )?;
+    editor.set_table_cell_currency_format(table_id, ROW, CURRENCY_COLUMN, currency_format()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -112,7 +139,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        3,
+        4,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -146,6 +173,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         PERCENTAGE_COLUMN,
         percentage_format()?,
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        CURRENCY_COLUMN,
+        CellValue::Number(CURRENCY_VALUE),
+    )?;
+    editor.set_slide_table_cell_currency_format(
+        0,
+        table.model_object_id,
+        ROW,
+        CURRENCY_COLUMN,
+        currency_format()?,
     )?;
     editor.save(output)?;
     Ok(())
