@@ -20,6 +20,7 @@
 pub mod constants;
 pub mod content_type;
 pub mod error;
+pub mod members;
 pub mod package;
 pub mod packuri;
 pub mod part;
@@ -32,14 +33,15 @@ pub mod signature;
 // Re-export commonly used types
 pub use content_type::ContentType;
 pub use error::{OpcError, Result};
+pub use members::{NonPartMember, NonPartReason};
 pub use package::OpcPackage;
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use signature::{
-    CanonicalizationMethod, CertificateTrust, DigitalSignatureError,
-    DetachedDigitalSignatureVerification, DetachedSignatureReference, DigitalSignatureVerification,
+    CanonicalizationMethod, CertificateTrust, DetachedDigitalSignatureVerification,
+    DetachedSignatureReference, DigitalSignatureError, DigitalSignatureVerification,
     EmbeddedCertificate, PackageSigner, ReferenceVerification, Sha1Policy, SignatureAlgorithm,
     SignatureVerificationPolicy, VerificationStatus, author_detached_signature,
     verify_detached_signature,

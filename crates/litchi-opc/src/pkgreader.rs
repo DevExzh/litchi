@@ -4,10 +4,11 @@
 //! content type mapping, relationship resolution, and part loading. It uses
 //! efficient algorithms for parsing and minimal memory allocation.
 
-use crate::constants::namespace;
+use crate::constants::{content_type as ct, namespace};
 use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
-use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
+use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
+use crate::packuri::{PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgReader;
 use crate::rel::{TargetMode, relationship_target_components};
 use quick_xml::XmlVersion;
@@ -152,6 +153,24 @@ pub struct PackageReader {
 
     /// All serialized parts in the package
     sparts: Vec<SerializedPart>,
+
+    /// ZIP items that were present but are not OPC parts
+    non_part_members: Vec<NonPartMember>,
+}
+
+/// Reserved ZIP item name of the content types stream (ECMA-376 Part 2 §10.1.2.2).
+const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
+
+/// Upper bound on distinct part names visited while walking the relationship graph.
+///
+/// Relationship targets need not resolve to an existing ZIP item, so a hostile
+/// package could otherwise name an unbounded number of phantom parts and make
+/// the traversal run for as long as its relationship manifests allow.
+const MAX_RELATIONSHIP_GRAPH_NODES: usize = 100_000;
+
+/// Whether a ZIP error reports a missing member rather than a damaged one.
+fn is_member_missing(error: &soapberry_zip::Error) -> bool {
+    matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_))
 }
 
 impl PackageReader {
@@ -176,10 +195,8 @@ impl PackageReader {
         let archive = phys_reader.archive();
 
         // Phase 1: Decompress and parse content types (on-demand)
-        let content_types_path = crate::packuri::CONTENT_TYPES_URI.trim_start_matches('/');
-        let content_types_xml = archive
-            .read(content_types_path)
-            .map_err(|_| OpcError::PartNotFound("[Content_Types].xml".to_string()))?;
+        let content_types_member = Self::locate_content_types_member(archive)?;
+        let content_types_xml = archive.read(content_types_member)?;
         let content_types = ContentTypeMap::from_xml(&content_types_xml)?;
 
         // Phase 2: Get package-level relationships (on-demand decompression)
@@ -188,9 +205,38 @@ impl PackageReader {
 
         // Phase 3: Load every physical part. Relationship traversal alone is
         // insufficient because OPC permits parts with no incoming relationship.
-        let sparts = Self::load_parts_lazy(archive, &pkg_srels, &content_types)?;
+        let mut non_part_members = Vec::new();
+        let sparts = Self::load_parts_lazy(
+            archive,
+            content_types_member,
+            &pkg_srels,
+            &content_types,
+            &mut non_part_members,
+        )?;
 
-        Ok(Self { pkg_srels, sparts })
+        Ok(Self {
+            pkg_srels,
+            sparts,
+            non_part_members,
+        })
+    }
+
+    /// Resolve the ZIP item that holds the content types stream.
+    ///
+    /// The reserved name is `[Content_Types].xml`. ECMA-376 Part 2 §9.1.1.2 makes
+    /// item-name comparison ASCII case-insensitive, so a package that stores the
+    /// stream as `[content_types].xml` is still unambiguous; Apache POI resolves
+    /// it the same way. The exact spelling wins when both are present.
+    fn locate_content_types_member<'archive>(
+        archive: &'archive soapberry_zip::office::LazyArchiveReader<'_>,
+    ) -> Result<&'archive str> {
+        if archive.contains(CONTENT_TYPES_MEMBER) {
+            return Ok(CONTENT_TYPES_MEMBER);
+        }
+        archive
+            .file_names()
+            .find(|name| name.eq_ignore_ascii_case(CONTENT_TYPES_MEMBER))
+            .ok_or_else(|| OpcError::PartNotFound(CONTENT_TYPES_MEMBER.to_string()))
     }
 
     /// Parse relationships XML into SerializedRelationship structs.
@@ -305,73 +351,39 @@ impl PackageReader {
                 source_uri.base_uri(),
                 Some(source_uri.as_str()),
             ),
-            Err(error) if matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_)) => {
-                Ok(SmallVec::new())
-            },
+            Err(error) if is_member_missing(&error) => Ok(SmallVec::new()),
             Err(error) => Err(error.into()),
         }
     }
 
     /// Load all physical parts using parallel decompression.
     ///
-    /// This is a two-phase approach for maximum performance:
-    /// 1. Traverse relationships to validate targets and discover their source parts.
-    /// 2. Enumerate ZIP members to include parts with no incoming relationship.
-    /// 3. Decompress all ordinary part contents in parallel.
+    /// The ZIP members are the authority on which parts exist (ECMA-376 Part 2
+    /// §10.1.3): relationships are edges recorded on their source part, not
+    /// evidence that a target part is present. The phases are:
+    /// 1. Walk the relationship graph to validate targets and learn which part
+    ///    names the package refers to.
+    /// 2. Classify every ZIP member into a part or a reported non-part member.
+    /// 3. Check the resulting part-name collection for OPC name conflicts.
+    /// 4. Decompress all part contents in parallel.
     fn load_parts_lazy(
         archive: &soapberry_zip::office::LazyArchiveReader<'_>,
+        content_types_member: &str,
         pkg_srels: &[SerializedRelationship],
         content_types: &ContentTypeMap,
+        non_part_members: &mut Vec<NonPartMember>,
     ) -> Result<Vec<SerializedPart>> {
-        use std::collections::HashSet;
+        // Phase 1: relationship reachability. Relationship types belong to
+        // edges, not parts, so they are intentionally not recorded here.
+        let mut relationships = Self::walk_relationship_graph(archive, pkg_srels)?;
 
-        // Phase 1: Discover relationship-reachable parts. Relationship types
-        // belong to edges, not parts, so they are intentionally not stored here.
-        let mut discovered: Vec<(PackURI, SmallVec<[SerializedRelationship; 8]>)> =
-            Vec::with_capacity(32);
-        let mut visited = HashSet::with_capacity(32);
-        let mut work_queue: Vec<PackURI> = Vec::with_capacity(pkg_srels.len());
-
-        // Initialize work queue with package-level relationships
-        for srel in pkg_srels {
-            if srel.is_external() {
-                continue;
-            }
-            let partname = srel.target_partname()?;
-            let partname_str = partname.to_string();
-            if visited.insert(partname_str) {
-                work_queue.push(partname);
-            }
-        }
-
-        // Traverse relationship graph (only decompresses small .rels files)
-        while let Some(partname) = work_queue.pop() {
-            // Load relationships for this part
-            let part_srels = Self::load_rels_lazy(archive, &partname)?;
-
-            // Add child parts to work queue
-            for child_srel in &part_srels {
-                if child_srel.is_external() {
-                    continue;
-                }
-                let child_partname = child_srel.target_partname()?;
-                let child_partname_str = child_partname.to_string();
-                if visited.insert(child_partname_str) {
-                    work_queue.push(child_partname);
-                }
-            }
-
-            discovered.push((partname, part_srels));
-        }
-
-        // Phase 2: Validate the physical part-name collection before reading any
-        // potentially large payload. Relationship parts participate in OPC name
-        // conformance even though they are loaded separately.
-        let mut physical_names: Vec<PackURI> = Vec::new();
+        // Phase 2 and 3: classify members, then admit the survivors as parts.
+        let mut index = PartNameIndex::with_capacity(archive.len());
+        let mut typed_parts: Vec<(PackURI, String)> = Vec::with_capacity(archive.len());
         for member_name in archive.file_names() {
             if member_name.is_empty()
                 || member_name.ends_with('/')
-                || member_name == crate::packuri::CONTENT_TYPES_URI.trim_start_matches('/')
+                || member_name == content_types_member
             {
                 continue;
             }
@@ -382,73 +394,149 @@ impl PackageReader {
                 ));
             }
 
-            let absolute_name = format!("/{member_name}");
-            let partname = PackURI::new(&absolute_name).map_err(OpcError::InvalidPackUri)?;
-            for existing in &physical_names {
-                if let Some(conflict) = existing.conflict_with(&partname) {
-                    return Err(part_name_conflict_error(existing, &partname, conflict));
-                }
-            }
-            for (reachable, _) in &discovered {
-                if reachable != &partname
-                    && let Some(conflict) = reachable.conflict_with(&partname)
-                {
-                    return Err(part_name_conflict_error(reachable, &partname, conflict));
-                }
-            }
-            physical_names.push(partname);
-        }
-
-        // Enumerate ordinary physical members so unreferenced custom data and
-        // extension parts are retained during open/save round trips.
-        for partname in physical_names {
-            if Self::is_relationship_member(partname.membername()) {
-                content_types.get(&partname)?;
+            let Some(partname) = part_name_for_member(member_name) else {
+                non_part_members.push(NonPartMember::new(
+                    member_name,
+                    NonPartReason::UnmappablePartName,
+                ));
                 continue;
-            }
-            if visited.insert(partname.to_string()) {
-                let part_srels = Self::load_rels_lazy(archive, &partname)?;
-                discovered.push((partname, part_srels));
+            };
+
+            let is_relationship_part = Self::is_relationship_member(partname.membername());
+            let content_type = if is_relationship_part {
+                Self::relationship_part_content_type(content_types, &partname)?
+            } else {
+                match content_types.get(&partname) {
+                    Ok(content_type) => content_type,
+                    // An untyped item that nothing refers to is archive junk,
+                    // not a non-conforming part (ECMA-376 Part 2 §10.1.2.2).
+                    Err(OpcError::ContentTypeNotFound(_))
+                        if !relationships.contains_key(partname.as_str()) =>
+                    {
+                        non_part_members.push(NonPartMember::new(
+                            member_name,
+                            NonPartReason::UntypedAndUnreferenced,
+                        ));
+                        continue;
+                    },
+                    Err(error) => return Err(error),
+                }
+            };
+
+            // Relationship parts are named parts for conflict purposes even
+            // though they are surfaced through their source part, not on
+            // their own.
+            index.insert(&partname)?;
+            if !is_relationship_part {
+                typed_parts.push((partname, content_type));
             }
         }
 
-        // Resolve content types before decompressing potentially large parts.
-        let mut typed_parts = Vec::with_capacity(discovered.len());
-        for (partname, part_srels) in discovered {
-            let content_type = content_types.get(&partname)?;
-            typed_parts.push((partname, content_type, part_srels));
-        }
-
-        // Phase 3: Parallel decompression of all discovered parts
-        // Collect member names for parallel batch read
+        // Phase 4: parallel decompression of every admitted part.
         let member_names: Vec<&str> = typed_parts
             .iter()
-            .map(|(partname, _, _)| partname.membername())
+            .map(|(partname, _)| partname.membername())
             .collect();
-
-        // Decompress all part contents in parallel
         let mut decompressed = HashMap::with_capacity(member_names.len());
         for (member_name, result) in archive.read_many_parallel_results(&member_names) {
             decompressed.insert(member_name.to_string(), result?);
         }
 
-        // Phase 4: Build SerializedPart structures (take ownership, no cloning)
+        // Phase 5: build SerializedPart structures (take ownership, no cloning)
         let mut sparts = Vec::with_capacity(typed_parts.len());
-        for (partname, content_type, part_srels) in typed_parts {
-            let membername = partname.membername();
+        for (partname, content_type) in typed_parts {
+            let srels = match relationships.remove(partname.as_str()) {
+                Some(srels) => srels,
+                None => Self::load_rels_lazy(archive, &partname)?,
+            };
             // Remove from map to take ownership instead of cloning
             let blob = decompressed
-                .remove(membername)
+                .remove(partname.membername())
                 .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
             sparts.push(SerializedPart {
                 partname,
                 content_type,
                 blob,
-                srels: part_srels,
+                srels,
             });
         }
 
         Ok(sparts)
+    }
+
+    /// Walk the relationship graph, returning each visited part name with its
+    /// own relationships.
+    ///
+    /// Only small `.rels` members are decompressed. A target that has no ZIP
+    /// member is still visited: OPC defines no rule requiring a relationship
+    /// target to resolve, and the dangling relationship stays visible on its
+    /// source part.
+    fn walk_relationship_graph(
+        archive: &soapberry_zip::office::LazyArchiveReader<'_>,
+        pkg_srels: &[SerializedRelationship],
+    ) -> Result<HashMap<String, SmallVec<[SerializedRelationship; 8]>>> {
+        let mut visited: HashMap<String, SmallVec<[SerializedRelationship; 8]>> = HashMap::new();
+        let mut work_queue: Vec<PackURI> = Vec::with_capacity(pkg_srels.len());
+        for srel in pkg_srels {
+            Self::enqueue_target(srel, &mut visited, &mut work_queue)?;
+        }
+
+        while let Some(partname) = work_queue.pop() {
+            let part_srels = Self::load_rels_lazy(archive, &partname)?;
+            for child_srel in &part_srels {
+                Self::enqueue_target(child_srel, &mut visited, &mut work_queue)?;
+            }
+            visited.insert(partname.to_string(), part_srels);
+        }
+
+        Ok(visited)
+    }
+
+    /// Queue an internal relationship target for traversal, once.
+    fn enqueue_target(
+        srel: &SerializedRelationship,
+        visited: &mut HashMap<String, SmallVec<[SerializedRelationship; 8]>>,
+        work_queue: &mut Vec<PackURI>,
+    ) -> Result<()> {
+        if srel.is_external() {
+            return Ok(());
+        }
+        let partname = srel.target_partname()?;
+        if visited.contains_key(partname.as_str()) {
+            return Ok(());
+        }
+        if visited.len() >= MAX_RELATIONSHIP_GRAPH_NODES {
+            return Err(OpcError::InvalidRelationshipsManifest(format!(
+                "package refers to more than {MAX_RELATIONSHIP_GRAPH_NODES} distinct part names"
+            )));
+        }
+        visited.insert(partname.to_string(), SmallVec::new());
+        work_queue.push(partname);
+        Ok(())
+    }
+
+    /// Resolve the content type of a relationship part.
+    ///
+    /// ECMA-376 Part 2 §9.2 fixes the content type of every Relationships part,
+    /// and §9.1.2 reserves the `_rels/*.rels` naming that identifies one, so a
+    /// manifest that omits the mapping leaves nothing ambiguous. A manifest that
+    /// maps a reserved relationship name onto some *other* type contradicts the
+    /// specification and is rejected.
+    fn relationship_part_content_type(
+        content_types: &ContentTypeMap,
+        partname: &PackURI,
+    ) -> Result<String> {
+        match content_types.get(partname) {
+            Ok(declared) if declared == ct::OPC_RELATIONSHIPS => Ok(declared),
+            Ok(declared) => Err(OpcError::InvalidContentType {
+                value: declared,
+                reason: format!("relationship part '{partname}' must be typed {}", {
+                    ct::OPC_RELATIONSHIPS
+                }),
+            }),
+            Err(OpcError::ContentTypeNotFound(_)) => Ok(ct::OPC_RELATIONSHIPS.to_string()),
+            Err(error) => Err(error),
+        }
     }
 
     /// Return whether a ZIP member is an OPC relationship part rather than an
@@ -485,23 +573,18 @@ impl PackageReader {
     pub fn take_sparts(&mut self) -> Vec<SerializedPart> {
         std::mem::take(&mut self.sparts)
     }
-}
 
-fn part_name_conflict_error(
-    existing: &PackURI,
-    candidate: &PackURI,
-    conflict: PartNameConflict,
-) -> OpcError {
-    match conflict {
-        PartNameConflict::Duplicate => OpcError::DuplicatePartName(candidate.to_string()),
-        PartNameConflict::Equivalent => OpcError::EquivalentPartNames {
-            existing: existing.to_string(),
-            candidate: candidate.to_string(),
-        },
-        PartNameConflict::Derived => OpcError::DerivedPartNames {
-            existing: existing.to_string(),
-            candidate: candidate.to_string(),
-        },
+    /// ZIP items that were present in the archive but are not OPC parts.
+    ///
+    /// Their contents are never decompressed; the entries exist so that
+    /// tolerating archive junk does not hide it from the caller.
+    pub fn non_part_members(&self) -> &[NonPartMember] {
+        &self.non_part_members
+    }
+
+    /// Take ownership of the reported non-part members (zero-copy move).
+    pub fn take_non_part_members(&mut self) -> Vec<NonPartMember> {
+        std::mem::take(&mut self.non_part_members)
     }
 }
 
@@ -790,25 +873,6 @@ mod tests {
             Err(error) => error,
         };
         assert!(matches!(error, OpcError::DerivedPartNames { .. }));
-    }
-
-    #[test]
-    fn rejects_unreferenced_part_without_content_type_mapping() {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
-        writer
-            .write_stored(
-                "[Content_Types].xml",
-                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#,
-            )
-            .unwrap();
-        writer.write_stored("custom/orphan.bin", b"orphan").unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
-        let physical = PhysPkgReader::new(&bytes).unwrap();
-        let error = match PackageReader::from_phys_reader(&physical) {
-            Ok(_) => panic!("unmapped orphan part unexpectedly loaded"),
-            Err(error) => error,
-        };
-        assert!(matches!(error, OpcError::ContentTypeNotFound(_)));
     }
 
     fn relationships_xml(children: &str) -> String {

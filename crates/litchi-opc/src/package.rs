@@ -6,6 +6,7 @@
 
 use crate::constants::relationship_type;
 use crate::error::{OpcError, Result};
+use crate::members::NonPartMember;
 use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
 use crate::part::{Part, PartFactory};
 use crate::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
@@ -38,6 +39,9 @@ pub struct OpcPackage {
     /// PackURI keys avoid string allocations compared to String keys
     parts: HashMap<PackURI, Box<dyn Part + Send + Sync>>,
 
+    /// ZIP items the reader found but did not model as parts
+    non_part_members: Vec<NonPartMember>,
+
     /// Save preferences
     save_options: SaveOptions,
 }
@@ -58,8 +62,19 @@ impl OpcPackage {
         Self {
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
+            non_part_members: Vec::new(),
             save_options: SaveOptions::default(),
         }
+    }
+
+    /// ZIP items that were present in the opened archive but are not OPC parts.
+    ///
+    /// A reader must not reject a package because a ZIP tool left junk in the
+    /// archive, but it must not hide the junk either. Each entry names the ZIP
+    /// item and why it was not modelled as a part; the bytes stay in the source
+    /// archive and are never decompressed.
+    pub fn non_part_members(&self) -> &[NonPartMember] {
+        &self.non_part_members
     }
 
     /// Set save options for the package.
@@ -130,9 +145,10 @@ impl OpcPackage {
     fn unmarshal(mut pkg_reader: PackageReader) -> Result<Self> {
         let mut package = Self::new();
 
-        // Get ownership of package relationships and parts
+        // Get ownership of package relationships, parts, and non-part members
         let pkg_srels = pkg_reader.take_pkg_srels();
         let sparts = pkg_reader.take_sparts();
+        package.non_part_members = pkg_reader.take_non_part_members();
 
         // Pre-allocate with known capacity to avoid reallocations
         let mut parts_map: HashMap<PackURI, Box<dyn Part + Send + Sync>> =
