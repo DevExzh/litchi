@@ -126,6 +126,8 @@ pub struct MutableXlsbWorksheet {
     formula_group_sources: BTreeMap<(u32, u32), String>,
     /// Structured tables (ListObjects) hosted on this sheet.
     tables: Vec<crate::xlsb::table::XlsbTable>,
+    /// Losslessly preserved PivotTable definition parts hosted on this sheet.
+    pivot_table_views: Vec<crate::xlsb::pivot_view::XlsbPivotTableViewPart>,
     /// Typed DrawingML charts anchored on this sheet.
     charts: Vec<crate::xlsx::WorksheetChart>,
     /// Typed image parts anchored in the same Drawings part.
@@ -252,6 +254,7 @@ impl MutableXlsbWorksheet {
             formula_groups: Vec::new(),
             formula_group_sources: BTreeMap::new(),
             tables: Vec::new(),
+            pivot_table_views: Vec::new(),
             charts: Vec::new(),
             images: Vec::new(),
             image_bytes: 0,
@@ -1038,6 +1041,39 @@ impl MutableXlsbWorksheet {
         &self.tables
     }
 
+    /// Attach a losslessly preserved PivotTable definition part to this sheet.
+    ///
+    /// Its cache identifier is resolved against workbook PivotCaches at save
+    /// time. Duplicate view names on one sheet are rejected immediately.
+    pub fn add_pivot_table_view(
+        &mut self,
+        view: crate::xlsb::pivot_view::XlsbPivotTableViewPart,
+    ) -> XlsbResult<()> {
+        if self.pivot_table_views.len() >= 4_096 {
+            return Err(XlsbError::InvalidFormula(
+                "worksheet PivotTable count exceeds the safety limit".to_string(),
+            ));
+        }
+        if self
+            .pivot_table_views
+            .iter()
+            .any(|existing| crate::xlsb::formula::excel_name_eq(existing.name(), view.name()))
+        {
+            return Err(XlsbError::InvalidFormula(format!(
+                "duplicate PivotTable view name {:?} on worksheet {:?}",
+                view.name(),
+                self.name
+            )));
+        }
+        self.pivot_table_views.push(view);
+        Ok(())
+    }
+
+    /// Losslessly preserved PivotTable definition parts hosted on this sheet.
+    pub fn pivot_table_views(&self) -> &[crate::xlsb::pivot_view::XlsbPivotTableViewPart] {
+        &self.pivot_table_views
+    }
+
     pub(crate) fn has_drawing_objects(&self) -> bool {
         !self.charts.is_empty()
             || !self.images.is_empty()
@@ -1056,9 +1092,9 @@ impl MutableXlsbWorksheet {
     ///
     /// XLSB uses the same chart and SpreadsheetDrawing XML as XLSX. The
     /// workbook writer emits the chart and drawing parts and stores their
-    /// relationship in the binary `BrtDrawing` record. Relationship-bearing
-    /// external data, user shapes, extension fragments, and pivot charts are
-    /// rejected until their complete package graphs can be authored.
+    /// relationship in the binary `BrtDrawing` record. Pivot charts are
+    /// resolved against PivotTable views attached to this workbook at save
+    /// time.
     pub fn add_chart(&mut self, chart: crate::xlsx::WorksheetChart) -> XlsbResult<()> {
         if self.charts.len() >= crate::xlsb::drawing_write::MAX_CHARTS_PER_SHEET {
             return Err(XlsbError::InvalidFormula(

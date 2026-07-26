@@ -55,7 +55,7 @@ pub struct XlsbWorkbookWriter {
     calculation_properties: CalculationProperties,
     is_1904: bool,
     connections: Option<crate::xlsb::connections::XlsbConnections>,
-    pivot_caches: Vec<(u32, Vec<u8>)>,
+    pivot_caches: Vec<AuthoredPivotCache>,
     vba_project: Option<(Vec<u8>, crate::vba::VbaLimits)>,
 }
 
@@ -63,6 +63,12 @@ pub struct XlsbWorkbookWriter {
 enum XlsbSheetSlot {
     Worksheet(usize),
     ChartSheet(usize),
+}
+
+struct AuthoredPivotCache {
+    id: u32,
+    version_created: u8,
+    bytes: Vec<u8>,
 }
 
 /// Minimal Worksheet Binary Index payload for an empty worksheet.
@@ -241,7 +247,11 @@ impl XlsbWorkbookWriter {
                     "PivotCache identifier overflow".to_string(),
                 )
             })?;
-        self.pivot_caches.push((cache_id, bytes));
+        self.pivot_caches.push(AuthoredPivotCache {
+            id: cache_id,
+            version_created: definition.version_created,
+            bytes,
+        });
         Ok(cache_id)
     }
 
@@ -347,7 +357,7 @@ impl XlsbWorkbookWriter {
         // PivotCache Definition parts (one per attached cache, related from
         // the workbook part; the relationships and BrtBeginPivotCacheID
         // records were already emitted by add_workbook_part).
-        for (index, (_cache_id, bytes)) in self.pivot_caches.iter().enumerate() {
+        for (index, cache) in self.pivot_caches.iter().enumerate() {
             let cache_uri = PackURI::new(format!(
                 "/xl/pivotCache/pivotCacheDefinition{}.bin",
                 index + 1
@@ -355,7 +365,7 @@ impl XlsbWorkbookWriter {
             package.add_part(Box::new(BlobPart::new(
                 cache_uri,
                 "application/vnd.ms-excel.pivotCacheDefinition".to_string(),
-                bytes.clone(),
+                cache.bytes.clone(),
             )));
         }
 
@@ -432,6 +442,42 @@ impl XlsbWorkbookWriter {
             }
         }
         Ok(())
+    }
+
+    fn authored_pivot_tables(&self) -> Vec<(String, String)> {
+        self.worksheets
+            .iter()
+            .flat_map(|sheet| {
+                sheet
+                    .pivot_table_views()
+                    .iter()
+                    .map(move |view| (view.name().to_string(), sheet.name().to_string()))
+            })
+            .collect()
+    }
+
+    fn normalized_pivot_chart(
+        chart: &crate::xlsx::WorksheetChart,
+        host_sheet_name: &str,
+        authored_pivot_tables: &[(String, String)],
+    ) -> XlsbResult<crate::xlsx::WorksheetChart> {
+        let Some(source) = chart.chart.pivot_source.as_ref() else {
+            return Ok(chart.clone());
+        };
+        let name = crate::xlsx::pivot_chart::resolve_authored_pivot_source_name(
+            &source.name,
+            host_sheet_name,
+            authored_pivot_tables,
+        )
+        .map_err(|error| XlsbError::InvalidFormula(error.to_string()))?;
+        let mut normalized = chart.clone();
+        normalized
+            .chart
+            .pivot_source
+            .as_mut()
+            .expect("pivot source presence checked above")
+            .name = name;
+        Ok(normalized)
     }
 
     /// Write workbook-level defined names (BrtName records).
@@ -675,12 +721,12 @@ impl XlsbWorkbookWriter {
 
             // PivotCache Definition relationships; the BrtBeginPivotCacheID
             // records below carry these relationship IDs.
-            for (index, (cache_id, _)) in self.pivot_caches.iter().enumerate() {
+            for (index, cache) in self.pivot_caches.iter().enumerate() {
                 let relationship = rels.get_or_add(
                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
                     &format!("pivotCache/pivotCacheDefinition{}.bin", index + 1),
                 );
-                pivot_cache_rel_ids.push((*cache_id, relationship.r_id().to_string()));
+                pivot_cache_rel_ids.push((cache.id, relationship.r_id().to_string()));
             }
         }
 
@@ -1018,6 +1064,7 @@ impl XlsbWorkbookWriter {
 
     /// Add worksheet parts to the package
     fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> XlsbResult<Vec<(u32, u32)>> {
+        let authored_pivot_tables = self.authored_pivot_tables();
         let worksheet_names = self
             .sheet_order
             .iter()
@@ -1045,6 +1092,7 @@ impl XlsbWorkbookWriter {
         let mut next_drawing_index = 1usize;
         let mut next_chart_index = 1usize;
         let mut next_image_index = 1usize;
+        let mut next_pivot_table_index = 1usize;
         for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
             // Create the worksheet part with an empty blob first so we can attach
             // relationships (binary index + external hyperlinks) and obtain
@@ -1126,6 +1174,49 @@ impl XlsbWorkbookWriter {
                 worksheet.table_rel_ids = rel_ids;
             }
 
+            // PivotTable definitions are related implicitly from their host
+            // worksheet and back to the exact workbook PivotCache definition.
+            let mut pivot_table_parts = Vec::new();
+            for view in worksheet.pivot_table_views() {
+                let cache_index = self
+                    .pivot_caches
+                    .iter()
+                    .position(|cache| cache.id == view.cache_id())
+                    .ok_or_else(|| {
+                        XlsbError::InvalidFormula(format!(
+                            "PivotTable view {:?} references unknown cache {}",
+                            view.name(),
+                            view.cache_id()
+                        ))
+                    })?;
+                let cache_version_created = self.pivot_caches[cache_index].version_created;
+                if (view.version_created() >= 3) != (cache_version_created >= 3) {
+                    return Err(XlsbError::InvalidFormula(format!(
+                        "PivotTable view {:?} functionality level {} is incompatible with cache {} level {}",
+                        view.name(),
+                        view.version_created(),
+                        view.cache_id(),
+                        cache_version_created
+                    )));
+                }
+                let pivot_name = format!("pivotTable{next_pivot_table_index}.bin");
+                next_pivot_table_index =
+                    next_pivot_table_index.checked_add(1).ok_or_else(|| {
+                        XlsbError::InvalidFormula("PivotTable part index overflow".to_string())
+                    })?;
+                sheet_part.relate_to(&format!("../pivotTables/{pivot_name}"), rel::PIVOT_TABLE);
+                let mut part = BlobPart::new(
+                    PackURI::new(format!("/xl/pivotTables/{pivot_name}"))?,
+                    "application/vnd.ms-excel.PivotTable".to_string(),
+                    view.as_bytes().to_vec(),
+                );
+                part.relate_to(
+                    &format!("../pivotCache/pivotCacheDefinition{}.bin", cache_index + 1),
+                    rel::PIVOT_CACHE_DEFINITION,
+                );
+                pivot_table_parts.push(part);
+            }
+
             // Worksheet images and charts use standard SpreadsheetDrawing,
             // Image, and DrawingML Chart parts. The binary sheet carries only
             // BrtDrawing with the relationship ID allocated here.
@@ -1133,9 +1224,20 @@ impl XlsbWorkbookWriter {
             let mut chart_parts = Vec::new();
             let mut image_parts = Vec::new();
             if worksheet.has_drawing_objects() {
+                let normalized_charts = worksheet
+                    .charts()
+                    .iter()
+                    .map(|chart| {
+                        Self::normalized_pivot_chart(
+                            chart,
+                            worksheet.name(),
+                            &authored_pivot_tables,
+                        )
+                    })
+                    .collect::<XlsbResult<Vec<_>>>()?;
                 let drawing_xml = crate::xlsb::drawing_write::serialize_drawing(
                     worksheet.images(),
-                    worksheet.charts(),
+                    &normalized_charts,
                     worksheet.shapes(),
                     worksheet.groups(),
                     worksheet.connections(),
@@ -1169,7 +1271,7 @@ impl XlsbWorkbookWriter {
                         image.data().to_vec(),
                     ));
                 }
-                for (chart_ordinal, chart) in worksheet.charts().iter().enumerate() {
+                for (chart_ordinal, chart) in normalized_charts.iter().enumerate() {
                     let chart_name = format!("chart{next_chart_index}.xml");
                     let graph =
                         crate::xlsb::chart_resources::author_chart_graph(chart, next_chart_index)?;
@@ -1231,6 +1333,9 @@ impl XlsbWorkbookWriter {
             for part in table_parts {
                 package.add_part(Box::new(part));
             }
+            for part in pivot_table_parts {
+                package.add_part(Box::new(part));
+            }
             if let Some(part) = drawing_part {
                 package.add_part(Box::new(part));
             }
@@ -1271,8 +1376,13 @@ impl XlsbWorkbookWriter {
             next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
                 XlsbError::InvalidFormula("chart part index overflow".to_string())
             })?;
+            let normalized_chart = Self::normalized_pivot_chart(
+                sheet.chart(),
+                sheet.name(),
+                &self.authored_pivot_tables(),
+            )?;
             let graph =
-                crate::xlsb::chart_resources::author_chart_graph(sheet.chart(), chart_index)?;
+                crate::xlsb::chart_resources::author_chart_graph(&normalized_chart, chart_index)?;
 
             let mut chart_sheet_part = BlobPart::new(
                 PackURI::new(format!("/xl/chartsheets/sheet{}.bin", index + 1))?,
@@ -2842,6 +2952,117 @@ mod tests {
         let relationship = sheet_part.rels().get(&drawing_rel_id).unwrap();
         assert_eq!(relationship.reltype(), rel::DRAWING);
         assert!(!relationship.is_external());
+    }
+
+    #[test]
+    fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
+        use crate::xlsx::{ChartAnchor, WorksheetChart};
+
+        let mut begin_view = vec![0u8; 32];
+        begin_view[28..32].copy_from_slice(&1u32.to_le_bytes());
+        let view_name = "RevenuePivot";
+        begin_view.extend_from_slice(&(view_name.len() as u32).to_le_bytes());
+        for unit in view_name.encode_utf16() {
+            begin_view.extend_from_slice(&unit.to_le_bytes());
+        }
+        let mut view_bytes = Vec::new();
+        {
+            let mut writer = RecordWriter::new(&mut view_bytes);
+            writer
+                .write_record(record_types::BEGIN_SX_VIEW, &begin_view)
+                .unwrap();
+            writer
+                .write_record(record_types::BEGIN_SX_LOCATION, &[0; 36])
+                .unwrap();
+            writer
+                .write_record(record_types::END_SX_LOCATION, &[])
+                .unwrap();
+            writer
+                .write_record(record_types::END_SX_VIEW, &[])
+                .unwrap();
+        }
+        let view =
+            crate::xlsb::pivot_view::XlsbPivotTableViewPart::from_bytes(view_bytes.clone()).unwrap();
+
+        let chart = WorksheetChart::line_chart(
+            "Revenue",
+            "Pivot Host!$A$2:$A$3",
+            "Pivot Host!$B$2:$B$3",
+            ChartAnchor::new(3, 0, 10, 14),
+        )
+        .unwrap()
+        .into_pivot_chart(view_name);
+        let mut sheet = MutableXlsbWorksheet::new("Pivot Host");
+        sheet.add_pivot_table_view(view).unwrap();
+        sheet.add_chart(chart).unwrap();
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        let cache_id = workbook
+            .add_pivot_cache(&crate::xlsb::pivot::PivotCacheDefinition::default())
+            .unwrap();
+        assert_eq!(cache_id, 1);
+        workbook.add_worksheet(sheet);
+
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let bytes = output.into_inner();
+        let package = OpcPackage::from_bytes(&bytes).unwrap();
+        let sheet_part = package
+            .get_part(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
+            .unwrap();
+        let view_relationship = sheet_part
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == rel::PIVOT_TABLE)
+            .expect("worksheet PivotTable relationship missing");
+        let view_part = package
+            .get_part(&view_relationship.target_partname().unwrap())
+            .unwrap();
+        assert_eq!(view_part.blob(), view_bytes);
+        let cache_relationship = view_part
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == rel::PIVOT_CACHE_DEFINITION)
+            .expect("PivotTable cache relationship missing");
+        assert_eq!(
+            cache_relationship.target_partname().unwrap(),
+            PackURI::new("/xl/pivotCache/pivotCacheDefinition1.bin").unwrap()
+        );
+
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(bytes)).unwrap();
+        assert_eq!(reader.pivot_views().len(), 1);
+        assert_eq!(reader.pivot_views()[0].name(), view_name);
+        assert_eq!(reader.pivot_views()[0].cache_id(), 1);
+        let drawing = reader.sheet_drawing(0).expect("pivot chart drawing missing");
+        let source = drawing.charts[0]
+            .chart
+            .pivot_source
+            .as_ref()
+            .expect("pivot source missing");
+        assert_eq!(source.name, "'Pivot Host'!RevenuePivot");
+    }
+
+    #[test]
+    fn pivot_chart_refuses_a_missing_view_binding() {
+        use crate::xlsx::{ChartAnchor, WorksheetChart};
+
+        let chart = WorksheetChart::line_chart(
+            "Revenue",
+            "Host!$A$1:$A$2",
+            "Host!$B$1:$B$2",
+            ChartAnchor::new(2, 0, 8, 12),
+        )
+        .unwrap()
+        .into_pivot_chart("MissingPivot");
+        let mut sheet = MutableXlsbWorksheet::new("Host");
+        sheet.add_chart(chart).unwrap();
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(sheet);
+
+        let error = workbook
+            .save(Cursor::new(Vec::new()))
+            .expect_err("missing PivotTable binding must fail");
+        assert!(error.to_string().contains("missing pivot table"));
     }
 
     #[test]

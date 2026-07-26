@@ -17,17 +17,8 @@ const MAX_DRAWING_XML_BYTES: usize = 16 * 1024 * 1024;
 const CHART_SHEET_EXTENT_X: u64 = 8_582_025;
 const CHART_SHEET_EXTENT_Y: u64 = 5_838_825;
 
-fn unsupported(detail: impl Into<String>) -> XlsbError {
-    XlsbError::UnsupportedFeature(detail.into())
-}
-
 pub(crate) fn validate_chart(chart: &WorksheetChart) -> XlsbResult<()> {
     crate::xlsx::chart::validate_chart_anchor(&chart.anchor)?;
-    if chart.chart.pivot_source.is_some() {
-        return Err(unsupported(
-            "XLSB worksheet chart authoring does not yet wire PivotTable views",
-        ));
-    }
     crate::xlsb::chart_resources::validate_chart_resources(chart)
 }
 

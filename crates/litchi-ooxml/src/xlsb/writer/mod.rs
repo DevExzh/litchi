@@ -65,6 +65,7 @@ pub(crate) mod conditional_formatting;
 
 // Re-export main types for public API
 pub use crate::xlsb::drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
+pub use crate::xlsb::pivot_view::XlsbPivotTableViewPart;
 pub use crate::xlsx::{
     ChartAnchor, WorksheetChart, XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxEmuExtent,
     XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor, XlsxShapeBodyProperties,
