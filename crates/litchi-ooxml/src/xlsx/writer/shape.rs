@@ -1,4 +1,4 @@
-//! Authoring model and serializer for XLSX DrawingML shapes and text boxes.
+//! Shared SpreadsheetDrawing authoring model for XLSX and XLSB shapes.
 //!
 //! [`XlsxShapeSpec`] describes one text-box shape to embed in a worksheet
 //! drawing part: a preset geometry, an anchor on the sheet grid, text-body
@@ -14,13 +14,12 @@
 //!
 //! [`ShapeEmitter`] serializes authored objects as
 //! `xdr:twoCellAnchor`/`xdr:oneCellAnchor`/`xdr:absoluteAnchor` elements for
-//! the worksheet drawing part emitted by
-//! `MutableWorksheet::generate_drawing_xml`, allocating drawing-wide unique
-//! object IDs and resolving connection-site name references. Everything is
-//! inert: no rendering, no layout computation, and all inputs are bounded
-//! and validated at authoring time.
+//! the standard worksheet drawing parts used by both XLSX and XLSB,
+//! allocating drawing-wide unique object IDs and resolving connection-site
+//! name references. Everything is inert: no rendering, no layout
+//! computation, and all inputs are bounded and validated at authoring time.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 
 use litchi_core::xml::escape::escape_xml;
@@ -33,6 +32,8 @@ use crate::xlsx::shapes::{
 
 /// Maximum number of authored top-level drawing objects per worksheet.
 const MAX_SHAPES_PER_WORKSHEET: usize = 4096;
+/// Maximum authored objects including nested group children.
+const MAX_OBJECTS_PER_DRAWING: usize = 100_000;
 /// Maximum aggregate run text bytes across one authored shape.
 const MAX_SHAPE_TEXT_BYTES: usize = 1024 * 1024;
 /// Maximum length of the shape name or description.
@@ -45,6 +46,11 @@ const MAX_RUNS_PER_PARAGRAPH: usize = 4096;
 const MAX_GROUP_CHILDREN: usize = 1024;
 /// Maximum group nesting depth, mirroring the reader's limit.
 const MAX_GROUP_DEPTH: usize = 32;
+/// DrawingML text bodies allow at most 16 columns.
+const MAX_TEXT_COLUMNS: u32 = 16;
+/// ST_TextFontSize bounds, in hundredths of a point.
+const MIN_FONT_SIZE_HUNDREDTHS: u32 = 100;
+const MAX_FONT_SIZE_HUNDREDTHS: u32 = 400_000;
 
 /// One authored DrawingML text-box shape for a worksheet drawing part.
 ///
@@ -128,11 +134,25 @@ impl XlsxShapeSpec {
             if paragraph.runs.len() > MAX_RUNS_PER_PARAGRAPH {
                 return Err("shape run count limit exceeded".to_string());
             }
-            text_bytes += paragraph.runs.iter().map(|run| run.text.len()).sum::<usize>();
+            for run in &paragraph.runs {
+                validate_xml_text(&run.text, "shape run text")?;
+                if run.font_size_hundredths.is_some_and(|size| {
+                    !(MIN_FONT_SIZE_HUNDREDTHS..=MAX_FONT_SIZE_HUNDREDTHS).contains(&size)
+                }) {
+                    return Err("shape run font size is outside DrawingML bounds".to_string());
+                }
+                text_bytes = text_bytes
+                    .checked_add(run.text.len())
+                    .ok_or_else(|| "shape text byte count overflow".to_string())?;
+            }
         }
         if text_bytes > MAX_SHAPE_TEXT_BYTES {
             return Err("shape text bytes limit exceeded".to_string());
         }
+        if !(1..=MAX_TEXT_COLUMNS).contains(&self.body_properties.column_count) {
+            return Err("shape text column count is outside DrawingML bounds".to_string());
+        }
+        validate_preset(&self.preset)?;
         validate_anchor(&self.anchor)
     }
 }
@@ -200,6 +220,14 @@ impl XlsxConnectionShapeSpec {
         if self.start.shape_name.is_empty() || self.end.shape_name.is_empty() {
             return Err("connection shape references cannot be empty".to_string());
         }
+        validate_xml_text(&self.start.shape_name, "connection start shape name")?;
+        validate_xml_text(&self.end.shape_name, "connection end shape name")?;
+        if self.start.shape_name.len() > MAX_SHAPE_NAME_BYTES
+            || self.end.shape_name.len() > MAX_SHAPE_NAME_BYTES
+        {
+            return Err("connection shape reference is too long".to_string());
+        }
+        validate_preset(&self.preset)?;
         validate_anchor(&self.anchor)
     }
 }
@@ -247,7 +275,9 @@ impl XlsxGroupSpec {
         validate_object_slot(existing)?;
         validate_identity(&self.name, &self.description)?;
         validate_anchor(&self.anchor)?;
-        validate_children(&self.children, 1)
+        validate_group_transform(&self.transform)?;
+        let mut object_count = 1usize;
+        validate_children(&self.children, 1, &mut object_count)
     }
 }
 
@@ -298,13 +328,41 @@ fn validate_identity(name: &str, description: &Option<String>) -> Result<(), Str
     {
         return Err("shape name/description is too long".to_string());
     }
+    validate_xml_text(name, "shape name")?;
+    if let Some(description) = description {
+        validate_xml_text(description, "shape description")?;
+    }
+    Ok(())
+}
+
+fn validate_preset(preset: &XlsxShapePreset) -> Result<(), String> {
+    let token = preset.as_str();
+    if token.is_empty() || token.len() > MAX_SHAPE_NAME_BYTES {
+        return Err("shape preset token is empty or too long".to_string());
+    }
+    validate_xml_text(token, "shape preset token")
+}
+
+fn validate_xml_text(value: &str, field: &str) -> Result<(), String> {
+    if value.chars().any(|character| {
+        !matches!(
+            character as u32,
+            0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+        )
+    }) {
+        return Err(format!("{field} contains an invalid XML character"));
+    }
     Ok(())
 }
 
 /// Validate group children recursively. Children carry anchor fields that
 /// the serializer ignores inside a group; they are validated anyway for
 /// consistency with top-level objects.
-fn validate_children(children: &[XlsxDrawingObjectSpec], depth: usize) -> Result<(), String> {
+fn validate_children(
+    children: &[XlsxDrawingObjectSpec],
+    depth: usize,
+    object_count: &mut usize,
+) -> Result<(), String> {
     if depth > MAX_GROUP_DEPTH {
         return Err("shape group depth limit exceeded".to_string());
     }
@@ -312,11 +370,19 @@ fn validate_children(children: &[XlsxDrawingObjectSpec], depth: usize) -> Result
         return Err("shape group children count limit exceeded".to_string());
     }
     for child in children {
+        *object_count = object_count
+            .checked_add(1)
+            .ok_or_else(|| "shape group object count overflow".to_string())?;
+        if *object_count > MAX_OBJECTS_PER_DRAWING {
+            return Err("shape group object count limit exceeded".to_string());
+        }
         match child {
             XlsxDrawingObjectSpec::Shape(shape) => shape.validate(0)?,
             XlsxDrawingObjectSpec::Group(group) => {
                 validate_identity(&group.name, &group.description)?;
-                validate_children(&group.children, depth + 1)?;
+                validate_anchor(&group.anchor)?;
+                validate_group_transform(&group.transform)?;
+                validate_children(&group.children, depth + 1, object_count)?;
             },
             XlsxDrawingObjectSpec::Connection(connection) => connection.validate(0)?,
         }
@@ -343,6 +409,33 @@ fn validate_anchor(anchor: &XlsxShapeAnchor) -> Result<(), String> {
         if marker.column >= MAX_COLUMNS || marker.row >= MAX_ROWS {
             return Err("shape anchor exceeds worksheet bounds".to_string());
         }
+        if marker.column_offset.emu() < 0 || marker.row_offset.emu() < 0 {
+            return Err("shape anchor offsets cannot be negative".to_string());
+        }
+    }
+    match anchor {
+        XlsxShapeAnchor::OneCell { extent, .. }
+        | XlsxShapeAnchor::Absolute { extent, .. } => validate_extent(extent)?,
+        XlsxShapeAnchor::TwoCell { .. } => {},
+    }
+    Ok(())
+}
+
+fn validate_group_transform(transform: &Option<XlsxGroupTransform>) -> Result<(), String> {
+    if let Some(transform) = transform {
+        if let Some(extent) = &transform.extent {
+            validate_extent(extent)?;
+        }
+        if let Some(child_extent) = &transform.child_extent {
+            validate_extent(child_extent)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_extent(extent: &XlsxEmuExtent) -> Result<(), String> {
+    if extent.width.emu() < 0 || extent.height.emu() < 0 {
+        return Err("shape extent cannot be negative".to_string());
     }
     Ok(())
 }
@@ -357,16 +450,79 @@ fn validate_anchor(anchor: &XlsxShapeAnchor) -> Result<(), String> {
 pub(crate) struct ShapeEmitter {
     next_id: u32,
     names: HashMap<String, u32>,
+    preallocated: bool,
+    emitted_names: HashSet<String>,
 }
 
 impl ShapeEmitter {
     /// An emitter whose first allocated ID is `first_id` (continuing the
     /// picture/chart ID sequence of the drawing part).
+    #[cfg(test)]
     pub(crate) fn new(first_id: u32) -> Self {
         Self {
             next_id: first_id,
             names: HashMap::new(),
+            preallocated: false,
+            emitted_names: HashSet::new(),
         }
+    }
+
+    /// Preallocate IDs for a complete worksheet shape graph.
+    ///
+    /// This makes connection targets independent of XML object order while
+    /// preserving deterministic IDs and rejecting duplicate names before any
+    /// output is emitted.
+    pub(crate) fn for_objects(
+        first_id: u32,
+        shapes: &[XlsxShapeSpec],
+        groups: &[XlsxGroupSpec],
+        connections: &[XlsxConnectionShapeSpec],
+    ) -> Result<Self, String> {
+        let mut emitter = Self {
+            next_id: first_id,
+            names: HashMap::new(),
+            preallocated: true,
+            emitted_names: HashSet::new(),
+        };
+        for shape in shapes {
+            emitter.reserve(&shape.name)?;
+        }
+        for group in groups {
+            emitter.reserve_group(group)?;
+        }
+        for connection in connections {
+            emitter.reserve(&connection.name)?;
+        }
+        Ok(emitter)
+    }
+
+    fn reserve_group(&mut self, group: &XlsxGroupSpec) -> Result<(), String> {
+        self.reserve(&group.name)?;
+        for child in &group.children {
+            match child {
+                XlsxDrawingObjectSpec::Shape(shape) => self.reserve(&shape.name)?,
+                XlsxDrawingObjectSpec::Group(group) => self.reserve_group(group)?,
+                XlsxDrawingObjectSpec::Connection(connection) => {
+                    self.reserve(&connection.name)?
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn reserve(&mut self, name: &str) -> Result<(), String> {
+        if self.names.len() >= MAX_OBJECTS_PER_DRAWING {
+            return Err("worksheet drawing object count limit exceeded".to_string());
+        }
+        let id = self.next_id;
+        self.next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or_else(|| "drawing object ID space exhausted".to_string())?;
+        if self.names.insert(name.to_string(), id).is_some() {
+            return Err(format!("duplicate shape name '{name}' in drawing"));
+        }
+        Ok(())
     }
 
     /// Serialize one top-level authored shape wrapped in its anchor.
@@ -528,7 +684,21 @@ impl ShapeEmitter {
     }
 
     fn allocate(&mut self, name: &str) -> Result<u32, String> {
+        if self.preallocated {
+            let id = self
+                .names
+                .get(name)
+                .copied()
+                .ok_or_else(|| format!("shape name '{name}' was not preallocated"))?;
+            if !self.emitted_names.insert(name.to_string()) {
+                return Err(format!("duplicate shape name '{name}' in drawing"));
+            }
+            return Ok(id);
+        }
         let id = self.next_id;
+        if self.names.len() >= MAX_OBJECTS_PER_DRAWING {
+            return Err("worksheet drawing object count limit exceeded".to_string());
+        }
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -1011,7 +1181,7 @@ mod tests {
             fancy.paragraphs[0].runs[0].bold = Some(true);
             fancy.paragraphs[0].runs[0].font_size_hundredths = Some(1400);
             ws.add_shape(fancy).unwrap();
-            drop(ws);
+            let _ = ws;
             workbook.save(&path).unwrap();
         }
 
@@ -1250,6 +1420,56 @@ mod group_connection_tests {
     }
 
     #[test]
+    fn preallocated_graph_resolves_forward_group_child_references() {
+        let connection = XlsxConnectionShapeSpec::new(
+            "Forward",
+            anchor((0, 0), (1, 1)),
+            XlsxShapePreset::StraightConnector1,
+            XlsxConnectionEndSpec {
+                shape_name: "Later".to_string(),
+                site: 0,
+            },
+            XlsxConnectionEndSpec {
+                shape_name: "Last".to_string(),
+                site: 1,
+            },
+        );
+        let group = XlsxGroupSpec::new("Group", anchor((0, 0), (4, 4)))
+            .with_child(connection.into())
+            .with_child(
+                XlsxShapeSpec::shape(
+                    "Later",
+                    anchor((1, 1), (2, 2)),
+                    XlsxShapePreset::Rectangle,
+                    "",
+                )
+                .into(),
+            )
+            .with_child(
+                XlsxShapeSpec::shape(
+                    "Last",
+                    anchor((2, 2), (3, 3)),
+                    XlsxShapePreset::Ellipse,
+                    "",
+                )
+                .into(),
+            );
+        let mut emitter = ShapeEmitter::for_objects(1, &[], std::slice::from_ref(&group), &[])
+            .expect("shape graph should preallocate");
+        let mut xml = String::new();
+        emitter.write_anchored_group(&mut xml, &group).unwrap();
+        let objects = parse_drawing_shapes(&drawing_wrap(&xml)).unwrap().unwrap();
+        let XlsxDrawingObject::Group(group) = &objects[0].object else {
+            panic!("expected group");
+        };
+        let XlsxDrawingObject::ConnectionShape(connection) = &group.children[0] else {
+            panic!("expected forward connector");
+        };
+        assert_eq!(connection.start.unwrap().shape_id, 3);
+        assert_eq!(connection.end.unwrap().shape_id, 4);
+    }
+
+    #[test]
     fn connector_to_group_child_resolves() {
         let group = XlsxGroupSpec::new("Box", anchor((0, 0), (3, 3))).with_child(
             XlsxShapeSpec::text_box("Child", anchor((0, 0), (1, 1)), XlsxShapePreset::Rectangle, "c")
@@ -1414,7 +1634,7 @@ mod group_connection_tests {
                 },
             ))
             .unwrap();
-            drop(ws);
+            let _ = ws;
             workbook.save(&path).unwrap();
         }
 

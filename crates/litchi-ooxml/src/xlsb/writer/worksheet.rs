@@ -132,6 +132,12 @@ pub struct MutableXlsbWorksheet {
     images: Vec<crate::xlsb::XlsbWorksheetImage>,
     /// Cached sum of encoded image bytes for constant-time safety checks.
     image_bytes: usize,
+    /// Top-level DrawingML shapes and text boxes.
+    shapes: Vec<crate::xlsx::writer::XlsxShapeSpec>,
+    /// Top-level DrawingML shape groups.
+    groups: Vec<crate::xlsx::writer::XlsxGroupSpec>,
+    /// Top-level DrawingML connection shapes.
+    connections: Vec<crate::xlsx::writer::XlsxConnectionShapeSpec>,
     /// Relationship ID allocated for the sheet's Drawings part.
     drawing_rel_id: Option<String>,
     /// Relationship IDs allocated for `tables` by the workbook writer, in
@@ -249,6 +255,9 @@ impl MutableXlsbWorksheet {
             charts: Vec::new(),
             images: Vec::new(),
             image_bytes: 0,
+            shapes: Vec::new(),
+            groups: Vec::new(),
+            connections: Vec::new(),
             drawing_rel_id: None,
             table_rel_ids: Vec::new(),
         }
@@ -829,6 +838,9 @@ impl MutableXlsbWorksheet {
         self.charts.clear();
         self.images.clear();
         self.image_bytes = 0;
+        self.shapes.clear();
+        self.groups.clear();
+        self.connections.clear();
         self.drawing_rel_id = None;
         self.formula_groups.clear();
         self.formula_group_sources.clear();
@@ -1026,6 +1038,20 @@ impl MutableXlsbWorksheet {
         &self.tables
     }
 
+    pub(crate) fn has_drawing_objects(&self) -> bool {
+        !self.charts.is_empty()
+            || !self.images.is_empty()
+            || !self.shapes.is_empty()
+            || !self.groups.is_empty()
+            || !self.connections.is_empty()
+    }
+
+    fn clear_drawing_rel_id_if_empty(&mut self) {
+        if !self.has_drawing_objects() {
+            self.drawing_rel_id = None;
+        }
+    }
+
     /// Add a typed DrawingML chart anchored on this worksheet.
     ///
     /// XLSB uses the same chart and SpreadsheetDrawing XML as XLSX. The
@@ -1058,18 +1084,14 @@ impl MutableXlsbWorksheet {
             )));
         }
         let removed = self.charts.remove(index);
-        if self.charts.is_empty() && self.images.is_empty() {
-            self.drawing_rel_id = None;
-        }
+        self.clear_drawing_rel_id_if_empty();
         Ok(removed)
     }
 
     /// Remove every authored chart from this worksheet.
     pub fn clear_charts(&mut self) {
         self.charts.clear();
-        if self.images.is_empty() {
-            self.drawing_rel_id = None;
-        }
+        self.clear_drawing_rel_id_if_empty();
     }
 
     /// Add a typed embedded image to this worksheet's Drawings part.
@@ -1114,9 +1136,7 @@ impl MutableXlsbWorksheet {
         }
         let removed = self.images.remove(index);
         self.image_bytes -= removed.data().len();
-        if self.images.is_empty() && self.charts.is_empty() {
-            self.drawing_rel_id = None;
-        }
+        self.clear_drawing_rel_id_if_empty();
         Ok(removed)
     }
 
@@ -1124,9 +1144,131 @@ impl MutableXlsbWorksheet {
     pub fn clear_images(&mut self) {
         self.images.clear();
         self.image_bytes = 0;
-        if self.charts.is_empty() {
-            self.drawing_rel_id = None;
+        self.clear_drawing_rel_id_if_empty();
+    }
+
+    fn drawing_shape_count(&self) -> usize {
+        self.shapes.len() + self.groups.len() + self.connections.len()
+    }
+
+    /// Add a standard DrawingML shape or text box.
+    pub fn add_shape(
+        &mut self,
+        shape: crate::xlsx::writer::XlsxShapeSpec,
+    ) -> XlsbResult<()> {
+        shape
+            .validate(self.drawing_shape_count())
+            .map_err(XlsbError::InvalidFormula)?;
+        self.shapes.push(shape);
+        Ok(())
+    }
+
+    /// Add a plain-text DrawingML text box.
+    pub fn add_text_box(
+        &mut self,
+        name: impl Into<String>,
+        anchor: crate::xlsx::XlsxShapeAnchor,
+        preset: crate::xlsx::XlsxShapePreset,
+        text: &str,
+    ) -> XlsbResult<()> {
+        self.add_shape(crate::xlsx::writer::XlsxShapeSpec::text_box(
+            name, anchor, preset, text,
+        ))
+    }
+
+    /// Authored top-level shapes in drawing order.
+    pub fn shapes(&self) -> &[crate::xlsx::writer::XlsxShapeSpec] {
+        &self.shapes
+    }
+
+    /// Remove one top-level shape.
+    pub fn remove_shape(
+        &mut self,
+        index: usize,
+    ) -> XlsbResult<crate::xlsx::writer::XlsxShapeSpec> {
+        if index >= self.shapes.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "shape index {index} is out of bounds for {} shapes",
+                self.shapes.len()
+            )));
         }
+        let removed = self.shapes.remove(index);
+        self.clear_drawing_rel_id_if_empty();
+        Ok(removed)
+    }
+
+    /// Add a nested DrawingML shape group.
+    pub fn add_group(
+        &mut self,
+        group: crate::xlsx::writer::XlsxGroupSpec,
+    ) -> XlsbResult<()> {
+        group
+            .validate(self.drawing_shape_count())
+            .map_err(XlsbError::InvalidFormula)?;
+        self.groups.push(group);
+        Ok(())
+    }
+
+    /// Authored top-level shape groups in drawing order.
+    pub fn groups(&self) -> &[crate::xlsx::writer::XlsxGroupSpec] {
+        &self.groups
+    }
+
+    /// Remove one top-level shape group.
+    pub fn remove_group(
+        &mut self,
+        index: usize,
+    ) -> XlsbResult<crate::xlsx::writer::XlsxGroupSpec> {
+        if index >= self.groups.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "group index {index} is out of bounds for {} groups",
+                self.groups.len()
+            )));
+        }
+        let removed = self.groups.remove(index);
+        self.clear_drawing_rel_id_if_empty();
+        Ok(removed)
+    }
+
+    /// Add a DrawingML connection shape.
+    pub fn add_connection(
+        &mut self,
+        connection: crate::xlsx::writer::XlsxConnectionShapeSpec,
+    ) -> XlsbResult<()> {
+        connection
+            .validate(self.drawing_shape_count())
+            .map_err(XlsbError::InvalidFormula)?;
+        self.connections.push(connection);
+        Ok(())
+    }
+
+    /// Authored top-level connection shapes in drawing order.
+    pub fn connections(&self) -> &[crate::xlsx::writer::XlsxConnectionShapeSpec] {
+        &self.connections
+    }
+
+    /// Remove one top-level connection shape.
+    pub fn remove_connection(
+        &mut self,
+        index: usize,
+    ) -> XlsbResult<crate::xlsx::writer::XlsxConnectionShapeSpec> {
+        if index >= self.connections.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "connection index {index} is out of bounds for {} connection shapes",
+                self.connections.len()
+            )));
+        }
+        let removed = self.connections.remove(index);
+        self.clear_drawing_rel_id_if_empty();
+        Ok(removed)
+    }
+
+    /// Remove every authored shape, group, and connection shape.
+    pub fn clear_drawing_shapes(&mut self) {
+        self.shapes.clear();
+        self.groups.clear();
+        self.connections.clear();
+        self.clear_drawing_rel_id_if_empty();
     }
 
     pub(crate) fn set_drawing_rel_id(&mut self, rel_id: Option<String>) {
@@ -1415,7 +1557,7 @@ impl MutableXlsbWorksheet {
             writer.write_record(record_types::END_WEB_EXTENSIONS, &[])?;
         }
 
-        if !self.charts.is_empty() || !self.images.is_empty() {
+        if self.has_drawing_objects() {
             let rel_id = self.drawing_rel_id.as_deref().ok_or_else(|| {
                 XlsbError::InvalidFormula(
                     "worksheet drawing objects lack a Drawings relationship ID".to_string(),

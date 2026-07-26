@@ -6,6 +6,9 @@
 use crate::xlsb::XlsbWorksheetImage;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsx::WorksheetChart;
+use crate::xlsx::writer::shape::{
+    ShapeEmitter, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
+};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as _;
 
@@ -61,10 +64,18 @@ pub(crate) fn serialize_chart(chart: &WorksheetChart) -> XlsbResult<Vec<u8>> {
 pub(crate) fn serialize_drawing(
     images: &[XlsbWorksheetImage],
     charts: &[WorksheetChart],
+    shapes: &[XlsxShapeSpec],
+    groups: &[XlsxGroupSpec],
+    connections: &[XlsxConnectionShapeSpec],
 ) -> XlsbResult<Vec<u8>> {
-    if images.is_empty() && charts.is_empty() {
+    if images.is_empty()
+        && charts.is_empty()
+        && shapes.is_empty()
+        && groups.is_empty()
+        && connections.is_empty()
+    {
         return Err(XlsbError::InvalidFormula(
-            "worksheet drawing requires at least one image or chart".to_string(),
+            "worksheet drawing requires at least one drawing object".to_string(),
         ));
     }
     if images.len() > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGES
@@ -108,8 +119,60 @@ pub(crate) fn serialize_drawing(
         images.len(),
         images.len(),
     )?;
+    let mut object_count = 0usize;
+    for shape in shapes {
+        shape
+            .validate(object_count)
+            .map_err(XlsbError::InvalidFormula)?;
+        object_count += 1;
+    }
+    for group in groups {
+        group
+            .validate(object_count)
+            .map_err(XlsbError::InvalidFormula)?;
+        object_count += 1;
+    }
+    for connection in connections {
+        connection
+            .validate(object_count)
+            .map_err(XlsbError::InvalidFormula)?;
+        object_count += 1;
+    }
+    let first_shape_id = images
+        .len()
+        .checked_add(charts.len())
+        .and_then(|count| count.checked_add(1))
+        .and_then(|id| u32::try_from(id).ok())
+        .ok_or_else(|| {
+            XlsbError::InvalidFormula("worksheet drawing object ID overflow".to_string())
+        })?;
+    let mut emitter = ShapeEmitter::for_objects(first_shape_id, shapes, groups, connections)
+        .map_err(XlsbError::InvalidFormula)?;
+    for shape in shapes {
+        emitter
+            .write_anchored_shape(&mut xml, shape)
+            .map_err(XlsbError::InvalidFormula)?;
+        ensure_drawing_size(xml.len())?;
+    }
+    for group in groups {
+        emitter
+            .write_anchored_group(&mut xml, group)
+            .map_err(XlsbError::InvalidFormula)?;
+        ensure_drawing_size(xml.len())?;
+    }
+    for connection in connections {
+        emitter
+            .write_anchored_connection(&mut xml, connection)
+            .map_err(XlsbError::InvalidFormula)?;
+        ensure_drawing_size(xml.len())?;
+    }
     xml.push_str("</xdr:wsDr>");
     ensure_drawing_size(xml.len())?;
+    // The detailed shared reader verifies the complete shape/group/connector
+    // grammar in addition to the lightweight XLSB drawing inventory below.
+    crate::xlsx::shapes::parse_drawing_shapes(&xml)?.ok_or_else(|| {
+        XlsbError::Encoding("authored drawing lacks an xdr:wsDr root".to_string())
+    })?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.
     crate::xlsb::drawing::parse_drawing_part(&bytes)?;

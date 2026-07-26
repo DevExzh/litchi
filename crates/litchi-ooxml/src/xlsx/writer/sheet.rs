@@ -1687,7 +1687,13 @@ impl MutableWorksheet {
         // IDs continue the same sequence, allocated by the emitter, which
         // also resolves connection-site name references.
         let shape_id_offset = (self.images.len() + self.charts.len()) as u32;
-        let mut emitter = ShapeEmitter::new(shape_id_offset + 1);
+        let mut emitter = ShapeEmitter::for_objects(
+            shape_id_offset + 1,
+            &self.shapes,
+            &self.groups,
+            &self.connections,
+        )
+        .map_err(|e| format!("XML write error: {e}"))?;
         for shape in &self.shapes {
             emitter
                 .write_anchored_shape(&mut xml, shape)

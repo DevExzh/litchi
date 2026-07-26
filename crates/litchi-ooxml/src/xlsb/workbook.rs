@@ -357,6 +357,12 @@ impl XlsbWorkbook {
         use crate::xlsb::drawing::{
             XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage, XlsbSheetDrawing,
         };
+        let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
+            crate::xlsb::error::XlsbError::Encoding(format!(
+                "Drawings part is not UTF-8: {error}"
+            ))
+        })?;
+        let shapes = crate::xlsx::shapes::parse_drawing_shapes(drawing_xml)?.unwrap_or_default();
         let drawing = crate::xlsb::drawing::parse_drawing_part(drawing_part.blob())?;
         let mut charts = Vec::new();
         let mut images = Vec::new();
@@ -479,6 +485,7 @@ impl XlsbWorkbook {
             drawing,
             charts,
             images,
+            shapes,
         })
     }
 

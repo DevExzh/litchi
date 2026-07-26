@@ -10,7 +10,7 @@
 //! - **Worksheet Writing**: Cell data with all types (numbers, strings, booleans, errors, formulas)
 //! - **Shared Strings**: Efficient shared string table generation
 //! - **Styles**: Fonts, fills, borders, and number formats
-//! - **Advanced Features**: Comments, hyperlinks, merged cells, data validation, worksheet charts and images
+//! - **Advanced Features**: Comments, hyperlinks, merged cells, data validation, and typed worksheet drawings
 //!
 //! # Example
 //!
@@ -62,7 +62,16 @@ pub(crate) mod conditional_formatting;
 
 // Re-export main types for public API
 pub use crate::xlsb::drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
-pub use crate::xlsx::{ChartAnchor, WorksheetChart};
+pub use crate::xlsx::{
+    ChartAnchor, WorksheetChart, XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxEmuExtent,
+    XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor, XlsxShapeBodyProperties,
+    XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun, XlsxTextAutofit, XlsxTextDirection,
+    XlsxTextInsets, XlsxTextVerticalAnchor, XlsxTextWrap,
+};
+pub use crate::xlsx::writer::{
+    XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
+    XlsxShapeSpec,
+};
 pub use record::RecordWriter;
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};

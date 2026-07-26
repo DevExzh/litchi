@@ -1036,10 +1036,13 @@ impl XlsbWorkbookWriter {
             let mut drawing_part = None;
             let mut chart_parts = Vec::new();
             let mut image_parts = Vec::new();
-            if !worksheet.charts().is_empty() || !worksheet.images().is_empty() {
+            if worksheet.has_drawing_objects() {
                 let drawing_xml = crate::xlsb::drawing_write::serialize_drawing(
                     worksheet.images(),
                     worksheet.charts(),
+                    worksheet.shapes(),
+                    worksheet.groups(),
+                    worksheet.connections(),
                 )?;
                 let drawing_name = format!("drawing{next_drawing_index}.xml");
                 next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
@@ -2542,7 +2545,10 @@ mod tests {
             XlsbDrawingAnchorKind, XlsbDrawingObject, XlsbWorksheetImage,
             XlsbWorksheetImageFormat,
         };
-        use crate::xlsx::{ChartAnchor, WorksheetChart};
+        use crate::xlsx::{
+            ChartAnchor, WorksheetChart, XlsxDrawingObject, XlsxEmu, XlsxEmuExtent,
+            XlsxEmuOffset, XlsxShapeAnchor, XlsxShapePreset,
+        };
 
         const PNG_1X1: &[u8] = &[
             0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
@@ -2587,6 +2593,23 @@ mod tests {
         sheet.add_image(png).unwrap();
         sheet.add_image(svg).unwrap();
         sheet.add_chart(chart).unwrap();
+        sheet
+            .add_text_box(
+                "Caption",
+                XlsxShapeAnchor::Absolute {
+                    position: XlsxEmuOffset {
+                        x: XlsxEmu(100_000),
+                        y: XlsxEmu(100_000),
+                    },
+                    extent: XlsxEmuExtent {
+                        width: XlsxEmu(1_000_000),
+                        height: XlsxEmu(500_000),
+                    },
+                },
+                XlsxShapePreset::Rectangle,
+                "Mixed drawing",
+            )
+            .unwrap();
         let mut image_only = MutableXlsbWorksheet::new("Image only");
         image_only
             .add_image(
@@ -2619,7 +2642,12 @@ mod tests {
         assert_eq!(drawing.images[0].rel_id, "rId1");
         assert_eq!(drawing.images[1].rel_id, "rId2");
         assert_eq!(drawing.charts[0].rel_id, "rId3");
-        assert_eq!(drawing.drawing.anchors.len(), 3);
+        assert_eq!(drawing.drawing.anchors.len(), 4);
+        assert_eq!(drawing.shapes.len(), 1);
+        let XlsxDrawingObject::Shape(caption) = &drawing.shapes[0].object else {
+            panic!("expected mixed-drawing caption");
+        };
+        assert_eq!(caption.non_visual.id, Some(4));
         match &drawing.drawing.anchors[0].anchor {
             XlsbDrawingAnchorKind::TwoCell { from, to, .. } => {
                 assert_eq!(
@@ -2726,5 +2754,253 @@ mod tests {
         sheet.add_image(valid).unwrap();
         sheet.clear_images();
         assert!(sheet.images().is_empty());
+    }
+
+    #[test]
+    fn worksheet_shapes_groups_and_connectors_round_trip() {
+        use crate::xlsx::writer::{
+            XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
+        };
+        use crate::xlsx::{
+            XlsxCellMarker, XlsxDrawingObject, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset,
+            XlsxGroupTransform, XlsxShapeAnchor, XlsxShapePreset,
+        };
+
+        fn marker(column: u32, row: u32) -> XlsxCellMarker {
+            XlsxCellMarker {
+                column,
+                row,
+                column_offset: XlsxEmu(0),
+                row_offset: XlsxEmu(0),
+            }
+        }
+
+        let two_cell = XlsxShapeAnchor::TwoCell {
+            from: marker(0, 0),
+            to: marker(3, 4),
+            edit_as: XlsxEditAs::OneCell,
+        };
+        let child_anchor = XlsxShapeAnchor::TwoCell {
+            from: marker(0, 0),
+            to: marker(1, 1),
+            edit_as: XlsxEditAs::TwoCell,
+        };
+        let mut standalone =
+            XlsxShapeSpec::text_box("Standalone", two_cell, XlsxShapePreset::RoundRectangle, "A\nB");
+        standalone.description = Some("Typed XLSB text box".to_string());
+        standalone.paragraphs[0].runs[0].bold = Some(true);
+        standalone.paragraphs[0].runs[0].font_size_hundredths = Some(1_400);
+
+        let group_anchor = XlsxShapeAnchor::OneCell {
+            from: marker(4, 1),
+            extent: XlsxEmuExtent {
+                width: XlsxEmu(4_000_000),
+                height: XlsxEmu(2_000_000),
+            },
+        };
+        let mut group = XlsxGroupSpec::new("Pair", group_anchor)
+            .with_child(
+                XlsxShapeSpec::shape("Left", child_anchor, XlsxShapePreset::Rectangle, "L").into(),
+            )
+            .with_child(
+                XlsxShapeSpec::shape("Right", child_anchor, XlsxShapePreset::Ellipse, "R").into(),
+            );
+        group.transform = Some(XlsxGroupTransform {
+            offset: Some(XlsxEmuOffset {
+                x: XlsxEmu(0),
+                y: XlsxEmu(0),
+            }),
+            extent: Some(XlsxEmuExtent {
+                width: XlsxEmu(4_000_000),
+                height: XlsxEmu(2_000_000),
+            }),
+            child_offset: Some(XlsxEmuOffset {
+                x: XlsxEmu(0),
+                y: XlsxEmu(0),
+            }),
+            child_extent: Some(XlsxEmuExtent {
+                width: XlsxEmu(4_000_000),
+                height: XlsxEmu(2_000_000),
+            }),
+        });
+
+        let connection = XlsxConnectionShapeSpec::new(
+            "Bridge",
+            XlsxShapeAnchor::Absolute {
+                position: XlsxEmuOffset {
+                    x: XlsxEmu(500_000),
+                    y: XlsxEmu(500_000),
+                },
+                extent: XlsxEmuExtent {
+                    width: XlsxEmu(1_000_000),
+                    height: XlsxEmu(1_000_000),
+                },
+            },
+            XlsxShapePreset::StraightConnector1,
+            XlsxConnectionEndSpec {
+                shape_name: "Left".to_string(),
+                site: 1,
+            },
+            XlsxConnectionEndSpec {
+                shape_name: "Right".to_string(),
+                site: 2,
+            },
+        );
+
+        let mut sheet = MutableXlsbWorksheet::new("Shapes");
+        sheet.add_shape(standalone).unwrap();
+        sheet.add_group(group).unwrap();
+        sheet.add_connection(connection).unwrap();
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(sheet);
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+        let drawing = reader.sheet_drawing(0).expect("shape drawing missing");
+        assert!(drawing.images.is_empty());
+        assert!(drawing.charts.is_empty());
+        assert_eq!(drawing.drawing.anchors.len(), 3);
+        assert_eq!(drawing.shapes.len(), 3);
+
+        let XlsxDrawingObject::Shape(shape) = &drawing.shapes[0].object else {
+            panic!("expected standalone shape");
+        };
+        assert_eq!(shape.non_visual.id, Some(1));
+        assert_eq!(shape.non_visual.name.as_deref(), Some("Standalone"));
+        assert_eq!(
+            shape.non_visual.description.as_deref(),
+            Some("Typed XLSB text box")
+        );
+        assert_eq!(shape.text_body.as_ref().unwrap().text(), "A\nB");
+        assert_eq!(
+            shape.text_body.as_ref().unwrap().paragraphs[0].runs[0].bold,
+            Some(true)
+        );
+
+        let XlsxDrawingObject::Group(group) = &drawing.shapes[1].object else {
+            panic!("expected shape group");
+        };
+        assert_eq!(group.non_visual.id, Some(2));
+        assert_eq!(group.children.len(), 2);
+        let XlsxDrawingObject::Shape(left) = &group.children[0] else {
+            panic!("expected left group child");
+        };
+        let XlsxDrawingObject::Shape(right) = &group.children[1] else {
+            panic!("expected right group child");
+        };
+        assert_eq!(left.non_visual.id, Some(3));
+        assert_eq!(right.non_visual.id, Some(4));
+
+        let XlsxDrawingObject::ConnectionShape(connection) = &drawing.shapes[2].object else {
+            panic!("expected connection shape");
+        };
+        assert_eq!(connection.non_visual.id, Some(5));
+        assert_eq!(connection.start.unwrap().shape_id, 3);
+        assert_eq!(connection.end.unwrap().shape_id, 4);
+
+        let drawing_part = reader
+            .opc_package()
+            .iter_parts()
+            .find(|part| part.content_type() == ct::OFC_DRAWING)
+            .unwrap();
+        assert!(drawing_part.rels().is_empty());
+    }
+
+    #[test]
+    fn worksheet_shape_crud_and_save_validation_are_lossless_or_refuse() {
+        use crate::xlsx::writer::{
+            XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxGroupSpec, XlsxShapeSpec,
+        };
+        use crate::xlsx::{
+            XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxShapeAnchor, XlsxShapePreset,
+        };
+
+        fn anchor(from: (u32, u32), to: (u32, u32)) -> XlsxShapeAnchor {
+            let marker = |(column, row)| XlsxCellMarker {
+                column,
+                row,
+                column_offset: XlsxEmu(0),
+                row_offset: XlsxEmu(0),
+            };
+            XlsxShapeAnchor::TwoCell {
+                from: marker(from),
+                to: marker(to),
+                edit_as: XlsxEditAs::TwoCell,
+            }
+        }
+
+        let valid = XlsxShapeSpec::shape(
+            "Target",
+            anchor((0, 0), (2, 2)),
+            XlsxShapePreset::Rectangle,
+            "target",
+        );
+        let invalid = XlsxShapeSpec::shape(
+            "Descending",
+            anchor((2, 2), (1, 1)),
+            XlsxShapePreset::Rectangle,
+            "",
+        );
+        let mut sheet = MutableXlsbWorksheet::new("Shapes");
+        assert!(sheet.add_shape(invalid).is_err());
+        assert!(sheet.shapes().is_empty());
+        let mut invalid_xml = valid.clone();
+        invalid_xml.name = "invalid\u{0}name".to_string();
+        assert!(sheet.add_shape(invalid_xml).is_err());
+        let mut invalid_text_properties = valid.clone();
+        invalid_text_properties.paragraphs[0].runs[0].font_size_hundredths = Some(0);
+        invalid_text_properties.body_properties.column_count = 17;
+        assert!(sheet.add_shape(invalid_text_properties).is_err());
+        assert!(sheet.shapes().is_empty());
+        sheet.add_shape(valid.clone()).unwrap();
+        sheet
+            .add_group(
+                XlsxGroupSpec::new("Group", anchor((3, 3), (6, 6))).with_child(
+                    XlsxShapeSpec::shape(
+                        "Nested",
+                        anchor((3, 3), (4, 4)),
+                        XlsxShapePreset::Ellipse,
+                        "",
+                    )
+                    .into(),
+                ),
+            )
+            .unwrap();
+        sheet
+            .add_connection(XlsxConnectionShapeSpec::new(
+                "Dangling",
+                anchor((1, 1), (2, 2)),
+                XlsxShapePreset::StraightConnector1,
+                XlsxConnectionEndSpec {
+                    shape_name: "Missing".to_string(),
+                    site: 0,
+                },
+                XlsxConnectionEndSpec {
+                    shape_name: "Target".to_string(),
+                    site: 0,
+                },
+            ))
+            .unwrap();
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(sheet);
+        assert!(workbook.save(&mut Cursor::new(Vec::new())).is_err());
+        let sheet = workbook.get_worksheet_mut(0).unwrap();
+        assert_eq!(sheet.shapes().len(), 1);
+        assert_eq!(sheet.groups().len(), 1);
+        assert_eq!(sheet.connections().len(), 1);
+        assert!(sheet.remove_shape(4).is_err());
+        assert!(sheet.remove_group(4).is_err());
+        assert!(sheet.remove_connection(4).is_err());
+        sheet.remove_connection(0).unwrap();
+        assert!(workbook.save(&mut Cursor::new(Vec::new())).is_ok());
+        let sheet = workbook.get_worksheet_mut(0).unwrap();
+        sheet.clear_drawing_shapes();
+        assert!(sheet.shapes().is_empty());
+        assert!(sheet.groups().is_empty());
+        assert!(sheet.connections().is_empty());
+        sheet.add_shape(valid).unwrap();
+        assert_eq!(sheet.remove_shape(0).unwrap().name, "Target");
     }
 }
