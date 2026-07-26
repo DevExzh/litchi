@@ -101,6 +101,8 @@ mod tests {
     use super::*;
 
     fn set_pointer(fib: &mut [u8], offset: u32, length: u32) {
+        fib[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
+        fib[152..154].copy_from_slice(&93u16.to_le_bytes());
         let start = 154 + 51 * 8;
         fib[start..start + 4].copy_from_slice(&offset.to_le_bytes());
         fib[start + 4..start + 8].copy_from_slice(&length.to_le_bytes());
@@ -122,7 +124,7 @@ mod tests {
     #[test]
     fn parses_unicode_revision_authors() {
         let authors = table(&["Unknown", "张三 😀"]);
-        let mut fib_data = vec![0; 640];
+        let mut fib_data = vec![0; 154 + 93 * 8];
         fib_data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
         set_pointer(&mut fib_data, 0, authors.len() as u32);
         let fib = FileInformationBlock::parse(&fib_data).unwrap();
@@ -134,7 +136,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_revision_author_tables() {
-        let mut fib_data = vec![0; 640];
+        let mut fib_data = vec![0; 154 + 93 * 8];
         fib_data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
         let wrong_first = table(&["Someone"]);
         set_pointer(&mut fib_data, 0, wrong_first.len() as u32);

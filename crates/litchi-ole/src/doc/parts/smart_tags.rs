@@ -560,6 +560,7 @@ mod tests {
         fib_bytes[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
         fib_bytes[6..8].copy_from_slice(&0x0409u16.to_le_bytes());
         fib_bytes[76..80].copy_from_slice(&10u32.to_le_bytes());
+        fib_bytes[152..154].copy_from_slice(&136u16.to_le_bytes());
 
         let mut table = Vec::new();
         table.extend_from_slice(&2u32.to_le_bytes());

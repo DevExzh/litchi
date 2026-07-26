@@ -242,6 +242,9 @@ mod tests {
     use super::*;
 
     fn set_fib_pointer(fib: &mut [u8], index: usize, offset: u32, length: u32) {
+        let declared = u16::from_le_bytes([fib[152], fib[153]]);
+        let count = declared.max(u16::try_from(index + 1).unwrap());
+        fib[152..154].copy_from_slice(&count.to_le_bytes());
         let start = 154 + index * 8;
         fib[start..start + 4].copy_from_slice(&offset.to_le_bytes());
         fib[start + 4..start + 8].copy_from_slice(&length.to_le_bytes());
@@ -261,10 +264,11 @@ mod tests {
     }
 
     fn fixture() -> (FileInformationBlock, Vec<u8>, usize) {
-        let mut fib_data = vec![0; 512];
+        let mut fib_data = vec![0; 154 + 93 * 8];
         fib_data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
         fib_data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
         fib_data[76..80].copy_from_slice(&10u32.to_le_bytes());
+        fib_data[152..154].copy_from_slice(&93u16.to_le_bytes());
 
         let mut table = Vec::new();
         let names = bookmark_names(&["Outer", "_Cell"]);

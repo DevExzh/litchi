@@ -224,8 +224,10 @@ mod tests {
     }
 
     fn fib_with_pointer(offset: u32, length: u32) -> FileInformationBlock {
-        let mut data = vec![0u8; 800];
+        let mut data = vec![0u8; 154 + 93 * 8];
         data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+        data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
+        data[152..154].copy_from_slice(&93u16.to_le_bytes());
         let pointer = 154 + SAVED_BY_FIB_INDEX * 8;
         data[pointer..pointer + 4].copy_from_slice(&offset.to_le_bytes());
         data[pointer + 4..pointer + 8].copy_from_slice(&length.to_le_bytes());

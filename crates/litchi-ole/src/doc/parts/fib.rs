@@ -11,6 +11,16 @@ use zerocopy::{FromBytes, LE, U16, U32};
 
 /// Minimum FIB size in bytes (the base FIB structure)
 const FIB_BASE_SIZE: usize = 32;
+/// Offset of `cbRgFcLcb` in Word 97 and newer FIBs.
+const TABLE_POINTER_COUNT_OFFSET: usize = 152;
+/// Offset of the first `FibRgFcLcb` pair in Word 97 and newer FIBs.
+const TABLE_POINTERS_OFFSET: usize = 154;
+/// Word 6/95 omit `cbRgFcLcb` and contain this fixed number of pairs.
+const LEGACY_TABLE_POINTER_COUNT: usize = 74;
+/// One `fc`/`lcb` pair consists of two 32-bit integers.
+const TABLE_POINTER_SIZE: usize = 8;
+/// Word 8 and newer use the counted `FibRgFcLcb` representation.
+const COUNTED_TABLE_POINTER_NFIB: u16 = 0x0069;
 
 /// File Information Block.
 ///
@@ -195,26 +205,54 @@ impl FileInformationBlock {
     ///
     /// # Returns
     ///
-    /// A tuple of (offset, length) in bytes, or None if out of bounds.
+    /// A tuple of (offset, length) in bytes, or `None` if the requested
+    /// entry is outside the FIB-declared array or that array is truncated.
     pub fn get_table_pointer(&self, index: usize) -> Option<(u32, u32)> {
-        // The FibRgFcLcb array starts at offset 154 for Word 97+
-        // Each entry is 8 bytes: 4 bytes offset, 4 bytes length
-        let base_offset = 154;
-        let entry_offset = base_offset + (index * 8);
-
-        if entry_offset + 8 > self.data.len() {
+        let (base_offset, count) = self.table_pointer_layout()?;
+        if index >= count {
             return None;
         }
+        let entry_offset = base_offset.checked_add(index.checked_mul(TABLE_POINTER_SIZE)?)?;
+        let entry = self
+            .data
+            .get(entry_offset..entry_offset.checked_add(TABLE_POINTER_SIZE)?)?;
 
-        let offset = U32::<LE>::read_from_bytes(&self.data[entry_offset..entry_offset + 4])
+        let offset = U32::<LE>::read_from_bytes(&entry[..4])
             .map(|v| v.get())
             .unwrap_or(0);
-
-        let length = U32::<LE>::read_from_bytes(&self.data[entry_offset + 4..entry_offset + 8])
+        let length = U32::<LE>::read_from_bytes(&entry[4..])
             .map(|v| v.get())
             .unwrap_or(0);
 
         Some((offset, length))
+    }
+
+    /// Number of `FibRgFcLcb` offset/length pairs declared by this FIB.
+    ///
+    /// Returns `None` when the declaration itself or its complete array is
+    /// truncated. Consumers must not infer additional pairs from subsequent
+    /// bytes in the `WordDocument` stream.
+    pub fn table_pointer_count(&self) -> Option<usize> {
+        self.table_pointer_layout().map(|(_, count)| count)
+    }
+
+    fn table_pointer_layout(&self) -> Option<(usize, usize)> {
+        let (offset, count) = if self.nfib < COUNTED_TABLE_POINTER_NFIB {
+            (TABLE_POINTER_COUNT_OFFSET, LEGACY_TABLE_POINTER_COUNT)
+        } else {
+            let count_bytes = self
+                .data
+                .get(TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET)?;
+            let count = usize::from(
+                U16::<LE>::read_from_bytes(count_bytes)
+                    .map(|value| value.get())
+                    .unwrap_or(0),
+            );
+            (TABLE_POINTERS_OFFSET, count)
+        };
+        let byte_len = count.checked_mul(TABLE_POINTER_SIZE)?;
+        let end = offset.checked_add(byte_len)?;
+        (end <= self.data.len()).then_some((offset, count))
     }
 
     /// Get access to the raw FIB data.
@@ -451,11 +489,65 @@ mod tests {
         let mut data = vec![0u8; 512];
         data[0] = 0xEC;
         data[1] = 0xA5;
+        data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
         // Set fWhichTblStm flag (bit 9)
         data[10] = 0x00;
         data[11] = 0x02;
 
         let fib = FileInformationBlock::parse(&data).unwrap();
         assert!(fib.which_table_stream());
+    }
+
+    #[test]
+    fn table_pointers_stop_at_the_declared_count() {
+        let mut data = vec![0u8; TABLE_POINTERS_OFFSET + 2 * TABLE_POINTER_SIZE];
+        data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+        data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
+        data[TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET]
+            .copy_from_slice(&1u16.to_le_bytes());
+        data[TABLE_POINTERS_OFFSET..TABLE_POINTERS_OFFSET + 4]
+            .copy_from_slice(&17u32.to_le_bytes());
+        data[TABLE_POINTERS_OFFSET + 4..TABLE_POINTERS_OFFSET + 8]
+            .copy_from_slice(&23u32.to_le_bytes());
+        // These bytes follow the declared array and must never be interpreted
+        // as a second pointer pair.
+        data[TABLE_POINTERS_OFFSET + 8..TABLE_POINTERS_OFFSET + 12]
+            .copy_from_slice(&99u32.to_le_bytes());
+        data[TABLE_POINTERS_OFFSET + 12..TABLE_POINTERS_OFFSET + 16]
+            .copy_from_slice(&101u32.to_le_bytes());
+
+        let fib = FileInformationBlock::parse(&data).unwrap();
+        assert_eq!(fib.table_pointer_count(), Some(1));
+        assert_eq!(fib.get_table_pointer(0), Some((17, 23)));
+        assert_eq!(fib.get_table_pointer(1), None);
+    }
+
+    #[test]
+    fn truncated_declared_table_pointer_array_is_unavailable() {
+        let mut data = vec![0u8; TABLE_POINTERS_OFFSET + TABLE_POINTER_SIZE];
+        data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+        data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
+        data[TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET]
+            .copy_from_slice(&2u16.to_le_bytes());
+
+        let fib = FileInformationBlock::parse(&data).unwrap();
+        assert_eq!(fib.table_pointer_count(), None);
+        assert_eq!(fib.get_table_pointer(0), None);
+    }
+
+    #[test]
+    fn word_95_uses_its_fixed_uncounted_pointer_array() {
+        let mut data =
+            vec![0u8; TABLE_POINTER_COUNT_OFFSET + LEGACY_TABLE_POINTER_COUNT * TABLE_POINTER_SIZE];
+        data[0..2].copy_from_slice(&0xA5DCu16.to_le_bytes());
+        data[2..4].copy_from_slice(&0x0067u16.to_le_bytes());
+        data[TABLE_POINTER_COUNT_OFFSET..TABLE_POINTER_COUNT_OFFSET + 4]
+            .copy_from_slice(&31u32.to_le_bytes());
+        data[TABLE_POINTER_COUNT_OFFSET + 4..TABLE_POINTER_COUNT_OFFSET + 8]
+            .copy_from_slice(&37u32.to_le_bytes());
+
+        let fib = FileInformationBlock::parse(&data).unwrap();
+        assert_eq!(fib.table_pointer_count(), Some(LEGACY_TABLE_POINTER_COUNT));
+        assert_eq!(fib.get_table_pointer(0), Some((31, 37)));
     }
 }
