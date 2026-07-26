@@ -263,6 +263,12 @@ struct CapturedStream {
     data: Vec<u8>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CapturedStorage {
+    path: Vec<String>,
+    clsid: Option<[u8; 16]>,
+}
+
 /// Targeted atomic CFB rewrite of an already-referenced object storage.
 ///
 /// Add/remove are intentionally collection-only: package-level add/remove is
@@ -273,7 +279,7 @@ pub struct LegacyOfficeObjectEditor {
     limits: LegacyOfficeObjectLimits,
     sector_size: usize,
     root_clsid: Option<[u8; 16]>,
-    storages: Vec<Vec<String>>,
+    storages: Vec<CapturedStorage>,
     streams: Vec<CapturedStream>,
     objects: LegacyOfficeObjectCollection,
     changed: bool,
@@ -287,7 +293,7 @@ impl LegacyOfficeObjectEditor {
     ) -> Result<Self, OleError> {
         validate_limits(limits)?;
         let mut ole = OleFile::open(Cursor::new(bytes.to_vec()))?;
-        reject_protected_package(&mut ole)?;
+        reject_protected_package(&ole)?;
         let sector_size = ole.sector_size();
         let root_clsid = ole.root_entry().and_then(|entry| parse_clsid_string(&entry.clsid));
         let mut storages = Vec::new();
@@ -340,7 +346,7 @@ impl LegacyOfficeObjectEditor {
             OleError::InvalidFormat(format!("embedded object {id:?} not found"))
         })?.storage_path.clone();
         let mut replacement = OleFile::open(Cursor::new(compound_file))?;
-        reject_protected_package(&mut replacement)?;
+        reject_protected_package(&replacement)?;
         let mut new_storages = Vec::new();
         let mut new_streams = Vec::new();
         capture_container(
@@ -352,14 +358,34 @@ impl LegacyOfficeObjectEditor {
         )?;
 
         let mut candidate = self.clone();
-        candidate.storages.retain(|path| {
-            path == &object_path || !(path.len() > object_path.len() && path.starts_with(&object_path))
+        let replacement_clsid = replacement
+            .root_entry()
+            .and_then(|entry| parse_clsid_string(&entry.clsid));
+        candidate.storages.retain(|storage| {
+            storage.path == object_path
+                || !(storage.path.len() > object_path.len()
+                    && storage.path.starts_with(&object_path))
         });
+        if let Some(storage) = candidate
+            .storages
+            .iter_mut()
+            .find(|storage| storage.path == object_path)
+        {
+            storage.clsid = replacement_clsid;
+        }
         candidate.streams.retain(|stream| !stream.path.starts_with(&object_path));
         for relative in new_storages {
-            let path = join(&object_path, &relative);
-            if path != object_path && !candidate.storages.contains(&path) {
-                candidate.storages.push(path);
+            let path = join(&object_path, &relative.path);
+            if path != object_path
+                && !candidate
+                    .storages
+                    .iter()
+                    .any(|storage| storage.path == path)
+            {
+                candidate.storages.push(CapturedStorage {
+                    path,
+                    clsid: relative.clsid,
+                });
             }
         }
         for stream in new_streams {
@@ -415,7 +441,12 @@ impl LegacyOfficeObjectEditor {
         if self.streams.iter().any(|stream| stream.path == path) {
             return Err(OleError::InvalidFormat(format!("package stream {path:?} already exists")));
         }
-        if path.len() > 1 && !self.storages.iter().any(|storage| storage == &path[..path.len() - 1]) {
+        if path.len() > 1
+            && !self
+                .storages
+                .iter()
+                .any(|storage| storage.path == path[..path.len() - 1])
+        {
             return Err(OleError::InvalidFormat("new package stream parent storage is missing".into()));
         }
         let mut candidate = self.clone();
@@ -441,7 +472,7 @@ impl LegacyOfficeObjectEditor {
             LegacyOfficeObjectFormat::Xls if is_xls_name(id) => vec![id.to_string()],
             _ => return Err(OleError::InvalidFormat("invalid format-specific object storage name".into())),
         };
-        if self.storages.iter().any(|value| value == &path) {
+        if self.storages.iter().any(|value| value.path == path) {
             return Err(OleError::InvalidFormat(format!("object storage {id:?} already exists")));
         }
         let mut nested = OleFile::open(Cursor::new(compound_file))?;
@@ -449,9 +480,20 @@ impl LegacyOfficeObjectEditor {
         let mut storages = Vec::new();
         let mut streams = Vec::new();
         capture_container(&mut nested, Vec::new(), &mut storages, &mut streams, self.limits)?;
+        let object_clsid = nested
+            .root_entry()
+            .and_then(|entry| parse_clsid_string(&entry.clsid));
         let mut candidate = self.clone();
-        candidate.storages.push(path.clone());
-        for storage in storages { candidate.storages.push(join(&path, &storage)); }
+        candidate.storages.push(CapturedStorage {
+            path: path.clone(),
+            clsid: object_clsid,
+        });
+        for storage in storages {
+            candidate.storages.push(CapturedStorage {
+                path: join(&path, &storage.path),
+                clsid: storage.clsid,
+            });
+        }
         for stream in streams {
             candidate.streams.push(CapturedStream { path: join(&path, &stream.path), data: stream.data });
         }
@@ -474,7 +516,7 @@ impl LegacyOfficeObjectEditor {
         let removed = object.compound_file.clone();
         let path = object.storage_path.clone();
         let mut candidate = self.clone();
-        candidate.storages.retain(|value| !value.starts_with(&path));
+        candidate.storages.retain(|value| !value.path.starts_with(&path));
         candidate.streams.retain(|value| !value.path.starts_with(&path));
         let rendered = candidate.render()?;
         let mut check = OleFile::open(Cursor::new(rendered))?;
@@ -494,10 +536,13 @@ impl LegacyOfficeObjectEditor {
             writer.set_root_clsid(clsid);
         }
         let mut storages = self.storages.clone();
-        storages.sort_by_key(Vec::len);
-        for path in &storages {
-            let refs = path_refs(path);
+        storages.sort_by_key(|storage| storage.path.len());
+        for storage in &storages {
+            let refs = path_refs(&storage.path);
             writer.create_storage(&refs)?;
+            if let Some(clsid) = storage.clsid {
+                writer.set_storage_clsid(&refs, clsid)?;
+            }
         }
         for stream in &self.streams {
             let refs = path_refs(&stream.path);
@@ -596,8 +641,14 @@ fn read_object<R: Read + Seek>(
 
     let mut writer = OleWriter::new();
     if let Some(clsid) = parse_clsid_string(&storage_clsid) { writer.set_root_clsid(clsid); }
-    storages.sort_by_key(Vec::len);
-    for storage in &storages { writer.create_storage(&path_refs(storage))?; }
+    storages.sort_by_key(|storage| storage.path.len());
+    for storage in &storages {
+        let refs = path_refs(&storage.path);
+        writer.create_storage(&refs)?;
+        if let Some(clsid) = storage.clsid {
+            writer.set_storage_clsid(&refs, clsid)?;
+        }
+    }
     for stream in &streams { writer.create_stream(&path_refs(&stream.path), &stream.data)?; }
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
@@ -636,7 +687,7 @@ fn read_object<R: Read + Seek>(
 fn capture_container<R: Read + Seek>(
     ole: &mut OleFile<R>,
     path: Vec<String>,
-    storages: &mut Vec<Vec<String>>,
+    storages: &mut Vec<CapturedStorage>,
     streams: &mut Vec<CapturedStream>,
     limits: LegacyOfficeObjectLimits,
 ) -> Result<(), OleError> {
@@ -648,14 +699,18 @@ fn capture_container<R: Read + Seek>(
         let mut child = path.clone();
         child.push(entry.name);
         if entry.entry_type == STORAGE {
-            storages.push(child.clone());
+            storages.push(CapturedStorage {
+                path: child.clone(),
+                clsid: parse_clsid_string(&entry.clsid),
+            });
             capture_container(ole, child, storages, streams, limits)?;
         } else if entry.entry_type == STREAM {
             if entry.size > limits.max_stream_size {
                 return Err(OleError::InvalidFormat(format!("stream {child:?} exceeds size limit")));
             }
-            let aggregate_limit = limits.max_streams_per_object.checked_mul(limits.max_objects)
-                .unwrap_or(usize::MAX);
+            let aggregate_limit = limits
+                .max_streams_per_object
+                .saturating_mul(limits.max_objects);
             if streams.len() >= aggregate_limit {
                 return Err(OleError::InvalidFormat("CFB stream count limit exceeded".into()));
             }
@@ -670,7 +725,7 @@ fn capture_subtree<R: Read + Seek>(
     ole: &mut OleFile<R>,
     absolute: &[String],
     relative: Vec<String>,
-    storages: &mut Vec<Vec<String>>,
+    storages: &mut Vec<CapturedStorage>,
     streams: &mut Vec<CapturedStream>,
     limits: LegacyOfficeObjectLimits,
 ) -> Result<(), OleError> {
@@ -683,7 +738,10 @@ fn capture_subtree<R: Read + Seek>(
         let mut child = relative.clone();
         child.push(entry.name);
         if entry.entry_type == STORAGE {
-            storages.push(child.clone());
+            storages.push(CapturedStorage {
+                path: child.clone(),
+                clsid: parse_clsid_string(&entry.clsid),
+            });
             capture_subtree(ole, absolute, child, storages, streams, limits)?;
         } else if entry.entry_type == STREAM {
             if streams.len() >= limits.max_streams_per_object || entry.size > limits.max_stream_size {

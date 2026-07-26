@@ -130,6 +130,8 @@ pub struct OleWriter {
     streams: Vec<(Vec<String>, Vec<u8>)>,
     /// Storages indexed by path
     storages: HashMap<Vec<String>, ()>,
+    /// Non-zero CLSIDs assigned to individual storages.
+    storage_clsids: HashMap<Vec<String>, [u8; 16]>,
 }
 
 impl OleWriter {
@@ -168,6 +170,7 @@ impl OleWriter {
             entries: Vec::new(),
             streams: Vec::new(),
             storages: HashMap::new(),
+            storage_clsids: HashMap::new(),
         };
 
         // Initialize with root entry
@@ -316,6 +319,25 @@ impl OleWriter {
         Ok(())
     }
 
+    /// Assign a CLSID to an explicitly created storage.
+    ///
+    /// `path` must identify a storage previously registered with
+    /// [`Self::create_storage`]. CLSIDs are encoded in CFB byte order.
+    pub fn set_storage_clsid(&mut self, path: &[&str], clsid: [u8; 16]) -> Result<(), OleError> {
+        let owned_path: Vec<String> = path.iter().map(|component| component.to_string()).collect();
+        if !self.storages.contains_key(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        if clsid == [0; 16] {
+            self.storage_clsids.remove(&owned_path);
+        } else {
+            self.storage_clsids.insert(owned_path, clsid);
+        }
+        Ok(())
+    }
+
     /// Delete a storage and all its contents
     ///
     /// # Arguments
@@ -425,6 +447,9 @@ impl OleWriter {
         // Pre-create storages declared explicitly by user
         for storage_path in self.storages.keys() {
             directory.add_storage_path(storage_path)?;
+        }
+        for (storage_path, clsid) in &self.storage_clsids {
+            directory.set_storage_clsid(storage_path, *clsid)?;
         }
 
         // Add large streams to directory using full path

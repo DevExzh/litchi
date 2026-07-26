@@ -292,7 +292,7 @@ conversion, fonts, and image conversion are optional.
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve embedded object storages; payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
 | Smart tags/factoids | ✅ | ✅ | ✅ | Bounded MS-OSHARED `PropertyBagStore` codec plus validated `SttbfBkmkFactoid`, start/end bookmark PLCFs, positional property bags, `Plcffactoid` recognizer-state ranges, typed `DocSmartTagEntry` authoring, deduplicated Unicode type/string tables, and automatic Word 2002 `fEmbedFactoids`; recognizers, VBA callbacks, download URLs, and schemas remain inert |
-| MathType/MTEF equations | 🟡 | ✅ | ❌ | Equation Native extraction and conversion; no DOC equation authoring |
+| MathType/MTEF equations | ✅ | ✅ | ✅ | Equation Native extraction/conversion plus bounded native Equation.3 authoring from validated MTEF payloads, canonical registration streams and ObjInfo, preserved storage CLSIDs, and real PNG/JPEG PICF previews; AST-to-MTEF synthesis remains a cross-format conversion concern |
 | Summary/document properties | ✅ | ✅ | ✅ | OLE property-set reading and editing |
 | Document protection settings | 🟡 | ✅ | ✅ | Typed settings/hashes; policy is not enforced |
 | Password encryption | ✅ | ✅ | ✅ | Supported DOC encryption profiles and encrypted writer output |

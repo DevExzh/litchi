@@ -70,6 +70,7 @@ pub mod vba;
 /// DOC file writing
 pub mod writer;
 pub mod embedded_object;
+pub mod equation;
 
 pub use bookmark::Bookmark;
 pub use comment::{Comment, CommentDateTime, CommentExtendedMetadata};
@@ -81,6 +82,7 @@ pub use parts::headers::HeaderFooterType;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use package::{DocEncryptionKind, DocError, DocOpenOptions, Package};
+pub use equation::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation};
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
 pub use parts::chp::CharacterConditionalFormatting;

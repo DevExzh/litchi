@@ -14,7 +14,6 @@ const PLCFBTE_CHPX: usize = 12;
 const PLCFFLD_MOM: usize = 16;
 const CLX: usize = 33;
 const SPRM_C_PIC_LOCATION: u16 = 0x6A03;
-const SPRM_C_F_DATA: u16 = 0x0806;
 const SPRM_C_F_OLE2: u16 = 0x080A;
 const SPRM_C_F_SPEC: u16 = 0x0855;
 const SPRM_C_F_OBJ: u16 = 0x0856;
@@ -26,7 +25,7 @@ const MAX_PICF: usize = 128 * 1024 * 1024;
 pub struct DocEmbeddedObjectWriteOptions {
     pub storage_id: u32,
     pub instruction: String,
-    /// Complete inert NilPICFAndBinData/PICF block for the Data stream.
+    /// Complete PICFAndOfficeArtData block for the Data stream.
     pub picture_data: Vec<u8>,
     /// Standalone CFB to install as `ObjectPool/_<storage_id>`.
     pub compound_file: Vec<u8>,
@@ -270,8 +269,8 @@ impl DocEmbeddedObjectEditor {
         }
         let mut builder = ChpxFkpBuilder::new();
         if fkp_start < sep_fc { builder.add_entry(fkp_start, sep_fc, Vec::new()); }
-        builder.add_entry(sep_fc, sep_fc + 2, object_sprms(storage_id, false));
-        builder.add_entry(result_fc, result_fc + 2, object_sprms(data_offset, true));
+        builder.add_entry(sep_fc, sep_fc + 2, object_separator_sprms(storage_id));
+        builder.add_entry(result_fc, result_fc + 2, object_preview_sprms(data_offset));
         if result_fc + 2 < byte_end { builder.add_entry(result_fc + 2, byte_end, Vec::new()); }
         let pages = builder.generate_pages().map_err(DocError::from)?;
         if pages.pages.len() != 1 { return Err(corrupted("object CHPX unexpectedly spans multiple FKPs")); }
@@ -313,7 +312,12 @@ fn managed_objects(word: &[u8], pieces: &[RawPiece], fields: &[FieldMarker]) -> 
                 let Some((start, kind, Some(separator))) = stack.pop() else { continue };
                 if kind != 0x3A || !stack.is_empty() { continue; }
                 let code = text_range(word, pieces, start + 1, separator)?;
-                let Some(id_text) = code.strip_prefix(" EMBED LITCHI_OBJECT _").and_then(|v| v.strip_suffix(' ')) else { continue };
+                let Some(id_text) = [" EMBED LITCHI_OBJECT _", " EMBED Equation.3 _"]
+                    .into_iter()
+                    .find_map(|prefix| code.strip_prefix(prefix).and_then(|v| v.strip_suffix(' ')))
+                else {
+                    continue;
+                };
                 let Ok(storage_id) = id_text.parse::<u32>() else { continue };
                 let end = marker.cp;
                 if pieces.iter().any(|piece| piece.start == start && piece.end == end + 1) {
@@ -479,12 +483,26 @@ fn serialize_fields(fields: &[FieldMarker], terminal: u32) -> Result<Vec<u8>> {
     output.extend_from_slice(&terminal.to_le_bytes()); for marker in fields { output.extend_from_slice(&marker.descriptor); } Ok(output)
 }
 
-fn object_sprms(location: u32, data: bool) -> Vec<u8> {
+fn object_separator_sprms(storage_id: u32) -> Vec<u8> {
     let mut output = Vec::new();
-    output.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes()); output.extend_from_slice(&location.to_le_bytes());
-    for (opcode, value) in [(SPRM_C_F_OLE2, !data), (SPRM_C_F_DATA, data), (SPRM_C_F_SPEC, true), (SPRM_C_F_OBJ, true)] {
+    output.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
+    output.extend_from_slice(&storage_id.to_le_bytes());
+    for (opcode, value) in [
+        (SPRM_C_F_OLE2, true),
+        (SPRM_C_F_SPEC, true),
+        (SPRM_C_F_OBJ, true),
+    ] {
         output.extend_from_slice(&opcode.to_le_bytes()); output.push(u8::from(value));
     }
+    output
+}
+
+fn object_preview_sprms(data_offset: u32) -> Vec<u8> {
+    let mut output = Vec::new();
+    output.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
+    output.extend_from_slice(&data_offset.to_le_bytes());
+    output.extend_from_slice(&SPRM_C_F_SPEC.to_le_bytes());
+    output.push(1);
     output
 }
 

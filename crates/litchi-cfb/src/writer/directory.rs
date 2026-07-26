@@ -273,6 +273,15 @@ impl DirectoryBuilder {
         }
     }
 
+    /// Set the CLSID for an existing storage path.
+    pub fn set_storage_clsid(&mut self, path: &[String], clsid: [u8; 16]) -> Result<(), OleError> {
+        let sid = self.path_to_sid.get(path).copied().ok_or_else(|| {
+            OleError::InvalidData(format!("CFB storage path {path:?} does not exist"))
+        })?;
+        self.entries[sid as usize].set_clsid(clsid);
+        Ok(())
+    }
+
     /// Ensure a storage path exists, creating missing storages.
     /// Returns the SID of the storage at the given path.
     pub fn add_storage_path(&mut self, path: &[String]) -> Result<u32, OleError> {
