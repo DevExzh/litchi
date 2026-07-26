@@ -3,7 +3,7 @@
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
 use crate::xlsb::calculation::CalculationProperties;
-use crate::xlsb::error::XlsbResult;
+use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
 };
@@ -53,6 +53,7 @@ pub struct XlsbWorkbookWriter {
     is_1904: bool,
     connections: Option<crate::xlsb::connections::XlsbConnections>,
     pivot_caches: Vec<(u32, Vec<u8>)>,
+    vba_project: Option<(Vec<u8>, crate::vba::VbaLimits)>,
 }
 
 /// Minimal Worksheet Binary Index payload for an empty worksheet.
@@ -84,6 +85,7 @@ impl XlsbWorkbookWriter {
             is_1904: false,
             connections: None,
             pivot_caches: Vec::new(),
+            vba_project: None,
         }
     }
 
@@ -104,6 +106,33 @@ impl XlsbWorkbookWriter {
     /// Mutably configure workbook formula calculation policy.
     pub fn calculation_properties_mut(&mut self) -> &mut CalculationProperties {
         &mut self.calculation_properties
+    }
+
+    /// Attach a cache-free, inert MS-OVBA project to generated workbooks.
+    pub fn set_vba_project(
+        &mut self,
+        project: &crate::vba::VbaProjectBinary,
+    ) -> XlsbResult<&mut Self> {
+        let payload = project
+            .to_cfb_bytes()
+            .map_err(|error| XlsbError::Encoding(error.to_string()))?;
+        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+    }
+
+    /// Attach an existing, bounded `vbaProject.bin` payload without executing it.
+    pub fn set_vba_project_bytes(
+        &mut self,
+        payload: Vec<u8>,
+        limits: &crate::vba::VbaLimits,
+    ) -> XlsbResult<&mut Self> {
+        crate::vba_package::validate_vba_project_payload(&payload, limits)?;
+        self.vba_project = Some((payload, *limits));
+        Ok(self)
+    }
+
+    /// Remove the project scheduled for insertion into generated workbooks.
+    pub fn clear_vba_project(&mut self) -> bool {
+        self.vba_project.take().is_some()
     }
 
     /// Add a worksheet to the workbook
@@ -254,6 +283,15 @@ impl XlsbWorkbookWriter {
         // so that relationships are created with full knowledge of which parts
         // actually exist.
         self.add_workbook_part(&mut package, &formula_sheet_ranges)?;
+
+        if let Some((payload, limits)) = &self.vba_project {
+            crate::xlsb::vba_project::store_vba_project(
+                &mut package,
+                &PackURI::new("/xl/workbook.bin")?,
+                payload.clone(),
+                limits,
+            )?;
+        }
 
         // External Data Connections part (at most one per package, related
         // from the workbook part).

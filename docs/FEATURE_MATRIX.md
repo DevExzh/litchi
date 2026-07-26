@@ -356,7 +356,7 @@ conversion, fonts, and image conversion are optional.
 | Structured tables | ✅ | ✅ | ✅ | Typed inert ListObject model (MS-XLSB 2.1.7.51): identity, ranges, table types, header/totals metadata, DXF style ids, typed totals-row functions, inert calculated-column/totals formulas, and style-info flags; worksheet list parts are resolved eagerly at load; authoring serializes tables with validated display names/ranges/columns and per-sheet BrtListPart wiring |
 | External links and connections | ✅ | ✅ | ❌ | Typed inert external-workbook, DDE, and OLE link targets, sheet names, and declared name/item metadata, plus the MS-XLSB 2.1.7.24 External Data Connections part: DBType/CmdType enums, refresh and credential metadata, ODBC/OLE DB/OLAP/Web properties, typed parameters, and Web query tables; connection strings, commands, URLs, and credentials are stored verbatim and never resolved, contacted, refreshed, or executed |
 | Web extensions/Office Add-ins | 🟡 | ✅ | ✅ | Bounded `WEBEXTENSIONS` collection and `BrtWebExtension` payload codecs preserve exact FRT formula bytes, enforce one REFERENCE-class 3D cell/area range, validate workbook-resolved internal-sheet XTI indices and exact UTF-16 `appRef` values, cross-check MS-OWEXML bindings, and integrate with immutable worksheet reads and mutable worksheet emission; records remain inert and are never activated |
-| VBA project/code modules | 🟡 | 🟡 | ❌ | Inert MS-XLSB topology, bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing, deterministic cache-free project/module payload authoring, and declared legacy/Agile signature-part metadata; workbook relationship insertion is not yet integrated, source is never executed, and signature payloads remain opaque/unverified |
+| VBA project/code modules | 🟡 | 🟡 | ✅ | Inert MS-XLSB topology, bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing, deterministic cache-free project/module payload authoring, and declared legacy/Agile signature-part metadata; parsed workbooks and the new-workbook writer attach validated or authored projects, preserve them across binary-part edits, and remove complete project/signature graphs; replacement drops stale project signatures, source is never executed, and signature payloads remain opaque/unverified |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
 | Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
 
@@ -680,10 +680,11 @@ and macro-enabled XLSB workbooks validate their relationship graphs and expose b
 codepage-aware MS-OVBA project/module source through the shared CFB reader. VBA is never compiled,
 interpreted, or executed. The shared builder deterministically writes bounded, cache-free CFB
 projects with spec-shaped `_VBA_PROJECT`, compressed `dir`, `PROJECT`, `PROJECTwm`, and standard,
-class, or document module streams. Word, Excel, and PowerPoint XML packages can attach validated
-existing payloads or authored projects, preserve them across main-part materialization, and remove
-their complete graphs; Word additionally writes typed VBA supplemental data. XLSB package insertion
-remains unsupported, and declared XLSB signature payloads remain opaque and unverified.
+class, or document module streams. Word, Excel XML, Excel binary, and PowerPoint packages can attach
+validated existing payloads or authored projects, preserve them across supported edits, and remove
+their complete graphs; Word additionally writes typed VBA supplemental data. Replacing an XLSB
+project removes its now-stale legacy and Agile project signatures; declared signature payloads
+remain opaque and unverified.
 
 ### OpenDocument
 

@@ -354,7 +354,7 @@ fn ensure_replacement_targets_available(
     Ok(())
 }
 
-fn ensure_exclusive_inbound_reference(
+pub(crate) fn ensure_exclusive_inbound_reference(
     package: &OpcPackage,
     target: &PackURI,
     expected_source: &PackURI,

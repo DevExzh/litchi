@@ -13,7 +13,10 @@ use crate::xlsb::named_ranges::{NamedRange, validate_defined_name};
 use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::styles_table::{CellFormat, StylesTable};
-use crate::xlsb::vba_project::{VbaProject, discover_vba_project};
+use crate::xlsb::vba_project::{
+    VbaProject, discover_vba_project, remove_vba_project as remove_workbook_vba_project,
+    store_vba_project as store_workbook_vba_project,
+};
 use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
@@ -151,6 +154,36 @@ impl XlsbWorkbook {
     pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
         let workbook = self.package.main_document_part()?;
         discover_vba_project(&self.package, workbook)
+    }
+
+    /// Attach a cache-free, inert MS-OVBA project to this binary workbook.
+    pub fn set_vba_project(
+        &mut self,
+        project: &crate::vba::VbaProjectBinary,
+    ) -> crate::error::Result<VbaProject> {
+        let payload = project
+            .to_cfb_bytes()
+            .map_err(|error| crate::error::OoxmlError::InvalidFormat(error.to_string()))?;
+        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+    }
+
+    /// Attach an existing, validated `vbaProject.bin` without executing it.
+    ///
+    /// Any existing legacy or Agile project signature is removed because
+    /// replacing the signed project bytes invalidates it.
+    pub fn set_vba_project_bytes(
+        &mut self,
+        payload: Vec<u8>,
+        limits: &crate::vba::VbaLimits,
+    ) -> crate::error::Result<VbaProject> {
+        let source = self.package.main_document_part()?.partname().clone();
+        store_workbook_vba_project(&mut self.package, &source, payload, limits)
+    }
+
+    /// Remove the VBA project and all declared project-signature parts.
+    pub fn remove_vba_project(&mut self) -> crate::error::Result<bool> {
+        let source = self.package.main_document_part()?.partname().clone();
+        remove_workbook_vba_project(&mut self.package, &source)
     }
 
     /// Workbook and sheet-scoped defined names in `PtgName` index order.
