@@ -17,8 +17,9 @@ use litchi_iwa::protobuf::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorage
 use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::{
-    CellStyleArchive, TableDataList, TableInfoArchive, TableModelArchive, TableStyleArchive,
-    TableStyleNetworkArchive, TableStylePresetArchive,
+    CellStyleArchive, ColumnRowUidMapArchive, HiddenStateFormulaOwnerArchive, TableDataList,
+    TableInfoArchive, TableModelArchive, TableStyleArchive, TableStyleNetworkArchive,
+    TableStylePresetArchive,
 };
 use litchi_iwa::protobuf::tswp::{
     BookmarkFieldArchive, CharacterStyleArchive, ColumnStyleArchive, DateTimeSmartFieldArchive,
@@ -26,6 +27,10 @@ use litchi_iwa::protobuf::tswp::{
     ListStyleArchive, ParagraphStyleArchive, ShapeInfoArchive, ShapeStyleArchive, StorageArchive,
 };
 use prost::Message;
+
+const LEGACY_COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_200;
+const HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE: u32 = 6_204;
+const COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_267;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -374,6 +379,18 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                     litchi_iwa::protobuf::tst::FilterSetArchive::decode(message.data.as_slice())
             {
                 println!("  filter_set={filter:#?}");
+            }
+            if message.type_ == HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE
+                && let Ok(owner) = HiddenStateFormulaOwnerArchive::decode(message.data.as_slice())
+            {
+                println!("  hidden_state_formula_owner={owner:#?}");
+            }
+            if matches!(
+                message.type_,
+                LEGACY_COLUMN_ROW_UID_MAP_MESSAGE_TYPE | COLUMN_ROW_UID_MAP_MESSAGE_TYPE
+            ) && let Ok(map) = ColumnRowUidMapArchive::decode(message.data.as_slice())
+            {
+                println!("  column_row_uid_map={map:#?}");
             }
             if message.type_ == 6_373
                 && let Ok(group) =

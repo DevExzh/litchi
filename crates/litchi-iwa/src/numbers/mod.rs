@@ -41,6 +41,7 @@ pub mod table_extractor;
 mod bnc;
 mod formula_owner;
 mod function_map;
+mod table_uid_map;
 
 pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue, TableCellUpdate};
 pub use creation::NumbersDocumentBuilder;

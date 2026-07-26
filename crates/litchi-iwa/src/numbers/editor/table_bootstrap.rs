@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
+use crate::numbers::table_uid_map::COLUMN_ROW_UID_MAP_MESSAGE_TYPE;
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
@@ -10,7 +11,6 @@ const TILE_MESSAGE_TYPE: u32 = 6_002;
 const DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 const TABLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
-const TABLE_AUXILIARY_MESSAGE_TYPE: u32 = 6_200;
 const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
 const STROKE_SIDECAR_MESSAGE_TYPE: u32 = 6_305;
 const THEME_MESSAGE_TYPE: u32 = 12_009;
@@ -481,7 +481,7 @@ fn table_objects(
     }
     objects.push(table_object(
         ids.uid_map,
-        TABLE_AUXILIARY_MESSAGE_TYPE,
+        COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
         empty_uid_map(rows, columns, ids.model)?,
         &[],
     )?);

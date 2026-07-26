@@ -9,6 +9,7 @@ use prost::Message;
 
 use super::editor::NumbersEditor;
 use super::formula_owner::{empty_table_formula_owner, uuid_as_cfuuid};
+use super::table_uid_map::COLUMN_ROW_UID_MAP_MESSAGE_TYPE;
 
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
 const CALCULATION_ARCHIVE_ENTRY: &str = "Index/CalculationEngine.iwa";
@@ -94,7 +95,7 @@ enum NumbersMessageType {
     DataList = 6_005,
     HeaderStorageBucket = 6_006,
     TablePreset = 6_008,
-    TableAuxiliary = 6_200,
+    ColumnRowUidMap = COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
     TableStyleNetwork = 6_247,
     StrokeSidecar = 6_305,
     DropCapStyle = 10_024,
@@ -632,7 +633,7 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
         )?,
         object(
             UID_MAP,
-            NumbersMessageType::TableAuxiliary,
+            NumbersMessageType::ColumnRowUidMap,
             uid_map(rows, columns),
             &[],
         )?,
@@ -1281,6 +1282,56 @@ mod tests {
                 u32::try_from(stable_index).unwrap()
             );
         }
+    }
+
+    #[test]
+    fn scratch_and_bootstrapped_tables_use_identity_preserving_uid_maps() {
+        fn uid_map_message_type(editor: &NumbersEditor, model_id: u64) -> u32 {
+            let package = editor.package();
+            let model = package
+                .iwa_entry_names()
+                .find_map(|name| {
+                    package
+                        .archive(name)
+                        .unwrap()
+                        .object(model_id)
+                        .and_then(|object| {
+                            object.messages.iter().find_map(|message| {
+                                tst::TableModelArchive::decode(message.data.as_slice()).ok()
+                            })
+                        })
+                })
+                .unwrap();
+            let uid_map_id = model.base_column_row_uids.unwrap().identifier;
+            package
+                .iwa_entry_names()
+                .find_map(|name| {
+                    package
+                        .archive(name)
+                        .unwrap()
+                        .object(uid_map_id)
+                        .and_then(|object| object.messages.first())
+                        .map(|message| message.type_)
+                })
+                .unwrap()
+        }
+
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let initial = editor.tables().unwrap().remove(0);
+        assert_eq!(
+            uid_map_message_type(&editor, initial.object_id),
+            COLUMN_ROW_UID_MAP_MESSAGE_TYPE
+        );
+
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        editor.remove_table(initial.object_id).unwrap();
+        let bootstrapped = editor
+            .add_empty_table(sheet_id, "Identity Preserved", 4, 3)
+            .unwrap();
+        assert_eq!(
+            uid_map_message_type(&editor, bootstrapped.object_id),
+            COLUMN_ROW_UID_MAP_MESSAGE_TYPE
+        );
     }
 
     #[test]
