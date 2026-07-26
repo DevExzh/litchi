@@ -93,7 +93,7 @@ use crate::doc::parts::pap::{
     TabStop, TextBoxTightWrap,
 };
 use crate::doc::parts::{list_names::ListNamesTable, list_templates::ListTemplateTable};
-use crate::doc::SmartTagRecognizerRange;
+use crate::doc::{ProofingFeature, ProofingStateTable, ProofingTables, SmartTagRecognizerRange};
 use crate::sprm_operations::*;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
@@ -901,6 +901,8 @@ pub struct DocWriter {
     smart_tags: Vec<DocSmartTagEntry>,
     /// Smart-tag recognizer processing-state ranges.
     smart_tag_recognizer_ranges: Vec<SmartTagRecognizerRange>,
+    /// Optional spelling and grammar proofing-state PLCFs.
+    proofing_tables: ProofingTables,
     /// Property revision metadata for the writer's single document section
     section_formatting_revision: Option<FormattingRevision>,
     /// Explicit column geometry for the writer's single document section.
@@ -1027,6 +1029,7 @@ impl DocWriter {
             bookmarks: Vec::new(),
             smart_tags: Vec::new(),
             smart_tag_recognizer_ranges: Vec::new(),
+            proofing_tables: ProofingTables::default(),
             section_formatting_revision: None,
             section_columns: None,
             section_right_to_left: false,
@@ -1108,6 +1111,35 @@ impl DocWriter {
     /// Whether a complete VBA project is configured for output.
     pub fn has_vba_project(&self) -> bool {
         self.vba_project.is_some()
+    }
+
+    /// Insert or replace a spelling or grammar proofing-state table.
+    ///
+    /// Character positions use the concatenated DOC document-part coordinate
+    /// space. The final CP ceiling is validated when output is generated.
+    pub fn set_proofing_table(
+        &mut self,
+        table: ProofingStateTable,
+    ) -> Option<ProofingStateTable> {
+        self.proofing_tables.set(table)
+    }
+
+    /// Replace both optional proofing tables.
+    pub fn set_proofing_tables(&mut self, tables: ProofingTables) {
+        self.proofing_tables = tables;
+    }
+
+    /// Access one configured proofing table.
+    pub fn proofing_table(&self, feature: ProofingFeature) -> Option<&ProofingStateTable> {
+        self.proofing_tables.get(feature)
+    }
+
+    /// Remove and return one configured proofing table.
+    pub fn clear_proofing_table(
+        &mut self,
+        feature: ProofingFeature,
+    ) -> Option<ProofingStateTable> {
+        self.proofing_tables.remove(feature)
     }
 
     fn encryption_table_header_len(&self) -> Result<usize, DocWriteError> {
@@ -3725,6 +3757,11 @@ impl DocWriter {
             pieces.push(Piece::new(current_cp, current_cp + 1, fc_trailing, true));
             current_cp += 1;
         }
+        let proofing_maximum_cp = current_cp
+            .checked_add(if has_subdocs { 1 } else { 2 })
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("document-parts proofing CP ceiling overflows".into())
+            })?;
 
         // Initialize FIB builder
         let mut fib = FibBuilder::new();
@@ -3851,6 +3888,13 @@ impl DocWriter {
             Self::append_revision_author_table(&mut fib, &mut table_stream, revisions);
             table_offset = table_stream.len() as u32;
         }
+        table_offset = super::proofing::append_proofing_tables(
+            &mut fib,
+            &mut table_stream,
+            &self.proofing_tables,
+            table_offset,
+            proofing_maximum_cp,
+        )?;
 
         // Write PlcfFldMom (main document field table) if there are field characters.
         if !field_char_cps.is_empty() {
@@ -4607,6 +4651,11 @@ impl DocWriter {
             pieces.push(Piece::new(current_cp, current_cp + 1, fc_trailing, true));
             current_cp += 1;
         }
+        let proofing_maximum_cp = current_cp
+            .checked_add(if has_subdocs { 1 } else { 2 })
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("document-parts proofing CP ceiling overflows".into())
+            })?;
 
         let mut fib = FibBuilder::new();
         fib.set_main_text(0, text_length);
@@ -4729,6 +4778,13 @@ impl DocWriter {
             Self::append_revision_author_table(&mut fib, &mut table_stream, revisions);
             table_offset = table_stream.len() as u32;
         }
+        table_offset = super::proofing::append_proofing_tables(
+            &mut fib,
+            &mut table_stream,
+            &self.proofing_tables,
+            table_offset,
+            proofing_maximum_cp,
+        )?;
 
         // Write PlcfFldMom if there are field characters
         if !field_char_cps.is_empty() {

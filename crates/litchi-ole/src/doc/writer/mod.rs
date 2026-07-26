@@ -67,6 +67,9 @@ pub mod shapes;
 /// Legacy smart-tag/factoid writer input types.
 pub mod smart_tags;
 
+/// Spelling and grammar proofing-state table authoring.
+mod proofing;
+
 // Re-export public types
 pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{

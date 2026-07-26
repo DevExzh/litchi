@@ -280,7 +280,7 @@ conversion, fonts, and image conversion are optional.
 | Track changes | ✅ | ✅ | ✅ | Transactional add/update/remove/accept/reject editing |
 | FIB, piece tables, FKPs, and BinTable | ✅ | ✅ | ✅ | Core DOC storage and formatting structures; FIB table-pointer access is bounded by the declared `cbRgFcLcb` array, with the fixed Word 6/95 layout handled separately |
 | SPRM properties and DOP versions | ✅ | ✅ | ✅ | Typed properties with unknown-data preservation where applicable |
-| Associated strings, saved-by, proofing, and revision tables | 🟡 | ✅ | 🟡 | Typed auxiliary tables; mutation coverage varies by table |
+| Associated strings, saved-by, proofing, and revision tables | 🟡 | ✅ | 🟡 | Typed auxiliary tables; proofing-state PLCFs support bounded authoring and round-trip mutation, while mutation coverage varies for other tables |
 | Glossary/AutoText | 🟡 | ✅ | 🟡 | Typed glossary structures with bounded authoring |
 
 ### Advanced and package features

@@ -300,7 +300,15 @@ impl ProofingStateTable {
 
     /// Serialize the complete PLC deterministically.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        validate_entries(self.feature, &self.entries, self.terminal_cp, None)?;
+        self.to_bytes_with_max_cp(None)
+    }
+
+    pub(crate) fn to_bytes_for_document(&self, maximum_cp: u32) -> Result<Vec<u8>> {
+        self.to_bytes_with_max_cp(Some(maximum_cp))
+    }
+
+    fn to_bytes_with_max_cp(&self, maximum_cp: Option<u32>) -> Result<Vec<u8>> {
+        validate_entries(self.feature, &self.entries, self.terminal_cp, maximum_cp)?;
         let size = self
             .entries
             .len()
@@ -361,6 +369,28 @@ pub struct ProofingTables {
 }
 
 impl ProofingTables {
+    /// Create a pair of optional proofing tables.
+    ///
+    /// Each supplied table must describe the matching proofing feature.
+    pub fn try_new(
+        spelling: Option<ProofingStateTable>,
+        grammar: Option<ProofingStateTable>,
+    ) -> Result<Self> {
+        if spelling
+            .as_ref()
+            .is_some_and(|table| table.feature() != ProofingFeature::Spelling)
+        {
+            return Err(corrupted("spelling slot requires a Plcfspl table"));
+        }
+        if grammar
+            .as_ref()
+            .is_some_and(|table| table.feature() != ProofingFeature::Grammar)
+        {
+            return Err(corrupted("grammar slot requires a Plcfgram table"));
+        }
+        Ok(Self { spelling, grammar })
+    }
+
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         let maximum_cp = fib
             .get_document_parts_end()
@@ -389,6 +419,29 @@ impl ProofingTables {
     }
     pub fn grammar(&self) -> Option<&ProofingStateTable> {
         self.grammar.as_ref()
+    }
+
+    pub fn get(&self, feature: ProofingFeature) -> Option<&ProofingStateTable> {
+        match feature {
+            ProofingFeature::Spelling => self.spelling(),
+            ProofingFeature::Grammar => self.grammar(),
+        }
+    }
+
+    /// Insert or replace the table for its typed proofing feature.
+    pub fn set(&mut self, table: ProofingStateTable) -> Option<ProofingStateTable> {
+        match table.feature() {
+            ProofingFeature::Spelling => self.spelling.replace(table),
+            ProofingFeature::Grammar => self.grammar.replace(table),
+        }
+    }
+
+    /// Remove and return one proofing table.
+    pub fn remove(&mut self, feature: ProofingFeature) -> Option<ProofingStateTable> {
+        match feature {
+            ProofingFeature::Spelling => self.spelling.take(),
+            ProofingFeature::Grammar => self.grammar.take(),
+        }
     }
 }
 

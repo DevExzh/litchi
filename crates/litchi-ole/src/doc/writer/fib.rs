@@ -125,6 +125,12 @@ pub struct FibBuilder {
     /// Tracked-revision author table (`SttbfRMark`)
     fc_sttbf_rmark: u32,
     lcb_sttbf_rmark: u32,
+    /// Spelling proofing-state table (`Plcfspl`)
+    fc_plcfspl: u32,
+    lcb_plcfspl: u32,
+    /// Grammar proofing-state table (`Plcfgram`)
+    fc_plcfgram: u32,
+    lcb_plcfgram: u32,
     /// Annotation bookmark name table (`SttbfAtnBkmk`)
     fc_sttbf_atn_bkmk: u32,
     lcb_sttbf_atn_bkmk: u32,
@@ -245,6 +251,10 @@ impl FibBuilder {
             lcb_plcf_factoid: 0,
             fc_sttbf_rmark: 0,
             lcb_sttbf_rmark: 0,
+            fc_plcfspl: 0,
+            lcb_plcfspl: 0,
+            fc_plcfgram: 0,
+            lcb_plcfgram: 0,
             fc_sttbf_atn_bkmk: 0,
             lcb_sttbf_atn_bkmk: 0,
             fc_plcf_atn_bkf: 0,
@@ -457,6 +467,18 @@ impl FibBuilder {
     pub fn set_sttbf_rmark(&mut self, offset: u32, size: u32) {
         self.fc_sttbf_rmark = offset;
         self.lcb_sttbf_rmark = size;
+    }
+
+    /// Set the spelling proofing-state table (`Plcfspl`).
+    pub fn set_plcfspl(&mut self, offset: u32, size: u32) {
+        self.fc_plcfspl = offset;
+        self.lcb_plcfspl = size;
+    }
+
+    /// Set the grammar proofing-state table (`Plcfgram`).
+    pub fn set_plcfgram(&mut self, offset: u32, size: u32) {
+        self.fc_plcfgram = offset;
+        self.lcb_plcfgram = size;
     }
 
     /// Set the annotation-bookmark name table (`SttbfAtnBkmk`).
@@ -776,8 +798,10 @@ impl FibBuilder {
         const PLCFENDREF: usize = 46; // Endnote reference PLCF
         const PLCFENDTXT: usize = 47; // Endnote text PLCF
         const STTBFRMARK: usize = 51; // Revision author table
+        const PLCFSPL: usize = 55; // Spelling proofing-state table
         const PLFLST: usize = 73; // List table (PlfLst)
         const PLFLFO: usize = 74; // List format override table (PlfLfo)
+        const PLCFGRAM: usize = 90; // Grammar proofing-state table
         const STTBLISTNAMES: usize = 91;
         const STTBRGTPLC: usize = 96;
         const ATRDEXTRA: usize = 112; // Extended comment metadata
@@ -804,6 +828,8 @@ impl FibBuilder {
         set_field(buf, PLCFENDREF, self.fc_plcfend_ref, self.lcb_plcfend_ref);
         set_field(buf, PLCFENDTXT, self.fc_plcfend_txt, self.lcb_plcfend_txt);
         set_field(buf, STTBFRMARK, self.fc_sttbf_rmark, self.lcb_sttbf_rmark);
+        set_field(buf, PLCFSPL, self.fc_plcfspl, self.lcb_plcfspl);
+        set_field(buf, PLCFGRAM, self.fc_plcfgram, self.lcb_plcfgram);
         set_field(buf, PLCFSED, self.fc_plcfsed, self.lcb_plcfsed);
         set_field(buf, PLCFHDD, self.fc_plcfhdd, self.lcb_plcfhdd);
         set_field(
