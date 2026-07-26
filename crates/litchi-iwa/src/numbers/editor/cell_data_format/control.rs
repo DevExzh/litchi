@@ -1,6 +1,7 @@
 //! Native control-cell-spec table lifecycle for interactive data formats.
 
 use super::*;
+use crate::table_cell_data_format::TableCellSliderRange;
 
 const DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const CHECKBOX_INTERACTION_TYPE: u32 = 8;
@@ -8,11 +9,13 @@ const STAR_RATING_INTERACTION_TYPE: u32 = 6;
 const STAR_RATING_MINIMUM: f64 = 0.0;
 const STAR_RATING_MAXIMUM: f64 = 5.0;
 const STAR_RATING_INCREMENT: f64 = 1.0;
+const SLIDER_INTERACTION_TYPE: u32 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ControlCellSpecKind {
     Checkbox,
     StarRating,
+    Slider(TableCellSliderRange),
 }
 
 pub(super) fn acquire_spec(
@@ -97,13 +100,11 @@ pub(super) fn acquire_spec(
     Ok(key)
 }
 
-pub(super) fn validate_spec(
+pub(super) fn read_spec(
     package: &IWorkPackage,
     location: &model::CellLocation,
     identifier: u32,
-    kind: ControlCellSpecKind,
-) -> Result<()> {
-    let label = control_label(kind);
+) -> Result<ControlCellSpecKind> {
     let table_id = location
         .descriptor
         .model
@@ -112,7 +113,7 @@ pub(super) fn validate_spec(
         .as_ref()
         .map(|reference| reference.identifier)
         .ok_or_else(|| {
-            Error::InvalidFormat(format!("{label} cell has no control-cell-spec table"))
+            Error::InvalidFormat("Interactive cell has no control-cell-spec table".to_owned())
         })?;
     let resolved = storage::resolve_table_data_list(
         package,
@@ -126,15 +127,24 @@ pub(super) fn validate_spec(
         .find(|entry| entry.entry.key == identifier)
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "{label} cell references missing control spec {identifier}"
+                "Interactive cell references missing control spec {identifier}"
             ))
         })?;
-    if entry.entry.refcount == 0 || entry.entry.cell_spec.as_ref() != Some(&cell_spec(kind)) {
+    if entry.entry.refcount == 0 {
         return Err(Error::InvalidFormat(format!(
-            "{label} control spec {identifier} is invalid"
+            "Interactive control spec {identifier} has no references"
         )));
     }
-    Ok(())
+    let spec = entry.entry.cell_spec.as_ref().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Interactive control spec {identifier} has no payload"
+        ))
+    })?;
+    parse_cell_spec(spec).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Interactive control spec {identifier} is invalid: {error}"
+        ))
+    })
 }
 
 pub(super) fn release_spec(
@@ -283,6 +293,13 @@ fn cell_spec(kind: ControlCellSpecKind) -> tst::CellSpecArchive {
             range_control_inc: Some(STAR_RATING_INCREMENT),
             ..Default::default()
         },
+        ControlCellSpecKind::Slider(range) => tst::CellSpecArchive {
+            interaction_type: SLIDER_INTERACTION_TYPE,
+            range_control_min: Some(range.minimum()),
+            range_control_max: Some(range.maximum()),
+            range_control_inc: Some(range.increment()),
+            ..Default::default()
+        },
     }
 }
 
@@ -290,5 +307,38 @@ const fn control_label(kind: ControlCellSpecKind) -> &'static str {
     match kind {
         ControlCellSpecKind::Checkbox => "Checkbox",
         ControlCellSpecKind::StarRating => "Star Rating",
+        ControlCellSpecKind::Slider(_) => "Slider",
     }
+}
+
+fn parse_cell_spec(
+    spec: &tst::CellSpecArchive,
+) -> std::result::Result<ControlCellSpecKind, String> {
+    let kind = match spec.interaction_type {
+        CHECKBOX_INTERACTION_TYPE => ControlCellSpecKind::Checkbox,
+        STAR_RATING_INTERACTION_TYPE => ControlCellSpecKind::StarRating,
+        SLIDER_INTERACTION_TYPE => {
+            let minimum = spec
+                .range_control_min
+                .ok_or_else(|| "Slider has no minimum".to_owned())?;
+            let maximum = spec
+                .range_control_max
+                .ok_or_else(|| "Slider has no maximum".to_owned())?;
+            let increment = spec
+                .range_control_inc
+                .ok_or_else(|| "Slider has no increment".to_owned())?;
+            ControlCellSpecKind::Slider(
+                TableCellSliderRange::new(minimum, maximum, increment)
+                    .map_err(|error| error.to_string())?,
+            )
+        },
+        value => return Err(format!("unsupported interaction type {value}")),
+    };
+    if spec != &cell_spec(kind) {
+        return Err(format!(
+            "{} contains non-canonical options",
+            control_label(kind)
+        ));
+    }
+    Ok(kind)
 }

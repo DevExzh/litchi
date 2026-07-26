@@ -62,6 +62,7 @@ pub use editor::{
     KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle,
     KeynoteTableCellNumberFormat, KeynoteTableCellNumeralSystemFormat,
     KeynoteTableCellPercentageFormat, KeynoteTableCellRegion, KeynoteTableCellScientificFormat,
+    KeynoteTableCellSliderDisplayFormat, KeynoteTableCellSliderFormat, KeynoteTableCellSliderRange,
     KeynoteTableCellStarRatingFormat, KeynoteTableCellTextWrap, KeynoteTableCellThousandsSeparator,
     KeynoteTableCellUpdate, KeynoteTableCellValue, KeynoteTableCellVerticalAlignment,
     KeynoteTableColumnDeletion, KeynoteTableColumnInsertion, KeynoteTableDimension,

@@ -9,6 +9,7 @@ const MAXIMUM_DECIMAL_PLACES: u8 = 30;
 mod date_time;
 mod duration;
 mod numeral_system;
+mod slider;
 pub use date_time::TableCellDateTimeFormat;
 pub use duration::{
     TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnit,
@@ -18,6 +19,7 @@ pub use numeral_system::{
     TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
 };
+pub use slider::{TableCellSliderDisplayFormat, TableCellSliderFormat, TableCellSliderRange};
 
 /// Native interactive Checkbox format for one table cell.
 ///
@@ -482,6 +484,8 @@ pub enum TableCellDataFormat {
     Checkbox(TableCellCheckboxFormat),
     /// Display and edit the numeric value as a native five-star rating.
     StarRating(TableCellStarRatingFormat),
+    /// Display and edit the numeric value with a native Slider control.
+    Slider(TableCellSliderFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -523,6 +527,12 @@ impl From<TableCellCheckboxFormat> for TableCellDataFormat {
 impl From<TableCellStarRatingFormat> for TableCellDataFormat {
     fn from(value: TableCellStarRatingFormat) -> Self {
         Self::StarRating(value)
+    }
+}
+
+impl From<TableCellSliderFormat> for TableCellDataFormat {
+    fn from(value: TableCellSliderFormat) -> Self {
+        Self::Slider(value)
     }
 }
 

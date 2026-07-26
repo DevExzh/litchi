@@ -14,7 +14,8 @@ use litchi_iwa::table_cell_data_format::{
     TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellNumeralSystemBase,
     TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
-    TableCellScientificFormat, TableCellStarRatingFormat, TableCellThousandsSeparator,
+    TableCellScientificFormat, TableCellSliderFormat, TableCellSliderRange,
+    TableCellStarRatingFormat, TableCellThousandsSeparator,
 };
 
 const ROW: usize = 1;
@@ -28,6 +29,7 @@ const DATE_TIME_COLUMN: usize = 7;
 const DURATION_COLUMN: usize = 8;
 const CHECKBOX_COLUMN: usize = 9;
 const STAR_RATING_COLUMN: usize = 10;
+const SLIDER_COLUMN: usize = 11;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
@@ -37,6 +39,7 @@ const NUMERAL_SYSTEM_VALUE: f64 = -1_234.5;
 const DATE_TIME_VALUE: f64 = 789_332_889.0;
 const DURATION_VALUE: f64 = 3_723.5;
 const STAR_RATING_VALUE: f64 = 4.0;
+const SLIDER_VALUE: f64 = 25.0;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -106,10 +109,22 @@ const fn duration_format() -> TableCellDurationFormat {
     )
 }
 
+fn slider_format() -> Result<TableCellSliderFormat, litchi_iwa::Error> {
+    Ok(TableCellSliderFormat::new(
+        TableCellSliderRange::new(-10.0, 30.0, 0.5)?,
+        TableCellNumberFormat::new(
+            TableCellDecimalPlaces::fixed(2)?,
+            TableCellNegativeNumberStyle::MinusSign,
+            TableCellThousandsSeparator::Hidden,
+        )
+        .into(),
+    ))
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 11)
+        .table_dimensions(3, 12)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -202,6 +217,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         STAR_RATING_COLUMN,
         TableCellStarRatingFormat,
     )?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        SLIDER_COLUMN,
+        CellValue::Number(SLIDER_VALUE),
+    )?;
+    editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, slider_format()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -209,7 +231,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with native table-cell formats.\n")
-        .body_table("Number Formats", 3, 11)
+        .body_table("Number Formats", 3, 12)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -302,6 +324,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         STAR_RATING_COLUMN,
         TableCellStarRatingFormat,
     )?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        SLIDER_COLUMN,
+        CellValue::Number(SLIDER_VALUE),
+    )?;
+    editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, slider_format()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -314,7 +343,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        11,
+        12,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -460,6 +489,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         STAR_RATING_COLUMN,
         TableCellStarRatingFormat,
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        SLIDER_COLUMN,
+        CellValue::Number(SLIDER_VALUE),
+    )?;
+    editor.set_slide_table_cell_slider_format(
+        0,
+        table.model_object_id,
+        ROW,
+        SLIDER_COLUMN,
+        slider_format()?,
     )?;
     editor.save(output)?;
     Ok(())

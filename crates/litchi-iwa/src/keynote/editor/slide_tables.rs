@@ -74,6 +74,9 @@ pub use crate::table_cell_data_format::{
     TableCellNumeralSystemFormat as KeynoteTableCellNumeralSystemFormat,
     TableCellPercentageFormat as KeynoteTableCellPercentageFormat,
     TableCellScientificFormat as KeynoteTableCellScientificFormat,
+    TableCellSliderDisplayFormat as KeynoteTableCellSliderDisplayFormat,
+    TableCellSliderFormat as KeynoteTableCellSliderFormat,
+    TableCellSliderRange as KeynoteTableCellSliderRange,
     TableCellStarRatingFormat as KeynoteTableCellStarRatingFormat,
 };
 pub use crate::table_cell_layout::{
@@ -1181,6 +1184,72 @@ impl KeynoteEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Star Rating reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Slider format for one slide-table cell.
+    pub fn slide_table_cell_slider_format(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<KeynoteTableCellSliderFormat>> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_slider_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace an explicit native Slider format transactionally.
+    pub fn set_slide_table_cell_slider_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: KeynoteTableCellSliderFormat,
+    ) -> Result<()> {
+        self.set_slide_table_cell_data_format(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            format.into(),
+        )
+    }
+
+    /// Restore Automatic from an explicit Slider slide-table cell.
+    pub fn reset_slide_table_cell_slider_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_slider_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
+                != KeynoteTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Keynote Slider reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;
