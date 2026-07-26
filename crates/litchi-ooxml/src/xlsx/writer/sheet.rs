@@ -1603,27 +1603,6 @@ impl MutableWorksheet {
         {
             return Ok(None);
         }
-        for chart in &self.charts {
-            let anchor = &chart.anchor;
-            if anchor.to_row < anchor.from_row || anchor.to_col < anchor.from_col {
-                return Err("chart anchor cannot be descending".into());
-            }
-            if anchor.to_row >= 1_048_576 || anchor.to_col >= 16_384 {
-                return Err("chart anchor exceeds worksheet bounds".into());
-            }
-            if [
-                anchor.from_col_offset,
-                anchor.from_row_offset,
-                anchor.to_col_offset,
-                anchor.to_row_offset,
-            ]
-            .iter()
-            .any(|offset| *offset < 0)
-            {
-                return Err("chart anchor offsets cannot be negative".into());
-            }
-        }
-
         let mut xml = String::with_capacity(4096);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
         xml.push_str(r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" "#);
@@ -1694,57 +1673,13 @@ impl MutableWorksheet {
             xml.push_str("<xdr:clientData/></xdr:twoCellAnchor>");
         }
 
-        // Add charts
         let image_count = self.images.len();
-        for (idx, chart) in self.charts.iter().enumerate() {
-            let anchor = &chart.anchor;
-            let chart_id = image_count + idx + 1;
-
-            // Two-cell anchor for chart
-            xml.push_str("<xdr:twoCellAnchor>");
-
-            // From position
-            write!(
-                xml,
-                "<xdr:from><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:from>",
-                anchor.from_col,
-                anchor.from_col_offset,
-                anchor.from_row,
-                anchor.from_row_offset
-            )
-            .map_err(|e| format!("XML write error: {}", e))?;
-
-            // To position
-            write!(
-                xml,
-                "<xdr:to><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to>",
-                anchor.to_col,
-                anchor.to_col_offset,
-                anchor.to_row,
-                anchor.to_row_offset
-            )
-            .map_err(|e| format!("XML write error: {}", e))?;
-
-            // Graphic frame for chart
-            write!(
-                xml,
-                r#"<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="{}" name="Chart {}"/>"#,
-                chart_id,
-                idx + 1
-            )
-            .map_err(|e| format!("XML write error: {}", e))?;
-
-            xml.push_str(r#"<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>"#);
-            xml.push_str(r#"<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>"#);
-            xml.push_str(r#"<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#);
-
-            // Chart reference - rel ID will be set when writing the actual drawing part
-            write!(xml, r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId{}"/>"#, chart_id)
-                .map_err(|e| format!("XML write error: {}", e))?;
-
-            xml.push_str("</a:graphicData></a:graphic></xdr:graphicFrame>");
-            xml.push_str("<xdr:clientData/></xdr:twoCellAnchor>");
-        }
+        crate::xlsx::chart::write_worksheet_chart_anchors(
+            &mut xml,
+            &self.charts,
+            image_count,
+            image_count,
+        )?;
 
         // Add authored shapes, groups, and connectors after pictures and
         // charts; they consume no drawing-part relationships, so the

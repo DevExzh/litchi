@@ -13,7 +13,7 @@ use crate::xlsb::writer::{
     MutableSharedStringsWriter, MutableXlsbWorksheet, RecordWriter, StylesWriter,
 };
 use litchi_core::xml::escape_xml;
-use litchi_opc::constants::relationship_type as rel;
+use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::io::{Seek, Write};
@@ -946,6 +946,8 @@ impl XlsbWorkbookWriter {
             .collect::<Vec<_>>();
         let formula_sheet_ranges = std::cell::RefCell::new(Vec::new());
         let mut next_table_index = 1usize;
+        let mut next_drawing_index = 1usize;
+        let mut next_chart_index = 1usize;
         for (i, worksheet) in self.worksheets.iter_mut().enumerate() {
             // Create the worksheet part with an empty blob first so we can attach
             // relationships (binary index + external hyperlinks) and obtain
@@ -1027,6 +1029,51 @@ impl XlsbWorkbookWriter {
                 worksheet.table_rel_ids = rel_ids;
             }
 
+            // Worksheet charts use standard SpreadsheetDrawing and DrawingML
+            // Chart XML parts. The binary sheet carries only BrtDrawing with
+            // the relationship ID allocated here.
+            let mut drawing_part = None;
+            let mut chart_parts = Vec::new();
+            if !worksheet.charts().is_empty() {
+                let drawing_xml =
+                    crate::xlsb::drawing_write::serialize_drawing(worksheet.charts())?;
+                let drawing_name = format!("drawing{next_drawing_index}.xml");
+                next_drawing_index = next_drawing_index.checked_add(1).ok_or_else(|| {
+                    XlsbError::InvalidFormula("drawing part index overflow".to_string())
+                })?;
+                let mut part = BlobPart::new(
+                    PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
+                    ct::OFC_DRAWING.to_string(),
+                    drawing_xml,
+                );
+                for (chart_ordinal, chart) in worksheet.charts().iter().enumerate() {
+                    let chart_name = format!("chart{next_chart_index}.xml");
+                    next_chart_index = next_chart_index.checked_add(1).ok_or_else(|| {
+                        XlsbError::InvalidFormula("chart part index overflow".to_string())
+                    })?;
+                    let chart_xml = crate::xlsb::drawing_write::serialize_chart(chart)?;
+                    let relationship_id =
+                        part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);
+                    let expected_relationship_id = format!("rId{}", chart_ordinal + 1);
+                    if relationship_id != expected_relationship_id {
+                        return Err(XlsbError::InvalidFormula(format!(
+                            "drawing chart relationship allocation mismatch: expected {expected_relationship_id}, got {relationship_id}"
+                        )));
+                    }
+                    chart_parts.push(BlobPart::new(
+                        PackURI::new(format!("/xl/charts/{chart_name}"))?,
+                        ct::DML_CHART.to_string(),
+                        chart_xml,
+                    ));
+                }
+                let rel_id =
+                    sheet_part.relate_to(&format!("../drawings/{drawing_name}"), rel::DRAWING);
+                worksheet.set_drawing_rel_id(Some(rel_id));
+                drawing_part = Some(part);
+            } else {
+                worksheet.set_drawing_rel_id(None);
+            }
+
             // Now serialize the worksheet with fully-populated relationship IDs
             // in the hyperlink records.
             let mut sheet_data = Vec::new();
@@ -1060,6 +1107,12 @@ impl XlsbWorkbookWriter {
                 package.add_part(Box::new(part));
             }
             for part in table_parts {
+                package.add_part(Box::new(part));
+            }
+            if let Some(part) = drawing_part {
+                package.add_part(Box::new(part));
+            }
+            for part in chart_parts {
                 package.add_part(Box::new(part));
             }
         }
@@ -2309,5 +2362,149 @@ mod tests {
             } if formula == "SUM({1,2;3,4})"
                 && matches!(cached.as_ref(), CellValue::Float(10.0))
         ));
+    }
+
+    #[test]
+    fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
+        use crate::charts::plot_area::TypeGroup;
+        use crate::xlsb::drawing::XlsbDrawingAnchorKind;
+        use crate::xlsx::{ChartAnchor, WorksheetChart};
+
+        let bar = WorksheetChart::bar_chart_with_cache(
+            "Quarterly sales",
+            "Charts!$A$2:$A$4",
+            &["Q1", "Q2", "Q3"],
+            "Charts!$B$2:$B$4",
+            &[10.0, 20.0, 30.0],
+            ChartAnchor::with_offsets(1, 10, 1, 20, 8, 30, 15, 40),
+        )
+        .unwrap();
+        let line = WorksheetChart::line_chart(
+            "Trend",
+            "Charts!$A$2:$A$4",
+            "Charts!$B$2:$B$4",
+            ChartAnchor::new(9, 1, 16, 15),
+        )
+        .unwrap();
+
+        let mut sheet = MutableXlsbWorksheet::new("Charts");
+        sheet.set_cell(0, 0, "Quarter");
+        sheet.set_cell(0, 1, "Sales");
+        sheet.add_chart(bar).unwrap();
+        sheet.add_chart(line).unwrap();
+        assert_eq!(sheet.charts().len(), 2);
+
+        let pie = WorksheetChart::pie_chart(
+            "Share",
+            "Summary!$A$1:$A$3",
+            "Summary!$B$1:$B$3",
+            ChartAnchor::new(0, 0, 7, 12),
+        )
+        .unwrap();
+        let mut summary = MutableXlsbWorksheet::new("Summary");
+        summary.add_chart(pie).unwrap();
+
+        let mut workbook = XlsbWorkbookWriter::new();
+        workbook.add_worksheet(sheet);
+        workbook.add_worksheet(summary);
+        let mut output = Cursor::new(Vec::new());
+        workbook.save(&mut output).unwrap();
+        let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
+
+        let drawing = reader.sheet_drawing(0).expect("sheet drawing missing");
+        assert_eq!(drawing.drawing.anchors.len(), 2);
+        assert_eq!(drawing.charts.len(), 2);
+        assert!(matches!(
+            drawing.charts[0].chart.plot_area.type_groups.as_slice(),
+            [TypeGroup::Bar(_)]
+        ));
+        assert!(matches!(
+            drawing.charts[1].chart.plot_area.type_groups.as_slice(),
+            [TypeGroup::Line(_)]
+        ));
+        let summary_drawing = reader
+            .sheet_drawing(1)
+            .expect("second sheet drawing missing");
+        assert!(matches!(
+            summary_drawing.charts[0]
+                .chart
+                .plot_area
+                .type_groups
+                .as_slice(),
+            [TypeGroup::Pie(_)]
+        ));
+        match &drawing.drawing.anchors[0].anchor {
+            XlsbDrawingAnchorKind::TwoCell { from, to, edit_as } => {
+                assert_eq!((from.column, from.row), (1, 1));
+                assert_eq!((from.column_offset, from.row_offset), (10, 20));
+                assert_eq!((to.column, to.row), (8, 15));
+                assert_eq!((to.column_offset, to.row_offset), (30, 40));
+                assert!(edit_as.is_none());
+            },
+            other => panic!("unexpected chart anchor: {other:?}"),
+        }
+
+        let package = reader.opc_package();
+        assert_eq!(
+            package
+                .iter_parts()
+                .filter(|part| part.content_type() == ct::OFC_DRAWING)
+                .count(),
+            2
+        );
+        assert_eq!(
+            package
+                .iter_parts()
+                .filter(|part| part.content_type() == ct::DML_CHART)
+                .count(),
+            3
+        );
+        let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+        let sheet_part = package.get_part(&sheet_uri).unwrap();
+        let drawing_record = crate::xlsb::records::XlsbRecordIter::new(sheet_part.blob())
+            .find_map(|record| {
+                let record = record.unwrap();
+                (record.header.record_type == record_types::DRAWING).then_some(record)
+            })
+            .expect("BrtDrawing missing");
+        let mut cursor =
+            crate::xlsb::walker::PayloadCursor::new(&drawing_record.data, "BrtDrawing");
+        let drawing_rel_id = cursor.read_wide_string().unwrap();
+        cursor.finish().unwrap();
+        let relationship = sheet_part.rels().get(&drawing_rel_id).unwrap();
+        assert_eq!(relationship.reltype(), rel::DRAWING);
+        assert!(!relationship.is_external());
+    }
+
+    #[test]
+    fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
+        use crate::xlsx::{ChartAnchor, WorksheetChart};
+
+        let mut sheet = MutableXlsbWorksheet::new("Charts");
+        let valid = WorksheetChart::bar_chart(
+            "Valid",
+            "Charts!$A$1:$A$2",
+            "Charts!$B$1:$B$2",
+            ChartAnchor::new(1, 1, 8, 15),
+        )
+        .unwrap();
+        sheet.add_chart(valid.clone()).unwrap();
+
+        let mut descending = valid.clone();
+        descending.anchor.to_col = 0;
+        assert!(sheet.add_chart(descending).is_err());
+        assert_eq!(sheet.charts().len(), 1);
+
+        let with_external_data = valid.clone().with_embedded_workbook(vec![0x50, 0x4B]);
+        assert!(sheet.add_chart(with_external_data).is_err());
+        assert_eq!(sheet.charts().len(), 1);
+
+        let removed = sheet.remove_chart(0).unwrap();
+        assert_eq!(removed.anchor.from_col, 1);
+        assert!(sheet.charts().is_empty());
+        assert!(sheet.remove_chart(0).is_err());
+        sheet.add_chart(valid).unwrap();
+        sheet.clear_charts();
+        assert!(sheet.charts().is_empty());
     }
 }

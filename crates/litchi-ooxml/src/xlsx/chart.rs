@@ -25,6 +25,9 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
+const WORKSHEET_ROW_COUNT: u32 = 1_048_576;
+const WORKSHEET_COLUMN_COUNT: u32 = 16_384;
+
 /// Storage target for a chart's external-data relationship.
 #[derive(Debug, Clone)]
 pub enum ChartExternalDataTarget {
@@ -239,6 +242,96 @@ impl Default for ChartAnchor {
     fn default() -> Self {
         Self::new(0, 0, 10, 15)
     }
+}
+
+pub(crate) fn validate_chart_anchor(anchor: &ChartAnchor) -> Result<()> {
+    if anchor.to_row < anchor.from_row || anchor.to_col < anchor.from_col {
+        return Err(OoxmlError::InvalidFormat(
+            "chart anchor cannot be descending".to_string(),
+        ));
+    }
+    if anchor.to_row >= WORKSHEET_ROW_COUNT || anchor.to_col >= WORKSHEET_COLUMN_COUNT {
+        return Err(OoxmlError::InvalidFormat(
+            "chart anchor exceeds worksheet bounds".to_string(),
+        ));
+    }
+    if [
+        anchor.from_col_offset,
+        anchor.from_row_offset,
+        anchor.to_col_offset,
+        anchor.to_row_offset,
+    ]
+    .iter()
+    .any(|offset| *offset < 0)
+    {
+        return Err(OoxmlError::InvalidFormat(
+            "chart anchor offsets cannot be negative".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn write_worksheet_chart_anchors(
+    xml: &mut String,
+    charts: &[WorksheetChart],
+    object_id_offset: usize,
+    relationship_id_offset: usize,
+) -> Result<()> {
+    use std::fmt::Write as _;
+
+    for (index, chart) in charts.iter().enumerate() {
+        validate_chart_anchor(&chart.anchor)?;
+        let object_id = object_id_offset
+            .checked_add(index)
+            .and_then(|value| value.checked_add(1))
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| OoxmlError::InvalidFormat("chart object ID overflow".to_string()))?;
+        let relationship_id = relationship_id_offset
+            .checked_add(index)
+            .and_then(|value| value.checked_add(1))
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat("chart relationship ID overflow".to_string())
+            })?;
+        let anchor = &chart.anchor;
+        xml.push_str("<xdr:twoCellAnchor>");
+        write!(
+            xml,
+            "<xdr:from><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:from>",
+            anchor.from_col,
+            anchor.from_col_offset,
+            anchor.from_row,
+            anchor.from_row_offset
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        write!(
+            xml,
+            "<xdr:to><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to>",
+            anchor.to_col,
+            anchor.to_col_offset,
+            anchor.to_row,
+            anchor.to_row_offset
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        write!(
+            xml,
+            r#"<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="{object_id}" name="Chart {}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>"#,
+            index + 1
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        xml.push_str(
+            r#"<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#,
+        );
+        write!(
+            xml,
+            r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId{relationship_id}"/>"#
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        xml.push_str(
+            "</a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>",
+        );
+    }
+    Ok(())
 }
 
 /// Chart reference for managing charts in a worksheet.

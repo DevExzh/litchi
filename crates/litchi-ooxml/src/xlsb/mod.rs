@@ -169,6 +169,7 @@ pub mod chartsheet;
 
 /// SpreadsheetDrawing XML inventory for XLSB Drawings parts (MS-XLSB 2.1.7.23)
 pub mod drawing;
+pub(crate) mod drawing_write;
 
 /// Formula parsing and generation
 pub mod formula;

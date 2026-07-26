@@ -10,7 +10,7 @@
 //! - **Worksheet Writing**: Cell data with all types (numbers, strings, booleans, errors, formulas)
 //! - **Shared Strings**: Efficient shared string table generation
 //! - **Styles**: Fonts, fills, borders, and number formats
-//! - **Advanced Features**: Comments, hyperlinks, merged cells, data validation
+//! - **Advanced Features**: Comments, hyperlinks, merged cells, data validation, worksheet charts
 //!
 //! # Example
 //!
@@ -61,6 +61,7 @@ pub(crate) mod data_validation;
 pub(crate) mod conditional_formatting;
 
 // Re-export main types for public API
+pub use crate::xlsx::{ChartAnchor, WorksheetChart};
 pub use record::RecordWriter;
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};

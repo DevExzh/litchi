@@ -126,6 +126,10 @@ pub struct MutableXlsbWorksheet {
     formula_group_sources: BTreeMap<(u32, u32), String>,
     /// Structured tables (ListObjects) hosted on this sheet.
     tables: Vec<crate::xlsb::table::XlsbTable>,
+    /// Typed DrawingML charts anchored on this sheet.
+    charts: Vec<crate::xlsx::WorksheetChart>,
+    /// Relationship ID allocated for the sheet's Drawings part.
+    drawing_rel_id: Option<String>,
     /// Relationship IDs allocated for `tables` by the workbook writer, in
     /// table order. Populated during `XlsbWorkbookWriter::save`.
     pub(crate) table_rel_ids: Vec<String>,
@@ -238,6 +242,8 @@ impl MutableXlsbWorksheet {
             formula_groups: Vec::new(),
             formula_group_sources: BTreeMap::new(),
             tables: Vec::new(),
+            charts: Vec::new(),
+            drawing_rel_id: None,
             table_rel_ids: Vec::new(),
         }
     }
@@ -814,6 +820,8 @@ impl MutableXlsbWorksheet {
         self.data_validation_settings = DataValidationSettings::default();
         self.data_validation14_settings = DataValidationSettings::default();
         self.conditional_formattings.clear();
+        self.charts.clear();
+        self.drawing_rel_id = None;
         self.formula_groups.clear();
         self.formula_group_sources.clear();
     }
@@ -1008,6 +1016,50 @@ impl MutableXlsbWorksheet {
     /// The structured tables hosted on this sheet.
     pub fn tables(&self) -> &[crate::xlsb::table::XlsbTable] {
         &self.tables
+    }
+
+    /// Add a typed DrawingML chart anchored on this worksheet.
+    ///
+    /// XLSB uses the same chart and SpreadsheetDrawing XML as XLSX. The
+    /// workbook writer emits the chart and drawing parts and stores their
+    /// relationship in the binary `BrtDrawing` record. Relationship-bearing
+    /// external data, user shapes, extension fragments, and pivot charts are
+    /// rejected until their complete package graphs can be authored.
+    pub fn add_chart(&mut self, chart: crate::xlsx::WorksheetChart) -> XlsbResult<()> {
+        if self.charts.len() >= crate::xlsb::drawing_write::MAX_CHARTS_PER_SHEET {
+            return Err(XlsbError::InvalidFormula(
+                "worksheet chart count exceeds the safety limit".to_string(),
+            ));
+        }
+        let _ = crate::xlsb::drawing_write::serialize_chart(&chart)?;
+        self.charts.push(chart);
+        Ok(())
+    }
+
+    /// Typed DrawingML charts in drawing order.
+    pub fn charts(&self) -> &[crate::xlsx::WorksheetChart] {
+        &self.charts
+    }
+
+    /// Remove one chart by drawing order.
+    pub fn remove_chart(&mut self, index: usize) -> XlsbResult<crate::xlsx::WorksheetChart> {
+        if index >= self.charts.len() {
+            return Err(XlsbError::InvalidFormula(format!(
+                "chart index {index} is out of bounds for {} charts",
+                self.charts.len()
+            )));
+        }
+        Ok(self.charts.remove(index))
+    }
+
+    /// Remove every authored chart from this worksheet.
+    pub fn clear_charts(&mut self) {
+        self.charts.clear();
+        self.drawing_rel_id = None;
+    }
+
+    pub(crate) fn set_drawing_rel_id(&mut self, rel_id: Option<String>) {
+        self.drawing_rel_id = rel_id;
     }
 
     pub fn comments(&self) -> &[Comment] {
@@ -1290,6 +1342,17 @@ impl MutableXlsbWorksheet {
                 writer.write_record(record_types::WEB_EXTENSION, &binding.to_payload()?)?;
             }
             writer.write_record(record_types::END_WEB_EXTENSIONS, &[])?;
+        }
+
+        if !self.charts.is_empty() {
+            let rel_id = self.drawing_rel_id.as_deref().ok_or_else(|| {
+                XlsbError::InvalidFormula(
+                    "worksheet charts lack a Drawings relationship ID".to_string(),
+                )
+            })?;
+            let mut payload = Vec::with_capacity(4 + rel_id.len() * 2);
+            RecordWriter::new(&mut payload).write_wide_string(rel_id)?;
+            writer.write_record(record_types::DRAWING, &payload)?;
         }
 
         // Write table references (BrtBeginListParts / BrtListPart /
