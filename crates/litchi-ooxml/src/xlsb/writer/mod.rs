@@ -51,6 +51,9 @@ mod worksheet;
 /// Workbook writer for creating complete XLSB files
 mod workbook;
 
+/// Typed chart-sheet authoring
+mod chartsheet;
+
 /// Binary cell range serialization helpers (shared by DV and CF writers)
 pub(crate) mod bin_range;
 
@@ -72,6 +75,7 @@ pub use crate::xlsx::writer::{
     XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
     XlsxShapeSpec,
 };
+pub use chartsheet::MutableXlsbChartSheet;
 pub use record::RecordWriter;
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};

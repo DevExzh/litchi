@@ -57,7 +57,7 @@ impl NamedRange {
 
     /// Create a 3D area formula token stream for a workbook-local sheet range.
     ///
-    /// The `sheet_id` is the zero-based worksheet index. XLSB formulas reference
+    /// The `sheet_id` is the zero-based workbook sheet index. XLSB formulas reference
     /// the workbook's self extern-sheet table, which reserves the first two
     /// entries for workbook and `#REF!`, so sheet references start at index 2.
     pub fn create_area3d_formula(

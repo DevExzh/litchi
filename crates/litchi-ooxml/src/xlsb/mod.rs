@@ -16,14 +16,14 @@
 //! - **Merged Cells**: Parse and handle merged cell ranges
 //! - **Hyperlinks**: Parse hyperlink data with locations and tooltips
 //! - **Named Ranges**: Parse defined names and ranges
-//! - **Chart Sheets**: Typed chart sheet stream parsing (code name, tab color, views,
-//!   protection, page setup, drawing links)
+//! - **Chart Sheets**: Typed chart sheet stream parsing and bounded new-workbook
+//!   authoring (code name, tab color, views, protection, page setup, drawing links)
 //! - **Drawings and Charts**: SpreadsheetDrawing inventory (anchors, shapes, pictures,
 //!   graphic frames) with embedded charts parsed through the shared typed chart model
 //! - **Error Handling**: Comprehensive error types with detailed context
 //!
 //! ## Writing
-//! - **Workbook Creation**: Create complete XLSB files with multiple worksheets
+//! - **Workbook Creation**: Create complete XLSB files with ordered worksheets and chart sheets
 //! - **Cell Writing**: Write all cell types (numbers, strings, booleans, errors, dates)
 //! - **Styles**: Write custom fonts, fills, borders, and number formats
 //! - **Shared Strings**: Automatic shared string table management
@@ -232,6 +232,6 @@ pub use records::{XlsbRecord, XlsbRecordHeader, XlsbRecordIter};
 
 // Re-export writer types for convenience
 pub use writer::{
-    MutableSharedStringsWriter, MutableXlsbWorksheet, RecordWriter, SheetProtection, StylesWriter,
-    XlsbWorkbookWriter,
+    MutableSharedStringsWriter, MutableXlsbChartSheet, MutableXlsbWorksheet, RecordWriter,
+    SheetProtection, StylesWriter, XlsbWorkbookWriter,
 };

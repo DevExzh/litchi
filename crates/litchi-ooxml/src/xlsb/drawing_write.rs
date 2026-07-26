@@ -15,6 +15,8 @@ use std::fmt::Write as _;
 pub(crate) const MAX_CHARTS_PER_SHEET: usize = 4_096;
 const MAX_DRAWING_XML_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CHART_XML_BYTES: usize = 16 * 1024 * 1024;
+const CHART_SHEET_EXTENT_X: u64 = 8_582_025;
+const CHART_SHEET_EXTENT_Y: u64 = 5_838_825;
 
 fn unsupported(detail: impl Into<String>) -> XlsbError {
     XlsbError::UnsupportedFeature(detail.into())
@@ -59,6 +61,27 @@ pub(crate) fn serialize_chart(chart: &WorksheetChart) -> XlsbResult<Vec<u8>> {
     // Treat the shared chart reader as a post-serialization grammar oracle.
     crate::charts::reader::parse_chart(xml.as_slice())?;
     Ok(xml)
+}
+
+/// Serialize the single absolute-anchored chart frame used by a chart sheet.
+pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> XlsbResult<Vec<u8>> {
+    if title.encode_utf16().count() > 32_767 || title.contains('\0') {
+        return Err(XlsbError::InvalidFormula(
+            "chart-sheet drawing title is too long or contains NUL".to_string(),
+        ));
+    }
+    let xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:absoluteAnchor><xdr:pos x="0" y="0"/><xdr:ext cx="{CHART_SHEET_EXTENT_X}" cy="{CHART_SHEET_EXTENT_Y}"/><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="1" name="{}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:absoluteAnchor></xdr:wsDr>"#,
+        escape_xml(title)
+    );
+    if xml.len() > MAX_DRAWING_XML_BYTES {
+        return Err(XlsbError::InvalidLength {
+            expected: MAX_DRAWING_XML_BYTES,
+            found: xml.len(),
+        });
+    }
+    crate::xlsb::drawing::parse_drawing_part(xml.as_bytes())?;
+    Ok(xml.into_bytes())
 }
 
 pub(crate) fn serialize_drawing(
