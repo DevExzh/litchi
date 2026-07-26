@@ -17,6 +17,8 @@ const MAX_TEXT_BLOCKS: usize = 1_000_000;
 const MAX_TEXT_DEPTH: usize = 4_096;
 const MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_SPACE_COUNT: usize = 1_000_000;
+/// Qualified name of the unnumbered leading block of an ODF list.
+const LIST_HEADER_TAG: &str = "text:list-header";
 
 /// A text paragraph element
 #[derive(Debug, Clone)]
@@ -686,9 +688,32 @@ impl List {
         Ok(items)
     }
 
+    /// Get the optional unnumbered header block of the list.
+    ///
+    /// ODF allows a single `text:list-header` before the first `text:list-item`.
+    /// It holds ordinary paragraphs that receive no list label, and is content
+    /// the author typed just like any item, so it is reported separately from
+    /// [`items`](Self::items) rather than dropped.
+    pub fn header(&self) -> Result<Option<ListHeader>> {
+        for child in self.element.children.iter() {
+            if child.tag_name() == LIST_HEADER_TAG {
+                return ListHeader::from_element(child.clone()).map(Some);
+            }
+        }
+        Ok(None)
+    }
+
     /// Add a list item
     pub fn add_item(&mut self, item: ListItem) {
         self.element.add_child(item.element);
+    }
+
+    /// Set the unnumbered header block of the list, replacing any existing one.
+    pub fn set_header(&mut self, header: ListHeader) {
+        self.element
+            .children
+            .retain(|child| child.tag_name() != LIST_HEADER_TAG);
+        self.element.children.insert(0, header.element);
     }
 
     /// Get the style name
@@ -705,6 +730,75 @@ impl List {
 impl From<List> for Element {
     fn from(list: List) -> Element {
         list.element
+    }
+}
+
+/// The unnumbered leading block of a list (`text:list-header`).
+///
+/// A list header holds the same paragraph content a list item does, but the
+/// list-level style gives it no number or bullet. ODF permits at most one, and
+/// it must precede every `text:list-item`.
+#[derive(Debug, Clone)]
+pub struct ListHeader {
+    element: Element,
+}
+
+impl Default for ListHeader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ListHeader {
+    /// Create an empty list header.
+    pub fn new() -> Self {
+        Self {
+            element: Element::new(LIST_HEADER_TAG),
+        }
+    }
+
+    /// Wrap a parsed `text:list-header` element.
+    pub fn from_element(element: Element) -> Result<Self> {
+        if element.tag_name() != LIST_HEADER_TAG {
+            return Err(Error::InvalidFormat(
+                "Element is not a list header".to_string(),
+            ));
+        }
+        Ok(Self { element })
+    }
+
+    /// Get the flattened text content of the header.
+    pub fn text(&self) -> Result<String> {
+        Ok(self.element.get_text_recursive())
+    }
+
+    /// Set the text content of the header.
+    pub fn set_text(&mut self, text: &str) {
+        self.element.set_text(text);
+    }
+
+    /// Get the paragraphs the header contains.
+    pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
+        let mut paragraphs = Vec::new();
+        for child in self.element.children.iter() {
+            if child.tag_name() == "text:p"
+                && let Ok(paragraph) = Paragraph::from_element(child.clone())
+            {
+                paragraphs.push(paragraph);
+            }
+        }
+        Ok(paragraphs)
+    }
+
+    /// Add a paragraph to the header.
+    pub fn add_paragraph(&mut self, paragraph: Paragraph) {
+        self.element.add_child(paragraph.into());
+    }
+}
+
+impl From<ListHeader> for Element {
+    fn from(header: ListHeader) -> Element {
+        header.element
     }
 }
 
@@ -885,17 +979,31 @@ struct ActiveTextBlock {
     element: Element,
     depth: usize,
     text: String,
+    /// Index of the reserved output slot, so completed blocks keep the order in
+    /// which they *started* rather than the order in which they closed.
+    slot: usize,
 }
 
+/// Parse every `text:p` and `text:h` in `xml_content` into flat text blocks.
+///
+/// ODF allows a paragraph to contain further paragraphs through frames
+/// (`draw:frame`/`draw:text-box`, `draw:custom-shape`), inline annotations
+/// (`office:annotation`), sections, and tables nested inside those frames.
+/// Each nested paragraph becomes its own block, emitted in document (start)
+/// order so an enclosing paragraph precedes the frame content it carries.
+///
+/// Stored tracked-change definitions, note bodies, and ruby pronunciation runs
+/// are excluded from the visible flow; they are exposed through their own
+/// dedicated readers instead.
 pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
     let mut reader = NsReader::from_str(xml_content);
     let mut buffer = Vec::new();
-    let mut blocks = Vec::new();
-    let mut active: Option<ActiveTextBlock> = None;
+    let mut blocks: Vec<Option<TextBlock>> = Vec::new();
+    let mut active: Vec<ActiveTextBlock> = Vec::new();
     let mut document_depth = 0usize;
     let mut tracked_changes_depth = 0usize;
-    let mut note_body_depth = 0usize;
-    let mut ruby_text_depth = 0usize;
+    // Depth of the note-body/ruby-text subtree whose content is suppressed.
+    let mut skipped_depth = 0usize;
     let mut total_text_bytes = 0usize;
 
     loop {
@@ -917,99 +1025,89 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
 
                 if tracked_changes_depth > 0 {
                     tracked_changes_depth += 1;
-                } else if is_text_element(text_namespace, element, b"tracked-changes") {
+                    buffer.clear();
+                    continue;
+                }
+                if is_text_element(text_namespace, element, b"tracked-changes") {
                     tracked_changes_depth = 1;
-                } else if let Some(current) = active.as_mut() {
+                    buffer.clear();
+                    continue;
+                }
+
+                // A nested block owns its whole subtree, so the element that
+                // opens it is counted once — against the new block, never also
+                // against the block that encloses it. Every other element counts
+                // against the innermost open block so that block still closes on
+                // the right end tag.
+                let starts_block = skipped_depth == 0 && is_text_block(text_namespace, element);
+                if !starts_block && let Some(current) = active.last_mut() {
                     current.depth += 1;
-                    if note_body_depth > 0 {
-                        note_body_depth += 1;
-                    } else if ruby_text_depth > 0 {
-                        ruby_text_depth += 1;
-                    } else if is_text_element(text_namespace, element, b"note-body") {
-                        note_body_depth = 1;
-                    } else if is_text_element(text_namespace, element, b"ruby-text") {
-                        ruby_text_depth = 1;
-                    } else if is_text_block(text_namespace, element) {
-                        return Err(Error::InvalidFormat(
-                            "nested ODF paragraphs or headings are not allowed".to_string(),
-                        ));
-                    } else {
-                        append_text_control(&reader, text_namespace, element, &mut current.text)?;
-                    }
-                } else if is_text_block(text_namespace, element) {
-                    active = Some(ActiveTextBlock {
+                }
+
+                if starts_block {
+                    active.push(ActiveTextBlock {
                         element: make_text_block_element(&reader, element)?,
                         depth: 1,
                         text: String::new(),
+                        slot: reserve_text_block(&mut blocks)?,
                     });
-                }
-            },
-            Event::Empty(ref element) if tracked_changes_depth == 0 => {
-                if let Some(current) = active.as_mut() {
-                    if note_body_depth == 0
-                        && ruby_text_depth == 0
-                        && !is_text_element(text_namespace, element, b"note-body")
-                        && !is_text_element(text_namespace, element, b"ruby-text")
+                } else if skipped_depth > 0 {
+                    skipped_depth += 1;
+                } else if let Some(current) = active.last_mut() {
+                    if is_text_element(text_namespace, element, b"note-body")
+                        || is_text_element(text_namespace, element, b"ruby-text")
                     {
-                        if is_text_block(text_namespace, element) {
-                            return Err(Error::InvalidFormat(
-                                "nested ODF paragraphs or headings are not allowed".to_string(),
-                            ));
-                        }
+                        skipped_depth = 1;
+                    } else {
                         append_text_control(&reader, text_namespace, element, &mut current.text)?;
                     }
+                }
+            },
+            Event::Empty(ref element) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if is_text_element(text_namespace, element, b"note-body")
+                    || is_text_element(text_namespace, element, b"ruby-text")
+                {
+                    // An empty suppressed run contributes nothing either way.
                 } else if is_text_block(text_namespace, element) {
-                    push_text_block(
+                    let slot = reserve_text_block(&mut blocks)?;
+                    store_text_block(
                         make_text_block_element(&reader, element)?,
                         String::new(),
+                        slot,
                         &mut blocks,
                         &mut total_text_bytes,
                     )?;
+                } else if let Some(current) = active.last_mut() {
+                    append_text_control(&reader, text_namespace, element, &mut current.text)?;
                 }
             },
-            Event::Text(ref value)
-                if tracked_changes_depth == 0
-                    && note_body_depth == 0
-                    && ruby_text_depth == 0
-                    && active.is_some() =>
-            {
-                let decoded = value
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid ODF text content: {error}"))
-                    })?;
-                append_checked(
-                    &mut active.as_mut().expect("checked active block").text,
-                    &decoded,
-                )?;
+            Event::Text(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text content: {error}"))
+                        })?;
+                    append_checked(&mut current.text, &decoded)?;
+                }
             },
-            Event::CData(ref value)
-                if tracked_changes_depth == 0
-                    && note_body_depth == 0
-                    && ruby_text_depth == 0
-                    && active.is_some() =>
-            {
-                let decoded = value
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid ODF text CDATA: {error}"))
-                    })?;
-                append_checked(
-                    &mut active.as_mut().expect("checked active block").text,
-                    &decoded,
-                )?;
+            Event::CData(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text CDATA: {error}"))
+                        })?;
+                    append_checked(&mut current.text, &decoded)?;
+                }
             },
             Event::GeneralRef(ref reference)
-                if tracked_changes_depth == 0
-                    && note_body_depth == 0
-                    && ruby_text_depth == 0
-                    && active.is_some() =>
+                if tracked_changes_depth == 0 && skipped_depth == 0 =>
             {
-                let decoded = decode_reference(reference)?;
-                append_checked(
-                    &mut active.as_mut().expect("checked active block").text,
-                    &decoded,
-                )?;
+                if let Some(current) = active.last_mut() {
+                    let decoded = decode_reference(reference)?;
+                    append_checked(&mut current.text, &decoded)?;
+                }
             },
             Event::End(_) => {
                 document_depth = document_depth.checked_sub(1).ok_or_else(|| {
@@ -1017,17 +1115,22 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
                 })?;
                 if tracked_changes_depth > 0 {
                     tracked_changes_depth -= 1;
-                } else if let Some(current) = active.as_mut() {
-                    note_body_depth = note_body_depth.saturating_sub(1);
-                    ruby_text_depth = ruby_text_depth.saturating_sub(1);
+                    buffer.clear();
+                    continue;
+                }
+                skipped_depth = skipped_depth.saturating_sub(1);
+                if let Some(current) = active.last_mut() {
                     current.depth = current.depth.checked_sub(1).ok_or_else(|| {
                         Error::InvalidFormat("ODF text block stack underflow".to_string())
                     })?;
                     if current.depth == 0 {
-                        let current = active.take().expect("checked active block");
-                        push_text_block(
+                        let current = active
+                            .pop()
+                            .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?;
+                        store_text_block(
                             current.element,
                             current.text,
+                            current.slot,
                             &mut blocks,
                             &mut total_text_bytes,
                         )?;
@@ -1040,17 +1143,13 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
         buffer.clear();
     }
 
-    if active.is_some()
-        || tracked_changes_depth != 0
-        || note_body_depth != 0
-        || ruby_text_depth != 0
-        || document_depth != 0
+    if !active.is_empty() || tracked_changes_depth != 0 || skipped_depth != 0 || document_depth != 0
     {
         return Err(Error::InvalidFormat(
             "incomplete ODF text XML structure".to_string(),
         ));
     }
-    Ok(blocks)
+    Ok(blocks.into_iter().flatten().collect())
 }
 
 fn is_text_element(text_namespace: bool, element: &BytesStart<'_>, local_name: &[u8]) -> bool {
@@ -1198,17 +1297,31 @@ fn append_checked(output: &mut String, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn push_text_block(
-    mut element: Element,
-    text: String,
-    blocks: &mut Vec<TextBlock>,
-    total_text_bytes: &mut usize,
-) -> Result<()> {
+/// Message used when the open-block stack and the element stack disagree.
+const BLOCK_STACK_ERROR: &str = "inconsistent ODF text block stack";
+
+/// Reserve an output slot for a block that has just started, returning its
+/// index. The slot keeps document order while the block is still being read.
+fn reserve_text_block(blocks: &mut Vec<Option<TextBlock>>) -> Result<usize> {
     if blocks.len() >= MAX_TEXT_BLOCKS {
         return Err(Error::InvalidFormat(format!(
             "ODF text exceeds {MAX_TEXT_BLOCKS} paragraphs and headings"
         )));
     }
+    let slot = blocks.len();
+    blocks.push(None);
+    Ok(slot)
+}
+
+/// Fill a previously reserved slot with the finished block, accounting the
+/// collected text against the overall size budget.
+fn store_text_block(
+    mut element: Element,
+    text: String,
+    slot: usize,
+    blocks: &mut [Option<TextBlock>],
+    total_text_bytes: &mut usize,
+) -> Result<()> {
     *total_text_bytes = total_text_bytes
         .checked_add(text.len())
         .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
@@ -1218,11 +1331,19 @@ fn push_text_block(
         )));
     }
     element.set_text(&text);
-    match element.tag_name() {
-        "text:p" => blocks.push(TextBlock::Paragraph(Paragraph::from_element(element)?)),
-        "text:h" => blocks.push(TextBlock::Heading(Heading::from_element(element)?)),
-        _ => unreachable!("text block elements are canonicalized"),
-    }
+    let block = match element.tag_name() {
+        "text:p" => TextBlock::Paragraph(Paragraph::from_element(element)?),
+        "text:h" => TextBlock::Heading(Heading::from_element(element)?),
+        _ => {
+            return Err(Error::InvalidFormat(
+                "element is not an ODF paragraph or heading".to_string(),
+            ));
+        },
+    };
+    let target = blocks
+        .get_mut(slot)
+        .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?;
+    *target = Some(block);
     Ok(())
 }
 

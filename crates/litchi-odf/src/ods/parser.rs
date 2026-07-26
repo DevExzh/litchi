@@ -36,6 +36,12 @@ const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const MAX_EXPANDED_CELLS_PER_ROW: usize = 1_048_576;
 const MAX_EXPANDED_CELLS_PER_SHEET: usize = 4_194_304;
+/// Interleaved runs of empty rows kept unmaterialised before the parser gives
+/// up and expands them, so deferral cannot grow without bound.
+const MAX_DEFERRED_BLANK_ROW_RUNS: usize = 4_096;
+/// Longest run of cell-less rows still kept at the end of a table. Anything
+/// longer is the full-height grid padding every ODF producer writes.
+const MAX_TRAILING_EMPTY_ROWS: usize = 4_096;
 
 /// A `text:a` hyperlink whose text content is still being collected.
 struct PendingHyperlink {
@@ -309,7 +315,7 @@ impl OdsParser {
                                 reader.decoder(),
                                 &document_namespaces,
                             )?;
-                            sheet.row_structure.begin_group(display)?;
+                            sheet.begin_row_group(display)?;
                         }
                     } else if current_row.is_none()
                         && Self::element_name_is(
@@ -320,7 +326,7 @@ impl OdsParser {
                         )
                     {
                         if let Some(sheet) = current_sheet.as_mut() {
-                            sheet.row_structure.begin_header(sheet.rows.len())?;
+                            sheet.begin_row_header()?;
                         }
                     } else if current_row.is_none()
                         && Self::element_name_is(
@@ -996,7 +1002,7 @@ impl OdsParser {
                         "table-row-group",
                     ) {
                         if let Some(sheet) = current_sheet.as_mut() {
-                            sheet.row_structure.end_group()?;
+                            sheet.end_row_group()?;
                         }
                     } else if Self::element_name_is(
                         e.name().as_ref(),
@@ -1005,7 +1011,7 @@ impl OdsParser {
                         "table-header-rows",
                     ) {
                         if let Some(sheet) = current_sheet.as_mut() {
-                            sheet.row_structure.end_header(sheet.rows.len())?;
+                            sheet.end_row_header()?;
                         }
                     } else if closes_current_sheet && let Some(sheet_builder) = current_sheet.take()
                     {
@@ -2470,6 +2476,10 @@ pub(crate) struct SheetBuilder {
     scenario: Option<SheetScenario>,
     images: Vec<crate::OdfImage>,
     cell_count: usize,
+    /// Runs of empty rows read but not yet materialised, in document order.
+    deferred_rows: Vec<(Row, usize)>,
+    /// Total number of rows the deferred runs stand for.
+    deferred_row_count: usize,
 }
 
 impl SheetBuilder {
@@ -2498,6 +2508,8 @@ impl SheetBuilder {
             scenario: None,
             images: Vec::new(),
             cell_count: 0,
+            deferred_rows: Vec::new(),
+            deferred_row_count: 0,
         }
     }
 
@@ -2566,16 +2578,93 @@ impl SheetBuilder {
         self.rows.push(row);
     }
 
+    /// Number of rows the sheet logically spans, including runs of empty rows
+    /// that have been deferred and may never be materialised.
+    fn logical_row_count(&self) -> usize {
+        self.rows.len().saturating_add(self.deferred_row_count)
+    }
+
+    /// Open a row grouping. Pending empty rows belong to the enclosing context,
+    /// so they are materialised before the boundary moves.
+    fn begin_row_group(&mut self, display: bool) -> Result<()> {
+        self.flush_deferred_rows()?;
+        self.row_structure.begin_group(display)
+    }
+
+    fn end_row_group(&mut self) -> Result<()> {
+        self.flush_deferred_rows()?;
+        self.row_structure.end_group()
+    }
+
+    fn begin_row_header(&mut self) -> Result<()> {
+        self.flush_deferred_rows()?;
+        self.row_structure.begin_header(self.rows.len())
+    }
+
+    fn end_row_header(&mut self) -> Result<()> {
+        self.flush_deferred_rows()?;
+        self.row_structure.end_header(self.rows.len())
+    }
+
     fn add_repeated_row(&mut self, row: Row, repeated: usize) -> Result<()> {
-        let start = self.rows.len();
-        let expanded_rows = self.rows.len().checked_add(repeated).ok_or_else(|| {
-            Error::InvalidFormat("table row repetition overflows address space".to_string())
-        })?;
-        if expanded_rows > MAX_EXPANDED_ROWS_PER_SHEET {
+        // The logical extent has to stay inside the grid a spreadsheet can
+        // address, whether or not the rows are eventually materialised.
+        let logical_end = self
+            .logical_row_count()
+            .checked_add(repeated)
+            .ok_or_else(|| {
+                Error::InvalidFormat("table row repetition overflows address space".to_string())
+            })?;
+        if logical_end > MAX_EXPANDED_ROWS_PER_SHEET {
             return Err(Error::InvalidFormat(format!(
                 "expanded sheet exceeds the {MAX_EXPANDED_ROWS_PER_SHEET} row safety limit"
             )));
         }
+
+        // Rows with no cell at all are the sheet-height padding producers append
+        // after the used range. Defer them: an interior run is expanded again as
+        // soon as a row with content follows, while a long trailing run is
+        // discarded by `build` instead of costing a million allocations.
+        if row.cells.is_empty() && self.deferred_rows.len() < MAX_DEFERRED_BLANK_ROW_RUNS {
+            self.deferred_rows.push((row, repeated));
+            self.deferred_row_count = self.deferred_row_count.saturating_add(repeated);
+            return Ok(());
+        }
+
+        self.flush_deferred_rows()?;
+        self.materialize_repeated_row(row, repeated)
+    }
+
+    /// Materialise every deferred empty-row run because a row with content or a
+    /// structure boundary follows, so later rows keep their true index.
+    fn flush_deferred_rows(&mut self) -> Result<()> {
+        for (row, repeated) in std::mem::take(&mut self.deferred_rows) {
+            self.materialize_repeated_row(row, repeated)?;
+        }
+        self.deferred_row_count = 0;
+        Ok(())
+    }
+
+    /// Resolve the run of empty rows still pending at the end of a table.
+    ///
+    /// A short tail is kept, so an authored gap of blank rows survives the round
+    /// trip. A long one is producer grid padding — every ODF spreadsheet is
+    /// written out to its full addressable height — and is discarded, since it
+    /// holds no cell, value, formula, annotation, or text. Discarding it records
+    /// no structure range either, so the sheet's row groups never describe rows
+    /// that are not there.
+    fn finish_deferred_rows(&mut self) -> Result<()> {
+        if self.deferred_row_count <= MAX_TRAILING_EMPTY_ROWS {
+            return self.flush_deferred_rows();
+        }
+        self.deferred_rows.clear();
+        self.deferred_row_count = 0;
+        Ok(())
+    }
+
+    /// Expand one run of rows and record the physical range it occupies.
+    fn materialize_repeated_row(&mut self, row: Row, repeated: usize) -> Result<()> {
+        let start = self.rows.len();
         let added_cells = row.cells.len().checked_mul(repeated).ok_or_else(|| {
             Error::InvalidFormat("table row repetition overflows cell count".to_string())
         })?;
@@ -2588,11 +2677,11 @@ impl SheetBuilder {
             )));
         }
         self.cell_count = expanded_cells;
+        self.rows.reserve(repeated);
         for _ in 0..repeated {
             self.add_row(row.clone());
         }
-        self.row_structure.add_range(start, self.rows.len())?;
-        Ok(())
+        self.row_structure.add_range(start, self.rows.len())
     }
 
     fn add_repeated_column(&mut self, column: Column, repeated: usize) -> Result<()> {
@@ -2614,7 +2703,8 @@ impl SheetBuilder {
         Ok(())
     }
 
-    pub fn build(self) -> Result<Sheet> {
+    pub fn build(mut self) -> Result<Sheet> {
+        self.finish_deferred_rows()?;
         Ok(Sheet {
             name: self.name,
             rows: self.rows,
@@ -2642,6 +2732,10 @@ pub(crate) struct RowBuilder {
     style_name: Option<String>,
     default_cell_style_name: Option<String>,
     visibility: TableVisibility,
+    /// Number of attribute-free filler cells read but not yet materialised.
+    deferred_blank_cells: usize,
+    /// The filler cell to clone when the deferred run has to be materialised.
+    deferred_blank_cell: Option<Cell>,
 }
 
 impl RowBuilder {
@@ -2653,6 +2747,8 @@ impl RowBuilder {
             style_name: None,
             default_cell_style_name: None,
             visibility: TableVisibility::Visible,
+            deferred_blank_cells: 0,
+            deferred_blank_cell: None,
         }
     }
 
@@ -2671,6 +2767,8 @@ impl RowBuilder {
             style_name,
             default_cell_style_name,
             visibility,
+            deferred_blank_cells: 0,
+            deferred_blank_cell: None,
         })
     }
 
@@ -2685,6 +2783,26 @@ impl RowBuilder {
         text: &str,
         rich_text: Option<&CellTextContent>,
     ) -> Result<()> {
+        // Producers pad every row out to the full sheet width with attribute-free
+        // `<table:table-cell/>` fillers. Defer those instead of materialising them:
+        // an interior run is still expanded when real content follows, but a
+        // trailing run is dropped by `build`, which is what makes ordinary
+        // spreadsheets fit inside the expansion safety limits at all.
+        if builder.is_blank(text, rich_text) {
+            self.deferred_blank_cells = self
+                .deferred_blank_cells
+                .checked_add(builder.repeated)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "table cell repetition overflows address space".to_string(),
+                    )
+                })?;
+            if self.deferred_blank_cell.is_none() {
+                self.deferred_blank_cell = Some(builder.build(text, rich_text));
+            }
+            return Ok(());
+        }
+        self.flush_deferred_blank_cells()?;
         let expanded = self
             .cells
             .len()
@@ -2699,6 +2817,31 @@ impl RowBuilder {
         }
         for _ in 0..builder.repeated {
             self.add_cell(builder.build(text, rich_text));
+        }
+        Ok(())
+    }
+
+    /// Materialise the deferred blank run because real content follows it, so
+    /// the column index of that content stays correct.
+    fn flush_deferred_blank_cells(&mut self) -> Result<()> {
+        let deferred = std::mem::take(&mut self.deferred_blank_cells);
+        let Some(template) = self.deferred_blank_cell.take() else {
+            return Ok(());
+        };
+        if deferred == 0 {
+            return Ok(());
+        }
+        let expanded = self.cells.len().checked_add(deferred).ok_or_else(|| {
+            Error::InvalidFormat("table cell repetition overflows address space".to_string())
+        })?;
+        if expanded > MAX_EXPANDED_CELLS_PER_ROW {
+            return Err(Error::InvalidFormat(format!(
+                "expanded row exceeds the {MAX_EXPANDED_CELLS_PER_ROW} cell safety limit"
+            )));
+        }
+        self.cells.reserve(deferred);
+        for _ in 0..deferred {
+            self.add_cell(template.clone());
         }
         Ok(())
     }
@@ -2740,6 +2883,32 @@ pub(crate) struct CellBuilder {
 }
 
 impl CellBuilder {
+    /// Whether this cell carries no user data whatsoever.
+    ///
+    /// A blank cell is exactly the attribute-free `<table:table-cell/>` filler
+    /// producers emit to pad a row out to the full sheet width. Anything that a
+    /// user could have authored — a value, formula, style, annotation,
+    /// hyperlink, validation, protection flag, merge role, or text — makes the
+    /// cell meaningful and therefore not blank.
+    fn is_blank(&self, text_content: &str, rich_text: Option<&CellTextContent>) -> bool {
+        self.value_type.is_none()
+            && self.value_str.is_none()
+            && self.currency.is_none()
+            && self.formula.is_none()
+            && self.validation_name.is_none()
+            && self.style_name.is_none()
+            && self.matrix_span.is_none()
+            && self.protect.is_none()
+            && self.protected.is_none()
+            && self.annotation.is_none()
+            && self.hyperlinks.is_empty()
+            && self.range_source.is_none()
+            && self.detective.is_none()
+            && self.merge == CellMerge::None
+            && text_content.is_empty()
+            && rich_text.is_none()
+    }
+
     pub fn build(&self, text_content: &str, rich_text: Option<&CellTextContent>) -> Cell {
         let value = self.parse_value(text_content);
 

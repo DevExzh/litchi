@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Reproduces the full-height, full-width grid padding every ODF spreadsheet
+  producer writes after the used range of a sheet:
+
+    * "Padded" ends with a row repeated across the remaining sheet height, whose
+      only child is an attribute-free cell repeated across the whole width.
+    * "Gaps" keeps an interior run of empty rows and cells between two rows that
+      do carry content, so a reader must still place the later content at its
+      true row and column.
+    * "Styled tail" ends with a short run of empty rows, which is authored
+      spacing rather than padding and has to survive.
+-->
+<office:document
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    office:mimetype="application/vnd.oasis.opendocument.spreadsheet"
+    office:version="1.3">
+  <office:body>
+    <office:spreadsheet>
+      <table:table table:name="Padded">
+        <table:table-row>
+          <table:table-cell office:value-type="string"><text:p>first</text:p></table:table-cell>
+          <table:table-cell table:number-columns-repeated="16383"/>
+        </table:table-row>
+        <table:table-row>
+          <table:table-cell office:value-type="float" office:value="42"><text:p>42</text:p></table:table-cell>
+          <table:table-cell table:number-columns-repeated="16383"/>
+        </table:table-row>
+        <table:table-row table:style-name="ro1" table:number-rows-repeated="1048574">
+          <table:table-cell table:number-columns-repeated="16384"/>
+        </table:table-row>
+      </table:table>
+      <table:table table:name="Gaps">
+        <table:table-row>
+          <table:table-cell office:value-type="string"><text:p>top</text:p></table:table-cell>
+        </table:table-row>
+        <table:table-row table:number-rows-repeated="3">
+          <table:table-cell table:number-columns-repeated="4"/>
+        </table:table-row>
+        <table:table-row>
+          <table:table-cell table:number-columns-repeated="2"/>
+          <table:table-cell office:value-type="string"><text:p>bottom</text:p></table:table-cell>
+          <table:table-cell table:number-columns-repeated="16381"/>
+        </table:table-row>
+        <table:table-row table:number-rows-repeated="1048571">
+          <table:table-cell table:number-columns-repeated="16384"/>
+        </table:table-row>
+      </table:table>
+      <table:table table:name="Styled tail">
+        <table:table-row>
+          <table:table-cell office:value-type="string"><text:p>only</text:p></table:table-cell>
+        </table:table-row>
+        <table:table-row table:style-name="ro2" table:number-rows-repeated="2"/>
+      </table:table>
+    </office:spreadsheet>
+  </office:body>
+</office:document>

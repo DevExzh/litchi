@@ -712,7 +712,8 @@ pub use odp::{Shape, Slide};
 pub use elements::table::{Table, TableCell as Cell, TableRow as Row};
 pub use elements::text::Span as Run;
 pub use elements::text::{
-    Heading, Hyperlink, List, ListItem, Paragraph, TextHyperlinkActuate, TextHyperlinkShow,
+    Heading, Hyperlink, List, ListHeader, ListItem, Paragraph, TextHyperlinkActuate,
+    TextHyperlinkShow,
 }; // Span is equivalent to Run in ODF
 
 // Re-export parser types for document element iteration
