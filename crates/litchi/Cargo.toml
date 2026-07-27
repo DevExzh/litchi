@@ -74,7 +74,7 @@ eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
 aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
 allsorts = { version = "0.17", optional = true } # Font subsetting and layout
 atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
-base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
+base64 = "0.23" # Base64 encoding/decoding for embedded binary data in XML
 bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
 bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
 chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps

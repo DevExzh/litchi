@@ -15,7 +15,7 @@ aes           = "0.9"
 aho-corasick  = "1.1"
 allsorts      = "0.17"
 atoi_simd     = "0.18"
-base64        = "0.22"
+base64        = "0.23"
 bitflags      = { version = "2.10", features = ["std", "serde"] }
 bumpalo       = { version = "3", features = ["collections"] }
 bytes         = { version = "1", features = ["serde"] }
