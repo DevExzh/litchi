@@ -2,6 +2,7 @@
 
 mod boolean;
 mod cell;
+mod checkbox;
 mod sign;
 mod text;
 
@@ -14,6 +15,7 @@ pub(super) fn encode(
     let kind = NativePredicateKind::from_condition(condition);
     let nodes = match (kind, condition) {
         (NativePredicateKind::Cell(kind), _) => cell::nodes(kind, formula_owner_uuid),
+        (NativePredicateKind::Checkbox(kind), _) => checkbox::nodes(kind, formula_owner_uuid)?,
         (NativePredicateKind::Boolean(kind), _) => boolean::nodes(kind, formula_owner_uuid)?,
         (NativePredicateKind::NumericSign(kind), _) => sign::nodes(kind, formula_owner_uuid)?,
         (
@@ -60,6 +62,14 @@ pub(super) fn encode_prepivot(
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<tsce::FormulaArchive> {
     let kind = NativePredicateKind::from_condition(condition);
+    if let NativePredicateKind::Checkbox(kind) = kind {
+        return Ok(tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: checkbox::prepivot_nodes(kind, formula_owner_uuid),
+            },
+            ..Default::default()
+        });
+    }
     if let NativePredicateKind::Boolean(kind) = kind {
         return Ok(tsce::FormulaArchive {
             ast_node_array: tsce::AstNodeArrayArchive {
@@ -86,6 +96,7 @@ pub(super) fn validate(
 ) -> Result<()> {
     match (kind, condition) {
         (NativePredicateKind::Cell(kind), _) => cell::validate(formula, kind),
+        (NativePredicateKind::Checkbox(kind), _) => checkbox::validate(formula, kind),
         (NativePredicateKind::Boolean(kind), _) => boolean::validate(formula, kind),
         (NativePredicateKind::NumericSign(kind), _) => sign::validate(formula, kind),
         (
@@ -114,6 +125,9 @@ pub(super) fn validate_prepivot(
     condition: &TableCellConditionalHighlightCondition,
 ) -> Result<()> {
     match kind {
+        NativePredicateKind::Checkbox(kind) => {
+            return checkbox::validate_prepivot(formula, kind);
+        },
         NativePredicateKind::Boolean(kind) => return boolean::validate_prepivot(formula, kind),
         NativePredicateKind::NumericSign(kind) => return sign::validate_prepivot(formula, kind),
         _ => {},

@@ -33,7 +33,9 @@ pub(super) const LOGICAL_NOT_FUNCTION_INDEX: u32 = 96;
 pub(super) const IF_ERROR_FUNCTION_INDEX: u32 = 235;
 pub(super) const IS_BLANK_FUNCTION_INDEX: u32 = 69;
 pub(super) const IS_NUMBER_FUNCTION_INDEX: u32 = 304;
+pub(super) const CELL_DATA_FORMAT_FUNCTION_INDEX: u32 = 326;
 pub(super) const VALUE_TYPE_FUNCTION_INDEX: u32 = 327;
+pub(super) const CHECKBOX_DATA_FORMAT_CODE: f64 = 8.0;
 pub(super) const BOOLEAN_VALUE_TYPE_CODE: f64 = 6.0;
 pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
 
@@ -57,6 +59,8 @@ impl NumericPredicateKind {
         match condition {
             TableCellConditionalHighlightCondition::CellIsBlank
             | TableCellConditionalHighlightCondition::CellIsNotBlank
+            | TableCellConditionalHighlightCondition::CheckboxIsChecked
+            | TableCellConditionalHighlightCondition::CheckboxIsNotChecked
             | TableCellConditionalHighlightCondition::BooleanIsTrue
             | TableCellConditionalHighlightCondition::BooleanIsFalse
             | TableCellConditionalHighlightCondition::NumberIsPositive
@@ -160,6 +164,34 @@ pub(super) enum NumericSignPredicateKind {
 pub(super) enum BooleanPredicateKind {
     IsTrue = 59,
     IsFalse = 60,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub(super) enum CheckboxPredicateKind {
+    IsChecked = 55,
+    IsNotChecked = 56,
+}
+
+impl CheckboxPredicateKind {
+    pub(super) const fn native_value(self) -> i32 {
+        self as i32
+    }
+
+    pub(super) const fn is_checked(self) -> bool {
+        matches!(self, Self::IsChecked)
+    }
+
+    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+        match self {
+            Self::IsChecked => TableCellConditionalHighlightCondition::CheckboxIsChecked,
+            Self::IsNotChecked => TableCellConditionalHighlightCondition::CheckboxIsNotChecked,
+        }
+    }
+
+    pub(super) const fn prepivot_kind(self) -> NumericPredicateKind {
+        NumericPredicateKind::EqualTo
+    }
 }
 
 impl BooleanPredicateKind {
@@ -268,6 +300,7 @@ impl TextPredicateKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum NativePredicateKind {
     Cell(CellPredicateKind),
+    Checkbox(CheckboxPredicateKind),
     Boolean(BooleanPredicateKind),
     Numeric(NumericPredicateKind),
     NumericSign(NumericSignPredicateKind),
@@ -282,6 +315,12 @@ impl NativePredicateKind {
             },
             TableCellConditionalHighlightCondition::CellIsNotBlank => {
                 return Self::Cell(CellPredicateKind::IsNotBlank);
+            },
+            TableCellConditionalHighlightCondition::CheckboxIsChecked => {
+                return Self::Checkbox(CheckboxPredicateKind::IsChecked);
+            },
+            TableCellConditionalHighlightCondition::CheckboxIsNotChecked => {
+                return Self::Checkbox(CheckboxPredicateKind::IsNotChecked);
             },
             TableCellConditionalHighlightCondition::BooleanIsTrue => {
                 return Self::Boolean(BooleanPredicateKind::IsTrue);
@@ -332,6 +371,7 @@ impl NativePredicateKind {
     pub(super) const fn native_value(self) -> i32 {
         match self {
             Self::Cell(kind) => kind.native_value(),
+            Self::Checkbox(kind) => kind.native_value(),
             Self::Boolean(kind) => kind.native_value(),
             Self::Numeric(kind) => kind.native_value(),
             Self::NumericSign(kind) => kind.native_value(),
@@ -342,6 +382,7 @@ impl NativePredicateKind {
     pub(super) const fn prepivot_native_value(self) -> i32 {
         match self {
             Self::NumericSign(kind) => kind.prepivot_kind().native_value(),
+            Self::Checkbox(kind) => kind.prepivot_kind().native_value(),
             Self::Boolean(kind) => kind.prepivot_kind().native_value(),
             _ => self.native_value(),
         }
@@ -358,6 +399,15 @@ impl TryFrom<i32> for NativePredicateKind {
             },
             value if value == CellPredicateKind::IsNotBlank.native_value() => {
                 return Ok(Self::Cell(CellPredicateKind::IsNotBlank));
+            },
+            _ => {},
+        }
+        match value {
+            value if value == CheckboxPredicateKind::IsChecked.native_value() => {
+                return Ok(Self::Checkbox(CheckboxPredicateKind::IsChecked));
+            },
+            value if value == CheckboxPredicateKind::IsNotChecked.native_value() => {
+                return Ok(Self::Checkbox(CheckboxPredicateKind::IsNotChecked));
             },
             _ => {},
         }
@@ -509,6 +559,20 @@ mod tests {
     fn native_boolean_predicate_values_are_reversible() {
         for boolean in [BooleanPredicateKind::IsTrue, BooleanPredicateKind::IsFalse] {
             let kind = NativePredicateKind::Boolean(boolean);
+            assert_eq!(
+                NativePredicateKind::try_from(kind.native_value()).unwrap(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn native_checkbox_predicate_values_are_reversible() {
+        for checkbox in [
+            CheckboxPredicateKind::IsChecked,
+            CheckboxPredicateKind::IsNotChecked,
+        ] {
+            let kind = NativePredicateKind::Checkbox(checkbox);
             assert_eq!(
                 NativePredicateKind::try_from(kind.native_value()).unwrap(),
                 kind

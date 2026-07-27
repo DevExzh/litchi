@@ -435,6 +435,129 @@ fn boolean_predicates_round_trip_and_match_only_the_exact_boolean() {
 }
 
 #[test]
+fn checkbox_predicates_round_trip_and_require_native_checkbox_format() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(3, 5)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    for (column, value) in [(1, true), (2, false), (3, true), (4, false)] {
+        editor
+            .set_cell(table_id, 1, column, CellValue::Boolean(value))
+            .unwrap();
+    }
+    for column in [1, 2] {
+        editor
+            .set_table_cell_checkbox_format(
+                table_id,
+                1,
+                column,
+                crate::table_cell_data_format::TableCellCheckboxFormat,
+            )
+            .unwrap();
+    }
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let rules = [
+        rule(
+            TableCellConditionalHighlightCondition::CheckboxIsChecked,
+            red,
+        ),
+        rule(
+            TableCellConditionalHighlightCondition::CheckboxIsNotChecked,
+            green,
+        ),
+    ];
+    for column in 1..=4 {
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, column, &rules)
+            .unwrap();
+        assert_eq!(
+            editor
+                .cell_conditional_highlight_rules(table_id, 1, column)
+                .unwrap(),
+            Some(rules.to_vec())
+        );
+    }
+
+    assert_eq!(applied_rule(&editor, table_id, 1, 1), Some(0));
+    assert_eq!(applied_rule(&editor, table_id, 1, 2), Some(1));
+    for column in [3, 4] {
+        assert_eq!(
+            applied_rule(&editor, table_id, 1, column),
+            Some(CONDITIONAL_STYLE_NO_APPLIED_RULE)
+        );
+    }
+
+    let info = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let archive = editor
+        .package
+        .archive(&location.object_locations[&info.style_set_object_id])
+        .unwrap();
+    let object = archive.object(info.style_set_object_id).unwrap();
+    let set = object
+        .messages
+        .iter()
+        .find_map(|message| {
+            (message.type_ == 6_010)
+                .then(|| tst::ConditionalStyleSetArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    let current = set.rules.unwrap().rule;
+    for (index, kind) in [
+        CheckboxPredicateKind::IsChecked,
+        CheckboxPredicateKind::IsNotChecked,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let predicate = current[index].predicate.as_ref().unwrap();
+        let prepivot = &set.rules_prepivot[index].predicate;
+        assert_eq!(predicate.predicate_type, kind.native_value());
+        assert_eq!(
+            predicate
+                .formula
+                .as_ref()
+                .unwrap()
+                .ast_node_array
+                .ast_node
+                .len(),
+            [13, 14][index]
+        );
+        let nodes = &predicate.formula.as_ref().unwrap().ast_node_array.ast_node;
+        let format_function_index = if kind.is_checked() { 2 } else { 3 };
+        assert_eq!(
+            nodes[format_function_index].ast_function_node_index,
+            Some(CELL_DATA_FORMAT_FUNCTION_INDEX)
+        );
+        assert_eq!(
+            nodes[format_function_index + 1].ast_number_node_number,
+            Some(CHECKBOX_DATA_FORMAT_CODE)
+        );
+        assert_eq!(
+            prepivot.predicate_type,
+            NumericPredicateKind::EqualTo.native_value()
+        );
+        assert_eq!(
+            prepivot.formula.ast_node_array.ast_node[1].ast_boolean_node_boolean,
+            Some(kind.is_checked())
+        );
+    }
+
+    assert!(!condition_matches(
+        &TableCellConditionalHighlightCondition::CheckboxIsChecked,
+        &ConditionalCellValue::Boolean(true),
+    ));
+    assert!(condition_matches(
+        &TableCellConditionalHighlightCondition::BooleanIsTrue,
+        &ConditionalCellValue::Checkbox(true),
+    ));
+}
+
+#[test]
 fn blank_predicates_reject_noncanonical_formula_graphs() {
     let mut editor = NumbersDocumentBuilder::new().build().unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;

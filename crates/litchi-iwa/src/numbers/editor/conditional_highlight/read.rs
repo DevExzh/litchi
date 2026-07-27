@@ -130,6 +130,11 @@ fn decode_predicate(
             PREDICATE_UNUSED_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
         ),
+        NativePredicateKind::Checkbox(_) => (
+            PREDICATE_CELL_ARGUMENT_INDEX,
+            PREDICATE_NUMBER_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+        ),
         NativePredicateKind::Boolean(_) => (
             PREDICATE_CELL_ARGUMENT_INDEX,
             PREDICATE_NUMBER_ARGUMENT_INDEX,
@@ -179,6 +184,7 @@ fn decode_predicate(
     }
     let condition = match kind {
         NativePredicateKind::Cell(kind) => decode_cell_predicate(predicate, kind)?,
+        NativePredicateKind::Checkbox(kind) => decode_checkbox_predicate(predicate, kind)?,
         NativePredicateKind::Boolean(kind) => decode_boolean_predicate(predicate, kind)?,
         NativePredicateKind::Numeric(kind) => decode_numeric_predicate(predicate, kind)?,
         NativePredicateKind::NumericSign(kind) => decode_sign_predicate(predicate, kind)?,
@@ -198,6 +204,14 @@ fn decode_predicate(
             .map_err(|_| unsupported_rule_graph())?;
     }
     Ok(condition)
+}
+
+fn decode_checkbox_predicate(
+    predicate: &tst::FormulaPredicateArchive,
+    kind: CheckboxPredicateKind,
+) -> Result<TableCellConditionalHighlightCondition> {
+    validate_operand_free_predicate(predicate)?;
+    Ok(kind.condition())
 }
 
 fn decode_boolean_predicate(

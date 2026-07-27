@@ -76,6 +76,8 @@ impl TableCellConditionalHighlightText {
 pub enum TableCellConditionalHighlightCondition {
     CellIsBlank,
     CellIsNotBlank,
+    CheckboxIsChecked,
+    CheckboxIsNotChecked,
     BooleanIsTrue,
     BooleanIsFalse,
     NumberIsPositive,
@@ -103,6 +105,8 @@ impl TableCellConditionalHighlightCondition {
         match self {
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::CheckboxIsChecked
+            | Self::CheckboxIsNotChecked
             | Self::BooleanIsTrue
             | Self::BooleanIsFalse
             | Self::NumberIsPositive
@@ -131,6 +135,8 @@ impl TableCellConditionalHighlightCondition {
             Self::Between(range) | Self::NotBetween(range) => Some(*range),
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::CheckboxIsChecked
+            | Self::CheckboxIsNotChecked
             | Self::BooleanIsTrue
             | Self::BooleanIsFalse
             | Self::NumberIsPositive
@@ -164,6 +170,8 @@ impl TableCellConditionalHighlightCondition {
             | Self::TextDoesNotContain(value) => Some(value),
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::CheckboxIsChecked
+            | Self::CheckboxIsNotChecked
             | Self::BooleanIsTrue
             | Self::BooleanIsFalse
             | Self::NumberIsPositive

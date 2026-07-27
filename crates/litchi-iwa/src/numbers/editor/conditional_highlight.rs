@@ -17,17 +17,19 @@ use crate::table_cell_conditional_highlight::{
 };
 use native::{
     BINARY_FUNCTION_ARGUMENT_COUNT, BOOLEAN_VALUE_TYPE_CODE, BooleanPredicateKind,
+    CELL_DATA_FORMAT_FUNCTION_INDEX, CHECKBOX_DATA_FORMAT_CODE,
     CONDITIONAL_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_INDEX, CellPredicateKind,
-    IF_ERROR_FUNCTION_INDEX, IS_BLANK_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX,
-    IS_NUMBER_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX, LOGICAL_NOT_FUNCTION_INDEX,
-    LOGICAL_OR_FUNCTION_INDEX, NativePredicateKind, NumericPredicateKind, NumericSignPredicateKind,
-    PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER, PREDICATE_ARGUMENT_RELATIVE_CELL,
-    PREDICATE_ARGUMENT_STRING, PREDICATE_CELL_ARGUMENT_INDEX, PREDICATE_NUMBER_ARGUMENT_INDEX,
-    PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
-    PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
-    PREDICATE_TEXT_ARGUMENT_INDEX, PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_LENGTH_FUNCTION_INDEX,
-    TEXT_RIGHT_FUNCTION_INDEX, TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind,
-    UNARY_FUNCTION_ARGUMENT_COUNT, VALUE_TYPE_FUNCTION_INDEX,
+    CheckboxPredicateKind, IF_ERROR_FUNCTION_INDEX, IS_BLANK_FUNCTION_INDEX,
+    IS_ERROR_FUNCTION_INDEX, IS_NUMBER_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX,
+    LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX, NativePredicateKind,
+    NumericPredicateKind, NumericSignPredicateKind, PREDICATE_ARGUMENT_NONE,
+    PREDICATE_ARGUMENT_NUMBER, PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_ARGUMENT_STRING,
+    PREDICATE_CELL_ARGUMENT_INDEX, PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE,
+    PREDICATE_RANGE_CELL_ARGUMENT_INDEX, PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
+    PREDICATE_RANGE_UPPER_ARGUMENT_INDEX, PREDICATE_TEXT_ARGUMENT_INDEX,
+    PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_LENGTH_FUNCTION_INDEX, TEXT_RIGHT_FUNCTION_INDEX,
+    TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind, UNARY_FUNCTION_ARGUMENT_COUNT,
+    VALUE_TYPE_FUNCTION_INDEX,
 };
 
 const MAX_CONDITIONAL_HIGHLIGHT_RULES: usize = CONDITIONAL_STYLE_NO_APPLIED_RULE as usize;
@@ -561,6 +563,13 @@ fn applied_rule_for_cell(
             },
             _ => match cell.cached_scalar()? {
                 Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value),
+                Some(CachedScalar::Boolean(value))
+                    if cell.cell_format_kind()
+                        == Some(crate::numbers::bnc::CHECKBOX_CELL_FORMAT_KIND)
+                        && cell.control_cell_spec_identifier().is_some() =>
+                {
+                    ConditionalCellValue::Checkbox(value)
+                },
                 Some(CachedScalar::Boolean(value)) => ConditionalCellValue::Boolean(value),
                 _ => ConditionalCellValue::Other,
             },
@@ -581,6 +590,7 @@ fn applied_rule_for_cell(
 enum ConditionalCellValue {
     Blank,
     Boolean(bool),
+    Checkbox(bool),
     Number(f64),
     Other,
     Text(String),
@@ -596,16 +606,25 @@ fn condition_matches(
             TableCellConditionalHighlightCondition::CellIsNotBlank,
             ConditionalCellValue::Number(_)
             | ConditionalCellValue::Boolean(_)
+            | ConditionalCellValue::Checkbox(_)
             | ConditionalCellValue::Other
             | ConditionalCellValue::Text(_),
         ) => true,
         (
+            TableCellConditionalHighlightCondition::CheckboxIsChecked,
+            ConditionalCellValue::Checkbox(value),
+        ) => *value,
+        (
+            TableCellConditionalHighlightCondition::CheckboxIsNotChecked,
+            ConditionalCellValue::Checkbox(value),
+        ) => !*value,
+        (
             TableCellConditionalHighlightCondition::BooleanIsTrue,
-            ConditionalCellValue::Boolean(value),
+            ConditionalCellValue::Boolean(value) | ConditionalCellValue::Checkbox(value),
         ) => *value,
         (
             TableCellConditionalHighlightCondition::BooleanIsFalse,
-            ConditionalCellValue::Boolean(value),
+            ConditionalCellValue::Boolean(value) | ConditionalCellValue::Checkbox(value),
         ) => !*value,
         (
             TableCellConditionalHighlightCondition::NumberIsPositive,
