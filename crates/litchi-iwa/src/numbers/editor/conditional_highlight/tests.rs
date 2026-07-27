@@ -1,0 +1,106 @@
+use super::*;
+use crate::numbers::NumbersDocumentBuilder;
+use crate::shapes::{RgbColorSpace, RgbaColor};
+use crate::table_cell_conditional_highlight::{
+    TableCellConditionalHighlightNumber, TableCellConditionalHighlightStyle,
+};
+
+fn rule(
+    condition: TableCellConditionalHighlightCondition,
+    color: RgbaColor,
+) -> TableCellConditionalHighlightRule {
+    TableCellConditionalHighlightRule::new(
+        condition,
+        TableCellConditionalHighlightStyle::with_fill(color),
+    )
+}
+
+#[test]
+fn scratch_document_conditional_highlights_create_replace_and_delete() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(4, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
+    let hundred = TableCellConditionalHighlightNumber::new(100.0).unwrap();
+    let initial = [
+        rule(TableCellConditionalHighlightCondition::LessThan(zero), red),
+        rule(
+            TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(hundred),
+            green,
+        ),
+    ];
+
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
+        .unwrap();
+    assert_eq!(
+        editor
+            .cell_conditional_highlighting(table_id, 1, 1)
+            .unwrap()
+            .unwrap()
+            .rule_count,
+        2
+    );
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap()
+            .unwrap(),
+        initial
+    );
+
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &initial[..1])
+        .unwrap();
+    assert_eq!(
+        editor
+            .cell_conditional_highlighting(table_id, 1, 1)
+            .unwrap()
+            .unwrap()
+            .rule_count,
+        1
+    );
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap()
+            .unwrap(),
+        initial[..1]
+    );
+    editor
+        .clear_cell_conditional_highlighting(table_id, 1, 1)
+        .unwrap();
+    assert!(
+        editor
+            .cell_conditional_highlighting(table_id, 1, 1)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn empty_or_excessive_rule_sets_are_rejected_transactionally() {
+    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    assert!(
+        editor
+            .set_cell_conditional_highlighting(table_id, 0, 0, &[])
+            .is_err()
+    );
+    assert!(
+        editor
+            .cell_conditional_highlighting(table_id, 0, 0)
+            .unwrap()
+            .is_none()
+    );
+}

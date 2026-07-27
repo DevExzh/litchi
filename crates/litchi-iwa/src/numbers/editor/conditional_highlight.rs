@@ -1,5 +1,12 @@
 //! Conditional-highlight references stored by table cells.
 
+mod delete;
+mod native;
+mod read;
+#[cfg(test)]
+mod tests;
+mod write;
+
 use prost::Message;
 
 use super::*;
@@ -7,13 +14,14 @@ use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid
 use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
 };
+use native::{
+    NumericPredicateKind, PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER,
+    PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_CELL_ARGUMENT_INDEX,
+    PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_UNUSED_ARGUMENT_INDEX,
+};
 
 const MAX_CONDITIONAL_HIGHLIGHT_RULES: usize = CONDITIONAL_STYLE_NO_APPLIED_RULE as usize;
 const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
-const CONDITIONAL_STYLE_SET_MESSAGE_TYPE: u32 = 6_010;
-const CELL_STYLE_MESSAGE_TYPE: u32 = 6_004;
-const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
-const NATIVE_MESSAGE_VERSION: &[u32] = &[1, 0, 5];
 
 pub(super) fn info_in_package(
     package: &IWorkPackage,
@@ -33,6 +41,26 @@ pub(super) fn attached_info_in_package(
 ) -> Result<Option<TableCellConditionalHighlightInfo>> {
     let location = locate_attached_cell(package, table_id, row, column)?;
     info_at_location(package, location, table_id, row, column)
+}
+
+pub(super) fn rules_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+    let location = locate_cell(package, table_id, row, column)?;
+    read::rules_at_location(package, &location, column)
+}
+
+pub(super) fn attached_rules_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+    let location = locate_attached_cell(package, table_id, row, column)?;
+    read::rules_at_location(package, &location, column)
 }
 
 fn info_at_location(
@@ -119,7 +147,7 @@ pub(super) fn clear_in_package(
     column: usize,
 ) -> Result<()> {
     let location = locate_cell(package, table_id, row, column)?;
-    clear_at_location(package, location, row, column)
+    delete::clear_at_location(package, location, row, column)
 }
 
 pub(super) fn clear_attached_in_package(
@@ -129,7 +157,7 @@ pub(super) fn clear_attached_in_package(
     column: usize,
 ) -> Result<()> {
     let location = locate_attached_cell(package, table_id, row, column)?;
-    clear_at_location(package, location, row, column)
+    delete::clear_at_location(package, location, row, column)
 }
 
 pub(super) fn set_in_package(
@@ -212,7 +240,7 @@ fn set_at_location(
     let style_set_id = first_graph_id;
     let formula_owner_uuid =
         formula_owner_uuid_for_table(&parse_table_uuid(&location.descriptor.model.table_id)?);
-    insert_conditional_style_graph(
+    write::insert_conditional_style_graph(
         package,
         &list_archive,
         style_set_id,
@@ -394,267 +422,6 @@ fn append_conditional_style_entry(
     Ok(key)
 }
 
-fn insert_conditional_style_graph(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    style_set_id: u64,
-    rules: &[TableCellConditionalHighlightRule],
-    formula_owner_uuid: &tsp::Uuid,
-) -> Result<()> {
-    let mut prepivot = Vec::with_capacity(rules.len());
-    let mut current = Vec::with_capacity(rules.len());
-    let mut objects = Vec::with_capacity(1 + rules.len() * 2);
-    let mut references = Vec::with_capacity(rules.len() * 2);
-    for (index, rule) in rules.iter().copied().enumerate() {
-        let offset = u64::try_from(index)
-            .map_err(|_| Error::ParseError("conditional-highlight index exceeds u64".to_owned()))?
-            .checked_mul(2)
-            .ok_or_else(|| {
-                Error::ParseError("conditional-highlight identifier overflow".to_owned())
-            })?;
-        let text_style_id = style_set_id
-            .checked_add(offset)
-            .and_then(|identifier| identifier.checked_add(1))
-            .ok_or_else(|| {
-                Error::ParseError("conditional-highlight identifier overflow".to_owned())
-            })?;
-        let cell_style_id = text_style_id.checked_add(1).ok_or_else(|| {
-            Error::ParseError("conditional-highlight identifier overflow".to_owned())
-        })?;
-        let formula = predicate_formula(rule.condition, formula_owner_uuid)?;
-        let predicate_type = predicate_type(rule.condition);
-        let cell_style = tsp::Reference {
-            identifier: cell_style_id,
-            ..Default::default()
-        };
-        let text_style = tsp::Reference {
-            identifier: text_style_id,
-            ..Default::default()
-        };
-        prepivot.push(
-            tst::conditional_style_set_archive::ConditionalStyleRulePrePivot {
-                predicate: tst::FormulaPredicatePrePivotArchive {
-                    formula: formula.clone(),
-                    predicate_type,
-                    qualifier1: 0,
-                    qualifier2: 0,
-                    param_index1: 1,
-                    param_index2: -1,
-                    param_index0: 0,
-                },
-                cell_style,
-                text_style,
-            },
-        );
-        current.push(tst::conditional_style_set_archive::ConditionalStyleRule {
-            predicate: Some(tst::FormulaPredicateArchive {
-                predicate_type,
-                qualifier1: 0,
-                qualifier2: 0,
-                param_value0: Some(tst::FormulaPredArgArchive {
-                    arg_type: 4,
-                    relative_cell_ref: Some(tsce::RelativeCellRefArchive {
-                        relative_row_offset: Some(0),
-                        relative_column_offset: Some(0),
-                        table_uid: Some(*formula_owner_uuid),
-                        preserve_column: Some(false),
-                        preserve_row: Some(false),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                param_value1: Some(tst::FormulaPredArgArchive {
-                    arg_type: 1,
-                    arg_value: Some(predicate_number(rule.condition)?),
-                    ..Default::default()
-                }),
-                param_value2: Some(tst::FormulaPredArgArchive {
-                    arg_type: 0,
-                    ..Default::default()
-                }),
-                formula: Some(formula),
-                for_conditional_style: Some(true),
-                ..Default::default()
-            }),
-            cell_style,
-            text_style,
-        });
-        objects.push(paragraph_style_object(text_style_id, rule)?);
-        objects.push(cell_style_object(cell_style_id, rule)?);
-        references.push(cell_style_id);
-        references.push(text_style_id);
-    }
-    let style_set = tst::ConditionalStyleSetArchive {
-        rule_count: u32::try_from(rules.len()).map_err(|_| {
-            Error::ParseError("conditional-highlight rule count exceeds u32".to_owned())
-        })?,
-        rules_prepivot: prepivot,
-        rules: Some(tst::conditional_style_set_archive::ConditionalStyleRules { rule: current }),
-    };
-    let mut set_object = ArchiveObject::new(
-        style_set_id,
-        vec![RawMessage {
-            type_: CONDITIONAL_STYLE_SET_MESSAGE_TYPE,
-            data: style_set.encode_to_vec(),
-        }],
-    )?;
-    set_object.archive_info.message_infos[0].versions = NATIVE_MESSAGE_VERSION.to_vec();
-    set_object.archive_info.message_infos[0].object_references = references;
-    package.update_archive(archive_name, |archive| {
-        archive.insert_object(set_object)?;
-        for object in objects {
-            archive.insert_object(object)?;
-        }
-        Ok(())
-    })?;
-    Ok(())
-}
-
-fn paragraph_style_object(
-    identifier: u64,
-    rule: TableCellConditionalHighlightRule,
-) -> Result<ArchiveObject> {
-    let style = rule.style;
-    let text_override_count = u32::from(style.bold()) + u32::from(style.text_color().is_some());
-    let data = tswp::ParagraphStyleArchive {
-        super_: tss::StyleArchive::default(),
-        override_count: (text_override_count != 0).then_some(text_override_count),
-        char_properties: (text_override_count != 0).then(|| {
-            tswp::CharacterStylePropertiesArchive {
-                bold: style.bold().then_some(true),
-                font_color: style.text_color().map(crate::shapes::color_to_native),
-                ..Default::default()
-            }
-        }),
-        ..Default::default()
-    }
-    .encode_to_vec();
-    style_object(identifier, PARAGRAPH_STYLE_MESSAGE_TYPE, data)
-}
-
-fn cell_style_object(
-    identifier: u64,
-    rule: TableCellConditionalHighlightRule,
-) -> Result<ArchiveObject> {
-    let fill = rule.style.fill().map(|color| tsd::FillArchive {
-        color: Some(crate::shapes::color_to_native(color)),
-        ..Default::default()
-    });
-    let data = tst::CellStyleArchive {
-        super_: tss::StyleArchive::default(),
-        override_count: fill.is_some().then_some(1),
-        cell_properties: fill.map(|cell_fill| tst::CellStylePropertiesArchive {
-            cell_fill: Some(cell_fill),
-            ..Default::default()
-        }),
-    }
-    .encode_to_vec();
-    style_object(identifier, CELL_STYLE_MESSAGE_TYPE, data)
-}
-
-fn style_object(identifier: u64, message_type: u32, data: Vec<u8>) -> Result<ArchiveObject> {
-    let mut object = ArchiveObject::new(
-        identifier,
-        vec![RawMessage {
-            type_: message_type,
-            data,
-        }],
-    )?;
-    object.archive_info.message_infos[0].versions = NATIVE_MESSAGE_VERSION.to_vec();
-    Ok(object)
-}
-
-fn predicate_type(condition: TableCellConditionalHighlightCondition) -> i32 {
-    match condition {
-        TableCellConditionalHighlightCondition::EqualTo(_) => 5,
-        TableCellConditionalHighlightCondition::NotEqualTo(_) => 6,
-        TableCellConditionalHighlightCondition::GreaterThan(_) => 7,
-        TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(_) => 8,
-        TableCellConditionalHighlightCondition::LessThan(_) => 9,
-        TableCellConditionalHighlightCondition::LessThanOrEqualTo(_) => 10,
-    }
-}
-
-fn predicate_formula(
-    condition: TableCellConditionalHighlightCondition,
-    formula_owner_uuid: &tsp::Uuid,
-) -> Result<tsce::FormulaArchive> {
-    use tsce::ast_node_array_archive::AstNodeType;
-    let comparison = match condition {
-        TableCellConditionalHighlightCondition::EqualTo(_) => AstNodeType::EqualToNode,
-        TableCellConditionalHighlightCondition::NotEqualTo(_) => AstNodeType::NotEqualToNode,
-        TableCellConditionalHighlightCondition::GreaterThan(_) => AstNodeType::GreaterThanNode,
-        TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(_) => {
-            AstNodeType::GreaterThanOrEqualToNode
-        },
-        TableCellConditionalHighlightCondition::LessThan(_) => AstNodeType::LessThanNode,
-        TableCellConditionalHighlightCondition::LessThanOrEqualTo(_) => {
-            AstNodeType::LessThanOrEqualToNode
-        },
-    };
-    let value = condition.operand().get();
-    let decimal = crate::numbers::bnc::decimal128_le(value)?;
-    let linked_cell = tsce::ast_node_array_archive::AstNodeArchive {
-        ast_node_type: AstNodeType::LinkedCellRefNode as i32,
-        ast_cross_table_reference_extra_info: Some(
-            tsce::ast_node_array_archive::AstCrossTableReferenceExtraInfoArchive {
-                table_id: uuid_as_cfuuid(formula_owner_uuid),
-                ..Default::default()
-            },
-        ),
-        ..Default::default()
-    };
-    let number = tsce::ast_node_array_archive::AstNodeArchive {
-        ast_node_type: AstNodeType::NumberNode as i32,
-        ast_number_node_number: Some(value),
-        ast_number_node_decimal_low: Some(u64::from_le_bytes(
-            decimal[..8]
-                .try_into()
-                .expect("fixed-size decimal lower half"),
-        )),
-        ast_number_node_decimal_high: Some(u64::from_le_bytes(
-            decimal[8..]
-                .try_into()
-                .expect("fixed-size decimal upper half"),
-        )),
-        ..Default::default()
-    };
-    Ok(tsce::FormulaArchive {
-        ast_node_array: tsce::AstNodeArrayArchive {
-            ast_node: vec![
-                linked_cell,
-                number,
-                tsce::ast_node_array_archive::AstNodeArchive {
-                    ast_node_type: comparison as i32,
-                    ..Default::default()
-                },
-            ],
-        },
-        ..Default::default()
-    })
-}
-
-fn predicate_number(
-    condition: TableCellConditionalHighlightCondition,
-) -> Result<tst::FormulaPredArgDataArchive> {
-    let value = condition.operand().get();
-    let decimal = crate::numbers::bnc::decimal128_le(value)?;
-    Ok(tst::FormulaPredArgDataArchive {
-        double_value: Some(value),
-        decimal_low: Some(u64::from_le_bytes(
-            decimal[..8]
-                .try_into()
-                .expect("fixed-size decimal lower half"),
-        )),
-        decimal_high: Some(u64::from_le_bytes(
-            decimal[8..]
-                .try_into()
-                .expect("fixed-size decimal upper half"),
-        )),
-        ..Default::default()
-    })
-}
-
 fn parse_table_uuid(value: &str) -> Result<tsp::Uuid> {
     let compact = value.replace('-', "");
     if compact.len() != 32 {
@@ -678,123 +445,6 @@ fn fresh_cfuuid() -> tsp::CfuuidArchive {
         upper: u64::from_be_bytes(bytes[..8].try_into().expect("fixed-size UUID upper half")),
         lower: u64::from_be_bytes(bytes[8..].try_into().expect("fixed-size UUID lower half")),
     })
-}
-
-fn clear_at_location(
-    package: &mut IWorkPackage,
-    location: CellLocation,
-    row: usize,
-    column: usize,
-) -> Result<()> {
-    let Some(cell) = read_tile_cell(
-        package,
-        &location.tile_archive,
-        location.tile_id,
-        location.tile_row,
-        column,
-    )?
-    else {
-        return Ok(());
-    };
-    let Some(list_identifier) = BncCell::parse(&cell)?.conditional_style_identifier() else {
-        return Ok(());
-    };
-    let locations = location.object_locations.clone();
-    let (resolved, entry) = resolve_entry(package, &location, list_identifier)?;
-    let style_set_object_id = entry
-        .entry
-        .reference
-        .as_ref()
-        .map(|reference| reference.identifier)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork conditional-highlight entry {list_identifier} has no style-set reference"
-            ))
-        })?;
-    let mut owned_object_ids =
-        conditional_style_owned_object_ids(package, &locations, style_set_object_id)?;
-    owned_object_ids.push(style_set_object_id);
-    let removed = decrement_table_data_list_entry(
-        package,
-        &locations,
-        &resolved,
-        &entry,
-        tst::table_data_list::ListType::ConditionalStyle,
-    )?;
-    update_cell(package, &location, row, column, None, None)?;
-    let mut modified_entries = vec![location.tile_archive.clone(), resolved.table_archive];
-    if removed {
-        let style_archive = locations.get(&style_set_object_id).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork conditional-highlight style set {style_set_object_id} is missing"
-            ))
-        })?;
-        if let Some(component) = component_identifier_for_entry(package, style_archive)? {
-            for identifier in &owned_object_ids {
-                remove_component_external_references_to_object(package, component, *identifier)?;
-            }
-            remove_component_object_uuids(package, component, &owned_object_ids)?;
-        }
-        for identifier in &owned_object_ids {
-            if let Some(archive_name) = locations.get(identifier)
-                && !modified_entries.contains(archive_name)
-            {
-                modified_entries.push(archive_name.clone());
-            }
-            remove_object_or_empty_entry(package, &locations, *identifier)?;
-        }
-        release_package_identifier_suffix(package, &owned_object_ids)?;
-    }
-    advance_save_tokens_for_entries(package, &modified_entries)
-}
-
-fn conditional_style_owned_object_ids(
-    package: &IWorkPackage,
-    locations: &HashMap<u64, String>,
-    style_set_id: u64,
-) -> Result<Vec<u64>> {
-    let archive_name = locations.get(&style_set_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "iWork conditional-highlight style set {style_set_id} is missing"
-        ))
-    })?;
-    let archive = package.archive(archive_name)?;
-    let object = archive.object(style_set_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "iWork conditional-highlight style set {style_set_id} is missing"
-        ))
-    })?;
-    let set = object
-        .messages
-        .iter()
-        .find_map(|message| {
-            (message.type_ == CONDITIONAL_STYLE_SET_MESSAGE_TYPE)
-                .then(|| tst::ConditionalStyleSetArchive::decode(message.data.as_slice()))
-        })
-        .transpose()?
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork conditional-highlight object {style_set_id} has no style-set payload"
-            ))
-        })?;
-    let mut identifiers = Vec::with_capacity(set.rules_prepivot.len() * 2);
-    for rule in set.rules_prepivot {
-        for identifier in [rule.cell_style.identifier, rule.text_style.identifier] {
-            if identifier != 0 && !identifiers.contains(&identifier) {
-                identifiers.push(identifier);
-            }
-        }
-    }
-    if let Some(rules) = set.rules {
-        for rule in rules.rule {
-            for identifier in [rule.cell_style.identifier, rule.text_style.identifier] {
-                if identifier != 0 && !identifiers.contains(&identifier) {
-                    identifiers.push(identifier);
-                }
-            }
-        }
-    }
-    Ok(identifiers)
 }
 
 fn resolve_entry(
@@ -904,95 +554,5 @@ fn condition_matches(condition: TableCellConditionalHighlightCondition, value: f
         TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(_) => value >= operand,
         TableCellConditionalHighlightCondition::LessThan(_) => value < operand,
         TableCellConditionalHighlightCondition::LessThanOrEqualTo(_) => value <= operand,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
-    use crate::shapes::{RgbColorSpace, RgbaColor};
-    use crate::table_cell_conditional_highlight::{
-        TableCellConditionalHighlightNumber, TableCellConditionalHighlightStyle,
-    };
-
-    fn rule(
-        condition: TableCellConditionalHighlightCondition,
-        color: RgbaColor,
-    ) -> TableCellConditionalHighlightRule {
-        TableCellConditionalHighlightRule::new(
-            condition,
-            TableCellConditionalHighlightStyle::with_fill(color),
-        )
-    }
-
-    #[test]
-    fn scratch_document_conditional_highlights_create_replace_and_delete() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .table_dimensions(4, 3)
-            .build()
-            .unwrap();
-        let table_id = editor.tables().unwrap()[0].object_id;
-        let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
-        let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
-        let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
-        let hundred = TableCellConditionalHighlightNumber::new(100.0).unwrap();
-        let initial = [
-            rule(TableCellConditionalHighlightCondition::LessThan(zero), red),
-            rule(
-                TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(hundred),
-                green,
-            ),
-        ];
-
-        editor
-            .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
-            .unwrap();
-        assert_eq!(
-            editor
-                .cell_conditional_highlighting(table_id, 1, 1)
-                .unwrap()
-                .unwrap()
-                .rule_count,
-            2
-        );
-
-        editor
-            .set_cell_conditional_highlighting(table_id, 1, 1, &initial[..1])
-            .unwrap();
-        assert_eq!(
-            editor
-                .cell_conditional_highlighting(table_id, 1, 1)
-                .unwrap()
-                .unwrap()
-                .rule_count,
-            1
-        );
-        editor
-            .clear_cell_conditional_highlighting(table_id, 1, 1)
-            .unwrap();
-        assert!(
-            editor
-                .cell_conditional_highlighting(table_id, 1, 1)
-                .unwrap()
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn empty_or_excessive_rule_sets_are_rejected_transactionally() {
-        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
-        let table_id = editor.tables().unwrap()[0].object_id;
-        assert!(
-            editor
-                .set_cell_conditional_highlighting(table_id, 0, 0, &[])
-                .is_err()
-        );
-        assert!(
-            editor
-                .cell_conditional_highlighting(table_id, 0, 0)
-                .unwrap()
-                .is_none()
-        );
     }
 }

@@ -74,6 +74,13 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
             .rule_count,
         1
     );
+    assert_eq!(
+        editor
+            .slide_table_cell_conditional_highlight_rules(0, table.model_object_id, 1, 1)
+            .unwrap()
+            .unwrap(),
+        vec![rule]
+    );
 }
 
 #[test]

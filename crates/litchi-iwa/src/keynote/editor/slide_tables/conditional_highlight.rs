@@ -24,6 +24,25 @@ impl KeynoteEditor {
         )
     }
 
+    /// Read supported ordered conditional-highlight rules from a slide-table cell.
+    pub fn slide_table_cell_conditional_highlight_rules(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<
+        Option<Vec<crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule>>,
+    > {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_conditional_highlight_rules_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
     /// Delete conditional highlighting without changing the cell value or base style.
     pub fn clear_slide_table_cell_conditional_highlighting(
         &mut self,

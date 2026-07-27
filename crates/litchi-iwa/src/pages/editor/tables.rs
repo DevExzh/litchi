@@ -2189,6 +2189,13 @@ mod tests {
                 .rule_count,
             1
         );
+        assert_eq!(
+            editor
+                .table_cell_conditional_highlight_rules(model_id, 1, 1)
+                .unwrap()
+                .unwrap(),
+            vec![rule]
+        );
     }
 
     #[test]

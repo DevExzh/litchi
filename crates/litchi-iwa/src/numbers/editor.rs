@@ -2930,6 +2930,16 @@ impl NumbersEditor {
         conditional_highlight::info_in_package(&self.package, table_id, row, column)
     }
 
+    /// Read the supported ordered conditional-highlight rules attached to a cell.
+    pub fn cell_conditional_highlight_rules(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+        conditional_highlight::rules_in_package(&self.package, table_id, row, column)
+    }
+
     /// Delete conditional highlighting from one cell without changing its value or base style.
     pub fn clear_cell_conditional_highlighting(
         &mut self,
@@ -4209,6 +4219,15 @@ pub(crate) fn table_cell_conditional_highlighting_in_package(
     column: usize,
 ) -> Result<Option<TableCellConditionalHighlightInfo>> {
     conditional_highlight::attached_info_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_conditional_highlight_rules_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+    conditional_highlight::attached_rules_in_package(package, table_id, row, column)
 }
 
 pub(crate) fn clear_table_cell_conditional_highlighting_in_package(
