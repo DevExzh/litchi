@@ -826,40 +826,72 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             }
 
             if let Some(mut formula) = pending_string_formula.take() {
-                if record.header.record_type != 0x0207 {
+                if record.header.record_type == 0x0207 {
+                    // The cached string result may span Continue records
+                    // (MS-XLS 2.1: FORMULA = ... [String *Continue]).
+                    let mut continues = Vec::new();
+                    let text = loop {
+                        match utils::decode_string_record(&record.data, &continues)? {
+                            utils::StringRecordDecode::Complete(text) => break text,
+                            utils::StringRecordDecode::NeedContinue => {
+                                let next = record_iter.next().ok_or_else(|| {
+                                    XlsError::InvalidRecord {
+                                        record_type: 0x0207,
+                                        message: "String result ends before its Continue records"
+                                            .to_string(),
+                                    }
+                                })??;
+                                if next.header.record_type != 0x003C {
+                                    return Err(XlsError::InvalidRecord {
+                                        record_type: next.header.record_type,
+                                        message:
+                                            "String result continuation must be a Continue record"
+                                                .to_string(),
+                                    });
+                                }
+                                continues.push(next.data);
+                            },
+                        }
+                    };
+                    if let CellRecord::Formula { value, .. } = &mut formula {
+                        *value = FormulaValue::String(text);
+                    }
+                    formatting.validate_cell_xf(cell_record_xf(&formula))?;
+                    if let Some(mut cell) = XlsCell::from_record_with_formula_context(
+                        &formula,
+                        worksheet.shared_strings(),
+                        formula_context,
+                        Some(&formatting),
+                    ) {
+                        if let CellRecord::Formula {
+                            row, col, formula, ..
+                        } = &formula
+                        {
+                            if let Some(anchor) = ptg_exp_anchor(formula) {
+                                if let Some(rendered) = shared_formulas
+                                    .get(&anchor)
+                                    .and_then(|template| template.render(formula_context, *row, *col))
+                                {
+                                    cell.set_rendered_formula(Some(rendered));
+                                }
+                            }
+                        }
+                        worksheet.add_cell(cell);
+                    }
+                    continue;
+                }
+                // Per MS-XLS 2.1 (FORMULA = Formula [Array / Table / ShrFmla /
+                // SUB] [String *Continue]) these records legally intervene
+                // between the Formula and its String; keep the formula pending
+                // and let the records flow through the normal walk.
+                if !matches!(record.header.record_type, 0x0221 | 0x0236 | 0x04BC | 0x0091) {
                     return Err(XlsError::InvalidRecord {
                         record_type: record.header.record_type,
                         message: "String-valued Formula must be followed by a String record"
                             .to_string(),
                     });
                 }
-                let text = utils::parse_string_record(&record.data, encoding)?;
-                if let CellRecord::Formula { value, .. } = &mut formula {
-                    *value = FormulaValue::String(text);
-                }
-                formatting.validate_cell_xf(cell_record_xf(&formula))?;
-                if let Some(mut cell) = XlsCell::from_record_with_formula_context(
-                    &formula,
-                    worksheet.shared_strings(),
-                    formula_context,
-                    Some(&formatting),
-                ) {
-                    if let CellRecord::Formula {
-                        row, col, formula, ..
-                    } = &formula
-                    {
-                        if let Some(anchor) = ptg_exp_anchor(formula) {
-                            if let Some(rendered) = shared_formulas
-                                .get(&anchor)
-                                .and_then(|template| template.render(formula_context, *row, *col))
-                            {
-                                cell.set_rendered_formula(Some(rendered));
-                            }
-                        }
-                    }
-                    worksheet.add_cell(cell);
-                }
-                continue;
+                pending_string_formula = Some(formula);
             }
 
             if pivot_table_collector.feed_record(record.header.record_type, &record.data).map_err(|error| {
@@ -1748,6 +1780,90 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn worksheet_resolves_string_formula_across_intervening_array_record() {
+        // MS-XLS 2.1: FORMULA = Formula [Array / Table / ShrFmla / SUB]
+        // [String *Continue], so an Array record may sit between the Formula
+        // and its cached String result.
+        let mut array = Vec::new();
+        array.extend_from_slice(&4u16.to_le_bytes()); // rwFirst
+        array.extend_from_slice(&4u16.to_le_bytes()); // rwLast
+        array.push(5); // colFirst
+        array.push(5); // colLast
+        array.extend_from_slice(&[0; 6]); // reserved/options
+        array.extend_from_slice(&3u16.to_le_bytes()); // cce
+        array.extend_from_slice(&[0x1E, 0x01, 0x00]); // PtgInt 1
+
+        let mut string_data = Vec::new();
+        string_data.extend_from_slice(&5u16.to_le_bytes());
+        string_data.push(0);
+        string_data.extend_from_slice(b"array");
+
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &string_formula_data(4, 5));
+        push_record(&mut stream, 0x0221, &array);
+        push_record(&mut stream, 0x0207, &string_data);
+        push_record(&mut stream, 0x000A, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
+            None,
+            Arc::new(XlsFormatting::default()),
+        )
+        .unwrap();
+        let cell = worksheet.get_cell(4, 5).unwrap();
+
+        assert!(cell.is_formula());
+        assert!(matches!(
+            cell.value(),
+            litchi_core::sheet::CellValue::String(value) if value == "array"
+        ));
+    }
+
+    #[test]
+    fn worksheet_resolves_string_formula_spanning_continue_records() {
+        // The declared characters do not fit in the String record; the rest
+        // arrive in a Continue record with its own option-flags byte.
+        let mut string_data = Vec::new();
+        string_data.extend_from_slice(&6u16.to_le_bytes());
+        string_data.push(0);
+        string_data.extend_from_slice(b"abc");
+
+        let mut continues = Vec::new();
+        continues.push(0); // fHighByte = 0 for this chunk
+        continues.extend_from_slice(b"def");
+
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &string_formula_data(1, 2));
+        push_record(&mut stream, 0x0207, &string_data);
+        push_record(&mut stream, 0x003C, &continues);
+        push_record(&mut stream, 0x000A, &[]);
+        let mut records = RecordIter::new(Cursor::new(stream)).unwrap();
+
+        let worksheet = XlsWorkbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            &XlsEncoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
+            None,
+            Arc::new(XlsFormatting::default()),
+        )
+        .unwrap();
+        let cell = worksheet.get_cell(1, 2).unwrap();
+
+        assert!(cell.is_formula());
+        assert!(matches!(
+            cell.value(),
+            litchi_core::sheet::CellValue::String(value) if value == "abcdef"
+        ));
     }
 
     #[test]

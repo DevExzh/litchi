@@ -52,8 +52,7 @@ pub fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<Str
 }
 
 /// Parse a BIFF8 `XLUnicodeString` with a 16-bit character count.
-pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
-    if data.len() < 3 {
+pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {    if data.len() < 3 {
         return Err(XlsError::InvalidLength {
             expected: 3,
             found: data.len(),
@@ -94,6 +93,87 @@ pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<St
         // does not apply to this BIFF8 structure.
         Ok(string_data.iter().map(|&byte| byte as char).collect())
     }
+}
+
+/// `fHighByte` option bit of an `XLUnicodeString` (MS-XLS 2.5.294).
+const STRING_HIGH_BYTE: u8 = 0x01;
+
+/// Outcome of decoding a possibly continued BIFF8 `String` record payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StringRecordDecode {
+    /// All declared characters were decoded.
+    Complete(String),
+    /// The declared characters extend past the supplied payloads; another
+    /// `Continue` record payload is required.
+    NeedContinue,
+}
+
+/// Decode the cached result of a `String` record (MS-XLS 2.4.296) whose
+/// character data may span `Continue` records (MS-XLS 2.1:
+/// `FORMULA = ... [String *Continue]`).
+///
+/// `first` is the `String` record payload and `continues` the payloads of the
+/// `Continue` records that follow it. Every `Continue` payload restarts with
+/// an option-flags byte selecting the character width of its chunk, so the
+/// encoding may switch between compressed and UTF-16 at record boundaries.
+/// Returns [`StringRecordDecode::NeedContinue`] when the declared characters
+/// extend past every supplied payload.
+pub fn decode_string_record(first: &[u8], continues: &[Vec<u8>]) -> XlsResult<StringRecordDecode> {
+    if first.len() < 3 {
+        return Err(XlsError::InvalidLength {
+            expected: 3,
+            found: first.len(),
+        });
+    }
+    let mut chars_left = usize::from(binary::read_u16_le_at(first, 0)?);
+    let mut high_byte = first[2] & STRING_HIGH_BYTE != 0;
+    let mut units: Vec<u16> = Vec::with_capacity(chars_left);
+    let mut first_segment = true;
+    for segment in std::iter::once(&first[3..]).chain(continues.iter().map(Vec::as_slice)) {
+        let mut chunk: &[u8] = segment;
+        if !first_segment {
+            // A Continue payload restarts with an option-flags byte.
+            let Some((&flags, rest)) = chunk.split_first() else {
+                continue;
+            };
+            high_byte = flags & STRING_HIGH_BYTE != 0;
+            chunk = rest;
+        }
+        first_segment = false;
+        if high_byte {
+            let mut consumed = 0usize;
+            for pair in chunk.chunks_exact(2) {
+                if chars_left == 0 {
+                    break;
+                }
+                units.push(u16::from_le_bytes([pair[0], pair[1]]));
+                chars_left -= 1;
+                consumed += 2;
+            }
+            if chars_left > 0 && consumed < chunk.len() {
+                return Err(XlsError::InvalidData(
+                    "UTF-16 character split across String Continue records".to_string(),
+                ));
+            }
+        } else {
+            for &byte in chunk {
+                if chars_left == 0 {
+                    break;
+                }
+                units.push(u16::from(byte));
+                chars_left -= 1;
+            }
+        }
+        if chars_left == 0 {
+            break;
+        }
+    }
+    if chars_left > 0 {
+        return Ok(StringRecordDecode::NeedContinue);
+    }
+    String::from_utf16(&units)
+        .map(StringRecordDecode::Complete)
+        .map_err(|error| XlsError::Encoding(format!("UTF-16 decoding error: {error}")))
 }
 
 /// Convert RK value to f64
@@ -327,5 +407,49 @@ mod tests {
         assert!(parse_cell_reference("1A").is_none()); // invalid - digits before letters
         assert!(parse_cell_reference("A").is_none()); // no row
         assert!(parse_cell_reference("1").is_none()); // no column
+    }
+
+    #[test]
+    fn decode_string_record_completes_within_one_record() {
+        let compressed = [3, 0, 0, b'a', b'b', b'c'];
+        assert_eq!(
+            decode_string_record(&compressed, &[]).unwrap(),
+            StringRecordDecode::Complete("abc".to_string())
+        );
+
+        let utf16 = [2, 0, 1, 0x22, 0x6F, 0x57, 0x5B];
+        assert_eq!(
+            decode_string_record(&utf16, &[]).unwrap(),
+            StringRecordDecode::Complete("漢字".to_string())
+        );
+    }
+
+    #[test]
+    fn decode_string_record_reports_missing_continuation() {
+        let short = [5, 0, 0, b'a', b'b'];
+        assert_eq!(
+            decode_string_record(&short, &[]).unwrap(),
+            StringRecordDecode::NeedContinue
+        );
+    }
+
+    #[test]
+    fn decode_string_record_switches_encoding_at_continue_boundary() {
+        // "ab文": two compressed characters in the String record, then a
+        // UTF-16 chunk in the Continue record.
+        let first = [3, 0, 0, b'a', b'b'];
+        let continues = vec![vec![1, 0x87, 0x65]];
+        assert_eq!(
+            decode_string_record(&first, &continues).unwrap(),
+            StringRecordDecode::Complete("ab文".to_string())
+        );
+    }
+
+    #[test]
+    fn decode_string_record_rejects_split_utf16_character() {
+        // The String record ends on a dangling byte of a UTF-16 character.
+        let first = [2, 0, 1, 0x22];
+        let continues = vec![vec![1, 0x6F, 0x57, 0x5B]];
+        assert!(decode_string_record(&first, &continues).is_err());
     }
 }
