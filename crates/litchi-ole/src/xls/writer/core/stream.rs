@@ -97,6 +97,7 @@ pub(crate) fn generate_workbook_stream(
     workbook_protection: Option<XlsWorkbookProtection>,
     file_sharing: Option<&XlsFileSharing>,
     book_ext: Option<&crate::xls::XlsBookExt>,
+    xf_extensions: &[crate::xls::XlsXfExt],
     worksheets: &[WritableWorksheet],
     string_map: &HashMap<String, u32>,
 ) -> XlsResult<WorkbookStreams> {
@@ -216,6 +217,25 @@ pub(crate) fn generate_workbook_stream(
     fmt.write_fonts(&mut stream)?;
     fmt.write_number_formats(&mut stream)?;
     fmt.write_formats(&mut stream)?;
+    if !xf_extensions.is_empty() {
+        let xf_count = fmt.xf_record_count();
+        for extension in xf_extensions {
+            if extension.xf_index() >= xf_count {
+                return Err(XlsError::InvalidData(format!(
+                    "XFExt references XF index {} but only {xf_count} XF records are written",
+                    extension.xf_index()
+                )));
+            }
+        }
+        // XFS = 16*XF [XFCRC 16*4050XFExt]: the extensions follow the XF
+        // table directly; the pivot path writes its own XFCRC block later.
+        if !has_pivot_tables {
+            biff::write_xfcrc(&mut stream, xf_count)?;
+        }
+        for extension in xf_extensions {
+            biff::write_xf_ext(&mut stream, extension)?;
+        }
+    }
     if let Some(styles) = custom_table_styles {
         biff::write_differential_formats(&mut stream, styles.differential_formats())?;
     }

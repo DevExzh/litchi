@@ -289,6 +289,7 @@ pub struct XlsFormatting {
     number_formats: Vec<XlsNumberFormat>,
     extended_formats: Vec<XlsExtendedFormat>,
     differential_formats: Vec<crate::xls::differential_format::XlsDifferentialFormat>,
+    xf_extensions: Vec<crate::xls::xf_ext::XlsXfExt>,
     format_by_id: HashMap<u16, usize>,
 }
 
@@ -312,6 +313,11 @@ impl XlsFormatting {
         &self,
     ) -> &[crate::xls::differential_format::XlsDifferentialFormat] {
         &self.differential_formats
+    }
+
+    /// `XFExt` formatting property extensions (MS-XLS 2.4.355), in record order.
+    pub fn xf_extensions(&self) -> &[crate::xls::xf_ext::XlsXfExt] {
+        &self.xf_extensions
     }
 
     pub fn differential_format(
@@ -393,6 +399,7 @@ impl XlsFormatting {
         let mut differential_formats = Vec::new();
         let mut format_by_id = HashMap::new();
         let mut xfcrc = None;
+        let mut xf_extensions = Vec::new();
 
         for record in records {
             match record.header.record_type {
@@ -433,6 +440,15 @@ impl XlsFormatting {
                         return Err(invalid(XFCRC_RECORD, "duplicate XFCRC record"));
                     }
                     xfcrc = Some(parse_xfcrc(&record.data)?);
+                },
+                crate::xls::xf_ext::XF_EXT_RECORD_TYPE => {
+                    if xf_extensions.len() == MAX_XF_RECORDS {
+                        return Err(invalid(
+                            crate::xls::xf_ext::XF_EXT_RECORD_TYPE,
+                            "more than 65,536 XFExt records",
+                        ));
+                    }
+                    xf_extensions.push(crate::xls::xf_ext::XlsXfExt::parse(&record.data)?);
                 },
                 crate::xls::differential_format::DXF_RECORD_TYPE => {
                     if differential_formats.len() == MAX_DXF_RECORDS {
@@ -534,6 +550,19 @@ impl XlsFormatting {
             }
         }
 
+        for extension in &xf_extensions {
+            if usize::from(extension.xf_index()) >= extended_formats.len() {
+                return Err(invalid(
+                    crate::xls::xf_ext::XF_EXT_RECORD_TYPE,
+                    format!(
+                        "XFExt references XF index {} but only {} XF records exist",
+                        extension.xf_index(),
+                        extended_formats.len()
+                    ),
+                ));
+            }
+        }
+
         for (dxf_index, dxf) in differential_formats.iter().enumerate() {
             for property in dxf.properties().properties() {
                 if let crate::xls::differential_format::XlsXfProperty::NumberFormatId(id) = property
@@ -565,6 +594,7 @@ impl XlsFormatting {
             number_formats,
             extended_formats,
             differential_formats,
+            xf_extensions,
             format_by_id,
         })
     }

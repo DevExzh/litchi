@@ -726,6 +726,24 @@ impl FormattingManager {
         Ok(())
     }
 
+    /// Total number of XF records `write_formats` emits, including the
+    /// pivot padding and extension XFs when pivot XFs are enabled.
+    pub(crate) fn xf_record_count(&self) -> u16 {
+        const BUILTIN_STYLE_XF_COUNT: u16 = 15;
+        const BUILTIN_STYLE_FORMAT_XF_COUNT: u16 = 5;
+        const PIVOT_XF_START_INDEX: u16 = 64;
+        const PIVOT_XF_COUNT: u16 = 3;
+        let base = BUILTIN_STYLE_XF_COUNT
+            + 1
+            + BUILTIN_STYLE_FORMAT_XF_COUNT
+            + (self.formats.len() as u16).saturating_sub(1);
+        if self.pivot_xfs_enabled {
+            base.max(PIVOT_XF_START_INDEX) + PIVOT_XF_COUNT
+        } else {
+            base
+        }
+    }
+
     /// Compute the next available user-defined number format index.
     ///
     /// BIFF8 reserves built-in indices below 164; custom formats start

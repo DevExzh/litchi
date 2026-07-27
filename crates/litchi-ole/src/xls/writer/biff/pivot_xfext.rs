@@ -24,7 +24,7 @@ fn write_frt_header<W: Write>(writer: &mut W, record_id: u16) -> XlsResult<()> {
     Ok(())
 }
 
-fn write_xfcrc<W: Write>(writer: &mut W) -> XlsResult<()> {
+pub(crate) fn write_xfcrc<W: Write>(writer: &mut W) -> XlsResult<()> {
     write_record_header(writer, XFCRC_RECORD_ID, 20)?;
     write_frt_header(writer, XFCRC_RECORD_ID)?;
     writer.write_all(&XFEXT_RESERVED)?;

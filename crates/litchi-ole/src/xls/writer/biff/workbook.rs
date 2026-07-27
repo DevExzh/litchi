@@ -311,6 +311,35 @@ pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsBookExt) 
     Ok(())
 }
 
+
+
+/// Write an XFCRC record (MS-XLS 2.4.354) declaring `xf_count` XF records.
+///
+/// Record type: 0x087C
+pub fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
+    write_record_header(writer, 0x087C, 20)?;
+    writer.write_all(&0x087Cu16.to_le_bytes())?;
+    writer.write_all(&[0; 12]); // FrtHeader remainder + reserved
+    writer.write_all(&xf_count.to_le_bytes())?;
+    writer.write_all(&0xB463_87D8u32.to_le_bytes())?; // checksum constant
+    Ok(())
+}
+
+/// Write an XFEXT record (MS-XLS 2.4.355) with formatting property
+/// extensions for one XF record.
+///
+/// Record type: 0x087D
+pub fn write_xf_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsXfExt) -> XlsResult<()> {
+    let payload = value.to_payload()?;
+    write_record_header(
+        writer,
+        crate::xls::xf_ext::XF_EXT_RECORD_TYPE,
+        payload.len() as u16,
+    )?;
+    writer.write_all(&payload)?;
+    Ok(())
+}
+
 /// Write EXCEL9FILE record.
 ///
 /// Record type: 0x01C0

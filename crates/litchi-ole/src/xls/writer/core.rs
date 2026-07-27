@@ -1316,6 +1316,7 @@ pub struct XlsWriter {
     dde_or_ole_links: Vec<XlsDdeOrOleLinkOptions>,
     custom_table_styles: Option<XlsCustomTableStyles>,
     book_ext: Option<crate::xls::XlsBookExt>,
+    xf_extensions: Vec<crate::xls::XlsXfExt>,
     encryption: Option<XlsWriterEncryption>,
 }
 
@@ -1344,6 +1345,7 @@ impl XlsWriter {
             dde_or_ole_links: Vec::new(),
             custom_table_styles: None,
             book_ext: None,
+            xf_extensions: Vec::new(),
             encryption: None,
         }
     }
@@ -3308,6 +3310,13 @@ impl XlsWriter {
         self.book_ext = book_ext;
     }
 
+    /// Set the `XFExt` formatting property extensions (MS-XLS 2.4.355)
+    /// emitted after the XF table. Each extension's `xf_index` is validated
+    /// against the written XF record count when the workbook is saved.
+    pub fn set_xf_extensions(&mut self, xf_extensions: Vec<crate::xls::XlsXfExt>) {
+        self.xf_extensions = xf_extensions;
+    }
+
     pub fn set_workbook_window(&mut self, options: XlsWorkbookWindowOptions) -> XlsResult<()> {
         options.validate_intrinsic()?;
         self.workbook_window_options = options;
@@ -4013,6 +4022,7 @@ impl XlsWriter {
             self.workbook_protection,
             self.file_sharing.as_ref(),
             self.book_ext.as_ref(),
+            &self.xf_extensions,
             &self.worksheets,
             &self.string_map,
         )?;

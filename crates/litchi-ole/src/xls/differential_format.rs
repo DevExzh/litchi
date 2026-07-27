@@ -150,7 +150,7 @@ impl XlsXfColor {
         self.rgba
     }
 
-    fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
         if data.len() != 8 {
             return Err(invalid(format!(
                 "XFPropColor has {} bytes; expected 8",
@@ -185,7 +185,7 @@ impl XlsXfColor {
         })
     }
 
-    fn write_to(&self, output: &mut Vec<u8>) {
+    pub(crate) fn write_to(&self, output: &mut Vec<u8>) {
         let (kind, index) = match self.source {
             XlsXfColorSource::Automatic => (0, self.ignored_index),
             XlsXfColorSource::Indexed(index) => (1, index),
@@ -279,7 +279,7 @@ impl XlsXfGradient {
         self.fill_to_bottom
     }
 
-    fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
         if data.len() != 44 {
             return Err(invalid(format!(
                 "XFPropGradient has {} bytes; expected 44",
@@ -311,6 +311,15 @@ impl XlsXfGradient {
             validate_unit_interval(coordinate, name)?;
         }
         Ok(value)
+    }
+
+    pub(crate) fn write_to(&self, output: &mut Vec<u8>) {
+        output.extend_from_slice(&(self.rectangular as u32).to_le_bytes());
+        output.extend_from_slice(&self.degree.to_le_bytes());
+        output.extend_from_slice(&self.fill_to_left.to_le_bytes());
+        output.extend_from_slice(&self.fill_to_right.to_le_bytes());
+        output.extend_from_slice(&self.fill_to_top.to_le_bytes());
+        output.extend_from_slice(&self.fill_to_bottom.to_le_bytes());
     }
 }
 
@@ -345,6 +354,28 @@ impl XlsXfGradientStop {
     }
     pub const fn color(&self) -> XlsXfColor {
         self.color
+    }
+
+    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+        if data.len() != 18 {
+            return Err(invalid(format!(
+                "XFPropGradientStop has {} bytes; expected 18",
+                data.len()
+            )));
+        }
+        let stop = Self {
+            position: read_f64(data, 2, "XFPropGradientStop.numPosition")?,
+            color: XlsXfColor::parse(&data[10..18])?,
+            unused: read_u16(data, 0, "XFPropGradientStop.unused")?,
+        };
+        validate_unit_interval(stop.position, "stop")?;
+        Ok(stop)
+    }
+
+    pub(crate) fn write_to(&self, output: &mut Vec<u8>) {
+        output.extend_from_slice(&self.unused.to_le_bytes());
+        output.extend_from_slice(&self.position.to_le_bytes());
+        self.color.write_to(output);
     }
 }
 
@@ -481,16 +512,7 @@ impl XlsXfProperty {
             0x0001 => Ok(Self::ForegroundColor(XlsXfColor::parse(data)?)),
             0x0002 => Ok(Self::BackgroundColor(XlsXfColor::parse(data)?)),
             0x0003 => Ok(Self::Gradient(XlsXfGradient::parse(data)?)),
-            0x0004 => {
-                exact(18)?;
-                let position = read_f64(data, 2, "XFPropGradientStop.numPosition")?;
-                validate_unit_interval(position, "stop")?;
-                Ok(Self::GradientStop(XlsXfGradientStop {
-                    unused: read_u16(data, 0, "XFPropGradientStop.unused")?,
-                    position,
-                    color: XlsXfColor::parse(&data[10..18])?,
-                }))
-            },
+            0x0004 => Ok(Self::GradientStop(XlsXfGradientStop::parse(data)?)),
             0x0005 => Ok(Self::TextColor(XlsXfColor::parse(data)?)),
             0x0006..=0x000C => {
                 exact(10)?;
@@ -634,19 +656,8 @@ impl XlsXfProperty {
             Self::ForegroundColor(value)
             | Self::BackgroundColor(value)
             | Self::TextColor(value) => value.write_to(&mut data),
-            Self::Gradient(value) => {
-                data.extend_from_slice(&(value.rectangular as u32).to_le_bytes());
-                data.extend_from_slice(&value.degree.to_le_bytes());
-                data.extend_from_slice(&value.fill_to_left.to_le_bytes());
-                data.extend_from_slice(&value.fill_to_right.to_le_bytes());
-                data.extend_from_slice(&value.fill_to_top.to_le_bytes());
-                data.extend_from_slice(&value.fill_to_bottom.to_le_bytes());
-            },
-            Self::GradientStop(value) => {
-                data.extend_from_slice(&value.unused.to_le_bytes());
-                data.extend_from_slice(&value.position.to_le_bytes());
-                value.color.write_to(&mut data);
-            },
+            Self::Gradient(value) => value.write_to(&mut data),
+            Self::GradientStop(value) => value.write_to(&mut data),
             Self::TopBorder(value)
             | Self::BottomBorder(value)
             | Self::LeftBorder(value)
