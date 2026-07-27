@@ -7,9 +7,8 @@ use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightNumber,
-    TableCellConditionalHighlightRange, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle,
+    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
+    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
 };
 
 const HIGHLIGHT_ROW: usize = 1;
@@ -29,12 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn highlight_rule() -> Result<TableCellConditionalHighlightRule, Box<dyn std::error::Error>> {
-    let lower = TableCellConditionalHighlightNumber::new(3.0)?;
-    let upper = TableCellConditionalHighlightNumber::new(7.0)?;
-    let range = TableCellConditionalHighlightRange::new(lower, upper)?;
+    let text = TableCellConditionalHighlightText::new("grain")?;
     let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
     Ok(TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::Between(range),
+        TableCellConditionalHighlightCondition::TextContains(text),
         TableCellConditionalHighlightStyle::new(Some(red), None, true)?,
     ))
 }
@@ -49,10 +46,15 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        CellValue::Number(5.0),
+        CellValue::Text("Organic Grain".to_owned()),
     )?;
     let rule = highlight_rule()?;
-    editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &[rule])?;
+    editor.set_cell_conditional_highlighting(
+        table_id,
+        HIGHLIGHT_ROW,
+        HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&rule),
+    )?;
     editor.save(output)?;
     assert_eq!(
         NumbersEditor::open(output)?.cell_conditional_highlight_rules(
@@ -75,14 +77,14 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        CellValue::Number(5.0),
+        CellValue::Text("Organic Grain".to_owned()),
     )?;
     let rule = highlight_rule()?;
     editor.set_table_cell_conditional_highlighting(
         table_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        &[rule],
+        std::slice::from_ref(&rule),
     )?;
     editor.save(output)?;
     assert_eq!(
@@ -116,7 +118,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        CellValue::Number(5.0),
+        CellValue::Text("Organic Grain".to_owned()),
     )?;
     let rule = highlight_rule()?;
     editor.set_slide_table_cell_conditional_highlighting(
@@ -124,7 +126,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        &[rule],
+        std::slice::from_ref(&rule),
     )?;
     editor.save(output)?;
     assert_eq!(

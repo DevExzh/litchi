@@ -1,8 +1,9 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
+use crate::numbers::CellValue;
 use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightNumber,
-    TableCellConditionalHighlightRule, TableCellConditionalHighlightStyle,
+    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
+    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
 };
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
@@ -54,9 +55,18 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
     let table = editor
         .add_slide_table(0, "Conditional", 2, 2, position, size)
         .unwrap();
+    editor
+        .set_slide_table_cell(
+            0,
+            table.model_object_id,
+            1,
+            1,
+            CellValue::Text("Organic Grain".to_owned()),
+        )
+        .unwrap();
     let rule = TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::GreaterThan(
-            TableCellConditionalHighlightNumber::new(10.0).unwrap(),
+        TableCellConditionalHighlightCondition::TextContains(
+            TableCellConditionalHighlightText::new("grain").unwrap(),
         ),
         TableCellConditionalHighlightStyle::with_text_color(
             crate::shapes::RgbaColor::new(0.1, 0.6, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
@@ -64,7 +74,13 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
         ),
     );
     editor
-        .set_slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1, &[rule])
+        .set_slide_table_cell_conditional_highlighting(
+            0,
+            table.model_object_id,
+            1,
+            1,
+            std::slice::from_ref(&rule),
+        )
         .unwrap();
     assert_eq!(
         editor

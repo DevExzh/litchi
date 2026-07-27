@@ -1,6 +1,7 @@
 //! Conditional-highlight references stored by table cells.
 
 mod delete;
+mod formula;
 mod native;
 mod read;
 #[cfg(test)]
@@ -16,12 +17,15 @@ use crate::table_cell_conditional_highlight::{
 };
 use native::{
     BINARY_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_ARGUMENT_COUNT,
-    CONDITIONAL_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX,
+    CONDITIONAL_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX,
+    LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX, NativePredicateKind,
     NumericPredicateKind, PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER,
-    PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_CELL_ARGUMENT_INDEX,
+    PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_ARGUMENT_STRING, PREDICATE_CELL_ARGUMENT_INDEX,
     PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
     PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
-    PREDICATE_UNUSED_ARGUMENT_INDEX,
+    PREDICATE_TEXT_ARGUMENT_INDEX, PREDICATE_TEXT_CELL_ARGUMENT_INDEX,
+    PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind,
+    UNARY_FUNCTION_ARGUMENT_COUNT,
 };
 
 const MAX_CONDITIONAL_HIGHLIGHT_RULES: usize = CONDITIONAL_STYLE_NO_APPLIED_RULE as usize;
@@ -522,24 +526,48 @@ fn applied_rule_for_cell(
     column: usize,
     rules: &[TableCellConditionalHighlightRule],
 ) -> Result<u32> {
-    let scalar = read_tile_cell(
+    let Some(data) = read_tile_cell(
         package,
         &location.tile_archive,
         location.tile_id,
         location.tile_row,
         column,
     )?
-    .map(|data| BncCell::parse(&data))
-    .transpose()?
-    .map(|cell| cell.cached_scalar())
-    .transpose()?
-    .flatten();
-    let Some(CachedScalar::Number(value)) = scalar else {
+    else {
         return Ok(CONDITIONAL_STYLE_NO_APPLIED_RULE);
+    };
+    let cell = BncCell::parse(&data)?;
+    let value = match cell.stored_value() {
+        StoredValue::Text(identifier) => {
+            let requested = HashSet::from([identifier]);
+            let values = resolve_table_string_values(
+                package,
+                &location.object_locations,
+                location
+                    .descriptor
+                    .model
+                    .base_data_store
+                    .string_table
+                    .identifier,
+                &requested,
+            )?;
+            let Some(value) = values.into_values().next() else {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork conditional-highlight cell references missing string {identifier}"
+                )));
+            };
+            ConditionalCellValue::Text(value)
+        },
+        _ => {
+            let Some(CachedScalar::Number(value)) = cell.cached_scalar()? else {
+                return Ok(CONDITIONAL_STYLE_NO_APPLIED_RULE);
+            };
+            ConditionalCellValue::Number(value)
+        },
     };
     rules
         .iter()
-        .position(|rule| condition_matches(rule.condition, value))
+        .position(|rule| condition_matches(&rule.condition, &value))
         .map(|index| {
             u32::try_from(index).map_err(|_| {
                 Error::ParseError("conditional-highlight rule index exceeds u32".to_owned())
@@ -549,23 +577,62 @@ fn applied_rule_for_cell(
         .map(|matched| matched.unwrap_or(CONDITIONAL_STYLE_NO_APPLIED_RULE))
 }
 
-fn condition_matches(condition: TableCellConditionalHighlightCondition, value: f64) -> bool {
-    match condition {
-        TableCellConditionalHighlightCondition::EqualTo(operand) => value == operand.get(),
-        TableCellConditionalHighlightCondition::NotEqualTo(operand) => value != operand.get(),
-        TableCellConditionalHighlightCondition::GreaterThan(operand) => value > operand.get(),
-        TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(operand) => {
-            value >= operand.get()
-        },
-        TableCellConditionalHighlightCondition::LessThan(operand) => value < operand.get(),
-        TableCellConditionalHighlightCondition::LessThanOrEqualTo(operand) => {
-            value <= operand.get()
-        },
-        TableCellConditionalHighlightCondition::Between(range) => {
-            value >= range.lower().get() && value <= range.upper().get()
-        },
-        TableCellConditionalHighlightCondition::NotBetween(range) => {
-            value < range.lower().get() || value > range.upper().get()
-        },
+enum ConditionalCellValue {
+    Number(f64),
+    Text(String),
+}
+
+fn condition_matches(
+    condition: &TableCellConditionalHighlightCondition,
+    value: &ConditionalCellValue,
+) -> bool {
+    match (condition, value) {
+        (
+            TableCellConditionalHighlightCondition::EqualTo(operand),
+            ConditionalCellValue::Number(value),
+        ) => *value == operand.get(),
+        (
+            TableCellConditionalHighlightCondition::NotEqualTo(operand),
+            ConditionalCellValue::Number(value),
+        ) => *value != operand.get(),
+        (
+            TableCellConditionalHighlightCondition::GreaterThan(operand),
+            ConditionalCellValue::Number(value),
+        ) => *value > operand.get(),
+        (
+            TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(operand),
+            ConditionalCellValue::Number(value),
+        ) => *value >= operand.get(),
+        (
+            TableCellConditionalHighlightCondition::LessThan(operand),
+            ConditionalCellValue::Number(value),
+        ) => *value < operand.get(),
+        (
+            TableCellConditionalHighlightCondition::LessThanOrEqualTo(operand),
+            ConditionalCellValue::Number(value),
+        ) => *value <= operand.get(),
+        (
+            TableCellConditionalHighlightCondition::Between(range),
+            ConditionalCellValue::Number(value),
+        ) => *value >= range.lower().get() && *value <= range.upper().get(),
+        (
+            TableCellConditionalHighlightCondition::NotBetween(range),
+            ConditionalCellValue::Number(value),
+        ) => *value < range.lower().get() || *value > range.upper().get(),
+        (
+            TableCellConditionalHighlightCondition::TextContains(needle),
+            ConditionalCellValue::Text(value),
+        ) => contains_case_insensitive(value, needle.as_str()),
+        _ => false,
     }
+}
+
+fn contains_case_insensitive(value: &str, needle: &str) -> bool {
+    if value.is_ascii() && needle.is_ascii() {
+        return value
+            .as_bytes()
+            .windows(needle.len())
+            .any(|candidate| candidate.eq_ignore_ascii_case(needle.as_bytes()));
+    }
+    value.to_lowercase().contains(&needle.to_lowercase())
 }

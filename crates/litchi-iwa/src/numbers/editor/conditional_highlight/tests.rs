@@ -3,7 +3,7 @@ use crate::numbers::NumbersDocumentBuilder;
 use crate::shapes::{RgbColorSpace, RgbaColor};
 use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightNumber, TableCellConditionalHighlightRange,
-    TableCellConditionalHighlightStyle,
+    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
 };
 
 fn rule(
@@ -123,12 +123,87 @@ fn range_conditions_use_inclusive_between_and_strictly_outside_not_between() {
     let between = TableCellConditionalHighlightCondition::Between(range);
     let not_between = TableCellConditionalHighlightCondition::NotBetween(range);
 
-    assert!(condition_matches(between, 3.0));
-    assert!(condition_matches(between, 5.0));
-    assert!(condition_matches(between, 7.0));
-    assert!(!condition_matches(between, 2.0));
-    assert!(!condition_matches(not_between, 3.0));
-    assert!(!condition_matches(not_between, 7.0));
-    assert!(condition_matches(not_between, 2.0));
-    assert!(condition_matches(not_between, 8.0));
+    assert!(condition_matches(
+        &between,
+        &ConditionalCellValue::Number(3.0)
+    ));
+    assert!(condition_matches(
+        &between,
+        &ConditionalCellValue::Number(5.0)
+    ));
+    assert!(condition_matches(
+        &between,
+        &ConditionalCellValue::Number(7.0)
+    ));
+    assert!(!condition_matches(
+        &between,
+        &ConditionalCellValue::Number(2.0)
+    ));
+    assert!(!condition_matches(
+        &not_between,
+        &ConditionalCellValue::Number(3.0)
+    ));
+    assert!(!condition_matches(
+        &not_between,
+        &ConditionalCellValue::Number(7.0)
+    ));
+    assert!(condition_matches(
+        &not_between,
+        &ConditionalCellValue::Number(2.0)
+    ));
+    assert!(condition_matches(
+        &not_between,
+        &ConditionalCellValue::Number(8.0)
+    ));
+}
+
+#[test]
+fn text_contains_is_case_insensitive_and_round_trips_from_scratch() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_cell(table_id, 1, 1, CellValue::Text("Organic Grain".to_owned()))
+        .unwrap();
+    let condition = TableCellConditionalHighlightCondition::TextContains(
+        TableCellConditionalHighlightText::new("grain").unwrap(),
+    );
+    assert!(condition_matches(
+        &condition,
+        &ConditionalCellValue::Text("GRAIN".to_owned())
+    ));
+    assert!(!condition_matches(
+        &condition,
+        &ConditionalCellValue::Text("Dairy".to_owned())
+    ));
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let rule = rule(condition, red);
+
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, std::slice::from_ref(&rule))
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let cell = read_tile_cell(
+        &editor.package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        1,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        BncCell::parse(&cell)
+            .unwrap()
+            .conditional_style_applied_rule(),
+        Some(0)
+    );
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap(),
+        Some(vec![rule])
+    );
 }

@@ -20,7 +20,7 @@ pub(super) fn insert_conditional_style_graph(
     let mut current = Vec::with_capacity(rules.len());
     let mut objects = Vec::with_capacity(1 + rules.len() * 2);
     let mut references = Vec::with_capacity(rules.len() * 2);
-    for (index, rule) in rules.iter().copied().enumerate() {
+    for (index, rule) in rules.iter().enumerate() {
         let offset = u64::try_from(index)
             .map_err(|_| Error::ParseError("conditional-highlight index exceeds u64".to_owned()))?
             .checked_mul(2)
@@ -36,23 +36,27 @@ pub(super) fn insert_conditional_style_graph(
         let cell_style_id = text_style_id.checked_add(1).ok_or_else(|| {
             Error::ParseError("conditional-highlight identifier overflow".to_owned())
         })?;
-        let kind = NumericPredicateKind::from_condition(rule.condition);
-        let formula = predicate_formula(rule.condition, formula_owner_uuid)?;
+        let kind = NativePredicateKind::from_condition(&rule.condition);
+        let formula = formula::encode(&rule.condition, formula_owner_uuid)?;
         let predicate_type = kind.native_value();
-        let (first_value, second_value) = predicate_values(rule.condition);
-        let (cell_index, first_index, second_index) = if kind.is_range() {
-            (
+        let (cell_index, first_index, second_index) = match kind {
+            NativePredicateKind::Numeric(kind) if kind.is_range() => (
                 PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
                 PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
                 PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
-            )
-        } else {
-            (
+            ),
+            NativePredicateKind::Numeric(_) => (
                 PREDICATE_CELL_ARGUMENT_INDEX,
                 PREDICATE_NUMBER_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
-            )
+            ),
+            NativePredicateKind::Text(_) => (
+                PREDICATE_TEXT_CELL_ARGUMENT_INDEX,
+                PREDICATE_TEXT_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
         };
+        let (first_argument, second_argument) = predicate_arguments(&rule.condition)?;
         let cell_style = tsp::Reference {
             identifier: cell_style_id,
             ..Default::default()
@@ -93,22 +97,8 @@ pub(super) fn insert_conditional_style_graph(
                     }),
                     ..Default::default()
                 }),
-                param_value1: Some(tst::FormulaPredArgArchive {
-                    arg_type: PREDICATE_ARGUMENT_NUMBER,
-                    arg_value: Some(predicate_number(first_value)?),
-                    ..Default::default()
-                }),
-                param_value2: Some(match second_value {
-                    Some(value) => tst::FormulaPredArgArchive {
-                        arg_type: PREDICATE_ARGUMENT_NUMBER,
-                        arg_value: Some(predicate_number(value)?),
-                        ..Default::default()
-                    },
-                    None => tst::FormulaPredArgArchive {
-                        arg_type: PREDICATE_ARGUMENT_NONE,
-                        ..Default::default()
-                    },
-                }),
+                param_value1: Some(first_argument),
+                param_value2: Some(second_argument),
                 formula: Some(formula),
                 for_conditional_style: Some(true),
                 ..Default::default()
@@ -149,7 +139,7 @@ pub(super) fn insert_conditional_style_graph(
 
 fn paragraph_style_object(
     identifier: u64,
-    rule: TableCellConditionalHighlightRule,
+    rule: &TableCellConditionalHighlightRule,
 ) -> Result<ArchiveObject> {
     let style = rule.style;
     let text_override_count = u32::from(style.bold()) + u32::from(style.text_color().is_some());
@@ -171,7 +161,7 @@ fn paragraph_style_object(
 
 fn cell_style_object(
     identifier: u64,
-    rule: TableCellConditionalHighlightRule,
+    rule: &TableCellConditionalHighlightRule,
 ) -> Result<ArchiveObject> {
     let fill = rule.style.fill().map(|color| tsd::FillArchive {
         color: Some(crate::shapes::color_to_native(color)),
@@ -201,158 +191,45 @@ fn style_object(identifier: u64, message_type: u32, data: Vec<u8>) -> Result<Arc
     Ok(object)
 }
 
-fn predicate_formula(
-    condition: TableCellConditionalHighlightCondition,
-    formula_owner_uuid: &tsp::Uuid,
-) -> Result<tsce::FormulaArchive> {
-    let kind = NumericPredicateKind::from_condition(condition);
-    let (first, second) = predicate_values(condition);
-    let nodes = if let Some(second) = second {
-        range_formula_nodes(kind, first, second, formula_owner_uuid)?
-    } else {
-        vec![
-            linked_cell_node(formula_owner_uuid),
-            number_node(first)?,
-            tsce::ast_node_array_archive::AstNodeArchive {
-                ast_node_type: kind
-                    .single_ast_node_type()
-                    .expect("single predicate has a comparison node")
-                    as i32,
-                ..Default::default()
-            },
-        ]
-    };
-    Ok(tsce::FormulaArchive {
-        ast_node_array: tsce::AstNodeArrayArchive { ast_node: nodes },
+fn predicate_arguments(
+    condition: &TableCellConditionalHighlightCondition,
+) -> Result<(tst::FormulaPredArgArchive, tst::FormulaPredArgArchive)> {
+    let none = || tst::FormulaPredArgArchive {
+        arg_type: PREDICATE_ARGUMENT_NONE,
         ..Default::default()
-    })
-}
-
-fn predicate_values(condition: TableCellConditionalHighlightCondition) -> (f64, Option<f64>) {
+    };
     if let Some(value) = condition.single_operand() {
-        (value.get(), None)
-    } else {
-        let range = condition.range().expect("range predicate has bounds");
-        (range.lower().get(), Some(range.upper().get()))
+        return Ok((number_argument(value.get())?, none()));
     }
-}
-
-fn linked_cell_node(
-    formula_owner_uuid: &tsp::Uuid,
-) -> tsce::ast_node_array_archive::AstNodeArchive {
-    use tsce::ast_node_array_archive::AstNodeType;
-
-    tsce::ast_node_array_archive::AstNodeArchive {
-        ast_node_type: AstNodeType::LinkedCellRefNode as i32,
-        ast_cross_table_reference_extra_info: Some(
-            tsce::ast_node_array_archive::AstCrossTableReferenceExtraInfoArchive {
-                table_id: uuid_as_cfuuid(formula_owner_uuid),
+    if let Some(range) = condition.range() {
+        return Ok((
+            number_argument(range.lower().get())?,
+            number_argument(range.upper().get())?,
+        ));
+    }
+    let text = condition
+        .text()
+        .expect("text predicate has a text operand")
+        .as_str();
+    Ok((
+        tst::FormulaPredArgArchive {
+            arg_type: PREDICATE_ARGUMENT_STRING,
+            arg_value: Some(tst::FormulaPredArgDataArchive {
+                string_value: Some(text.to_owned()),
                 ..Default::default()
-            },
-        ),
-        ..Default::default()
-    }
+            }),
+            ..Default::default()
+        },
+        none(),
+    ))
 }
 
-fn number_node(value: f64) -> Result<tsce::ast_node_array_archive::AstNodeArchive> {
-    use tsce::ast_node_array_archive::AstNodeType;
-
-    let decimal = crate::numbers::bnc::decimal128_le(value)?;
-    Ok(tsce::ast_node_array_archive::AstNodeArchive {
-        ast_node_type: AstNodeType::NumberNode as i32,
-        ast_number_node_number: Some(value),
-        ast_number_node_decimal_low: Some(u64::from_le_bytes(
-            decimal[..8]
-                .try_into()
-                .expect("fixed-size decimal lower half"),
-        )),
-        ast_number_node_decimal_high: Some(u64::from_le_bytes(
-            decimal[8..]
-                .try_into()
-                .expect("fixed-size decimal upper half"),
-        )),
+fn number_argument(value: f64) -> Result<tst::FormulaPredArgArchive> {
+    Ok(tst::FormulaPredArgArchive {
+        arg_type: PREDICATE_ARGUMENT_NUMBER,
+        arg_value: Some(predicate_number(value)?),
         ..Default::default()
     })
-}
-
-fn operator_node(
-    node_type: tsce::ast_node_array_archive::AstNodeType,
-) -> tsce::ast_node_array_archive::AstNodeArchive {
-    tsce::ast_node_array_archive::AstNodeArchive {
-        ast_node_type: node_type as i32,
-        ..Default::default()
-    }
-}
-
-fn function_node(index: u32, argument_count: u32) -> tsce::ast_node_array_archive::AstNodeArchive {
-    use tsce::ast_node_array_archive::AstNodeType;
-
-    tsce::ast_node_array_archive::AstNodeArchive {
-        ast_node_type: AstNodeType::FunctionNode as i32,
-        ast_function_node_index: Some(index),
-        ast_function_node_num_args: Some(argument_count),
-        ..Default::default()
-    }
-}
-
-fn range_formula_nodes(
-    kind: NumericPredicateKind,
-    lower: f64,
-    upper: f64,
-    formula_owner_uuid: &tsp::Uuid,
-) -> Result<Vec<tsce::ast_node_array_archive::AstNodeArchive>> {
-    use tsce::ast_node_array_archive::AstNodeType;
-
-    let (
-        first_lower_comparison,
-        first_upper_comparison,
-        second_lower_comparison,
-        second_upper_comparison,
-        logical_function,
-    ) = match kind {
-        NumericPredicateKind::Between => (
-            AstNodeType::GreaterThanOrEqualToNode,
-            AstNodeType::LessThanOrEqualToNode,
-            AstNodeType::GreaterThanOrEqualToNode,
-            AstNodeType::LessThanOrEqualToNode,
-            LOGICAL_AND_FUNCTION_INDEX,
-        ),
-        NumericPredicateKind::NotBetween => (
-            AstNodeType::LessThanNode,
-            AstNodeType::GreaterThanNode,
-            AstNodeType::LessThanNode,
-            AstNodeType::GreaterThanNode,
-            LOGICAL_OR_FUNCTION_INDEX,
-        ),
-        _ => unreachable!("range formula requires a range predicate"),
-    };
-    Ok(vec![
-        number_node(lower)?,
-        number_node(upper)?,
-        operator_node(AstNodeType::LessThanOrEqualToNode),
-        operator_node(AstNodeType::BeginThunkNode),
-        linked_cell_node(formula_owner_uuid),
-        number_node(lower)?,
-        operator_node(first_lower_comparison),
-        linked_cell_node(formula_owner_uuid),
-        number_node(upper)?,
-        operator_node(first_upper_comparison),
-        function_node(logical_function, BINARY_FUNCTION_ARGUMENT_COUNT),
-        operator_node(AstNodeType::EndThunkNode),
-        operator_node(AstNodeType::BeginThunkNode),
-        linked_cell_node(formula_owner_uuid),
-        number_node(upper)?,
-        operator_node(second_lower_comparison),
-        linked_cell_node(formula_owner_uuid),
-        number_node(lower)?,
-        operator_node(second_upper_comparison),
-        function_node(logical_function, BINARY_FUNCTION_ARGUMENT_COUNT),
-        operator_node(AstNodeType::EndThunkNode),
-        function_node(
-            CONDITIONAL_FUNCTION_INDEX,
-            CONDITIONAL_FUNCTION_ARGUMENT_COUNT,
-        ),
-    ])
 }
 
 fn predicate_number(value: f64) -> Result<tst::FormulaPredArgDataArchive> {

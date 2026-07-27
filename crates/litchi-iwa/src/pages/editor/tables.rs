@@ -2116,10 +2116,11 @@ fn remove_table_object(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::numbers::CellValue;
     use crate::pages::PagesDocumentBuilder;
     use crate::table_cell_conditional_highlight::{
-        TableCellConditionalHighlightCondition, TableCellConditionalHighlightNumber,
-        TableCellConditionalHighlightRule, TableCellConditionalHighlightStyle,
+        TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
+        TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
     };
     use crate::table_cell_data_format::{
         TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
@@ -2163,9 +2164,12 @@ mod tests {
             .build()
             .unwrap();
         let model_id = editor.tables().unwrap()[0].model_object_id;
+        editor
+            .set_table_cell(model_id, 1, 1, CellValue::Text("Organic Grain".to_owned()))
+            .unwrap();
         let rule = TableCellConditionalHighlightRule::new(
-            TableCellConditionalHighlightCondition::LessThan(
-                TableCellConditionalHighlightNumber::new(0.0).unwrap(),
+            TableCellConditionalHighlightCondition::TextContains(
+                TableCellConditionalHighlightText::new("grain").unwrap(),
             ),
             TableCellConditionalHighlightStyle::with_fill(
                 crate::shapes::RgbaColor::new(
@@ -2179,7 +2183,7 @@ mod tests {
             ),
         );
         editor
-            .set_table_cell_conditional_highlighting(model_id, 1, 1, &[rule])
+            .set_table_cell_conditional_highlighting(model_id, 1, 1, std::slice::from_ref(&rule))
             .unwrap();
         assert_eq!(
             editor

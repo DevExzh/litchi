@@ -51,8 +51,28 @@ impl TableCellConditionalHighlightRange {
     }
 }
 
-/// Numeric condition evaluated against the cell carrying the rule.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Non-empty text operand used by a conditional-highlight rule.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TableCellConditionalHighlightText(Box<str>);
+
+impl TableCellConditionalHighlightText {
+    pub fn new(value: impl Into<Box<str>>) -> Result<Self> {
+        let value = value.into();
+        if value.is_empty() {
+            return Err(Error::ParseError(
+                "iWork conditional-highlight text must not be empty".to_owned(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Condition evaluated against the cell carrying the rule.
+#[derive(Debug, Clone, PartialEq)]
 pub enum TableCellConditionalHighlightCondition {
     EqualTo(TableCellConditionalHighlightNumber),
     NotEqualTo(TableCellConditionalHighlightNumber),
@@ -62,30 +82,46 @@ pub enum TableCellConditionalHighlightCondition {
     LessThanOrEqualTo(TableCellConditionalHighlightNumber),
     Between(TableCellConditionalHighlightRange),
     NotBetween(TableCellConditionalHighlightRange),
+    TextContains(TableCellConditionalHighlightText),
 }
 
 impl TableCellConditionalHighlightCondition {
-    pub const fn single_operand(self) -> Option<TableCellConditionalHighlightNumber> {
+    pub const fn single_operand(&self) -> Option<TableCellConditionalHighlightNumber> {
         match self {
             Self::EqualTo(value)
             | Self::NotEqualTo(value)
             | Self::GreaterThan(value)
             | Self::GreaterThanOrEqualTo(value)
             | Self::LessThan(value)
-            | Self::LessThanOrEqualTo(value) => Some(value),
-            Self::Between(_) | Self::NotBetween(_) => None,
+            | Self::LessThanOrEqualTo(value) => Some(*value),
+            Self::Between(_) | Self::NotBetween(_) | Self::TextContains(_) => None,
         }
     }
 
-    pub const fn range(self) -> Option<TableCellConditionalHighlightRange> {
+    pub const fn range(&self) -> Option<TableCellConditionalHighlightRange> {
         match self {
-            Self::Between(range) | Self::NotBetween(range) => Some(range),
+            Self::Between(range) | Self::NotBetween(range) => Some(*range),
             Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
             | Self::GreaterThanOrEqualTo(_)
             | Self::LessThan(_)
-            | Self::LessThanOrEqualTo(_) => None,
+            | Self::LessThanOrEqualTo(_)
+            | Self::TextContains(_) => None,
+        }
+    }
+
+    pub fn text(&self) -> Option<&TableCellConditionalHighlightText> {
+        match self {
+            Self::TextContains(value) => Some(value),
+            Self::EqualTo(_)
+            | Self::NotEqualTo(_)
+            | Self::GreaterThan(_)
+            | Self::GreaterThanOrEqualTo(_)
+            | Self::LessThan(_)
+            | Self::LessThanOrEqualTo(_)
+            | Self::Between(_)
+            | Self::NotBetween(_) => None,
         }
     }
 }
@@ -144,14 +180,14 @@ impl TableCellConditionalHighlightStyle {
 }
 
 /// One ordered conditional-highlight condition and its visual style.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TableCellConditionalHighlightRule {
     pub condition: TableCellConditionalHighlightCondition,
     pub style: TableCellConditionalHighlightStyle,
 }
 
 impl TableCellConditionalHighlightRule {
-    pub const fn new(
+    pub fn new(
         condition: TableCellConditionalHighlightCondition,
         style: TableCellConditionalHighlightStyle,
     ) -> Self {
@@ -172,6 +208,13 @@ mod tests {
         let lower = TableCellConditionalHighlightNumber::new(7.0).unwrap();
         let upper = TableCellConditionalHighlightNumber::new(3.0).unwrap();
         assert!(TableCellConditionalHighlightRange::new(lower, upper).is_err());
+        assert!(TableCellConditionalHighlightText::new("").is_err());
+        assert_eq!(
+            TableCellConditionalHighlightText::new("Grain")
+                .unwrap()
+                .as_str(),
+            "Grain"
+        );
 
         let color = RgbaColor::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
         assert_eq!(
