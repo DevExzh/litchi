@@ -35,6 +35,7 @@ pub mod paragraph_extractor;
 pub mod piece_table;
 pub mod proofing;
 pub mod revisions;
+pub mod rsids;
 pub mod saved_by;
 pub mod sections;
 pub mod smart_tags;

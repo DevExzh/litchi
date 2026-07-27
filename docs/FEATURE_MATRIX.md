@@ -279,6 +279,7 @@ conversion, fonts, and image conversion are optional.
 | Bookmarks | ✅ | ✅ | ✅ | Bookmark ranges and writer support |
 | Comments | ✅ | ✅ | ✅ | Annotation ranges, authors, and reply metadata |
 | Track changes | ✅ | ✅ | ✅ | Transactional add/update/remove/accept/reject editing |
+| Revision-save identifiers | ✅ | ✅ | N/A | Typed `PLRSID` table with header validation |
 | FIB, piece tables, FKPs, and BinTable | ✅ | ✅ | ✅ | Core DOC storage and formatting structures; FIB table-pointer access is bounded by the declared `cbRgFcLcb` array, with the fixed Word 6/95 layout handled separately |
 | SPRM properties and DOP versions | ✅ | ✅ | ✅ | Typed properties with unknown-data preservation where applicable |
 | Associated strings, saved-by, proofing, and revision tables | ✅ | ✅ | ✅ | Typed, bounded auxiliary tables with mandatory associated-string emission, optional save-history authoring, proofing-state PLCFs, and round-trip mutation |
