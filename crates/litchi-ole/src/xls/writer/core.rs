@@ -1317,6 +1317,7 @@ pub struct XlsWriter {
     custom_table_styles: Option<XlsCustomTableStyles>,
     book_ext: Option<crate::xls::XlsBookExt>,
     xf_extensions: Vec<crate::xls::XlsXfExt>,
+    style_extensions: Vec<crate::xls::XlsStyleExt>,
     encryption: Option<XlsWriterEncryption>,
 }
 
@@ -1346,6 +1347,7 @@ impl XlsWriter {
             custom_table_styles: None,
             book_ext: None,
             xf_extensions: Vec::new(),
+            style_extensions: Vec::new(),
             encryption: None,
         }
     }
@@ -3317,6 +3319,12 @@ impl XlsWriter {
         self.xf_extensions = xf_extensions;
     }
 
+    /// Set the `StyleExt` cell-style extensions (MS-XLS 2.4.270) emitted
+    /// after the built-in STYLE records.
+    pub fn set_style_extensions(&mut self, style_extensions: Vec<crate::xls::XlsStyleExt>) {
+        self.style_extensions = style_extensions;
+    }
+
     pub fn set_workbook_window(&mut self, options: XlsWorkbookWindowOptions) -> XlsResult<()> {
         options.validate_intrinsic()?;
         self.workbook_window_options = options;
@@ -4023,6 +4031,7 @@ impl XlsWriter {
             self.file_sharing.as_ref(),
             self.book_ext.as_ref(),
             &self.xf_extensions,
+            &self.style_extensions,
             &self.worksheets,
             &self.string_map,
         )?;

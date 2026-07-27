@@ -312,7 +312,7 @@ conversion, fonts, and image conversion are optional.
 | Formula evaluation | 🟡 | ✅ | N/A | Shared evaluator via `WorkbookTrait`; not complete Excel semantics |
 | Shared strings and rich text | ✅ | ✅ | ✅ | SST/CONTINUE handling and formatting runs |
 | Defined names | ✅ | ✅ | ✅ | Workbook/sheet names and extended metadata |
-| Styles and number formats | ✅ | ✅ | ✅ | Fonts, fills, borders, alignment, XF/DXF, custom formats, and typed `XFExt` theme-color/gradient/indent extensions |
+| Styles and number formats | ✅ | ✅ | ✅ | Fonts, fills, borders, alignment, XF/DXF, custom formats, typed `XFExt` theme-color/gradient/indent extensions, and typed `StyleExt` style category/hidden/custom/name/`XFProps` extensions |
 | Merged cells | ✅ | ✅ | ✅ | BIFF merge ranges |
 | Rows, columns, outlines, and views | ✅ | ✅ | ✅ | Dimensions, hidden state, freeze/split panes, selections, and window settings |
 | Sheet extensions and tab color | ✅ | ✅ | ✅ | Typed `SheetExt` tab color (`icvPlain`), refreshed color, conditional-format calculation and not-published flags, and `CFColor` preservation |

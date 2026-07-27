@@ -154,6 +154,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     vba_metadata: crate::xls::vba::XlsVbaMetadata,
     environment: crate::xls::environment::XlsWorkbookEnvironment,
     book_ext: Option<crate::xls::book_ext::XlsBookExt>,
+    style_extensions: Vec<crate::xls::style_ext::XlsStyleExt>,
     write_access: crate::xls::XlsResult<Option<crate::xls::access::XlsWriteAccess>>,
     table_styles: Option<crate::xls::table_styles::XlsTableStyles>,
     shared_string_index: XlsResult<Option<crate::xls::shared_string_index::XlsSharedStringIndex>>,
@@ -235,6 +236,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             book_ext: None,
+            style_extensions: Vec::new(),
             write_access: Ok(None),
             table_styles: None,
             shared_string_index: Ok(None),
@@ -288,6 +290,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             book_ext: None,
+            style_extensions: Vec::new(),
             write_access: Ok(None),
             table_styles: None,
             shared_string_index: Ok(None),
@@ -555,6 +558,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         &record.data,
                         &mut palette_seen,
                     )?;
+                },
+                crate::xls::style_ext::STYLE_EXT_RECORD_TYPE => {
+                    self.style_extensions
+                        .push(crate::xls::style_ext::XlsStyleExt::parse(&record.data)?);
                 },
                 crate::xls::book_ext::BOOK_EXT_RECORD_TYPE => {
                     if self.book_ext.is_some() {
@@ -1320,6 +1327,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Workbook extension flags from the `BookExt` record, when present.
     pub fn book_ext(&self) -> Option<&crate::xls::book_ext::XlsBookExt> {
         self.book_ext.as_ref()
+    }
+
+    /// Cell-style extensions from `StyleExt` records, in record order.
+    pub fn style_extensions(&self) -> &[crate::xls::style_ext::XlsStyleExt] {
+        &self.style_extensions
     }
 
     /// Strictly access the user recorded as last creating, opening, or modifying the workbook.

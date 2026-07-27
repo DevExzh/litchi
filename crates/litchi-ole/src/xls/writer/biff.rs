@@ -357,6 +357,10 @@ pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsBookExt) 
     workbook::write_book_ext(writer, value)
 }
 
+pub fn write_style_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsStyleExt) -> XlsResult<()> {
+    workbook::write_style_ext(writer, value)
+}
+
 pub fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
     workbook::write_xfcrc(writer, xf_count)
 }

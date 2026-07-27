@@ -98,6 +98,7 @@ pub(crate) fn generate_workbook_stream(
     file_sharing: Option<&XlsFileSharing>,
     book_ext: Option<&crate::xls::XlsBookExt>,
     xf_extensions: &[crate::xls::XlsXfExt],
+    style_extensions: &[crate::xls::XlsStyleExt],
     worksheets: &[WritableWorksheet],
     string_map: &HashMap<String, u32>,
 ) -> XlsResult<WorkbookStreams> {
@@ -248,6 +249,9 @@ pub(crate) fn generate_workbook_stream(
     // etc.) visible to Excel even though we currently only use the default
     // cell XF (index 15) for all cells.
     biff::write_builtin_styles(&mut stream)?;
+    for style_ext in style_extensions {
+        biff::write_style_ext(&mut stream, style_ext)?;
+    }
     if let Some(styles) = custom_table_styles {
         biff::write_custom_table_styles(
             &mut stream,

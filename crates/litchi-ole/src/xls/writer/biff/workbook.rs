@@ -313,6 +313,20 @@ pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsBookExt) 
 
 
 
+/// Write a STYLEEXT record (MS-XLS 2.4.270) with a cell-style extension.
+///
+/// Record type: 0x0892
+pub fn write_style_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsStyleExt) -> XlsResult<()> {
+    let payload = value.to_payload()?;
+    write_record_header(
+        writer,
+        crate::xls::style_ext::STYLE_EXT_RECORD_TYPE,
+        payload.len() as u16,
+    )?;
+    writer.write_all(&payload)?;
+    Ok(())
+}
+
 /// Write an XFCRC record (MS-XLS 2.4.354) declaring `xf_count` XF records.
 ///
 /// Record type: 0x087C

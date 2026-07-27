@@ -760,7 +760,7 @@ impl XlsXfProperties {
         self.properties.is_empty()
     }
 
-    fn parse(data: &[u8]) -> XlsResult<Self> {
+    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
         if data.len() < 4 {
             return Err(invalid("truncated XFProps header"));
         }
@@ -846,7 +846,7 @@ impl XlsXfProperties {
         Ok(())
     }
 
-    fn to_bytes(&self) -> XlsResult<Vec<u8>> {
+    pub(crate) fn to_bytes(&self) -> XlsResult<Vec<u8>> {
         self.validate()?;
         let mut data = Vec::new();
         data.extend_from_slice(&0u16.to_le_bytes());

@@ -109,6 +109,9 @@ mod data_table;
 /// BIFF8 `XFExt` record: formatting property extensions for XF records.
 mod xf_ext;
 
+/// BIFF8 `StyleExt` record: cell-style extensions.
+mod style_ext;
+
 /// BIFF8 worksheet default dimensions and outline workspace metadata.
 mod sheet_layout;
 
@@ -265,6 +268,7 @@ pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenario
 pub use shapes::XlsShape;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
 pub use xf_ext::{XlsExtProp, XlsFullColorExt, XlsFullColorType, XlsXfExt};
+pub use style_ext::{XlsStyleCategory, XlsStyleExt};
 pub use data_table::{
     XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange,
 };
