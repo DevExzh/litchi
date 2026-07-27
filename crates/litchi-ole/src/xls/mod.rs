@@ -103,6 +103,9 @@ mod layout;
 /// BIFF8 worksheet default dimensions and outline workspace metadata.
 mod sheet_layout;
 
+/// BIFF8 `SheetExt` record: sheet tab color and publish state.
+mod sheet_ext;
+
 /// BIFF8 worksheet window, zoom, pane, and selection state.
 mod view;
 
@@ -252,6 +255,7 @@ pub use row_block_index::{
 pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
 pub use shapes::XlsShape;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
+pub use sheet_ext::{XlsSheetExt, XlsSheetExtOptional};
 pub use sheet_layout::XlsWorksheetLayout;
 pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
 pub use sort_data::{

@@ -1360,6 +1360,12 @@ pub(crate) fn generate_workbook_stream(
             biff::write_code_name(&mut stream, code_name)?;
         }
 
+        // SHEETEXT sits after CodeName and before the FEAT records
+        // (list objects) in the worksheet substream grammar.
+        if let Some(tab_color) = worksheet.tab_color {
+            biff::write_sheet_ext_tab_color(&mut stream, tab_color)?;
+        }
+
         biff::write_list_objects(
             &mut stream,
             &worksheet.list_objects,

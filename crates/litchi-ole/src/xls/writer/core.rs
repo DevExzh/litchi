@@ -3542,6 +3542,29 @@ impl XlsWriter {
         }
     }
 
+    /// Set a worksheet's tab color as a BIFF8 palette index (SHEETEXT
+    /// `icvPlain`, MS-XLS 2.4.259). Valid indices are 0x08 through 0x3F;
+    /// `None` clears an explicitly set color.
+    pub fn set_worksheet_tab_color(
+        &mut self,
+        sheet: usize,
+        tab_color: Option<u8>,
+    ) -> XlsResult<()> {
+        if let Some(index) = tab_color {
+            if !(0x08..=0x3F).contains(&index) {
+                return Err(XlsError::InvalidData(format!(
+                    "sheet tab color index {index:#04X} is outside the Icv palette"
+                )));
+            }
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.tab_color = tab_color;
+        Ok(())
+    }
+
     pub fn set_worksheet_vba_code_name(
         &mut self,
         sheet: usize,

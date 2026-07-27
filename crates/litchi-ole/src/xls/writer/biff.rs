@@ -448,6 +448,10 @@ pub fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
     worksheet::write_sheet_ext(writer)
 }
 
+pub fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> XlsResult<()> {
+    worksheet::write_sheet_ext_tab_color(writer, tab_color)
+}
+
 /// Write PANE record (freeze panes configuration)
 ///
 /// Record type: 0x0041, Length: 10

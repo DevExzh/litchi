@@ -938,6 +938,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     *worksheet.protection_mut() = protection_collector.finish()?;
                     break;
                 }
+                crate::xls::sheet_ext::SHEET_EXT_RECORD_TYPE => { // SheetExt
+                    if worksheet.sheet_ext().is_some() {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: crate::xls::sheet_ext::SHEET_EXT_RECORD_TYPE,
+                            message: "worksheet contains more than one SheetExt record".to_string(),
+                        });
+                    }
+                    worksheet.set_sheet_ext(crate::xls::sheet_ext::XlsSheetExt::parse(&record.data)?);
+                }
                 0x0200 => { // Dimensions
                     if let Ok(dimensions) = DimensionsRecord::parse(&record.data) {
                         worksheet.set_dimensions(dimensions.first_row, dimensions.last_row,

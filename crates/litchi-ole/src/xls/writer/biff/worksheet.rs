@@ -1249,6 +1249,20 @@ pub fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
+/// Write a SHEETEXT record (MS-XLS 2.4.259) carrying a sheet tab color.
+///
+/// Record type: 0x0862
+pub fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> XlsResult<()> {
+    let payload = crate::xls::sheet_ext::XlsSheetExt::from_tab_color(Some(tab_color)).to_payload();
+    write_record_header(
+        writer,
+        crate::xls::sheet_ext::SHEET_EXT_RECORD_TYPE,
+        payload.len() as u16,
+    )?;
+    writer.write_all(&payload)?;
+    Ok(())
+}
+
 /// Write DIMENSIONS record (worksheet dimensions)
 ///
 /// Record type: 0x0200

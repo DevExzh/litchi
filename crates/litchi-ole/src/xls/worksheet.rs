@@ -72,6 +72,8 @@ pub struct XlsWorksheet {
     list_objects: Vec<crate::xls::list_object::XlsListObject>,
     row_block_index:
         std::result::Result<Option<crate::xls::row_block_index::XlsRowBlockIndex>, String>,
+    /// Sheet tab color and publish state (SHEETEXT record).
+    sheet_ext: Option<crate::xls::sheet_ext::XlsSheetExt>,
 }
 
 impl XlsWorksheet {
@@ -111,6 +113,7 @@ impl XlsWorksheet {
             formula_error_features: Vec::new(),
             list_objects: Vec::new(),
             row_block_index: Ok(None),
+            sheet_ext: None,
         }
     }
 
@@ -150,6 +153,7 @@ impl XlsWorksheet {
             formula_error_features: Vec::new(),
             list_objects: Vec::new(),
             row_block_index: Ok(None),
+            sheet_ext: None,
         }
     }
 
@@ -294,6 +298,17 @@ impl XlsWorksheet {
 
     pub(crate) fn set_sort_data(&mut self, sort_data: XlsSortData) {
         self.sort_data = Some(sort_data);
+    }
+
+    // -- Sheet extensions --
+
+    /// Sheet tab color and publish state from the SHEETEXT record, when present.
+    pub fn sheet_ext(&self) -> Option<&crate::xls::sheet_ext::XlsSheetExt> {
+        self.sheet_ext.as_ref()
+    }
+
+    pub(crate) fn set_sheet_ext(&mut self, sheet_ext: crate::xls::sheet_ext::XlsSheetExt) {
+        self.sheet_ext = Some(sheet_ext);
     }
 
     // -- Filter mode --

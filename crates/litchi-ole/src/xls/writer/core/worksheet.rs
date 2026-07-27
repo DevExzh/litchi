@@ -129,6 +129,8 @@ pub(super) struct WritableWorksheet {
     pub vba_code_name: Option<String>,
     pub consolidation: Option<crate::xls::consolidation::XlsConsolidation>,
     pub list_objects: Vec<crate::xls::XlsListObject>,
+    /// Sheet tab color as a palette index (SHEETEXT `icvPlain`).
+    pub tab_color: Option<u8>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -192,6 +194,7 @@ impl WritableWorksheet {
             vba_code_name: None,
             consolidation: None,
             list_objects: Vec::new(),
+            tab_color: None,
         }
     }
 
