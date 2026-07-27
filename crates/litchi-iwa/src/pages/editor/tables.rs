@@ -65,6 +65,7 @@ pub use crate::table_cell_border::{
 pub use crate::table_cell_data_format::{
     TableCellCheckboxFormat as PagesTableCellCheckboxFormat,
     TableCellCurrencyFormat as PagesTableCellCurrencyFormat,
+    TableCellCustomFormat as PagesTableCellCustomFormat,
     TableCellDataFormat as PagesTableCellDataFormat,
     TableCellDateTimeFormat as PagesTableCellDateTimeFormat,
     TableCellDurationFormat as PagesTableCellDurationFormat,
@@ -441,6 +442,63 @@ impl PagesEditor {
             {
                 return Err(Error::InvalidFormat(
                     "Pages Text-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read a named custom format for one body-table cell.
+    pub fn table_cell_custom_format(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<PagesTableCellCustomFormat>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_custom_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a named custom format transactionally.
+    pub fn set_table_cell_custom_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        format: PagesTableCellCustomFormat,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(model_object_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from a named custom body-table format.
+    pub fn reset_table_cell_custom_format(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_custom_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            if verified.table_cell_data_format(model_object_id, row, column)?
+                != PagesTableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Pages Custom-format reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;
@@ -2058,9 +2116,10 @@ mod tests {
     use super::*;
     use crate::pages::PagesDocumentBuilder;
     use crate::table_cell_data_format::{
-        TableCellCurrencyCode, TableCellCurrencyStyle, TableCellFractionAccuracy,
-        TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
-        TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
+        TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
+        TableCellCustomTextFormat, TableCellFractionAccuracy, TableCellNumeralSystemBase,
+        TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemNegativeStyle,
+        TableCellNumeralSystemPlaces,
     };
 
     const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
@@ -2579,6 +2638,44 @@ mod tests {
         assert!(
             reopened
                 .reset_table_cell_text_format(model_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
+            PagesTableCellDataFormat::Automatic
+        );
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_custom_format_crud() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Custom Text", 3, 3)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let format = PagesTableCellCustomFormat::Text(
+            TableCellCustomTextFormat::try_new(
+                TableCellCustomFormatName::try_new("Invoice Identifier").unwrap(),
+                "",
+                " ID",
+            )
+            .unwrap(),
+        );
+        editor
+            .set_table_cell(model_id, 1, 1, PagesCellValue::Text("00123".to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_custom_format(model_id, 1, 1, format.clone())
+            .unwrap();
+
+        let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_custom_format(model_id, 1, 1).unwrap(),
+            Some(format)
+        );
+        assert!(
+            reopened
+                .reset_table_cell_custom_format(model_id, 1, 1)
                 .unwrap()
         );
         assert_eq!(

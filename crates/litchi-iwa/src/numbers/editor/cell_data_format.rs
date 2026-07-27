@@ -4,11 +4,12 @@ use super::*;
 use crate::numbers::bnc;
 use crate::protobuf::tsk::FormatStructArchive;
 use crate::table_cell_data_format::{
-    TableCellCheckboxFormat, TableCellCurrencyFormat, TableCellDataFormat, TableCellDateTimeFormat,
-    TableCellDurationFormat, TableCellFractionFormat, TableCellNumberFormat,
-    TableCellNumeralSystemFormat, TableCellNumericControlDisplayFormat, TableCellPercentageFormat,
-    TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection, TableCellScientificFormat,
-    TableCellSliderFormat, TableCellStarRatingFormat, TableCellStepperFormat, TableCellTextFormat,
+    TableCellCheckboxFormat, TableCellCurrencyFormat, TableCellCustomFormat, TableCellDataFormat,
+    TableCellDateTimeFormat, TableCellDurationFormat, TableCellFractionFormat,
+    TableCellNumberFormat, TableCellNumeralSystemFormat, TableCellNumericControlDisplayFormat,
+    TableCellPercentageFormat, TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection,
+    TableCellScientificFormat, TableCellSliderFormat, TableCellStarRatingFormat,
+    TableCellStepperFormat, TableCellTextFormat,
 };
 #[cfg(test)]
 use crate::table_cell_data_format::{
@@ -19,6 +20,7 @@ use crate::table_cell_data_format::{
 
 mod codec;
 mod control;
+mod custom;
 mod pop_up_menu;
 use codec::*;
 
@@ -56,7 +58,11 @@ pub(super) fn cell_data_format(
                 .transpose()?;
             match control {
                 None => {
-                    let format = data_format_from_native(native)?;
+                    let format = if custom::reference_uuid(native)?.is_some() {
+                        TableCellDataFormat::Custom(custom::resolve_reference(package, native)?)
+                    } else {
+                        data_format_from_native(native)?
+                    };
                     if matches!(
                         format,
                         TableCellDataFormat::Checkbox(_)
@@ -170,8 +176,39 @@ pub(super) fn cell_number_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn cell_custom_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellCustomFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Custom(format) => Ok(Some(format)),
+        _ => Err(Error::InvalidFormat(
+            "Table cell does not use a Custom data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_custom_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Custom(_) => reset_cell_data_format(package, table_id, row, column),
+        _ => Err(Error::InvalidFormat(
+            "Cannot reset Custom format from a non-Custom cell".to_owned(),
         )),
     }
 }
@@ -227,6 +264,7 @@ pub(super) fn cell_currency_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
@@ -254,6 +292,7 @@ pub(super) fn reset_cell_currency_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
@@ -281,6 +320,7 @@ pub(super) fn cell_percentage_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
@@ -308,6 +348,7 @@ pub(super) fn cell_scientific_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
@@ -337,6 +378,7 @@ pub(super) fn reset_cell_scientific_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
@@ -364,6 +406,7 @@ pub(super) fn cell_fraction_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
@@ -391,6 +434,7 @@ pub(super) fn reset_cell_fraction_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
         )),
@@ -418,6 +462,7 @@ pub(super) fn cell_numeral_system_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Numeral System data format".to_owned(),
         )),
@@ -447,6 +492,7 @@ pub(super) fn reset_cell_numeral_system_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
         )),
@@ -474,6 +520,7 @@ pub(super) fn cell_date_time_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Date & Time data format".to_owned(),
         )),
@@ -501,6 +548,7 @@ pub(super) fn reset_cell_date_time_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Date & Time format from a non-Date-Time cell".to_owned(),
         )),
@@ -528,6 +576,7 @@ pub(super) fn cell_duration_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Duration data format".to_owned(),
         )),
@@ -555,6 +604,7 @@ pub(super) fn reset_cell_duration_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Duration format from a non-Duration cell".to_owned(),
         )),
@@ -773,6 +823,7 @@ pub(super) fn set_cell_data_format(
             _ => bnc::CellDataFormatKind::NumericControlNumberOrPercentage,
         },
         TableCellDataFormat::PopUpMenu(_) => bnc::CellDataFormatKind::PopUpMenu,
+        TableCellDataFormat::Custom(format) => custom::scalar_kind(format),
         TableCellDataFormat::Number(_)
         | TableCellDataFormat::Percentage(_)
         | TableCellDataFormat::Scientific(_)
@@ -780,7 +831,10 @@ pub(super) fn set_cell_data_format(
         | TableCellDataFormat::NumeralSystem(_) => bnc::CellDataFormatKind::NumberOrPercentage,
         TableCellDataFormat::Automatic => unreachable!("handled above"),
     };
-    let native = data_format_to_native(format)?;
+    let native = match format {
+        TableCellDataFormat::Custom(format) => custom::acquire_reference(package, format)?,
+        _ => data_format_to_native(format)?,
+    };
     let new_control_identifier = match format {
         TableCellDataFormat::Checkbox(_) => Some(control::acquire_spec(
             package,
@@ -827,6 +881,14 @@ pub(super) fn set_cell_data_format(
                 .find(|entry| entry.entry.key == identifier)
         })
         .copied();
+    let mut old_custom_references = Vec::new();
+    for entry in &old_entries {
+        if let Some(native) = entry.entry.format.as_ref()
+            && custom::reference_uuid(native)?.is_some()
+        {
+            old_custom_references.push((entry.entry.key, native.clone()));
+        }
+    }
 
     if matches!(old_reference, CellFormatReference::Explicit { .. })
         && old_entry.and_then(|entry| entry.entry.format.as_ref()) == Some(&native)
@@ -920,6 +982,11 @@ pub(super) fn set_cell_data_format(
             )?;
         }
     }
+    for (identifier, reference) in old_custom_references {
+        if identifier != new_identifier {
+            custom::release_reference_if_unused(package, &reference)?;
+        }
+    }
     if let Some(identifier) = old_control_identifier
         && Some(identifier) != new_control_identifier
     {
@@ -949,6 +1016,7 @@ pub(super) fn reset_cell_number_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
@@ -978,6 +1046,7 @@ pub(super) fn reset_cell_percentage_format(
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
         | TableCellDataFormat::Text(_)
+        | TableCellDataFormat::Custom(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
@@ -1013,6 +1082,14 @@ pub(super) fn reset_cell_data_format(
         .flatten()
         .map(|identifier| required_format_entry(&resolved, identifier))
         .collect::<Result<Vec<_>>>()?;
+    let mut old_custom_references = Vec::new();
+    for entry in &old_entries {
+        if let Some(native) = entry.entry.format.as_ref()
+            && custom::reference_uuid(native)?.is_some()
+        {
+            old_custom_references.push(native.clone());
+        }
+    }
     let old_control_identifier = cell.control_cell_spec_identifier();
 
     cell.clear_explicit_format();
@@ -1040,6 +1117,9 @@ pub(super) fn reset_cell_data_format(
             old_entry,
             tst::table_data_list::ListType::Format,
         )?;
+    }
+    for reference in old_custom_references {
+        custom::release_reference_if_unused(package, &reference)?;
     }
     if let Some(identifier) = old_control_identifier {
         control::release_spec(package, &location, identifier)?;
@@ -1379,6 +1459,10 @@ mod tests {
     use super::*;
     use crate::numbers::{CellValue, NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
     use crate::table_cell_data_format::{
+        TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern, TableCellCustomFormat,
+        TableCellCustomFormatName, TableCellCustomNumberCondition,
+        TableCellCustomNumberConditionValue, TableCellCustomNumberFormat,
+        TableCellCustomNumberPattern, TableCellCustomNumberRule, TableCellCustomTextFormat,
         TableCellDurationStyle, TableCellDurationUnit, TableCellDurationUnitRange,
         TableCellFractionAccuracy, TableCellFractionFormat, TableCellNumeralSystemBase,
         TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
@@ -2024,6 +2108,106 @@ mod tests {
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         let formats = resolve_format_table(reopened.package(), &location).unwrap();
         assert!(formats.entries.is_empty());
+    }
+
+    #[test]
+    fn source_built_table_roundtrips_reuses_and_cleans_up_custom_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Custom Formats")
+            .table_dimensions(4, 4)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let name = |value| TableCellCustomFormatName::try_new(value).unwrap();
+        let number = TableCellCustomNumberFormat::try_with_rules(
+            name("Grouped Integer"),
+            TableCellCustomNumberPattern::try_new("#,###").unwrap(),
+            [TableCellCustomNumberRule::new(
+                TableCellCustomNumberCondition::LessThan(
+                    TableCellCustomNumberConditionValue::try_new(0.0).unwrap(),
+                ),
+                TableCellCustomNumberPattern::try_new("(#,###)").unwrap(),
+            )],
+        )
+        .unwrap();
+        let date_time = TableCellCustomDateTimeFormat::new(
+            name("Month Day Year"),
+            TableCellCustomDateTimePattern::try_new("MMM d, y").unwrap(),
+        );
+        let text =
+            TableCellCustomTextFormat::try_new(name("Text With ID Suffix"), "", "ID: ").unwrap();
+        let number = TableCellCustomFormat::Number(number);
+        let date_time = TableCellCustomFormat::DateTime(date_time);
+        let text = TableCellCustomFormat::Text(text);
+
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Number(-12_345.0))
+            .unwrap();
+        editor
+            .set_cell(table_id, 1, 2, CellValue::Number(42.0))
+            .unwrap();
+        editor
+            .set_cell(table_id, 2, 1, CellValue::Date(789_004_800.0))
+            .unwrap();
+        editor
+            .set_cell(table_id, 2, 2, CellValue::Text("Invoice 001".to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_custom_format(table_id, 1, 1, number.clone())
+            .unwrap();
+        editor
+            .set_table_cell_custom_format(table_id, 1, 2, number.clone())
+            .unwrap();
+        editor
+            .set_table_cell_custom_format(table_id, 2, 1, date_time.clone())
+            .unwrap();
+        editor
+            .set_table_cell_custom_format(table_id, 2, 2, text.clone())
+            .unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 3);
+        assert_eq!(
+            formats
+                .entries
+                .iter()
+                .find(|entry| entry.entry.format.as_ref().unwrap().format_type == Some(270))
+                .unwrap()
+                .entry
+                .refcount,
+            2
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_custom_format(table_id, 1, 1).unwrap(),
+            Some(number)
+        );
+        assert_eq!(
+            reopened.table_cell_custom_format(table_id, 2, 1).unwrap(),
+            Some(date_time)
+        );
+        assert_eq!(
+            reopened.table_cell_custom_format(table_id, 2, 2).unwrap(),
+            Some(text)
+        );
+
+        for (row, column) in [(1, 1), (1, 2), (2, 1), (2, 2)] {
+            assert!(
+                reopened
+                    .reset_table_cell_custom_format(table_id, row, column)
+                    .unwrap()
+            );
+        }
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 1).unwrap();
+        assert!(
+            resolve_format_table(reopened.package(), &location)
+                .unwrap()
+                .entries
+                .is_empty()
+        );
+        assert_eq!(custom::registry_entry_count(reopened.package()).unwrap(), 0);
     }
 
     #[test]

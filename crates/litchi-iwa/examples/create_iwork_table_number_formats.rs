@@ -8,11 +8,14 @@ use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_data_format::{
     TableCellCheckboxFormat, TableCellCurrencyCode, TableCellCurrencyFormat,
-    TableCellCurrencyStyle, TableCellDateTimeFormat, TableCellDecimalPlaces,
-    TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnitRange,
-    TableCellFixedDecimalPlaces, TableCellFractionAccuracy, TableCellFractionFormat,
-    TableCellNegativeNumberStyle, TableCellNumberFormat, TableCellNumeralSystemBase,
-    TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
+    TableCellCurrencyStyle, TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern,
+    TableCellCustomFormat, TableCellCustomFormatName, TableCellCustomNumberCondition,
+    TableCellCustomNumberConditionValue, TableCellCustomNumberFormat, TableCellCustomNumberPattern,
+    TableCellCustomNumberRule, TableCellCustomTextFormat, TableCellDateTimeFormat,
+    TableCellDecimalPlaces, TableCellDurationFormat, TableCellDurationStyle,
+    TableCellDurationUnitRange, TableCellFixedDecimalPlaces, TableCellFractionAccuracy,
+    TableCellFractionFormat, TableCellNegativeNumberStyle, TableCellNumberFormat,
+    TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces, TableCellPercentageFormat,
     TableCellPopUpMenuFormat, TableCellScientificFormat, TableCellSliderFormat,
     TableCellSliderRange, TableCellStarRatingFormat, TableCellStepperFormat, TableCellStepperRange,
@@ -34,6 +37,9 @@ const SLIDER_COLUMN: usize = 11;
 const STEPPER_COLUMN: usize = 12;
 const POP_UP_MENU_COLUMN: usize = 13;
 const TEXT_COLUMN: usize = 14;
+const CUSTOM_NUMBER_COLUMN: usize = 15;
+const CUSTOM_DATE_TIME_COLUMN: usize = 16;
+const CUSTOM_TEXT_COLUMN: usize = 17;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
@@ -142,10 +148,41 @@ fn pop_up_menu_format() -> Result<TableCellPopUpMenuFormat, litchi_iwa::Error> {
     TableCellPopUpMenuFormat::try_new(["Low", "Medium", "High"])
 }
 
+fn custom_number_format() -> Result<TableCellCustomFormat, litchi_iwa::Error> {
+    Ok(TableCellCustomNumberFormat::try_with_rules(
+        TableCellCustomFormatName::try_new("Grouped Integer")?,
+        TableCellCustomNumberPattern::try_new("#,###")?,
+        [TableCellCustomNumberRule::new(
+            TableCellCustomNumberCondition::LessThan(TableCellCustomNumberConditionValue::try_new(
+                0.0,
+            )?),
+            TableCellCustomNumberPattern::try_new("(#,###)")?,
+        )],
+    )?
+    .into())
+}
+
+fn custom_date_time_format() -> Result<TableCellCustomFormat, litchi_iwa::Error> {
+    Ok(TableCellCustomDateTimeFormat::new(
+        TableCellCustomFormatName::try_new("Month Day Year")?,
+        TableCellCustomDateTimePattern::try_new("MMM d, y")?,
+    )
+    .into())
+}
+
+fn custom_text_format() -> Result<TableCellCustomFormat, litchi_iwa::Error> {
+    Ok(TableCellCustomTextFormat::try_new(
+        TableCellCustomFormatName::try_new("Text With ID Suffix")?,
+        "",
+        "ID: ",
+    )?
+    .into())
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 15)
+        .table_dimensions(3, 18)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -265,6 +302,42 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Text("Invoice 001".to_owned()),
     )?;
     editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        CUSTOM_NUMBER_COLUMN,
+        CellValue::Number(NUMBER_VALUE),
+    )?;
+    editor.set_table_cell_custom_format(
+        table_id,
+        ROW,
+        CUSTOM_NUMBER_COLUMN,
+        custom_number_format()?,
+    )?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        CUSTOM_DATE_TIME_COLUMN,
+        CellValue::Date(DATE_TIME_VALUE),
+    )?;
+    editor.set_table_cell_custom_format(
+        table_id,
+        ROW,
+        CUSTOM_DATE_TIME_COLUMN,
+        custom_date_time_format()?,
+    )?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        CUSTOM_TEXT_COLUMN,
+        CellValue::Text("Invoice 001".to_owned()),
+    )?;
+    editor.set_table_cell_custom_format(
+        table_id,
+        ROW,
+        CUSTOM_TEXT_COLUMN,
+        custom_text_format()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -272,7 +345,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with native table-cell formats.\n")
-        .body_table("Number Formats", 3, 15)
+        .body_table("Number Formats", 3, 18)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -392,6 +465,42 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Text("Invoice 001".to_owned()),
     )?;
     editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        CUSTOM_NUMBER_COLUMN,
+        CellValue::Number(NUMBER_VALUE),
+    )?;
+    editor.set_table_cell_custom_format(
+        table_id,
+        ROW,
+        CUSTOM_NUMBER_COLUMN,
+        custom_number_format()?,
+    )?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        CUSTOM_DATE_TIME_COLUMN,
+        CellValue::Date(DATE_TIME_VALUE),
+    )?;
+    editor.set_table_cell_custom_format(
+        table_id,
+        ROW,
+        CUSTOM_DATE_TIME_COLUMN,
+        custom_date_time_format()?,
+    )?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        CUSTOM_TEXT_COLUMN,
+        CellValue::Text("Invoice 001".to_owned()),
+    )?;
+    editor.set_table_cell_custom_format(
+        table_id,
+        ROW,
+        CUSTOM_TEXT_COLUMN,
+        custom_text_format()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -404,7 +513,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        15,
+        18,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -594,6 +703,26 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         CellValue::Text("Invoice 001".to_owned()),
     )?;
     editor.set_slide_table_cell_text_format(0, table.model_object_id, ROW, TEXT_COLUMN)?;
+    for (column, value, format) in [
+        (
+            CUSTOM_NUMBER_COLUMN,
+            CellValue::Number(NUMBER_VALUE),
+            custom_number_format()?,
+        ),
+        (
+            CUSTOM_DATE_TIME_COLUMN,
+            CellValue::Date(DATE_TIME_VALUE),
+            custom_date_time_format()?,
+        ),
+        (
+            CUSTOM_TEXT_COLUMN,
+            CellValue::Text("Invoice 001".to_owned()),
+            custom_text_format()?,
+        ),
+    ] {
+        editor.set_slide_table_cell(0, table.model_object_id, ROW, column, value)?;
+        editor.set_slide_table_cell_custom_format(0, table.model_object_id, ROW, column, format)?;
+    }
     editor.save(output)?;
     Ok(())
 }

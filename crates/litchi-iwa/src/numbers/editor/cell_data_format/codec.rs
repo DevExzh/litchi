@@ -156,6 +156,7 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         TableCellDataFormat::Stepper(_) => unreachable!("handled above"),
         TableCellDataFormat::PopUpMenu(_) => unreachable!("handled above"),
         TableCellDataFormat::Text(_) => unreachable!("handled above"),
+        TableCellDataFormat::Custom(_) => unreachable!("handled by custom-format registry"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),

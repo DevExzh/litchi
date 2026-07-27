@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 const MAXIMUM_DECIMAL_PLACES: u8 = 30;
 
+mod custom;
 mod date_time;
 mod duration;
 mod numeral_system;
@@ -13,6 +14,13 @@ mod numeric_control;
 mod pop_up_menu;
 mod slider;
 mod stepper;
+pub(crate) use custom::NATIVE_CUSTOM_TEXT_VALUE_TOKEN;
+pub use custom::{
+    TableCellCustomDateTimeFormat, TableCellCustomDateTimePattern, TableCellCustomFormat,
+    TableCellCustomFormatName, TableCellCustomNumberCondition, TableCellCustomNumberConditionValue,
+    TableCellCustomNumberFormat, TableCellCustomNumberPattern, TableCellCustomNumberRule,
+    TableCellCustomTextFormat,
+};
 pub use date_time::TableCellDateTimeFormat;
 pub use duration::{
     TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnit,
@@ -508,6 +516,8 @@ pub enum TableCellDataFormat {
     Stepper(TableCellStepperFormat),
     /// Display and edit a text value with a native Pop-Up Menu control.
     PopUpMenu(TableCellPopUpMenuFormat),
+    /// Display the value with a document-registered custom format.
+    Custom(TableCellCustomFormat),
 }
 
 impl From<TableCellNumberFormat> for TableCellDataFormat {
@@ -573,6 +583,30 @@ impl From<TableCellStepperFormat> for TableCellDataFormat {
 impl From<TableCellPopUpMenuFormat> for TableCellDataFormat {
     fn from(value: TableCellPopUpMenuFormat) -> Self {
         Self::PopUpMenu(value)
+    }
+}
+
+impl From<TableCellCustomFormat> for TableCellDataFormat {
+    fn from(value: TableCellCustomFormat) -> Self {
+        Self::Custom(value)
+    }
+}
+
+impl From<TableCellCustomNumberFormat> for TableCellDataFormat {
+    fn from(value: TableCellCustomNumberFormat) -> Self {
+        Self::Custom(value.into())
+    }
+}
+
+impl From<TableCellCustomTextFormat> for TableCellDataFormat {
+    fn from(value: TableCellCustomTextFormat) -> Self {
+        Self::Custom(value.into())
+    }
+}
+
+impl From<TableCellCustomDateTimeFormat> for TableCellDataFormat {
+    fn from(value: TableCellCustomDateTimeFormat) -> Self {
+        Self::Custom(value.into())
     }
 }
 
