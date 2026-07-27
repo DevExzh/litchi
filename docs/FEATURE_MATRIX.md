@@ -522,12 +522,12 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Text, paragraphs, and runs | ✅ | ✅ | ✅ | Unicode/ANSI text, formatting groups, and deterministic serialization |
-| Sections | ✅ | ✅ | ✅ | Typed multi-section properties, headers/footers, explicit `\sect` boundaries, and inherited sections round-trip in source order |
+| Sections | ✅ | ✅ | ✅ | Typed multi-section properties, headers/footers, title-page and endnote-here flags, explicit `\sect` boundaries, and inherited sections round-trip in source order |
 | Page layout, columns, borders, and numbering | ✅ | ✅ | ✅ | Orientation, dimensions, margins, facing pages, columns, page borders, and line/page numbering |
 | Headers and footers | ✅ | ✅ | ✅ | Header/footer story content and types |
 | Tables | ✅ | ✅ | ✅ | Nested/floating tables, merges, geometry, borders, shading, distances, banding, and story ownership |
 | Character formatting | ✅ | ✅ | ✅ | Fonts, sizes, colors, bold/italic/underline, borders, shading, positioning, scaling, and kerning |
-| Paragraph formatting | ✅ | ✅ | ✅ | Alignment, indents, spacing, tabs, borders, shading, bidi, flow, drop caps, and style references |
+| Paragraph formatting | ✅ | ✅ | ✅ | Alignment, indents, spacing, tabs, borders, shading, bidi, flow, drop caps, outline levels, and style references |
 | Stylesheets and latent styles | ✅ | ✅ | ✅ | Paragraph, character, section, table, inheritance, latent styles, filters, and restrictions |
 | Lists and numbering | ✅ | ✅ | ✅ | Modern list tables/overrides plus legacy section and paragraph numbering |
 | Languages and bidirectional text | ✅ | ✅ | ✅ | Document defaults, character languages, LTR/RTL, and East Asian controls |

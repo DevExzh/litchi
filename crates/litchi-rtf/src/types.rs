@@ -563,6 +563,9 @@ pub struct Paragraph {
     pub paragraph_style: Option<u16>,
     /// RSID attached to the paragraph formatting (`\pararsidN`).
     pub paragraph_rsid: Option<u32>,
+    /// Paragraph outline level 0-9 for headings and TOC-by-outline
+    /// (`\outlinelevelN`).
+    pub outline_level: Option<u8>,
     /// Explicit paragraph direction; `None` uses left-to-right precedence.
     pub direction: Option<TextDirection>,
     /// Text alignment

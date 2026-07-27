@@ -292,6 +292,9 @@ pub struct SectionNoteOptions {
     pub endnote_restart: Option<crate::EndnoteRestart>,
     pub footnote_numbering: Option<crate::NoteNumberingStyle>,
     pub endnote_numbering: Option<crate::NoteNumberingStyle>,
+    /// Place endnotes at the end of the section rather than the document
+    /// (`\endnhere`).
+    pub endnote_here: bool,
 }
 
 impl SectionNoteOptions {
@@ -318,6 +321,9 @@ pub struct SectionProperties {
     pub section_style: Option<u16>,
     /// RSID attached to the section formatting (`\sectrsidN`).
     pub section_rsid: Option<u32>,
+    /// Different first page: the first page uses its own header/footer
+    /// (`\titlepg`).
+    pub title_page: bool,
     /// Explicit direction used to thread section columns.
     pub direction: Option<TextDirection>,
     /// Section break type
@@ -363,6 +369,7 @@ impl Default for SectionProperties {
         Self {
             section_style: None,
             section_rsid: None,
+            title_page: false,
             direction: None,
             break_type: SectionBreakType::default(),
             page_width: 12240,  // 8.5 inches at 1440 twips/inch

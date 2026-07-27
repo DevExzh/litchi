@@ -770,6 +770,9 @@ pub enum ControlWord<'a> {
 
     // Sections
     SectionBreak,
+    TitlePage,
+    SectionEndnoteHere,
+    OutlineLevel(i32),
     SectionContinuous,
     SectionColumn,
     SectionPage,
@@ -2775,6 +2778,9 @@ impl<'a> Lexer<'a> {
             "levelpicture" => ControlWord::ListLevelPicture(param_value),
 
             // Sections
+            "titlepg" => ControlWord::TitlePage,
+            "endnhere" => ControlWord::SectionEndnoteHere,
+            "outlinelevel" => ControlWord::OutlineLevel(param_value),
             "sectd" => ControlWord::SectionDefault,
             "sect" => ControlWord::Section,
             "sbk" => ControlWord::SectionBreak,

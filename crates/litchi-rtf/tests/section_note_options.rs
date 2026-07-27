@@ -22,6 +22,7 @@ fn parses_last_wins_section_note_options_and_round_trips_stably() {
             endnote_restart: Some(EndnoteRestart::EachSection),
             footnote_numbering: Some(NoteNumberingStyle::Chicago),
             endnote_numbering: Some(NoteNumberingStyle::UppercaseRoman),
+            endnote_here: false,
         }
     );
 

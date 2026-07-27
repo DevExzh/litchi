@@ -6024,6 +6024,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(paragraph_rsid) = para.paragraph_rsid {
             self.write_control_word("pararsid", Some(paragraph_rsid as i32))?;
         }
+        if let Some(outline_level) = para.outline_level {
+            self.write_control_word("outlinelevel", Some(i32::from(outline_level)))?;
+        }
         self.write_legacy_paragraph_numbering(para.legacy_numbering)?;
         if let Some(direction) = para.direction {
             self.write_control_word(
@@ -7616,6 +7619,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(section_rsid) = section.properties.section_rsid {
             self.write_control_word("sectrsid", Some(section_rsid as i32))?;
         }
+        if section.properties.title_page {
+            self.write_control_word("titlepg", None)?;
+        }
         self.write_section_note_options(&section.properties.note_options)?;
         self.write_page_borders(&section.properties.page_borders)?;
 
@@ -7781,6 +7787,9 @@ impl<W: Write> RtfWriter<W> {
         options
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if options.endnote_here {
+            self.write_control_word("endnhere", None)?;
+        }
         if let Some(value) = options.footnote_placement {
             self.write_control_word(
                 match value {

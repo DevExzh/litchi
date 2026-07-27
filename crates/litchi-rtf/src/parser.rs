@@ -412,6 +412,7 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
         ControlWord::SectionDefault
             | ControlWord::SectionStyle(_)
             | ControlWord::SectionBreak
+            | ControlWord::TitlePage
             | ControlWord::SectionRsid(_)
             | ControlWord::SectionContinuous
             | ControlWord::SectionColumn
@@ -453,6 +454,7 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::LeftToRightSection
             | ControlWord::RightToLeftSection
             | ControlWord::SectionFootnotePlacement(_)
+            | ControlWord::SectionEndnoteHere
             | ControlWord::SectionFootnoteStart(_)
             | ControlWord::SectionEndnoteStart(_)
             | ControlWord::SectionFootnoteRestart(_)
@@ -7573,6 +7575,14 @@ impl<'a> Parser<'a> {
             ControlWord::ParagraphRsid(value) => {
                 state.paragraph.paragraph_rsid = Some(*value as u32);
             },
+            ControlWord::OutlineLevel(value) => {
+                let level = u8::try_from(*value).ok().filter(|level| *level <= 9).ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF outline level must be between 0 and 9".to_string(),
+                    )
+                })?;
+                state.paragraph.outline_level = Some(level);
+            },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
             ControlWord::Center => state.paragraph.alignment = Alignment::Center,
@@ -8687,6 +8697,7 @@ impl<'a> Parser<'a> {
         let is_section_note_control = matches!(
             control,
             ControlWord::SectionFootnotePlacement(_)
+                | ControlWord::SectionEndnoteHere
                 | ControlWord::SectionFootnoteStart(_)
                 | ControlWord::SectionEndnoteStart(_)
                 | ControlWord::SectionFootnoteRestart(_)
@@ -8746,6 +8757,8 @@ impl<'a> Parser<'a> {
             ControlWord::SectionRsid(value) => {
                 properties.section_rsid = Some(*value as u32);
             },
+            ControlWord::TitlePage => properties.title_page = true,
+            ControlWord::SectionEndnoteHere => properties.note_options.endnote_here = true,
             ControlWord::SectionDefault => {
                 *properties = super::section::SectionProperties::default();
                 properties.margin_gutter = self
@@ -14031,6 +14044,14 @@ impl<'a> Parser<'a> {
             },
             ControlWord::ParagraphRsid(value) => {
                 state.paragraph.paragraph_rsid = Some(*value as u32);
+            },
+            ControlWord::OutlineLevel(value) => {
+                let level = u8::try_from(*value).ok().filter(|level| *level <= 9).ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF outline level must be between 0 and 9".to_string(),
+                    )
+                })?;
+                state.paragraph.outline_level = Some(level);
             },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
