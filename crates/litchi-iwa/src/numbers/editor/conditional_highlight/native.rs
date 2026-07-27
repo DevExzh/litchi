@@ -38,6 +38,8 @@ pub(super) const VALUE_TYPE_FUNCTION_INDEX: u32 = 327;
 pub(super) const CHECKBOX_DATA_FORMAT_CODE: f64 = 8.0;
 pub(super) const BOOLEAN_VALUE_TYPE_CODE: f64 = 6.0;
 pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
+pub(super) const ZERO_FUNCTION_ARGUMENT_COUNT: u32 = 0;
+pub(super) const TODAY_FUNCTION_INDEX: u32 = 154;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
@@ -64,7 +66,10 @@ impl NumericPredicateKind {
             | TableCellConditionalHighlightCondition::BooleanIsTrue
             | TableCellConditionalHighlightCondition::BooleanIsFalse
             | TableCellConditionalHighlightCondition::NumberIsPositive
-            | TableCellConditionalHighlightCondition::NumberIsNegative => None,
+            | TableCellConditionalHighlightCondition::NumberIsNegative
+            | TableCellConditionalHighlightCondition::DateIsToday
+            | TableCellConditionalHighlightCondition::DateIsYesterday
+            | TableCellConditionalHighlightCondition::DateIsTomorrow => None,
             TableCellConditionalHighlightCondition::EqualTo(_) => Some(Self::EqualTo),
             TableCellConditionalHighlightCondition::NotEqualTo(_) => Some(Self::NotEqualTo),
             TableCellConditionalHighlightCondition::GreaterThan(_) => Some(Self::GreaterThan),
@@ -171,6 +176,28 @@ pub(super) enum BooleanPredicateKind {
 pub(super) enum CheckboxPredicateKind {
     IsChecked = 55,
     IsNotChecked = 56,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub(super) enum RelativeDatePredicateKind {
+    Today = 17,
+    Yesterday = 18,
+    Tomorrow = 19,
+}
+
+impl RelativeDatePredicateKind {
+    pub(super) const fn native_value(self) -> i32 {
+        self as i32
+    }
+
+    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+        match self {
+            Self::Today => TableCellConditionalHighlightCondition::DateIsToday,
+            Self::Yesterday => TableCellConditionalHighlightCondition::DateIsYesterday,
+            Self::Tomorrow => TableCellConditionalHighlightCondition::DateIsTomorrow,
+        }
+    }
 }
 
 impl CheckboxPredicateKind {
@@ -304,6 +331,7 @@ pub(super) enum NativePredicateKind {
     Boolean(BooleanPredicateKind),
     Numeric(NumericPredicateKind),
     NumericSign(NumericSignPredicateKind),
+    RelativeDate(RelativeDatePredicateKind),
     Text(TextPredicateKind),
 }
 
@@ -333,6 +361,15 @@ impl NativePredicateKind {
             },
             TableCellConditionalHighlightCondition::NumberIsNegative => {
                 return Self::NumericSign(NumericSignPredicateKind::IsNegative);
+            },
+            TableCellConditionalHighlightCondition::DateIsToday => {
+                return Self::RelativeDate(RelativeDatePredicateKind::Today);
+            },
+            TableCellConditionalHighlightCondition::DateIsYesterday => {
+                return Self::RelativeDate(RelativeDatePredicateKind::Yesterday);
+            },
+            TableCellConditionalHighlightCondition::DateIsTomorrow => {
+                return Self::RelativeDate(RelativeDatePredicateKind::Tomorrow);
             },
             _ => {},
         }
@@ -375,6 +412,7 @@ impl NativePredicateKind {
             Self::Boolean(kind) => kind.native_value(),
             Self::Numeric(kind) => kind.native_value(),
             Self::NumericSign(kind) => kind.native_value(),
+            Self::RelativeDate(kind) => kind.native_value(),
             Self::Text(kind) => kind.native_value(),
         }
     }
@@ -393,6 +431,18 @@ impl TryFrom<i32> for NativePredicateKind {
     type Error = Error;
 
     fn try_from(value: i32) -> Result<Self> {
+        match value {
+            value if value == RelativeDatePredicateKind::Today.native_value() => {
+                return Ok(Self::RelativeDate(RelativeDatePredicateKind::Today));
+            },
+            value if value == RelativeDatePredicateKind::Yesterday.native_value() => {
+                return Ok(Self::RelativeDate(RelativeDatePredicateKind::Yesterday));
+            },
+            value if value == RelativeDatePredicateKind::Tomorrow.native_value() => {
+                return Ok(Self::RelativeDate(RelativeDatePredicateKind::Tomorrow));
+            },
+            _ => {},
+        }
         match value {
             value if value == CellPredicateKind::IsBlank.native_value() => {
                 return Ok(Self::Cell(CellPredicateKind::IsBlank));
@@ -573,6 +623,21 @@ mod tests {
             CheckboxPredicateKind::IsNotChecked,
         ] {
             let kind = NativePredicateKind::Checkbox(checkbox);
+            assert_eq!(
+                NativePredicateKind::try_from(kind.native_value()).unwrap(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn native_relative_date_predicate_values_are_reversible() {
+        for date in [
+            RelativeDatePredicateKind::Today,
+            RelativeDatePredicateKind::Yesterday,
+            RelativeDatePredicateKind::Tomorrow,
+        ] {
+            let kind = NativePredicateKind::RelativeDate(date);
             assert_eq!(
                 NativePredicateKind::try_from(kind.native_value()).unwrap(),
                 kind

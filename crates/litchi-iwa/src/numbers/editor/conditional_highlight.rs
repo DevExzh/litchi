@@ -8,6 +8,7 @@ mod read;
 mod tests;
 mod write;
 
+use chrono::{Local, NaiveDate};
 use prost::Message;
 
 use super::*;
@@ -27,13 +28,17 @@ use native::{
     PREDICATE_CELL_ARGUMENT_INDEX, PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE,
     PREDICATE_RANGE_CELL_ARGUMENT_INDEX, PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
     PREDICATE_RANGE_UPPER_ARGUMENT_INDEX, PREDICATE_TEXT_ARGUMENT_INDEX,
-    PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_LENGTH_FUNCTION_INDEX, TEXT_RIGHT_FUNCTION_INDEX,
-    TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind, UNARY_FUNCTION_ARGUMENT_COUNT,
-    VALUE_TYPE_FUNCTION_INDEX,
+    PREDICATE_UNUSED_ARGUMENT_INDEX, RelativeDatePredicateKind, TEXT_LENGTH_FUNCTION_INDEX,
+    TEXT_RIGHT_FUNCTION_INDEX, TEXT_SEARCH_FUNCTION_INDEX, TODAY_FUNCTION_INDEX, TextPredicateKind,
+    UNARY_FUNCTION_ARGUMENT_COUNT, VALUE_TYPE_FUNCTION_INDEX, ZERO_FUNCTION_ARGUMENT_COUNT,
 };
 
 const MAX_CONDITIONAL_HIGHLIGHT_RULES: usize = CONDITIONAL_STYLE_NO_APPLIED_RULE as usize;
 const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
+const APPLE_EPOCH_YEAR: i32 = 2001;
+const APPLE_EPOCH_MONTH: u32 = 1;
+const APPLE_EPOCH_DAY: u32 = 1;
+const SECONDS_PER_DAY: f64 = 86_400.0;
 
 pub(super) fn info_in_package(
     package: &IWorkPackage,
@@ -563,6 +568,7 @@ fn applied_rule_for_cell(
             },
             _ => match cell.cached_scalar()? {
                 Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value),
+                Some(CachedScalar::Date(value)) => ConditionalCellValue::Date(value),
                 Some(CachedScalar::Boolean(value))
                     if cell.cell_format_kind()
                         == Some(crate::numbers::bnc::CHECKBOX_CELL_FORMAT_KIND)
@@ -575,9 +581,20 @@ fn applied_rule_for_cell(
             },
         },
     };
+    let today = rules
+        .iter()
+        .any(|rule| {
+            matches!(
+                rule.condition,
+                TableCellConditionalHighlightCondition::DateIsToday
+                    | TableCellConditionalHighlightCondition::DateIsYesterday
+                    | TableCellConditionalHighlightCondition::DateIsTomorrow
+            )
+        })
+        .then(current_reference_date_midnight_seconds);
     rules
         .iter()
-        .position(|rule| condition_matches(&rule.condition, &value))
+        .position(|rule| condition_matches_at(&rule.condition, &value, today))
         .map(|index| {
             u32::try_from(index).map_err(|_| {
                 Error::ParseError("conditional-highlight rule index exceeds u32".to_owned())
@@ -591,14 +608,28 @@ enum ConditionalCellValue {
     Blank,
     Boolean(bool),
     Checkbox(bool),
+    Date(f64),
     Number(f64),
     Other,
     Text(String),
 }
 
+#[cfg(test)]
 fn condition_matches(
     condition: &TableCellConditionalHighlightCondition,
     value: &ConditionalCellValue,
+) -> bool {
+    condition_matches_at(
+        condition,
+        value,
+        Some(current_reference_date_midnight_seconds()),
+    )
+}
+
+fn condition_matches_at(
+    condition: &TableCellConditionalHighlightCondition,
+    value: &ConditionalCellValue,
+    today: Option<f64>,
 ) -> bool {
     match (condition, value) {
         (TableCellConditionalHighlightCondition::CellIsBlank, ConditionalCellValue::Blank) => true,
@@ -607,6 +638,7 @@ fn condition_matches(
             ConditionalCellValue::Number(_)
             | ConditionalCellValue::Boolean(_)
             | ConditionalCellValue::Checkbox(_)
+            | ConditionalCellValue::Date(_)
             | ConditionalCellValue::Other
             | ConditionalCellValue::Text(_),
         ) => true,
@@ -634,6 +666,20 @@ fn condition_matches(
             TableCellConditionalHighlightCondition::NumberIsNegative,
             ConditionalCellValue::Number(value),
         ) => *value < 0.0,
+        (
+            TableCellConditionalHighlightCondition::DateIsToday,
+            ConditionalCellValue::Date(value),
+        ) => today.is_some_and(|today| *value >= today && *value < today + SECONDS_PER_DAY),
+        (
+            TableCellConditionalHighlightCondition::DateIsYesterday,
+            ConditionalCellValue::Date(value),
+        ) => today.is_some_and(|today| *value >= today - SECONDS_PER_DAY && *value < today),
+        (
+            TableCellConditionalHighlightCondition::DateIsTomorrow,
+            ConditionalCellValue::Date(value),
+        ) => today.is_some_and(|today| {
+            *value >= today + SECONDS_PER_DAY && *value < today + 2.0 * SECONDS_PER_DAY
+        }),
         (
             TableCellConditionalHighlightCondition::EqualTo(operand),
             ConditionalCellValue::Number(value),
@@ -700,6 +746,16 @@ fn condition_matches(
         ) => !contains_case_insensitive(value, needle.as_str()),
         _ => false,
     }
+}
+
+fn current_reference_date_midnight_seconds() -> f64 {
+    let epoch = NaiveDate::from_ymd_opt(APPLE_EPOCH_YEAR, APPLE_EPOCH_MONTH, APPLE_EPOCH_DAY)
+        .expect("the Apple epoch is a valid calendar date");
+    Local::now()
+        .date_naive()
+        .signed_duration_since(epoch)
+        .num_days() as f64
+        * SECONDS_PER_DAY
 }
 
 fn equals_case_insensitive(value: &str, expected: &str) -> bool {

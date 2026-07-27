@@ -125,7 +125,7 @@ fn decode_predicate(
     let kind = NativePredicateKind::try_from(predicate.predicate_type)
         .map_err(|_| unsupported_rule_graph())?;
     let expected_indexes = match kind {
-        NativePredicateKind::Cell(_) => (
+        NativePredicateKind::Cell(_) | NativePredicateKind::RelativeDate(_) => (
             PREDICATE_CELL_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
@@ -188,6 +188,7 @@ fn decode_predicate(
         NativePredicateKind::Boolean(kind) => decode_boolean_predicate(predicate, kind)?,
         NativePredicateKind::Numeric(kind) => decode_numeric_predicate(predicate, kind)?,
         NativePredicateKind::NumericSign(kind) => decode_sign_predicate(predicate, kind)?,
+        NativePredicateKind::RelativeDate(kind) => decode_date_predicate(predicate, kind)?,
         NativePredicateKind::Text(kind) => decode_text_predicate(predicate, kind)?,
     };
     formula::validate(
@@ -233,6 +234,14 @@ fn decode_cell_predicate(
 fn decode_sign_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: NumericSignPredicateKind,
+) -> Result<TableCellConditionalHighlightCondition> {
+    validate_operand_free_predicate(predicate)?;
+    Ok(kind.condition())
+}
+
+fn decode_date_predicate(
+    predicate: &tst::FormulaPredicateArchive,
+    kind: RelativeDatePredicateKind,
 ) -> Result<TableCellConditionalHighlightCondition> {
     validate_operand_free_predicate(predicate)?;
     Ok(kind.condition())

@@ -9,6 +9,7 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
+chrono        = { workspace = true }
 litchi-core   = { workspace = true }
 once_cell     = { workspace = true }
 phf           = { workspace = true }

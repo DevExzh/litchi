@@ -42,7 +42,7 @@ pub(super) fn insert_conditional_style_graph(
         let predicate_type = kind.native_value();
         let prepivot_predicate_type = kind.prepivot_native_value();
         let (cell_index, first_index, second_index) = match kind {
-            NativePredicateKind::Cell(_) => (
+            NativePredicateKind::Cell(_) | NativePredicateKind::RelativeDate(_) => (
                 PREDICATE_CELL_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
@@ -230,6 +230,9 @@ fn predicate_arguments(
             | TableCellConditionalHighlightCondition::BooleanIsFalse
             | TableCellConditionalHighlightCondition::NumberIsPositive
             | TableCellConditionalHighlightCondition::NumberIsNegative
+            | TableCellConditionalHighlightCondition::DateIsToday
+            | TableCellConditionalHighlightCondition::DateIsYesterday
+            | TableCellConditionalHighlightCondition::DateIsTomorrow
     ) {
         return Ok((none(), none()));
     }

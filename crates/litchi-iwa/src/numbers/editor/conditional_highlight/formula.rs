@@ -3,6 +3,7 @@
 mod boolean;
 mod cell;
 mod checkbox;
+mod date;
 mod sign;
 mod text;
 
@@ -17,6 +18,7 @@ pub(super) fn encode(
         (NativePredicateKind::Cell(kind), _) => cell::nodes(kind, formula_owner_uuid),
         (NativePredicateKind::Checkbox(kind), _) => checkbox::nodes(kind, formula_owner_uuid)?,
         (NativePredicateKind::Boolean(kind), _) => boolean::nodes(kind, formula_owner_uuid)?,
+        (NativePredicateKind::RelativeDate(kind), _) => date::nodes(kind, formula_owner_uuid),
         (NativePredicateKind::NumericSign(kind), _) => sign::nodes(kind, formula_owner_uuid)?,
         (
             NativePredicateKind::Numeric(kind),
@@ -98,6 +100,7 @@ pub(super) fn validate(
         (NativePredicateKind::Cell(kind), _) => cell::validate(formula, kind),
         (NativePredicateKind::Checkbox(kind), _) => checkbox::validate(formula, kind),
         (NativePredicateKind::Boolean(kind), _) => boolean::validate(formula, kind),
+        (NativePredicateKind::RelativeDate(kind), _) => date::validate(formula, kind),
         (NativePredicateKind::NumericSign(kind), _) => sign::validate(formula, kind),
         (
             NativePredicateKind::Numeric(kind),

@@ -82,6 +82,9 @@ pub enum TableCellConditionalHighlightCondition {
     BooleanIsFalse,
     NumberIsPositive,
     NumberIsNegative,
+    DateIsToday,
+    DateIsYesterday,
+    DateIsTomorrow,
     EqualTo(TableCellConditionalHighlightNumber),
     NotEqualTo(TableCellConditionalHighlightNumber),
     GreaterThan(TableCellConditionalHighlightNumber),
@@ -110,7 +113,10 @@ impl TableCellConditionalHighlightCondition {
             | Self::BooleanIsTrue
             | Self::BooleanIsFalse
             | Self::NumberIsPositive
-            | Self::NumberIsNegative => None,
+            | Self::NumberIsNegative
+            | Self::DateIsToday
+            | Self::DateIsYesterday
+            | Self::DateIsTomorrow => None,
             Self::EqualTo(value)
             | Self::NotEqualTo(value)
             | Self::GreaterThan(value)
@@ -141,6 +147,9 @@ impl TableCellConditionalHighlightCondition {
             | Self::BooleanIsFalse
             | Self::NumberIsPositive
             | Self::NumberIsNegative
+            | Self::DateIsToday
+            | Self::DateIsYesterday
+            | Self::DateIsTomorrow
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
@@ -176,6 +185,9 @@ impl TableCellConditionalHighlightCondition {
             | Self::BooleanIsFalse
             | Self::NumberIsPositive
             | Self::NumberIsNegative
+            | Self::DateIsToday
+            | Self::DateIsYesterday
+            | Self::DateIsTomorrow
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
