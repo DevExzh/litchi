@@ -1,6 +1,7 @@
 //! Canonical formula graphs used by conditional-highlight predicates.
 
 mod cell;
+mod sign;
 mod text;
 
 use super::*;
@@ -12,6 +13,7 @@ pub(super) fn encode(
     let kind = NativePredicateKind::from_condition(condition);
     let nodes = match (kind, condition) {
         (NativePredicateKind::Cell(kind), _) => cell::nodes(kind, formula_owner_uuid),
+        (NativePredicateKind::NumericSign(kind), _) => sign::nodes(kind, formula_owner_uuid)?,
         (
             NativePredicateKind::Numeric(kind),
             TableCellConditionalHighlightCondition::Between(range)
@@ -51,6 +53,22 @@ pub(super) fn encode(
     })
 }
 
+pub(super) fn encode_prepivot(
+    condition: &TableCellConditionalHighlightCondition,
+    formula_owner_uuid: &tsp::Uuid,
+) -> Result<tsce::FormulaArchive> {
+    let kind = NativePredicateKind::from_condition(condition);
+    if let NativePredicateKind::NumericSign(kind) = kind {
+        return Ok(tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: sign::prepivot_nodes(kind, formula_owner_uuid)?,
+            },
+            ..Default::default()
+        });
+    }
+    encode(condition, formula_owner_uuid)
+}
+
 pub(super) fn validate(
     formula: &tsce::FormulaArchive,
     kind: NativePredicateKind,
@@ -58,6 +76,7 @@ pub(super) fn validate(
 ) -> Result<()> {
     match (kind, condition) {
         (NativePredicateKind::Cell(kind), _) => cell::validate(formula, kind),
+        (NativePredicateKind::NumericSign(kind), _) => sign::validate(formula, kind),
         (
             NativePredicateKind::Numeric(kind),
             TableCellConditionalHighlightCondition::Between(range)
@@ -76,6 +95,17 @@ pub(super) fn validate(
             condition.text().ok_or_else(invalid_formula)?.as_str(),
         ),
     }
+}
+
+pub(super) fn validate_prepivot(
+    formula: &tsce::FormulaArchive,
+    kind: NativePredicateKind,
+    condition: &TableCellConditionalHighlightCondition,
+) -> Result<()> {
+    if let NativePredicateKind::NumericSign(kind) = kind {
+        return sign::validate_prepivot(formula, kind);
+    }
+    validate(formula, kind, condition)
 }
 
 fn linked_cell_node(

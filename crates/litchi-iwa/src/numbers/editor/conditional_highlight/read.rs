@@ -130,6 +130,11 @@ fn decode_predicate(
             PREDICATE_UNUSED_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
         ),
+        NativePredicateKind::NumericSign(_) => (
+            PREDICATE_CELL_ARGUMENT_INDEX,
+            PREDICATE_NUMBER_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+        ),
         NativePredicateKind::Numeric(kind) if kind.is_range() => (
             PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
             PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
@@ -158,7 +163,7 @@ fn decode_predicate(
         return Err(unsupported_rule_graph());
     }
     if prepivot.is_some_and(|prepivot| {
-        predicate.predicate_type != prepivot.predicate_type
+        kind.prepivot_native_value() != prepivot.predicate_type
             || prepivot.qualifier1 != PREDICATE_QUALIFIER_NONE
             || prepivot.qualifier2 != PREDICATE_QUALIFIER_NONE
             || prepivot.param_index0 != expected_indexes.0
@@ -170,6 +175,7 @@ fn decode_predicate(
     let condition = match kind {
         NativePredicateKind::Cell(kind) => decode_cell_predicate(predicate, kind)?,
         NativePredicateKind::Numeric(kind) => decode_numeric_predicate(predicate, kind)?,
+        NativePredicateKind::NumericSign(kind) => decode_sign_predicate(predicate, kind)?,
         NativePredicateKind::Text(kind) => decode_text_predicate(predicate, kind)?,
     };
     formula::validate(
@@ -182,7 +188,7 @@ fn decode_predicate(
     )
     .map_err(|_| unsupported_rule_graph())?;
     if let Some(prepivot) = prepivot {
-        formula::validate(&prepivot.formula, kind, &condition)
+        formula::validate_prepivot(&prepivot.formula, kind, &condition)
             .map_err(|_| unsupported_rule_graph())?;
     }
     Ok(condition)
@@ -192,6 +198,19 @@ fn decode_cell_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: CellPredicateKind,
 ) -> Result<TableCellConditionalHighlightCondition> {
+    validate_operand_free_predicate(predicate)?;
+    Ok(kind.condition())
+}
+
+fn decode_sign_predicate(
+    predicate: &tst::FormulaPredicateArchive,
+    kind: NumericSignPredicateKind,
+) -> Result<TableCellConditionalHighlightCondition> {
+    validate_operand_free_predicate(predicate)?;
+    Ok(kind.condition())
+}
+
+fn validate_operand_free_predicate(predicate: &tst::FormulaPredicateArchive) -> Result<()> {
     if [
         predicate.param_value1.as_ref(),
         predicate.param_value2.as_ref(),
@@ -201,7 +220,7 @@ fn decode_cell_predicate(
     {
         return Err(unsupported_rule_graph());
     }
-    Ok(kind.condition())
+    Ok(())
 }
 
 fn decode_numeric_predicate(

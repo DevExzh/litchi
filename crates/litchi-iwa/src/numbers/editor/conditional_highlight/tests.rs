@@ -16,6 +16,22 @@ fn rule(
     )
 }
 
+fn applied_rule(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Option<u32> {
+    let location = locate_cell(&editor.package, table_id, row, column).unwrap();
+    let cell = read_tile_cell(
+        &editor.package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        column,
+    )
+    .unwrap()
+    .unwrap();
+    BncCell::parse(&cell)
+        .unwrap()
+        .conditional_style_applied_rule()
+}
+
 #[test]
 fn scratch_document_conditional_highlights_create_replace_and_delete() {
     let mut editor = NumbersDocumentBuilder::new()
@@ -189,23 +205,8 @@ fn blank_predicates_round_trip_and_apply_to_empty_and_populated_cells() {
         );
     }
 
-    let applied_rule = |editor: &NumbersEditor, column| {
-        let location = locate_cell(&editor.package, table_id, 1, column).unwrap();
-        let cell = read_tile_cell(
-            &editor.package,
-            &location.tile_archive,
-            location.tile_id,
-            location.tile_row,
-            column,
-        )
-        .unwrap()
-        .unwrap();
-        BncCell::parse(&cell)
-            .unwrap()
-            .conditional_style_applied_rule()
-    };
-    assert_eq!(applied_rule(&editor, 1), Some(0));
-    assert_eq!(applied_rule(&editor, 2), Some(1));
+    assert_eq!(applied_rule(&editor, table_id, 1, 1), Some(0));
+    assert_eq!(applied_rule(&editor, table_id, 1, 2), Some(1));
 
     assert!(condition_matches(
         &TableCellConditionalHighlightCondition::CellIsBlank,
@@ -218,6 +219,106 @@ fn blank_predicates_round_trip_and_apply_to_empty_and_populated_cells() {
     assert!(condition_matches(
         &TableCellConditionalHighlightCondition::CellIsNotBlank,
         &ConditionalCellValue::Other,
+    ));
+}
+
+#[test]
+fn numeric_sign_predicates_round_trip_and_exclude_zero_and_non_numbers() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(3, 4)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    for (column, value) in [(1, 3.0), (2, -3.0), (3, 0.0)] {
+        editor
+            .set_cell(table_id, 1, column, CellValue::Number(value))
+            .unwrap();
+    }
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let rules = [
+        rule(
+            TableCellConditionalHighlightCondition::NumberIsPositive,
+            red,
+        ),
+        rule(
+            TableCellConditionalHighlightCondition::NumberIsNegative,
+            green,
+        ),
+    ];
+    for column in 1..=3 {
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, column, &rules)
+            .unwrap();
+        assert_eq!(
+            editor
+                .cell_conditional_highlight_rules(table_id, 1, column)
+                .unwrap(),
+            Some(rules.to_vec())
+        );
+    }
+
+    assert_eq!(applied_rule(&editor, table_id, 1, 1), Some(0));
+    assert_eq!(applied_rule(&editor, table_id, 1, 2), Some(1));
+    assert_eq!(
+        applied_rule(&editor, table_id, 1, 3),
+        Some(CONDITIONAL_STYLE_NO_APPLIED_RULE)
+    );
+    let info = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let archive_name = &location.object_locations[&info.style_set_object_id];
+    let archive = editor.package.archive(archive_name).unwrap();
+    let object = archive.object(info.style_set_object_id).unwrap();
+    let set = object
+        .messages
+        .iter()
+        .find_map(|message| {
+            (message.type_ == 6_010)
+                .then(|| tst::ConditionalStyleSetArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    let current = set.rules.unwrap().rule;
+    for (index, (expected_current, expected_prepivot)) in [
+        (
+            NumericSignPredicateKind::IsPositive.native_value(),
+            NumericPredicateKind::GreaterThan.native_value(),
+        ),
+        (
+            NumericSignPredicateKind::IsNegative.native_value(),
+            NumericPredicateKind::LessThan.native_value(),
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let current = current[index].predicate.as_ref().unwrap();
+        let prepivot = &set.rules_prepivot[index].predicate;
+        assert_eq!(current.predicate_type, expected_current);
+        assert_eq!(
+            current
+                .formula
+                .as_ref()
+                .unwrap()
+                .ast_node_array
+                .ast_node
+                .len(),
+            6
+        );
+        assert_eq!(prepivot.predicate_type, expected_prepivot);
+        assert_eq!(prepivot.param_index0, PREDICATE_CELL_ARGUMENT_INDEX);
+        assert_eq!(prepivot.param_index1, PREDICATE_NUMBER_ARGUMENT_INDEX);
+        assert_eq!(prepivot.param_index2, PREDICATE_UNUSED_ARGUMENT_INDEX);
+        assert_eq!(prepivot.formula.ast_node_array.ast_node.len(), 3);
+    }
+    assert!(!condition_matches(
+        &TableCellConditionalHighlightCondition::NumberIsPositive,
+        &ConditionalCellValue::Other,
+    ));
+    assert!(!condition_matches(
+        &TableCellConditionalHighlightCondition::NumberIsNegative,
+        &ConditionalCellValue::Number(0.0),
     ));
 }
 

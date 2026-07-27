@@ -32,6 +32,7 @@ pub(super) const IS_ERROR_FUNCTION_INDEX: u32 = 70;
 pub(super) const LOGICAL_NOT_FUNCTION_INDEX: u32 = 96;
 pub(super) const IF_ERROR_FUNCTION_INDEX: u32 = 235;
 pub(super) const IS_BLANK_FUNCTION_INDEX: u32 = 69;
+pub(super) const IS_NUMBER_FUNCTION_INDEX: u32 = 304;
 pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +54,9 @@ impl NumericPredicateKind {
     ) -> Option<Self> {
         match condition {
             TableCellConditionalHighlightCondition::CellIsBlank
-            | TableCellConditionalHighlightCondition::CellIsNotBlank => None,
+            | TableCellConditionalHighlightCondition::CellIsNotBlank
+            | TableCellConditionalHighlightCondition::NumberIsPositive
+            | TableCellConditionalHighlightCondition::NumberIsNegative => None,
             TableCellConditionalHighlightCondition::EqualTo(_) => Some(Self::EqualTo),
             TableCellConditionalHighlightCondition::NotEqualTo(_) => Some(Self::NotEqualTo),
             TableCellConditionalHighlightCondition::GreaterThan(_) => Some(Self::GreaterThan),
@@ -143,6 +146,42 @@ impl CellPredicateKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
+pub(super) enum NumericSignPredicateKind {
+    IsPositive = 57,
+    IsNegative = 58,
+}
+
+impl NumericSignPredicateKind {
+    pub(super) const fn native_value(self) -> i32 {
+        self as i32
+    }
+
+    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+        match self {
+            Self::IsPositive => TableCellConditionalHighlightCondition::NumberIsPositive,
+            Self::IsNegative => TableCellConditionalHighlightCondition::NumberIsNegative,
+        }
+    }
+
+    pub(super) const fn comparison(self) -> tsce::ast_node_array_archive::AstNodeType {
+        use tsce::ast_node_array_archive::AstNodeType;
+
+        match self {
+            Self::IsPositive => AstNodeType::GreaterThanNode,
+            Self::IsNegative => AstNodeType::LessThanNode,
+        }
+    }
+
+    pub(super) const fn prepivot_kind(self) -> NumericPredicateKind {
+        match self {
+            Self::IsPositive => NumericPredicateKind::GreaterThan,
+            Self::IsNegative => NumericPredicateKind::LessThan,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
 pub(super) enum TextPredicateKind {
     StartsWith = 1,
     EndsWith = 2,
@@ -198,6 +237,7 @@ impl TextPredicateKind {
 pub(super) enum NativePredicateKind {
     Cell(CellPredicateKind),
     Numeric(NumericPredicateKind),
+    NumericSign(NumericSignPredicateKind),
     Text(TextPredicateKind),
 }
 
@@ -209,6 +249,12 @@ impl NativePredicateKind {
             },
             TableCellConditionalHighlightCondition::CellIsNotBlank => {
                 return Self::Cell(CellPredicateKind::IsNotBlank);
+            },
+            TableCellConditionalHighlightCondition::NumberIsPositive => {
+                return Self::NumericSign(NumericSignPredicateKind::IsPositive);
+            },
+            TableCellConditionalHighlightCondition::NumberIsNegative => {
+                return Self::NumericSign(NumericSignPredicateKind::IsNegative);
             },
             _ => {},
         }
@@ -248,7 +294,15 @@ impl NativePredicateKind {
         match self {
             Self::Cell(kind) => kind.native_value(),
             Self::Numeric(kind) => kind.native_value(),
+            Self::NumericSign(kind) => kind.native_value(),
             Self::Text(kind) => kind.native_value(),
+        }
+    }
+
+    pub(super) const fn prepivot_native_value(self) -> i32 {
+        match self {
+            Self::NumericSign(kind) => kind.prepivot_kind().native_value(),
+            _ => self.native_value(),
         }
     }
 }
@@ -263,6 +317,15 @@ impl TryFrom<i32> for NativePredicateKind {
             },
             value if value == CellPredicateKind::IsNotBlank.native_value() => {
                 return Ok(Self::Cell(CellPredicateKind::IsNotBlank));
+            },
+            _ => {},
+        }
+        match value {
+            value if value == NumericSignPredicateKind::IsPositive.native_value() => {
+                return Ok(Self::NumericSign(NumericSignPredicateKind::IsPositive));
+            },
+            value if value == NumericSignPredicateKind::IsNegative.native_value() => {
+                return Ok(Self::NumericSign(NumericSignPredicateKind::IsNegative));
             },
             _ => {},
         }
@@ -371,6 +434,20 @@ mod tests {
     fn native_cell_predicate_values_are_reversible() {
         for cell in [CellPredicateKind::IsBlank, CellPredicateKind::IsNotBlank] {
             let kind = NativePredicateKind::Cell(cell);
+            assert_eq!(
+                NativePredicateKind::try_from(kind.native_value()).unwrap(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn native_numeric_sign_predicate_values_are_reversible() {
+        for sign in [
+            NumericSignPredicateKind::IsPositive,
+            NumericSignPredicateKind::IsNegative,
+        ] {
+            let kind = NativePredicateKind::NumericSign(sign);
             assert_eq!(
                 NativePredicateKind::try_from(kind.native_value()).unwrap(),
                 kind

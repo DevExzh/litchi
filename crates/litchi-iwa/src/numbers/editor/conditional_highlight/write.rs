@@ -38,11 +38,18 @@ pub(super) fn insert_conditional_style_graph(
         })?;
         let kind = NativePredicateKind::from_condition(&rule.condition);
         let formula = formula::encode(&rule.condition, formula_owner_uuid)?;
+        let prepivot_formula = formula::encode_prepivot(&rule.condition, formula_owner_uuid)?;
         let predicate_type = kind.native_value();
+        let prepivot_predicate_type = kind.prepivot_native_value();
         let (cell_index, first_index, second_index) = match kind {
             NativePredicateKind::Cell(_) => (
                 PREDICATE_CELL_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
+            NativePredicateKind::NumericSign(_) => (
+                PREDICATE_CELL_ARGUMENT_INDEX,
+                PREDICATE_NUMBER_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
             ),
             NativePredicateKind::Numeric(kind) if kind.is_range() => (
@@ -73,8 +80,8 @@ pub(super) fn insert_conditional_style_graph(
         prepivot.push(
             tst::conditional_style_set_archive::ConditionalStyleRulePrePivot {
                 predicate: tst::FormulaPredicatePrePivotArchive {
-                    formula: formula.clone(),
-                    predicate_type,
+                    formula: prepivot_formula,
+                    predicate_type: prepivot_predicate_type,
                     qualifier1: PREDICATE_QUALIFIER_NONE,
                     qualifier2: PREDICATE_QUALIFIER_NONE,
                     param_index1: first_index,
@@ -207,6 +214,8 @@ fn predicate_arguments(
         condition,
         TableCellConditionalHighlightCondition::CellIsBlank
             | TableCellConditionalHighlightCondition::CellIsNotBlank
+            | TableCellConditionalHighlightCondition::NumberIsPositive
+            | TableCellConditionalHighlightCondition::NumberIsNegative
     ) {
         return Ok((none(), none()));
     }

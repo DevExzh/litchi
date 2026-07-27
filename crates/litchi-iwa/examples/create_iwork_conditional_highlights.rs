@@ -13,7 +13,11 @@ use litchi_iwa::table_cell_conditional_highlight::{
 
 const HIGHLIGHT_ROW: usize = 1;
 const HIGHLIGHT_COLUMN: usize = 1;
-const BLANK_HIGHLIGHT_COLUMN: usize = 2;
+const SIGN_HIGHLIGHT_ROW: usize = 2;
+const POSITIVE_HIGHLIGHT_COLUMN: usize = 1;
+const NEGATIVE_HIGHLIGHT_COLUMN: usize = 2;
+const POSITIVE_VALUE: f64 = 42.0;
+const NEGATIVE_VALUE: f64 = -42.0;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -57,9 +61,11 @@ fn highlight_style() -> Result<TableCellConditionalHighlightStyle, Box<dyn std::
     )?)
 }
 
-fn blank_highlight_rule() -> Result<TableCellConditionalHighlightRule, Box<dyn std::error::Error>> {
+fn highlight_rule(
+    condition: TableCellConditionalHighlightCondition,
+) -> Result<TableCellConditionalHighlightRule, Box<dyn std::error::Error>> {
     Ok(TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::CellIsBlank,
+        condition,
         highlight_style()?,
     ))
 }
@@ -76,14 +82,33 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         CellValue::Text("Organic Grain".to_owned()),
     )?;
+    editor.set_cell(
+        table_id,
+        SIGN_HIGHLIGHT_ROW,
+        POSITIVE_HIGHLIGHT_COLUMN,
+        CellValue::Number(POSITIVE_VALUE),
+    )?;
+    editor.set_cell(
+        table_id,
+        SIGN_HIGHLIGHT_ROW,
+        NEGATIVE_HIGHLIGHT_COLUMN,
+        CellValue::Number(NEGATIVE_VALUE),
+    )?;
     let rules = highlight_rules()?;
     editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &rules)?;
-    let blank_rule = blank_highlight_rule()?;
+    let positive_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsPositive)?;
     editor.set_cell_conditional_highlighting(
         table_id,
-        HIGHLIGHT_ROW,
-        BLANK_HIGHLIGHT_COLUMN,
-        std::slice::from_ref(&blank_rule),
+        SIGN_HIGHLIGHT_ROW,
+        POSITIVE_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&positive_rule),
+    )?;
+    let negative_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsNegative)?;
+    editor.set_cell_conditional_highlighting(
+        table_id,
+        SIGN_HIGHLIGHT_ROW,
+        NEGATIVE_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&negative_rule),
     )?;
     editor.save(output)?;
     assert_eq!(
@@ -97,10 +122,18 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         NumbersEditor::open(output)?.cell_conditional_highlight_rules(
             table_id,
-            HIGHLIGHT_ROW,
-            BLANK_HIGHLIGHT_COLUMN,
+            SIGN_HIGHLIGHT_ROW,
+            POSITIVE_HIGHLIGHT_COLUMN,
         )?,
-        Some(vec![blank_rule])
+        Some(vec![positive_rule])
+    );
+    assert_eq!(
+        NumbersEditor::open(output)?.cell_conditional_highlight_rules(
+            table_id,
+            SIGN_HIGHLIGHT_ROW,
+            NEGATIVE_HIGHLIGHT_COLUMN,
+        )?,
+        Some(vec![negative_rule])
     );
     Ok(())
 }
@@ -117,6 +150,18 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         CellValue::Text("Organic Grain".to_owned()),
     )?;
+    editor.set_table_cell(
+        table_id,
+        SIGN_HIGHLIGHT_ROW,
+        POSITIVE_HIGHLIGHT_COLUMN,
+        CellValue::Number(POSITIVE_VALUE),
+    )?;
+    editor.set_table_cell(
+        table_id,
+        SIGN_HIGHLIGHT_ROW,
+        NEGATIVE_HIGHLIGHT_COLUMN,
+        CellValue::Number(NEGATIVE_VALUE),
+    )?;
     let rules = highlight_rules()?;
     editor.set_table_cell_conditional_highlighting(
         table_id,
@@ -124,12 +169,19 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         &rules,
     )?;
-    let blank_rule = blank_highlight_rule()?;
+    let positive_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsPositive)?;
     editor.set_table_cell_conditional_highlighting(
         table_id,
-        HIGHLIGHT_ROW,
-        BLANK_HIGHLIGHT_COLUMN,
-        std::slice::from_ref(&blank_rule),
+        SIGN_HIGHLIGHT_ROW,
+        POSITIVE_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&positive_rule),
+    )?;
+    let negative_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsNegative)?;
+    editor.set_table_cell_conditional_highlighting(
+        table_id,
+        SIGN_HIGHLIGHT_ROW,
+        NEGATIVE_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&negative_rule),
     )?;
     editor.save(output)?;
     assert_eq!(
@@ -143,10 +195,18 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         PagesEditor::open(output)?.table_cell_conditional_highlight_rules(
             table_id,
-            HIGHLIGHT_ROW,
-            BLANK_HIGHLIGHT_COLUMN,
+            SIGN_HIGHLIGHT_ROW,
+            POSITIVE_HIGHLIGHT_COLUMN,
         )?,
-        Some(vec![blank_rule])
+        Some(vec![positive_rule])
+    );
+    assert_eq!(
+        PagesEditor::open(output)?.table_cell_conditional_highlight_rules(
+            table_id,
+            SIGN_HIGHLIGHT_ROW,
+            NEGATIVE_HIGHLIGHT_COLUMN,
+        )?,
+        Some(vec![negative_rule])
     );
     Ok(())
 }
@@ -173,6 +233,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         CellValue::Text("Organic Grain".to_owned()),
     )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        SIGN_HIGHLIGHT_ROW,
+        POSITIVE_HIGHLIGHT_COLUMN,
+        CellValue::Number(POSITIVE_VALUE),
+    )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        SIGN_HIGHLIGHT_ROW,
+        NEGATIVE_HIGHLIGHT_COLUMN,
+        CellValue::Number(NEGATIVE_VALUE),
+    )?;
     let rules = highlight_rules()?;
     editor.set_slide_table_cell_conditional_highlighting(
         0,
@@ -181,13 +255,21 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         &rules,
     )?;
-    let blank_rule = blank_highlight_rule()?;
+    let positive_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsPositive)?;
     editor.set_slide_table_cell_conditional_highlighting(
         0,
         table.model_object_id,
-        HIGHLIGHT_ROW,
-        BLANK_HIGHLIGHT_COLUMN,
-        std::slice::from_ref(&blank_rule),
+        SIGN_HIGHLIGHT_ROW,
+        POSITIVE_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&positive_rule),
+    )?;
+    let negative_rule = highlight_rule(TableCellConditionalHighlightCondition::NumberIsNegative)?;
+    editor.set_slide_table_cell_conditional_highlighting(
+        0,
+        table.model_object_id,
+        SIGN_HIGHLIGHT_ROW,
+        NEGATIVE_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&negative_rule),
     )?;
     editor.save(output)?;
     assert_eq!(
@@ -203,10 +285,19 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         KeynoteEditor::open(output)?.slide_table_cell_conditional_highlight_rules(
             0,
             table.model_object_id,
-            HIGHLIGHT_ROW,
-            BLANK_HIGHLIGHT_COLUMN,
+            SIGN_HIGHLIGHT_ROW,
+            POSITIVE_HIGHLIGHT_COLUMN,
         )?,
-        Some(vec![blank_rule])
+        Some(vec![positive_rule])
+    );
+    assert_eq!(
+        KeynoteEditor::open(output)?.slide_table_cell_conditional_highlight_rules(
+            0,
+            table.model_object_id,
+            SIGN_HIGHLIGHT_ROW,
+            NEGATIVE_HIGHLIGHT_COLUMN,
+        )?,
+        Some(vec![negative_rule])
     );
     Ok(())
 }

@@ -76,6 +76,8 @@ impl TableCellConditionalHighlightText {
 pub enum TableCellConditionalHighlightCondition {
     CellIsBlank,
     CellIsNotBlank,
+    NumberIsPositive,
+    NumberIsNegative,
     EqualTo(TableCellConditionalHighlightNumber),
     NotEqualTo(TableCellConditionalHighlightNumber),
     GreaterThan(TableCellConditionalHighlightNumber),
@@ -97,7 +99,10 @@ pub enum TableCellConditionalHighlightCondition {
 impl TableCellConditionalHighlightCondition {
     pub const fn single_operand(&self) -> Option<TableCellConditionalHighlightNumber> {
         match self {
-            Self::CellIsBlank | Self::CellIsNotBlank => None,
+            Self::CellIsBlank
+            | Self::CellIsNotBlank
+            | Self::NumberIsPositive
+            | Self::NumberIsNegative => None,
             Self::EqualTo(value)
             | Self::NotEqualTo(value)
             | Self::GreaterThan(value)
@@ -122,6 +127,8 @@ impl TableCellConditionalHighlightCondition {
             Self::Between(range) | Self::NotBetween(range) => Some(*range),
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::NumberIsPositive
+            | Self::NumberIsNegative
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
@@ -151,6 +158,8 @@ impl TableCellConditionalHighlightCondition {
             | Self::TextDoesNotContain(value) => Some(value),
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::NumberIsPositive
+            | Self::NumberIsNegative
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
