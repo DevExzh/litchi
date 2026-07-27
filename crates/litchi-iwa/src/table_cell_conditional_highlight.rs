@@ -1,7 +1,14 @@
 //! Strictly typed conditional-highlight rules shared by iWork table editors.
 
+use chrono::NaiveDate;
+
 use crate::shapes::RgbaColor;
 use crate::{Error, Result};
+
+const APPLE_EPOCH_YEAR: i32 = 2001;
+const APPLE_EPOCH_MONTH: u32 = 1;
+const APPLE_EPOCH_DAY: u32 = 1;
+const SECONDS_PER_DAY: f64 = 86_400.0;
 
 /// Finite numeric operand used by a conditional-highlight comparison.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -51,6 +58,71 @@ impl TableCellConditionalHighlightRange {
     }
 }
 
+/// Calendar-date operand stored as whole days from Apple's 2001 epoch.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TableCellConditionalHighlightDate(f64);
+
+impl TableCellConditionalHighlightDate {
+    /// Construct a date from Apple-epoch seconds at midnight.
+    pub fn new(apple_seconds: f64) -> Result<Self> {
+        if !apple_seconds.is_finite()
+            || !(apple_seconds + SECONDS_PER_DAY).is_finite()
+            || apple_seconds.rem_euclid(SECONDS_PER_DAY) != 0.0
+        {
+            return Err(Error::ParseError(
+                "iWork conditional-highlight dates must be finite Apple-epoch midnight values"
+                    .to_owned(),
+            ));
+        }
+        Ok(Self(apple_seconds))
+    }
+
+    /// Construct a date from Gregorian calendar components.
+    pub fn from_ymd(year: i32, month: u32, day: u32) -> Result<Self> {
+        let date = NaiveDate::from_ymd_opt(year, month, day).ok_or_else(|| {
+            Error::ParseError("iWork conditional-highlight date is not valid".to_owned())
+        })?;
+        let epoch = NaiveDate::from_ymd_opt(APPLE_EPOCH_YEAR, APPLE_EPOCH_MONTH, APPLE_EPOCH_DAY)
+            .expect("the Apple epoch is a valid calendar date");
+        Ok(Self(
+            date.signed_duration_since(epoch).num_days() as f64 * SECONDS_PER_DAY,
+        ))
+    }
+
+    pub const fn apple_seconds(self) -> f64 {
+        self.0
+    }
+}
+
+/// Inclusive ordered calendar-date bounds used by a date-range rule.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TableCellConditionalHighlightDateRange {
+    lower: TableCellConditionalHighlightDate,
+    upper: TableCellConditionalHighlightDate,
+}
+
+impl TableCellConditionalHighlightDateRange {
+    pub fn new(
+        lower: TableCellConditionalHighlightDate,
+        upper: TableCellConditionalHighlightDate,
+    ) -> Result<Self> {
+        if lower.apple_seconds() > upper.apple_seconds() {
+            return Err(Error::ParseError(
+                "iWork conditional-highlight date range bounds must be ordered".to_owned(),
+            ));
+        }
+        Ok(Self { lower, upper })
+    }
+
+    pub const fn lower(self) -> TableCellConditionalHighlightDate {
+        self.lower
+    }
+
+    pub const fn upper(self) -> TableCellConditionalHighlightDate {
+        self.upper
+    }
+}
+
 /// Non-empty text operand used by a conditional-highlight rule.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TableCellConditionalHighlightText(Box<str>);
@@ -85,6 +157,10 @@ pub enum TableCellConditionalHighlightCondition {
     DateIsToday,
     DateIsYesterday,
     DateIsTomorrow,
+    DateIs(TableCellConditionalHighlightDate),
+    DateIsBefore(TableCellConditionalHighlightDate),
+    DateIsAfter(TableCellConditionalHighlightDate),
+    DateIsBetween(TableCellConditionalHighlightDateRange),
     EqualTo(TableCellConditionalHighlightNumber),
     NotEqualTo(TableCellConditionalHighlightNumber),
     GreaterThan(TableCellConditionalHighlightNumber),
@@ -116,7 +192,11 @@ impl TableCellConditionalHighlightCondition {
             | Self::NumberIsNegative
             | Self::DateIsToday
             | Self::DateIsYesterday
-            | Self::DateIsTomorrow => None,
+            | Self::DateIsTomorrow
+            | Self::DateIs(_)
+            | Self::DateIsBefore(_)
+            | Self::DateIsAfter(_)
+            | Self::DateIsBetween(_) => None,
             Self::EqualTo(value)
             | Self::NotEqualTo(value)
             | Self::GreaterThan(value)
@@ -150,6 +230,10 @@ impl TableCellConditionalHighlightCondition {
             | Self::DateIsToday
             | Self::DateIsYesterday
             | Self::DateIsTomorrow
+            | Self::DateIs(_)
+            | Self::DateIsBefore(_)
+            | Self::DateIsAfter(_)
+            | Self::DateIsBetween(_)
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
@@ -188,6 +272,10 @@ impl TableCellConditionalHighlightCondition {
             | Self::DateIsToday
             | Self::DateIsYesterday
             | Self::DateIsTomorrow
+            | Self::DateIs(_)
+            | Self::DateIsBefore(_)
+            | Self::DateIsAfter(_)
+            | Self::DateIsBetween(_)
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
@@ -196,6 +284,22 @@ impl TableCellConditionalHighlightCondition {
             | Self::LessThanOrEqualTo(_)
             | Self::Between(_)
             | Self::NotBetween(_) => None,
+        }
+    }
+
+    pub const fn date(&self) -> Option<TableCellConditionalHighlightDate> {
+        match self {
+            Self::DateIs(value) | Self::DateIsBefore(value) | Self::DateIsAfter(value) => {
+                Some(*value)
+            },
+            _ => None,
+        }
+    }
+
+    pub const fn date_range(&self) -> Option<TableCellConditionalHighlightDateRange> {
+        match self {
+            Self::DateIsBetween(range) => Some(*range),
+            _ => None,
         }
     }
 }
@@ -295,5 +399,22 @@ mod tests {
             TableCellConditionalHighlightStyle::with_fill(color).fill(),
             Some(color)
         );
+    }
+
+    #[test]
+    fn date_operands_are_midnight_aligned_and_ranges_are_ordered() {
+        let date = TableCellConditionalHighlightDate::from_ymd(2026, 7, 27).unwrap();
+        assert_eq!(date.apple_seconds(), 806_803_200.0);
+        assert_eq!(
+            TableCellConditionalHighlightDate::new(date.apple_seconds()).unwrap(),
+            date
+        );
+        assert!(TableCellConditionalHighlightDate::from_ymd(2026, 2, 29).is_err());
+        assert!(TableCellConditionalHighlightDate::new(f64::NAN).is_err());
+        assert!(TableCellConditionalHighlightDate::new(date.apple_seconds() + 1.0).is_err());
+
+        let earlier = TableCellConditionalHighlightDate::from_ymd(2026, 7, 26).unwrap();
+        assert!(TableCellConditionalHighlightDateRange::new(earlier, date).is_ok());
+        assert!(TableCellConditionalHighlightDateRange::new(date, earlier).is_err());
     }
 }

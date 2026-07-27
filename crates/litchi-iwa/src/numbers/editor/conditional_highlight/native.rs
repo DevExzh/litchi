@@ -2,13 +2,15 @@
 
 use super::*;
 use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightNumber,
+    TableCellConditionalHighlightCondition, TableCellConditionalHighlightDate,
+    TableCellConditionalHighlightDateRange, TableCellConditionalHighlightNumber,
     TableCellConditionalHighlightText,
 };
 
 pub(super) const PREDICATE_QUALIFIER_NONE: i32 = 0;
 pub(super) const PREDICATE_CELL_ARGUMENT_INDEX: i32 = 0;
 pub(super) const PREDICATE_NUMBER_ARGUMENT_INDEX: i32 = 1;
+pub(super) const PREDICATE_DATE_ARGUMENT_INDEX: i32 = 1;
 pub(super) const PREDICATE_UNUSED_ARGUMENT_INDEX: i32 = -1;
 pub(super) const PREDICATE_RANGE_LOWER_ARGUMENT_INDEX: i32 = 0;
 pub(super) const PREDICATE_RANGE_UPPER_ARGUMENT_INDEX: i32 = 1;
@@ -16,14 +18,18 @@ pub(super) const PREDICATE_RANGE_CELL_ARGUMENT_INDEX: i32 = 3;
 pub(super) const PREDICATE_TEXT_ARGUMENT_INDEX: i32 = 0;
 pub(super) const PREDICATE_TEXT_CELL_ARGUMENT_INDEX: i32 = 1;
 pub(super) const PREDICATE_TEXT_EQUALITY_CELL_ARGUMENT_INDEX: i32 = 2;
+pub(super) const PREDICATE_DATE_EQUALITY_CELL_ARGUMENT_INDEX: i32 = 2;
+pub(super) const PREDICATE_DATE_EQUALITY_ARGUMENT_INDEX: i32 = 0;
 pub(super) const PREDICATE_ARGUMENT_NONE: i32 = 0;
 pub(super) const PREDICATE_ARGUMENT_NUMBER: i32 = 1;
+pub(super) const PREDICATE_ARGUMENT_DATE: i32 = 2;
 pub(super) const PREDICATE_ARGUMENT_STRING: i32 = 3;
 pub(super) const PREDICATE_ARGUMENT_RELATIVE_CELL: i32 = 4;
 pub(super) const LOGICAL_AND_FUNCTION_INDEX: u32 = 7;
 pub(super) const CONDITIONAL_FUNCTION_INDEX: u32 = 62;
 pub(super) const LOGICAL_OR_FUNCTION_INDEX: u32 = 102;
 pub(super) const BINARY_FUNCTION_ARGUMENT_COUNT: u32 = 2;
+pub(super) const TERNARY_FUNCTION_ARGUMENT_COUNT: u32 = 3;
 pub(super) const CONDITIONAL_FUNCTION_ARGUMENT_COUNT: u32 = 3;
 pub(super) const TEXT_SEARCH_FUNCTION_INDEX: u32 = 296;
 pub(super) const TEXT_LENGTH_FUNCTION_INDEX: u32 = 77;
@@ -40,6 +46,9 @@ pub(super) const BOOLEAN_VALUE_TYPE_CODE: f64 = 6.0;
 pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
 pub(super) const ZERO_FUNCTION_ARGUMENT_COUNT: u32 = 0;
 pub(super) const TODAY_FUNCTION_INDEX: u32 = 154;
+pub(super) const DATE_DAY_FUNCTION_INDEX: u32 = 41;
+pub(super) const DATE_MONTH_FUNCTION_INDEX: u32 = 94;
+pub(super) const DATE_YEAR_FUNCTION_INDEX: u32 = 167;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
@@ -69,7 +78,11 @@ impl NumericPredicateKind {
             | TableCellConditionalHighlightCondition::NumberIsNegative
             | TableCellConditionalHighlightCondition::DateIsToday
             | TableCellConditionalHighlightCondition::DateIsYesterday
-            | TableCellConditionalHighlightCondition::DateIsTomorrow => None,
+            | TableCellConditionalHighlightCondition::DateIsTomorrow
+            | TableCellConditionalHighlightCondition::DateIs(_)
+            | TableCellConditionalHighlightCondition::DateIsBefore(_)
+            | TableCellConditionalHighlightCondition::DateIsAfter(_)
+            | TableCellConditionalHighlightCondition::DateIsBetween(_) => None,
             TableCellConditionalHighlightCondition::EqualTo(_) => Some(Self::EqualTo),
             TableCellConditionalHighlightCondition::NotEqualTo(_) => Some(Self::NotEqualTo),
             TableCellConditionalHighlightCondition::GreaterThan(_) => Some(Self::GreaterThan),
@@ -197,6 +210,47 @@ impl RelativeDatePredicateKind {
             Self::Yesterday => TableCellConditionalHighlightCondition::DateIsYesterday,
             Self::Tomorrow => TableCellConditionalHighlightCondition::DateIsTomorrow,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub(super) enum FixedDatePredicateKind {
+    Equal = 20,
+    Before = 21,
+    After = 22,
+    Between = 23,
+}
+
+impl FixedDatePredicateKind {
+    pub(super) const fn native_value(self) -> i32 {
+        self as i32
+    }
+
+    pub(super) const fn condition(
+        self,
+        date: TableCellConditionalHighlightDate,
+    ) -> Option<TableCellConditionalHighlightCondition> {
+        match self {
+            Self::Equal => Some(TableCellConditionalHighlightCondition::DateIs(date)),
+            Self::Before => Some(TableCellConditionalHighlightCondition::DateIsBefore(date)),
+            Self::After => Some(TableCellConditionalHighlightCondition::DateIsAfter(date)),
+            Self::Between => None,
+        }
+    }
+
+    pub(super) const fn range_condition(
+        self,
+        range: TableCellConditionalHighlightDateRange,
+    ) -> Option<TableCellConditionalHighlightCondition> {
+        match self {
+            Self::Between => Some(TableCellConditionalHighlightCondition::DateIsBetween(range)),
+            Self::Equal | Self::Before | Self::After => None,
+        }
+    }
+
+    pub(super) const fn is_range(self) -> bool {
+        matches!(self, Self::Between)
     }
 }
 
@@ -329,6 +383,7 @@ pub(super) enum NativePredicateKind {
     Cell(CellPredicateKind),
     Checkbox(CheckboxPredicateKind),
     Boolean(BooleanPredicateKind),
+    FixedDate(FixedDatePredicateKind),
     Numeric(NumericPredicateKind),
     NumericSign(NumericSignPredicateKind),
     RelativeDate(RelativeDatePredicateKind),
@@ -371,6 +426,18 @@ impl NativePredicateKind {
             TableCellConditionalHighlightCondition::DateIsTomorrow => {
                 return Self::RelativeDate(RelativeDatePredicateKind::Tomorrow);
             },
+            TableCellConditionalHighlightCondition::DateIs(_) => {
+                return Self::FixedDate(FixedDatePredicateKind::Equal);
+            },
+            TableCellConditionalHighlightCondition::DateIsBefore(_) => {
+                return Self::FixedDate(FixedDatePredicateKind::Before);
+            },
+            TableCellConditionalHighlightCondition::DateIsAfter(_) => {
+                return Self::FixedDate(FixedDatePredicateKind::After);
+            },
+            TableCellConditionalHighlightCondition::DateIsBetween(_) => {
+                return Self::FixedDate(FixedDatePredicateKind::Between);
+            },
             _ => {},
         }
         NumericPredicateKind::from_condition(condition).map_or_else(
@@ -410,6 +477,7 @@ impl NativePredicateKind {
             Self::Cell(kind) => kind.native_value(),
             Self::Checkbox(kind) => kind.native_value(),
             Self::Boolean(kind) => kind.native_value(),
+            Self::FixedDate(kind) => kind.native_value(),
             Self::Numeric(kind) => kind.native_value(),
             Self::NumericSign(kind) => kind.native_value(),
             Self::RelativeDate(kind) => kind.native_value(),
@@ -431,6 +499,21 @@ impl TryFrom<i32> for NativePredicateKind {
     type Error = Error;
 
     fn try_from(value: i32) -> Result<Self> {
+        match value {
+            value if value == FixedDatePredicateKind::Equal.native_value() => {
+                return Ok(Self::FixedDate(FixedDatePredicateKind::Equal));
+            },
+            value if value == FixedDatePredicateKind::Before.native_value() => {
+                return Ok(Self::FixedDate(FixedDatePredicateKind::Before));
+            },
+            value if value == FixedDatePredicateKind::After.native_value() => {
+                return Ok(Self::FixedDate(FixedDatePredicateKind::After));
+            },
+            value if value == FixedDatePredicateKind::Between.native_value() => {
+                return Ok(Self::FixedDate(FixedDatePredicateKind::Between));
+            },
+            _ => {},
+        }
         match value {
             value if value == RelativeDatePredicateKind::Today.native_value() => {
                 return Ok(Self::RelativeDate(RelativeDatePredicateKind::Today));
@@ -638,6 +721,22 @@ mod tests {
             RelativeDatePredicateKind::Tomorrow,
         ] {
             let kind = NativePredicateKind::RelativeDate(date);
+            assert_eq!(
+                NativePredicateKind::try_from(kind.native_value()).unwrap(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn native_fixed_date_predicate_values_are_reversible() {
+        for date in [
+            FixedDatePredicateKind::Equal,
+            FixedDatePredicateKind::Before,
+            FixedDatePredicateKind::After,
+            FixedDatePredicateKind::Between,
+        ] {
+            let kind = NativePredicateKind::FixedDate(date);
             assert_eq!(
                 NativePredicateKind::try_from(kind.native_value()).unwrap(),
                 kind

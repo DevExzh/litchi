@@ -2,6 +2,7 @@ use super::*;
 use crate::numbers::NumbersDocumentBuilder;
 use crate::shapes::{RgbColorSpace, RgbaColor};
 use crate::table_cell_conditional_highlight::{
+    TableCellConditionalHighlightDate, TableCellConditionalHighlightDateRange,
     TableCellConditionalHighlightNumber, TableCellConditionalHighlightRange,
     TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
 };
@@ -355,6 +356,214 @@ fn relative_date_predicates_round_trip_apply_and_observe_day_boundaries() {
             Some(today)
         ));
     }
+}
+
+#[test]
+fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
+    let exact = TableCellConditionalHighlightDate::from_ymd(2026, 7, 27).unwrap();
+    let lower = TableCellConditionalHighlightDate::from_ymd(2026, 7, 26).unwrap();
+    let upper = TableCellConditionalHighlightDate::from_ymd(2026, 7, 28).unwrap();
+    let range = TableCellConditionalHighlightDateRange::new(lower, upper).unwrap();
+    let conditions = [
+        TableCellConditionalHighlightCondition::DateIs(exact),
+        TableCellConditionalHighlightCondition::DateIsBefore(exact),
+        TableCellConditionalHighlightCondition::DateIsAfter(exact),
+        TableCellConditionalHighlightCondition::DateIsBetween(range),
+    ];
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let rules = conditions.clone().map(|condition| rule(condition, red));
+    let midday = SECONDS_PER_DAY / 2.0;
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(3, 6)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    for (column, value) in [
+        (1, exact.apple_seconds() + midday),
+        (2, lower.apple_seconds() + midday),
+        (3, upper.apple_seconds() + midday),
+    ] {
+        editor
+            .set_cell(table_id, 1, column, CellValue::Date(value))
+            .unwrap();
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, column, &rules)
+            .unwrap();
+    }
+    editor
+        .set_cell(
+            table_id,
+            1,
+            4,
+            CellValue::Date(exact.apple_seconds() + midday),
+        )
+        .unwrap();
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 4, &rules[3..])
+        .unwrap();
+    editor
+        .set_cell(
+            table_id,
+            1,
+            5,
+            CellValue::Number(exact.apple_seconds() + midday),
+        )
+        .unwrap();
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 5, &rules)
+        .unwrap();
+
+    assert_eq!(applied_rule(&editor, table_id, 1, 1), Some(0));
+    assert_eq!(applied_rule(&editor, table_id, 1, 2), Some(1));
+    assert_eq!(applied_rule(&editor, table_id, 1, 3), Some(2));
+    assert_eq!(applied_rule(&editor, table_id, 1, 4), Some(0));
+    assert_eq!(
+        applied_rule(&editor, table_id, 1, 5),
+        Some(CONDITIONAL_STYLE_NO_APPLIED_RULE)
+    );
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap(),
+        Some(rules.to_vec())
+    );
+
+    let info = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let archive = editor
+        .package
+        .archive(&location.object_locations[&info.style_set_object_id])
+        .unwrap();
+    let object = archive.object(info.style_set_object_id).unwrap();
+    let set = object
+        .messages
+        .iter()
+        .find_map(|message| {
+            (message.type_ == 6_010)
+                .then(|| tst::ConditionalStyleSetArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    let current = &set.rules.as_ref().unwrap().rule;
+    for (index, (kind, node_count, indexes)) in [
+        (
+            FixedDatePredicateKind::Equal,
+            16,
+            (
+                PREDICATE_DATE_EQUALITY_CELL_ARGUMENT_INDEX,
+                PREDICATE_DATE_EQUALITY_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
+        ),
+        (
+            FixedDatePredicateKind::Before,
+            7,
+            (
+                PREDICATE_CELL_ARGUMENT_INDEX,
+                PREDICATE_DATE_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
+        ),
+        (
+            FixedDatePredicateKind::After,
+            5,
+            (
+                PREDICATE_CELL_ARGUMENT_INDEX,
+                PREDICATE_DATE_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
+        ),
+        (
+            FixedDatePredicateKind::Between,
+            26,
+            (
+                PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
+                PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
+                PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
+            ),
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let predicate = current[index].predicate.as_ref().unwrap();
+        let prepivot = &set.rules_prepivot[index].predicate;
+        assert_eq!(predicate.predicate_type, kind.native_value());
+        assert_eq!(
+            predicate.param_value1.as_ref().unwrap().arg_type,
+            PREDICATE_ARGUMENT_DATE
+        );
+        assert_eq!(
+            predicate.param_value2.as_ref().unwrap().arg_type,
+            if kind.is_range() {
+                PREDICATE_ARGUMENT_DATE
+            } else {
+                PREDICATE_ARGUMENT_NONE
+            }
+        );
+        assert_eq!(prepivot.predicate_type, kind.native_value());
+        assert_eq!(
+            (
+                prepivot.param_index0,
+                prepivot.param_index1,
+                prepivot.param_index2,
+            ),
+            indexes
+        );
+        assert_eq!(
+            predicate.formula.as_ref().unwrap().ast_node_array.ast_node,
+            prepivot.formula.ast_node_array.ast_node
+        );
+        assert_eq!(
+            predicate
+                .formula
+                .as_ref()
+                .unwrap()
+                .ast_node_array
+                .ast_node
+                .len(),
+            node_count
+        );
+    }
+
+    let exact_start = exact.apple_seconds();
+    assert!(condition_matches(
+        &conditions[0],
+        &ConditionalCellValue::Date(exact_start)
+    ));
+    assert!(condition_matches(
+        &conditions[0],
+        &ConditionalCellValue::Date(exact_start + SECONDS_PER_DAY - 1.0)
+    ));
+    assert!(!condition_matches(
+        &conditions[0],
+        &ConditionalCellValue::Date(exact_start + SECONDS_PER_DAY)
+    ));
+    assert!(condition_matches(
+        &conditions[1],
+        &ConditionalCellValue::Date(exact_start - 1.0)
+    ));
+    assert!(!condition_matches(
+        &conditions[1],
+        &ConditionalCellValue::Date(exact_start)
+    ));
+    assert!(!condition_matches(
+        &conditions[2],
+        &ConditionalCellValue::Date(exact_start + SECONDS_PER_DAY - 1.0)
+    ));
+    assert!(condition_matches(
+        &conditions[2],
+        &ConditionalCellValue::Date(exact_start + SECONDS_PER_DAY)
+    ));
+    assert!(condition_matches(
+        &conditions[3],
+        &ConditionalCellValue::Date(upper.apple_seconds() + SECONDS_PER_DAY - 1.0)
+    ));
+    assert!(!condition_matches(
+        &conditions[3],
+        &ConditionalCellValue::Date(upper.apple_seconds() + SECONDS_PER_DAY)
+    ));
 }
 
 #[test]

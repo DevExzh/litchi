@@ -14,22 +14,26 @@ use prost::Message;
 use super::*;
 use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
 use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
+    TableCellConditionalHighlightCondition, TableCellConditionalHighlightDate,
+    TableCellConditionalHighlightDateRange, TableCellConditionalHighlightRule,
 };
 use native::{
     BINARY_FUNCTION_ARGUMENT_COUNT, BOOLEAN_VALUE_TYPE_CODE, BooleanPredicateKind,
     CELL_DATA_FORMAT_FUNCTION_INDEX, CHECKBOX_DATA_FORMAT_CODE,
     CONDITIONAL_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_INDEX, CellPredicateKind,
-    CheckboxPredicateKind, IF_ERROR_FUNCTION_INDEX, IS_BLANK_FUNCTION_INDEX,
-    IS_ERROR_FUNCTION_INDEX, IS_NUMBER_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX,
-    LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX, NativePredicateKind,
-    NumericPredicateKind, NumericSignPredicateKind, PREDICATE_ARGUMENT_NONE,
-    PREDICATE_ARGUMENT_NUMBER, PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_ARGUMENT_STRING,
-    PREDICATE_CELL_ARGUMENT_INDEX, PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE,
-    PREDICATE_RANGE_CELL_ARGUMENT_INDEX, PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
-    PREDICATE_RANGE_UPPER_ARGUMENT_INDEX, PREDICATE_TEXT_ARGUMENT_INDEX,
-    PREDICATE_UNUSED_ARGUMENT_INDEX, RelativeDatePredicateKind, TEXT_LENGTH_FUNCTION_INDEX,
-    TEXT_RIGHT_FUNCTION_INDEX, TEXT_SEARCH_FUNCTION_INDEX, TODAY_FUNCTION_INDEX, TextPredicateKind,
+    CheckboxPredicateKind, DATE_DAY_FUNCTION_INDEX, DATE_MONTH_FUNCTION_INDEX,
+    DATE_YEAR_FUNCTION_INDEX, FixedDatePredicateKind, IF_ERROR_FUNCTION_INDEX,
+    IS_BLANK_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX, IS_NUMBER_FUNCTION_INDEX,
+    LOGICAL_AND_FUNCTION_INDEX, LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX,
+    NativePredicateKind, NumericPredicateKind, NumericSignPredicateKind, PREDICATE_ARGUMENT_DATE,
+    PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER, PREDICATE_ARGUMENT_RELATIVE_CELL,
+    PREDICATE_ARGUMENT_STRING, PREDICATE_CELL_ARGUMENT_INDEX, PREDICATE_DATE_ARGUMENT_INDEX,
+    PREDICATE_DATE_EQUALITY_ARGUMENT_INDEX, PREDICATE_DATE_EQUALITY_CELL_ARGUMENT_INDEX,
+    PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
+    PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
+    PREDICATE_TEXT_ARGUMENT_INDEX, PREDICATE_UNUSED_ARGUMENT_INDEX, RelativeDatePredicateKind,
+    TERNARY_FUNCTION_ARGUMENT_COUNT, TEXT_LENGTH_FUNCTION_INDEX, TEXT_RIGHT_FUNCTION_INDEX,
+    TEXT_SEARCH_FUNCTION_INDEX, TODAY_FUNCTION_INDEX, TextPredicateKind,
     UNARY_FUNCTION_ARGUMENT_COUNT, VALUE_TYPE_FUNCTION_INDEX, ZERO_FUNCTION_ARGUMENT_COUNT,
 };
 
@@ -680,6 +684,28 @@ fn condition_matches_at(
         ) => today.is_some_and(|today| {
             *value >= today + SECONDS_PER_DAY && *value < today + 2.0 * SECONDS_PER_DAY
         }),
+        (
+            TableCellConditionalHighlightCondition::DateIs(date),
+            ConditionalCellValue::Date(value),
+        ) => {
+            let lower = date.apple_seconds();
+            *value >= lower && *value < lower + SECONDS_PER_DAY
+        },
+        (
+            TableCellConditionalHighlightCondition::DateIsBefore(date),
+            ConditionalCellValue::Date(value),
+        ) => *value < date.apple_seconds(),
+        (
+            TableCellConditionalHighlightCondition::DateIsAfter(date),
+            ConditionalCellValue::Date(value),
+        ) => *value >= date.apple_seconds() + SECONDS_PER_DAY,
+        (
+            TableCellConditionalHighlightCondition::DateIsBetween(range),
+            ConditionalCellValue::Date(value),
+        ) => {
+            *value >= range.lower().apple_seconds()
+                && *value < range.upper().apple_seconds() + SECONDS_PER_DAY
+        },
         (
             TableCellConditionalHighlightCondition::EqualTo(operand),
             ConditionalCellValue::Number(value),

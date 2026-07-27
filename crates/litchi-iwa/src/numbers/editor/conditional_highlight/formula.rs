@@ -18,7 +18,27 @@ pub(super) fn encode(
         (NativePredicateKind::Cell(kind), _) => cell::nodes(kind, formula_owner_uuid),
         (NativePredicateKind::Checkbox(kind), _) => checkbox::nodes(kind, formula_owner_uuid)?,
         (NativePredicateKind::Boolean(kind), _) => boolean::nodes(kind, formula_owner_uuid)?,
-        (NativePredicateKind::RelativeDate(kind), _) => date::nodes(kind, formula_owner_uuid),
+        (NativePredicateKind::RelativeDate(kind), _) => {
+            date::relative_nodes(kind, formula_owner_uuid)
+        },
+        (
+            NativePredicateKind::FixedDate(kind),
+            TableCellConditionalHighlightCondition::DateIsBetween(range),
+        ) => date::fixed_nodes(
+            kind,
+            range.lower().apple_seconds(),
+            Some(range.upper().apple_seconds()),
+            formula_owner_uuid,
+        ),
+        (NativePredicateKind::FixedDate(kind), _) => date::fixed_nodes(
+            kind,
+            condition
+                .date()
+                .expect("single-date predicate has one operand")
+                .apple_seconds(),
+            None,
+            formula_owner_uuid,
+        ),
         (NativePredicateKind::NumericSign(kind), _) => sign::nodes(kind, formula_owner_uuid)?,
         (
             NativePredicateKind::Numeric(kind),
@@ -100,7 +120,25 @@ pub(super) fn validate(
         (NativePredicateKind::Cell(kind), _) => cell::validate(formula, kind),
         (NativePredicateKind::Checkbox(kind), _) => checkbox::validate(formula, kind),
         (NativePredicateKind::Boolean(kind), _) => boolean::validate(formula, kind),
-        (NativePredicateKind::RelativeDate(kind), _) => date::validate(formula, kind),
+        (NativePredicateKind::RelativeDate(kind), _) => date::validate_relative(formula, kind),
+        (
+            NativePredicateKind::FixedDate(kind),
+            TableCellConditionalHighlightCondition::DateIsBetween(range),
+        ) => date::validate_fixed(
+            formula,
+            kind,
+            range.lower().apple_seconds(),
+            Some(range.upper().apple_seconds()),
+        ),
+        (NativePredicateKind::FixedDate(kind), _) => date::validate_fixed(
+            formula,
+            kind,
+            condition
+                .date()
+                .ok_or_else(invalid_formula)?
+                .apple_seconds(),
+            None,
+        ),
         (NativePredicateKind::NumericSign(kind), _) => sign::validate(formula, kind),
         (
             NativePredicateKind::Numeric(kind),

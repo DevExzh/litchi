@@ -57,6 +57,21 @@ pub(super) fn insert_conditional_style_graph(
                 PREDICATE_NUMBER_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
             ),
+            NativePredicateKind::FixedDate(FixedDatePredicateKind::Equal) => (
+                PREDICATE_DATE_EQUALITY_CELL_ARGUMENT_INDEX,
+                PREDICATE_DATE_EQUALITY_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
+            NativePredicateKind::FixedDate(kind) if kind.is_range() => (
+                PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
+                PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
+                PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
+            ),
+            NativePredicateKind::FixedDate(_) => (
+                PREDICATE_CELL_ARGUMENT_INDEX,
+                PREDICATE_DATE_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
             NativePredicateKind::NumericSign(_) => (
                 PREDICATE_CELL_ARGUMENT_INDEX,
                 PREDICATE_NUMBER_ARGUMENT_INDEX,
@@ -236,6 +251,12 @@ fn predicate_arguments(
     ) {
         return Ok((none(), none()));
     }
+    if let Some(value) = condition.date() {
+        return Ok((date_argument(value), none()));
+    }
+    if let Some(range) = condition.date_range() {
+        return Ok((date_argument(range.lower()), date_argument(range.upper())));
+    }
     if let Some(value) = condition.single_operand() {
         return Ok((number_argument(value.get())?, none()));
     }
@@ -268,6 +289,17 @@ fn number_argument(value: f64) -> Result<tst::FormulaPredArgArchive> {
         arg_value: Some(predicate_number(value)?),
         ..Default::default()
     })
+}
+
+fn date_argument(value: TableCellConditionalHighlightDate) -> tst::FormulaPredArgArchive {
+    tst::FormulaPredArgArchive {
+        arg_type: PREDICATE_ARGUMENT_DATE,
+        arg_value: Some(tst::FormulaPredArgDataArchive {
+            date_value: Some(value.apple_seconds()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
 }
 
 fn predicate_number(value: f64) -> Result<tst::FormulaPredArgDataArchive> {

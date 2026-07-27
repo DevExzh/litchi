@@ -140,6 +140,21 @@ fn decode_predicate(
             PREDICATE_NUMBER_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
         ),
+        NativePredicateKind::FixedDate(FixedDatePredicateKind::Equal) => (
+            PREDICATE_DATE_EQUALITY_CELL_ARGUMENT_INDEX,
+            PREDICATE_DATE_EQUALITY_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+        ),
+        NativePredicateKind::FixedDate(kind) if kind.is_range() => (
+            PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
+            PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
+            PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
+        ),
+        NativePredicateKind::FixedDate(_) => (
+            PREDICATE_CELL_ARGUMENT_INDEX,
+            PREDICATE_DATE_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+        ),
         NativePredicateKind::NumericSign(_) => (
             PREDICATE_CELL_ARGUMENT_INDEX,
             PREDICATE_NUMBER_ARGUMENT_INDEX,
@@ -186,6 +201,7 @@ fn decode_predicate(
         NativePredicateKind::Cell(kind) => decode_cell_predicate(predicate, kind)?,
         NativePredicateKind::Checkbox(kind) => decode_checkbox_predicate(predicate, kind)?,
         NativePredicateKind::Boolean(kind) => decode_boolean_predicate(predicate, kind)?,
+        NativePredicateKind::FixedDate(kind) => decode_fixed_date_predicate(predicate, kind)?,
         NativePredicateKind::Numeric(kind) => decode_numeric_predicate(predicate, kind)?,
         NativePredicateKind::NumericSign(kind) => decode_sign_predicate(predicate, kind)?,
         NativePredicateKind::RelativeDate(kind) => decode_date_predicate(predicate, kind)?,
@@ -245,6 +261,30 @@ fn decode_date_predicate(
 ) -> Result<TableCellConditionalHighlightCondition> {
     validate_operand_free_predicate(predicate)?;
     Ok(kind.condition())
+}
+
+fn decode_fixed_date_predicate(
+    predicate: &tst::FormulaPredicateArchive,
+    kind: FixedDatePredicateKind,
+) -> Result<TableCellConditionalHighlightCondition> {
+    let lower = decode_date_argument(predicate.param_value1.as_ref())?;
+    if kind.is_range() {
+        let upper = decode_date_argument(predicate.param_value2.as_ref())?;
+        let range = TableCellConditionalHighlightDateRange::new(lower, upper)
+            .map_err(|_| unsupported_rule_graph())?;
+        return kind
+            .range_condition(range)
+            .ok_or_else(unsupported_rule_graph);
+    }
+    if predicate
+        .param_value2
+        .as_ref()
+        .map(|argument| argument.arg_type)
+        != Some(PREDICATE_ARGUMENT_NONE)
+    {
+        return Err(unsupported_rule_graph());
+    }
+    kind.condition(lower).ok_or_else(unsupported_rule_graph)
 }
 
 fn validate_operand_free_predicate(predicate: &tst::FormulaPredicateArchive) -> Result<()> {
@@ -331,6 +371,17 @@ fn decode_number_argument(
         .and_then(|value| value.double_value)
         .ok_or_else(unsupported_rule_graph)?;
     TableCellConditionalHighlightNumber::new(value).map_err(|_| unsupported_rule_graph())
+}
+
+fn decode_date_argument(
+    argument: Option<&tst::FormulaPredArgArchive>,
+) -> Result<TableCellConditionalHighlightDate> {
+    let value = argument
+        .filter(|argument| argument.arg_type == PREDICATE_ARGUMENT_DATE)
+        .and_then(|argument| argument.arg_value.as_ref())
+        .and_then(|value| value.date_value)
+        .ok_or_else(unsupported_rule_graph)?;
+    TableCellConditionalHighlightDate::new(value).map_err(|_| unsupported_rule_graph())
 }
 
 fn decode_cell_style(
