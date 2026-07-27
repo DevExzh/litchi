@@ -297,6 +297,20 @@ pub fn write_country<W: Write>(
     Ok(())
 }
 
+/// Write a BOOKEXT record (MS-XLS 2.4.23) with workbook extension flags.
+///
+/// Record type: 0x0863
+pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsBookExt) -> XlsResult<()> {
+    let payload = value.to_payload();
+    write_record_header(
+        writer,
+        crate::xls::book_ext::BOOK_EXT_RECORD_TYPE,
+        payload.len() as u16,
+    )?;
+    writer.write_all(&payload)?;
+    Ok(())
+}
+
 /// Write EXCEL9FILE record.
 ///
 /// Record type: 0x01C0

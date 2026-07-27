@@ -96,6 +96,7 @@ pub(crate) fn generate_workbook_stream(
     sst_total: u32,
     workbook_protection: Option<XlsWorkbookProtection>,
     file_sharing: Option<&XlsFileSharing>,
+    book_ext: Option<&crate::xls::XlsBookExt>,
     worksheets: &[WritableWorksheet],
     string_map: &HashMap<String, u32>,
 ) -> XlsResult<WorkbookStreams> {
@@ -530,6 +531,12 @@ pub(crate) fn generate_workbook_stream(
     // SST record (shared string table)
     if !shared_strings.is_empty() {
         biff::write_sst(&mut stream, shared_strings, sst_total)?;
+    }
+
+    // BOOKEXT follows the shared-string/web-publishing region in the
+    // workbook globals grammar.
+    if let Some(book_ext) = book_ext {
+        biff::write_book_ext(&mut stream, book_ext)?;
     }
 
     // EOF record (end of workbook globals)

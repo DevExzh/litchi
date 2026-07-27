@@ -1315,6 +1315,7 @@ pub struct XlsWriter {
     add_in_functions: Vec<XlsAddInFunctionOptions>,
     dde_or_ole_links: Vec<XlsDdeOrOleLinkOptions>,
     custom_table_styles: Option<XlsCustomTableStyles>,
+    book_ext: Option<crate::xls::XlsBookExt>,
     encryption: Option<XlsWriterEncryption>,
 }
 
@@ -1342,6 +1343,7 @@ impl XlsWriter {
             add_in_functions: Vec::new(),
             dde_or_ole_links: Vec::new(),
             custom_table_styles: None,
+            book_ext: None,
             encryption: None,
         }
     }
@@ -3300,6 +3302,12 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Set the workbook extension flags emitted as a `BookExt` record
+    /// (MS-XLS 2.4.23); `None` emits no record.
+    pub fn set_book_ext(&mut self, book_ext: Option<crate::xls::XlsBookExt>) {
+        self.book_ext = book_ext;
+    }
+
     pub fn set_workbook_window(&mut self, options: XlsWorkbookWindowOptions) -> XlsResult<()> {
         options.validate_intrinsic()?;
         self.workbook_window_options = options;
@@ -3949,6 +3957,7 @@ impl XlsWriter {
             self.sst_total,
             self.workbook_protection,
             self.file_sharing.as_ref(),
+            self.book_ext.as_ref(),
             &self.worksheets,
             &self.string_map,
         )?;

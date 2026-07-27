@@ -352,6 +352,10 @@ pub fn write_country<W: Write>(
     workbook::write_country(writer, default_country, current_country)
 }
 
+pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsBookExt) -> XlsResult<()> {
+    workbook::write_book_ext(writer, value)
+}
+
 pub fn write_excel9_file<W: Write>(writer: &mut W) -> XlsResult<()> {
     workbook::write_excel9_file(writer)
 }

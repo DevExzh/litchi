@@ -153,6 +153,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     calculation: crate::xls::calculation::XlsWorkbookCalculation,
     vba_metadata: crate::xls::vba::XlsVbaMetadata,
     environment: crate::xls::environment::XlsWorkbookEnvironment,
+    book_ext: Option<crate::xls::book_ext::XlsBookExt>,
     write_access: crate::xls::XlsResult<Option<crate::xls::access::XlsWriteAccess>>,
     table_styles: Option<crate::xls::table_styles::XlsTableStyles>,
     shared_string_index: XlsResult<Option<crate::xls::shared_string_index::XlsSharedStringIndex>>,
@@ -233,6 +234,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
+            book_ext: None,
             write_access: Ok(None),
             table_styles: None,
             shared_string_index: Ok(None),
@@ -285,6 +287,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             calculation: crate::xls::calculation::XlsWorkbookCalculation::default(),
             vba_metadata: crate::xls::vba::XlsVbaMetadata::default(),
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
+            book_ext: None,
             write_access: Ok(None),
             table_styles: None,
             shared_string_index: Ok(None),
@@ -552,6 +555,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         &record.data,
                         &mut palette_seen,
                     )?;
+                },
+                crate::xls::book_ext::BOOK_EXT_RECORD_TYPE => {
+                    if self.book_ext.is_some() {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: crate::xls::book_ext::BOOK_EXT_RECORD_TYPE,
+                            message: "workbook contains more than one BookExt record".to_string(),
+                        });
+                    }
+                    self.book_ext = Some(crate::xls::book_ext::XlsBookExt::parse(&record.data)?);
                 },
                 0x0809 => {
                     // BOF
@@ -1300,6 +1312,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
 
     pub fn environment(&self) -> &crate::xls::environment::XlsWorkbookEnvironment {
         &self.environment
+    }
+
+    /// Workbook extension flags from the `BookExt` record, when present.
+    pub fn book_ext(&self) -> Option<&crate::xls::book_ext::XlsBookExt> {
+        self.book_ext.as_ref()
     }
 
     /// Strictly access the user recorded as last creating, opening, or modifying the workbook.
