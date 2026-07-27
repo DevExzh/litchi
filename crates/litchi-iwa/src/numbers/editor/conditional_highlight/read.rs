@@ -125,6 +125,11 @@ fn decode_predicate(
     let kind = NativePredicateKind::try_from(predicate.predicate_type)
         .map_err(|_| unsupported_rule_graph())?;
     let expected_indexes = match kind {
+        NativePredicateKind::Cell(_) => (
+            PREDICATE_CELL_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+        ),
         NativePredicateKind::Numeric(kind) if kind.is_range() => (
             PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
             PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
@@ -163,6 +168,7 @@ fn decode_predicate(
         return Err(unsupported_rule_graph());
     }
     let condition = match kind {
+        NativePredicateKind::Cell(kind) => decode_cell_predicate(predicate, kind)?,
         NativePredicateKind::Numeric(kind) => decode_numeric_predicate(predicate, kind)?,
         NativePredicateKind::Text(kind) => decode_text_predicate(predicate, kind)?,
     };
@@ -180,6 +186,22 @@ fn decode_predicate(
             .map_err(|_| unsupported_rule_graph())?;
     }
     Ok(condition)
+}
+
+fn decode_cell_predicate(
+    predicate: &tst::FormulaPredicateArchive,
+    kind: CellPredicateKind,
+) -> Result<TableCellConditionalHighlightCondition> {
+    if [
+        predicate.param_value1.as_ref(),
+        predicate.param_value2.as_ref(),
+    ]
+    .into_iter()
+    .any(|argument| argument.map(|argument| argument.arg_type) != Some(PREDICATE_ARGUMENT_NONE))
+    {
+        return Err(unsupported_rule_graph());
+    }
+    Ok(kind.condition())
 }
 
 fn decode_numeric_predicate(

@@ -1,5 +1,6 @@
 //! Canonical formula graphs used by conditional-highlight predicates.
 
+mod cell;
 mod text;
 
 use super::*;
@@ -10,6 +11,7 @@ pub(super) fn encode(
 ) -> Result<tsce::FormulaArchive> {
     let kind = NativePredicateKind::from_condition(condition);
     let nodes = match (kind, condition) {
+        (NativePredicateKind::Cell(kind), _) => cell::nodes(kind, formula_owner_uuid),
         (
             NativePredicateKind::Numeric(kind),
             TableCellConditionalHighlightCondition::Between(range)
@@ -55,6 +57,7 @@ pub(super) fn validate(
     condition: &TableCellConditionalHighlightCondition,
 ) -> Result<()> {
     match (kind, condition) {
+        (NativePredicateKind::Cell(kind), _) => cell::validate(formula, kind),
         (
             NativePredicateKind::Numeric(kind),
             TableCellConditionalHighlightCondition::Between(range)

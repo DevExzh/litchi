@@ -13,6 +13,7 @@ use litchi_iwa::table_cell_conditional_highlight::{
 
 const HIGHLIGHT_ROW: usize = 1;
 const HIGHLIGHT_COLUMN: usize = 1;
+const BLANK_HIGHLIGHT_COLUMN: usize = 2;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -28,10 +29,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn highlight_rules() -> Result<Vec<TableCellConditionalHighlightRule>, Box<dyn std::error::Error>> {
-    let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
-    let style = TableCellConditionalHighlightStyle::new(Some(red), None, true)?;
+    let style = highlight_style()?;
     let text = |value| TableCellConditionalHighlightText::new(value);
     Ok([
+        TableCellConditionalHighlightCondition::CellIsBlank,
+        TableCellConditionalHighlightCondition::CellIsNotBlank,
         TableCellConditionalHighlightCondition::TextEqualTo(text("organic grain")?),
         TableCellConditionalHighlightCondition::TextNotEqualTo(text("dairy")?),
         TableCellConditionalHighlightCondition::TextStartsWith(text("organic")?),
@@ -44,6 +46,22 @@ fn highlight_rules() -> Result<Vec<TableCellConditionalHighlightRule>, Box<dyn s
     .into_iter()
     .map(|condition| TableCellConditionalHighlightRule::new(condition, style))
     .collect())
+}
+
+fn highlight_style() -> Result<TableCellConditionalHighlightStyle, Box<dyn std::error::Error>> {
+    let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
+    Ok(TableCellConditionalHighlightStyle::new(
+        Some(red),
+        None,
+        true,
+    )?)
+}
+
+fn blank_highlight_rule() -> Result<TableCellConditionalHighlightRule, Box<dyn std::error::Error>> {
+    Ok(TableCellConditionalHighlightRule::new(
+        TableCellConditionalHighlightCondition::CellIsBlank,
+        highlight_style()?,
+    ))
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -60,6 +78,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let rules = highlight_rules()?;
     editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &rules)?;
+    let blank_rule = blank_highlight_rule()?;
+    editor.set_cell_conditional_highlighting(
+        table_id,
+        HIGHLIGHT_ROW,
+        BLANK_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&blank_rule),
+    )?;
     editor.save(output)?;
     assert_eq!(
         NumbersEditor::open(output)?.cell_conditional_highlight_rules(
@@ -68,6 +93,14 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             HIGHLIGHT_COLUMN,
         )?,
         Some(rules)
+    );
+    assert_eq!(
+        NumbersEditor::open(output)?.cell_conditional_highlight_rules(
+            table_id,
+            HIGHLIGHT_ROW,
+            BLANK_HIGHLIGHT_COLUMN,
+        )?,
+        Some(vec![blank_rule])
     );
     Ok(())
 }
@@ -91,6 +124,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         &rules,
     )?;
+    let blank_rule = blank_highlight_rule()?;
+    editor.set_table_cell_conditional_highlighting(
+        table_id,
+        HIGHLIGHT_ROW,
+        BLANK_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&blank_rule),
+    )?;
     editor.save(output)?;
     assert_eq!(
         PagesEditor::open(output)?.table_cell_conditional_highlight_rules(
@@ -99,6 +139,14 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             HIGHLIGHT_COLUMN,
         )?,
         Some(rules)
+    );
+    assert_eq!(
+        PagesEditor::open(output)?.table_cell_conditional_highlight_rules(
+            table_id,
+            HIGHLIGHT_ROW,
+            BLANK_HIGHLIGHT_COLUMN,
+        )?,
+        Some(vec![blank_rule])
     );
     Ok(())
 }
@@ -133,6 +181,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         &rules,
     )?;
+    let blank_rule = blank_highlight_rule()?;
+    editor.set_slide_table_cell_conditional_highlighting(
+        0,
+        table.model_object_id,
+        HIGHLIGHT_ROW,
+        BLANK_HIGHLIGHT_COLUMN,
+        std::slice::from_ref(&blank_rule),
+    )?;
     editor.save(output)?;
     assert_eq!(
         KeynoteEditor::open(output)?.slide_table_cell_conditional_highlight_rules(
@@ -142,6 +198,15 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             HIGHLIGHT_COLUMN,
         )?,
         Some(rules)
+    );
+    assert_eq!(
+        KeynoteEditor::open(output)?.slide_table_cell_conditional_highlight_rules(
+            0,
+            table.model_object_id,
+            HIGHLIGHT_ROW,
+            BLANK_HIGHLIGHT_COLUMN,
+        )?,
+        Some(vec![blank_rule])
     );
     Ok(())
 }

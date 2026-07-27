@@ -158,6 +158,136 @@ fn range_conditions_use_inclusive_between_and_strictly_outside_not_between() {
 }
 
 #[test]
+fn blank_predicates_round_trip_and_apply_to_empty_and_populated_cells() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    editor
+        .set_cell(table_id, 1, 2, CellValue::Text("occupied".to_owned()))
+        .unwrap();
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let rules = [
+        rule(TableCellConditionalHighlightCondition::CellIsBlank, red),
+        rule(
+            TableCellConditionalHighlightCondition::CellIsNotBlank,
+            green,
+        ),
+    ];
+
+    for column in [1, 2] {
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, column, &rules)
+            .unwrap();
+        assert_eq!(
+            editor
+                .cell_conditional_highlight_rules(table_id, 1, column)
+                .unwrap(),
+            Some(rules.to_vec())
+        );
+    }
+
+    let applied_rule = |editor: &NumbersEditor, column| {
+        let location = locate_cell(&editor.package, table_id, 1, column).unwrap();
+        let cell = read_tile_cell(
+            &editor.package,
+            &location.tile_archive,
+            location.tile_id,
+            location.tile_row,
+            column,
+        )
+        .unwrap()
+        .unwrap();
+        BncCell::parse(&cell)
+            .unwrap()
+            .conditional_style_applied_rule()
+    };
+    assert_eq!(applied_rule(&editor, 1), Some(0));
+    assert_eq!(applied_rule(&editor, 2), Some(1));
+
+    assert!(condition_matches(
+        &TableCellConditionalHighlightCondition::CellIsBlank,
+        &ConditionalCellValue::Blank,
+    ));
+    assert!(!condition_matches(
+        &TableCellConditionalHighlightCondition::CellIsNotBlank,
+        &ConditionalCellValue::Blank,
+    ));
+    assert!(condition_matches(
+        &TableCellConditionalHighlightCondition::CellIsNotBlank,
+        &ConditionalCellValue::Other,
+    ));
+}
+
+#[test]
+fn blank_predicates_reject_noncanonical_formula_graphs() {
+    let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    editor
+        .set_cell_conditional_highlighting(
+            table_id,
+            0,
+            0,
+            &[rule(
+                TableCellConditionalHighlightCondition::CellIsBlank,
+                red,
+            )],
+        )
+        .unwrap();
+    let info = info_in_package(&editor.package, table_id, 0, 0)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 0, 0).unwrap();
+    let archive_name = location.object_locations[&info.style_set_object_id].clone();
+    editor
+        .package
+        .update_archive(&archive_name, |archive| {
+            let object = archive
+                .object_mut(info.style_set_object_id)
+                .ok_or_else(|| Error::InvalidFormat("style set missing".to_owned()))?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == 6_010)
+                .ok_or_else(|| Error::InvalidFormat("style-set payload missing".to_owned()))?;
+            let mut set = tst::ConditionalStyleSetArchive::decode(
+                object.messages[message_index].data.as_slice(),
+            )?;
+            set.rules
+                .as_mut()
+                .and_then(|rules| rules.rule[0].predicate.as_mut())
+                .and_then(|predicate| predicate.formula.as_mut())
+                .and_then(|formula| formula.ast_node_array.ast_node.get_mut(1))
+                .ok_or_else(|| Error::InvalidFormat("current formula missing".to_owned()))?
+                .ast_function_node_index = Some(IS_ERROR_FUNCTION_INDEX);
+            set.rules_prepivot[0]
+                .predicate
+                .formula
+                .ast_node_array
+                .ast_node[1]
+                .ast_function_node_index = Some(IS_ERROR_FUNCTION_INDEX);
+            let message_type = object.messages[message_index].type_;
+            object.replace_message(
+                message_index,
+                crate::archive::RawMessage {
+                    type_: message_type,
+                    data: set.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    assert!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 0, 0)
+            .is_err()
+    );
+}
+
+#[test]
 fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(3, 3)

@@ -17,9 +17,10 @@ use crate::table_cell_conditional_highlight::{
 };
 use native::{
     BINARY_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_ARGUMENT_COUNT,
-    CONDITIONAL_FUNCTION_INDEX, IF_ERROR_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX,
-    LOGICAL_AND_FUNCTION_INDEX, LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX,
-    NativePredicateKind, NumericPredicateKind, PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER,
+    CONDITIONAL_FUNCTION_INDEX, CellPredicateKind, IF_ERROR_FUNCTION_INDEX,
+    IS_BLANK_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX,
+    LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX, NativePredicateKind,
+    NumericPredicateKind, PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER,
     PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_ARGUMENT_STRING, PREDICATE_CELL_ARGUMENT_INDEX,
     PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
     PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
@@ -526,43 +527,41 @@ fn applied_rule_for_cell(
     column: usize,
     rules: &[TableCellConditionalHighlightRule],
 ) -> Result<u32> {
-    let Some(data) = read_tile_cell(
+    let data = read_tile_cell(
         package,
         &location.tile_archive,
         location.tile_id,
         location.tile_row,
         column,
-    )?
-    else {
-        return Ok(CONDITIONAL_STYLE_NO_APPLIED_RULE);
-    };
-    let cell = BncCell::parse(&data)?;
-    let value = match cell.stored_value() {
-        StoredValue::Text(identifier) => {
-            let requested = HashSet::from([identifier]);
-            let values = resolve_table_string_values(
-                package,
-                &location.object_locations,
-                location
-                    .descriptor
-                    .model
-                    .base_data_store
-                    .string_table
-                    .identifier,
-                &requested,
-            )?;
-            let Some(value) = values.into_values().next() else {
-                return Err(Error::InvalidFormat(format!(
-                    "iWork conditional-highlight cell references missing string {identifier}"
-                )));
-            };
-            ConditionalCellValue::Text(value)
-        },
-        _ => {
-            let Some(CachedScalar::Number(value)) = cell.cached_scalar()? else {
-                return Ok(CONDITIONAL_STYLE_NO_APPLIED_RULE);
-            };
-            ConditionalCellValue::Number(value)
+    )?;
+    let value = match data.as_deref().map(BncCell::parse).transpose()? {
+        None => ConditionalCellValue::Blank,
+        Some(cell) if cell.stored_value() == StoredValue::Empty => ConditionalCellValue::Blank,
+        Some(cell) => match cell.stored_value() {
+            StoredValue::Text(identifier) => {
+                let requested = HashSet::from([identifier]);
+                let values = resolve_table_string_values(
+                    package,
+                    &location.object_locations,
+                    location
+                        .descriptor
+                        .model
+                        .base_data_store
+                        .string_table
+                        .identifier,
+                    &requested,
+                )?;
+                let Some(value) = values.into_values().next() else {
+                    return Err(Error::InvalidFormat(format!(
+                        "iWork conditional-highlight cell references missing string {identifier}"
+                    )));
+                };
+                ConditionalCellValue::Text(value)
+            },
+            _ => match cell.cached_scalar()? {
+                Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value),
+                _ => ConditionalCellValue::Other,
+            },
         },
     };
     rules
@@ -578,7 +577,9 @@ fn applied_rule_for_cell(
 }
 
 enum ConditionalCellValue {
+    Blank,
     Number(f64),
+    Other,
     Text(String),
 }
 
@@ -587,6 +588,13 @@ fn condition_matches(
     value: &ConditionalCellValue,
 ) -> bool {
     match (condition, value) {
+        (TableCellConditionalHighlightCondition::CellIsBlank, ConditionalCellValue::Blank) => true,
+        (
+            TableCellConditionalHighlightCondition::CellIsNotBlank,
+            ConditionalCellValue::Number(_)
+            | ConditionalCellValue::Other
+            | ConditionalCellValue::Text(_),
+        ) => true,
         (
             TableCellConditionalHighlightCondition::EqualTo(operand),
             ConditionalCellValue::Number(value),

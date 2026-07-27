@@ -40,6 +40,11 @@ pub(super) fn insert_conditional_style_graph(
         let formula = formula::encode(&rule.condition, formula_owner_uuid)?;
         let predicate_type = kind.native_value();
         let (cell_index, first_index, second_index) = match kind {
+            NativePredicateKind::Cell(_) => (
+                PREDICATE_CELL_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
             NativePredicateKind::Numeric(kind) if kind.is_range() => (
                 PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
                 PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
@@ -198,6 +203,13 @@ fn predicate_arguments(
         arg_type: PREDICATE_ARGUMENT_NONE,
         ..Default::default()
     };
+    if matches!(
+        condition,
+        TableCellConditionalHighlightCondition::CellIsBlank
+            | TableCellConditionalHighlightCondition::CellIsNotBlank
+    ) {
+        return Ok((none(), none()));
+    }
     if let Some(value) = condition.single_operand() {
         return Ok((number_argument(value.get())?, none()));
     }

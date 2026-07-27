@@ -31,6 +31,7 @@ pub(super) const TEXT_RIGHT_FUNCTION_INDEX: u32 = 124;
 pub(super) const IS_ERROR_FUNCTION_INDEX: u32 = 70;
 pub(super) const LOGICAL_NOT_FUNCTION_INDEX: u32 = 96;
 pub(super) const IF_ERROR_FUNCTION_INDEX: u32 = 235;
+pub(super) const IS_BLANK_FUNCTION_INDEX: u32 = 69;
 pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +52,8 @@ impl NumericPredicateKind {
         condition: &TableCellConditionalHighlightCondition,
     ) -> Option<Self> {
         match condition {
+            TableCellConditionalHighlightCondition::CellIsBlank
+            | TableCellConditionalHighlightCondition::CellIsNotBlank => None,
             TableCellConditionalHighlightCondition::EqualTo(_) => Some(Self::EqualTo),
             TableCellConditionalHighlightCondition::NotEqualTo(_) => Some(Self::NotEqualTo),
             TableCellConditionalHighlightCondition::GreaterThan(_) => Some(Self::GreaterThan),
@@ -120,6 +123,26 @@ impl NumericPredicateKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
+pub(super) enum CellPredicateKind {
+    IsBlank = 34,
+    IsNotBlank = 35,
+}
+
+impl CellPredicateKind {
+    pub(super) const fn native_value(self) -> i32 {
+        self as i32
+    }
+
+    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+        match self {
+            Self::IsBlank => TableCellConditionalHighlightCondition::CellIsBlank,
+            Self::IsNotBlank => TableCellConditionalHighlightCondition::CellIsNotBlank,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
 pub(super) enum TextPredicateKind {
     StartsWith = 1,
     EndsWith = 2,
@@ -173,12 +196,22 @@ impl TextPredicateKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum NativePredicateKind {
+    Cell(CellPredicateKind),
     Numeric(NumericPredicateKind),
     Text(TextPredicateKind),
 }
 
 impl NativePredicateKind {
     pub(super) fn from_condition(condition: &TableCellConditionalHighlightCondition) -> Self {
+        match condition {
+            TableCellConditionalHighlightCondition::CellIsBlank => {
+                return Self::Cell(CellPredicateKind::IsBlank);
+            },
+            TableCellConditionalHighlightCondition::CellIsNotBlank => {
+                return Self::Cell(CellPredicateKind::IsNotBlank);
+            },
+            _ => {},
+        }
         NumericPredicateKind::from_condition(condition).map_or_else(
             || match condition {
                 TableCellConditionalHighlightCondition::TextEqualTo(_) => {
@@ -213,6 +246,7 @@ impl NativePredicateKind {
 
     pub(super) const fn native_value(self) -> i32 {
         match self {
+            Self::Cell(kind) => kind.native_value(),
             Self::Numeric(kind) => kind.native_value(),
             Self::Text(kind) => kind.native_value(),
         }
@@ -223,6 +257,15 @@ impl TryFrom<i32> for NativePredicateKind {
     type Error = Error;
 
     fn try_from(value: i32) -> Result<Self> {
+        match value {
+            value if value == CellPredicateKind::IsBlank.native_value() => {
+                return Ok(Self::Cell(CellPredicateKind::IsBlank));
+            },
+            value if value == CellPredicateKind::IsNotBlank.native_value() => {
+                return Ok(Self::Cell(CellPredicateKind::IsNotBlank));
+            },
+            _ => {},
+        }
         let text = match value {
             value if value == TextPredicateKind::StartsWith.native_value() => {
                 Some(TextPredicateKind::StartsWith)
@@ -317,6 +360,17 @@ mod tests {
             TextPredicateKind::DoesNotContain,
         ] {
             let kind = NativePredicateKind::Text(text);
+            assert_eq!(
+                NativePredicateKind::try_from(kind.native_value()).unwrap(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn native_cell_predicate_values_are_reversible() {
+        for cell in [CellPredicateKind::IsBlank, CellPredicateKind::IsNotBlank] {
+            let kind = NativePredicateKind::Cell(cell);
             assert_eq!(
                 NativePredicateKind::try_from(kind.native_value()).unwrap(),
                 kind
