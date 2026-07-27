@@ -2962,7 +2962,7 @@ impl NumbersEditor {
         Ok(())
     }
 
-    /// Replace a cell's conditional highlighting with ordered numeric rules.
+    /// Replace a cell's conditional highlighting with ordered rules.
     pub fn set_cell_conditional_highlighting(
         &mut self,
         table_id: u64,

@@ -69,7 +69,7 @@ impl PagesEditor {
         Ok(())
     }
 
-    /// Replace a body-table cell's conditional highlighting with ordered numeric rules.
+    /// Replace a body-table cell's conditional highlighting with ordered rules.
     pub fn set_table_cell_conditional_highlighting(
         &mut self,
         model_object_id: u64,

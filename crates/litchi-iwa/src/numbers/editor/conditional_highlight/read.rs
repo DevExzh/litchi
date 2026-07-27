@@ -132,8 +132,8 @@ fn decode_predicate(
             PREDICATE_NUMBER_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
         ),
-        NativePredicateKind::Text(_) => (
-            PREDICATE_TEXT_CELL_ARGUMENT_INDEX,
+        NativePredicateKind::Text(kind) => (
+            kind.cell_argument_index(),
             PREDICATE_TEXT_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
         ),

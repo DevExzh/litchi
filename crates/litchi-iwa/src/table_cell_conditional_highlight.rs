@@ -82,7 +82,12 @@ pub enum TableCellConditionalHighlightCondition {
     LessThanOrEqualTo(TableCellConditionalHighlightNumber),
     Between(TableCellConditionalHighlightRange),
     NotBetween(TableCellConditionalHighlightRange),
+    TextEqualTo(TableCellConditionalHighlightText),
+    TextNotEqualTo(TableCellConditionalHighlightText),
+    TextStartsWith(TableCellConditionalHighlightText),
+    TextEndsWith(TableCellConditionalHighlightText),
     TextContains(TableCellConditionalHighlightText),
+    TextDoesNotContain(TableCellConditionalHighlightText),
 }
 
 impl TableCellConditionalHighlightCondition {
@@ -94,7 +99,14 @@ impl TableCellConditionalHighlightCondition {
             | Self::GreaterThanOrEqualTo(value)
             | Self::LessThan(value)
             | Self::LessThanOrEqualTo(value) => Some(*value),
-            Self::Between(_) | Self::NotBetween(_) | Self::TextContains(_) => None,
+            Self::Between(_)
+            | Self::NotBetween(_)
+            | Self::TextEqualTo(_)
+            | Self::TextNotEqualTo(_)
+            | Self::TextStartsWith(_)
+            | Self::TextEndsWith(_)
+            | Self::TextContains(_)
+            | Self::TextDoesNotContain(_) => None,
         }
     }
 
@@ -107,13 +119,23 @@ impl TableCellConditionalHighlightCondition {
             | Self::GreaterThanOrEqualTo(_)
             | Self::LessThan(_)
             | Self::LessThanOrEqualTo(_)
-            | Self::TextContains(_) => None,
+            | Self::TextEqualTo(_)
+            | Self::TextNotEqualTo(_)
+            | Self::TextStartsWith(_)
+            | Self::TextEndsWith(_)
+            | Self::TextContains(_)
+            | Self::TextDoesNotContain(_) => None,
         }
     }
 
     pub fn text(&self) -> Option<&TableCellConditionalHighlightText> {
         match self {
-            Self::TextContains(value) => Some(value),
+            Self::TextEqualTo(value)
+            | Self::TextNotEqualTo(value)
+            | Self::TextStartsWith(value)
+            | Self::TextEndsWith(value)
+            | Self::TextContains(value)
+            | Self::TextDoesNotContain(value) => Some(value),
             Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)

@@ -1,5 +1,7 @@
 //! Canonical formula graphs used by conditional-highlight predicates.
 
+mod text;
+
 use super::*;
 
 pub(super) fn encode(
@@ -32,11 +34,14 @@ pub(super) fn encode(
                 ),
             ]
         },
-        (
-            NativePredicateKind::Text(TextPredicateKind::Contains),
-            TableCellConditionalHighlightCondition::TextContains(text),
-        ) => text_contains_nodes(text.as_str(), formula_owner_uuid),
-        _ => unreachable!("native predicate kind matches its public condition"),
+        (NativePredicateKind::Text(kind), _) => text::nodes(
+            kind,
+            condition
+                .text()
+                .expect("text predicate has a text operand")
+                .as_str(),
+            formula_owner_uuid,
+        )?,
     };
     Ok(tsce::FormulaArchive {
         ast_node_array: tsce::AstNodeArrayArchive { ast_node: nodes },
@@ -62,11 +67,11 @@ pub(super) fn validate(
                 .get();
             validate_single_number(formula, kind, value)
         },
-        (
-            NativePredicateKind::Text(TextPredicateKind::Contains),
-            TableCellConditionalHighlightCondition::TextContains(text),
-        ) => validate_text_contains(formula, text.as_str()),
-        _ => Err(invalid_formula()),
+        (NativePredicateKind::Text(kind), _) => text::validate(
+            formula,
+            kind,
+            condition.text().ok_or_else(invalid_formula)?.as_str(),
+        ),
     }
 }
 
@@ -106,16 +111,6 @@ fn number_node(value: f64) -> Result<tsce::ast_node_array_archive::AstNodeArchiv
         )),
         ..Default::default()
     })
-}
-
-fn string_node(value: &str) -> tsce::ast_node_array_archive::AstNodeArchive {
-    use tsce::ast_node_array_archive::AstNodeType;
-
-    tsce::ast_node_array_archive::AstNodeArchive {
-        ast_node_type: AstNodeType::StringNode as i32,
-        ast_string_node_string: Some(value.to_owned()),
-        ..Default::default()
-    }
 }
 
 fn operator_node(
@@ -196,19 +191,6 @@ fn range_nodes(
             CONDITIONAL_FUNCTION_ARGUMENT_COUNT,
         ),
     ])
-}
-
-fn text_contains_nodes(
-    text: &str,
-    formula_owner_uuid: &tsp::Uuid,
-) -> Vec<tsce::ast_node_array_archive::AstNodeArchive> {
-    vec![
-        string_node(text),
-        linked_cell_node(formula_owner_uuid),
-        function_node(TEXT_SEARCH_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
-        function_node(IS_ERROR_FUNCTION_INDEX, UNARY_FUNCTION_ARGUMENT_COUNT),
-        function_node(LOGICAL_NOT_FUNCTION_INDEX, UNARY_FUNCTION_ARGUMENT_COUNT),
-    ]
 }
 
 fn validate_single_number(
@@ -319,37 +301,6 @@ fn validate_range(
     Ok(())
 }
 
-fn validate_text_contains(formula: &tsce::FormulaArchive, text: &str) -> Result<()> {
-    use tsce::ast_node_array_archive::AstNodeType;
-
-    let [needle, cell, search, is_error, logical_not] = formula.ast_node_array.ast_node.as_slice()
-    else {
-        return Err(invalid_formula());
-    };
-    if !node_matches(needle, AstNodeType::StringNode)
-        || needle.ast_string_node_string.as_deref() != Some(text)
-        || !node_matches(cell, AstNodeType::LinkedCellRefNode)
-        || !function_matches(
-            search,
-            TEXT_SEARCH_FUNCTION_INDEX,
-            BINARY_FUNCTION_ARGUMENT_COUNT,
-        )
-        || !function_matches(
-            is_error,
-            IS_ERROR_FUNCTION_INDEX,
-            UNARY_FUNCTION_ARGUMENT_COUNT,
-        )
-        || !function_matches(
-            logical_not,
-            LOGICAL_NOT_FUNCTION_INDEX,
-            UNARY_FUNCTION_ARGUMENT_COUNT,
-        )
-    {
-        return Err(invalid_formula());
-    }
-    Ok(())
-}
-
 fn node_matches(
     node: &tsce::ast_node_array_archive::AstNodeArchive,
     node_type: tsce::ast_node_array_archive::AstNodeType,
@@ -368,7 +319,10 @@ fn function_matches(
     index: u32,
     argument_count: u32,
 ) -> bool {
-    node.ast_function_node_index == Some(index)
+    use tsce::ast_node_array_archive::AstNodeType;
+
+    node_matches(node, AstNodeType::FunctionNode)
+        && node.ast_function_node_index == Some(index)
         && node.ast_function_node_num_args == Some(argument_count)
 }
 

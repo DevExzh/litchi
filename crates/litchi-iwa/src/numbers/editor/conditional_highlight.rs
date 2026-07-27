@@ -23,8 +23,8 @@ use native::{
     PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_ARGUMENT_STRING, PREDICATE_CELL_ARGUMENT_INDEX,
     PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
     PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
-    PREDICATE_TEXT_ARGUMENT_INDEX, PREDICATE_TEXT_CELL_ARGUMENT_INDEX,
-    PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind,
+    PREDICATE_TEXT_ARGUMENT_INDEX, PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_LENGTH_FUNCTION_INDEX,
+    TEXT_RIGHT_FUNCTION_INDEX, TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind,
     UNARY_FUNCTION_ARGUMENT_COUNT,
 };
 
@@ -620,11 +620,60 @@ fn condition_matches(
             ConditionalCellValue::Number(value),
         ) => *value < range.lower().get() || *value > range.upper().get(),
         (
+            TableCellConditionalHighlightCondition::TextEqualTo(needle),
+            ConditionalCellValue::Text(value),
+        ) => equals_case_insensitive(value, needle.as_str()),
+        (
+            TableCellConditionalHighlightCondition::TextNotEqualTo(needle),
+            ConditionalCellValue::Text(value),
+        ) => !equals_case_insensitive(value, needle.as_str()),
+        (
+            TableCellConditionalHighlightCondition::TextStartsWith(needle),
+            ConditionalCellValue::Text(value),
+        ) => starts_with_case_insensitive(value, needle.as_str()),
+        (
+            TableCellConditionalHighlightCondition::TextEndsWith(needle),
+            ConditionalCellValue::Text(value),
+        ) => ends_with_case_insensitive(value, needle.as_str()),
+        (
             TableCellConditionalHighlightCondition::TextContains(needle),
             ConditionalCellValue::Text(value),
         ) => contains_case_insensitive(value, needle.as_str()),
+        (
+            TableCellConditionalHighlightCondition::TextDoesNotContain(needle),
+            ConditionalCellValue::Text(value),
+        ) => !contains_case_insensitive(value, needle.as_str()),
         _ => false,
     }
+}
+
+fn equals_case_insensitive(value: &str, expected: &str) -> bool {
+    if value.is_ascii() && expected.is_ascii() {
+        return value.eq_ignore_ascii_case(expected);
+    }
+    value.to_lowercase() == expected.to_lowercase()
+}
+
+fn starts_with_case_insensitive(value: &str, prefix: &str) -> bool {
+    if value.is_ascii() && prefix.is_ascii() {
+        return value
+            .as_bytes()
+            .get(..prefix.len())
+            .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix.as_bytes()));
+    }
+    value.to_lowercase().starts_with(&prefix.to_lowercase())
+}
+
+fn ends_with_case_insensitive(value: &str, suffix: &str) -> bool {
+    if value.is_ascii() && suffix.is_ascii() {
+        return value
+            .as_bytes()
+            .get(value.len().saturating_sub(suffix.len())..)
+            .is_some_and(|candidate| {
+                candidate.len() == suffix.len() && candidate.eq_ignore_ascii_case(suffix.as_bytes())
+            });
+    }
+    value.to_lowercase().ends_with(&suffix.to_lowercase())
 }
 
 fn contains_case_insensitive(value: &str, needle: &str) -> bool {

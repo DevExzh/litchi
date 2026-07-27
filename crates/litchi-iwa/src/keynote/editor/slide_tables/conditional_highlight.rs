@@ -72,7 +72,7 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Replace a slide-table cell's conditional highlighting with ordered numeric rules.
+    /// Replace a slide-table cell's conditional highlighting with ordered rules.
     pub fn set_slide_table_cell_conditional_highlighting(
         &mut self,
         slide_index: usize,

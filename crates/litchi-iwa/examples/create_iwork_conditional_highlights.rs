@@ -27,13 +27,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn highlight_rule() -> Result<TableCellConditionalHighlightRule, Box<dyn std::error::Error>> {
-    let text = TableCellConditionalHighlightText::new("grain")?;
+fn highlight_rules() -> Result<Vec<TableCellConditionalHighlightRule>, Box<dyn std::error::Error>> {
     let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
-    Ok(TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::TextContains(text),
-        TableCellConditionalHighlightStyle::new(Some(red), None, true)?,
-    ))
+    let style = TableCellConditionalHighlightStyle::new(Some(red), None, true)?;
+    let text = |value| TableCellConditionalHighlightText::new(value);
+    Ok([
+        TableCellConditionalHighlightCondition::TextEqualTo(text("organic grain")?),
+        TableCellConditionalHighlightCondition::TextNotEqualTo(text("dairy")?),
+        TableCellConditionalHighlightCondition::TextStartsWith(text("organic")?),
+        TableCellConditionalHighlightCondition::TextEndsWith(text("grain")?),
+        TableCellConditionalHighlightCondition::TextContains(text("nic gr")?),
+        TableCellConditionalHighlightCondition::TextDoesNotContain(text("rice")?),
+    ]
+    .into_iter()
+    .map(|condition| TableCellConditionalHighlightRule::new(condition, style))
+    .collect())
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -48,13 +56,8 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         CellValue::Text("Organic Grain".to_owned()),
     )?;
-    let rule = highlight_rule()?;
-    editor.set_cell_conditional_highlighting(
-        table_id,
-        HIGHLIGHT_ROW,
-        HIGHLIGHT_COLUMN,
-        std::slice::from_ref(&rule),
-    )?;
+    let rules = highlight_rules()?;
+    editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &rules)?;
     editor.save(output)?;
     assert_eq!(
         NumbersEditor::open(output)?.cell_conditional_highlight_rules(
@@ -62,7 +65,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             HIGHLIGHT_ROW,
             HIGHLIGHT_COLUMN,
         )?,
-        Some(vec![rule])
+        Some(rules)
     );
     Ok(())
 }
@@ -79,12 +82,12 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         CellValue::Text("Organic Grain".to_owned()),
     )?;
-    let rule = highlight_rule()?;
+    let rules = highlight_rules()?;
     editor.set_table_cell_conditional_highlighting(
         table_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        std::slice::from_ref(&rule),
+        &rules,
     )?;
     editor.save(output)?;
     assert_eq!(
@@ -93,7 +96,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             HIGHLIGHT_ROW,
             HIGHLIGHT_COLUMN,
         )?,
-        Some(vec![rule])
+        Some(rules)
     );
     Ok(())
 }
@@ -120,13 +123,13 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         HIGHLIGHT_COLUMN,
         CellValue::Text("Organic Grain".to_owned()),
     )?;
-    let rule = highlight_rule()?;
+    let rules = highlight_rules()?;
     editor.set_slide_table_cell_conditional_highlighting(
         0,
         table.model_object_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        std::slice::from_ref(&rule),
+        &rules,
     )?;
     editor.save(output)?;
     assert_eq!(
@@ -136,7 +139,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             HIGHLIGHT_ROW,
             HIGHLIGHT_COLUMN,
         )?,
-        Some(vec![rule])
+        Some(rules)
     );
     Ok(())
 }

@@ -158,7 +158,7 @@ fn range_conditions_use_inclusive_between_and_strictly_outside_not_between() {
 }
 
 #[test]
-fn text_contains_is_case_insensitive_and_round_trips_from_scratch() {
+fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(3, 3)
         .build()
@@ -167,22 +167,48 @@ fn text_contains_is_case_insensitive_and_round_trips_from_scratch() {
     editor
         .set_cell(table_id, 1, 1, CellValue::Text("Organic Grain".to_owned()))
         .unwrap();
-    let condition = TableCellConditionalHighlightCondition::TextContains(
-        TableCellConditionalHighlightText::new("grain").unwrap(),
-    );
-    assert!(condition_matches(
-        &condition,
-        &ConditionalCellValue::Text("GRAIN".to_owned())
-    ));
-    assert!(!condition_matches(
-        &condition,
-        &ConditionalCellValue::Text("Dairy".to_owned())
-    ));
+    let text = |value| TableCellConditionalHighlightText::new(value).unwrap();
+    let condition_cases = [
+        (
+            TableCellConditionalHighlightCondition::TextEqualTo(text("organic grain")),
+            "Dairy",
+        ),
+        (
+            TableCellConditionalHighlightCondition::TextNotEqualTo(text("dairy")),
+            "Dairy",
+        ),
+        (
+            TableCellConditionalHighlightCondition::TextStartsWith(text("ORGANIC")),
+            "Dairy",
+        ),
+        (
+            TableCellConditionalHighlightCondition::TextEndsWith(text("grain")),
+            "Dairy",
+        ),
+        (
+            TableCellConditionalHighlightCondition::TextContains(text("NIC GR")),
+            "Dairy",
+        ),
+        (
+            TableCellConditionalHighlightCondition::TextDoesNotContain(text("rice")),
+            "Organic Rice",
+        ),
+    ];
+    for (condition, nonmatching) in &condition_cases {
+        assert!(condition_matches(
+            condition,
+            &ConditionalCellValue::Text("Organic Grain".to_owned())
+        ));
+        assert!(!condition_matches(
+            condition,
+            &ConditionalCellValue::Text((*nonmatching).to_owned())
+        ));
+    }
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
-    let rule = rule(condition, red);
+    let rules = condition_cases.map(|(condition, _nonmatching)| rule(condition, red));
 
     editor
-        .set_cell_conditional_highlighting(table_id, 1, 1, std::slice::from_ref(&rule))
+        .set_cell_conditional_highlighting(table_id, 1, 1, &rules)
         .unwrap();
     let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
     let cell = read_tile_cell(
@@ -204,6 +230,6 @@ fn text_contains_is_case_insensitive_and_round_trips_from_scratch() {
         editor
             .cell_conditional_highlight_rules(table_id, 1, 1)
             .unwrap(),
-        Some(vec![rule])
+        Some(rules.to_vec())
     );
 }
