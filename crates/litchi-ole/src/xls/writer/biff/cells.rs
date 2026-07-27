@@ -231,6 +231,16 @@ pub fn write_formula<W: Write>(
     Ok(())
 }
 
+/// Write a TABLE record (MS-XLS 2.4.319) for a what-if data table.
+///
+/// Record type: 0x0236
+pub fn write_table<W: Write>(writer: &mut W, table: &crate::xls::XlsDataTable) -> XlsResult<()> {
+    let payload = table.to_payload();
+    write_record_header(writer, 0x0236, payload.len() as u16)?;
+    writer.write_all(&payload)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::write_formula;

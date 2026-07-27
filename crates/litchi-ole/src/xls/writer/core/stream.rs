@@ -846,6 +846,20 @@ pub(crate) fn generate_workbook_stream(
                 }
             }
 
+            // A data-table anchor cell emits its PtgTbl formula immediately
+            // followed by the Table record (MS-XLS 2.4.319).
+            if let Some((_, _, table)) = worksheet
+                .data_tables
+                .iter()
+                .find(|(anchor_row, anchor_col, _)| (*anchor_row, *anchor_col) == (*row, *col))
+            {
+                let tokens = table.ptg_tbl_tokens();
+                biff::write_formula(&mut stream, *row, *col, xf_index, &tokens)?;
+                biff::write_table(&mut stream, table)?;
+                cell_index += 1;
+                continue;
+            }
+
             match &cell.value {
                 XlsCellValue::Number(value) => {
                     biff::write_number(&mut stream, *row, *col, xf_index, *value)?;

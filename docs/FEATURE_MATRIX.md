@@ -308,6 +308,7 @@ conversion, fonts, and image conversion are optional.
 | BIFF versions | ✅ | ✅ | ✅ | Reads BIFF2-BIFF8; writes BIFF8 |
 | Workbooks, worksheets, and cells | ✅ | ✅ | ✅ | Multiple sheets and all principal cell value records |
 | Formula tokens, shared/array formulas | ✅ | ✅ | ✅ | Ptg token streams and cached results |
+| What-if data tables | ✅ | ✅ | ✅ | Typed `Table` records (one/two-variable input cells, deleted markers, orientation) with `PtgTbl` anchor authoring |
 | Formula evaluation | 🟡 | ✅ | N/A | Shared evaluator via `WorkbookTrait`; not complete Excel semantics |
 | Shared strings and rich text | ✅ | ✅ | ✅ | SST/CONTINUE handling and formatting runs |
 | Defined names | ✅ | ✅ | ✅ | Workbook/sheet names and extended metadata |

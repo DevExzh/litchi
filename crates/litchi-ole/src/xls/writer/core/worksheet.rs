@@ -131,6 +131,8 @@ pub(super) struct WritableWorksheet {
     pub list_objects: Vec<crate::xls::XlsListObject>,
     /// Sheet tab color as a palette index (SHEETEXT `icvPlain`).
     pub tab_color: Option<u8>,
+    /// What-if data tables: anchor formula cell and typed TABLE record.
+    pub data_tables: Vec<(u32, u16, crate::xls::XlsDataTable)>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -195,6 +197,7 @@ impl WritableWorksheet {
             consolidation: None,
             list_objects: Vec::new(),
             tab_color: None,
+            data_tables: Vec::new(),
         }
     }
 

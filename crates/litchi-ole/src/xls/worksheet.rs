@@ -74,6 +74,8 @@ pub struct XlsWorksheet {
         std::result::Result<Option<crate::xls::row_block_index::XlsRowBlockIndex>, String>,
     /// Sheet tab color and publish state (SHEETEXT record).
     sheet_ext: Option<crate::xls::sheet_ext::XlsSheetExt>,
+    /// What-if data tables (TABLE records), in record order.
+    data_tables: Vec<crate::xls::data_table::XlsDataTable>,
 }
 
 impl XlsWorksheet {
@@ -114,6 +116,7 @@ impl XlsWorksheet {
             list_objects: Vec::new(),
             row_block_index: Ok(None),
             sheet_ext: None,
+            data_tables: Vec::new(),
         }
     }
 
@@ -154,6 +157,7 @@ impl XlsWorksheet {
             list_objects: Vec::new(),
             row_block_index: Ok(None),
             sheet_ext: None,
+            data_tables: Vec::new(),
         }
     }
 
@@ -309,6 +313,15 @@ impl XlsWorksheet {
 
     pub(crate) fn set_sheet_ext(&mut self, sheet_ext: crate::xls::sheet_ext::XlsSheetExt) {
         self.sheet_ext = Some(sheet_ext);
+    }
+
+    /// What-if data tables declared in this worksheet, in record order.
+    pub fn data_tables(&self) -> &[crate::xls::data_table::XlsDataTable] {
+        &self.data_tables
+    }
+
+    pub(crate) fn add_data_table(&mut self, table: crate::xls::data_table::XlsDataTable) {
+        self.data_tables.push(table);
     }
 
     // -- Filter mode --

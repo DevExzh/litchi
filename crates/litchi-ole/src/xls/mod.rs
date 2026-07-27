@@ -103,6 +103,9 @@ mod layout;
 /// BIFF8 `BookExt` record: workbook extension flags.
 mod book_ext;
 
+/// BIFF8 `Table` record: what-if data tables.
+mod data_table;
+
 /// BIFF8 worksheet default dimensions and outline workspace metadata.
 mod sheet_layout;
 
@@ -258,6 +261,9 @@ pub use row_block_index::{
 pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
 pub use shapes::XlsShape;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
+pub use data_table::{
+    XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange,
+};
 pub use book_ext::{
     XlsBookExt, XlsBookExtConditional11, XlsBookExtConditional12, XlsFactoidDisplay,
 };

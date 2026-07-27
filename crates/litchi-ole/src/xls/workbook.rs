@@ -959,6 +959,9 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     }
                     worksheet.set_sheet_ext(crate::xls::sheet_ext::XlsSheetExt::parse(&record.data)?);
                 }
+                crate::xls::data_table::TABLE_RECORD_TYPE => { // Table
+                    worksheet.add_data_table(crate::xls::data_table::XlsDataTable::parse(&record.data)?);
+                }
                 0x0200 => { // Dimensions
                     if let Ok(dimensions) = DimensionsRecord::parse(&record.data) {
                         worksheet.set_dimensions(dimensions.first_row, dimensions.last_row,

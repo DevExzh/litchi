@@ -2,6 +2,7 @@ use std::io::{self, ErrorKind};
 
 const INDEX_RECORD_TYPE: u16 = 0x020b;
 const ROW_RECORD_TYPE: u16 = 0x0208;
+const TABLE_RECORD_TYPE: u16 = 0x0236;
 const DBCELL_RECORD_TYPE: u16 = 0x00d7;
 const MAX_ROWS_PER_BLOCK: usize = 32;
 const MAX_ROW_BLOCKS: usize = 2048;
@@ -167,6 +168,7 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
     let mut rows = Vec::new();
     let mut offset = 0usize;
     let mut reached_cells = false;
+    let mut last_cell_row: Option<usize> = None;
     while offset < bytes.len() {
         let header_end = offset.checked_add(4).ok_or_else(overflow)?;
         if header_end > bytes.len() {
@@ -198,6 +200,16 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
                 bytes[offset..record_end].to_vec(),
                 Vec::new(),
             ));
+        } else if record_type == TABLE_RECORD_TYPE {
+            // A Table record follows its anchor Formula and shares that
+            // cell's layout row; its own payload does not start with the
+            // row coordinate of the anchor cell.
+            reached_cells = true;
+            let row_index = last_cell_row
+                .ok_or_else(|| invalid("staged Table record has no preceding cell record"))?;
+            rows[row_index]
+                .cell_records
+                .extend_from_slice(&bytes[offset..record_end]);
         } else {
             reached_cells = true;
             if !is_row_addressed_cell_record(record_type) || payload_len < 2 {
@@ -210,6 +222,7 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<XlsRowBlockLayoutRow>> {
             rows[row_index]
                 .cell_records
                 .extend_from_slice(&bytes[offset..record_end]);
+            last_cell_row = Some(row_index);
         }
         offset = record_end;
     }
@@ -304,6 +317,11 @@ fn validate_cell_records(row: &XlsRowBlockLayoutRow) -> io::Result<()> {
         let record_end = header_end.checked_add(payload_len).ok_or_else(overflow)?;
         if record_end > row.cell_records.len() {
             return Err(invalid("cell record buffer ends inside a BIFF payload"));
+        }
+        if record_type == TABLE_RECORD_TYPE {
+            // Table records carry the table range, not the anchor cell's row.
+            offset = record_end;
+            continue;
         }
         if !is_row_addressed_cell_record(record_type) {
             return Err(invalid("record is not a supported BIFF8 cell-table record"));

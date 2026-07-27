@@ -3577,6 +3577,61 @@ impl XlsWriter {
         Ok(())
     }
 
+    /// Author a what-if data table (MS-XLS 2.4.319) anchored at a formula
+    /// cell. The anchor cell is written as a `PtgTbl` formula immediately
+    /// followed by the `Table` record; it must lie outside the table range
+    /// and must not already carry a value.
+    pub fn add_data_table(
+        &mut self,
+        sheet: usize,
+        anchor_row: u32,
+        anchor_col: u16,
+        table: crate::xls::XlsDataTable,
+    ) -> XlsResult<()> {
+        if anchor_row > u32::from(u16::MAX) || anchor_col > 255 {
+            return Err(XlsError::InvalidData(
+                "data-table anchor cell exceeds the BIFF8 grid".to_string(),
+            ));
+        }
+        let range = table.range();
+        let inside = (u32::from(range.first_row())..=u32::from(range.last_row()))
+            .contains(&anchor_row)
+            && (range.first_col()..=range.last_col()).contains(&(anchor_col as u8));
+        if inside {
+            return Err(XlsError::InvalidData(
+                "data-table anchor formula cell must lie outside the table range".to_string(),
+            ));
+        }
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        if worksheet.data_tables.iter().any(|(row, col, _)| {
+            (*row, *col) == (anchor_row, anchor_col)
+        }) {
+            return Err(XlsError::InvalidData(
+                "duplicate data-table anchor cell".to_string(),
+            ));
+        }
+        if let Some(cell) = worksheet.cells.get(&(anchor_row, anchor_col)) {
+            if !matches!(cell.value, XlsCellValue::Blank) {
+                return Err(XlsError::InvalidData(
+                    "data-table anchor cell already carries a value".to_string(),
+                ));
+            }
+        } else {
+            worksheet.add_cell(WritableCell {
+                row: anchor_row,
+                col: anchor_col,
+                value: XlsCellValue::Blank,
+                format_idx: 0,
+                pivot_xf_role: None,
+            });
+        }
+        worksheet.data_tables.push((anchor_row, anchor_col, table));
+        Ok(())
+    }
+
     pub fn set_worksheet_vba_code_name(
         &mut self,
         sheet: usize,
