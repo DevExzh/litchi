@@ -146,6 +146,7 @@ impl<W: Write> RtfWriter<W> {
                 .map(|f| Font {
                     name: std::borrow::Cow::Owned(f.name.to_string()),
                     family: f.family,
+                    theme: f.theme,
                     charset: f.charset,
                     alternate_name: f
                         .alternate_name
@@ -1544,6 +1545,9 @@ impl<W: Write> RtfWriter<W> {
             // Write charset
             if font.charset != 0 {
                 self.write_control_word("fcharset", Some(font.charset as i32))?;
+            }
+            if let Some(theme) = font.theme {
+                self.write_control_word(theme.control_word(), None)?;
             }
             self.write_control_word(
                 "fprq",

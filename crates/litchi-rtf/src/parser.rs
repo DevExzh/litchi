@@ -14697,6 +14697,7 @@ impl<'a> Parser<'a> {
         let mut charset = None;
         let mut pitch = crate::FontPitch::Default;
         let mut code_page = None;
+        let mut theme = None;
         let mut alternate_name = None;
         let mut non_tagged_name = None;
         let mut panose = None;
@@ -14859,6 +14860,15 @@ impl<'a> Parser<'a> {
                     })?);
                     self.pos += 1;
                 },
+                Token::Control(ControlWord::FontTheme(word)) => {
+                    if !seen.insert("theme") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF font theme selector".to_string(),
+                        ));
+                    }
+                    theme = super::types::FontTheme::from_control_word(word);
+                    self.pos += 1;
+                },
                 Token::Text(text) => {
                     name.push_str(&self.decode_transport_text(text)?);
                     self.pos += 1;
@@ -14899,6 +14909,7 @@ impl<'a> Parser<'a> {
         font.pitch = pitch;
         font.code_page = code_page;
         font.embedded = embedded;
+        font.theme = theme;
         font.validate()?;
         if let Some(existing) = self.font_table.borrow().get(font_num) {
             if existing == &font {

@@ -526,7 +526,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Page layout, columns, borders, and numbering | ✅ | ✅ | ✅ | Orientation, dimensions, margins, facing pages, columns, page borders, and line/page numbering |
 | Headers and footers | ✅ | ✅ | ✅ | Header/footer story content and types |
 | Tables | ✅ | ✅ | ✅ | Nested/floating tables, merges, geometry, borders, shading, distances, banding, and story ownership |
-| Character formatting | ✅ | ✅ | ✅ | Fonts, sizes, colors, bold/italic, all nineteen underline styles plus underline color, borders, shading, positioning, scaling, and kerning |
+| Character formatting | ✅ | ✅ | ✅ | Fonts, sizes, colors, bold/italic, all nineteen underline styles plus underline color, theme-font roles, borders, shading, positioning, scaling, and kerning |
 | Paragraph formatting | ✅ | ✅ | ✅ | Alignment, indents, spacing, tabs, borders, shading, bidi, flow, drop caps, outline levels, and style references |
 | Stylesheets and latent styles | ✅ | ✅ | ✅ | Paragraph, character, section, table, inheritance, latent styles, filters, and restrictions |
 | Lists and numbering | ✅ | ✅ | ✅ | Modern list tables/overrides with per-level tentative/legal/no-restart/legacy/previous-level metadata, plus legacy section and paragraph numbering |

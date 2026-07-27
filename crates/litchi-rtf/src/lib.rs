@@ -313,7 +313,7 @@ pub use types::{
     Alignment, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
     AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
     DocumentElement, EmbeddedFont, EmbeddedFontFormat, Font, FontFamily, FontPitch, FontRef,
-    FontTable, Formatting, Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph,
+    FontTable, FontTheme, Formatting, Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph,
     ParagraphContent, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
     ParagraphLineBreaking, ParagraphLogicalIndentation, ParagraphSpacingPolicy,
     ParagraphWrapping, Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,

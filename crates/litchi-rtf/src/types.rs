@@ -176,6 +176,58 @@ impl EmbeddedFont<'_> {
     }
 }
 
+/// Theme-font role of a font-table entry (`\flomajor` and friends).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FontTheme {
+    /// Major Latin-script theme font (`\flomajor`).
+    MajorLatin,
+    /// Major high-ANSI theme font (`\fhimajor`).
+    MajorHighAnsi,
+    /// Major double-byte (East Asian) theme font (`\fdbmajor`).
+    MajorDoubleByte,
+    /// Major bidi (complex scripts) theme font (`\fbimajor`).
+    MajorBidi,
+    /// Minor Latin-script theme font (`\flominor`).
+    MinorLatin,
+    /// Minor high-ANSI theme font (`\fhiminor`).
+    MinorHighAnsi,
+    /// Minor double-byte (East Asian) theme font (`\fdbminor`).
+    MinorDoubleByte,
+    /// Minor bidi (complex scripts) theme font (`\fbiminor`).
+    MinorBidi,
+}
+
+impl FontTheme {
+    /// The RTF control word selecting this role.
+    pub fn control_word(self) -> &'static str {
+        match self {
+            Self::MajorLatin => "flomajor",
+            Self::MajorHighAnsi => "fhimajor",
+            Self::MajorDoubleByte => "fdbmajor",
+            Self::MajorBidi => "fbimajor",
+            Self::MinorLatin => "flominor",
+            Self::MinorHighAnsi => "fhiminor",
+            Self::MinorDoubleByte => "fdbminor",
+            Self::MinorBidi => "fbiminor",
+        }
+    }
+
+    /// The role for a control word, or `None` for an unknown selector.
+    pub fn from_control_word(word: &str) -> Option<Self> {
+        Some(match word {
+            "flomajor" => Self::MajorLatin,
+            "fhimajor" => Self::MajorHighAnsi,
+            "fdbmajor" => Self::MajorDoubleByte,
+            "fbimajor" => Self::MajorBidi,
+            "flominor" => Self::MinorLatin,
+            "fhiminor" => Self::MinorHighAnsi,
+            "fdbminor" => Self::MinorDoubleByte,
+            "fbiminor" => Self::MinorBidi,
+            _ => return None,
+        })
+    }
+}
+
 /// Font definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Font<'a> {
@@ -197,6 +249,8 @@ pub struct Font<'a> {
     pub code_page: Option<u16>,
     /// Embedded font payload from the inert `fontemb` destination.
     pub embedded: Option<EmbeddedFont<'a>>,
+    /// Theme-font role from the major/minor theme selectors.
+    pub theme: Option<FontTheme>,
 }
 
 impl<'a> Font<'a> {
@@ -213,6 +267,7 @@ impl<'a> Font<'a> {
             pitch: FontPitch::Default,
             code_page: None,
             embedded: None,
+            theme: None,
         }
     }
 
@@ -243,6 +298,7 @@ impl<'a> Font<'a> {
         Font {
             name: Cow::Owned(self.name.into_owned()),
             family: self.family,
+            theme: self.theme,
             charset: self.charset,
             alternate_name: self
                 .alternate_name
