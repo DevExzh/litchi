@@ -43,6 +43,14 @@ pub struct TableCellCheckboxFormat;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct TableCellStarRatingFormat;
 
+/// Native explicit Text format for one table cell.
+///
+/// This preserves empty and text values verbatim. Applying Text to another
+/// value type is rejected because iWork converts the locale-formatted display
+/// string, which cannot be reproduced safely without the originating locale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TableCellTextFormat;
+
 /// A fixed fractional-digit count accepted by the iWork cell inspector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TableCellFixedDecimalPlaces(u8);
@@ -474,6 +482,8 @@ pub enum TableCellDataFormat {
     Automatic,
     /// Display the value as a decimal number.
     Number(TableCellNumberFormat),
+    /// Preserve and display the value as literal text.
+    Text(TableCellTextFormat),
     /// Display the value using a native currency and optional accounting style.
     Currency(TableCellCurrencyFormat),
     /// Multiply the displayed value by one hundred and append a percent sign.
@@ -503,6 +513,12 @@ pub enum TableCellDataFormat {
 impl From<TableCellNumberFormat> for TableCellDataFormat {
     fn from(value: TableCellNumberFormat) -> Self {
         Self::Number(value)
+    }
+}
+
+impl From<TableCellTextFormat> for TableCellDataFormat {
+    fn from(value: TableCellTextFormat) -> Self {
+        Self::Text(value)
     }
 }
 

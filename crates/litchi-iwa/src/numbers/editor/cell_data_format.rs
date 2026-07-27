@@ -8,7 +8,7 @@ use crate::table_cell_data_format::{
     TableCellDurationFormat, TableCellFractionFormat, TableCellNumberFormat,
     TableCellNumeralSystemFormat, TableCellNumericControlDisplayFormat, TableCellPercentageFormat,
     TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection, TableCellScientificFormat,
-    TableCellSliderFormat, TableCellStarRatingFormat, TableCellStepperFormat,
+    TableCellSliderFormat, TableCellStarRatingFormat, TableCellStepperFormat, TableCellTextFormat,
 };
 #[cfg(test)]
 use crate::table_cell_data_format::{
@@ -169,8 +169,39 @@ pub(super) fn cell_number_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Number data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn cell_text_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellTextFormat>> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(None),
+        TableCellDataFormat::Text(format) => Ok(Some(format)),
+        _ => Err(Error::InvalidFormat(
+            "Table cell does not use the Text data format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn reset_cell_text_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    match cell_data_format(package, table_id, row, column)? {
+        TableCellDataFormat::Automatic => Ok(false),
+        TableCellDataFormat::Text(_) => reset_cell_data_format(package, table_id, row, column),
+        _ => Err(Error::InvalidFormat(
+            "Cannot reset Text format from a non-Text cell".to_owned(),
         )),
     }
 }
@@ -195,6 +226,7 @@ pub(super) fn cell_currency_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Currency data format".to_owned(),
         )),
@@ -221,6 +253,7 @@ pub(super) fn reset_cell_currency_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Currency format from a non-Currency cell".to_owned(),
         )),
@@ -247,6 +280,7 @@ pub(super) fn cell_percentage_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Percentage data format".to_owned(),
         )),
@@ -273,6 +307,7 @@ pub(super) fn cell_scientific_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Scientific data format".to_owned(),
         )),
@@ -301,6 +336,7 @@ pub(super) fn reset_cell_scientific_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Scientific format from a non-Scientific cell".to_owned(),
         )),
@@ -327,6 +363,7 @@ pub(super) fn cell_fraction_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Fraction data format".to_owned(),
         )),
@@ -353,6 +390,7 @@ pub(super) fn reset_cell_fraction_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Fraction format from a non-Fraction cell".to_owned(),
         )),
@@ -379,6 +417,7 @@ pub(super) fn cell_numeral_system_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Numeral System data format".to_owned(),
         )),
@@ -407,6 +446,7 @@ pub(super) fn reset_cell_numeral_system_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Numeral System format from a non-Numeral-System cell".to_owned(),
         )),
@@ -433,6 +473,7 @@ pub(super) fn cell_date_time_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Date & Time data format".to_owned(),
         )),
@@ -459,6 +500,7 @@ pub(super) fn reset_cell_date_time_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Date & Time format from a non-Date-Time cell".to_owned(),
         )),
@@ -485,6 +527,7 @@ pub(super) fn cell_duration_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Table cell does not use the Duration data format".to_owned(),
         )),
@@ -511,6 +554,7 @@ pub(super) fn reset_cell_duration_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Duration format from a non-Duration cell".to_owned(),
         )),
@@ -713,6 +757,7 @@ pub(super) fn set_cell_data_format(
         TableCellDataFormat::Currency(_) => bnc::CellDataFormatKind::Currency,
         TableCellDataFormat::DateTime(_) => bnc::CellDataFormatKind::DateTime,
         TableCellDataFormat::Duration(_) => bnc::CellDataFormatKind::Duration,
+        TableCellDataFormat::Text(_) => bnc::CellDataFormatKind::Text,
         TableCellDataFormat::Checkbox(_) => bnc::CellDataFormatKind::Checkbox,
         TableCellDataFormat::StarRating(_) => bnc::CellDataFormatKind::StarRating,
         TableCellDataFormat::Slider(format) => match format.display_format() {
@@ -903,6 +948,7 @@ pub(super) fn reset_cell_number_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Number format from a non-Number cell".to_owned(),
         )),
@@ -931,6 +977,7 @@ pub(super) fn reset_cell_percentage_format(
         | TableCellDataFormat::StarRating(_)
         | TableCellDataFormat::Slider(_)
         | TableCellDataFormat::Stepper(_)
+        | TableCellDataFormat::Text(_)
         | TableCellDataFormat::PopUpMenu(_) => Err(Error::InvalidFormat(
             "Cannot reset Percentage format from a non-Percentage cell".to_owned(),
         )),
@@ -1110,14 +1157,14 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
                 secondary: None,
             })
         },
-        (bnc::EXPLICIT_TEXT_FORMAT, Some(bnc::TEXT_CELL_FORMAT_KIND), Some(identifier))
-            if secondary.is_none() =>
-        {
-            Ok(CellFormatReference::Explicit {
-                identifier,
-                secondary: None,
-            })
-        },
+        (
+            bnc::EXPLICIT_TEXT_FORMAT | bnc::EXPLICIT_CONVERTED_TEXT_FORMAT,
+            Some(bnc::TEXT_CELL_FORMAT_KIND),
+            Some(identifier),
+        ) if secondary.is_none() => Ok(CellFormatReference::Explicit {
+            identifier,
+            secondary: None,
+        }),
         _ => Err(Error::InvalidFormat(
             "Table cell contains inconsistent data-format metadata".to_owned(),
         )),
@@ -1916,6 +1963,70 @@ mod tests {
     }
 
     #[test]
+    fn source_built_table_roundtrips_reuses_and_resets_text_formats() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Text")
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Text("00123".to_owned()))
+            .unwrap();
+        editor.set_table_cell_text_format(table_id, 1, 1).unwrap();
+        editor.set_table_cell_text_format(table_id, 1, 2).unwrap();
+
+        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
+        let formats = resolve_format_table(editor.package(), &location).unwrap();
+        assert_eq!(formats.entries.len(), 1);
+        assert_eq!(formats.entries[0].entry.refcount, 2);
+        assert_eq!(
+            formats.entries[0].entry.format,
+            Some(text_format_to_native())
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.table_cell_text_format(table_id, 1, 1).unwrap(),
+            Some(TableCellTextFormat)
+        );
+        assert_eq!(
+            reopened.table_cell_text_format(table_id, 1, 2).unwrap(),
+            Some(TableCellTextFormat)
+        );
+        let document = NumbersDocument::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 1),
+            Some(&CellValue::Text("00123".to_owned()))
+        );
+        assert_eq!(
+            document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
+            Some(&CellValue::Empty)
+        );
+
+        reopened
+            .set_cell(table_id, 2, 1, CellValue::Number(42.0))
+            .unwrap();
+        let before = reopened.to_bytes().unwrap();
+        assert!(reopened.set_table_cell_text_format(table_id, 2, 1).is_err());
+        assert_eq!(reopened.to_bytes().unwrap(), before);
+
+        assert!(
+            reopened
+                .reset_table_cell_text_format(table_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            reopened
+                .reset_table_cell_text_format(table_id, 1, 2)
+                .unwrap()
+        );
+        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
+        let formats = resolve_format_table(reopened.package(), &location).unwrap();
+        assert!(formats.entries.is_empty());
+    }
+
+    #[test]
     fn source_built_table_roundtrips_reuses_and_cleans_up_pop_up_menus() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Menus")
@@ -1978,6 +2089,16 @@ mod tests {
             document.sheets().unwrap()[0].tables[0].get_cell(1, 2),
             Some(&CellValue::Text("Low".to_owned()))
         );
+        reopened
+            .set_cell(table_id, 2, 1, CellValue::Number(42.0))
+            .unwrap();
+        let before = reopened.to_bytes().unwrap();
+        assert!(
+            reopened
+                .set_table_cell_pop_up_menu_format(table_id, 2, 1, priority.clone())
+                .is_err()
+        );
+        assert_eq!(reopened.to_bytes().unwrap(), before);
 
         let blank_priority = TableCellPopUpMenuFormat::try_new(["Low", "Medium", "High"])
             .unwrap()

@@ -2037,6 +2037,56 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read an explicit Text format for one zero-based table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_text_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<crate::table_cell_data_format::TableCellTextFormat>> {
+        cell_data_format::cell_text_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit Text format transactionally.
+    pub fn set_table_cell_text_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(
+            table_id,
+            row,
+            column,
+            crate::table_cell_data_format::TableCellTextFormat.into(),
+        )
+    }
+
+    /// Restore Automatic from an explicit Text cell.
+    pub fn reset_table_cell_text_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_data_format::reset_cell_text_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != crate::table_cell_data_format::TableCellDataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Text-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read an explicit currency format for one zero-based table cell.
     ///
     /// `None` means the cell uses iWork's automatic data format.
@@ -3679,6 +3729,24 @@ pub(crate) fn reset_table_cell_number_format_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_data_format::reset_cell_number_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<crate::table_cell_data_format::TableCellTextFormat>> {
+    cell_data_format::cell_text_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_text_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_text_format(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_currency_format_in_package(

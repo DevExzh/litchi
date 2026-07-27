@@ -10,7 +10,7 @@ use crate::table_cell_data_format::{
     TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFormat,
     TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
     TableCellNumericControlDisplayFormat, TableCellPercentageFormat, TableCellScientificFormat,
-    TableCellStarRatingFormat, TableCellThousandsSeparator,
+    TableCellStarRatingFormat, TableCellTextFormat, TableCellThousandsSeparator,
 };
 use crate::{Error, Result};
 
@@ -37,7 +37,10 @@ const NATIVE_FRACTION_TENTHS: i32 = 10;
 const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
 
 pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<FormatStructArchive> {
-    if matches!(format, TableCellDataFormat::PopUpMenu(_)) {
+    if matches!(
+        format,
+        TableCellDataFormat::Text(_) | TableCellDataFormat::PopUpMenu(_)
+    ) {
         return Ok(text_format_to_native());
     }
     if let TableCellDataFormat::Slider(format) = format {
@@ -152,6 +155,7 @@ pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<Form
         TableCellDataFormat::Slider(_) => unreachable!("handled above"),
         TableCellDataFormat::Stepper(_) => unreachable!("handled above"),
         TableCellDataFormat::PopUpMenu(_) => unreachable!("handled above"),
+        TableCellDataFormat::Text(_) => unreachable!("handled above"),
     };
     Ok(FormatStructArchive {
         format_type: Some(format_type),
@@ -249,6 +253,10 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Ta
     let format_type = native.format_type.ok_or_else(|| {
         Error::InvalidFormat("Table cell has no native data-format type".to_owned())
     })?;
+    if format_type == NATIVE_TEXT_FORMAT_TYPE {
+        validate_text_format(native)?;
+        return Ok(TableCellDataFormat::Text(TableCellTextFormat));
+    }
     if format_type == NATIVE_CHECKBOX_FORMAT_TYPE {
         let canonical =
             data_format_to_native(&TableCellDataFormat::Checkbox(TableCellCheckboxFormat))?;

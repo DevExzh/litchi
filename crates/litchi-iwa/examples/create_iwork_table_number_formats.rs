@@ -33,6 +33,7 @@ const STAR_RATING_COLUMN: usize = 10;
 const SLIDER_COLUMN: usize = 11;
 const STEPPER_COLUMN: usize = 12;
 const POP_UP_MENU_COLUMN: usize = 13;
+const TEXT_COLUMN: usize = 14;
 const NUMBER_VALUE: f64 = -1_234.5;
 const PERCENTAGE_VALUE: f64 = -12.345;
 const CURRENCY_VALUE: f64 = -1_234.5;
@@ -144,7 +145,7 @@ fn pop_up_menu_format() -> Result<TableCellPopUpMenuFormat, litchi_iwa::Error> {
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Number Formats")
-        .table_dimensions(3, 14)
+        .table_dimensions(3, 15)
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(
@@ -257,6 +258,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         POP_UP_MENU_COLUMN,
         pop_up_menu_format()?,
     )?;
+    editor.set_cell(
+        table_id,
+        ROW,
+        TEXT_COLUMN,
+        CellValue::Text("Invoice 001".to_owned()),
+    )?;
+    editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
     editor.save(output)?;
     Ok(())
 }
@@ -264,7 +272,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Created from scratch with native table-cell formats.\n")
-        .body_table("Number Formats", 3, 14)
+        .body_table("Number Formats", 3, 15)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(
@@ -377,6 +385,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         POP_UP_MENU_COLUMN,
         pop_up_menu_format()?,
     )?;
+    editor.set_table_cell(
+        table_id,
+        ROW,
+        TEXT_COLUMN,
+        CellValue::Text("Invoice 001".to_owned()),
+    )?;
+    editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
     editor.save(output)?;
     Ok(())
 }
@@ -389,7 +404,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         0,
         "Number Formats",
         3,
-        14,
+        15,
         DrawablePoint { x: 320.0, y: 360.0 },
         DrawableSize {
             width: 1_280.0,
@@ -571,6 +586,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         POP_UP_MENU_COLUMN,
         pop_up_menu_format()?,
     )?;
+    editor.set_slide_table_cell(
+        0,
+        table.model_object_id,
+        ROW,
+        TEXT_COLUMN,
+        CellValue::Text("Invoice 001".to_owned()),
+    )?;
+    editor.set_slide_table_cell_text_format(0, table.model_object_id, ROW, TEXT_COLUMN)?;
     editor.save(output)?;
     Ok(())
 }

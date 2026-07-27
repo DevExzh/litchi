@@ -46,6 +46,8 @@ pub(crate) const EXPLICIT_DATE_TIME_FORMAT: u16 = 0x0008;
 pub(crate) const EXPLICIT_DURATION_FORMAT: u16 = 0x0005;
 pub(crate) const EXPLICIT_CHECKBOX_FORMAT: u16 = 0x0020;
 pub(crate) const EXPLICIT_TEXT_FORMAT: u16 = 0x0080;
+pub(crate) const EXPLICIT_CONVERTED_TEXT_FORMAT: u16 =
+    EXPLICIT_TEXT_FORMAT | EXPLICIT_DECIMAL_FORMAT;
 pub(crate) const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
 pub(crate) const CURRENCY_CELL_FORMAT_KIND: u32 = 2;
 pub(crate) const DATE_TIME_CELL_FORMAT_KIND: u32 = 3;
@@ -64,6 +66,7 @@ pub(crate) enum CellDataFormatKind {
     StarRating,
     NumericControlNumberOrPercentage,
     NumericControlCurrency,
+    Text,
     PopUpMenu,
 }
 
@@ -431,7 +434,8 @@ impl BncCell {
                 CellDataFormatKind::NumberOrPercentage
                 | CellDataFormatKind::Currency
                 | CellDataFormatKind::DateTime
-                | CellDataFormatKind::Duration,
+                | CellDataFormatKind::Duration
+                | CellDataFormatKind::Text,
                 None,
             ) => {},
             (
@@ -561,6 +565,18 @@ impl BncCell {
                 );
                 (EXPLICIT_TEXT_FORMAT, TEXT_CELL_FORMAT_KIND)
             },
+            CellDataFormatKind::Text => {
+                self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&DURATION_FORMAT_IDENTIFIER_FLAG);
+                self.fields.remove(&CHECKBOX_FORMAT_IDENTIFIER_FLAG);
+                self.fields.insert(
+                    TEXT_FORMAT_IDENTIFIER_FLAG,
+                    identifier.to_le_bytes().to_vec(),
+                );
+                (EXPLICIT_TEXT_FORMAT, TEXT_CELL_FORMAT_KIND)
+            },
         };
         if let Some(control_identifier) = control_identifier {
             self.fields.insert(
@@ -594,18 +610,19 @@ impl BncCell {
     }
 
     fn convert_scalar_for_data_format(&mut self, kind: CellDataFormatKind) -> Result<()> {
+        if matches!(
+            kind,
+            CellDataFormatKind::Text | CellDataFormatKind::PopUpMenu
+        ) && !matches!(
+            self.stored_value(),
+            StoredValue::Empty | StoredValue::Text(_)
+        ) {
+            return Err(Error::InvalidFormat(
+                "Text-based format can only be applied safely to an empty or text cell".to_owned(),
+            ));
+        }
         let formula_identifier = self.u32_field(FORMULA_FLAG);
         match (kind, self.cached_scalar()?) {
-            (CellDataFormatKind::PopUpMenu, None)
-                if !matches!(
-                    self.stored_value(),
-                    StoredValue::Empty | StoredValue::Text(_)
-                ) =>
-            {
-                return Err(Error::InvalidFormat(
-                    "Pop-Up Menu can only be applied to an empty or text cell".to_owned(),
-                ));
-            },
             (CellDataFormatKind::Checkbox, Some(CachedScalar::Number(value))) => {
                 self.set_boolean(value != 0.0);
             },
@@ -1212,6 +1229,37 @@ mod tests {
         assert_eq!(cell.format_identifier(), Some(13));
         assert_eq!(cell.stored_value(), StoredValue::Text(1));
         assert_eq!(cell.encode(), native);
+
+        let native_empty = hex("050000000000800000100200050000000c000000");
+        let empty = BncCell::parse(&native_empty).unwrap();
+        assert_eq!(empty.stored_value(), StoredValue::Empty);
+        assert_eq!(empty.explicit_format_flags(), EXPLICIT_TEXT_FORMAT);
+        assert_eq!(empty.cell_format_kind(), Some(TEXT_CELL_FORMAT_KIND));
+        assert_eq!(empty.control_cell_spec_identifier(), None);
+        assert_eq!(empty.format_identifier(), Some(12));
+        assert_eq!(empty.encode(), native_empty);
+
+        let native_converted = hex("0503000000008100083002000200000005000000010000000c000000");
+        let converted = BncCell::parse(&native_converted).unwrap();
+        assert_eq!(converted.stored_value(), StoredValue::Text(2));
+        assert_eq!(
+            converted.explicit_format_flags(),
+            EXPLICIT_CONVERTED_TEXT_FORMAT
+        );
+        assert_eq!(converted.cell_format_kind(), Some(TEXT_CELL_FORMAT_KIND));
+        assert_eq!(converted.control_cell_spec_identifier(), None);
+        assert_eq!(converted.format_identifier(), Some(12));
+        assert_eq!(converted.encode(), native_converted);
+
+        let mut created = BncCell::minimal();
+        created
+            .set_data_format_identifier(12, CellDataFormatKind::Text, None)
+            .unwrap();
+        assert_eq!(created.stored_value(), StoredValue::Empty);
+        assert_eq!(created.explicit_format_flags(), EXPLICIT_TEXT_FORMAT);
+        assert_eq!(created.cell_format_kind(), Some(TEXT_CELL_FORMAT_KIND));
+        assert_eq!(created.format_identifier(), Some(12));
+        assert_eq!(created.control_cell_spec_identifier(), None);
     }
 
     fn hex(value: &str) -> Vec<u8> {
