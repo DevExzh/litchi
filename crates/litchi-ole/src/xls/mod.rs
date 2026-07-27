@@ -115,6 +115,9 @@ mod style_ext;
 /// BIFF8 `Theme` record: the document theme.
 mod theme;
 
+/// BIFF8 `PhoneticInfo` record: phonetic-string format and visible ranges.
+mod phonetic_info;
+
 /// BIFF8 worksheet default dimensions and outline workspace metadata.
 mod sheet_layout;
 
@@ -273,6 +276,9 @@ pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
 pub use xf_ext::{XlsExtProp, XlsFullColorExt, XlsFullColorType, XlsXfExt};
 pub use style_ext::{XlsStyleCategory, XlsStyleExt};
 pub use theme::XlsTheme;
+pub use phonetic_info::{
+    XlsPhoneticAlignment, XlsPhoneticFormat, XlsPhoneticInfo, XlsPhoneticRange, XlsPhoneticType,
+};
 pub use data_table::{
     XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange,
 };

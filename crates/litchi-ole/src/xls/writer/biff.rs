@@ -473,6 +473,13 @@ pub fn write_sheet_ext_tab_color<W: Write>(writer: &mut W, tab_color: u8) -> Xls
     worksheet::write_sheet_ext_tab_color(writer, tab_color)
 }
 
+pub fn write_phonetic_info<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsPhoneticInfo,
+) -> XlsResult<()> {
+    worksheet::write_phonetic_info(writer, value)
+}
+
 /// Write PANE record (freeze panes configuration)
 ///
 /// Record type: 0x0041, Length: 10

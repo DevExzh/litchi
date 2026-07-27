@@ -3314,6 +3314,21 @@ impl XlsWriter {
         self.book_ext = book_ext;
     }
 
+    /// Set a worksheet's default phonetic format and visible phonetic ranges
+    /// (PHONETICINFO, MS-XLS 2.4.192); `None` emits no record.
+    pub fn set_phonetic_info(
+        &mut self,
+        sheet: usize,
+        phonetic_info: Option<crate::xls::XlsPhoneticInfo>,
+    ) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.phonetic_info = phonetic_info;
+        Ok(())
+    }
+
     /// Set the document theme emitted as a `Theme` record (MS-XLS 2.4.326);
     /// `None` emits no record. Large custom theme contents are chunked into
     /// ContinueFrt12 records automatically.

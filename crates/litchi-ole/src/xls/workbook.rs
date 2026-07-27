@@ -990,6 +990,37 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 crate::xls::data_table::TABLE_RECORD_TYPE => { // Table
                     worksheet.add_data_table(crate::xls::data_table::XlsDataTable::parse(&record.data)?);
                 }
+                crate::xls::phonetic_info::PHONETIC_INFO_RECORD_TYPE => { // PhoneticInfo
+                    if worksheet.phonetic_info().is_some() {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: crate::xls::phonetic_info::PHONETIC_INFO_RECORD_TYPE,
+                            message: "worksheet contains more than one PhoneticInfo record"
+                                .to_string(),
+                        });
+                    }
+                    // PHONETICINFO = PhoneticInfo *Continue: pull Continue
+                    // records while the declared range list is incomplete.
+                    let mut payload = record.data.clone();
+                    while payload.len() < 6
+                        || payload.len()
+                            < 6 + usize::from(u16::from_le_bytes([payload[4], payload[5]])) * 6
+                    {
+                        let next = record_iter.next().ok_or(XlsError::InvalidLength {
+                            expected: payload.len() + 1,
+                            found: payload.len(),
+                        })??;
+                        if next.header.record_type != 0x003C {
+                            return Err(XlsError::InvalidRecord {
+                                record_type: next.header.record_type,
+                                message: "PhoneticInfo continuation must be a Continue record"
+                                    .to_string(),
+                            });
+                        }
+                        payload.extend_from_slice(&next.data);
+                    }
+                    worksheet
+                        .set_phonetic_info(crate::xls::phonetic_info::XlsPhoneticInfo::parse(&payload)?);
+                }
                 0x0200 => { // Dimensions
                     if let Ok(dimensions) = DimensionsRecord::parse(&record.data) {
                         worksheet.set_dimensions(dimensions.first_row, dimensions.last_row,

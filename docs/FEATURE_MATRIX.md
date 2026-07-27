@@ -311,6 +311,7 @@ conversion, fonts, and image conversion are optional.
 | What-if data tables | ✅ | ✅ | ✅ | Typed `Table` records (one/two-variable input cells, deleted markers, orientation) with `PtgTbl` anchor authoring |
 | Formula evaluation | 🟡 | ✅ | N/A | Shared evaluator via `WorkbookTrait`; not complete Excel semantics |
 | Shared strings and rich text | ✅ | ✅ | ✅ | SST/CONTINUE handling and formatting runs |
+| Phonetic strings | ✅ | ✅ | ✅ | Typed `PhoneticInfo` default format and visible ranges with `Continue` chunking |
 | Defined names | ✅ | ✅ | ✅ | Workbook/sheet names and extended metadata |
 | Styles and number formats | ✅ | ✅ | ✅ | Fonts, fills, borders, alignment, XF/DXF, custom formats, typed `XFExt` theme-color/gradient/indent extensions, and typed `StyleExt` style category/hidden/custom/name/`XFProps` extensions |
 | Merged cells | ✅ | ✅ | ✅ | BIFF merge ranges |

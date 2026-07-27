@@ -133,6 +133,8 @@ pub(super) struct WritableWorksheet {
     pub tab_color: Option<u8>,
     /// What-if data tables: anchor formula cell and typed TABLE record.
     pub data_tables: Vec<(u32, u16, crate::xls::XlsDataTable)>,
+    /// Default phonetic format and visible ranges (PHONETICINFO).
+    pub phonetic_info: Option<crate::xls::XlsPhoneticInfo>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -198,6 +200,7 @@ impl WritableWorksheet {
             list_objects: Vec::new(),
             tab_color: None,
             data_tables: Vec::new(),
+            phonetic_info: None,
         }
     }
 

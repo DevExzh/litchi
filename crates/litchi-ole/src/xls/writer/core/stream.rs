@@ -1135,6 +1135,11 @@ pub(crate) fn generate_workbook_stream(
             }
         }
 
+        // PHONETICINFO precedes CONDFMTS in the worksheet substream grammar.
+        if let Some(phonetic_info) = &worksheet.phonetic_info {
+            biff::write_phonetic_info(&mut stream, phonetic_info)?;
+        }
+
         if !worksheet.conditional_formats.is_empty() {
             for (identifier, group) in worksheet.conditional_formats.iter().enumerate() {
                 let ranges = group
@@ -1404,8 +1409,13 @@ pub(crate) fn generate_workbook_stream(
             biff::write_pivot_window2(&mut stream, worksheet.view.selected)?;
             biff::write_plv(&mut stream)?;
             biff::write_selection(&mut stream)?;
-            biff::write_phonetic_pr(&mut stream)?;
             biff::write_sheet_ext(&mut stream)?;
+        }
+
+        // PHONETICINFO is a per-sheet record; emit the pivot-era stub at
+        // most once even when several pivot tables share the sheet.
+        if worksheet.phonetic_info.is_none() && !worksheet.pivot_tables.is_empty() {
+            biff::write_phonetic_pr(&mut stream)?;
         }
 
         if let Some(code_name) = &worksheet.vba_code_name {

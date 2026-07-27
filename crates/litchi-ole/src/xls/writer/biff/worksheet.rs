@@ -1256,6 +1256,31 @@ pub fn write_sheet_ext<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
+/// Write a PHONETICINFO record (MS-XLS 2.4.192) with phonetic defaults,
+/// chunking long range lists into Continue records.
+///
+/// Record type: 0x00EF
+pub fn write_phonetic_info<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsPhoneticInfo,
+) -> XlsResult<()> {
+    const MAX_RECORD_PAYLOAD: usize = 8_224;
+    const CONTINUE_RECORD_TYPE: u16 = 0x003C;
+    let payload = value.to_payload();
+    let first_chunk = payload.len().min(MAX_RECORD_PAYLOAD);
+    write_record_header(
+        writer,
+        crate::xls::phonetic_info::PHONETIC_INFO_RECORD_TYPE,
+        first_chunk as u16,
+    )?;
+    writer.write_all(&payload[..first_chunk])?;
+    for chunk in payload[first_chunk..].chunks(MAX_RECORD_PAYLOAD) {
+        write_record_header(writer, CONTINUE_RECORD_TYPE, chunk.len() as u16)?;
+        writer.write_all(chunk)?;
+    }
+    Ok(())
+}
+
 /// Write a SHEETEXT record (MS-XLS 2.4.259) carrying a sheet tab color.
 ///
 /// Record type: 0x0862

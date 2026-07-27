@@ -76,6 +76,8 @@ pub struct XlsWorksheet {
     sheet_ext: Option<crate::xls::sheet_ext::XlsSheetExt>,
     /// What-if data tables (TABLE records), in record order.
     data_tables: Vec<crate::xls::data_table::XlsDataTable>,
+    /// Default phonetic format and visible phonetic ranges (PHONETICINFO).
+    phonetic_info: Option<crate::xls::phonetic_info::XlsPhoneticInfo>,
 }
 
 impl XlsWorksheet {
@@ -117,6 +119,7 @@ impl XlsWorksheet {
             row_block_index: Ok(None),
             sheet_ext: None,
             data_tables: Vec::new(),
+            phonetic_info: None,
         }
     }
 
@@ -158,6 +161,7 @@ impl XlsWorksheet {
             row_block_index: Ok(None),
             sheet_ext: None,
             data_tables: Vec::new(),
+            phonetic_info: None,
         }
     }
 
@@ -322,6 +326,15 @@ impl XlsWorksheet {
 
     pub(crate) fn add_data_table(&mut self, table: crate::xls::data_table::XlsDataTable) {
         self.data_tables.push(table);
+    }
+
+    /// Default phonetic format and visible phonetic ranges, when present.
+    pub fn phonetic_info(&self) -> Option<&crate::xls::phonetic_info::XlsPhoneticInfo> {
+        self.phonetic_info.as_ref()
+    }
+
+    pub(crate) fn set_phonetic_info(&mut self, value: crate::xls::phonetic_info::XlsPhoneticInfo) {
+        self.phonetic_info = Some(value);
     }
 
     // -- Filter mode --
