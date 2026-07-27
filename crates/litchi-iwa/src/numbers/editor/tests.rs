@@ -6814,7 +6814,10 @@ fn cell_conditional_highlighting_is_detected_and_deleted_without_changing_value(
         location.tile_row,
         1,
         location.descriptor.model.number_of_columns as usize,
-        EncodedValue::ConditionalStyle(Some(1)),
+        EncodedValue::ConditionalStyle {
+            identifier: Some(1),
+            applied_rule: Some(CONDITIONAL_STYLE_NO_APPLIED_RULE),
+        },
     )
     .unwrap();
     update_row_header(

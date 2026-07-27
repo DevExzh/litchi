@@ -2117,6 +2117,10 @@ fn remove_table_object(
 mod tests {
     use super::*;
     use crate::pages::PagesDocumentBuilder;
+    use crate::table_cell_conditional_highlight::{
+        TableCellConditionalHighlightCondition, TableCellConditionalHighlightNumber,
+        TableCellConditionalHighlightRule, TableCellConditionalHighlightStyle,
+    };
     use crate::table_cell_data_format::{
         TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
         TableCellCustomTextFormat, TableCellFractionAccuracy, TableCellNumeralSystemBase,
@@ -2149,6 +2153,41 @@ mod tests {
                 .table_cell_conditional_highlighting(model_id, 1, 1)
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn source_built_table_creates_and_replaces_conditional_highlighting() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Conditional", 2, 2)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+        let rule = TableCellConditionalHighlightRule::new(
+            TableCellConditionalHighlightCondition::LessThan(
+                TableCellConditionalHighlightNumber::new(0.0).unwrap(),
+            ),
+            TableCellConditionalHighlightStyle::with_fill(
+                crate::shapes::RgbaColor::new(
+                    0.9,
+                    0.1,
+                    0.1,
+                    1.0,
+                    crate::shapes::RgbColorSpace::Srgb,
+                )
+                .unwrap(),
+            ),
+        );
+        editor
+            .set_table_cell_conditional_highlighting(model_id, 1, 1, &[rule])
+            .unwrap();
+        assert_eq!(
+            editor
+                .table_cell_conditional_highlighting(model_id, 1, 1)
+                .unwrap()
+                .unwrap()
+                .rule_count,
+            1
         );
     }
 

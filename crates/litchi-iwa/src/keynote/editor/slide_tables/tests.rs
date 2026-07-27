@@ -1,5 +1,9 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
+use crate::table_cell_conditional_highlight::{
+    TableCellConditionalHighlightCondition, TableCellConditionalHighlightNumber,
+    TableCellConditionalHighlightRule, TableCellConditionalHighlightStyle,
+};
 use crate::table_cell_data_format::{
     TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
     TableCellCustomNumberFormat, TableCellCustomNumberPattern, TableCellFractionAccuracy,
@@ -40,6 +44,35 @@ fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() 
             .slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
             .unwrap()
             .is_none()
+    );
+}
+
+#[test]
+fn source_built_table_creates_and_replaces_conditional_highlighting() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Conditional", 2, 2, position, size)
+        .unwrap();
+    let rule = TableCellConditionalHighlightRule::new(
+        TableCellConditionalHighlightCondition::GreaterThan(
+            TableCellConditionalHighlightNumber::new(10.0).unwrap(),
+        ),
+        TableCellConditionalHighlightStyle::with_text_color(
+            crate::shapes::RgbaColor::new(0.1, 0.6, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
+                .unwrap(),
+        ),
+    );
+    editor
+        .set_slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1, &[rule])
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
+            .unwrap()
+            .unwrap()
+            .rule_count,
+        1
     );
 }
 

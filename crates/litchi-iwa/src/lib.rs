@@ -151,6 +151,8 @@ pub mod structured;
 pub mod table_appearance;
 /// Typed explicit cell-border controls shared by native iWork tables.
 pub mod table_cell_border;
+/// Typed conditional-highlight rules shared by native iWork table cells.
+pub mod table_cell_conditional_highlight;
 /// Typed cell data formats shared by native iWork tables.
 pub mod table_cell_data_format;
 /// Typed text-layout controls shared by native iWork table cells.

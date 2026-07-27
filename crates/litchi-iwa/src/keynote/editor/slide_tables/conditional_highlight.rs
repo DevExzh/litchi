@@ -52,4 +52,39 @@ impl KeynoteEditor {
         *self = verified;
         Ok(())
     }
+
+    /// Replace a slide-table cell's conditional highlighting with ordered numeric rules.
+    pub fn set_slide_table_cell_conditional_highlighting(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        rules: &[crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule],
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_conditional_highlighting_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            rules,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let actual = verified
+            .slide_table_cell_conditional_highlighting(slide_index, model_object_id, row, column)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Keynote conditional-highlight creation failed validation".to_owned(),
+                )
+            })?;
+        if actual.rule_count as usize != rules.len() {
+            return Err(Error::InvalidFormat(
+                "Keynote conditional-highlight rule count failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
 }

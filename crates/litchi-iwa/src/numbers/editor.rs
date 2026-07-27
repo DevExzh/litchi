@@ -6,7 +6,7 @@ use std::path::Path;
 
 use prost::Message;
 
-use super::bnc::{BncCell, StoredValue};
+use super::bnc::{BncCell, CachedScalar, StoredValue};
 use super::cell::{CellValue, TableCellUpdate};
 use super::formula::{
     ExternalFormulaTable, ExternalPivotCategory, FormulaCachedValue, FormulaExpression,
@@ -31,7 +31,7 @@ use crate::package_metadata::{
 use crate::protobuf::tst::{
     self, TableDataList, TableDataListSegment, TableModelArchive, Tile, TileRowInfo,
 };
-use crate::protobuf::{tn, tsce, tsd, tsp, tswp};
+use crate::protobuf::{tn, tsce, tsd, tsp, tss, tswp};
 use crate::registry::{Application, detect_application_from_document};
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
@@ -39,6 +39,7 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::table_appearance::TableAppearance;
+use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
 use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
@@ -77,6 +78,7 @@ const DOCUMENT_COMPONENT_IDENTIFIER: u64 = 1;
 const DRAWABLE_DUPLICATE_OFFSET: f32 = 10.0;
 const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
 const EMPTY_TABLE_POSITION_OFFSET: f32 = 40.0;
+const CONDITIONAL_STYLE_NO_APPLIED_RULE: u32 = 15;
 
 /// Stable identity and dimensions of a Numbers table.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2950,6 +2952,33 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Replace a cell's conditional highlighting with ordered numeric rules.
+    pub fn set_cell_conditional_highlighting(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        rules: &[TableCellConditionalHighlightRule],
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        conditional_highlight::set_in_package(&mut staged, table_id, row, column, rules)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let actual = verified
+            .cell_conditional_highlighting(table_id, row, column)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Numbers conditional-highlight creation failed validation".to_owned(),
+                )
+            })?;
+        if actual.rule_count as usize != rules.len() {
+            return Err(Error::InvalidFormat(
+                "Numbers conditional-highlight rule count failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Read the direct replies attached to a cell comment in stored order.
     pub fn cell_comment_replies(
         &self,
@@ -4189,6 +4218,16 @@ pub(crate) fn clear_table_cell_conditional_highlighting_in_package(
     column: usize,
 ) -> Result<()> {
     conditional_highlight::clear_attached_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_conditional_highlighting_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    rules: &[TableCellConditionalHighlightRule],
+) -> Result<()> {
+    conditional_highlight::set_attached_in_package(package, table_id, row, column, rules)
 }
 
 pub(crate) fn set_table_cell_comment_in_package(

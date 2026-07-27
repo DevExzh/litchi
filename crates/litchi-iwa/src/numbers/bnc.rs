@@ -27,11 +27,12 @@ pub(crate) const DATE_FLAG: u32 = 0x000004;
 pub(crate) const STRING_FLAG: u32 = 0x000008;
 pub(crate) const RICH_TEXT_FLAG: u32 = 0x000010;
 pub(crate) const STYLE_FLAG: u32 = 0x000020;
+pub(crate) const CONDITIONAL_STYLE_FLAG: u32 = 0x000080;
+pub(crate) const CONDITIONAL_STYLE_APPLIED_RULE_FLAG: u32 = 0x000100;
 pub(crate) const FORMULA_FLAG: u32 = 0x000200;
 const CONTROL_CELL_SPEC_FLAG: u32 = 0x000400;
 pub(crate) const FORMULA_ERROR_FLAG: u32 = 0x000800;
 pub(crate) const COMMENT_FLAG: u32 = 0x080000;
-pub(crate) const CONDITIONAL_STYLE_FLAG: u32 = 0x100000;
 const CELL_FORMAT_KIND_FLAG: u32 = 0x001000;
 const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x002000;
 const CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x004000;
@@ -384,6 +385,10 @@ impl BncCell {
         self.u32_field(CONDITIONAL_STYLE_FLAG)
     }
 
+    pub(crate) fn conditional_style_applied_rule(&self) -> Option<u32> {
+        self.u32_field(CONDITIONAL_STYLE_APPLIED_RULE_FLAG)
+    }
+
     pub(crate) fn explicit_format_flags(&self) -> u16 {
         u16::from_le_bytes(
             self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
@@ -701,12 +706,24 @@ impl BncCell {
         }
     }
 
-    pub(crate) fn set_conditional_style_identifier(&mut self, identifier: Option<u32>) {
+    pub(crate) fn set_conditional_style(
+        &mut self,
+        identifier: Option<u32>,
+        applied_rule: Option<u32>,
+    ) {
         if let Some(identifier) = identifier {
             self.fields
                 .insert(CONDITIONAL_STYLE_FLAG, identifier.to_le_bytes().to_vec());
         } else {
             self.fields.remove(&CONDITIONAL_STYLE_FLAG);
+        }
+        if let Some(applied_rule) = applied_rule {
+            self.fields.insert(
+                CONDITIONAL_STYLE_APPLIED_RULE_FLAG,
+                applied_rule.to_le_bytes().to_vec(),
+            );
+        } else {
+            self.fields.remove(&CONDITIONAL_STYLE_APPLIED_RULE_FLAG);
         }
     }
 
@@ -946,16 +963,44 @@ mod tests {
     fn conditional_styles_are_orthogonal_to_cell_values() {
         let mut cell = BncCell::minimal();
         cell.set_number(42.0).unwrap();
-        cell.set_conditional_style_identifier(Some(11));
+        cell.set_conditional_style(Some(11), Some(15));
 
         let mut reparsed = BncCell::parse(&cell.encode()).unwrap();
         assert_eq!(reparsed.conditional_style_identifier(), Some(11));
+        assert_eq!(reparsed.conditional_style_applied_rule(), Some(15));
         assert_eq!(reparsed.stored_value(), StoredValue::Number);
 
-        reparsed.set_conditional_style_identifier(None);
+        reparsed.set_conditional_style(None, None);
         let cleared = BncCell::parse(&reparsed.encode()).unwrap();
         assert_eq!(cleared.conditional_style_identifier(), None);
+        assert_eq!(cleared.conditional_style_applied_rule(), None);
         assert_eq!(cleared.stored_value(), StoredValue::Number);
+    }
+
+    #[test]
+    fn app_authored_conditional_style_fields_decode_independently() {
+        let mut data = vec![5, 2, 0, 0, 0, 0, 0, 0];
+        data.extend_from_slice(
+            &(DECIMAL_FLAG
+                | CONDITIONAL_STYLE_FLAG
+                | CONDITIONAL_STYLE_APPLIED_RULE_FLAG
+                | CELL_FORMAT_KIND_FLAG
+                | CELL_FORMAT_IDENTIFIER_FLAG)
+                .to_le_bytes(),
+        );
+        data.extend_from_slice(&decimal128_le(-5.0).unwrap());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&15u32.to_le_bytes());
+        data.extend_from_slice(&DECIMAL_CELL_FORMAT_KIND.to_le_bytes());
+        data.extend_from_slice(&2u32.to_le_bytes());
+
+        let cell = BncCell::parse(&data).unwrap();
+        assert_eq!(cell.conditional_style_identifier(), Some(1));
+        assert_eq!(cell.conditional_style_applied_rule(), Some(15));
+        assert_eq!(
+            cell.cached_scalar().unwrap(),
+            Some(CachedScalar::Number(-5.0))
+        );
     }
 
     #[test]

@@ -6,7 +6,8 @@ use litchi_iwa::protobuf::{tsd, tst};
 use prost::Message;
 
 const BNC_COMMENT_FLAG: u32 = 0x080000;
-const BNC_CONDITIONAL_STYLE_FLAG: u32 = 0x100000;
+const BNC_CONDITIONAL_STYLE_FLAG: u32 = 0x000080;
+const BNC_CONDITIONAL_STYLE_APPLIED_RULE_FLAG: u32 = 0x000100;
 
 #[allow(deprecated)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -496,8 +497,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             if let Some(conditional_style_id) =
                                 bnc_u32_field(cell, BNC_CONDITIONAL_STYLE_FLAG)
                             {
+                                let applied_rule =
+                                    bnc_u32_field(cell, BNC_CONDITIONAL_STYLE_APPLIED_RULE_FLAG);
                                 println!(
-                                    "   conditional cell=({}, {}) id={conditional_style_id}",
+                                    "   conditional cell=({}, {}) id={conditional_style_id} applied={applied_rule:?}",
                                     tile_ref.tileid * tile_size + row.tile_row_index,
                                     column
                                 );

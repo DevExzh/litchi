@@ -845,6 +845,49 @@ pub(super) fn rewrite_table_model_comment_table_wire(
     Ok(data)
 }
 
+pub(super) fn rewrite_table_model_conditional_style_wire(
+    original: &[u8],
+    previous: &TableModelArchive,
+    current: &TableModelArchive,
+) -> Result<Vec<u8>> {
+    let mut expected = current.clone();
+    expected.base_data_store.conditionalstyletable = previous.base_data_store.conditionalstyletable;
+    expected.conditional_style_formula_owner_id =
+        previous.conditional_style_formula_owner_id.clone();
+    if expected != *previous {
+        return Err(Error::InvalidFormat(
+            "Numbers table model changed outside its conditional-style references".to_owned(),
+        ));
+    }
+    let replacement = current
+        .base_data_store
+        .conditionalstyletable
+        .as_ref()
+        .map(Message::encode_to_vec);
+    let mut data = patch_nested_length_delimited_field(
+        original,
+        &[4, 18],
+        previous.base_data_store.conditionalstyletable.is_some(),
+        replacement.as_deref(),
+    )?;
+    let owner = current
+        .conditional_style_formula_owner_id
+        .as_ref()
+        .map(Message::encode_to_vec);
+    data = patch_length_delimited_field(
+        &data,
+        39,
+        previous.conditional_style_formula_owner_id.is_some(),
+        owner.as_deref(),
+    )?;
+    if TableModelArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "Numbers table-model conditional-style wire mutation failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn rewrite_table_model_format_table_wire(
     original: &[u8],
     previous: &TableModelArchive,
@@ -2890,7 +2933,10 @@ pub(super) fn update_tile(
                 EncodedValue::Clear
                     | EncodedValue::ClearValuePreservingMetadata
                     | EncodedValue::Comment(None)
-                    | EncodedValue::ConditionalStyle(None)
+                    | EncodedValue::ConditionalStyle {
+                        identifier: None,
+                        ..
+                    }
             )
         {
             updated_cell_count = Some(0);
@@ -2939,14 +2985,17 @@ pub(super) fn update_tile(
                     return Ok(());
                 }
             },
-            EncodedValue::ConditionalStyle(identifier) => {
+            EncodedValue::ConditionalStyle {
+                identifier,
+                applied_rule,
+            } => {
                 if let Some(data) = cells[column].as_deref() {
                     let mut cell = BncCell::parse(data)?;
-                    cell.set_conditional_style_identifier(identifier);
+                    cell.set_conditional_style(identifier, applied_rule);
                     cells[column] = Some(cell.encode());
                 } else if identifier.is_some() {
                     let mut cell = BncCell::minimal();
-                    cell.set_conditional_style_identifier(identifier);
+                    cell.set_conditional_style(identifier, applied_rule);
                     cells[column] = Some(cell.encode());
                 } else {
                     updated_cell_count = Some(
@@ -2984,7 +3033,7 @@ pub(super) fn update_tile(
                     EncodedValue::Clear
                     | EncodedValue::ClearValuePreservingMetadata
                     | EncodedValue::Comment(_)
-                    | EncodedValue::ConditionalStyle(_)
+                    | EncodedValue::ConditionalStyle { .. }
                     | EncodedValue::Raw(_) => unreachable!(),
                 }
                 cells[column] = Some(cell.encode());

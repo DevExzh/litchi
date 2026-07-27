@@ -50,4 +50,38 @@ impl PagesEditor {
         *self = verified;
         Ok(())
     }
+
+    /// Replace a body-table cell's conditional highlighting with ordered numeric rules.
+    pub fn set_table_cell_conditional_highlighting(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        rules: &[crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule],
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_conditional_highlighting_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            rules,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let actual = verified
+            .table_cell_conditional_highlighting(model_object_id, row, column)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Pages conditional-highlight creation failed validation".to_owned(),
+                )
+            })?;
+        if actual.rule_count as usize != rules.len() {
+            return Err(Error::InvalidFormat(
+                "Pages conditional-highlight rule count failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
 }
