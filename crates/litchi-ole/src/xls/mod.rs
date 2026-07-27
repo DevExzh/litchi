@@ -144,7 +144,10 @@ mod pivot_editor;
 pub use pivot_editor::XlsPivotViewEditor;
 mod ole_object;
 pub use ole_object::{
-    XlsFtCmo, XlsFtPictFmla, XlsFtPioGrbit, XlsObjSubrecord, XlsOleObjectEditor,
+    XlsCheckState, XlsDropDownStyle, XlsEditBoxValidation, XlsFormControl, XlsFtCblsData,
+    XlsFtCmo, XlsFtEdoData, XlsFtGboData, XlsFtLbsData, XlsFtPictFmla, XlsFtPioGrbit,
+    XlsFtRboData, XlsFtSbs, XlsLbsDropData, XlsLbsItem, XlsListBehaviorClass,
+    XlsListSelectionType, XlsObjSubrecord, XlsObjectType, XlsOleObjectEditor,
     XlsOleObjectRecord,
 };
 pub use pivot_table::{
