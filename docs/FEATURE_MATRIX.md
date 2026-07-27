@@ -314,6 +314,7 @@ conversion, fonts, and image conversion are optional.
 | Styles and number formats | ✅ | ✅ | ✅ | Fonts, fills, borders, alignment, XF/DXF, and custom formats |
 | Merged cells | ✅ | ✅ | ✅ | BIFF merge ranges |
 | Rows, columns, outlines, and views | ✅ | ✅ | ✅ | Dimensions, hidden state, freeze/split panes, selections, and window settings |
+| Sheet extensions and tab color | ✅ | ✅ | ✅ | Typed `SheetExt` tab color (`icvPlain`), refreshed color, conditional-format calculation and not-published flags, and `CFColor` preservation |
 | Conditional formatting | ✅ | ✅ | ✅ | Classic and extended rule records |
 | Data validation | ✅ | ✅ | ✅ | Validation collections, prompts, and ranges |
 | Hyperlinks | ✅ | ✅ | ✅ | URL, file, and internal monikers |
