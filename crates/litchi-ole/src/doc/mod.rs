@@ -179,6 +179,9 @@ pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
     ProofingStatus, ProofingTables,
 };
+pub use parts::protection::{
+    DocumentProtectedRanges, ProtectedRange, ProtectionUser, ProtectionUserRole, UidSel,
+};
 pub use parts::rsids::DocumentRsids;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};
 pub use parts::smart_tags::{

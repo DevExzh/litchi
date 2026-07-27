@@ -40,8 +40,9 @@ use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::saved_by::SavedByTable;
-use super::parts::sections::SectionsTable;
+use super::parts::protection::DocumentProtectedRanges;
 use super::parts::rsids::DocumentRsids;
+use super::parts::sections::SectionsTable;
 use super::parts::smart_tags::DocumentSmartTags;
 use super::parts::styles::StyleSheet;
 use super::parts::text::TextExtractor;
@@ -107,6 +108,8 @@ pub struct Document {
     smart_tags: Option<DocumentSmartTags>,
     /// Revision-save identifiers assigned in the document.
     rsids: Option<DocumentRsids>,
+    /// Word 2003 range-level protection ("editable ranges") metadata.
+    protected_ranges: Option<DocumentProtectedRanges>,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
     /// Fixed associated-document strings
@@ -255,6 +258,7 @@ impl Document {
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
         let rsids = DocumentRsids::parse(&fib, &table_stream)?;
+        let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
@@ -349,6 +353,7 @@ impl Document {
             bookmarks_table,
             smart_tags,
             rsids,
+            protected_ranges,
             revision_authors,
             associated_strings,
             list_names,
@@ -1919,6 +1924,15 @@ impl Document {
     /// when the document carries a `PLRSID` table.
     pub fn rsids(&self) -> Option<&DocumentRsids> {
         self.rsids.as_ref()
+    }
+
+    /// Word 2003 range-level protection ("editable ranges") metadata, when
+    /// the document carries it (MS-DOC 2.9.283 and 2.9.293).
+    ///
+    /// The metadata is inert: usernames are exposed verbatim, never
+    /// authenticated, and no protection policy is enforced.
+    pub fn protected_ranges(&self) -> Option<&DocumentProtectedRanges> {
+        self.protected_ranges.as_ref()
     }
 
     /// Get author names used by tracked revisions and related annotations.
