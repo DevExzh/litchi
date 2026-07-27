@@ -1192,9 +1192,9 @@ pub enum LegacyFormFieldKind {
 /// [MS-DOC] §2.9.90 identifies native `FORMTEXT`, `FORMCHECKBOX`, and
 /// `FORMDROPDOWN` fields with types `0x46`, `0x47`, and `0x53`. This type
 /// retains only the stored kind, opaque instruction text, cached result, and
-/// field-marker state. It never reads associated form properties, fills a form,
-/// changes a selection or checkbox state, invokes entry or exit macros, or
-/// refreshes a field.
+/// field-marker state, plus the stored `FFData` form state when it could be
+/// located and parsed. It never fills a form, changes a selection or checkbox
+/// state, invokes entry or exit macros, or refreshes a field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyFormField {
     field: Field,
@@ -1202,6 +1202,7 @@ pub struct LegacyFormField {
     kind: LegacyFormFieldKind,
     opaque_instructions: String,
     cached_result: Option<String>,
+    form_data: Option<super::form_fields::FormFieldData>,
 }
 
 impl LegacyFormField {
@@ -1237,6 +1238,25 @@ impl LegacyFormField {
     /// state.
     pub fn cached_result(&self) -> Option<&str> {
         self.cached_result.as_deref()
+    }
+
+    /// Return the parsed stored form state (`FFData`, MS-DOC 2.9.78), when the
+    /// field's `NilPICFAndBinData` could be located in the Data stream and was
+    /// well-formed.
+    ///
+    /// The returned data is inert: entry and exit macro names are stored
+    /// verbatim and never invoked, the form is never filled, and checkbox or
+    /// selection state is never changed. Fields constructed without Data
+    /// stream access (or whose stored binary data is invalid, which MS-DOC
+    /// §2.9.158 says MUST be ignored) return `None`.
+    pub fn form_data(&self) -> Option<&super::form_fields::FormFieldData> {
+        self.form_data.as_ref()
+    }
+
+    /// Attach the parsed stored form state. Crate-internal: only the document
+    /// layer can locate the `NilPICFAndBinData` in the Data stream.
+    pub(crate) fn set_form_data(&mut self, form_data: Option<super::form_fields::FormFieldData>) {
+        self.form_data = form_data;
     }
 
     /// Whether a producer marked the stored result stale.
@@ -4942,6 +4962,7 @@ impl FieldText {
             kind,
             opaque_instructions,
             cached_result: self.result.clone(),
+            form_data: None,
         })
     }
 

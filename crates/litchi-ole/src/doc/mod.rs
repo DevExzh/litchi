@@ -131,6 +131,9 @@ pub use parts::fields::FormulaField;
 pub use parts::fields::HyperlinkField;
 pub use parts::fields::InfoField;
 pub use parts::fields::{LegacyFormField, LegacyFormFieldKind};
+pub use parts::form_fields::{
+    CheckBoxState, FormFieldData, FormFieldDataKind, FormFieldTextKind, NilPicfAndBinData,
+};
 pub use parts::fields::ListNumberField;
 pub use parts::fields::PrintField;
 pub use parts::fields::PrivateField;

@@ -27,6 +27,7 @@ use super::parts::fields::{
     TableOfContentsEntryField, TableOfContentsField, UserIdentityField, non_plcf_field_texts,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
+use super::parts::form_fields::FormFieldData;
 use super::parts::glossary::{AttachedGlossary, GlossaryMetadata};
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
@@ -860,15 +861,63 @@ impl Document {
     /// Get typed, inert legacy form-code fields in story and source order.
     ///
     /// Returned values expose only stored text/checkbox/drop-down kind, opaque
-    /// instructions, cached results, and field state. This method never reads
-    /// form properties, fills a form, changes a selection or checkbox state,
-    /// invokes entry or exit macros, or refreshes a field.
+    /// instructions, cached results, field state, and — when the field's
+    /// `NilPICFAndBinData` could be located in the Data stream and parsed —
+    /// the stored `FFData` form state. This method never fills a form, changes
+    /// a selection or checkbox state, invokes entry or exit macros, or
+    /// refreshes a field.
     pub fn legacy_form_fields(&self) -> Result<Vec<LegacyFormField>> {
         let fields = self.fields()?;
         Ok(fields
             .iter()
             .filter_map(FieldText::legacy_form_field)
+            .map(|field| self.attach_form_field_data(field))
             .collect())
+    }
+
+    /// Attach the stored `FFData` form state to a legacy form-code field.
+    ///
+    /// The picture character (U+0001) inside the field instruction carries
+    /// `sprmCData` and `sprmCPicLocation`, pointing at the field's
+    /// `NilPICFAndBinData` in the Data stream (MS-DOC 2.9.158). Invalid or
+    /// absent binary data MUST be ignored, so failures leave the field's
+    /// `form_data` as `None` rather than failing the whole listing.
+    fn attach_form_field_data(&self, mut field: LegacyFormField) -> LegacyFormField {
+        field.set_form_data(self.parse_form_field_data(field.field()));
+        field
+    }
+
+    /// Locate and parse the `FFData` of one legacy form-code field.
+    fn parse_form_field_data(&self, field: &Field) -> Option<FormFieldData> {
+        let data_stream = self.data_stream.as_deref()?;
+        let chp_table = self.chp_bin_table.as_ref()?;
+        let (story_start, _story_end) = self.field_story_range_if_present(field.story)?;
+        let (code_start, code_end) = field.code_range();
+        let instruction = self
+            .field_story_text(field.story, code_start, code_end)
+            .ok()?;
+        let base_cp = story_start.checked_add(code_start)?;
+        // CPs count UTF-16 code units, so scan the instruction by code unit.
+        for (unit_index, unit) in instruction.encode_utf16().enumerate() {
+            if unit != 0x0001 {
+                continue;
+            }
+            let picture_cp = base_cp.checked_add(u32::try_from(unit_index).ok()?)?;
+            let picture_end = picture_cp.checked_add(1)?;
+            for run in chp_table.runs_in_range(picture_cp, picture_end) {
+                let properties = &run.properties;
+                if !properties.is_data {
+                    continue;
+                }
+                let Some(offset) = properties.pic_offset else {
+                    continue;
+                };
+                if let Ok(data) = FormFieldData::parse_at(data_stream, offset) {
+                    return Some(data);
+                }
+            }
+        }
+        None
     }
 
     /// Get the number of typed, inert legacy form-code fields.

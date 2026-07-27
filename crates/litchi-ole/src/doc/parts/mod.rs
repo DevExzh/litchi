@@ -22,6 +22,7 @@ pub mod fib;
 pub mod fields;
 pub mod fkp;
 pub mod footnotes;
+pub mod form_fields;
 pub mod glossary;
 pub mod headers;
 pub mod hyperlinks;
