@@ -29,6 +29,7 @@ pub mod hyperlinks;
 pub mod images;
 pub mod list_names;
 pub mod list_templates;
+pub mod mail_merge;
 pub mod numbering;
 pub mod pap;
 pub mod pap_bin_table;

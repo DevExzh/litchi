@@ -33,6 +33,7 @@ use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
 use super::parts::list_names::ListNamesTable;
 use super::parts::list_templates::ListTemplateTable;
+use super::parts::mail_merge::DocumentMailMerge;
 use super::parts::numbering::{ListTables, ParagraphListBinding};
 use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
@@ -110,6 +111,8 @@ pub struct Document {
     rsids: Option<DocumentRsids>,
     /// Word 2003 range-level protection ("editable ranges") metadata.
     protected_ranges: Option<DocumentProtectedRanges>,
+    /// Mail-merge data-source state (`Pms` and the ODSO property set).
+    mail_merge: Option<DocumentMailMerge>,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
     /// Fixed associated-document strings
@@ -259,6 +262,7 @@ impl Document {
         let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
         let rsids = DocumentRsids::parse(&fib, &table_stream)?;
         let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
+        let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
@@ -354,6 +358,7 @@ impl Document {
             smart_tags,
             rsids,
             protected_ranges,
+            mail_merge,
             revision_authors,
             associated_strings,
             list_names,
@@ -1933,6 +1938,29 @@ impl Document {
     /// authenticated, and no protection policy is enforced.
     pub fn protected_ranges(&self) -> Option<&DocumentProtectedRanges> {
         self.protected_ranges.as_ref()
+    }
+
+    /// The mail-merge data-source state of the document (`Pms` plus the ODSO
+    /// property set), when the document carries any (MS-DOC 2.9.205, 2.9.162).
+    ///
+    /// The state is inert: data-source paths, connection strings, and SQL
+    /// queries are stored verbatim, never opened, resolved, contacted, or
+    /// executed, and no merge is performed.
+    pub fn mail_merge(&self) -> Option<&DocumentMailMerge> {
+        self.mail_merge.as_ref()
+    }
+
+    /// The Word 97 mail-merge state (`Pms`), when the document carries one.
+    pub fn mail_merge_state(&self) -> Option<&super::parts::mail_merge::Pms> {
+        self.mail_merge.as_ref().and_then(DocumentMailMerge::state)
+    }
+
+    /// The Word 2002+ ODSO mail-merge properties, when the document carries
+    /// mail-merge state. Never used to contact a data source.
+    pub fn odso_properties(&self) -> Option<&[super::parts::mail_merge::OdsoProperty]> {
+        self.mail_merge
+            .as_ref()
+            .map(DocumentMailMerge::odso_properties)
     }
 
     /// Get author names used by tracked revisions and related annotations.

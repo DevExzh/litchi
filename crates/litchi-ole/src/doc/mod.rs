@@ -173,6 +173,12 @@ pub use parts::list_names::ListNamesTable;
 pub use parts::list_templates::{
     BuiltInListTemplate, ListTemplateCode, ListTemplateLanguageId, ListTemplateTable,
 };
+pub use parts::mail_merge::{
+    DocumentMailMerge, FieldMapInfo, FieldMapping, FilterComparison, FilterCondition,
+    FilterDataItem, Fnpi, MailMergeDestination, MailMergeDocumentType, MailMergeType,
+    MergeDataSourceKind, MergeErrorCheck, MergeFileToken, OdsoProperty, Pmfs, Pms, RecipientEntry,
+    RecipientInfo, Rfs, SortColumnAndDirection, SortDirection, SttbfRfs, Wpms,
+};
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat, ParagraphListBinding};
 pub use parts::pap::ParagraphConditionalFormatting;
 pub use parts::proofing::{
