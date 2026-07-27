@@ -16,17 +16,18 @@ use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
 };
 use native::{
-    BINARY_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_ARGUMENT_COUNT,
-    CONDITIONAL_FUNCTION_INDEX, CellPredicateKind, IF_ERROR_FUNCTION_INDEX,
-    IS_BLANK_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX, IS_NUMBER_FUNCTION_INDEX,
-    LOGICAL_AND_FUNCTION_INDEX, LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX,
-    NativePredicateKind, NumericPredicateKind, NumericSignPredicateKind, PREDICATE_ARGUMENT_NONE,
-    PREDICATE_ARGUMENT_NUMBER, PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_ARGUMENT_STRING,
-    PREDICATE_CELL_ARGUMENT_INDEX, PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE,
-    PREDICATE_RANGE_CELL_ARGUMENT_INDEX, PREDICATE_RANGE_LOWER_ARGUMENT_INDEX,
-    PREDICATE_RANGE_UPPER_ARGUMENT_INDEX, PREDICATE_TEXT_ARGUMENT_INDEX,
-    PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_LENGTH_FUNCTION_INDEX, TEXT_RIGHT_FUNCTION_INDEX,
-    TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind, UNARY_FUNCTION_ARGUMENT_COUNT,
+    BINARY_FUNCTION_ARGUMENT_COUNT, BOOLEAN_VALUE_TYPE_CODE, BooleanPredicateKind,
+    CONDITIONAL_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_INDEX, CellPredicateKind,
+    IF_ERROR_FUNCTION_INDEX, IS_BLANK_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX,
+    IS_NUMBER_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX, LOGICAL_NOT_FUNCTION_INDEX,
+    LOGICAL_OR_FUNCTION_INDEX, NativePredicateKind, NumericPredicateKind, NumericSignPredicateKind,
+    PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER, PREDICATE_ARGUMENT_RELATIVE_CELL,
+    PREDICATE_ARGUMENT_STRING, PREDICATE_CELL_ARGUMENT_INDEX, PREDICATE_NUMBER_ARGUMENT_INDEX,
+    PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
+    PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
+    PREDICATE_TEXT_ARGUMENT_INDEX, PREDICATE_UNUSED_ARGUMENT_INDEX, TEXT_LENGTH_FUNCTION_INDEX,
+    TEXT_RIGHT_FUNCTION_INDEX, TEXT_SEARCH_FUNCTION_INDEX, TextPredicateKind,
+    UNARY_FUNCTION_ARGUMENT_COUNT, VALUE_TYPE_FUNCTION_INDEX,
 };
 
 const MAX_CONDITIONAL_HIGHLIGHT_RULES: usize = CONDITIONAL_STYLE_NO_APPLIED_RULE as usize;
@@ -560,6 +561,7 @@ fn applied_rule_for_cell(
             },
             _ => match cell.cached_scalar()? {
                 Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value),
+                Some(CachedScalar::Boolean(value)) => ConditionalCellValue::Boolean(value),
                 _ => ConditionalCellValue::Other,
             },
         },
@@ -578,6 +580,7 @@ fn applied_rule_for_cell(
 
 enum ConditionalCellValue {
     Blank,
+    Boolean(bool),
     Number(f64),
     Other,
     Text(String),
@@ -592,9 +595,18 @@ fn condition_matches(
         (
             TableCellConditionalHighlightCondition::CellIsNotBlank,
             ConditionalCellValue::Number(_)
+            | ConditionalCellValue::Boolean(_)
             | ConditionalCellValue::Other
             | ConditionalCellValue::Text(_),
         ) => true,
+        (
+            TableCellConditionalHighlightCondition::BooleanIsTrue,
+            ConditionalCellValue::Boolean(value),
+        ) => *value,
+        (
+            TableCellConditionalHighlightCondition::BooleanIsFalse,
+            ConditionalCellValue::Boolean(value),
+        ) => !*value,
         (
             TableCellConditionalHighlightCondition::NumberIsPositive,
             ConditionalCellValue::Number(value),

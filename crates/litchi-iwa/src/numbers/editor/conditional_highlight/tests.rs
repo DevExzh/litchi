@@ -323,6 +323,118 @@ fn numeric_sign_predicates_round_trip_and_exclude_zero_and_non_numbers() {
 }
 
 #[test]
+fn boolean_predicates_round_trip_and_match_only_the_exact_boolean() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(3, 5)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    for (column, value) in [
+        (1, CellValue::Boolean(true)),
+        (2, CellValue::Boolean(false)),
+        (3, CellValue::Number(1.0)),
+        (4, CellValue::Text("TRUE".to_owned())),
+    ] {
+        editor.set_cell(table_id, 1, column, value).unwrap();
+    }
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let rules = [
+        rule(TableCellConditionalHighlightCondition::BooleanIsTrue, red),
+        rule(
+            TableCellConditionalHighlightCondition::BooleanIsFalse,
+            green,
+        ),
+    ];
+    for column in 1..=4 {
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, column, &rules)
+            .unwrap();
+        assert_eq!(
+            editor
+                .cell_conditional_highlight_rules(table_id, 1, column)
+                .unwrap(),
+            Some(rules.to_vec())
+        );
+    }
+
+    assert_eq!(applied_rule(&editor, table_id, 1, 1), Some(0));
+    assert_eq!(applied_rule(&editor, table_id, 1, 2), Some(1));
+    for column in [3, 4] {
+        assert_eq!(
+            applied_rule(&editor, table_id, 1, column),
+            Some(CONDITIONAL_STYLE_NO_APPLIED_RULE)
+        );
+    }
+
+    let info = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let archive = editor
+        .package
+        .archive(&location.object_locations[&info.style_set_object_id])
+        .unwrap();
+    let object = archive.object(info.style_set_object_id).unwrap();
+    let set = object
+        .messages
+        .iter()
+        .find_map(|message| {
+            (message.type_ == 6_010)
+                .then(|| tst::ConditionalStyleSetArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    let current = set.rules.unwrap().rule;
+    for (index, kind) in [BooleanPredicateKind::IsTrue, BooleanPredicateKind::IsFalse]
+        .into_iter()
+        .enumerate()
+    {
+        let predicate = current[index].predicate.as_ref().unwrap();
+        let prepivot = &set.rules_prepivot[index].predicate;
+        assert_eq!(predicate.predicate_type, kind.native_value());
+        assert_eq!(
+            predicate
+                .formula
+                .as_ref()
+                .unwrap()
+                .ast_node_array
+                .ast_node
+                .len(),
+            [13, 14][index]
+        );
+        let nodes = &predicate.formula.as_ref().unwrap().ast_node_array.ast_node;
+        assert_eq!(
+            nodes[1].ast_function_node_index,
+            Some(VALUE_TYPE_FUNCTION_INDEX)
+        );
+        assert_eq!(
+            nodes[2].ast_number_node_number,
+            Some(BOOLEAN_VALUE_TYPE_CODE)
+        );
+        assert_eq!(
+            prepivot.predicate_type,
+            NumericPredicateKind::EqualTo.native_value()
+        );
+        assert_eq!(prepivot.param_index0, PREDICATE_CELL_ARGUMENT_INDEX);
+        assert_eq!(prepivot.param_index1, PREDICATE_NUMBER_ARGUMENT_INDEX);
+        assert_eq!(prepivot.param_index2, PREDICATE_UNUSED_ARGUMENT_INDEX);
+        assert_eq!(
+            prepivot.formula.ast_node_array.ast_node[1].ast_boolean_node_boolean,
+            Some(kind.value())
+        );
+    }
+
+    assert!(!condition_matches(
+        &TableCellConditionalHighlightCondition::BooleanIsTrue,
+        &ConditionalCellValue::Number(1.0),
+    ));
+    assert!(!condition_matches(
+        &TableCellConditionalHighlightCondition::BooleanIsFalse,
+        &ConditionalCellValue::Text("FALSE".to_owned()),
+    ));
+}
+
+#[test]
 fn blank_predicates_reject_noncanonical_formula_graphs() {
     let mut editor = NumbersDocumentBuilder::new().build().unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;

@@ -76,6 +76,8 @@ impl TableCellConditionalHighlightText {
 pub enum TableCellConditionalHighlightCondition {
     CellIsBlank,
     CellIsNotBlank,
+    BooleanIsTrue,
+    BooleanIsFalse,
     NumberIsPositive,
     NumberIsNegative,
     EqualTo(TableCellConditionalHighlightNumber),
@@ -101,6 +103,8 @@ impl TableCellConditionalHighlightCondition {
         match self {
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::BooleanIsTrue
+            | Self::BooleanIsFalse
             | Self::NumberIsPositive
             | Self::NumberIsNegative => None,
             Self::EqualTo(value)
@@ -127,6 +131,8 @@ impl TableCellConditionalHighlightCondition {
             Self::Between(range) | Self::NotBetween(range) => Some(*range),
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::BooleanIsTrue
+            | Self::BooleanIsFalse
             | Self::NumberIsPositive
             | Self::NumberIsNegative
             | Self::EqualTo(_)
@@ -158,6 +164,8 @@ impl TableCellConditionalHighlightCondition {
             | Self::TextDoesNotContain(value) => Some(value),
             Self::CellIsBlank
             | Self::CellIsNotBlank
+            | Self::BooleanIsTrue
+            | Self::BooleanIsFalse
             | Self::NumberIsPositive
             | Self::NumberIsNegative
             | Self::EqualTo(_)

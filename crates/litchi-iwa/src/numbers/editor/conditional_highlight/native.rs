@@ -33,6 +33,8 @@ pub(super) const LOGICAL_NOT_FUNCTION_INDEX: u32 = 96;
 pub(super) const IF_ERROR_FUNCTION_INDEX: u32 = 235;
 pub(super) const IS_BLANK_FUNCTION_INDEX: u32 = 69;
 pub(super) const IS_NUMBER_FUNCTION_INDEX: u32 = 304;
+pub(super) const VALUE_TYPE_FUNCTION_INDEX: u32 = 327;
+pub(super) const BOOLEAN_VALUE_TYPE_CODE: f64 = 6.0;
 pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +57,8 @@ impl NumericPredicateKind {
         match condition {
             TableCellConditionalHighlightCondition::CellIsBlank
             | TableCellConditionalHighlightCondition::CellIsNotBlank
+            | TableCellConditionalHighlightCondition::BooleanIsTrue
+            | TableCellConditionalHighlightCondition::BooleanIsFalse
             | TableCellConditionalHighlightCondition::NumberIsPositive
             | TableCellConditionalHighlightCondition::NumberIsNegative => None,
             TableCellConditionalHighlightCondition::EqualTo(_) => Some(Self::EqualTo),
@@ -151,6 +155,34 @@ pub(super) enum NumericSignPredicateKind {
     IsNegative = 58,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub(super) enum BooleanPredicateKind {
+    IsTrue = 59,
+    IsFalse = 60,
+}
+
+impl BooleanPredicateKind {
+    pub(super) const fn native_value(self) -> i32 {
+        self as i32
+    }
+
+    pub(super) const fn value(self) -> bool {
+        matches!(self, Self::IsTrue)
+    }
+
+    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+        match self {
+            Self::IsTrue => TableCellConditionalHighlightCondition::BooleanIsTrue,
+            Self::IsFalse => TableCellConditionalHighlightCondition::BooleanIsFalse,
+        }
+    }
+
+    pub(super) const fn prepivot_kind(self) -> NumericPredicateKind {
+        NumericPredicateKind::EqualTo
+    }
+}
+
 impl NumericSignPredicateKind {
     pub(super) const fn native_value(self) -> i32 {
         self as i32
@@ -236,6 +268,7 @@ impl TextPredicateKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum NativePredicateKind {
     Cell(CellPredicateKind),
+    Boolean(BooleanPredicateKind),
     Numeric(NumericPredicateKind),
     NumericSign(NumericSignPredicateKind),
     Text(TextPredicateKind),
@@ -249,6 +282,12 @@ impl NativePredicateKind {
             },
             TableCellConditionalHighlightCondition::CellIsNotBlank => {
                 return Self::Cell(CellPredicateKind::IsNotBlank);
+            },
+            TableCellConditionalHighlightCondition::BooleanIsTrue => {
+                return Self::Boolean(BooleanPredicateKind::IsTrue);
+            },
+            TableCellConditionalHighlightCondition::BooleanIsFalse => {
+                return Self::Boolean(BooleanPredicateKind::IsFalse);
             },
             TableCellConditionalHighlightCondition::NumberIsPositive => {
                 return Self::NumericSign(NumericSignPredicateKind::IsPositive);
@@ -293,6 +332,7 @@ impl NativePredicateKind {
     pub(super) const fn native_value(self) -> i32 {
         match self {
             Self::Cell(kind) => kind.native_value(),
+            Self::Boolean(kind) => kind.native_value(),
             Self::Numeric(kind) => kind.native_value(),
             Self::NumericSign(kind) => kind.native_value(),
             Self::Text(kind) => kind.native_value(),
@@ -302,6 +342,7 @@ impl NativePredicateKind {
     pub(super) const fn prepivot_native_value(self) -> i32 {
         match self {
             Self::NumericSign(kind) => kind.prepivot_kind().native_value(),
+            Self::Boolean(kind) => kind.prepivot_kind().native_value(),
             _ => self.native_value(),
         }
     }
@@ -317,6 +358,15 @@ impl TryFrom<i32> for NativePredicateKind {
             },
             value if value == CellPredicateKind::IsNotBlank.native_value() => {
                 return Ok(Self::Cell(CellPredicateKind::IsNotBlank));
+            },
+            _ => {},
+        }
+        match value {
+            value if value == BooleanPredicateKind::IsTrue.native_value() => {
+                return Ok(Self::Boolean(BooleanPredicateKind::IsTrue));
+            },
+            value if value == BooleanPredicateKind::IsFalse.native_value() => {
+                return Ok(Self::Boolean(BooleanPredicateKind::IsFalse));
             },
             _ => {},
         }
@@ -448,6 +498,17 @@ mod tests {
             NumericSignPredicateKind::IsNegative,
         ] {
             let kind = NativePredicateKind::NumericSign(sign);
+            assert_eq!(
+                NativePredicateKind::try_from(kind.native_value()).unwrap(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn native_boolean_predicate_values_are_reversible() {
+        for boolean in [BooleanPredicateKind::IsTrue, BooleanPredicateKind::IsFalse] {
+            let kind = NativePredicateKind::Boolean(boolean);
             assert_eq!(
                 NativePredicateKind::try_from(kind.native_value()).unwrap(),
                 kind

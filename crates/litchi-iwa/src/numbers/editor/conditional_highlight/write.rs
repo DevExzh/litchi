@@ -47,6 +47,11 @@ pub(super) fn insert_conditional_style_graph(
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
             ),
+            NativePredicateKind::Boolean(_) => (
+                PREDICATE_CELL_ARGUMENT_INDEX,
+                PREDICATE_NUMBER_ARGUMENT_INDEX,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
             NativePredicateKind::NumericSign(_) => (
                 PREDICATE_CELL_ARGUMENT_INDEX,
                 PREDICATE_NUMBER_ARGUMENT_INDEX,
@@ -214,6 +219,8 @@ fn predicate_arguments(
         condition,
         TableCellConditionalHighlightCondition::CellIsBlank
             | TableCellConditionalHighlightCondition::CellIsNotBlank
+            | TableCellConditionalHighlightCondition::BooleanIsTrue
+            | TableCellConditionalHighlightCondition::BooleanIsFalse
             | TableCellConditionalHighlightCondition::NumberIsPositive
             | TableCellConditionalHighlightCondition::NumberIsNegative
     ) {

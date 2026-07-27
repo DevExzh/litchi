@@ -1,5 +1,6 @@
 //! Canonical formula graphs used by conditional-highlight predicates.
 
+mod boolean;
 mod cell;
 mod sign;
 mod text;
@@ -13,6 +14,7 @@ pub(super) fn encode(
     let kind = NativePredicateKind::from_condition(condition);
     let nodes = match (kind, condition) {
         (NativePredicateKind::Cell(kind), _) => cell::nodes(kind, formula_owner_uuid),
+        (NativePredicateKind::Boolean(kind), _) => boolean::nodes(kind, formula_owner_uuid)?,
         (NativePredicateKind::NumericSign(kind), _) => sign::nodes(kind, formula_owner_uuid)?,
         (
             NativePredicateKind::Numeric(kind),
@@ -58,6 +60,14 @@ pub(super) fn encode_prepivot(
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<tsce::FormulaArchive> {
     let kind = NativePredicateKind::from_condition(condition);
+    if let NativePredicateKind::Boolean(kind) = kind {
+        return Ok(tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: boolean::prepivot_nodes(kind, formula_owner_uuid),
+            },
+            ..Default::default()
+        });
+    }
     if let NativePredicateKind::NumericSign(kind) = kind {
         return Ok(tsce::FormulaArchive {
             ast_node_array: tsce::AstNodeArrayArchive {
@@ -76,6 +86,7 @@ pub(super) fn validate(
 ) -> Result<()> {
     match (kind, condition) {
         (NativePredicateKind::Cell(kind), _) => cell::validate(formula, kind),
+        (NativePredicateKind::Boolean(kind), _) => boolean::validate(formula, kind),
         (NativePredicateKind::NumericSign(kind), _) => sign::validate(formula, kind),
         (
             NativePredicateKind::Numeric(kind),
@@ -102,8 +113,10 @@ pub(super) fn validate_prepivot(
     kind: NativePredicateKind,
     condition: &TableCellConditionalHighlightCondition,
 ) -> Result<()> {
-    if let NativePredicateKind::NumericSign(kind) = kind {
-        return sign::validate_prepivot(formula, kind);
+    match kind {
+        NativePredicateKind::Boolean(kind) => return boolean::validate_prepivot(formula, kind),
+        NativePredicateKind::NumericSign(kind) => return sign::validate_prepivot(formula, kind),
+        _ => {},
     }
     validate(formula, kind, condition)
 }
@@ -144,6 +157,16 @@ fn number_node(value: f64) -> Result<tsce::ast_node_array_archive::AstNodeArchiv
         )),
         ..Default::default()
     })
+}
+
+fn boolean_node(value: bool) -> tsce::ast_node_array_archive::AstNodeArchive {
+    use tsce::ast_node_array_archive::AstNodeType;
+
+    tsce::ast_node_array_archive::AstNodeArchive {
+        ast_node_type: AstNodeType::BooleanNode as i32,
+        ast_boolean_node_boolean: Some(value),
+        ..Default::default()
+    }
 }
 
 fn operator_node(
