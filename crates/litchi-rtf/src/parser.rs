@@ -152,6 +152,16 @@ fn control_symbol_text(control: &ControlWord<'_>) -> Option<&'static str> {
         ControlWord::NonBreakingSpace => Some("\u{00A0}"),
         ControlWord::OptionalHyphen => Some("\u{00AD}"),
         ControlWord::NonBreakingHyphen => Some("\u{2011}"),
+        ControlWord::EmDash => Some("\u{2014}"),
+        ControlWord::EnDash => Some("\u{2013}"),
+        ControlWord::EmSpace => Some("\u{2003}"),
+        ControlWord::EnSpace => Some("\u{2002}"),
+        ControlWord::QuarterEmSpace => Some("\u{2005}"),
+        ControlWord::Bullet => Some("\u{2022}"),
+        ControlWord::LeftToRightMark => Some("\u{200E}"),
+        ControlWord::RightToLeftMark => Some("\u{200F}"),
+        ControlWord::ZeroWidthJoiner => Some("\u{200D}"),
+        ControlWord::ZeroWidthNonJoiner => Some("\u{200C}"),
         _ => None,
     }
 }
@@ -4872,6 +4882,14 @@ impl<'a> Parser<'a> {
                 self.record_body_page_break()?;
                 self.pos += 1;
             },
+            ControlWord::Column(param) => {
+                require_parameterless(*param, "column")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_body_column_break()?;
+                self.pos += 1;
+            },
             ControlWord::Section => {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
@@ -4919,7 +4937,17 @@ impl<'a> Parser<'a> {
             },
             ControlWord::NonBreakingSpace
             | ControlWord::OptionalHyphen
-            | ControlWord::NonBreakingHyphen => {
+            | ControlWord::NonBreakingHyphen
+            | ControlWord::EmDash
+            | ControlWord::EnDash
+            | ControlWord::EmSpace
+            | ControlWord::EnSpace
+            | ControlWord::QuarterEmSpace
+            | ControlWord::Bullet
+            | ControlWord::LeftToRightMark
+            | ControlWord::RightToLeftMark
+            | ControlWord::ZeroWidthJoiner
+            | ControlWord::ZeroWidthNonJoiner => {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
                 }
@@ -4928,6 +4956,15 @@ impl<'a> Parser<'a> {
                 })?;
                 self.pos += 1;
                 self.append_semantic_text(text)?;
+            },
+            ControlWord::CurrentDate
+            | ControlWord::CurrentDateLong
+            | ControlWord::CurrentDateAbbreviated
+            | ControlWord::CurrentTime => {
+                // These stamps expand to the current date or time when a
+                // renderer lays out the document. The parser has no clock or
+                // calendar facility, so they contribute no extracted text.
+                self.pos += 1;
             },
             ControlWord::AnnotationMark => {
                 if !text_buffer.is_empty() {
@@ -5185,6 +5222,36 @@ impl<'a> Parser<'a> {
             self.root_section_format_run = false;
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                 crate::BodyStoryEvent::PageBreak(crate::PageBreak::new(self.body_text_len)),
+            ));
+        }
+        Ok(())
+    }
+
+    fn record_body_column_break(&mut self) -> RtfResult<()> {
+        let state = self.current_state()?.clone();
+        if state.destination != Destination::DocumentBody {
+            return Err(RtfError::MalformedDocument(
+                "RTF column is not permitted in this destination".to_string(),
+            ));
+        }
+        if state.table_nesting_level >= 2 {
+            let builder = self.ensure_nested_builder(state.table_nesting_level)?;
+            builder
+                .cell_story_events
+                .push(crate::CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
+                    builder.cell_text.len(),
+                )));
+        } else if state.in_table {
+            self.current_cell_story_events
+                .push(crate::CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
+                    self.current_cell_text.len(),
+                )));
+        } else {
+            self.note_options_closed = true;
+            self.section_note_options_closed = true;
+            self.root_section_format_run = false;
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::ColumnBreak(crate::ColumnBreak::new(self.body_text_len)),
             ));
         }
         Ok(())

@@ -3401,6 +3401,30 @@ impl<'a> RtfDocument<'a> {
             .retain(|event| !matches!(event, crate::BodyStoryEvent::PageBreak(_)));
     }
 
+    pub fn column_breaks(&self) -> impl Iterator<Item = &crate::ColumnBreak> {
+        self.body_story_events.iter().filter_map(|event| match event {
+            crate::BodyStoryEvent::ColumnBreak(column_break) => Some(column_break),
+            _ => None,
+        })
+    }
+
+    pub fn push_column_break(&mut self, position: usize) -> RtfResult<()> {
+        let body = self.text();
+        if body.get(position..position).is_none() {
+            return Err(RtfError::MalformedDocument(
+                "RTF column-break position is not a UTF-8 body boundary".to_string(),
+            ));
+        }
+        self.insert_body_story_event(crate::BodyStoryEvent::ColumnBreak(
+            crate::ColumnBreak::new(position),
+        ))
+    }
+
+    pub fn clear_column_breaks(&mut self) {
+        self.body_story_events
+            .retain(|event| !matches!(event, crate::BodyStoryEvent::ColumnBreak(_)));
+    }
+
     /// Append a validated standalone shape at its UTF-8 body position.
     pub fn push_shape(&mut self, shape: super::shape::Shape<'a>) -> RtfResult<()> {
         if shape.is_background {
@@ -3834,6 +3858,7 @@ impl<'a> RtfDocument<'a> {
                 crate::BodyStoryEvent::Drawing(_)
                 | crate::BodyStoryEvent::Field(_)
                 | crate::BodyStoryEvent::PageBreak(_)
+                | crate::BodyStoryEvent::ColumnBreak(_)
                 | crate::BodyStoryEvent::SectionBreak(_) => {
                     self.body_story_event_position(*event)
                 },
@@ -3851,6 +3876,7 @@ impl<'a> RtfDocument<'a> {
             },
             crate::BodyStoryEvent::Field(index) => self.fields.get(index)?.position,
             crate::BodyStoryEvent::PageBreak(page_break) => page_break.position,
+            crate::BodyStoryEvent::ColumnBreak(column_break) => column_break.position,
             crate::BodyStoryEvent::SectionBreak(section_break) => section_break.position,
             crate::BodyStoryEvent::BookmarkStart(index) => {
                 self.bookmarks.bookmarks().get(index)?.position

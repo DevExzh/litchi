@@ -95,6 +95,7 @@ enum BodyEventKind<'b, 'a> {
     FormFieldEnd,
     GenericField(&'b crate::Field<'a>),
     PageBreak,
+    ColumnBreak,
     SectionBreak(Option<&'b Section<'a>>),
 }
 
@@ -4311,6 +4312,9 @@ impl<W: Write> RtfWriter<W> {
                 crate::BodyStoryEvent::PageBreak(page_break) => {
                     (page_break.position, BodyEventKind::PageBreak)
                 },
+                crate::BodyStoryEvent::ColumnBreak(column_break) => {
+                    (column_break.position, BodyEventKind::ColumnBreak)
+                },
                 crate::BodyStoryEvent::SectionBreak(section_break) => {
                     let section = match section_break.next_section {
                         None => None,
@@ -4624,6 +4628,7 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::FormFieldEnd => self.write_str("}}"),
             BodyEventKind::GenericField(field) => self.write_field_with_fields(field, fields, 0),
             BodyEventKind::PageBreak => self.write_str("\\page "),
+            BodyEventKind::ColumnBreak => self.write_str("\\column "),
             BodyEventKind::SectionBreak(section) => {
                 self.write_control_word("sect", None)?;
                 if let Some(section) = section {
@@ -6550,6 +6555,7 @@ impl<W: Write> RtfWriter<W> {
                 },
                 crate::CellStoryEvent::Field(field) => field.position,
                 crate::CellStoryEvent::PageBreak(page_break) => page_break.position,
+                crate::CellStoryEvent::ColumnBreak(column_break) => column_break.position,
                 crate::CellStoryEvent::NavigationEntry(reference)
                 | crate::CellStoryEvent::RevisionStart(reference)
                 | crate::CellStoryEvent::RevisionEnd(reference)
@@ -6571,6 +6577,7 @@ impl<W: Write> RtfWriter<W> {
                     self.write_field_with_fields(field, fields, 0)?;
                 },
                 crate::CellStoryEvent::PageBreak(_) => self.write_str("\\page ")?,
+                crate::CellStoryEvent::ColumnBreak(_) => self.write_str("\\column ")?,
                 crate::CellStoryEvent::NavigationEntry(reference) => {
                     let entry = navigation_entries.get(reference.index).filter(|entry| {
                         entry.position() == reference.position
@@ -7132,6 +7139,19 @@ impl<W: Write> RtfWriter<W> {
                 // a single delimiting space, so it never reappears as content.
                 '\n' => self.write_str("\\par ")?,
                 '\t' => self.write_str("\\tab ")?,
+                // RTF special characters with dedicated control words keep their
+                // source spelling instead of a generic \u escape. The trailing
+                // space delimits the control word exactly like \par and \tab.
+                '\u{2014}' => self.write_str("\\emdash ")?,
+                '\u{2013}' => self.write_str("\\endash ")?,
+                '\u{2003}' => self.write_str("\\emspace ")?,
+                '\u{2002}' => self.write_str("\\enspace ")?,
+                '\u{2005}' => self.write_str("\\qmspace ")?,
+                '\u{2022}' => self.write_str("\\bullet ")?,
+                '\u{200E}' => self.write_str("\\ltrmark ")?,
+                '\u{200F}' => self.write_str("\\rtlmark ")?,
+                '\u{200D}' => self.write_str("\\zwj ")?,
+                '\u{200C}' => self.write_str("\\zwnj ")?,
                 // Readers discard raw carriage returns and other bare control
                 // bytes as line-ending noise, so emit them as hex escapes to keep
                 // them part of the document text.

@@ -899,6 +899,7 @@ pub enum CellStoryEvent {
     Drawing(crate::StoryDrawing),
     Field(crate::StoryField),
     PageBreak(crate::PageBreak),
+    ColumnBreak(crate::ColumnBreak),
     NavigationEntry(CellStoryReference),
     RevisionStart(CellStoryReference),
     RevisionEnd(CellStoryReference),
@@ -1055,6 +1056,7 @@ impl<'a> Cell<'a> {
             },
             CellStoryEvent::Field(field) => field.position,
             CellStoryEvent::PageBreak(page_break) => page_break.position,
+            CellStoryEvent::ColumnBreak(column_break) => column_break.position,
             CellStoryEvent::NavigationEntry(reference)
             | CellStoryEvent::RevisionStart(reference)
             | CellStoryEvent::RevisionEnd(reference)
@@ -1113,6 +1115,14 @@ impl<'a> Cell<'a> {
                         .is_some() =>
                 {
                     page_break.position
+                },
+                CellStoryEvent::ColumnBreak(column_break)
+                    if self
+                        .text
+                        .get(column_break.position..column_break.position)
+                        .is_some() =>
+                {
+                    column_break.position
                 },
                 CellStoryEvent::NavigationEntry(reference)
                 | CellStoryEvent::RevisionStart(reference)
@@ -1233,6 +1243,31 @@ impl<'a> Cell<'a> {
     pub fn clear_page_breaks(&mut self) {
         self.story_events
             .retain(|event| !matches!(event, CellStoryEvent::PageBreak(_)));
+    }
+    pub fn column_breaks(&self) -> impl Iterator<Item = &crate::ColumnBreak> {
+        self.story_events.iter().filter_map(|event| match event {
+            CellStoryEvent::ColumnBreak(column_break) => Some(column_break),
+            _ => None,
+        })
+    }
+    pub fn push_column_break(&mut self, position: usize) -> crate::RtfResult<()> {
+        if self.text.get(position..position).is_none()
+            || self
+                .story_events
+                .last()
+                .is_some_and(|event| self.event_position(*event) > position)
+        {
+            return Err(crate::RtfError::MalformedDocument(
+                "invalid table-cell column-break insertion offset".to_string(),
+            ));
+        }
+        self.story_events
+            .push(CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(position)));
+        Ok(())
+    }
+    pub fn clear_column_breaks(&mut self) {
+        self.story_events
+            .retain(|event| !matches!(event, CellStoryEvent::ColumnBreak(_)));
     }
     pub fn navigation_entry_references(
         &self,

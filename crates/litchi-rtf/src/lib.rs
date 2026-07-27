@@ -178,7 +178,7 @@ pub use field::{
     BibliographyField,
     BarcodeDisplayField, BarcodeDisplayFieldKind, BarcodeField, BibliographyOption,
     BidiOutlineField, BodyStoryEvent, CitationField,
-    CitationOption, DatabaseField, DdeField, DdeFieldKind,
+    CitationOption, ColumnBreak, DatabaseField, DdeField, DdeFieldKind,
     DdeRepresentation, DocumentContextField, DocumentContextFieldKind, DocumentInformationField,
     DocumentInformationFieldKind, DocumentPropertyField, DocumentVariableField, EquationField,
     EmbedField, ExternalIncludeField, ExternalIncludeOption, Field, FieldCodeError,

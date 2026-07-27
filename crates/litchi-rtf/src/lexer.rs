@@ -556,6 +556,7 @@ pub enum ControlWord<'a> {
     // Paragraph formatting
     Par,
     Page(Option<i32>),
+    Column(Option<i32>),
     Pard,
     LeftAlign,
     RightAlign,
@@ -1011,6 +1012,20 @@ pub enum ControlWord<'a> {
     NonBreakingSpace,
     OptionalHyphen,
     NonBreakingHyphen,
+    EmDash,
+    EnDash,
+    EmSpace,
+    EnSpace,
+    QuarterEmSpace,
+    Bullet,
+    LeftToRightMark,
+    RightToLeftMark,
+    ZeroWidthJoiner,
+    ZeroWidthNonJoiner,
+    CurrentDate,
+    CurrentDateLong,
+    CurrentDateAbbreviated,
+    CurrentTime,
 
     // Binary data
     Binary(i32),
@@ -1968,6 +1983,7 @@ impl<'a> Lexer<'a> {
             // Paragraph
             "par" => ControlWord::Par,
             "page" => ControlWord::Page(param),
+            "column" => ControlWord::Column(param),
             "pard" => ControlWord::Pard,
             "ql" => ControlWord::LeftAlign,
             "qr" => ControlWord::RightAlign,
@@ -3256,6 +3272,20 @@ impl<'a> Lexer<'a> {
             // Special
             "tab" => ControlWord::Tab,
             "line" => ControlWord::Line,
+            "emdash" => ControlWord::EmDash,
+            "endash" => ControlWord::EnDash,
+            "emspace" => ControlWord::EmSpace,
+            "enspace" => ControlWord::EnSpace,
+            "qmspace" => ControlWord::QuarterEmSpace,
+            "bullet" => ControlWord::Bullet,
+            "ltrmark" => ControlWord::LeftToRightMark,
+            "rtlmark" => ControlWord::RightToLeftMark,
+            "zwj" => ControlWord::ZeroWidthJoiner,
+            "zwnj" => ControlWord::ZeroWidthNonJoiner,
+            "chdate" => ControlWord::CurrentDate,
+            "chdpl" => ControlWord::CurrentDateLong,
+            "chdpa" => ControlWord::CurrentDateAbbreviated,
+            "chtime" => ControlWord::CurrentTime,
 
             // Binary data
             "bin" => ControlWord::Binary(param_value),
@@ -3545,6 +3575,43 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0], Token::Control(ControlWord::NonBreakingHyphen));
+    }
+
+    #[test]
+    fn test_tokenize_special_character_control_words() {
+        let cases: &[(&str, ControlWord<'_>)] = &[
+            (r"\emdash", ControlWord::EmDash),
+            (r"\endash", ControlWord::EnDash),
+            (r"\emspace", ControlWord::EmSpace),
+            (r"\enspace", ControlWord::EnSpace),
+            (r"\qmspace", ControlWord::QuarterEmSpace),
+            (r"\bullet", ControlWord::Bullet),
+            (r"\ltrmark", ControlWord::LeftToRightMark),
+            (r"\rtlmark", ControlWord::RightToLeftMark),
+            (r"\zwj", ControlWord::ZeroWidthJoiner),
+            (r"\zwnj", ControlWord::ZeroWidthNonJoiner),
+            (r"\chdate", ControlWord::CurrentDate),
+            (r"\chdpl", ControlWord::CurrentDateLong),
+            (r"\chdpa", ControlWord::CurrentDateAbbreviated),
+            (r"\chtime", ControlWord::CurrentTime),
+        ];
+        for (input, expected) in cases {
+            let arena = Bump::new();
+            let mut lexer = Lexer::new(input, &arena);
+            let tokens = lexer.tokenize().unwrap();
+            assert_eq!(tokens.len(), 1, "tokenized {input}");
+            assert_eq!(tokens[0], Token::Control(*expected), "lexed {input}");
+        }
+    }
+
+    #[test]
+    fn test_tokenize_column_break() {
+        let arena = Bump::new();
+        let input = r"\column";
+        let mut lexer = Lexer::new(input, &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Control(ControlWord::Column(None)));
     }
 
     #[test]

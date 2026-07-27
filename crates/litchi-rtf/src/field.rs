@@ -112,6 +112,18 @@ impl PageBreak {
     }
 }
 
+/// A zero-width explicit `\column` control at a UTF-8 story boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ColumnBreak {
+    pub position: usize,
+}
+
+impl ColumnBreak {
+    pub const fn new(position: usize) -> Self {
+        Self { position }
+    }
+}
+
 /// A zero-width explicit `\sect` control at a UTF-8 main-story boundary.
 ///
 /// `next_section` identifies the typed section definition that starts after
@@ -135,6 +147,7 @@ impl SectionBreak {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BodyStoryEvent {
     PageBreak(PageBreak),
+    ColumnBreak(ColumnBreak),
     SectionBreak(SectionBreak),
     Drawing(crate::StoryDrawing),
     Field(usize),
