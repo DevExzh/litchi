@@ -14,6 +14,8 @@
 //! - **Workbook Structure**: Parse workbook properties, sheet metadata, and relationships
 //! - **Column Information**: Support for column widths, hidden columns, and custom widths
 //! - **Merged Cells**: Parse and handle merged cell ranges
+//! - **Sheet Views**: Parse worksheet views (zoom scales, frozen and split
+//!   panes, selections, tab-selected flag) through the shared typed view model
 //! - **Hyperlinks**: Parse hyperlink data with locations and tooltips
 //! - **Named Ranges**: Parse defined names and ranges
 //! - **Chart Sheets**: Typed chart sheet stream parsing and bounded new-workbook
@@ -29,6 +31,7 @@
 //! - **Styles**: Write custom fonts, fills, borders, and number formats
 //! - **Shared Strings**: Automatic shared string table management
 //! - **Advanced Features**: Write merged cells, hyperlinks, and comments
+//! - **Sheet Views**: Write worksheet views (zoom scales, freeze panes, selections)
 //! - **CRUD Operations**: Full support for creating, reading, updating, and deleting cells
 //!
 //! # Supported Record Types
@@ -142,6 +145,9 @@ pub mod writer;
 /// Merged cell support
 pub mod merged_cells;
 
+/// Worksheet sheet-view (panes, zoom, selections) support
+pub mod sheet_view;
+
 /// Hyperlink support
 pub mod hyperlinks;
 
@@ -221,6 +227,9 @@ pub use pivot::{
 };
 pub use shared_strings::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedString, SharedStringRun,
+};
+pub use sheet_view::{
+    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
 };
 pub use styles::{
     Alignment, Border, BorderSide, BorderStyle, HorizontalAlignment, VerticalAlignment,

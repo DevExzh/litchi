@@ -206,6 +206,9 @@ fn paired_end(record_type: u16) -> Option<u16> {
         // Chart sheet stream (2.1.7.7).
         rt::BEGIN_CS_VIEWS => rt::END_CS_VIEWS,
         rt::BEGIN_CS_VIEW => rt::END_CS_VIEW,
+        // Worksheet stream (2.1.7.62) sheet views.
+        rt::BEGIN_WS_VIEWS => rt::END_WS_VIEWS,
+        rt::BEGIN_WS_VIEW => rt::END_WS_VIEW,
         rt::BEGIN_HEADER_FOOTER => rt::END_HEADER_FOOTER,
         // External Data Connections part (2.1.7.24).
         rt::BEGIN_EC_DB_PROPS => rt::END_EC_DB_PROPS,

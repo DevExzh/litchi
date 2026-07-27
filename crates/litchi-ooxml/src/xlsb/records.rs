@@ -174,6 +174,10 @@ pub mod record_types {
     pub const END_SHEET_DATA: u16 = 0x0092;
     pub const WS_PROP: u16 = 0x0093;
     pub const WS_DIM: u16 = 0x0094;
+
+    // Worksheet view records
+    pub const PANE: u16 = 0x0097;
+    pub const SEL: u16 = 0x0098;
     pub const WORKBOOK_PROP: u16 = 0x0099;
     pub const BUNDLE_SH: u16 = 0x009C;
     pub const CALC_PROP: u16 = 0x009D;
@@ -1302,28 +1306,6 @@ impl<R: Read> RecordIter<R> {
 
         self.reader.read_exact(&mut buf[..len])?;
         Ok(len)
-    }
-
-    /// Reads next type, and discard blocks between `start` and `end`
-    pub fn next_skip_blocks(
-        &mut self,
-        record_type: u16,
-        bounds: &[(u16, Option<u16>)],
-        buf: &mut Vec<u8>,
-    ) -> Result<usize, XlsbError> {
-        loop {
-            let typ = self.read_type().map_err(XlsbError::Io)?;
-            let len = self.fill_buffer(buf).map_err(XlsbError::Io)?;
-            if typ == record_type {
-                return Ok(len);
-            }
-            if let Some(end) = bounds.iter().find(|b| b.0 == typ).and_then(|b| b.1) {
-                while self.read_type().map_err(XlsbError::Io)? != end {
-                    let _ = self.fill_buffer(buf).map_err(XlsbError::Io)?;
-                }
-                let _ = self.fill_buffer(buf).map_err(XlsbError::Io)?;
-            }
-        }
     }
 }
 

@@ -11,6 +11,10 @@ use crate::xlsb::formula::{
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
 use crate::xlsb::records::record_types;
+use crate::xlsb::sheet_view::{
+    MAX_SHEET_VIEW_SELECTIONS, SheetPane, SheetPanePosition, SheetPaneState, SheetSelection,
+    SheetView,
+};
 use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use crate::xlsb::writer::RecordWriter;
 use litchi_core::sheet::CellValue;
@@ -49,6 +53,17 @@ pub struct RowInfo {
     pub height: Option<f64>,
     /// Whether the row is hidden.
     pub hidden: bool,
+}
+
+/// Freeze panes configuration.
+///
+/// Freezes rows and columns in place while scrolling.
+#[derive(Debug, Clone)]
+struct FreezePanes {
+    /// Number of rows to freeze from the top.
+    freeze_rows: u32,
+    /// Number of columns to freeze from the left.
+    freeze_cols: u32,
 }
 
 /// Auto-filter configuration for a rectangular range.
@@ -110,6 +125,10 @@ pub struct MutableXlsbWorksheet {
     auto_filter: Option<AutoFilter>,
     /// Optional sheet protection configuration.
     sheet_protection: Option<SheetProtection>,
+    /// Optional worksheet view configuration (zoom, pane, selections).
+    sheet_view: Option<SheetView>,
+    /// Optional freeze panes configuration.
+    freeze_panes: Option<FreezePanes>,
     /// Data validation rules.
     data_validations: Vec<DataValidation>,
     data_validation_settings: DataValidationSettings,
@@ -246,6 +265,8 @@ impl MutableXlsbWorksheet {
             rows: BTreeMap::new(),
             auto_filter: None,
             sheet_protection: None,
+            sheet_view: None,
+            freeze_panes: None,
             data_validations: Vec::new(),
             data_validation_settings: DataValidationSettings::default(),
             data_validation14_settings: DataValidationSettings::default(),
@@ -926,6 +947,40 @@ impl MutableXlsbWorksheet {
     /// Set sheet protection options. Passing `None` clears protection.
     pub fn set_sheet_protection(&mut self, protection: Option<SheetProtection>) {
         self.sheet_protection = protection;
+    }
+
+    /// Set the worksheet view (zoom scales, pane, selections, tab-selected flag).
+    ///
+    /// The view model is shared with XLSX worksheets; see
+    /// [`crate::xlsx::views::SheetView`]. Pane and selection settings conflict
+    /// with [`Self::freeze_panes`]; combining both fails at save time.
+    pub fn set_sheet_view(&mut self, view: SheetView) {
+        self.sheet_view = Some(view);
+    }
+
+    /// Worksheet view configured through [`Self::set_sheet_view`].
+    pub fn sheet_view(&self) -> Option<&SheetView> {
+        self.sheet_view.as_ref()
+    }
+
+    /// Freeze panes at the specified position.
+    ///
+    /// `freeze_rows` is the number of rows frozen from the top and
+    /// `freeze_cols` the number of columns frozen from the left. The frozen
+    /// pane uses the first scrolling cell as its selection anchor, mirroring
+    /// the XLSX writer.
+    pub fn freeze_panes(&mut self, freeze_rows: u32, freeze_cols: u32) {
+        if freeze_rows > 0 || freeze_cols > 0 {
+            self.freeze_panes = Some(FreezePanes {
+                freeze_rows,
+                freeze_cols,
+            });
+        }
+    }
+
+    /// Remove freeze panes.
+    pub fn unfreeze_panes(&mut self) {
+        self.freeze_panes = None;
     }
 
     /// Add a merged cell range
@@ -1666,56 +1721,67 @@ impl MutableXlsbWorksheet {
 
     /// Write worksheet views (REQUIRED by Excel)
     ///
-    /// [MS-XLSB] 2.4.304: Specifies sheet view settings
+    /// [MS-XLSB] 2.4.307/2.4.308: BrtBeginWsViews / BrtBeginWsView, optionally
+    /// followed by BrtPane (2.4.723) and BrtSel (2.4.790) records.
     fn write_ws_views<W: Write>(&self, writer: &mut RecordWriter<W>) -> XlsbResult<()> {
+        let mut view = self.sheet_view.clone().unwrap_or_default();
+        let configured = self.sheet_view.is_some() || self.freeze_panes.is_some();
+
+        if let Some(freeze) = &self.freeze_panes {
+            if view.pane.is_some() || !view.selections.is_empty() {
+                return Err(XlsbError::Unrecognized {
+                    typ: "worksheet sheet view".to_string(),
+                    val: "freeze panes and explicit sheet-view pane selections cannot both be set"
+                        .to_string(),
+                });
+            }
+            let y_split = freeze.freeze_rows;
+            let x_split = freeze.freeze_cols;
+            let active_pane = match (x_split > 0, y_split > 0) {
+                (true, true) => SheetPanePosition::BottomRight,
+                (true, false) => SheetPanePosition::TopRight,
+                (false, true) => SheetPanePosition::BottomLeft,
+                (false, false) => unreachable!("freeze panes require a nonzero split"),
+            };
+            let top_left_cell = crate::xlsb::utils::cell_reference(y_split, x_split);
+            view.pane = Some(SheetPane {
+                x_split: (x_split > 0).then_some(f64::from(x_split)),
+                y_split: (y_split > 0).then_some(f64::from(y_split)),
+                top_left_cell: Some(top_left_cell.clone()),
+                active_pane: Some(active_pane),
+                state: Some(SheetPaneState::Frozen),
+            });
+            view.selections.push(SheetSelection {
+                pane: Some(active_pane),
+                active_cell: Some(top_left_cell.clone()),
+                active_cell_id: None,
+                sqref: Some(top_left_cell),
+            });
+        }
+
+        if view.selections.len() > MAX_SHEET_VIEW_SELECTIONS {
+            return Err(XlsbError::Unrecognized {
+                typ: "worksheet sheet view".to_string(),
+                val: "a sheet view cannot contain more than four selections".to_string(),
+            });
+        }
+
         writer.write_record(record_types::BEGIN_WS_VIEWS, &[])?;
 
         // BrtBeginWsView (30 bytes according to spec)
-        let mut view_data = Vec::new();
-        let mut temp_writer = RecordWriter::new(&mut view_data);
-
-        // Flags (2 bytes) - bits A-K + reserved
-        // Default: fDspGrid=1, fDspRwCol=1, fDspZeros=1, fDefaultHdr=1
-        // 0xDC = 11011100 = fDefaultHdr(1) + fDspGuts(1) + fSelected(1) + fDspZeros(1) + fDspRwCol(1) + fDspGrid(1)
-        // 0x03 = 00000011 = reserved bits
-        temp_writer.write_u8(0xDC)?;
-        temp_writer.write_u8(0x03)?;
-
-        // xlView (4 bytes) - XLView: 0 = normal view
-        temp_writer.write_u32(0)?;
-
-        // rwTop (4 bytes) - first row displayed
-        temp_writer.write_u32(0)?;
-
-        // colLeft (4 bytes) - first column displayed
-        temp_writer.write_u32(0)?;
-
-        // icvHdr (1 byte) - Icv: gridline color (0x40 = default)
-        temp_writer.write_u8(0x40)?;
-
-        // reserved2 (1 byte)
-        temp_writer.write_u8(0)?;
-
-        // reserved3 (2 bytes)
-        temp_writer.write_u16(0)?;
-
-        // wScale (2 bytes) - zoom level (100%)
-        temp_writer.write_u16(100)?;
-
-        // wScaleNormal (2 bytes) - per spec example: 0 means default 100
-        temp_writer.write_u16(0)?;
-
-        // wScaleSLV (2 bytes) - zoom for page break preview (0 = default 100%)
-        temp_writer.write_u16(0)?;
-
-        // wScalePLV (2 bytes) - zoom for page layout view (0 = default 100%)
-        temp_writer.write_u16(0)?;
-
-        // iWbkView (4 bytes) - workbook view index
-        temp_writer.write_u32(0)?;
-
-        // Minimal SheetJS-style view: BrtBeginWsViews / BrtBeginWsView / BrtEndWsView / BrtEndWsViews
+        let view_data = crate::xlsb::sheet_view::write_ws_view_payload(
+            configured.then_some(&view),
+        )?;
         writer.write_record(record_types::BEGIN_WS_VIEW, &view_data)?;
+
+        if let Some(pane) = view.pane.as_ref() {
+            let pane_data = crate::xlsb::sheet_view::write_pane_payload(pane)?;
+            writer.write_record(record_types::PANE, &pane_data)?;
+        }
+        for selection in &view.selections {
+            let selection_data = crate::xlsb::sheet_view::write_selection_payload(selection)?;
+            writer.write_record(record_types::SEL, &selection_data)?;
+        }
 
         writer.write_record(record_types::END_WS_VIEW, &[])?;
         writer.write_record(record_types::END_WS_VIEWS, &[])?;

@@ -133,6 +133,8 @@ where
     pub conditional_formattings: Vec<ConditionalFormatting>,
     /// Inert Office Add-in bindings from the worksheet WEBEXTENSIONS collection.
     pub web_extension_bindings: Vec<XlsbWebExtensionBinding>,
+    /// Sheet views from the worksheet WSVIEWS collection.
+    pub sheet_views: Vec<crate::xlsb::sheet_view::SheetView>,
     saw_web_extension_collection: bool,
 }
 
@@ -148,15 +150,19 @@ where
     ) -> XlsbResult<Self> {
         let mut buf = Vec::with_capacity(1024);
 
-        // Skip to BrtWsDim (worksheet dimensions)
-        let _ = iter.next_skip_blocks(
-            0x0094, // BrtWsDim
-            &[
-                (0x0081, None), // BrtBeginSheet
-                (0x0093, None), // BrtWsProp
-            ],
-            &mut buf,
-        )?;
+        // Walk the worksheet preamble up to BrtWsDim (worksheet dimensions),
+        // capturing the sheet-view collection while skipping everything else.
+        let mut sheet_views = Vec::new();
+        loop {
+            let typ = iter.read_type()?;
+            let _ = iter.fill_buffer(&mut buf)?;
+            if typ == record_types::WS_DIM {
+                break;
+            }
+            if typ == record_types::BEGIN_WS_VIEWS {
+                sheet_views = crate::xlsb::sheet_view::read_sheet_views(&mut iter, &mut buf)?;
+            }
+        }
         if buf.len() != 16 {
             return Err(XlsbError::InvalidLength {
                 expected: 16,
@@ -166,7 +172,9 @@ where
         let dimensions = Self::parse_dimensions(&buf);
 
         // Read worksheet preamble through BrtBeginSheetData, retaining column
-        // formatting while safely ignoring unrelated and future records.
+        // formatting and sheet views while safely ignoring unrelated and
+        // future records. Producers disagree on whether the WSVIEWS block
+        // precedes or follows BrtWsDim, so both phases capture it.
         let mut column_infos = Vec::new();
         loop {
             let typ = iter.read_type()?;
@@ -176,6 +184,8 @@ where
             }
             if typ == record_types::COL_INFO {
                 column_infos.push(Self::parse_column_info(&buf, cell_xf_count)?);
+            } else if typ == record_types::BEGIN_WS_VIEWS {
+                sheet_views = crate::xlsb::sheet_view::read_sheet_views(&mut iter, &mut buf)?;
             }
         }
 
@@ -202,6 +212,7 @@ where
             data_validation14_settings: None,
             conditional_formattings: Vec::new(),
             web_extension_bindings: Vec::new(),
+            sheet_views,
             saw_web_extension_collection: false,
         })
     }

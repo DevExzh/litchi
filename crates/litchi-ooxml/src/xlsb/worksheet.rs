@@ -6,6 +6,7 @@ use crate::xlsb::conditional_formatting::ConditionalFormatting;
 use crate::xlsb::data_validation::{DataValidation, DataValidationSettings};
 use crate::xlsb::hyperlinks::Hyperlink;
 use crate::xlsb::merged_cells::MergedCell;
+use crate::xlsb::sheet_view::SheetView;
 use crate::xlsb::web_extension_bindings::XlsbWebExtensionBinding;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet,
@@ -133,6 +134,7 @@ pub struct XlsbWorksheet {
     data_validation14_settings: Option<DataValidationSettings>,
     conditional_formattings: Vec<ConditionalFormatting>,
     web_extension_bindings: Vec<XlsbWebExtensionBinding>,
+    sheet_views: Vec<SheetView>,
 }
 
 impl XlsbWorksheet {
@@ -156,6 +158,7 @@ impl XlsbWorksheet {
             data_validation14_settings: None,
             conditional_formattings: Vec::new(),
             web_extension_bindings: Vec::new(),
+            sheet_views: Vec::new(),
         }
     }
 
@@ -229,6 +232,10 @@ impl XlsbWorksheet {
         self.web_extension_bindings = bindings;
     }
 
+    pub(crate) fn set_sheet_views(&mut self, sheet_views: Vec<SheetView>) {
+        self.sheet_views = sheet_views;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -292,6 +299,14 @@ impl XlsbWorksheet {
     /// Inert Office Add-in range bindings in worksheet stream order.
     pub fn web_extension_bindings(&self) -> &[XlsbWebExtensionBinding] {
         &self.web_extension_bindings
+    }
+
+    /// Sheet views (zoom, panes, selections) in worksheet stream order.
+    ///
+    /// The view model is shared with XLSX worksheets; see
+    /// [`crate::xlsx::views::SheetView`].
+    pub fn sheet_views(&self) -> &[SheetView] {
+        &self.sheet_views
     }
 }
 

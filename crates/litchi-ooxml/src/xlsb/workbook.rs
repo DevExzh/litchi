@@ -1585,6 +1585,7 @@ impl XlsbWorkbook {
         );
         worksheet.set_conditional_formattings(cells_reader.conditional_formattings);
         worksheet.set_web_extension_bindings(cells_reader.web_extension_bindings);
+        worksheet.set_sheet_views(cells_reader.sheet_views);
 
         Ok(worksheet)
     }
