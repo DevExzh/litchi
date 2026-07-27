@@ -648,6 +648,24 @@ pub enum UnderlineStyle {
     Thick,
     /// Wave underline
     Wave,
+    /// Hairline underline
+    Hairline,
+    /// Thick dotted underline
+    ThickDotted,
+    /// Thick dashed underline
+    ThickDashed,
+    /// Thick dash-dot underline
+    ThickDashDot,
+    /// Thick dash-dot-dot underline
+    ThickDashDotDot,
+    /// Thick long-dash underline
+    ThickLongDash,
+    /// Long-dash underline
+    LongDash,
+    /// Heavy wave underline
+    HeavyWave,
+    /// Double wave underline
+    DoubleWave,
 }
 
 /// Explicit bidirectional precedence for a character run or paragraph.
@@ -822,6 +840,8 @@ pub struct Formatting {
     pub delete_rsid: Option<u32>,
     /// RSID attached to the character formatting (`\charrsidN`).
     pub char_style_rsid: Option<u32>,
+    /// Underline color reference from `\ulcN`; `None` uses the text color.
+    pub underline_color: Option<ColorRef>,
     /// Font reference
     pub font_ref: FontRef,
     /// Font size in half-points
@@ -903,6 +923,7 @@ impl Default for Formatting {
             insert_rsid: None,
             delete_rsid: None,
             char_style_rsid: None,
+            underline_color: None,
             font_ref: 0,
             font_size: NonZeroU16::new(24).expect("non-zero default font size"),
             color_ref: 0,

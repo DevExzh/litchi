@@ -5746,6 +5746,20 @@ impl<W: Write> RtfWriter<W> {
             UnderlineStyle::Words => self.write_control_word("ulw", None)?,
             UnderlineStyle::Thick => self.write_control_word("ulth", None)?,
             UnderlineStyle::Wave => self.write_control_word("ulwave", None)?,
+            UnderlineStyle::Hairline => self.write_control_word("ulhair", None)?,
+            UnderlineStyle::ThickDotted => self.write_control_word("ulthd", None)?,
+            UnderlineStyle::ThickDashed => self.write_control_word("ulthdash", None)?,
+            UnderlineStyle::ThickDashDot => self.write_control_word("ulthdashd", None)?,
+            UnderlineStyle::ThickDashDotDot => {
+                self.write_control_word("ulthdashdd", None)?
+            },
+            UnderlineStyle::ThickLongDash => self.write_control_word("ulthldash", None)?,
+            UnderlineStyle::LongDash => self.write_control_word("ulldash", None)?,
+            UnderlineStyle::HeavyWave => self.write_control_word("ulhwave", None)?,
+            UnderlineStyle::DoubleWave => self.write_control_word("ululdbwave", None)?,
+        }
+        if let Some(underline_color) = fmt.underline_color {
+            self.write_control_word("ulc", Some(i32::from(underline_color)))?;
         }
 
         // Strike

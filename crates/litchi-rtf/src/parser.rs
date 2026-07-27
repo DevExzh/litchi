@@ -7495,6 +7495,40 @@ impl<'a> Parser<'a> {
             ControlWord::UnderlineWave => {
                 state.formatting.underline = super::types::UnderlineStyle::Wave
             },
+            ControlWord::UnderlineHairline => {
+                state.formatting.underline = super::types::UnderlineStyle::Hairline
+            },
+            ControlWord::UnderlineThickDotted => {
+                state.formatting.underline = super::types::UnderlineStyle::ThickDotted
+            },
+            ControlWord::UnderlineThickDashed => {
+                state.formatting.underline = super::types::UnderlineStyle::ThickDashed
+            },
+            ControlWord::UnderlineThickDashDot => {
+                state.formatting.underline = super::types::UnderlineStyle::ThickDashDot
+            },
+            ControlWord::UnderlineThickDashDotDot => {
+                state.formatting.underline = super::types::UnderlineStyle::ThickDashDotDot
+            },
+            ControlWord::UnderlineThickLongDash => {
+                state.formatting.underline = super::types::UnderlineStyle::ThickLongDash
+            },
+            ControlWord::UnderlineLongDash => {
+                state.formatting.underline = super::types::UnderlineStyle::LongDash
+            },
+            ControlWord::UnderlineHeavyWave => {
+                state.formatting.underline = super::types::UnderlineStyle::HeavyWave
+            },
+            ControlWord::UnderlineDoubleWave => {
+                state.formatting.underline = super::types::UnderlineStyle::DoubleWave
+            },
+            ControlWord::UnderlineColor(value) => {
+                state.formatting.underline_color = Some(Self::required_character_value(
+                    Some(*value),
+                    "ulc",
+                    u16::MAX,
+                )?);
+            },
             ControlWord::Strike(b) => state.formatting.strike = *b,
             ControlWord::DoubleStrike(b) => state.formatting.double_strike = *b,
             ControlWord::Superscript(b) => {
@@ -13933,6 +13967,40 @@ impl<'a> Parser<'a> {
             ControlWord::UnderlineWords => state.formatting.underline = UnderlineStyle::Words,
             ControlWord::UnderlineThick => state.formatting.underline = UnderlineStyle::Thick,
             ControlWord::UnderlineWave => state.formatting.underline = UnderlineStyle::Wave,
+            ControlWord::UnderlineHairline => {
+                state.formatting.underline = UnderlineStyle::Hairline
+            },
+            ControlWord::UnderlineThickDotted => {
+                state.formatting.underline = UnderlineStyle::ThickDotted
+            },
+            ControlWord::UnderlineThickDashed => {
+                state.formatting.underline = UnderlineStyle::ThickDashed
+            },
+            ControlWord::UnderlineThickDashDot => {
+                state.formatting.underline = UnderlineStyle::ThickDashDot
+            },
+            ControlWord::UnderlineThickDashDotDot => {
+                state.formatting.underline = UnderlineStyle::ThickDashDotDot
+            },
+            ControlWord::UnderlineThickLongDash => {
+                state.formatting.underline = UnderlineStyle::ThickLongDash
+            },
+            ControlWord::UnderlineLongDash => {
+                state.formatting.underline = UnderlineStyle::LongDash
+            },
+            ControlWord::UnderlineHeavyWave => {
+                state.formatting.underline = UnderlineStyle::HeavyWave
+            },
+            ControlWord::UnderlineDoubleWave => {
+                state.formatting.underline = UnderlineStyle::DoubleWave
+            },
+            ControlWord::UnderlineColor(value) => {
+                state.formatting.underline_color = Some(u16::try_from(*value).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF underline color is outside the supported range".to_string(),
+                    )
+                })?);
+            },
             ControlWord::Strike(value) => state.formatting.strike = *value,
             ControlWord::DoubleStrike(value) => state.formatting.double_strike = *value,
             ControlWord::Superscript(value) => {
