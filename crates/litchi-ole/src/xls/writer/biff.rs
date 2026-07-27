@@ -361,6 +361,10 @@ pub fn write_style_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsStyleExt
     workbook::write_style_ext(writer, value)
 }
 
+pub fn write_theme<W: Write>(writer: &mut W, value: &crate::xls::XlsTheme) -> XlsResult<()> {
+    workbook::write_theme(writer, value)
+}
+
 pub fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
     workbook::write_xfcrc(writer, xf_count)
 }

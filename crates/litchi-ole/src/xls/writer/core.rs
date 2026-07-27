@@ -1316,6 +1316,7 @@ pub struct XlsWriter {
     dde_or_ole_links: Vec<XlsDdeOrOleLinkOptions>,
     custom_table_styles: Option<XlsCustomTableStyles>,
     book_ext: Option<crate::xls::XlsBookExt>,
+    theme: Option<crate::xls::XlsTheme>,
     xf_extensions: Vec<crate::xls::XlsXfExt>,
     style_extensions: Vec<crate::xls::XlsStyleExt>,
     encryption: Option<XlsWriterEncryption>,
@@ -1346,6 +1347,7 @@ impl XlsWriter {
             dde_or_ole_links: Vec::new(),
             custom_table_styles: None,
             book_ext: None,
+            theme: None,
             xf_extensions: Vec::new(),
             style_extensions: Vec::new(),
             encryption: None,
@@ -3312,6 +3314,13 @@ impl XlsWriter {
         self.book_ext = book_ext;
     }
 
+    /// Set the document theme emitted as a `Theme` record (MS-XLS 2.4.326);
+    /// `None` emits no record. Large custom theme contents are chunked into
+    /// ContinueFrt12 records automatically.
+    pub fn set_theme(&mut self, theme: Option<crate::xls::XlsTheme>) {
+        self.theme = theme;
+    }
+
     /// Set the `XFExt` formatting property extensions (MS-XLS 2.4.355)
     /// emitted after the XF table. Each extension's `xf_index` is validated
     /// against the written XF record count when the workbook is saved.
@@ -4030,6 +4039,7 @@ impl XlsWriter {
             self.workbook_protection,
             self.file_sharing.as_ref(),
             self.book_ext.as_ref(),
+            self.theme.as_ref(),
             &self.xf_extensions,
             &self.style_extensions,
             &self.worksheets,

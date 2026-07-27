@@ -155,6 +155,7 @@ pub struct XlsWorkbook<R: Read + Seek> {
     environment: crate::xls::environment::XlsWorkbookEnvironment,
     book_ext: Option<crate::xls::book_ext::XlsBookExt>,
     style_extensions: Vec<crate::xls::style_ext::XlsStyleExt>,
+    theme: Option<crate::xls::theme::XlsTheme>,
     write_access: crate::xls::XlsResult<Option<crate::xls::access::XlsWriteAccess>>,
     table_styles: Option<crate::xls::table_styles::XlsTableStyles>,
     shared_string_index: XlsResult<Option<crate::xls::shared_string_index::XlsSharedStringIndex>>,
@@ -237,6 +238,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             book_ext: None,
             style_extensions: Vec::new(),
+            theme: None,
             write_access: Ok(None),
             table_styles: None,
             shared_string_index: Ok(None),
@@ -291,6 +293,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             environment: crate::xls::environment::XlsWorkbookEnvironment::default(),
             book_ext: None,
             style_extensions: Vec::new(),
+            theme: None,
             write_access: Ok(None),
             table_styles: None,
             shared_string_index: Ok(None),
@@ -558,6 +561,24 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         &record.data,
                         &mut palette_seen,
                     )?;
+                },
+                crate::xls::theme::THEME_RECORD_TYPE => {
+                    if self.theme.is_some() {
+                        return Err(XlsError::InvalidRecord {
+                            record_type: crate::xls::theme::THEME_RECORD_TYPE,
+                            message: "workbook contains more than one Theme record".to_string(),
+                        });
+                    }
+                    let mut continues = Vec::new();
+                    while records
+                        .get(i + 1)
+                        .is_some_and(|next| next.header.record_type
+                            == crate::xls::theme::CONTINUE_FRT12_RECORD_TYPE)
+                    {
+                        i += 1;
+                        continues.push(records[i].data.clone());
+                    }
+                    self.theme = Some(crate::xls::theme::XlsTheme::parse(&record.data, &continues)?);
                 },
                 crate::xls::style_ext::STYLE_EXT_RECORD_TYPE => {
                     self.style_extensions
@@ -1332,6 +1353,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Cell-style extensions from `StyleExt` records, in record order.
     pub fn style_extensions(&self) -> &[crate::xls::style_ext::XlsStyleExt] {
         &self.style_extensions
+    }
+
+    /// The document theme from the `Theme` record, when present.
+    pub fn theme(&self) -> Option<&crate::xls::theme::XlsTheme> {
+        self.theme.as_ref()
     }
 
     /// Strictly access the user recorded as last creating, opening, or modifying the workbook.

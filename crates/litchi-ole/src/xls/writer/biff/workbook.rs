@@ -327,6 +327,19 @@ pub fn write_style_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsStyleExt
     Ok(())
 }
 
+/// Write a THEME record (MS-XLS 2.4.326), chunking large theme contents
+/// into ContinueFrt12 records.
+///
+/// Record type: 0x0896
+pub fn write_theme<W: Write>(writer: &mut W, value: &crate::xls::XlsTheme) -> XlsResult<()> {
+    for payload in value.to_record_payloads() {
+        let record_type = u16::from_le_bytes([payload[0], payload[1]]);
+        write_record_header(writer, record_type, payload.len() as u16)?;
+        writer.write_all(&payload)?;
+    }
+    Ok(())
+}
+
 /// Write an XFCRC record (MS-XLS 2.4.354) declaring `xf_count` XF records.
 ///
 /// Record type: 0x087C

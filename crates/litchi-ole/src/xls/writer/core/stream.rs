@@ -97,6 +97,7 @@ pub(crate) fn generate_workbook_stream(
     workbook_protection: Option<XlsWorkbookProtection>,
     file_sharing: Option<&XlsFileSharing>,
     book_ext: Option<&crate::xls::XlsBookExt>,
+    theme: Option<&crate::xls::XlsTheme>,
     xf_extensions: &[crate::xls::XlsXfExt],
     style_extensions: &[crate::xls::XlsStyleExt],
     worksheets: &[WritableWorksheet],
@@ -561,6 +562,12 @@ pub(crate) fn generate_workbook_stream(
     // workbook globals grammar.
     if let Some(book_ext) = book_ext {
         biff::write_book_ext(&mut stream, book_ext)?;
+    }
+
+    // THEME follows the BookExt/data-connection region in the workbook
+    // globals grammar.
+    if let Some(theme) = theme {
+        biff::write_theme(&mut stream, theme)?;
     }
 
     // EOF record (end of workbook globals)
