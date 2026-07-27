@@ -3,7 +3,9 @@
 //! This module provides a mutable wrapper around ODS spreadsheets that allows
 //! for in-place modification of sheets, rows, and cells.
 
-use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
+use crate::core::{
+    MetaXmlPatch, OdfMetadata, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml,
+};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellHyperlink, CellRangeSource,
     CellValue, Column,
@@ -2398,7 +2400,36 @@ impl MutableSpreadsheet {
         Ok(out)
     }
 
-    fn generate_meta_xml(&self) -> String {
+    /// Generate meta.xml with current metadata.
+    fn generate_meta_xml(&self) -> Result<String> {
+        if let Some(patched) = self.patched_source_meta_xml()? {
+            return Ok(patched);
+        }
+        Ok(Self::generate_meta_xml_from_scratch())
+    }
+
+    /// Patch the retained source meta.xml so metadata the edit did not change
+    /// survives the save, while fields set through the mutable API, the
+    /// generator, and the modification date are updated in place.
+    fn patched_source_meta_xml(&self) -> Result<Option<String>> {
+        let Some(package) = &self.source_package else {
+            return Ok(None);
+        };
+        let Ok(bytes) = package.get_file("meta.xml") else {
+            return Ok(None);
+        };
+        let Ok(source) = String::from_utf8(bytes) else {
+            return Ok(None);
+        };
+        let source_metadata = OdfMetadata::from_xml(&source)?;
+        let patch = MetaXmlPatch::preserve_all()
+            .with_generator_and_modification_date("Litchi/0.0.1", chrono::Utc::now().to_rfc3339())
+            .diff_simple_fields(&source_metadata, &self.metadata);
+        patch_meta_xml(&source, &patch)
+    }
+
+    /// Generate meta.xml from scratch with the generator and modification date.
+    fn generate_meta_xml_from_scratch() -> String {
         let now = chrono::Utc::now().to_rfc3339();
         format!(
             r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><dc:date>{}</dc:date></office:meta></office:document-meta>"#,
@@ -2437,7 +2468,7 @@ impl MutableSpreadsheet {
         let styles_xml = self.styles_xml.as_deref().unwrap_or(&default_styles);
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 
-        let meta_xml = self.generate_meta_xml();
+        let meta_xml = self.generate_meta_xml()?;
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
         // Add authored picture payloads with manifest entries.

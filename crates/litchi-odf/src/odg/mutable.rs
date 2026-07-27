@@ -4,7 +4,9 @@ use super::{
     DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage, DrawingPageProperties,
 };
 use crate::constants;
-use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
+use crate::core::{
+    MetaXmlPatch, OdfMetadata, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml,
+};
 use crate::odp::{DrawingAttributeNamespace, PresentationBuilder};
 use crate::Shape;
 use litchi_core::{Error, Metadata, Result, xml::escape_xml};
@@ -528,7 +530,11 @@ impl MutableDrawing {
             writer.add_file(constants::ODF_STYLES, OdfStructure::default_styles_xml().as_bytes())?;
         }
         if self.metadata_dirty || self.source.is_none() {
-            writer.add_file(constants::ODF_META, generate_meta_xml(&self.metadata).as_bytes())?;
+            let meta_xml = match self.patched_source_meta_xml()? {
+                Some(patched) => patched,
+                None => generate_meta_xml(&self.metadata),
+            };
+            writer.add_file(constants::ODF_META, meta_xml.as_bytes())?;
         } else if let Some(source) = &self.source
             && source.package.has_file(constants::ODF_META)?
         {
@@ -549,6 +555,26 @@ impl MutableDrawing {
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         let bytes = self.to_bytes()?;
         atomic_write(path.as_ref(), &bytes)
+    }
+
+    /// Patch the retained source meta.xml so metadata the edit did not change
+    /// survives the save, while fields set through the mutable API, the
+    /// generator, and the modification date are updated in place.
+    fn patched_source_meta_xml(&self) -> Result<Option<String>> {
+        let Some(source) = &self.source else {
+            return Ok(None);
+        };
+        let Ok(bytes) = source.package.get_file(constants::ODF_META) else {
+            return Ok(None);
+        };
+        let Ok(source_xml) = String::from_utf8(bytes) else {
+            return Ok(None);
+        };
+        let source_metadata = OdfMetadata::from_xml(&source_xml)?;
+        let patch = MetaXmlPatch::preserve_all()
+            .with_generator_and_modification_date("Litchi/0.0.1", chrono::Utc::now().to_rfc3339())
+            .diff_simple_fields(&source_metadata, &self.metadata);
+        patch_meta_xml(&source_xml, &patch)
     }
 }
 

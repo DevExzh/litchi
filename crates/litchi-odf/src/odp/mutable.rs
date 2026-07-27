@@ -3,7 +3,9 @@
 //! This module provides a mutable wrapper around ODP presentations that allows
 //! for in-place modification of slides, shapes, and content.
 
-use crate::core::{OdfStructure, OwnedPackage, PackageWriter};
+use crate::core::{
+    MetaXmlPatch, OdfMetadata, OdfStructure, OwnedPackage, PackageWriter, patch_meta_xml,
+};
 use crate::odp::animation::validate_animation_roots;
 use crate::odp::content_source::PresentationContentSource;
 use crate::odp::legacy_animation::validate_legacy_animation_root;
@@ -1010,7 +1012,35 @@ impl MutablePresentation {
     }
 
     /// Generate meta.xml with current metadata.
-    fn generate_meta_xml(&self) -> String {
+    fn generate_meta_xml(&self) -> Result<String> {
+        if let Some(patched) = self.patched_source_meta_xml()? {
+            return Ok(patched);
+        }
+        Ok(self.generate_meta_xml_from_scratch())
+    }
+
+    /// Patch the retained source meta.xml so metadata the edit did not change
+    /// survives the save, while fields set through the mutable API, the
+    /// generator, and the modification date are updated in place.
+    fn patched_source_meta_xml(&self) -> Result<Option<String>> {
+        let Some(package) = &self.source_package else {
+            return Ok(None);
+        };
+        let Ok(bytes) = package.get_file("meta.xml") else {
+            return Ok(None);
+        };
+        let Ok(source) = String::from_utf8(bytes) else {
+            return Ok(None);
+        };
+        let source_metadata = OdfMetadata::from_xml(&source)?;
+        let patch = MetaXmlPatch::preserve_all()
+            .with_generator_and_modification_date("Litchi/0.0.1", chrono::Utc::now().to_rfc3339())
+            .diff_simple_fields(&source_metadata, &self.metadata);
+        patch_meta_xml(&source, &patch)
+    }
+
+    /// Generate meta.xml from the mutable metadata model alone.
+    fn generate_meta_xml_from_scratch(&self) -> String {
         let now = chrono::Utc::now().to_rfc3339();
         let mut estimated = 64usize;
         estimated += self.metadata.title.as_ref().map(|s| s.len()).unwrap_or(0);
@@ -1107,8 +1137,8 @@ impl MutablePresentation {
         let styles_xml = self.styles_xml.as_deref().unwrap_or(&default_styles);
         writer.add_file("styles.xml", styles_xml.as_bytes())?;
 
-        // Add meta.xml (regenerated with current metadata)
-        let meta_xml = self.generate_meta_xml();
+        // Add meta.xml (patched from the source or regenerated with current metadata)
+        let meta_xml = self.generate_meta_xml()?;
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
 
         for (path, media) in &self.media_files {

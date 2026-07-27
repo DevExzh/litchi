@@ -78,6 +78,7 @@ pub use metadata::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,
     TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
 };
+pub(crate) use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::OwnedPackage;
 pub use writer::{OdfStructure, PackageWriter};
 pub use xml::{Content, Meta, Styles};
