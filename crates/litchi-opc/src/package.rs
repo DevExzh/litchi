@@ -224,16 +224,48 @@ impl OpcPackage {
     /// # Arguments
     /// * `partname` - The PackURI of the part to retrieve
     pub fn get_part(&self, partname: &PackURI) -> Result<&dyn Part> {
-        self.parts
-            .get(partname)
-            .map(|b| &**b as &dyn Part)
+        if let Some(part) = self.parts.get(partname) {
+            return Ok(&**part as &dyn Part);
+        }
+        self.find_case_insensitive(partname)
+            .map(|(_, part)| part)
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
+    }
+
+    /// Locate a part whose name matches `partname` ignoring ASCII case.
+    ///
+    /// OPC compares part names case-insensitively, which is why a package
+    /// containing two names differing only by case is rejected as ambiguous
+    /// when it is read. Because that ambiguity cannot survive loading, this
+    /// fallback can match at most one part, and it is what lets a package whose
+    /// writer stored `/xl/sharedstrings.xml` still resolve a relationship
+    /// targeting `sharedStrings.xml` — without it those parts are simply
+    /// unreachable and their content silently reads as absent.
+    ///
+    /// The exact lookup above is the fast path; this linear scan runs only on a
+    /// miss, and the part count is already bounded when the package is read.
+    fn find_case_insensitive(&self, partname: &PackURI) -> Option<(&PackURI, &dyn Part)> {
+        let wanted = partname.as_str();
+        self.parts
+            .iter()
+            .find(|(name, _)| name.as_str().eq_ignore_ascii_case(wanted))
+            .map(|(name, part)| (name, &**part as &dyn Part))
     }
 
     /// Get a mutable reference to a part by its partname.
     pub fn get_part_mut(&mut self, partname: &PackURI) -> Result<&mut dyn Part> {
+        // Resolve the stored key first so the borrow of `self.parts` ends before
+        // the mutable lookup; see `find_case_insensitive` for why this matches.
+        let key = if self.parts.contains_key(partname) {
+            partname.clone()
+        } else {
+            match self.find_case_insensitive(partname) {
+                Some((name, _)) => name.clone(),
+                None => return Err(OpcError::PartNotFound(partname.to_string())),
+            }
+        };
         self.parts
-            .get_mut(partname)
+            .get_mut(&key)
             .map(|b| &mut **b as &mut dyn Part)
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
     }

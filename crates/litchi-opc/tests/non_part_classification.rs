@@ -186,3 +186,37 @@ fn types_relationship_parts_from_the_reserved_name_but_rejects_contradictions() 
         Err(OpcError::InvalidContentType { .. })
     ));
 }
+
+/// OPC compares part names case-insensitively, which is why a package holding
+/// two names differing only by case is rejected as ambiguous. Because that
+/// ambiguity cannot survive loading, a relationship target must still resolve
+/// when a writer stored the part under a different case — otherwise the part is
+/// unreachable and its content silently reads as absent, which is exactly what
+/// happens to the shared strings of `poi/test-data/spreadsheet/49609.xlsx`.
+#[test]
+fn a_part_resolves_when_its_stored_name_differs_only_by_case() {
+    let bytes = archive(&[
+        (
+            "[Content_Types].xml",
+            br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"# as &[u8],
+        ),
+        ("xl/sharedstrings.xml", b"<sst/>"),
+    ]);
+    let package = litchi_opc::OpcPackage::from_bytes(&bytes).expect("package loads");
+
+    // The stored spelling resolves, as always.
+    let stored = litchi_opc::PackURI::new("/xl/sharedstrings.xml").unwrap();
+    assert_eq!(package.get_part(&stored).unwrap().blob(), b"<sst/>");
+
+    // The spelling a relationship would use also resolves.
+    let referenced = litchi_opc::PackURI::new("/xl/sharedStrings.xml").unwrap();
+    assert_eq!(
+        package.get_part(&referenced).unwrap().blob(),
+        b"<sst/>",
+        "a case-only difference must not make the part unreachable"
+    );
+
+    // A genuinely absent part is still absent.
+    let missing = litchi_opc::PackURI::new("/xl/styles.xml").unwrap();
+    assert!(package.get_part(&missing).is_err());
+}
