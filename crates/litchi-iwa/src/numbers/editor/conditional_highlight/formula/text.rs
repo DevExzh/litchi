@@ -110,6 +110,15 @@ fn formula_tokens(kind: TextPredicateKind, text: &str) -> Vec<FormulaToken<'_>> 
             Number(1.0),
             Operator(AstNodeType::EqualToNode),
         ],
+        TextPredicateKind::DoesNotStartWith => vec![
+            String(text),
+            LinkedCell,
+            Function(TEXT_SEARCH_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
+            Number(1.0),
+            Operator(AstNodeType::NotEqualToNode),
+            Boolean(true),
+            Function(IF_ERROR_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
+        ],
         TextPredicateKind::EndsWith => vec![
             String(text),
             LinkedCell,
@@ -117,6 +126,17 @@ fn formula_tokens(kind: TextPredicateKind, text: &str) -> Vec<FormulaToken<'_>> 
             Function(TEXT_LENGTH_FUNCTION_INDEX, UNARY_FUNCTION_ARGUMENT_COUNT),
             Function(TEXT_RIGHT_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
             Function(TEXT_SEARCH_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
+        ],
+        TextPredicateKind::DoesNotEndWith => vec![
+            String(text),
+            LinkedCell,
+            String(text),
+            Function(TEXT_LENGTH_FUNCTION_INDEX, UNARY_FUNCTION_ARGUMENT_COUNT),
+            Function(TEXT_RIGHT_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
+            Function(TEXT_SEARCH_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
+            Function(LOGICAL_NOT_FUNCTION_INDEX, UNARY_FUNCTION_ARGUMENT_COUNT),
+            Boolean(true),
+            Function(IF_ERROR_FUNCTION_INDEX, BINARY_FUNCTION_ARGUMENT_COUNT),
         ],
         TextPredicateKind::Contains => vec![
             String(text),

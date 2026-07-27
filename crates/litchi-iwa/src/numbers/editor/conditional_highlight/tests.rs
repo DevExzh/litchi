@@ -182,8 +182,16 @@ fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
             "Dairy",
         ),
         (
+            TableCellConditionalHighlightCondition::TextDoesNotStartWith(text("dairy")),
+            "Dairy Milk",
+        ),
+        (
             TableCellConditionalHighlightCondition::TextEndsWith(text("grain")),
             "Dairy",
+        ),
+        (
+            TableCellConditionalHighlightCondition::TextDoesNotEndWith(text("rice")),
+            "Organic Rice",
         ),
         (
             TableCellConditionalHighlightCondition::TextContains(text("NIC GR")),
@@ -226,6 +234,44 @@ fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
             .conditional_style_applied_rule(),
         Some(0)
     );
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap(),
+        Some(rules.to_vec())
+    );
+
+    let info = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let archive_name = location.object_locations[&info.style_set_object_id].clone();
+    editor
+        .package
+        .update_archive(&archive_name, |archive| {
+            let object = archive
+                .object_mut(info.style_set_object_id)
+                .ok_or_else(|| Error::InvalidFormat("style set missing".to_owned()))?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == 6_010)
+                .ok_or_else(|| Error::InvalidFormat("style-set payload missing".to_owned()))?;
+            let mut set = tst::ConditionalStyleSetArchive::decode(
+                object.messages[message_index].data.as_slice(),
+            )?;
+            set.rules_prepivot.clear();
+            let message_type = object.messages[message_index].type_;
+            object.replace_message(
+                message_index,
+                crate::archive::RawMessage {
+                    type_: message_type,
+                    data: set.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
     assert_eq!(
         editor
             .cell_conditional_highlight_rules(table_id, 1, 1)

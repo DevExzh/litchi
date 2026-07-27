@@ -30,6 +30,7 @@ pub(super) const TEXT_LENGTH_FUNCTION_INDEX: u32 = 77;
 pub(super) const TEXT_RIGHT_FUNCTION_INDEX: u32 = 124;
 pub(super) const IS_ERROR_FUNCTION_INDEX: u32 = 70;
 pub(super) const LOGICAL_NOT_FUNCTION_INDEX: u32 = 96;
+pub(super) const IF_ERROR_FUNCTION_INDEX: u32 = 235;
 pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +66,9 @@ impl NumericPredicateKind {
             TableCellConditionalHighlightCondition::TextEqualTo(_)
             | TableCellConditionalHighlightCondition::TextNotEqualTo(_)
             | TableCellConditionalHighlightCondition::TextStartsWith(_)
+            | TableCellConditionalHighlightCondition::TextDoesNotStartWith(_)
             | TableCellConditionalHighlightCondition::TextEndsWith(_)
+            | TableCellConditionalHighlightCondition::TextDoesNotEndWith(_)
             | TableCellConditionalHighlightCondition::TextContains(_)
             | TableCellConditionalHighlightCondition::TextDoesNotContain(_) => None,
         }
@@ -124,6 +127,8 @@ pub(super) enum TextPredicateKind {
     DoesNotContain = 4,
     EqualTo = 36,
     NotEqualTo = 37,
+    DoesNotStartWith = 61,
+    DoesNotEndWith = 62,
 }
 
 impl TextPredicateKind {
@@ -139,7 +144,13 @@ impl TextPredicateKind {
             Self::EqualTo => TableCellConditionalHighlightCondition::TextEqualTo(text),
             Self::NotEqualTo => TableCellConditionalHighlightCondition::TextNotEqualTo(text),
             Self::StartsWith => TableCellConditionalHighlightCondition::TextStartsWith(text),
+            Self::DoesNotStartWith => {
+                TableCellConditionalHighlightCondition::TextDoesNotStartWith(text)
+            },
             Self::EndsWith => TableCellConditionalHighlightCondition::TextEndsWith(text),
+            Self::DoesNotEndWith => {
+                TableCellConditionalHighlightCondition::TextDoesNotEndWith(text)
+            },
             Self::Contains => TableCellConditionalHighlightCondition::TextContains(text),
             Self::DoesNotContain => {
                 TableCellConditionalHighlightCondition::TextDoesNotContain(text)
@@ -150,9 +161,12 @@ impl TextPredicateKind {
     pub(super) const fn cell_argument_index(self) -> i32 {
         match self {
             Self::EqualTo | Self::NotEqualTo => PREDICATE_TEXT_EQUALITY_CELL_ARGUMENT_INDEX,
-            Self::StartsWith | Self::EndsWith | Self::Contains | Self::DoesNotContain => {
-                PREDICATE_TEXT_CELL_ARGUMENT_INDEX
-            },
+            Self::StartsWith
+            | Self::DoesNotStartWith
+            | Self::EndsWith
+            | Self::DoesNotEndWith
+            | Self::Contains
+            | Self::DoesNotContain => PREDICATE_TEXT_CELL_ARGUMENT_INDEX,
         }
     }
 }
@@ -176,8 +190,14 @@ impl NativePredicateKind {
                 TableCellConditionalHighlightCondition::TextStartsWith(_) => {
                     Self::Text(TextPredicateKind::StartsWith)
                 },
+                TableCellConditionalHighlightCondition::TextDoesNotStartWith(_) => {
+                    Self::Text(TextPredicateKind::DoesNotStartWith)
+                },
                 TableCellConditionalHighlightCondition::TextEndsWith(_) => {
                     Self::Text(TextPredicateKind::EndsWith)
+                },
+                TableCellConditionalHighlightCondition::TextDoesNotEndWith(_) => {
+                    Self::Text(TextPredicateKind::DoesNotEndWith)
                 },
                 TableCellConditionalHighlightCondition::TextContains(_) => {
                     Self::Text(TextPredicateKind::Contains)
@@ -209,6 +229,12 @@ impl TryFrom<i32> for NativePredicateKind {
             },
             value if value == TextPredicateKind::EndsWith.native_value() => {
                 Some(TextPredicateKind::EndsWith)
+            },
+            value if value == TextPredicateKind::DoesNotStartWith.native_value() => {
+                Some(TextPredicateKind::DoesNotStartWith)
+            },
+            value if value == TextPredicateKind::DoesNotEndWith.native_value() => {
+                Some(TextPredicateKind::DoesNotEndWith)
             },
             value if value == TextPredicateKind::Contains.native_value() => {
                 Some(TextPredicateKind::Contains)
@@ -284,7 +310,9 @@ mod tests {
             TextPredicateKind::EqualTo,
             TextPredicateKind::NotEqualTo,
             TextPredicateKind::StartsWith,
+            TextPredicateKind::DoesNotStartWith,
             TextPredicateKind::EndsWith,
+            TextPredicateKind::DoesNotEndWith,
             TextPredicateKind::Contains,
             TextPredicateKind::DoesNotContain,
         ] {

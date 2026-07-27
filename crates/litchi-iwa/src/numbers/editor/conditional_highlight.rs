@@ -17,9 +17,9 @@ use crate::table_cell_conditional_highlight::{
 };
 use native::{
     BINARY_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_ARGUMENT_COUNT,
-    CONDITIONAL_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX,
-    LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX, NativePredicateKind,
-    NumericPredicateKind, PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER,
+    CONDITIONAL_FUNCTION_INDEX, IF_ERROR_FUNCTION_INDEX, IS_ERROR_FUNCTION_INDEX,
+    LOGICAL_AND_FUNCTION_INDEX, LOGICAL_NOT_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX,
+    NativePredicateKind, NumericPredicateKind, PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER,
     PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_ARGUMENT_STRING, PREDICATE_CELL_ARGUMENT_INDEX,
     PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
     PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
@@ -632,9 +632,17 @@ fn condition_matches(
             ConditionalCellValue::Text(value),
         ) => starts_with_case_insensitive(value, needle.as_str()),
         (
+            TableCellConditionalHighlightCondition::TextDoesNotStartWith(needle),
+            ConditionalCellValue::Text(value),
+        ) => !starts_with_case_insensitive(value, needle.as_str()),
+        (
             TableCellConditionalHighlightCondition::TextEndsWith(needle),
             ConditionalCellValue::Text(value),
         ) => ends_with_case_insensitive(value, needle.as_str()),
+        (
+            TableCellConditionalHighlightCondition::TextDoesNotEndWith(needle),
+            ConditionalCellValue::Text(value),
+        ) => !ends_with_case_insensitive(value, needle.as_str()),
         (
             TableCellConditionalHighlightCondition::TextContains(needle),
             ConditionalCellValue::Text(value),

@@ -77,7 +77,9 @@ fn decode_rules(
     let declared = usize::try_from(set.rule_count).map_err(|_| {
         Error::InvalidFormat("conditional-highlight rule count overflow".to_owned())
     })?;
-    if current.rule.len() != declared || set.rules_prepivot.len() != declared {
+    if current.rule.len() != declared
+        || (!set.rules_prepivot.is_empty() && set.rules_prepivot.len() != declared)
+    {
         return Err(Error::InvalidFormat(
             "conditional-highlight rule representations disagree on their count".to_owned(),
         ));
@@ -85,8 +87,8 @@ fn decode_rules(
     current
         .rule
         .iter()
-        .zip(&set.rules_prepivot)
-        .map(|(rule, prepivot)| decode_rule(package, locations, rule, prepivot))
+        .enumerate()
+        .map(|(index, rule)| decode_rule(package, locations, rule, set.rules_prepivot.get(index)))
         .collect()
 }
 
@@ -94,15 +96,16 @@ fn decode_rule(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     rule: &tst::conditional_style_set_archive::ConditionalStyleRule,
-    prepivot: &tst::conditional_style_set_archive::ConditionalStyleRulePrePivot,
+    prepivot: Option<&tst::conditional_style_set_archive::ConditionalStyleRulePrePivot>,
 ) -> Result<TableCellConditionalHighlightRule> {
-    if rule.cell_style.identifier != prepivot.cell_style.identifier
-        || rule.text_style.identifier != prepivot.text_style.identifier
-    {
+    if prepivot.is_some_and(|prepivot| {
+        rule.cell_style.identifier != prepivot.cell_style.identifier
+            || rule.text_style.identifier != prepivot.text_style.identifier
+    }) {
         return Err(unsupported_rule_graph());
     }
     let predicate = rule.predicate.as_ref().ok_or_else(unsupported_rule_graph)?;
-    let condition = decode_predicate(predicate, &prepivot.predicate)?;
+    let condition = decode_predicate(predicate, prepivot.map(|prepivot| &prepivot.predicate))?;
     let fill = decode_cell_style(package, locations, rule.cell_style.identifier)?;
     let (text_color, bold) = decode_text_style(package, locations, rule.text_style.identifier)?;
     Ok(TableCellConditionalHighlightRule::new(
@@ -117,7 +120,7 @@ fn decode_rule(
 
 fn decode_predicate(
     predicate: &tst::FormulaPredicateArchive,
-    prepivot: &tst::FormulaPredicatePrePivotArchive,
+    prepivot: Option<&tst::FormulaPredicatePrePivotArchive>,
 ) -> Result<TableCellConditionalHighlightCondition> {
     let kind = NativePredicateKind::try_from(predicate.predicate_type)
         .map_err(|_| unsupported_rule_graph())?;
@@ -138,14 +141,8 @@ fn decode_predicate(
             PREDICATE_UNUSED_ARGUMENT_INDEX,
         ),
     };
-    if predicate.predicate_type != prepivot.predicate_type
-        || predicate.qualifier1 != PREDICATE_QUALIFIER_NONE
+    if predicate.qualifier1 != PREDICATE_QUALIFIER_NONE
         || predicate.qualifier2 != PREDICATE_QUALIFIER_NONE
-        || prepivot.qualifier1 != PREDICATE_QUALIFIER_NONE
-        || prepivot.qualifier2 != PREDICATE_QUALIFIER_NONE
-        || prepivot.param_index0 != expected_indexes.0
-        || prepivot.param_index1 != expected_indexes.1
-        || prepivot.param_index2 != expected_indexes.2
         || predicate.for_conditional_style != Some(true)
         || predicate
             .param_value0
@@ -153,6 +150,16 @@ fn decode_predicate(
             .map(|argument| argument.arg_type)
             != Some(PREDICATE_ARGUMENT_RELATIVE_CELL)
     {
+        return Err(unsupported_rule_graph());
+    }
+    if prepivot.is_some_and(|prepivot| {
+        predicate.predicate_type != prepivot.predicate_type
+            || prepivot.qualifier1 != PREDICATE_QUALIFIER_NONE
+            || prepivot.qualifier2 != PREDICATE_QUALIFIER_NONE
+            || prepivot.param_index0 != expected_indexes.0
+            || prepivot.param_index1 != expected_indexes.1
+            || prepivot.param_index2 != expected_indexes.2
+    }) {
         return Err(unsupported_rule_graph());
     }
     let condition = match kind {
@@ -168,7 +175,10 @@ fn decode_predicate(
         &condition,
     )
     .map_err(|_| unsupported_rule_graph())?;
-    formula::validate(&prepivot.formula, kind, &condition).map_err(|_| unsupported_rule_graph())?;
+    if let Some(prepivot) = prepivot {
+        formula::validate(&prepivot.formula, kind, &condition)
+            .map_err(|_| unsupported_rule_graph())?;
+    }
     Ok(condition)
 }
 

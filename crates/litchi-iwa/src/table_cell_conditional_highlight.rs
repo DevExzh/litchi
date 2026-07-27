@@ -85,7 +85,9 @@ pub enum TableCellConditionalHighlightCondition {
     TextEqualTo(TableCellConditionalHighlightText),
     TextNotEqualTo(TableCellConditionalHighlightText),
     TextStartsWith(TableCellConditionalHighlightText),
+    TextDoesNotStartWith(TableCellConditionalHighlightText),
     TextEndsWith(TableCellConditionalHighlightText),
+    TextDoesNotEndWith(TableCellConditionalHighlightText),
     TextContains(TableCellConditionalHighlightText),
     TextDoesNotContain(TableCellConditionalHighlightText),
 }
@@ -104,7 +106,9 @@ impl TableCellConditionalHighlightCondition {
             | Self::TextEqualTo(_)
             | Self::TextNotEqualTo(_)
             | Self::TextStartsWith(_)
+            | Self::TextDoesNotStartWith(_)
             | Self::TextEndsWith(_)
+            | Self::TextDoesNotEndWith(_)
             | Self::TextContains(_)
             | Self::TextDoesNotContain(_) => None,
         }
@@ -122,7 +126,9 @@ impl TableCellConditionalHighlightCondition {
             | Self::TextEqualTo(_)
             | Self::TextNotEqualTo(_)
             | Self::TextStartsWith(_)
+            | Self::TextDoesNotStartWith(_)
             | Self::TextEndsWith(_)
+            | Self::TextDoesNotEndWith(_)
             | Self::TextContains(_)
             | Self::TextDoesNotContain(_) => None,
         }
@@ -133,7 +139,9 @@ impl TableCellConditionalHighlightCondition {
             Self::TextEqualTo(value)
             | Self::TextNotEqualTo(value)
             | Self::TextStartsWith(value)
+            | Self::TextDoesNotStartWith(value)
             | Self::TextEndsWith(value)
+            | Self::TextDoesNotEndWith(value)
             | Self::TextContains(value)
             | Self::TextDoesNotContain(value) => Some(value),
             Self::EqualTo(_)

@@ -35,7 +35,9 @@ fn highlight_rules() -> Result<Vec<TableCellConditionalHighlightRule>, Box<dyn s
         TableCellConditionalHighlightCondition::TextEqualTo(text("organic grain")?),
         TableCellConditionalHighlightCondition::TextNotEqualTo(text("dairy")?),
         TableCellConditionalHighlightCondition::TextStartsWith(text("organic")?),
+        TableCellConditionalHighlightCondition::TextDoesNotStartWith(text("dairy")?),
         TableCellConditionalHighlightCondition::TextEndsWith(text("grain")?),
+        TableCellConditionalHighlightCondition::TextDoesNotEndWith(text("rice")?),
         TableCellConditionalHighlightCondition::TextContains(text("nic gr")?),
         TableCellConditionalHighlightCondition::TextDoesNotContain(text("rice")?),
     ]
