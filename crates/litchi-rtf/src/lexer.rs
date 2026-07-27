@@ -767,6 +767,13 @@ pub enum ControlWord<'a> {
     ListLevelStartAt(i32),
     ListLevelNumbers,
     ListLevelPicture(i32),
+    ListLevelTentative,
+    ListLevelLegal(bool),
+    ListLevelNoRestart(bool),
+    ListLevelOld(bool),
+    ListLevelPrevious(bool),
+    ListLevelPreviousSpace(bool),
+    ListLevelTemplateId(i32),
 
     // Sections
     SectionBreak,
@@ -2776,6 +2783,13 @@ impl<'a> Lexer<'a> {
             "levelstartat" => ControlWord::ListLevelStartAt(param_value),
             "levelnumbers" => ControlWord::ListLevelNumbers,
             "levelpicture" => ControlWord::ListLevelPicture(param_value),
+            "lvltentative" => ControlWord::ListLevelTentative,
+            "levellegal" => ControlWord::ListLevelLegal(param_bool),
+            "levelnorestart" => ControlWord::ListLevelNoRestart(param_bool),
+            "levelold" => ControlWord::ListLevelOld(param_bool),
+            "levelprev" => ControlWord::ListLevelPrevious(param_bool),
+            "levelprevspace" => ControlWord::ListLevelPreviousSpace(param_bool),
+            "leveltemplateid" => ControlWord::ListLevelTemplateId(param_value),
 
             // Sections
             "titlepg" => ControlWord::TitlePage,

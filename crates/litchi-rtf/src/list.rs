@@ -94,6 +94,21 @@ pub struct ListLevel<'a> {
     pub tabs: Vec<i32>,
     /// Zero-based inert reference into the list-picture destination.
     pub picture_index: Option<u32>,
+    /// Whether this level is tentative (`\lvltentative`).
+    pub tentative: bool,
+    /// Convert smaller levels' numbers to legal (Arabic) format (`\levellegal`).
+    pub legal_format: bool,
+    /// Do not restart this level's number after higher-level items
+    /// (`\levelnorestart`).
+    pub no_restart: bool,
+    /// Level retained for backward compatibility (`\levelold`).
+    pub legacy: bool,
+    /// Include the previous level's number in the display (`\levelprev`).
+    pub include_previous: bool,
+    /// Include a space after the previous level's number (`\levelprevspace`).
+    pub include_previous_space: bool,
+    /// Level template identifier (`\leveltemplateid`).
+    pub template_id: Option<i32>,
 }
 
 impl<'a> ListLevel<'a> {
@@ -116,6 +131,13 @@ impl<'a> ListLevel<'a> {
             first_line_indent: None,
             tabs: Vec::new(),
             picture_index: None,
+            tentative: false,
+            legal_format: false,
+            no_restart: false,
+            legacy: false,
+            include_previous: false,
+            include_previous_space: false,
+            template_id: None,
         }
     }
 

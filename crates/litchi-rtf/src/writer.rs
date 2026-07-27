@@ -1925,6 +1925,27 @@ impl<W: Write> RtfWriter<W> {
         for tab in &level.tabs {
             self.write_control_word("tx", Some(*tab))?;
         }
+        if level.tentative {
+            self.write_control_word("lvltentative", None)?;
+        }
+        if level.legal_format {
+            self.write_control_word("levellegal", None)?;
+        }
+        if level.no_restart {
+            self.write_control_word("levelnorestart", None)?;
+        }
+        if level.legacy {
+            self.write_control_word("levelold", None)?;
+        }
+        if level.include_previous {
+            self.write_control_word("levelprev", None)?;
+        }
+        if level.include_previous_space {
+            self.write_control_word("levelprevspace", None)?;
+        }
+        if let Some(template_id) = level.template_id {
+            self.write_control_word("leveltemplateid", Some(template_id))?;
+        }
         if let Some(picture_index) = level.picture_index {
             self.write_control_word(
                 "levelpicture",

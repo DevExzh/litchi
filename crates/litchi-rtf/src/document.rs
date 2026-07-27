@@ -4066,6 +4066,13 @@ impl<'a> RtfDocument<'a> {
                         first_line_indent: level.first_line_indent,
                         tabs: level.tabs.clone(),
                         picture_index: level.picture_index,
+                        tentative: level.tentative,
+                        legal_format: level.legal_format,
+                        no_restart: level.no_restart,
+                        legacy: level.legacy,
+                        include_previous: level.include_previous,
+                        include_previous_space: level.include_previous_space,
+                        template_id: level.template_id,
                     })
                     .collect(),
             });

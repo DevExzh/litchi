@@ -12516,6 +12516,15 @@ impl<'a> Parser<'a> {
                         }
                         level.tabs.push(value);
                     },
+                    ControlWord::ListLevelTentative => level.tentative = true,
+                    ControlWord::ListLevelLegal(value) => level.legal_format = *value,
+                    ControlWord::ListLevelNoRestart(value) => level.no_restart = *value,
+                    ControlWord::ListLevelOld(value) => level.legacy = *value,
+                    ControlWord::ListLevelPrevious(value) => level.include_previous = *value,
+                    ControlWord::ListLevelPreviousSpace(value) => {
+                        level.include_previous_space = *value
+                    },
+                    ControlWord::ListLevelTemplateId(value) => level.template_id = Some(*value),
                     ControlWord::ListLevelPicture(value) => {
                         level.picture_index = Some(u32::try_from(*value).map_err(|_| {
                             RtfError::MalformedDocument(

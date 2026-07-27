@@ -529,7 +529,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Character formatting | ✅ | ✅ | ✅ | Fonts, sizes, colors, bold/italic/underline, borders, shading, positioning, scaling, and kerning |
 | Paragraph formatting | ✅ | ✅ | ✅ | Alignment, indents, spacing, tabs, borders, shading, bidi, flow, drop caps, outline levels, and style references |
 | Stylesheets and latent styles | ✅ | ✅ | ✅ | Paragraph, character, section, table, inheritance, latent styles, filters, and restrictions |
-| Lists and numbering | ✅ | ✅ | ✅ | Modern list tables/overrides plus legacy section and paragraph numbering |
+| Lists and numbering | ✅ | ✅ | ✅ | Modern list tables/overrides with per-level tentative/legal/no-restart/legacy/previous-level metadata, plus legacy section and paragraph numbering |
 | Languages and bidirectional text | ✅ | ✅ | ✅ | Document defaults, character languages, LTR/RTL, and East Asian controls |
 | Pictures and alternatives | ✅ | ✅ | ✅ | Common raster/metafile types, crop/layout metadata, identities, and compatibility alternatives |
 | Shapes, groups, and text frames | ✅ | ✅ | ✅ | Geometry, anchors, wrapping, fills, gradients, themes, binary properties, stories, and mutation |
