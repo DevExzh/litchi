@@ -149,6 +149,9 @@ struct RegionBuilder {
 }
 
 pub(crate) fn parse_master_pages(xml: &str) -> Result<Vec<MasterPage>> {
+    // quick-xml strips a UTF-8 BOM and reports positions relative to the
+    // stripped text, so slice against the same view.
+    let xml = xml.strip_prefix('\u{FEFF}').unwrap_or(xml);
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut pages = Vec::new();

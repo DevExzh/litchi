@@ -345,6 +345,7 @@ mod generic;
 /// Semantic family readers for flat OpenDocument XML documents.
 mod flat;
 mod graphic_properties;
+mod handout_master;
 mod line_numbering;
 mod master_page;
 /// Shared semantic discovery of images in OpenDocument XML and packages.
@@ -624,6 +625,7 @@ pub use variable_declaration::{
 };
 
 // Re-export main types for convenience
+pub use handout_master::HandoutMaster;
 pub use master_page::{insert_master_page_xml, remove_master_page_xml, replace_master_page_xml};
 pub use odp::{
     AnimationAttribute, AnimationAttributeNamespace, AnimationKind, AnimationNode,

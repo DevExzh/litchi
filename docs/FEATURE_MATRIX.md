@@ -492,6 +492,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Audio and video | ✅ | ✅ | ✅ | Linked or package-contained media, parameters, and mutation |
 | Slide layouts | ✅ | ✅ | ✅ | Presentation page-layout definitions and mutation |
 | Master pages | ✅ | ✅ | ✅ | Presentation master-page CRUD and reference repair |
+| Handout master | ✅ | ✅ | N/A | Typed `style:handout-master` page-layout references and verbatim shape children |
 | Styles and backgrounds | ✅ | ✅ | ✅ | Presentation styles, page styles, drawing properties, and read-only named fill-image, gradient, hatch, marker, opacity, and stroke-dash definitions; no link following, style-use resolution, or rendering |
 | Animations | ✅ | ✅ | ✅ | ODF/SMIL trees and legacy effects with ordered mutation |
 | Transitions and timings | ✅ | ✅ | ✅ | Transition type/style/speed/direction/duration/sound and automatic timing |
