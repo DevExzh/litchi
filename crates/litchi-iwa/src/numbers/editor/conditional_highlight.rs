@@ -15,9 +15,13 @@ use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
 };
 use native::{
+    BINARY_FUNCTION_ARGUMENT_COUNT, CONDITIONAL_FUNCTION_ARGUMENT_COUNT,
+    CONDITIONAL_FUNCTION_INDEX, LOGICAL_AND_FUNCTION_INDEX, LOGICAL_OR_FUNCTION_INDEX,
     NumericPredicateKind, PREDICATE_ARGUMENT_NONE, PREDICATE_ARGUMENT_NUMBER,
     PREDICATE_ARGUMENT_RELATIVE_CELL, PREDICATE_CELL_ARGUMENT_INDEX,
-    PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_UNUSED_ARGUMENT_INDEX,
+    PREDICATE_NUMBER_ARGUMENT_INDEX, PREDICATE_QUALIFIER_NONE, PREDICATE_RANGE_CELL_ARGUMENT_INDEX,
+    PREDICATE_RANGE_LOWER_ARGUMENT_INDEX, PREDICATE_RANGE_UPPER_ARGUMENT_INDEX,
+    PREDICATE_UNUSED_ARGUMENT_INDEX,
 };
 
 const MAX_CONDITIONAL_HIGHLIGHT_RULES: usize = CONDITIONAL_STYLE_NO_APPLIED_RULE as usize;
@@ -546,13 +550,22 @@ fn applied_rule_for_cell(
 }
 
 fn condition_matches(condition: TableCellConditionalHighlightCondition, value: f64) -> bool {
-    let operand = condition.operand().get();
     match condition {
-        TableCellConditionalHighlightCondition::EqualTo(_) => value == operand,
-        TableCellConditionalHighlightCondition::NotEqualTo(_) => value != operand,
-        TableCellConditionalHighlightCondition::GreaterThan(_) => value > operand,
-        TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(_) => value >= operand,
-        TableCellConditionalHighlightCondition::LessThan(_) => value < operand,
-        TableCellConditionalHighlightCondition::LessThanOrEqualTo(_) => value <= operand,
+        TableCellConditionalHighlightCondition::EqualTo(operand) => value == operand.get(),
+        TableCellConditionalHighlightCondition::NotEqualTo(operand) => value != operand.get(),
+        TableCellConditionalHighlightCondition::GreaterThan(operand) => value > operand.get(),
+        TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(operand) => {
+            value >= operand.get()
+        },
+        TableCellConditionalHighlightCondition::LessThan(operand) => value < operand.get(),
+        TableCellConditionalHighlightCondition::LessThanOrEqualTo(operand) => {
+            value <= operand.get()
+        },
+        TableCellConditionalHighlightCondition::Between(range) => {
+            value >= range.lower().get() && value <= range.upper().get()
+        },
+        TableCellConditionalHighlightCondition::NotBetween(range) => {
+            value < range.lower().get() || value > range.upper().get()
+        },
     }
 }

@@ -8,7 +8,8 @@ use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightNumber,
-    TableCellConditionalHighlightRule, TableCellConditionalHighlightStyle,
+    TableCellConditionalHighlightRange, TableCellConditionalHighlightRule,
+    TableCellConditionalHighlightStyle,
 };
 
 const HIGHLIGHT_ROW: usize = 1;
@@ -28,10 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn highlight_rule() -> Result<TableCellConditionalHighlightRule, Box<dyn std::error::Error>> {
-    let zero = TableCellConditionalHighlightNumber::new(0.0)?;
+    let lower = TableCellConditionalHighlightNumber::new(3.0)?;
+    let upper = TableCellConditionalHighlightNumber::new(7.0)?;
+    let range = TableCellConditionalHighlightRange::new(lower, upper)?;
     let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
     Ok(TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::LessThan(zero),
+        TableCellConditionalHighlightCondition::Between(range),
         TableCellConditionalHighlightStyle::new(Some(red), None, true)?,
     ))
 }
@@ -46,7 +49,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        CellValue::Number(-5.0),
+        CellValue::Number(5.0),
     )?;
     let rule = highlight_rule()?;
     editor.set_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN, &[rule])?;
@@ -72,7 +75,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        CellValue::Number(-5.0),
+        CellValue::Number(5.0),
     )?;
     let rule = highlight_rule()?;
     editor.set_table_cell_conditional_highlighting(
@@ -113,7 +116,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         HIGHLIGHT_ROW,
         HIGHLIGHT_COLUMN,
-        CellValue::Number(-5.0),
+        CellValue::Number(5.0),
     )?;
     let rule = highlight_rule()?;
     editor.set_slide_table_cell_conditional_highlighting(

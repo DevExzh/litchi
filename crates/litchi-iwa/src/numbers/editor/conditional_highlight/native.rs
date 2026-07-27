@@ -9,9 +9,17 @@ pub(super) const PREDICATE_QUALIFIER_NONE: i32 = 0;
 pub(super) const PREDICATE_CELL_ARGUMENT_INDEX: i32 = 0;
 pub(super) const PREDICATE_NUMBER_ARGUMENT_INDEX: i32 = 1;
 pub(super) const PREDICATE_UNUSED_ARGUMENT_INDEX: i32 = -1;
+pub(super) const PREDICATE_RANGE_LOWER_ARGUMENT_INDEX: i32 = 0;
+pub(super) const PREDICATE_RANGE_UPPER_ARGUMENT_INDEX: i32 = 1;
+pub(super) const PREDICATE_RANGE_CELL_ARGUMENT_INDEX: i32 = 3;
 pub(super) const PREDICATE_ARGUMENT_NONE: i32 = 0;
 pub(super) const PREDICATE_ARGUMENT_NUMBER: i32 = 1;
 pub(super) const PREDICATE_ARGUMENT_RELATIVE_CELL: i32 = 4;
+pub(super) const LOGICAL_AND_FUNCTION_INDEX: u32 = 7;
+pub(super) const CONDITIONAL_FUNCTION_INDEX: u32 = 62;
+pub(super) const LOGICAL_OR_FUNCTION_INDEX: u32 = 102;
+pub(super) const BINARY_FUNCTION_ARGUMENT_COUNT: u32 = 2;
+pub(super) const CONDITIONAL_FUNCTION_ARGUMENT_COUNT: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
@@ -22,6 +30,8 @@ pub(super) enum NumericPredicateKind {
     GreaterThanOrEqualTo = 8,
     LessThan = 9,
     LessThanOrEqualTo = 10,
+    Between = 13,
+    NotBetween = 32,
 }
 
 impl NumericPredicateKind {
@@ -35,6 +45,8 @@ impl NumericPredicateKind {
             },
             TableCellConditionalHighlightCondition::LessThan(_) => Self::LessThan,
             TableCellConditionalHighlightCondition::LessThanOrEqualTo(_) => Self::LessThanOrEqualTo,
+            TableCellConditionalHighlightCondition::Between(_) => Self::Between,
+            TableCellConditionalHighlightCondition::NotBetween(_) => Self::NotBetween,
         }
     }
 
@@ -42,35 +54,43 @@ impl NumericPredicateKind {
         self as i32
     }
 
-    pub(super) const fn condition(
+    pub(super) const fn single_condition(
         self,
         number: TableCellConditionalHighlightNumber,
-    ) -> TableCellConditionalHighlightCondition {
+    ) -> Option<TableCellConditionalHighlightCondition> {
         match self {
-            Self::EqualTo => TableCellConditionalHighlightCondition::EqualTo(number),
-            Self::NotEqualTo => TableCellConditionalHighlightCondition::NotEqualTo(number),
-            Self::GreaterThan => TableCellConditionalHighlightCondition::GreaterThan(number),
+            Self::EqualTo => Some(TableCellConditionalHighlightCondition::EqualTo(number)),
+            Self::NotEqualTo => Some(TableCellConditionalHighlightCondition::NotEqualTo(number)),
+            Self::GreaterThan => Some(TableCellConditionalHighlightCondition::GreaterThan(number)),
             Self::GreaterThanOrEqualTo => {
-                TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(number)
+                Some(TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(number))
             },
-            Self::LessThan => TableCellConditionalHighlightCondition::LessThan(number),
-            Self::LessThanOrEqualTo => {
-                TableCellConditionalHighlightCondition::LessThanOrEqualTo(number)
-            },
+            Self::LessThan => Some(TableCellConditionalHighlightCondition::LessThan(number)),
+            Self::LessThanOrEqualTo => Some(
+                TableCellConditionalHighlightCondition::LessThanOrEqualTo(number),
+            ),
+            Self::Between | Self::NotBetween => None,
         }
     }
 
-    pub(super) const fn ast_node_type(self) -> tsce::ast_node_array_archive::AstNodeType {
+    pub(super) const fn single_ast_node_type(
+        self,
+    ) -> Option<tsce::ast_node_array_archive::AstNodeType> {
         use tsce::ast_node_array_archive::AstNodeType;
 
         match self {
-            Self::EqualTo => AstNodeType::EqualToNode,
-            Self::NotEqualTo => AstNodeType::NotEqualToNode,
-            Self::GreaterThan => AstNodeType::GreaterThanNode,
-            Self::GreaterThanOrEqualTo => AstNodeType::GreaterThanOrEqualToNode,
-            Self::LessThan => AstNodeType::LessThanNode,
-            Self::LessThanOrEqualTo => AstNodeType::LessThanOrEqualToNode,
+            Self::EqualTo => Some(AstNodeType::EqualToNode),
+            Self::NotEqualTo => Some(AstNodeType::NotEqualToNode),
+            Self::GreaterThan => Some(AstNodeType::GreaterThanNode),
+            Self::GreaterThanOrEqualTo => Some(AstNodeType::GreaterThanOrEqualToNode),
+            Self::LessThan => Some(AstNodeType::LessThanNode),
+            Self::LessThanOrEqualTo => Some(AstNodeType::LessThanOrEqualToNode),
+            Self::Between | Self::NotBetween => None,
         }
+    }
+
+    pub(super) const fn is_range(self) -> bool {
+        matches!(self, Self::Between | Self::NotBetween)
     }
 }
 
@@ -87,6 +107,8 @@ impl TryFrom<i32> for NumericPredicateKind {
             },
             value if value == Self::LessThan.native_value() => Ok(Self::LessThan),
             value if value == Self::LessThanOrEqualTo.native_value() => Ok(Self::LessThanOrEqualTo),
+            value if value == Self::Between.native_value() => Ok(Self::Between),
+            value if value == Self::NotBetween.native_value() => Ok(Self::NotBetween),
             _ => Err(Error::InvalidFormat(
                 "iWork conditional-highlight rule uses an unsupported predicate".to_owned(),
             )),
@@ -107,6 +129,8 @@ mod tests {
             NumericPredicateKind::GreaterThanOrEqualTo,
             NumericPredicateKind::LessThan,
             NumericPredicateKind::LessThanOrEqualTo,
+            NumericPredicateKind::Between,
+            NumericPredicateKind::NotBetween,
         ];
         for kind in kinds {
             assert_eq!(

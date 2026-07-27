@@ -22,6 +22,35 @@ impl TableCellConditionalHighlightNumber {
     }
 }
 
+/// Ordered finite bounds used by a range conditional-highlight rule.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TableCellConditionalHighlightRange {
+    lower: TableCellConditionalHighlightNumber,
+    upper: TableCellConditionalHighlightNumber,
+}
+
+impl TableCellConditionalHighlightRange {
+    pub fn new(
+        lower: TableCellConditionalHighlightNumber,
+        upper: TableCellConditionalHighlightNumber,
+    ) -> Result<Self> {
+        if lower.get() > upper.get() {
+            return Err(Error::ParseError(
+                "iWork conditional-highlight range bounds must be ordered".to_owned(),
+            ));
+        }
+        Ok(Self { lower, upper })
+    }
+
+    pub const fn lower(self) -> TableCellConditionalHighlightNumber {
+        self.lower
+    }
+
+    pub const fn upper(self) -> TableCellConditionalHighlightNumber {
+        self.upper
+    }
+}
+
 /// Numeric condition evaluated against the cell carrying the rule.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TableCellConditionalHighlightCondition {
@@ -31,17 +60,32 @@ pub enum TableCellConditionalHighlightCondition {
     GreaterThanOrEqualTo(TableCellConditionalHighlightNumber),
     LessThan(TableCellConditionalHighlightNumber),
     LessThanOrEqualTo(TableCellConditionalHighlightNumber),
+    Between(TableCellConditionalHighlightRange),
+    NotBetween(TableCellConditionalHighlightRange),
 }
 
 impl TableCellConditionalHighlightCondition {
-    pub const fn operand(self) -> TableCellConditionalHighlightNumber {
+    pub const fn single_operand(self) -> Option<TableCellConditionalHighlightNumber> {
         match self {
             Self::EqualTo(value)
             | Self::NotEqualTo(value)
             | Self::GreaterThan(value)
             | Self::GreaterThanOrEqualTo(value)
             | Self::LessThan(value)
-            | Self::LessThanOrEqualTo(value) => value,
+            | Self::LessThanOrEqualTo(value) => Some(value),
+            Self::Between(_) | Self::NotBetween(_) => None,
+        }
+    }
+
+    pub const fn range(self) -> Option<TableCellConditionalHighlightRange> {
+        match self {
+            Self::Between(range) | Self::NotBetween(range) => Some(range),
+            Self::EqualTo(_)
+            | Self::NotEqualTo(_)
+            | Self::GreaterThan(_)
+            | Self::GreaterThanOrEqualTo(_)
+            | Self::LessThan(_)
+            | Self::LessThanOrEqualTo(_) => None,
         }
     }
 }
@@ -125,6 +169,9 @@ mod tests {
         assert!(TableCellConditionalHighlightNumber::new(f64::NAN).is_err());
         assert!(TableCellConditionalHighlightNumber::new(f64::INFINITY).is_err());
         assert!(TableCellConditionalHighlightStyle::new(None, None, false).is_err());
+        let lower = TableCellConditionalHighlightNumber::new(7.0).unwrap();
+        let upper = TableCellConditionalHighlightNumber::new(3.0).unwrap();
+        assert!(TableCellConditionalHighlightRange::new(lower, upper).is_err());
 
         let color = RgbaColor::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
         assert_eq!(

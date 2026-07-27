@@ -2,7 +2,8 @@ use super::*;
 use crate::numbers::NumbersDocumentBuilder;
 use crate::shapes::{RgbColorSpace, RgbaColor};
 use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightNumber, TableCellConditionalHighlightStyle,
+    TableCellConditionalHighlightNumber, TableCellConditionalHighlightRange,
+    TableCellConditionalHighlightStyle,
 };
 
 fn rule(
@@ -26,11 +27,20 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
     let hundred = TableCellConditionalHighlightNumber::new(100.0).unwrap();
+    let range = TableCellConditionalHighlightRange::new(zero, hundred).unwrap();
     let initial = [
         rule(TableCellConditionalHighlightCondition::LessThan(zero), red),
         rule(
             TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(hundred),
             green,
+        ),
+        rule(
+            TableCellConditionalHighlightCondition::Between(range),
+            green,
+        ),
+        rule(
+            TableCellConditionalHighlightCondition::NotBetween(range),
+            red,
         ),
     ];
 
@@ -43,7 +53,7 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
             .unwrap()
             .unwrap()
             .rule_count,
-        2
+        4
     );
     assert_eq!(
         editor
@@ -103,4 +113,22 @@ fn empty_or_excessive_rule_sets_are_rejected_transactionally() {
             .unwrap()
             .is_none()
     );
+}
+
+#[test]
+fn range_conditions_use_inclusive_between_and_strictly_outside_not_between() {
+    let lower = TableCellConditionalHighlightNumber::new(3.0).unwrap();
+    let upper = TableCellConditionalHighlightNumber::new(7.0).unwrap();
+    let range = TableCellConditionalHighlightRange::new(lower, upper).unwrap();
+    let between = TableCellConditionalHighlightCondition::Between(range);
+    let not_between = TableCellConditionalHighlightCondition::NotBetween(range);
+
+    assert!(condition_matches(between, 3.0));
+    assert!(condition_matches(between, 5.0));
+    assert!(condition_matches(between, 7.0));
+    assert!(!condition_matches(between, 2.0));
+    assert!(!condition_matches(not_between, 3.0));
+    assert!(!condition_matches(not_between, 7.0));
+    assert!(condition_matches(not_between, 2.0));
+    assert!(condition_matches(not_between, 8.0));
 }
