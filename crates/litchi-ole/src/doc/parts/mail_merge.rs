@@ -497,6 +497,11 @@ pub struct Fnpi {
 }
 
 impl Fnpi {
+    /// Wrap a raw 2-byte `FNPI` value (used by other table parsers).
+    pub(crate) fn from_raw(raw: u16) -> Self {
+        Fnpi { raw }
+    }
+
     /// `fnpt`: the type of the referenced file name.
     pub fn file_type(&self) -> u8 {
         (self.raw & FNPI_TYPE_MASK) as u8

@@ -46,6 +46,7 @@ use super::parts::rsids::DocumentRsids;
 use super::parts::sections::SectionsTable;
 use super::parts::smart_tags::DocumentSmartTags;
 use super::parts::styles::StyleSheet;
+use super::parts::subdocuments::DocumentSubdocuments;
 use super::parts::text::TextExtractor;
 use super::table::Table;
 #[cfg(feature = "formula")]
@@ -113,6 +114,8 @@ pub struct Document {
     protected_ranges: Option<DocumentProtectedRanges>,
     /// Mail-merge data-source state (`Pms` and the ODSO property set).
     mail_merge: Option<DocumentMailMerge>,
+    /// Master-document subdocument directory and referenced-file name table.
+    subdocuments: Option<DocumentSubdocuments>,
     /// Revision-mark authors
     revision_authors: RevisionAuthorTable,
     /// Fixed associated-document strings
@@ -263,6 +266,7 @@ impl Document {
         let rsids = DocumentRsids::parse(&fib, &table_stream)?;
         let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
         let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
+        let subdocuments = DocumentSubdocuments::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
         let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
@@ -359,6 +363,7 @@ impl Document {
             rsids,
             protected_ranges,
             mail_merge,
+            subdocuments,
             revision_authors,
             associated_strings,
             list_names,
@@ -1948,6 +1953,16 @@ impl Document {
     /// executed, and no merge is performed.
     pub fn mail_merge(&self) -> Option<&DocumentMailMerge> {
         self.mail_merge.as_ref()
+    }
+
+    /// The master-document subdocument directory (`PlcfWKB`) and the
+    /// referenced-file name table (`SttbFnm`), when the document carries
+    /// either (MS-DOC 2.8.34, 2.9.288).
+    ///
+    /// The metadata is inert: file paths are exposed verbatim and are never
+    /// opened, resolved, or followed, and no subdocument content is loaded.
+    pub fn subdocuments(&self) -> Option<&DocumentSubdocuments> {
+        self.subdocuments.as_ref()
     }
 
     /// The Word 97 mail-merge state (`Pms`), when the document carries one.

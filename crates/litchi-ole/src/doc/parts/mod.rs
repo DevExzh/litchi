@@ -44,6 +44,7 @@ pub mod sections;
 pub mod smart_tags;
 pub mod spa;
 pub mod styles;
+pub mod subdocuments;
 pub mod tap;
 pub mod tap_parser;
 pub mod text;

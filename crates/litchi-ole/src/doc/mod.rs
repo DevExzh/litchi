@@ -198,6 +198,9 @@ pub use parts::styles::{
     StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
     StyleSheetHeader,
 };
+pub use parts::subdocuments::{
+    DocumentSubdocuments, ReferencedFileKind, ReferencedFileName, Subdocument,
+};
 pub use parts::tap::TableStyleCondition;
 pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
