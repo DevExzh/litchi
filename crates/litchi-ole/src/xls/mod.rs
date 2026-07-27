@@ -241,7 +241,7 @@ pub use number_format::{
     XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
 };
 pub use page_setup::{
-    XlsPageBreak, XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder,
+    XlsHeaderFooter, XlsPageBreak, XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder,
     XlsPrintOrientation, XlsPrintSetup,
 };
 pub use palette::{XlsColor, XlsPalette};

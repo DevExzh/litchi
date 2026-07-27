@@ -36,6 +36,7 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
         footer_margin_inches: 0.4,
         copies: 2,
         printer_driver_data: Some(vec![0x5a; 9000]),
+        header_footer: None,
     };
     writer.set_page_setup(sheet, options).unwrap();
     writer.add_horizontal_page_break(sheet, 20, 0, 10).unwrap();

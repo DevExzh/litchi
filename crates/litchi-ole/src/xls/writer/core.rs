@@ -542,6 +542,9 @@ pub struct XlsPageSetupOptions {
     pub copies: u16,
     /// Opaque DEVMODE bytes. They are serialized but never interpreted or executed.
     pub printer_driver_data: Option<Vec<u8>>,
+    /// Even/first-page header/footer text and display flags; `None` emits no
+    /// `HeaderFooter` record.
+    pub header_footer: Option<crate::xls::XlsHeaderFooter>,
 }
 
 impl Default for XlsPageSetupOptions {
@@ -574,6 +577,7 @@ impl Default for XlsPageSetupOptions {
             footer_margin_inches: 0.5,
             copies: 1,
             printer_driver_data: None,
+            header_footer: None,
         }
     }
 }

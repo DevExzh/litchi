@@ -18,6 +18,7 @@ const CONTINUE_RECORD_TYPE: u16 = 0x003c;
 const HCENTER_RECORD_TYPE: u16 = 0x0083;
 const VCENTER_RECORD_TYPE: u16 = 0x0084;
 const SETUP_RECORD_TYPE: u16 = 0x00a1;
+const HEADER_FOOTER_RECORD_TYPE: u16 = 0x089c;
 const USER_SVIEW_BEGIN_RECORD_TYPE: u16 = 0x01aa;
 const USER_SVIEW_END_RECORD_TYPE: u16 = 0x01ab;
 
@@ -205,6 +206,7 @@ pub struct XlsPageSetup {
     vertical_page_breaks: Vec<XlsPageBreak>,
     printer_driver_data: Vec<Vec<u8>>,
     print_setup: XlsPrintSetup,
+    header_footer: Option<XlsHeaderFooter>,
 }
 
 impl XlsPageSetup {
@@ -252,6 +254,11 @@ impl XlsPageSetup {
     }
     pub fn print_setup(&self) -> &XlsPrintSetup {
         &self.print_setup
+    }
+    /// Even-page and first-page header/footer text and display flags from the
+    /// `HeaderFooter` record, when present.
+    pub fn header_footer(&self) -> Option<&XlsHeaderFooter> {
+        self.header_footer.as_ref()
     }
 }
 
@@ -302,8 +309,294 @@ fn parse_header_footer(data: &[u8], record_type: u16) -> XlsResult<String> {
     }
 }
 
-fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {
-    if data.len() != 2 {
+/// Size in bytes of the fixed `HeaderFooter` portion before the four strings:
+/// `FrtHeader` (12) + `guidSView` (16) + flags (2) + four character counts (8).
+const HEADER_FOOTER_FIXED_LEN: usize = 38;
+/// `HeaderFooter` flag: odd and even pages use different headers/footers.
+const HF_DIFF_ODD_EVEN: u16 = 0x0001;
+/// `HeaderFooter` flag: the first page uses a different header/footer.
+const HF_DIFF_FIRST: u16 = 0x0002;
+/// `HeaderFooter` flag: the header/footer is scaled with the sheet.
+const HF_SCALE_WITH_DOC: u16 = 0x0004;
+/// `HeaderFooter` flag: header/footer edges align with the page margins.
+const HF_ALIGN_MARGINS: u16 = 0x0008;
+/// Maximum length of a header/footer string in UTF-16 code units.
+const MAX_HEADER_FOOTER_CHARS: usize = 255;
+
+/// Typed `HeaderFooter` record (MS-XLS 2.4.137): even-page and first-page
+/// header/footer text plus header/footer display flags.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct XlsHeaderFooter {
+    /// GUID of the sheet view the record applies to; `None` for the sheet
+    /// itself (an all-zero `guidSView`).
+    sheet_view_guid: Option<[u8; 16]>,
+    /// Whether odd and even pages use different headers/footers.
+    diff_odd_even: bool,
+    /// Whether the first page uses a different header/footer.
+    diff_first: bool,
+    /// Whether the header/footer is scaled with the sheet.
+    scale_with_doc: bool,
+    /// Whether header/footer edges align with the page margins.
+    align_margins: bool,
+    /// Even-page header text (`&L`/`&C`/`&R` commands included verbatim).
+    even_header: String,
+    /// Even-page footer text.
+    even_footer: String,
+    /// First-page header text.
+    first_header: String,
+    /// First-page footer text.
+    first_footer: String,
+}
+
+impl XlsHeaderFooter {
+    pub fn sheet_view_guid(&self) -> Option<&[u8; 16]> {
+        self.sheet_view_guid.as_ref()
+    }
+    pub const fn diff_odd_even(&self) -> bool {
+        self.diff_odd_even
+    }
+    pub const fn diff_first(&self) -> bool {
+        self.diff_first
+    }
+    pub const fn scale_with_doc(&self) -> bool {
+        self.scale_with_doc
+    }
+    pub const fn align_margins(&self) -> bool {
+        self.align_margins
+    }
+    pub fn even_header(&self) -> &str {
+        &self.even_header
+    }
+    pub fn even_footer(&self) -> &str {
+        &self.even_footer
+    }
+    pub fn first_header(&self) -> &str {
+        &self.first_header
+    }
+    pub fn first_footer(&self) -> &str {
+        &self.first_footer
+    }
+
+    /// Even-page header/footer text; setting either marks the record as
+    /// differentiating odd and even pages.
+    pub fn set_even(&mut self, header: String, footer: String) -> XlsResult<()> {
+        validate_header_footer_text(&header)?;
+        validate_header_footer_text(&footer)?;
+        self.diff_odd_even = true;
+        self.even_header = header;
+        self.even_footer = footer;
+        Ok(())
+    }
+
+    /// First-page header/footer text; setting either marks the record as
+    /// differentiating the first page.
+    pub fn set_first(&mut self, header: String, footer: String) -> XlsResult<()> {
+        validate_header_footer_text(&header)?;
+        validate_header_footer_text(&footer)?;
+        self.diff_first = true;
+        self.first_header = header;
+        self.first_footer = footer;
+        Ok(())
+    }
+
+    pub fn set_scale_with_doc(&mut self, scale_with_doc: bool) {
+        self.scale_with_doc = scale_with_doc;
+    }
+
+    pub fn set_align_margins(&mut self, align_margins: bool) {
+        self.align_margins = align_margins;
+    }
+
+    /// Parse a `HeaderFooter` record payload.
+    pub(crate) fn parse(data: &[u8]) -> XlsResult<Self> {
+        if data.len() < HEADER_FOOTER_FIXED_LEN {
+            return Err(XlsError::InvalidLength {
+                expected: HEADER_FOOTER_FIXED_LEN,
+                found: data.len(),
+            });
+        }
+        if read_u16(data, 0) != HEADER_FOOTER_RECORD_TYPE {
+            return Err(invalid(
+                HEADER_FOOTER_RECORD_TYPE,
+                "HeaderFooter FrtHeader.rt mismatch",
+            ));
+        }
+        let guid: [u8; 16] = data[12..28].try_into().expect("length checked");
+        let flags = read_u16(data, 28);
+        let diff_odd_even = flags & HF_DIFF_ODD_EVEN != 0;
+        let diff_first = flags & HF_DIFF_FIRST != 0;
+        let counts = [
+            usize::from(read_u16(data, 30)),
+            usize::from(read_u16(data, 32)),
+            usize::from(read_u16(data, 34)),
+            usize::from(read_u16(data, 36)),
+        ];
+        for (index, &count) in counts.iter().enumerate() {
+            if count > MAX_HEADER_FOOTER_CHARS {
+                return Err(invalid(
+                    HEADER_FOOTER_RECORD_TYPE,
+                    "header/footer text exceeds 255 UTF-16 code units",
+                ));
+            }
+            let gated = match index {
+                0 | 1 => diff_odd_even,
+                _ => diff_first,
+            };
+            if count > 0 && !gated {
+                return Err(invalid(
+                    HEADER_FOOTER_RECORD_TYPE,
+                    "header/footer text present without its difference flag",
+                ));
+            }
+        }
+        let mut offset = HEADER_FOOTER_FIXED_LEN;
+        let mut strings = [String::new(), String::new(), String::new(), String::new()];
+        for (string, &count) in strings.iter_mut().zip(&counts) {
+            if count == 0 {
+                continue;
+            }
+            *string = parse_no_cch_string(data, &mut offset, count)?;
+        }
+        if offset != data.len() {
+            return Err(invalid(
+                HEADER_FOOTER_RECORD_TYPE,
+                "header/footer character counts do not match the payload",
+            ));
+        }
+        let [even_header, even_footer, first_header, first_footer] = strings;
+        Ok(Self {
+            sheet_view_guid: (guid != [0; 16]).then_some(guid),
+            diff_odd_even,
+            diff_first,
+            scale_with_doc: flags & HF_SCALE_WITH_DOC != 0,
+            align_margins: flags & HF_ALIGN_MARGINS != 0,
+            even_header,
+            even_footer,
+            first_header,
+            first_footer,
+        })
+    }
+
+    /// Serialize back to a complete `HeaderFooter` record payload.
+    pub(crate) fn to_payload(&self) -> XlsResult<Vec<u8>> {
+        for text in [
+            &self.even_header,
+            &self.even_footer,
+            &self.first_header,
+            &self.first_footer,
+        ] {
+            validate_header_footer_text(text)?;
+        }
+        if (!self.diff_odd_even && (!self.even_header.is_empty() || !self.even_footer.is_empty()))
+            || (!self.diff_first && (!self.first_header.is_empty() || !self.first_footer.is_empty()))
+        {
+            return Err(invalid(
+                HEADER_FOOTER_RECORD_TYPE,
+                "header/footer text requires its difference flag",
+            ));
+        }
+        let mut flags = 0u16;
+        if self.diff_odd_even {
+            flags |= HF_DIFF_ODD_EVEN;
+        }
+        if self.diff_first {
+            flags |= HF_DIFF_FIRST;
+        }
+        if self.scale_with_doc {
+            flags |= HF_SCALE_WITH_DOC;
+        }
+        if self.align_margins {
+            flags |= HF_ALIGN_MARGINS;
+        }
+        let mut payload = Vec::with_capacity(HEADER_FOOTER_FIXED_LEN);
+        payload.extend_from_slice(&HEADER_FOOTER_RECORD_TYPE.to_le_bytes());
+        payload.extend_from_slice(&[0; 10]);
+        payload.extend_from_slice(&self.sheet_view_guid.unwrap_or([0; 16]));
+        payload.extend_from_slice(&flags.to_le_bytes());
+        for text in [
+            &self.even_header,
+            &self.even_footer,
+            &self.first_header,
+            &self.first_footer,
+        ] {
+            payload.extend_from_slice(&(text.encode_utf16().count() as u16).to_le_bytes());
+        }
+        for text in [
+            &self.even_header,
+            &self.even_footer,
+            &self.first_header,
+            &self.first_footer,
+        ] {
+            write_no_cch_string(&mut payload, text);
+        }
+        Ok(payload)
+    }
+}
+
+fn validate_header_footer_text(text: &str) -> XlsResult<()> {
+    if text.encode_utf16().count() > MAX_HEADER_FOOTER_CHARS {
+        return Err(invalid(
+            HEADER_FOOTER_RECORD_TYPE,
+            "header/footer text exceeds 255 UTF-16 code units",
+        ));
+    }
+    Ok(())
+}
+
+/// Parse an `XLUnicodeStringNoCch` (MS-XLS 2.5.296) of `count` characters,
+/// advancing `offset` past the consumed bytes.
+fn parse_no_cch_string(data: &[u8], offset: &mut usize, count: usize) -> XlsResult<String> {
+    let flags = *data.get(*offset).ok_or(XlsError::InvalidLength {
+        expected: *offset + 1,
+        found: data.len(),
+    })?;
+    *offset += 1;
+    let width = if flags & XL_UNICODE_STRING_HIGH_BYTE != 0 {
+        UTF16_CHAR_BYTES
+    } else {
+        COMPRESSED_CHAR_BYTES
+    };
+    let byte_count = count
+        .checked_mul(width)
+        .ok_or_else(|| invalid(HEADER_FOOTER_RECORD_TYPE, "header/footer length overflow"))?;
+    let text = data
+        .get(*offset..*offset + byte_count)
+        .ok_or(XlsError::InvalidLength {
+            expected: *offset + byte_count,
+            found: data.len(),
+        })?;
+    *offset += byte_count;
+    if width == COMPRESSED_CHAR_BYTES {
+        Ok(text.iter().map(|&byte| char::from(byte)).collect())
+    } else {
+        let units = text
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units)
+            .map_err(|_| invalid(HEADER_FOOTER_RECORD_TYPE, "header/footer invalid UTF-16"))
+    }
+}
+
+/// Append an `XLUnicodeStringNoCch`, compressing to one byte per character
+/// when every code unit fits.
+fn write_no_cch_string(out: &mut Vec<u8>, text: &str) {
+    let units = text.encode_utf16().collect::<Vec<_>>();
+    if units.is_empty() {
+        return;
+    }
+    let compressed = units.iter().all(|&unit| unit <= 0x00FF);
+    out.push(u8::from(!compressed));
+    for unit in units {
+        if compressed {
+            out.push(unit as u8);
+        } else {
+            out.extend_from_slice(&unit.to_le_bytes());
+        }
+    }
+}
+
+fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {    if data.len() != 2 {
         return Err(invalid(
             record_type,
             format!("Boolean payload must be 2 bytes, found {}", data.len()),
@@ -522,6 +815,7 @@ struct PartialPageSetup {
     vertical_page_breaks: Option<Vec<XlsPageBreak>>,
     printer_driver_data: Vec<Vec<u8>>,
     print_setup: Option<XlsPrintSetup>,
+    header_footer: Option<XlsHeaderFooter>,
 }
 
 /// Collects primary worksheet page records while excluding custom views.
@@ -649,6 +943,12 @@ impl PageSetupCollector {
                 }
                 self.page.bottom_margin_inches = Some(parse_margin(data, record_type)?);
             },
+            HEADER_FOOTER_RECORD_TYPE => {
+                if self.page.header_footer.is_some() {
+                    return Err(Self::duplicate(record_type));
+                }
+                self.page.header_footer = Some(XlsHeaderFooter::parse(data)?);
+            },
             PLS_RECORD_TYPE => {
                 self.page.printer_driver_data.push(parse_pls(data)?);
                 self.collecting_pls = true;
@@ -677,7 +977,8 @@ impl PageSetupCollector {
             || self.page.left_margin_inches.is_some()
             || self.page.right_margin_inches.is_some()
             || self.page.top_margin_inches.is_some()
-            || self.page.bottom_margin_inches.is_some();
+            || self.page.bottom_margin_inches.is_some()
+            || self.page.header_footer.is_some();
         if !has_partial && self.page.print_setup.is_none() {
             return Ok(None);
         }
@@ -696,6 +997,7 @@ impl PageSetupCollector {
             vertical_page_breaks: self.page.vertical_page_breaks.unwrap_or_default(),
             printer_driver_data: self.page.printer_driver_data,
             print_setup: self.page.print_setup.unwrap_or_default(),
+            header_footer: self.page.header_footer,
         }))
     }
 }
@@ -854,5 +1156,86 @@ mod tests {
         assert!(
             !page.horizontal_page_breaks().is_empty() || !page.vertical_page_breaks().is_empty()
         );
+    }
+
+    fn header_footer_record(flags: u16, counts: [u16; 4], strings: &[u8]) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&HEADER_FOOTER_RECORD_TYPE.to_le_bytes());
+        data.extend_from_slice(&[0; 26]);
+        data.extend_from_slice(&flags.to_le_bytes());
+        for count in counts {
+            data.extend_from_slice(&count.to_le_bytes());
+        }
+        data.extend_from_slice(strings);
+        data
+    }
+
+    #[test]
+    fn parses_header_footer_even_and_first_pages() {
+        // Even header "EH" (compressed), even footer empty, first header
+        // "文" (UTF-16), first footer empty; scale and align flags set.
+        let mut strings = Vec::new();
+        strings.push(0);
+        strings.extend_from_slice(b"EH");
+        strings.push(1);
+        strings.extend_from_slice(&0x6587u16.to_le_bytes());
+        let data = header_footer_record(0x000F, [2, 0, 1, 0], &strings);
+
+        let parsed = XlsHeaderFooter::parse(&data).unwrap();
+        assert!(parsed.diff_odd_even());
+        assert!(parsed.diff_first());
+        assert!(parsed.scale_with_doc());
+        assert!(parsed.align_margins());
+        assert_eq!(parsed.even_header(), "EH");
+        assert_eq!(parsed.even_footer(), "");
+        assert_eq!(parsed.first_header(), "文");
+        assert_eq!(parsed.first_footer(), "");
+        assert!(parsed.sheet_view_guid().is_none());
+        assert_eq!(parsed.to_payload().unwrap(), data);
+    }
+
+    #[test]
+    fn parses_header_footer_without_strings() {
+        let data = header_footer_record(0x000C, [0, 0, 0, 0], &[]);
+        let parsed = XlsHeaderFooter::parse(&data).unwrap();
+        assert!(!parsed.diff_odd_even());
+        assert!(!parsed.diff_first());
+        assert!(parsed.scale_with_doc());
+        assert!(parsed.align_margins());
+        assert_eq!(parsed.to_payload().unwrap(), data);
+    }
+
+    #[test]
+    fn rejects_malformed_header_footer_records() {
+        // Truncated fixed portion.
+        assert!(XlsHeaderFooter::parse(&[0; 30]).is_err());
+        // Wrong FrtHeader.rt.
+        let mut wrong_rt = header_footer_record(0x000C, [0, 0, 0, 0], &[]);
+        wrong_rt[0..2].copy_from_slice(&0x0862u16.to_le_bytes());
+        assert!(XlsHeaderFooter::parse(&wrong_rt).is_err());
+        // Text without its difference flag.
+        let mut strings = Vec::new();
+        strings.push(0);
+        strings.extend_from_slice(b"EH");
+        assert!(XlsHeaderFooter::parse(&header_footer_record(0x000C, [2, 0, 0, 0], &strings)).is_err());
+        // Character count above the 255-unit limit.
+        assert!(XlsHeaderFooter::parse(&header_footer_record(0x000F, [256, 0, 0, 0], &[])).is_err());
+        // Trailing garbage after the declared strings.
+        assert!(XlsHeaderFooter::parse(&header_footer_record(0x000C, [0, 0, 0, 0], &[0])).is_err());
+        // Truncated string payload.
+        assert!(XlsHeaderFooter::parse(&header_footer_record(0x0001, [3, 0, 0, 0], &[0, b'E'])).is_err());
+    }
+
+    #[test]
+    fn header_footer_builder_validates_and_serializes() {
+        let mut value = XlsHeaderFooter::default();
+        value.set_even("&LEven".to_string(), "&CFooter".to_string()).unwrap();
+        value.set_first("First".to_string(), String::new()).unwrap();
+        value.set_scale_with_doc(true);
+        value.set_align_margins(true);
+        let parsed = XlsHeaderFooter::parse(&value.to_payload().unwrap()).unwrap();
+        assert_eq!(parsed, value);
+
+        assert!(value.set_even("x".repeat(256), String::new()).is_err());
     }
 }

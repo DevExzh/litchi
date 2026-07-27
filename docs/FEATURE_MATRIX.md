@@ -327,7 +327,7 @@ conversion, fonts, and image conversion are optional.
 | External workbook, DDE, and OLE links | ✅ | ✅ | ✅ | Inert links, caches, names, and monikers; never refreshed automatically |
 | Embedded OLE objects | ✅ | ✅ | ✅ | Package editor CRUD; embedded payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
-| Page setup, headers/footers, and breaks | ✅ | ✅ | ✅ | Print/page records and page-break authoring |
+| Page setup, headers/footers, and breaks | ✅ | ✅ | ✅ | Print/page records, page-break authoring, and typed `HeaderFooter` even/first-page text with scale/align flags |
 | Protection | ✅ | ✅ | ✅ | Sheet, object, scenario, workbook, and password records |
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
 | Codepage handling | 🟡 | ✅ | 🟡 | Reader honors BIFF codepages; writer is centered on BIFF8/Windows-1252 |

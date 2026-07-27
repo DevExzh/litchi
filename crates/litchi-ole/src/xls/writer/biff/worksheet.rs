@@ -251,6 +251,13 @@ pub fn write_page_settings<W: Write>(
     writer.write_all(&options.header_margin_inches.to_le_bytes())?;
     writer.write_all(&options.footer_margin_inches.to_le_bytes())?;
     writer.write_all(&options.copies.to_le_bytes())?;
+    // HeaderFooter (0x089C) follows the PAGESETUP group in the worksheet
+    // substream grammar.
+    if let Some(header_footer) = &options.header_footer {
+        let payload = header_footer.to_payload()?;
+        write_record_header(writer, 0x089C, payload.len() as u16)?;
+        writer.write_all(&payload)?;
+    }
     Ok(())
 }
 
