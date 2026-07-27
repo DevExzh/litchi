@@ -348,6 +348,7 @@ struct State {
     /// Cell boundaries for current row (in twips)
     cell_boundaries: SmallVec<[i32; 8]>,
     table_style: Option<u16>,
+    table_rsid: Option<u32>,
     table_row_padding: crate::TableEdgeDistances,
     table_row_spacing: crate::TableEdgeDistances,
     table_row_positioning: crate::FloatingTablePosition,
@@ -411,6 +412,7 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
         ControlWord::SectionDefault
             | ControlWord::SectionStyle(_)
             | ControlWord::SectionBreak
+            | ControlWord::SectionRsid(_)
             | ControlWord::SectionContinuous
             | ControlWord::SectionColumn
             | ControlWord::SectionPage
@@ -1000,6 +1002,7 @@ impl Default for State {
             table_nesting_level: 0,
             cell_boundaries: SmallVec::new(),
             table_style: None,
+            table_rsid: None,
             table_row_padding: Default::default(),
             table_row_spacing: Default::default(),
             table_row_positioning: Default::default(),
@@ -7445,6 +7448,15 @@ impl<'a> Parser<'a> {
             },
 
             // Character formatting
+            ControlWord::InsertRsid(value) => {
+                state.formatting.insert_rsid = Some(*value as u32);
+            },
+            ControlWord::DeleteRsid(value) => {
+                state.formatting.delete_rsid = Some(*value as u32);
+            },
+            ControlWord::CharStyleRsid(value) => {
+                state.formatting.char_style_rsid = Some(*value as u32);
+            },
             ControlWord::Bold(b) => state.formatting.bold = *b,
             ControlWord::Italic(b) => state.formatting.italic = *b,
             ControlWord::Underline(b) => {
@@ -7557,6 +7569,9 @@ impl<'a> Parser<'a> {
             // Paragraph alignment
             ControlWord::ParagraphStyle(value) => {
                 state.paragraph.paragraph_style = Some(paragraph_style_reference(*value)?);
+            },
+            ControlWord::ParagraphRsid(value) => {
+                state.paragraph.paragraph_rsid = Some(*value as u32);
             },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
@@ -7836,10 +7851,19 @@ impl<'a> Parser<'a> {
                     state.table_style = Some(table_style_reference(*value)?);
                 }
             },
+            ControlWord::TableRsid(value) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    state.table_rsid = Some(*value as u32);
+                }
+            },
             ControlWord::TableRowDefaults => {
                 // Start a new row definition
                 state.cell_boundaries.clear();
                 state.table_style = None;
+                state.table_rsid = None;
                 state.table_row_padding = Default::default();
                 state.table_row_spacing = Default::default();
                 state.table_row_positioning = Default::default();
@@ -8304,6 +8328,7 @@ impl<'a> Parser<'a> {
                 // Row break - finalize current row
                 let row_geometry = resolve_row_geometry(state)?;
                 let table_style = state.table_style;
+                let table_rsid = state.table_rsid;
                 let row_padding = state.table_row_padding.clone();
                 let row_spacing = state.table_row_spacing.clone();
                 let row_positioning = state.table_row_positioning.clone();
@@ -8347,6 +8372,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                     row.set_table_style(table_style);
+                    row.set_table_rsid(table_rsid);
                     row.set_direction(row_direction);
                     row.set_layout(row_layout);
                     row.set_padding(row_padding);
@@ -8716,6 +8742,9 @@ impl<'a> Parser<'a> {
         match control {
             ControlWord::SectionStyle(value) => {
                 properties.section_style = Some(section_style_reference(*value)?);
+            },
+            ControlWord::SectionRsid(value) => {
+                properties.section_rsid = Some(*value as u32);
             },
             ControlWord::SectionDefault => {
                 *properties = super::section::SectionProperties::default();
@@ -14000,6 +14029,9 @@ impl<'a> Parser<'a> {
             ControlWord::ParagraphStyle(value) => {
                 state.paragraph.paragraph_style = Some(paragraph_style_reference(*value)?);
             },
+            ControlWord::ParagraphRsid(value) => {
+                state.paragraph.paragraph_rsid = Some(*value as u32);
+            },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
             ControlWord::RightAlign => state.paragraph.alignment = Alignment::Right,
             ControlWord::Center => state.paragraph.alignment = Alignment::Center,
@@ -16460,6 +16492,7 @@ impl<'a> Parser<'a> {
             }
         }
         builder.row.set_table_style(state.table_style);
+        builder.row.set_table_rsid(state.table_rsid);
         builder.row.set_direction(state.table_row_direction);
         builder.row.set_layout(state.table_row_layout);
         builder.row.set_padding(state.table_row_padding.clone());

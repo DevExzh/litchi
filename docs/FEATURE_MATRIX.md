@@ -557,6 +557,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Footnotes/endnotes and separators | ✅ | ✅ | ✅ | Note bodies, numbering/options, section overrides, and separator stories |
 | Comments/annotations | ✅ | ✅ | ✅ | Point/range comments, identity, positions, and mutation |
 | Track changes | ✅ | ✅ | ✅ | Author table, insert/delete ranges, revision metadata, and mutation |
+| Revision save identifiers | ✅ | ✅ | ✅ | `\*\rsidtbl` plus in-content `\insrsid`/`\delrsid`/`\charrsid`/`\pararsid`/`\sectrsid`/`\tblrsid` markers |
 | Legacy form-code fields | ✅ | ✅ | N/A | Typed inert `FORMTEXT`/`FORMCHECKBOX`/`FORMDROPDOWN` kind/opaque-instruction/cached-result metadata; form properties are not reconciled, forms are never filled, selections and checkbox state are never changed, and entry or exit macros are never invoked |
 | Legacy private-data fields | ✅ | ✅ | N/A | Typed inert `PRIVATE` opaque-instruction/cached-result metadata; conversion data is never converted, interpreted or revealed, laid out, or refreshed, and the field is not treated as a confidentiality mechanism |
 | Historical external-include aliases | ✅ | ✅ | N/A | Typed inert `INCLUDE`/`IMPORT` aliases for text/picture external include metadata; sources are never opened, resolved, imported, fetched, transformed, converted, evaluated, executed, or refreshed |

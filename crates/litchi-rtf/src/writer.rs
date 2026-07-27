@@ -5534,6 +5534,15 @@ impl<W: Write> RtfWriter<W> {
         if let Some(character_style) = fmt.character_style {
             self.write_control_word("cs", Some(i32::from(character_style)))?;
         }
+        if let Some(insert_rsid) = fmt.insert_rsid {
+            self.write_control_word("insrsid", Some(insert_rsid as i32))?;
+        }
+        if let Some(delete_rsid) = fmt.delete_rsid {
+            self.write_control_word("delrsid", Some(delete_rsid as i32))?;
+        }
+        if let Some(char_style_rsid) = fmt.char_style_rsid {
+            self.write_control_word("charrsid", Some(char_style_rsid as i32))?;
+        }
         if let Some(direction) = fmt.direction {
             self.write_control_word(
                 match direction {
@@ -6012,6 +6021,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(paragraph_style) = para.paragraph_style {
             self.write_control_word("s", Some(i32::from(paragraph_style)))?;
         }
+        if let Some(paragraph_rsid) = para.paragraph_rsid {
+            self.write_control_word("pararsid", Some(paragraph_rsid as i32))?;
+        }
         self.write_legacy_paragraph_numbering(para.legacy_numbering)?;
         if let Some(direction) = para.direction {
             self.write_control_word(
@@ -6484,6 +6496,9 @@ impl<W: Write> RtfWriter<W> {
         if let Some(table_style) = row.table_style() {
             self.write_control_word("ts", Some(i32::from(table_style)))?;
         }
+        if let Some(table_rsid) = row.table_rsid() {
+            self.write_control_word("tblrsid", Some(table_rsid as i32))?;
+        }
 
         if let Some(direction) = table_direction {
             self.write_control_word(
@@ -6637,6 +6652,9 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("trowd", None)?;
             if let Some(table_style) = row.table_style() {
                 self.write_control_word("ts", Some(i32::from(table_style)))?;
+            }
+            if let Some(table_rsid) = row.table_rsid() {
+                self.write_control_word("tblrsid", Some(table_rsid as i32))?;
             }
             if let Some(direction) = table.direction() {
                 self.write_control_word(
@@ -7594,6 +7612,9 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("sectd", None)?;
         if let Some(section_style) = section.properties.section_style {
             self.write_control_word("ds", Some(i32::from(section_style)))?;
+        }
+        if let Some(section_rsid) = section.properties.section_rsid {
+            self.write_control_word("sectrsid", Some(section_rsid as i32))?;
         }
         self.write_section_note_options(&section.properties.note_options)?;
         self.write_page_borders(&section.properties.page_borders)?;

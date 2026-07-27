@@ -13,6 +13,7 @@ fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> 
     for row in table.rows() {
         let mut owned_row = super::table::Row::new();
         owned_row.set_table_style(row.table_style());
+        owned_row.set_table_rsid(row.table_rsid());
         owned_row.set_direction(row.direction());
         owned_row.set_layout(*row.layout());
         owned_row.set_borders(row.borders().clone());

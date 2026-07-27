@@ -699,6 +699,8 @@ pub struct Row<'a> {
     cells: Vec<Cell<'a>>,
     /// Optional table-style handle referenced by this row.
     table_style: Option<u16>,
+    /// RSID attached to the row (`\tblrsidN`).
+    table_rsid: Option<u32>,
     /// Explicit row direction.
     direction: Option<TextDirection>,
     layout: TableRowLayout,
@@ -718,6 +720,7 @@ impl<'a> Row<'a> {
         Self {
             cells: Vec::new(),
             table_style: None,
+            table_rsid: None,
             direction: None,
             layout: TableRowLayout::default(),
             padding: TableEdgeDistances::default(),
@@ -754,6 +757,16 @@ impl<'a> Row<'a> {
     /// Set or clear the table-style handle referenced by this row.
     pub fn set_table_style(&mut self, table_style: Option<u16>) {
         self.table_style = table_style;
+    }
+
+    /// RSID attached to this row, when present.
+    pub fn table_rsid(&self) -> Option<u32> {
+        self.table_rsid
+    }
+
+    /// Set or clear the row RSID.
+    pub fn set_table_rsid(&mut self, table_rsid: Option<u32>) {
+        self.table_rsid = table_rsid;
     }
 
     /// Return the explicit row direction.
@@ -1427,6 +1440,7 @@ impl Row<'_> {
         Row {
             cells: self.cells.into_iter().map(Cell::into_owned).collect(),
             table_style: self.table_style,
+            table_rsid: self.table_rsid,
             direction: self.direction,
             layout: self.layout,
             padding: self.padding,

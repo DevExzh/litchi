@@ -316,6 +316,8 @@ impl SectionNoteOptions {
 pub struct SectionProperties {
     /// Optional section-style handle referenced by this section.
     pub section_style: Option<u16>,
+    /// RSID attached to the section formatting (`\sectrsidN`).
+    pub section_rsid: Option<u32>,
     /// Explicit direction used to thread section columns.
     pub direction: Option<TextDirection>,
     /// Section break type
@@ -360,6 +362,7 @@ impl Default for SectionProperties {
     fn default() -> Self {
         Self {
             section_style: None,
+            section_rsid: None,
             direction: None,
             break_type: SectionBreakType::default(),
             page_width: 12240,  // 8.5 inches at 1440 twips/inch

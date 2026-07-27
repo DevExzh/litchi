@@ -561,6 +561,8 @@ pub struct Paragraph {
     /// The reference is retained as inert provenance; concrete paragraph and
     /// character properties remain independently represented.
     pub paragraph_style: Option<u16>,
+    /// RSID attached to the paragraph formatting (`\pararsidN`).
+    pub paragraph_rsid: Option<u32>,
     /// Explicit paragraph direction; `None` uses left-to-right precedence.
     pub direction: Option<TextDirection>,
     /// Text alignment
@@ -811,6 +813,12 @@ pub struct Formatting {
     /// so this is retained as inert provenance rather than resolved into the
     /// surrounding formatting.
     pub character_style: Option<u16>,
+    /// RSID of the revision that inserted this text (`\insrsidN`).
+    pub insert_rsid: Option<u32>,
+    /// RSID of the revision that deleted this text (`\delrsidN`).
+    pub delete_rsid: Option<u32>,
+    /// RSID attached to the character formatting (`\charrsidN`).
+    pub char_style_rsid: Option<u32>,
     /// Font reference
     pub font_ref: FontRef,
     /// Font size in half-points
@@ -889,6 +897,9 @@ impl Default for Formatting {
         Self {
             character_positioning: crate::CharacterPositioning::default(),
             character_style: None,
+            insert_rsid: None,
+            delete_rsid: None,
+            char_style_rsid: None,
             font_ref: 0,
             font_size: NonZeroU16::new(24).expect("non-zero default font size"),
             color_ref: 0,
