@@ -6803,6 +6803,70 @@ fn table_sort_distinguishes_empty_and_populated_conditional_style_storage() {
 }
 
 #[test]
+fn cell_conditional_highlighting_is_detected_and_deleted_without_changing_value() {
+    let mut package = test_package();
+    add_test_conditional_style_storage(&mut package, true);
+    let location = locate_cell(&package, 10, 0, 1).unwrap();
+    let cell_count = update_tile(
+        &mut package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        1,
+        location.descriptor.model.number_of_columns as usize,
+        EncodedValue::ConditionalStyle(Some(1)),
+    )
+    .unwrap();
+    update_row_header(
+        &mut package,
+        &location.object_locations,
+        &location.descriptor.model,
+        0,
+        cell_count,
+    )
+    .unwrap();
+
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let original_value = NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
+        .unwrap()
+        .sheets()
+        .unwrap()[0]
+        .tables[0]
+        .get_cell(0, 1)
+        .cloned();
+    let info = editor
+        .cell_conditional_highlighting(10, 0, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(info.list_identifier, 1);
+    assert_eq!(info.style_set_object_id, 91);
+    assert_eq!(info.rule_count, 1);
+
+    editor
+        .clear_cell_conditional_highlighting(10, 0, 1)
+        .unwrap();
+    assert!(
+        editor
+            .cell_conditional_highlighting(10, 0, 1)
+            .unwrap()
+            .is_none()
+    );
+    let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        document.sheets().unwrap()[0].tables[0].get_cell(0, 1),
+        original_value.as_ref()
+    );
+    assert!(
+        editor
+            .package()
+            .archive("Index/Document.iwa")
+            .unwrap()
+            .object(91)
+            .is_none()
+    );
+}
+
+#[test]
 fn table_sort_execution_rejects_unsupported_state_transactionally() {
     let mut no_order = NumbersEditor::from_package(test_package()).unwrap();
     let before = no_order.to_bytes().unwrap();

@@ -136,6 +136,17 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 /// A resolved direct reply in a Numbers cell-comment thread.
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 
+/// Storage identity and rule count of conditional highlighting attached to one cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableCellConditionalHighlightInfo {
+    pub table_id: u64,
+    pub row: usize,
+    pub column: usize,
+    pub list_identifier: u32,
+    pub style_set_object_id: u64,
+    pub rule_count: u32,
+}
+
 /// Mutable, transactional Numbers package editor.
 ///
 /// Each semantic edit is applied to a cloned package and committed only after
@@ -2907,6 +2918,38 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Inspect the conditional-highlight style set attached to a writable BNC cell.
+    pub fn cell_conditional_highlighting(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<TableCellConditionalHighlightInfo>> {
+        conditional_highlight::info_in_package(&self.package, table_id, row, column)
+    }
+
+    /// Delete conditional highlighting from one cell without changing its value or base style.
+    pub fn clear_cell_conditional_highlighting(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        conditional_highlight::clear_in_package(&mut staged, table_id, row, column)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .cell_conditional_highlighting(table_id, row, column)?
+            .is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers conditional-highlight deletion failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Read the direct replies attached to a cell comment in stored order.
     pub fn cell_comment_replies(
         &self,
@@ -4130,6 +4173,24 @@ pub(crate) fn table_cell_comment_in_package(
     model::attached_cell_comment_in_package(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_conditional_highlighting_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellConditionalHighlightInfo>> {
+    conditional_highlight::attached_info_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn clear_table_cell_conditional_highlighting_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<()> {
+    conditional_highlight::clear_attached_in_package(package, table_id, row, column)
+}
+
 pub(crate) fn set_table_cell_comment_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -4392,6 +4453,7 @@ mod cell_layout;
 mod cell_merge;
 mod cell_style;
 mod column_insert;
+mod conditional_highlight;
 mod date_time_fields;
 mod drawable_order;
 mod formula_cache;

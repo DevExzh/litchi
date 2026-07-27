@@ -18,6 +18,32 @@ fn table_geometry() -> (DrawablePoint, DrawableSize) {
 }
 
 #[test]
+fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    let table = editor
+        .add_slide_table(0, "Conditional", 2, 2, position, size)
+        .unwrap();
+
+    assert!(
+        editor
+            .slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
+            .unwrap()
+            .is_none()
+    );
+    editor
+        .clear_slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
+        .unwrap();
+    assert!(
+        KeynoteEditor::from_bytes(&editor.to_bytes().unwrap())
+            .unwrap()
+            .slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
 fn source_built_table_roundtrips_cell_border_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let (position, size) = table_geometry();

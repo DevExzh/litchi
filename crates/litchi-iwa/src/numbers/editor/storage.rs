@@ -2890,6 +2890,7 @@ pub(super) fn update_tile(
                 EncodedValue::Clear
                     | EncodedValue::ClearValuePreservingMetadata
                     | EncodedValue::Comment(None)
+                    | EncodedValue::ConditionalStyle(None)
             )
         {
             updated_cell_count = Some(0);
@@ -2938,6 +2939,24 @@ pub(super) fn update_tile(
                     return Ok(());
                 }
             },
+            EncodedValue::ConditionalStyle(identifier) => {
+                if let Some(data) = cells[column].as_deref() {
+                    let mut cell = BncCell::parse(data)?;
+                    cell.set_conditional_style_identifier(identifier);
+                    cells[column] = Some(cell.encode());
+                } else if identifier.is_some() {
+                    let mut cell = BncCell::minimal();
+                    cell.set_conditional_style_identifier(identifier);
+                    cells[column] = Some(cell.encode());
+                } else {
+                    updated_cell_count = Some(
+                        u32::try_from(cells.iter().filter(|cell| cell.is_some()).count()).map_err(
+                            |_| Error::ParseError("Numbers row cell count exceeds u32".to_owned()),
+                        )?,
+                    );
+                    return Ok(());
+                }
+            },
             EncodedValue::Raw(data) => {
                 BncCell::parse(&data)?;
                 cells[column] = Some(data);
@@ -2965,6 +2984,7 @@ pub(super) fn update_tile(
                     EncodedValue::Clear
                     | EncodedValue::ClearValuePreservingMetadata
                     | EncodedValue::Comment(_)
+                    | EncodedValue::ConditionalStyle(_)
                     | EncodedValue::Raw(_) => unreachable!(),
                 }
                 cells[column] = Some(cell.encode());

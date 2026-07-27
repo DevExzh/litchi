@@ -57,8 +57,8 @@ pub use editor::{
     NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,
     NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
     RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
-    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableColumnDeletion, TableColumnInsertion,
-    TableRowDeletion, TableRowInsertion,
+    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableCellConditionalHighlightInfo,
+    TableColumnDeletion, TableColumnInsertion, TableRowDeletion, TableRowInsertion,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

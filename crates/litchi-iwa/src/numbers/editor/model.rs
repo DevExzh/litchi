@@ -2209,6 +2209,7 @@ pub(super) enum EncodedValue {
     FormulaCachedNumber(f64),
     FormulaCachedBoolean(bool),
     Comment(Option<u32>),
+    ConditionalStyle(Option<u32>),
 }
 
 pub(super) struct CellLocation {

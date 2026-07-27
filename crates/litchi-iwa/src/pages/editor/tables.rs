@@ -2,6 +2,7 @@
 
 mod appearance;
 mod comments;
+mod conditional_highlight;
 mod formula;
 mod hidden_axes;
 mod layout;
@@ -13,6 +14,7 @@ mod topology;
 pub use comments::{
     PagesTableCellComment, PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
 };
+pub use conditional_highlight::PagesTableCellConditionalHighlightInfo;
 pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression,
@@ -2123,6 +2125,32 @@ mod tests {
     };
 
     const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
+
+    #[test]
+    fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() {
+        let mut editor = PagesDocumentBuilder::new()
+            .body_table("Conditional", 2, 2)
+            .build()
+            .unwrap();
+        let model_id = editor.tables().unwrap()[0].model_object_id;
+
+        assert!(
+            editor
+                .table_cell_conditional_highlighting(model_id, 1, 1)
+                .unwrap()
+                .is_none()
+        );
+        editor
+            .clear_table_cell_conditional_highlighting(model_id, 1, 1)
+            .unwrap();
+        assert!(
+            PagesEditor::from_bytes(&editor.to_bytes().unwrap())
+                .unwrap()
+                .table_cell_conditional_highlighting(model_id, 1, 1)
+                .unwrap()
+                .is_none()
+        );
+    }
 
     #[test]
     fn source_built_table_roundtrips_cell_border_crud() {

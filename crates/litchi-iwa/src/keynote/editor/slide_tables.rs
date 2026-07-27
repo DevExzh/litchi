@@ -12,6 +12,7 @@ use crate::table_lock::TableLockState;
 
 mod appearance;
 mod comments;
+mod conditional_highlight;
 mod formula;
 mod graph;
 mod hidden_axes;
@@ -24,6 +25,7 @@ mod topology;
 pub use comments::{
     KeynoteTableCellComment, KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo,
 };
+pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
 pub use formula::{
     KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
     KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
