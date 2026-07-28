@@ -136,6 +136,10 @@ pub use parts::fields::{LegacyFormField, LegacyFormFieldKind};
 pub use parts::form_fields::{
     CheckBoxState, FormFieldData, FormFieldDataKind, FormFieldTextKind, NilPicfAndBinData,
 };
+pub use parts::format_consistency::{
+    DocumentFormatConsistencyMarks, FormatConsistencyInfo, FormatConsistencyKind,
+    FormatConsistencyMark, FormatConsistencyProperties,
+};
 pub use parts::fields::ListNumberField;
 pub use parts::fields::PrintField;
 pub use parts::fields::PrivateField;
@@ -182,6 +186,7 @@ pub use parts::mail_merge::{
     RecipientInfo, Rfs, SortColumnAndDirection, SortDirection, SttbfRfs, Wpms,
 };
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat, ParagraphListBinding};
+pub use parts::ole_controls::{DocumentOleControls, OleControlInfo};
 pub use parts::pap::ParagraphConditionalFormatting;
 pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
@@ -202,6 +207,10 @@ pub use parts::smart_tags::{
 pub use parts::styles::{
     StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
     StyleSheetHeader,
+};
+pub use parts::structured_tags::{
+    DocumentStructuredTag, DocumentStructuredTags, StructuredTagAttribute, StructuredTagInfo,
+    StructuredTagKind, StructuredTagName,
 };
 pub use parts::subdocuments::{
     DocumentSubdocuments, ReferencedFileKind, ReferencedFileName, Subdocument,

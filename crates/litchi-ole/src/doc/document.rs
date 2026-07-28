@@ -44,10 +44,13 @@ use super::parts::proofing::ProofingTables;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::rmd_threading::DocumentRmdThreading;
 use super::parts::saved_by::SavedByTable;
+use super::parts::format_consistency::DocumentFormatConsistencyMarks;
+use super::parts::ole_controls::DocumentOleControls;
 use super::parts::protection::DocumentProtectedRanges;
 use super::parts::rsids::DocumentRsids;
 use super::parts::sections::SectionsTable;
 use super::parts::smart_tags::DocumentSmartTags;
+use super::parts::structured_tags::DocumentStructuredTags;
 use super::parts::styles::StyleSheet;
 use super::parts::subdocuments::DocumentSubdocuments;
 use super::parts::text::TextExtractor;
@@ -121,6 +124,12 @@ pub struct Document {
     auto_summary: Option<DocumentAutoSummary>,
     /// Word 2003 range-level protection ("editable ranges") metadata.
     protected_ranges: Option<DocumentProtectedRanges>,
+    /// Format consistency-checker marks.
+    format_consistency_marks: Option<DocumentFormatConsistencyMarks>,
+    /// Word 2003 structured document tag bookmarks.
+    structured_tags: Option<DocumentStructuredTags>,
+    /// OLE controls recorded in the document.
+    ole_controls: Option<DocumentOleControls>,
     /// Mail-merge data-source state (`Pms` and the ODSO property set).
     mail_merge: Option<DocumentMailMerge>,
     /// Master-document subdocument directory and referenced-file name table.
@@ -277,6 +286,9 @@ impl Document {
         let embedded_fonts = DocumentEmbeddedFonts::parse(&fib, &table_stream)?;
         let auto_summary = DocumentAutoSummary::parse(&fib, &table_stream)?;
         let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
+        let format_consistency_marks = DocumentFormatConsistencyMarks::parse(&fib, &table_stream)?;
+        let structured_tags = DocumentStructuredTags::parse(&fib, &table_stream)?;
+        let ole_controls = DocumentOleControls::parse(&fib, &table_stream)?;
         let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
         let subdocuments = DocumentSubdocuments::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
@@ -377,6 +389,9 @@ impl Document {
             embedded_fonts,
             auto_summary,
             protected_ranges,
+            format_consistency_marks,
+            structured_tags,
+            ole_controls,
             mail_merge,
             subdocuments,
             revision_authors,
@@ -1982,6 +1997,33 @@ impl Document {
     /// authenticated, and no protection policy is enforced.
     pub fn protected_ranges(&self) -> Option<&DocumentProtectedRanges> {
         self.protected_ranges.as_ref()
+    }
+
+    /// Format consistency-checker marks, when the document carries them
+    /// (MS-DOC 2.9.282 and 2.9.64).
+    ///
+    /// The data is inert: it records which text regions the checker flagged
+    /// and why; no formatting is analyzed or modified.
+    pub fn format_consistency_marks(&self) -> Option<&DocumentFormatConsistencyMarks> {
+        self.format_consistency_marks.as_ref()
+    }
+
+    /// Word 2003 structured document tag bookmarks, when the document
+    /// carries them (MS-DOC 2.9.284 and 2.9.239).
+    ///
+    /// The data is inert: no XML schema is resolved and no placeholder is
+    /// rendered.
+    pub fn structured_tags(&self) -> Option<&DocumentStructuredTags> {
+        self.structured_tags.as_ref()
+    }
+
+    /// The OLE controls recorded in the document (`RgxOcxInfo`, MS-DOC
+    /// 2.9.229), when it contains any.
+    ///
+    /// The data is inert: no control is instantiated or activated and no
+    /// control code is executed.
+    pub fn ole_controls(&self) -> Option<&DocumentOleControls> {
+        self.ole_controls.as_ref()
     }
 
     /// The mail-merge data-source state of the document (`Pms` plus the ODSO
