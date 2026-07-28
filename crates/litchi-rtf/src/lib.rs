@@ -306,9 +306,9 @@ pub use table::{
     TableDistanceScope, TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances,
     TableHorizontalPosition, TableHorizontalReference, TableIndent, TableIndentUnit,
     TablePreferredWidth, TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex,
-    TableRowBanding, TableRowBorderSide, TableRowBorders, TableRowGeometry, TableRowHeight,
-    TableRowLayout, TableShading, TableSideDistance, TableVerticalPosition, TableVerticalReference,
-    TableWrapDistances,
+    TableRowBanding, TableRowBorderSide, TableRowBorders, TableRowCellDefaults, TableRowGeometry,
+    TableRowHeight, TableRowLayout, TableShading, TableSideDistance, TableStyleBorderSide,
+    TableStyleDefaultBorders, TableVerticalPosition, TableVerticalReference, TableWrapDistances,
 };
 pub use theme::DocumentTheme;
 pub use types::{

@@ -358,6 +358,11 @@ struct State {
     table_row_borders: crate::TableRowBorders,
     table_row_shading: crate::TableShading,
     table_row_geometry: crate::TableRowGeometry,
+    table_default_borders: crate::TableStyleDefaultBorders,
+    table_default_padding: crate::TableEdgeDistances,
+    table_default_spacing: crate::TableEdgeDistances,
+    table_default_width_unit: Option<crate::TablePreferredWidthUnit>,
+    table_default_width_value: Option<i32>,
     table_autoformat_flags: crate::TableAutoformatFlags,
     table_row_banding: crate::TableRowBanding,
     table_row_index_seen: bool,
@@ -482,30 +487,16 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
     )
 }
 
-fn apply_table_distance(
-    state: &mut State,
-    target: crate::TableDistanceTarget,
+fn apply_table_distance_side(
+    distances: &mut crate::TableEdgeDistances,
+    edge: crate::TableEdge,
     parameter: Option<i32>,
     unit: bool,
 ) -> RtfResult<()> {
     let value = parameter.ok_or_else(|| {
         RtfError::MalformedDocument("RTF table distance control requires a parameter".to_string())
     })?;
-    let distances = match (target.scope, target.kind) {
-        (crate::TableDistanceScope::Row, crate::TableDistanceKind::Padding) => {
-            &mut state.table_row_padding
-        },
-        (crate::TableDistanceScope::Row, crate::TableDistanceKind::Spacing) => {
-            &mut state.table_row_spacing
-        },
-        (crate::TableDistanceScope::Cell, crate::TableDistanceKind::Padding) => {
-            &mut state.pending_cell_padding
-        },
-        (crate::TableDistanceScope::Cell, crate::TableDistanceKind::Spacing) => {
-            &mut state.pending_cell_spacing
-        },
-    };
-    let side = distances.side_mut(target.edge);
+    let side = distances.side_mut(edge);
     if unit {
         side.unit = Some(match value {
             0 => crate::TableDistanceUnit::Null,
@@ -525,6 +516,29 @@ fn apply_table_distance(
         side.value = Some(value as u16);
     }
     Ok(())
+}
+
+fn apply_table_distance(
+    state: &mut State,
+    target: crate::TableDistanceTarget,
+    parameter: Option<i32>,
+    unit: bool,
+) -> RtfResult<()> {
+    let distances = match (target.scope, target.kind) {
+        (crate::TableDistanceScope::Row, crate::TableDistanceKind::Padding) => {
+            &mut state.table_row_padding
+        },
+        (crate::TableDistanceScope::Row, crate::TableDistanceKind::Spacing) => {
+            &mut state.table_row_spacing
+        },
+        (crate::TableDistanceScope::Cell, crate::TableDistanceKind::Padding) => {
+            &mut state.pending_cell_padding
+        },
+        (crate::TableDistanceScope::Cell, crate::TableDistanceKind::Spacing) => {
+            &mut state.pending_cell_spacing
+        },
+    };
+    apply_table_distance_side(distances, target.edge, parameter, unit)
 }
 
 fn table_width_unit(parameter: Option<i32>) -> RtfResult<crate::TablePreferredWidthUnit> {
@@ -1078,6 +1092,11 @@ impl Default for State {
             table_row_borders: Default::default(),
             table_row_shading: Default::default(),
             table_row_geometry: Default::default(),
+            table_default_borders: Default::default(),
+            table_default_padding: Default::default(),
+            table_default_spacing: Default::default(),
+            table_default_width_unit: None,
+            table_default_width_value: None,
             table_autoformat_flags: Default::default(),
             table_row_banding: Default::default(),
             table_row_index_seen: false,
@@ -8010,6 +8029,11 @@ impl<'a> Parser<'a> {
                 state.table_row_borders = Default::default();
                 state.table_row_shading = Default::default();
                 state.table_row_geometry = Default::default();
+                state.table_default_borders = Default::default();
+                state.table_default_padding = Default::default();
+                state.table_default_spacing = Default::default();
+                state.table_default_width_unit = None;
+                state.table_default_width_value = None;
                 state.table_autoformat_flags = Default::default();
                 state.table_row_banding = Default::default();
                 state.table_row_revision = Default::default();
@@ -8370,6 +8394,40 @@ impl<'a> Parser<'a> {
             ControlWord::TableDistanceUnit(target, value) => {
                 apply_table_distance(state, *target, *value, true)?
             },
+            ControlWord::TableDefaultDistanceValue(kind, edge, value) => {
+                let distances = match kind {
+                    crate::TableDistanceKind::Padding => &mut state.table_default_padding,
+                    crate::TableDistanceKind::Spacing => &mut state.table_default_spacing,
+                };
+                apply_table_distance_side(distances, *edge, *value, false)?
+            },
+            ControlWord::TableDefaultDistanceUnit(kind, edge, value) => {
+                let distances = match kind {
+                    crate::TableDistanceKind::Padding => &mut state.table_default_padding,
+                    crate::TableDistanceKind::Spacing => &mut state.table_default_spacing,
+                };
+                apply_table_distance_side(distances, *edge, *value, true)?
+            },
+            ControlWord::TableDefaultCellWidthUnit(param) => {
+                let unit = table_width_unit(*param)?;
+                if state.table_default_width_unit.replace(unit).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF tscellwidthfts is duplicated".to_string(),
+                    ));
+                }
+            },
+            ControlWord::TableDefaultCellWidthValue(param) => {
+                let value = param.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF tscellwidth requires a parameter".to_string(),
+                    )
+                })?;
+                if state.table_default_width_value.replace(value).is_some() {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF tscellwidth is duplicated".to_string(),
+                    ));
+                }
+            },
             ControlWord::TableHorizontalReference(value, param) => {
                 if matches!(
                     state.destination,
@@ -8496,6 +8554,15 @@ impl<'a> Parser<'a> {
             ControlWord::TableRow => {
                 // Row break - finalize current row
                 let row_geometry = resolve_row_geometry(state)?;
+                let row_cell_defaults = crate::TableRowCellDefaults {
+                    borders: state.table_default_borders.clone(),
+                    padding: state.table_default_padding.clone(),
+                    spacing: state.table_default_spacing.clone(),
+                    preferred_cell_width: resolve_preferred_width(
+                        state.table_default_width_unit,
+                        state.table_default_width_value,
+                    )?,
+                };
                 let table_style = state.table_style;
                 let table_rsid = state.table_rsid;
                 let row_padding = state.table_row_padding.clone();
@@ -8551,6 +8618,7 @@ impl<'a> Parser<'a> {
                     row.set_layout(row_layout);
                     row.set_padding(row_padding);
                     row.set_spacing(row_spacing);
+                    row.set_cell_defaults(row_cell_defaults);
                     row.set_positioning(row_positioning);
                     row.set_borders(row_borders);
                     row.set_shading(row_shading);
@@ -13771,6 +13839,9 @@ impl<'a> Parser<'a> {
                 crate::table::TableBorderTarget::Cell(side) => {
                     state.pending_cell_borders.side_mut(*side)
                 },
+                crate::table::TableBorderTarget::StyleDefault(side) => {
+                    state.table_default_borders.side_mut(*side)
+                },
             };
             *slot = Some(crate::Border::default());
             return Ok(true);
@@ -13881,6 +13952,9 @@ impl<'a> Parser<'a> {
             crate::table::TableBorderTarget::Row(side) => state.table_row_borders.side_mut(side),
             crate::table::TableBorderTarget::Cell(side) => {
                 state.pending_cell_borders.side_mut(side)
+            },
+            crate::table::TableBorderTarget::StyleDefault(side) => {
+                state.table_default_borders.side_mut(side)
             },
         }
         .as_mut()
@@ -16740,6 +16814,15 @@ impl<'a> Parser<'a> {
         self.drain_nested_to(level)?;
         let state = self.current_state()?.clone();
         let geometry = resolve_row_geometry(&state)?;
+        let cell_defaults = crate::TableRowCellDefaults {
+            borders: state.table_default_borders.clone(),
+            padding: state.table_default_padding.clone(),
+            spacing: state.table_default_spacing.clone(),
+            preferred_cell_width: resolve_preferred_width(
+                state.table_default_width_unit,
+                state.table_default_width_value,
+            )?,
+        };
         let builder = self.ensure_nested_builder(level)?;
         if !builder.cell_text.is_empty()
             || !builder.cell_nested.is_empty()
@@ -16789,6 +16872,7 @@ impl<'a> Parser<'a> {
         builder.row.set_layout(state.table_row_layout);
         builder.row.set_padding(state.table_row_padding.clone());
         builder.row.set_spacing(state.table_row_spacing.clone());
+        builder.row.set_cell_defaults(cell_defaults);
         builder
             .row
             .set_positioning(state.table_row_positioning.clone());

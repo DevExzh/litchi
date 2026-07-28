@@ -671,6 +671,10 @@ pub enum ControlWord<'a> {
         Option<i32>,
     ),
     TableBorder(crate::table::TableBorderTarget, Option<i32>),
+    TableDefaultDistanceValue(crate::TableDistanceKind, crate::TableEdge, Option<i32>),
+    TableDefaultDistanceUnit(crate::TableDistanceKind, crate::TableEdge, Option<i32>),
+    TableDefaultCellWidthUnit(Option<i32>),
+    TableDefaultCellWidthValue(Option<i32>),
     TableShadingAmount(crate::TableDistanceScope, Option<i32>),
     TableShadingForeground(crate::TableDistanceScope, Option<i32>),
     TableShadingBackground(crate::TableDistanceScope, Option<i32>),
@@ -2598,6 +2602,128 @@ impl<'a> Lexer<'a> {
                 ),
                 param,
             ),
+            "tsbrdrt" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(crate::TableStyleBorderSide::Top),
+                param,
+            ),
+            "tsbrdrl" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(crate::TableStyleBorderSide::Left),
+                param,
+            ),
+            "tsbrdrb" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(crate::TableStyleBorderSide::Bottom),
+                param,
+            ),
+            "tsbrdrr" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(crate::TableStyleBorderSide::Right),
+                param,
+            ),
+            "tsbrdrh" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(
+                    crate::TableStyleBorderSide::HorizontalInside,
+                ),
+                param,
+            ),
+            "tsbrdrv" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(
+                    crate::TableStyleBorderSide::VerticalInside,
+                ),
+                param,
+            ),
+            "tsbrdrdgl" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(
+                    crate::TableStyleBorderSide::DiagonalUpperLeftToLowerRight,
+                ),
+                param,
+            ),
+            "tsbrdrdg" => ControlWord::TableBorder(
+                crate::table::TableBorderTarget::StyleDefault(
+                    crate::TableStyleBorderSide::DiagonalUpperRightToLowerLeft,
+                ),
+                param,
+            ),
+            "tscellpaddl" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Left,
+                param,
+            ),
+            "tscellpaddr" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Right,
+                param,
+            ),
+            "tscellpaddt" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Top,
+                param,
+            ),
+            "tscellpaddb" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Bottom,
+                param,
+            ),
+            "tscellpaddfl" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Left,
+                param,
+            ),
+            "tscellpaddfr" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Right,
+                param,
+            ),
+            "tscellpaddft" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Top,
+                param,
+            ),
+            "tscellpaddfb" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Padding,
+                crate::TableEdge::Bottom,
+                param,
+            ),
+            "tscellspcl" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Left,
+                param,
+            ),
+            "tscellspcr" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Right,
+                param,
+            ),
+            "tscellspct" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Top,
+                param,
+            ),
+            "tscellspcb" => ControlWord::TableDefaultDistanceValue(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Bottom,
+                param,
+            ),
+            "tscellspcfl" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Left,
+                param,
+            ),
+            "tscellspcfr" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Right,
+                param,
+            ),
+            "tscellspcft" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Top,
+                param,
+            ),
+            "tscellspcfb" => ControlWord::TableDefaultDistanceUnit(
+                crate::TableDistanceKind::Spacing,
+                crate::TableEdge::Bottom,
+                param,
+            ),
+            "tscellwidthfts" => ControlWord::TableDefaultCellWidthUnit(param),
+            "tscellwidth" => ControlWord::TableDefaultCellWidthValue(param),
             "trshdng" => ControlWord::TableShadingAmount(crate::TableDistanceScope::Row, param),
             "trcfpat" => ControlWord::TableShadingForeground(crate::TableDistanceScope::Row, param),
             "trcbpat" => ControlWord::TableShadingBackground(crate::TableDistanceScope::Row, param),

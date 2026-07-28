@@ -6585,6 +6585,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_table_shading("tr", row.shading())?;
         self.write_table_distances("trpadd", "trpaddf", row.padding())?;
         self.write_table_distances("trspd", "trspdf", row.spacing())?;
+        self.write_table_row_cell_defaults(row.cell_defaults())?;
         self.write_floating_table_position(row.positioning())?;
 
         // Cell boundaries
@@ -6743,6 +6744,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_table_shading("tr", row.shading())?;
             self.write_table_distances("trpadd", "trpaddf", row.padding())?;
             self.write_table_distances("trspd", "trspdf", row.spacing())?;
+            self.write_table_row_cell_defaults(row.cell_defaults())?;
             self.write_floating_table_position(row.positioning())?;
             for (index, cell) in row.cells().iter().enumerate() {
                 self.write_table_preferred_width("clftsWidth", "clwWidth", cell.preferred_width())?;
@@ -7066,6 +7068,38 @@ impl<W: Write> RtfWriter<W> {
         }
         Ok(())
     }
+    fn write_table_row_cell_defaults(
+        &mut self,
+        defaults: &crate::TableRowCellDefaults,
+    ) -> io::Result<()> {
+        defaults
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        let borders = &defaults.borders;
+        for (selector, border) in [
+            ("tsbrdrt", borders.top),
+            ("tsbrdrl", borders.left),
+            ("tsbrdrb", borders.bottom),
+            ("tsbrdrr", borders.right),
+            ("tsbrdrh", borders.horizontal_inside),
+            ("tsbrdrv", borders.vertical_inside),
+            ("tsbrdrdgl", borders.diagonal_upper_left_to_lower_right),
+            ("tsbrdrdg", borders.diagonal_upper_right_to_lower_left),
+        ] {
+            if let Some(border) = border {
+                self.write_table_border(selector, &border)?;
+            }
+        }
+        self.write_table_distances("tscellpadd", "tscellpaddf", &defaults.padding)?;
+        self.write_table_distances("tscellspc", "tscellspcf", &defaults.spacing)?;
+        self.write_table_preferred_width(
+            "tscellwidthfts",
+            "tscellwidth",
+            defaults.preferred_cell_width,
+        )?;
+        Ok(())
+    }
+
     fn write_table_shading(
         &mut self,
         prefix: &str,

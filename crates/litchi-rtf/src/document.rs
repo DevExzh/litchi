@@ -60,6 +60,7 @@ fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> 
         }
         owned_row.set_padding(row.padding().clone());
         owned_row.set_spacing(row.spacing().clone());
+        owned_row.set_cell_defaults(row.cell_defaults().clone());
         owned_row.set_positioning(row.positioning().clone());
         output.add_row(owned_row);
     }

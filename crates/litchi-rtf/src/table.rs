@@ -433,10 +433,24 @@ pub enum TableCellBorderSide {
     UpperRightToLowerLeft,
 }
 
+/// Sides of the table-style default borders (`\tsbrdr*`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableStyleBorderSide {
+    Top,
+    Left,
+    Bottom,
+    Right,
+    HorizontalInside,
+    VerticalInside,
+    DiagonalUpperLeftToLowerRight,
+    DiagonalUpperRightToLowerLeft,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TableBorderTarget {
     Row(TableRowBorderSide),
     Cell(TableCellBorderSide),
+    StyleDefault(TableStyleBorderSide),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -472,6 +486,98 @@ impl TableRowBorders {
         .flatten()
         {
             border.validate_table()?;
+        }
+        Ok(())
+    }
+}
+
+/// Table-style default borders declared once per row (`\tsbrdr*`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TableStyleDefaultBorders {
+    pub top: Option<crate::Border>,
+    pub left: Option<crate::Border>,
+    pub bottom: Option<crate::Border>,
+    pub right: Option<crate::Border>,
+    pub horizontal_inside: Option<crate::Border>,
+    pub vertical_inside: Option<crate::Border>,
+    pub diagonal_upper_left_to_lower_right: Option<crate::Border>,
+    pub diagonal_upper_right_to_lower_left: Option<crate::Border>,
+}
+impl TableStyleDefaultBorders {
+    pub(crate) fn side_mut(&mut self, side: TableStyleBorderSide) -> &mut Option<crate::Border> {
+        match side {
+            TableStyleBorderSide::Top => &mut self.top,
+            TableStyleBorderSide::Left => &mut self.left,
+            TableStyleBorderSide::Bottom => &mut self.bottom,
+            TableStyleBorderSide::Right => &mut self.right,
+            TableStyleBorderSide::HorizontalInside => &mut self.horizontal_inside,
+            TableStyleBorderSide::VerticalInside => &mut self.vertical_inside,
+            TableStyleBorderSide::DiagonalUpperLeftToLowerRight => {
+                &mut self.diagonal_upper_left_to_lower_right
+            },
+            TableStyleBorderSide::DiagonalUpperRightToLowerLeft => {
+                &mut self.diagonal_upper_right_to_lower_left
+            },
+        }
+    }
+    /// Whether no default border was explicitly retained.
+    pub fn is_empty(&self) -> bool {
+        [
+            self.top,
+            self.left,
+            self.bottom,
+            self.right,
+            self.horizontal_inside,
+            self.vertical_inside,
+            self.diagonal_upper_left_to_lower_right,
+            self.diagonal_upper_right_to_lower_left,
+        ]
+        .into_iter()
+        .all(|border| border.is_none())
+    }
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        for border in [
+            self.top,
+            self.left,
+            self.bottom,
+            self.right,
+            self.horizontal_inside,
+            self.vertical_inside,
+            self.diagonal_upper_left_to_lower_right,
+            self.diagonal_upper_right_to_lower_left,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            border.validate_table()?;
+        }
+        Ok(())
+    }
+}
+
+/// Row-scoped default formatting applied to every cell in the row
+/// (`\tsbrdr*`, `\tscellpadd*`, `\tscellspc*`, and `\tscellwidth*`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TableRowCellDefaults {
+    pub borders: TableStyleDefaultBorders,
+    pub padding: TableEdgeDistances,
+    pub spacing: TableEdgeDistances,
+    pub preferred_cell_width: Option<TablePreferredWidth>,
+}
+impl TableRowCellDefaults {
+    /// Whether no default formatting was explicitly retained.
+    pub fn is_empty(&self) -> bool {
+        self.borders.is_empty()
+            && self.padding == TableEdgeDistances::default()
+            && self.spacing == TableEdgeDistances::default()
+            && self.preferred_cell_width.is_none()
+    }
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        self.borders.validate()?;
+        self.padding.validate()?;
+        self.spacing.validate()?;
+        if let Some(width) = self.preferred_cell_width {
+            width.validate()?;
         }
         Ok(())
     }
@@ -754,6 +860,7 @@ pub struct Row<'a> {
     layout: TableRowLayout,
     padding: TableEdgeDistances,
     spacing: TableEdgeDistances,
+    cell_defaults: TableRowCellDefaults,
     positioning: FloatingTablePosition,
     borders: TableRowBorders,
     shading: TableShading,
@@ -776,6 +883,7 @@ impl<'a> Row<'a> {
             layout: TableRowLayout::default(),
             padding: TableEdgeDistances::default(),
             spacing: TableEdgeDistances::default(),
+            cell_defaults: TableRowCellDefaults::default(),
             positioning: FloatingTablePosition::default(),
             borders: Default::default(),
             shading: Default::default(),
@@ -847,6 +955,14 @@ impl<'a> Row<'a> {
     }
     pub fn set_spacing(&mut self, value: TableEdgeDistances) {
         self.spacing = value
+    }
+    /// Row-scoped default cell formatting (`\tsbrdr*`, `\tscellpadd*`,
+    /// `\tscellspc*`, and `\tscellwidth*`).
+    pub fn cell_defaults(&self) -> &TableRowCellDefaults {
+        &self.cell_defaults
+    }
+    pub fn set_cell_defaults(&mut self, value: TableRowCellDefaults) {
+        self.cell_defaults = value
     }
     pub fn positioning(&self) -> &FloatingTablePosition {
         &self.positioning
@@ -1515,6 +1631,7 @@ impl Row<'_> {
             layout: self.layout,
             padding: self.padding,
             spacing: self.spacing,
+            cell_defaults: self.cell_defaults,
             positioning: self.positioning,
             borders: self.borders,
             shading: self.shading,
