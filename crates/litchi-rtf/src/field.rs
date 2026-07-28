@@ -6800,6 +6800,7 @@ fn barcode_field_instructions(instruction: &str) -> Option<&str> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn barcode_display_field_parts(
     instruction: &str,
 ) -> Option<(
@@ -6988,6 +6989,7 @@ fn auto_text_field_parts<'a>(
     Some((kind, entry_name, unknown_switches))
 }
 
+#[allow(clippy::type_complexity)]
 fn auto_text_list_field_parts<'a>(
     instruction: &'a str,
 ) -> Option<(
@@ -8843,6 +8845,7 @@ fn field_argument_end(input: &str) -> Option<usize> {
     None
 }
 
+#[allow(clippy::type_complexity)]
 fn sequence_field_parts<'a>(
     instruction: &'a str,
 ) -> Option<(Cow<'a, str>, Option<Cow<'a, str>>, &'a str)> {

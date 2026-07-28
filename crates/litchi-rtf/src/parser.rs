@@ -9331,10 +9331,7 @@ impl<'a> Parser<'a> {
         let mut border = crate::PageBorder::default();
         let mut saw_style = false;
         let mut seen = 0u8;
-        loop {
-            let Some(Token::Control(control)) = self.tokens.get(self.pos) else {
-                break;
-            };
+        while let Some(Token::Control(control)) = self.tokens.get(self.pos) {
             let style = match control {
                 ControlWord::BorderNone => Some(crate::PageBorderStyle::None),
                 ControlWord::BorderSingle => Some(crate::PageBorderStyle::Single),
@@ -9719,7 +9716,7 @@ impl<'a> Parser<'a> {
             (
                 Some(Token::Control(ControlWord::IgnorableDestination)),
                 Some(Token::Control(control)),
-            ) => Ok(control.clone()),
+            ) => Ok(*control),
             _ => Err(RtfError::MalformedDocument(
                 "nested RTF mail-merge destinations must be starred".to_string(),
             )),
@@ -13235,8 +13232,10 @@ impl<'a> Parser<'a> {
             },
         }
         self.pos += 1;
-        let mut state = State::default();
-        state.unicode_skip = self.current_state()?.unicode_skip;
+        let mut state = State {
+            unicode_skip: self.current_state()?.unicode_skip,
+            ..State::default()
+        };
         let mut seen = std::collections::HashSet::new();
         let mut script = None;
         let mut low = None;
@@ -13474,8 +13473,10 @@ impl<'a> Parser<'a> {
         let mut style_type = None;
         let mut id = None;
         let inherited_unicode_skip = self.current_state()?.unicode_skip;
-        let mut state = State::default();
-        state.unicode_skip = inherited_unicode_skip;
+        let mut state = State {
+            unicode_skip: inherited_unicode_skip,
+            ..State::default()
+        };
         let mut name = String::new();
         let mut name_complete = false;
         let mut based_on = None;
@@ -18119,6 +18120,7 @@ impl<'a> Parser<'a> {
         Ok(shape)
     }
 
+    #[allow(clippy::type_complexity)]
     fn parse_shape_text_destination(
         &mut self,
     ) -> RtfResult<(
@@ -18129,19 +18131,17 @@ impl<'a> Parser<'a> {
         Vec<crate::StoryEvent>,
         Option<ColorRef>,
     )> {
-        match self.tokens.get(self.pos..self.pos + 3) {
-            Some(
-                [
-                    Token::OpenBrace,
-                    Token::Control(ControlWord::IgnorableDestination),
-                    Token::Control(ControlWord::ShapeText(_)),
-                ],
-            ) => {
-                return Err(RtfError::MalformedDocument(
-                    "RTF shptxt destination must not be starred".to_string(),
-                ));
-            },
-            _ => {},
+        if let Some(
+            [
+                Token::OpenBrace,
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(ControlWord::ShapeText(_)),
+            ],
+        ) = self.tokens.get(self.pos..self.pos + 3)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF shptxt destination must not be starred".to_string(),
+            ));
         }
         match self.tokens.get(self.pos..self.pos + 2) {
             Some(
@@ -18525,6 +18525,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn parse_shape_property_group(
         &mut self,
     ) -> RtfResult<(
@@ -19456,11 +19457,9 @@ impl<'a> Parser<'a> {
                         text: Cow::Borrowed(self.arena.alloc_str(&text) as &str),
                         shapes: std::mem::take(&mut builder.shapes)
                             .into_iter()
-                            .map(|shape| shape)
                             .collect(),
                         shape_groups: std::mem::take(&mut builder.shape_groups)
                             .into_iter()
-                            .map(|group| group)
                             .collect(),
                         drawing_order: std::mem::take(&mut builder.drawing_order),
                         story_events: std::mem::take(&mut builder.story_events),

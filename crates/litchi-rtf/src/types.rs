@@ -1288,6 +1288,7 @@ pub struct ParagraphContent<'a> {
 /// This enum is used by the `elements()` method to represent
 /// the mixed content of an RTF document in sequential order.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)] // public content enum; boxing would break the API
 pub enum DocumentElement<'a> {
     /// A paragraph with formatted runs
     Paragraph(ParagraphContent<'a>),

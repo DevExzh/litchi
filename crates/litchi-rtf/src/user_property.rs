@@ -295,7 +295,7 @@ impl<'a> UserPropertyValue<'a> {
                     "RTF date user-property lexical and typed values disagree".to_string(),
                 ))
             },
-            Self::Unknown { type_code, .. } if matches!(type_code, 3 | 5 | 11 | 30 | 64) => {
+            Self::Unknown { type_code: 3 | 5 | 11 | 30 | 64, .. } => {
                 Err(RtfError::MalformedDocument(
                     "known RTF user-property type cannot use Unknown".to_string(),
                 ))

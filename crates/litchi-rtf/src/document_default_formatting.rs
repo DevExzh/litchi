@@ -18,23 +18,12 @@ pub struct DocumentDefaultFonts {
     pub stylesheet_bidi: Option<u16>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DefaultCharacterProperties {
     pub formatting: Formatting,
     pub low_ansi_font: Option<u16>,
     pub high_ansi_font: Option<u16>,
     pub double_byte_font: Option<u16>,
-}
-
-impl Default for DefaultCharacterProperties {
-    fn default() -> Self {
-        Self {
-            formatting: Formatting::default(),
-            low_ansi_font: None,
-            high_ansi_font: None,
-            double_byte_font: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

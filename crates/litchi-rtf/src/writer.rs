@@ -2986,6 +2986,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_field_story(
         &mut self,
         text: &str,
@@ -3452,12 +3453,12 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("{")?;
         self.write_control_word(control, None)?;
         for (name, value) in [
-            ("yr", timestamp.year.map(i32::from)),
-            ("mo", timestamp.month.map(i32::from)),
-            ("dy", timestamp.day.map(i32::from)),
-            ("hr", timestamp.hour.map(i32::from)),
-            ("min", timestamp.minute.map(i32::from)),
-            ("sec", timestamp.second.map(i32::from)),
+            ("yr", timestamp.year),
+            ("mo", timestamp.month),
+            ("dy", timestamp.day),
+            ("hr", timestamp.hour),
+            ("min", timestamp.minute),
+            ("sec", timestamp.second),
         ] {
             if let Some(value) = value {
                 self.write_control_word(name, Some(value))?;
@@ -3711,6 +3712,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_blocks_with_markup(
         &mut self,
         blocks: &[StyleBlock<'_>],
