@@ -6,7 +6,7 @@
 //! and the text indentation level. Extensions of a type or size the
 //! specification does not define are preserved verbatim.
 
-use super::differential_format::{XlsXfColor, XlsXfFontScheme, XlsXfGradient, XlsXfGradientStop};
+use super::differential_format::{XlsXfFontScheme, XlsXfGradient, XlsXfGradientStop};
 use super::{XlsError, XlsResult};
 
 /// Record type of the `XFExt` record.
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn parses_gradient_fill() {
         let gradient = XlsXfGradient::linear(90.0).unwrap();
-        let color = XlsXfColor::try_new(
+        let color = super::super::differential_format::XlsXfColor::try_new(
             super::super::differential_format::XlsXfColorSource::Rgb,
             0,
             [0xFF, 0, 0, 0xFF],

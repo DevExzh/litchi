@@ -54,6 +54,7 @@ use super::parts::structured_tags::DocumentStructuredTags;
 use super::parts::styles::StyleSheet;
 use super::parts::subdocuments::DocumentSubdocuments;
 use super::parts::text::TextExtractor;
+use super::parts::xml_schemas::DocumentXmlSchemas;
 use super::table::Table;
 #[cfg(feature = "formula")]
 use crate::mtef_extractor::MtefExtractor;
@@ -128,6 +129,10 @@ pub struct Document {
     format_consistency_marks: Option<DocumentFormatConsistencyMarks>,
     /// Word 2003 structured document tag bookmarks.
     structured_tags: Option<DocumentStructuredTags>,
+    /// Word 2003 XML schema definition references (`Hplxsdr`).
+    xml_schemas: Option<DocumentXmlSchemas>,
+    /// Custom XML save transform path (`fcCustomXForm`).
+    custom_xml_transform_path: Option<String>,
     /// OLE controls recorded in the document.
     ole_controls: Option<DocumentOleControls>,
     /// Mail-merge data-source state (`Pms` and the ODSO property set).
@@ -288,6 +293,9 @@ impl Document {
         let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
         let format_consistency_marks = DocumentFormatConsistencyMarks::parse(&fib, &table_stream)?;
         let structured_tags = DocumentStructuredTags::parse(&fib, &table_stream)?;
+        let xml_schemas = DocumentXmlSchemas::parse(&fib, &table_stream)?;
+        let custom_xml_transform_path =
+            super::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream)?;
         let ole_controls = DocumentOleControls::parse(&fib, &table_stream)?;
         let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
         let subdocuments = DocumentSubdocuments::parse(&fib, &table_stream)?;
@@ -391,6 +399,8 @@ impl Document {
             protected_ranges,
             format_consistency_marks,
             structured_tags,
+            xml_schemas,
+            custom_xml_transform_path,
             ole_controls,
             mail_merge,
             subdocuments,
@@ -2015,6 +2025,25 @@ impl Document {
     /// rendered.
     pub fn structured_tags(&self) -> Option<&DocumentStructuredTags> {
         self.structured_tags.as_ref()
+    }
+
+    /// The XML schema definition references of the document (`Hplxsdr`,
+    /// MS-DOC 2.9.117), when it carries any.
+    ///
+    /// The data is inert: schema URIs and name tables are exposed verbatim;
+    /// no schema is fetched, resolved, or applied.
+    pub fn xml_schemas(&self) -> Option<&DocumentXmlSchemas> {
+        self.xml_schemas.as_ref()
+    }
+
+    /// The custom XML save transform path (`fcCustomXForm`, MS-DOC 2.5.9):
+    /// the XML stylesheet Word applies when saving the document in XML
+    /// format, when the document names one.
+    ///
+    /// The path is inert: it is exposed verbatim and never opened, resolved,
+    /// or applied.
+    pub fn custom_xml_transform_path(&self) -> Option<&str> {
+        self.custom_xml_transform_path.as_deref()
     }
 
     /// The OLE controls recorded in the document (`RgxOcxInfo`, MS-DOC

@@ -4,8 +4,10 @@
 //! merge state: the merge flags (`Wpms`, 2.9.347), two data-source connection
 //! descriptors (`Pmfs`, 2.9.204), record filtering (`Rfs`, 2.9.227), a stored
 //! SQL query, the connection string table (`SttbfRfs`, 2.9.289), and the merge
-//! document type (`Wpmsdt`, 2.9.348). The Word 2002+ Office Data Source Object
-//! (`fcODSO`, MS-DOC 2.5) is a sequence of variable-length `ODSOPropertyBase`
+//! document type (`Wpmsdt`, 2.9.348). Word 2002+ stores the current merge
+//! state in a second `Pms` addressed by `fcPmsNew` (MS-DOC 2.5.8). The Word
+//! 2002+ Office Data Source Object (`fcODSO`, MS-DOC 2.5) is a sequence of
+//! variable-length `ODSOPropertyBase`
 //! items (2.9.162) covering the connection string, data table, source file,
 //! recipient filters (`FilterDataItem`, 2.9.87), sort keys
 //! (`SortColumnAndDirection`, 2.9.252), recipient inclusion (`RecipientInfo`,
@@ -20,6 +22,8 @@ use crate::doc::package::{DocError, Result};
 
 /// Table-pointer index of `fcPms`/`lcbPms`.
 const FC_PMS: usize = 44;
+/// Table-pointer index of `fcPmsNew`/`lcbPmsNew`.
+const FC_PMS_NEW: usize = 126;
 /// Table-pointer index of `fcODSO`/`lcbODSO`.
 const FC_ODSO: usize = 127;
 
@@ -1285,6 +1289,7 @@ fn expect_u32(value: &[u8], context: &str) -> Result<u32> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocumentMailMerge {
     state: Option<Pms>,
+    new_state: Option<Pms>,
     odso_properties: Vec<OdsoProperty>,
 }
 
@@ -1292,6 +1297,13 @@ impl DocumentMailMerge {
     /// The Word 97 merge state (`Pms`), when the document carries one.
     pub fn state(&self) -> Option<&Pms> {
         self.state.as_ref()
+    }
+
+    /// The Word 2002+ merge state (`fcPmsNew`, a new `Pms` recording the
+    /// current state of the print merge operation), when the document
+    /// carries one.
+    pub fn new_state(&self) -> Option<&Pms> {
+        self.new_state.as_ref()
     }
 
     /// The Word 2002+ ODSO properties in storage order (empty when the
@@ -1315,15 +1327,19 @@ impl DocumentMailMerge {
         let state = optional_slice(fib, table_stream, FC_PMS, "Pms")?
             .map(Pms::parse)
             .transpose()?;
+        let new_state = optional_slice(fib, table_stream, FC_PMS_NEW, "PmsNew")?
+            .map(Pms::parse)
+            .transpose()?;
         let odso_properties = match optional_slice(fib, table_stream, FC_ODSO, "ODSO data")? {
             Some(data) => parse_odso_properties(data)?,
             None => Vec::new(),
         };
-        if state.is_none() && odso_properties.is_empty() {
+        if state.is_none() && new_state.is_none() && odso_properties.is_empty() {
             return Ok(None);
         }
         Ok(Some(DocumentMailMerge {
             state,
+            new_state,
             odso_properties,
         }))
     }
@@ -1995,4 +2011,45 @@ mod tests {
         good.truncate(total - 4);
         assert!(wrap(&good).is_err());
     }
+
+    #[test]
+    fn parses_pms_new_through_the_fib() {
+        const FIB_POINTERS: usize = 145;
+
+        fn set_fib_pointer(fib: &mut [u8], index: usize, offset: u32, length: u32) {
+            let declared = u16::from_le_bytes([fib[152], fib[153]]);
+            let count = declared.max(u16::try_from(index + 1).unwrap());
+            fib[152..154].copy_from_slice(&count.to_le_bytes());
+            let start = 154 + index * 8;
+            fib[start..start + 4].copy_from_slice(&offset.to_le_bytes());
+            fib[start + 4..start + 8].copy_from_slice(&length.to_le_bytes());
+        }
+
+        let mut fib_data = vec![0; 154 + FIB_POINTERS * 8];
+        fib_data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+        fib_data[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+        fib_data[152..154].copy_from_slice(&(FIB_POINTERS as u16).to_le_bytes());
+
+        let mut builder = PmsBuilder::new();
+        builder.irec_cur = 7;
+        let pms_new = builder.build();
+        set_fib_pointer(&mut fib_data, FC_PMS_NEW, 0, pms_new.len() as u32);
+        let fib = FileInformationBlock::parse(&fib_data).unwrap();
+
+        let mail_merge = DocumentMailMerge::parse(&fib, &pms_new)
+            .unwrap()
+            .expect("merge state present");
+        assert!(mail_merge.state().is_none());
+        assert_eq!(
+            mail_merge.new_state().and_then(|pms| pms.current_record),
+            Some(7)
+        );
+
+        // A malformed PmsNew is reported, not ignored.
+        let mut fib_data = fib.raw_data().to_vec();
+        set_fib_pointer(&mut fib_data, FC_PMS_NEW, 0, 1);
+        let fib = FileInformationBlock::parse(&fib_data).unwrap();
+        assert!(DocumentMailMerge::parse(&fib, &pms_new).is_err());
+    }
 }
+

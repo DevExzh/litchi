@@ -670,6 +670,8 @@ pub struct Paragraph {
     pub keep_together: bool,
     /// Keep with next paragraph
     pub keep_next: bool,
+    /// Side-by-side paragraph layout (`\sbys`).
+    pub side_by_side: bool,
     /// Page break before
     pub page_break_before: bool,
     /// Widow/orphan control
@@ -752,6 +754,62 @@ pub enum UnderlineStyle {
     HeavyWave,
     /// Double wave underline
     DoubleWave,
+}
+
+/// Animated text effect selected by `\animtextN`.
+///
+/// The numeric values are fixed by the RTF 1.9.1 specification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AnimatedTextEffect {
+    /// No animation (`\animtext0`).
+    #[default]
+    None,
+    /// Las Vegas lights (`\animtext1`).
+    LasVegasLights,
+    /// Blinking background (`\animtext2`).
+    BlinkingBackground,
+    /// Sparkle text (`\animtext3`).
+    SparkleText,
+    /// Marching black ants (`\animtext4`).
+    MarchingBlackAnts,
+    /// Marching red ants (`\animtext5`).
+    MarchingRedAnts,
+    /// Shimmer (`\animtext6`).
+    Shimmer,
+}
+
+impl AnimatedTextEffect {
+    /// Maximum value accepted by the RTF `\animtextN` domain.
+    pub const MAX_RTF_VALUE: i32 = 6;
+
+    /// Convert a raw RTF `\animtextN` parameter to a typed effect.
+    #[inline]
+    pub fn from_rtf(value: i32) -> Option<Self> {
+        Some(match value {
+            0 => Self::None,
+            1 => Self::LasVegasLights,
+            2 => Self::BlinkingBackground,
+            3 => Self::SparkleText,
+            4 => Self::MarchingBlackAnts,
+            5 => Self::MarchingRedAnts,
+            6 => Self::Shimmer,
+            _ => return None,
+        })
+    }
+
+    /// Return the raw RTF `\animtextN` parameter for this effect.
+    #[inline]
+    pub fn rtf_value(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::LasVegasLights => 1,
+            Self::BlinkingBackground => 2,
+            Self::SparkleText => 3,
+            Self::MarchingBlackAnts => 4,
+            Self::MarchingRedAnts => 5,
+            Self::Shimmer => 6,
+        }
+    }
 }
 
 /// Explicit bidirectional precedence for a character run or paragraph.
@@ -997,6 +1055,8 @@ pub struct Formatting {
     pub complex_script: Option<bool>,
     /// East Asian character-grid metadata from `\\cgrid` or `\\cgridN`.
     pub character_grid: Option<CharacterGrid>,
+    /// Animated text effect from `\animtextN`.
+    pub animated_text: AnimatedTextEffect,
     /// Associated complex-script character properties.
     pub associated: AssociatedCharacterFormatting,
 }
@@ -1043,6 +1103,7 @@ impl Default for Formatting {
             character_type: None,
             complex_script: None,
             character_grid: None,
+            animated_text: AnimatedTextEffect::default(),
             associated: AssociatedCharacterFormatting::default(),
         }
     }

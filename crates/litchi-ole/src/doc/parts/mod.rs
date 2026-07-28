@@ -55,3 +55,4 @@ pub mod tap;
 pub mod tap_parser;
 pub mod text;
 pub mod textbox;
+pub mod xml_schemas;

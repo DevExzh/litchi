@@ -312,7 +312,7 @@ pub use table::{
 };
 pub use theme::DocumentTheme;
 pub use types::{
-    Alignment, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
+    Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
     AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
     DocumentElement, EmbeddedFont, EmbeddedFontFormat, Font, FontFamily, FontPitch, FontRef,
     FontTable, FontTheme, Formatting, Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph,

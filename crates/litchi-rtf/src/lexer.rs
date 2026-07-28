@@ -40,6 +40,7 @@ pub enum ControlWord<'a> {
     DoubleByteCharacter(Option<i32>),
     FontComplexScript(Option<i32>),
     CharacterGrid(Option<i32>),
+    AnimatedText(Option<i32>),
     NoWidowControl(Option<i32>),
     LegacySectionNumberingLevel(i32),
     LegacyParagraphNumbering(Option<i32>),
@@ -604,6 +605,7 @@ pub enum ControlWord<'a> {
     // Paragraph additional properties
     KeepTogether,
     KeepNext,
+    SideBySide(bool),
     PageBreakBefore,
     WidowControl,
     DropCapLines(Option<i32>),
@@ -824,6 +826,8 @@ pub enum ControlWord<'a> {
     PageNumberHeadingSeparator(crate::PageNumberHeadingSeparator),
     SectionLineGrid(Option<i32>),
     SectionDocumentGrid(crate::SectionDocumentGridType),
+    PaperSourceFirst(Option<i32>),
+    PaperSourceOther(Option<i32>),
     ParagraphRevisionAuthor(i32),
     ParagraphRevisionDate(i32),
     SectionRevisionAuthor(i32),
@@ -2042,6 +2046,7 @@ impl<'a> Lexer<'a> {
             "dbch" => ControlWord::DoubleByteCharacter(param),
             "fcs" => ControlWord::FontComplexScript(param),
             "cgrid" => ControlWord::CharacterGrid(param),
+            "animtext" => ControlWord::AnimatedText(param),
 
             // Paragraph
             "par" => ControlWord::Par,
@@ -2077,6 +2082,7 @@ impl<'a> Lexer<'a> {
             // Paragraph additional properties
             "keep" => ControlWord::KeepTogether,
             "keepn" => ControlWord::KeepNext,
+            "sbys" => ControlWord::SideBySide(param_bool),
             "pagebb" => ControlWord::PageBreakBefore,
             "widctlpar" => ControlWord::WidowControl,
             "nowidctlpar" => ControlWord::NoWidowControl(param),
@@ -2851,6 +2857,8 @@ impl<'a> Lexer<'a> {
             "margt" | "margtsxn" => ControlWord::MarginTop(param_value),
             "margb" | "margbsxn" => ControlWord::MarginBottom(param_value),
             "guttersxn" => ControlWord::MarginGutter(param_value),
+            "binfsxn" => ControlWord::PaperSourceFirst(param),
+            "binsxn" => ControlWord::PaperSourceOther(param),
             "facingp" => ControlWord::FacingPages(param_bool),
             "margmirror" => ControlWord::MirrorMargins(param),
             "gutter" => ControlWord::DocumentGutter(param),

@@ -5600,6 +5600,9 @@ impl<W: Write> RtfWriter<W> {
                 },
             )?;
         }
+        if fmt.animated_text != crate::AnimatedTextEffect::None {
+            self.write_control_word("animtext", Some(fmt.animated_text.rtf_value()))?;
+        }
 
         if let Some(language) = fmt.language {
             self.write_control_word("lang", Some(language.rtf_value()))?;
@@ -6208,6 +6211,11 @@ impl<W: Write> RtfWriter<W> {
         // Keep with next
         if para.keep_next {
             self.write_control_word("keepn", None)?;
+        }
+
+        // Side-by-side
+        if para.side_by_side {
+            self.write_control_word("sbys", None)?;
         }
 
         // Page break before
@@ -7734,6 +7742,14 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("margtsxn", Some(section.properties.margin_top))?;
         self.write_control_word("margbsxn", Some(section.properties.margin_bottom))?;
         self.write_control_word("guttersxn", Some(section.properties.margin_gutter))?;
+
+        // Paper-source bins
+        if let Some(first) = section.properties.paper_source.first {
+            self.write_control_word("binfsxn", Some(i32::from(first)))?;
+        }
+        if let Some(other) = section.properties.paper_source.other {
+            self.write_control_word("binsxn", Some(i32::from(other)))?;
+        }
 
         // Header/footer distance
         self.write_control_word("headery", Some(section.properties.header_distance))?;

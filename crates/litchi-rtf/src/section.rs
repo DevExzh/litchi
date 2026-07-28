@@ -540,6 +540,29 @@ impl SectionDocumentGrid {
     }
 }
 
+/// Maximum printer paper-bin index accepted for `\binfsxnN` / `\binsxnN`.
+pub const MAX_SECTION_PAPER_BIN: i32 = u16::MAX as i32;
+
+/// Printer paper-source bins selected for a section.
+///
+/// `\binfsxnN` picks the bin feeding the section's first page and `\binsxnN`
+/// picks the bin feeding its remaining pages; bin indices are printer-driver
+/// specific and retained as inert values.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SectionPaperSource {
+    /// Paper bin for the first page of the section (`\binfsxnN`).
+    pub first: Option<u16>,
+    /// Paper bin for the remaining pages of the section (`\binsxnN`).
+    pub other: Option<u16>,
+}
+
+impl SectionPaperSource {
+    /// Whether no paper-source bins were authored.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
 /// Section properties
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionProperties {
@@ -591,6 +614,8 @@ pub struct SectionProperties {
     /// Document-grid settings for the section (`\sectlinegridN`,
     /// `\sectspecifyl` / `\sectspecifycl` / `\sectspecifygen`).
     pub document_grid: SectionDocumentGrid,
+    /// Printer paper-source bins for the section (`\binfsxnN` / `\binsxnN`).
+    pub paper_source: SectionPaperSource,
     /// Author/date metadata for the revision that changed this section's
     /// properties (`\srauthN`, `\srdateN`).
     pub revision: crate::RevisionMetadata,
@@ -630,6 +655,7 @@ impl Default for SectionProperties {
             page_number_offset_y: None,
             page_number_heading: SectionPageNumberHeading::default(),
             document_grid: SectionDocumentGrid::default(),
+            paper_source: SectionPaperSource::default(),
             revision: crate::RevisionMetadata::default(),
             vertical_alignment: VerticalAlignment::default(),
             line_numbering: SectionLineNumbering::default(),

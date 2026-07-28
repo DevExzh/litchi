@@ -17,8 +17,6 @@ const NORMAL_VIEW_SET_INFO_TYPE: u16 = 0x0414;
 const NORMAL_VIEW_SET_INFO_ATOM_TYPE: u16 = 0x0415;
 /// `RT_NotesTextViewInfo9` record type.
 const NOTES_TEXT_VIEW_INFO_TYPE: u16 = 0x0413;
-/// `RT_ViewInfoAtom` record type of the notes-text zoom atom.
-const VIEW_INFO_ATOM_TYPE: u16 = 0x03FD;
 /// Byte length of a `NormalViewSetInfo9Atom` payload.
 const ATOM_LEN: usize = 20;
 /// Flag bits defined by `NormalViewSetInfo9Atom`.

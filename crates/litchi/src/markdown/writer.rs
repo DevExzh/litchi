@@ -1482,6 +1482,7 @@ impl MarkdownWriter {
 
     /// Convert MTEF AST nodes to LaTeX string
     #[cfg(feature = "formula")]
+    #[allow(dead_code)] // Used conditionally based on feature flags
     fn convert_mtef_to_latex(&self, nodes: &[litchi_formula::MathNode]) -> String {
         use litchi_formula::latex::LatexConverter;
 

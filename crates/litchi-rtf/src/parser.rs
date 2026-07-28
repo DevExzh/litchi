@@ -429,6 +429,8 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::MarginTop(_)
             | ControlWord::MarginBottom(_)
             | ControlWord::MarginGutter(_)
+            | ControlWord::PaperSourceFirst(_)
+            | ControlWord::PaperSourceOther(_)
             | ControlWord::HeaderDistance(_)
             | ControlWord::FooterDistance(_)
             | ControlWord::Landscape
@@ -820,6 +822,30 @@ fn character_grid(value: Option<i32>) -> RtfResult<crate::CharacterGrid> {
                 RtfError::MalformedDocument("RTF cgrid value must be in -32768..=32767".to_string())
             }),
     }
+}
+
+fn animated_text(value: Option<i32>) -> RtfResult<crate::AnimatedTextEffect> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF animtext control requires a numeric parameter".to_string())
+    })?;
+    crate::AnimatedTextEffect::from_rtf(value).ok_or_else(|| {
+        RtfError::MalformedDocument(format!(
+            "RTF animtext value must be in 0..={}",
+            crate::AnimatedTextEffect::MAX_RTF_VALUE
+        ))
+    })
+}
+
+fn paper_source_bin(value: Option<i32>, name: &str) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
+    })?;
+    u16::try_from(value).map_err(|_| {
+        RtfError::MalformedDocument(format!(
+            "RTF {name} value must be in 0..={}",
+            super::section::MAX_SECTION_PAPER_BIN
+        ))
+    })
 }
 
 fn associated_font_size(value: Option<i32>) -> RtfResult<NonZeroU16> {
@@ -7474,6 +7500,9 @@ impl<'a> Parser<'a> {
             ControlWord::CharacterGrid(value) => {
                 state.formatting.character_grid = Some(character_grid(*value)?);
             },
+            ControlWord::AnimatedText(value) => {
+                state.formatting.animated_text = animated_text(*value)?;
+            },
             ControlWord::FontSize(size) => {
                 if let Some(nz) = NonZeroU16::new((*size).max(0) as u16) {
                     state.formatting.font_size = nz;
@@ -7748,6 +7777,7 @@ impl<'a> Parser<'a> {
             // Paragraph additional properties
             ControlWord::KeepTogether => state.paragraph.keep_together = true,
             ControlWord::KeepNext => state.paragraph.keep_next = true,
+            ControlWord::SideBySide(value) => state.paragraph.side_by_side = *value,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
             ControlWord::DropCapLines(_) | ControlWord::DropCapType(_) => {
@@ -8971,6 +9001,12 @@ impl<'a> Parser<'a> {
             ControlWord::MarginTop(value) => properties.margin_top = *value,
             ControlWord::MarginBottom(value) => properties.margin_bottom = *value,
             ControlWord::MarginGutter(value) => properties.margin_gutter = *value,
+            ControlWord::PaperSourceFirst(value) => {
+                properties.paper_source.first = Some(paper_source_bin(*value, "binfsxn")?);
+            },
+            ControlWord::PaperSourceOther(value) => {
+                properties.paper_source.other = Some(paper_source_bin(*value, "binsxn")?);
+            },
             ControlWord::HeaderDistance(value) => properties.header_distance = *value,
             ControlWord::FooterDistance(value) => properties.footer_distance = *value,
             ControlWord::Landscape => properties.orientation = PageOrientation::Landscape,
@@ -13002,6 +13038,7 @@ impl<'a> Parser<'a> {
             ControlWord::LeftToRightCharacter | ControlWord::RightToLeftCharacter => "direction",
             ControlWord::FontComplexScript(_) => "complex-script",
             ControlWord::CharacterGrid(_) => "character-grid",
+            ControlWord::AnimatedText(_) => "animated-text",
             _ => return None,
         })
     }
@@ -13035,6 +13072,7 @@ impl<'a> Parser<'a> {
             ControlWord::MirrorIndents(_) => "mirror-indent",
             ControlWord::KeepTogether => "keep",
             ControlWord::KeepNext => "keep-next",
+            ControlWord::SideBySide(_) => "side-by-side",
             ControlWord::PageBreakBefore => "page-break",
             ControlWord::WidowControl | ControlWord::NoWidowControl(_) => "widow",
             ControlWord::DropCapLines(_) => "drop-cap-lines",
@@ -14243,6 +14281,9 @@ impl<'a> Parser<'a> {
             ControlWord::CharacterGrid(value) => {
                 state.formatting.character_grid = Some(character_grid(*value)?);
             },
+            ControlWord::AnimatedText(value) => {
+                state.formatting.animated_text = animated_text(*value)?;
+            },
             ControlWord::Plain => {
                 state.formatting = Formatting::default();
                 state.character_border_active = false;
@@ -14346,6 +14387,7 @@ impl<'a> Parser<'a> {
             },
             ControlWord::KeepTogether => state.paragraph.keep_together = true,
             ControlWord::KeepNext => state.paragraph.keep_next = true,
+            ControlWord::SideBySide(value) => state.paragraph.side_by_side = *value,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
             ControlWord::ParagraphHyphenation(value) => {
