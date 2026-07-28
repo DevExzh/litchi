@@ -655,6 +655,15 @@ impl Package {
         self.presentation()?.ole_objects()
     }
 
+    /// Discover bounded, inert slide controls (ActiveX/OCX) and their
+    /// resolved controls-part descriptors.
+    ///
+    /// This never instantiates a control, resolves a CLSID, decodes binary
+    /// control state, executes a macro, or follows an external relationship.
+    pub fn controls(&self) -> Result<Vec<crate::pptx::PptxSlideControl>> {
+        self.presentation()?.controls()
+    }
+
     /// Discover programmable tag-list parts reachable from presentation slides.
     ///
     /// Tag names and values remain inert document strings and are never
@@ -681,6 +690,14 @@ impl Package {
     ) -> Result<Option<crate::pptx::presentation_properties::PresentationProperties>> {
         crate::pptx::presentation_properties::load_from_package(&self.opc)
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+    }
+
+    /// Load the presentation's table styles part, if the package declares one.
+    ///
+    /// The returned inventory reports stored style metadata only; cell style
+    /// payloads are never resolved or rendered.
+    pub fn table_styles(&self) -> Result<Option<crate::pptx::table_styles::TableStyleList>> {
+        crate::pptx::table_styles::load_table_styles(&self.opc)
     }
 
     /// Load the PowerPoint Revision Information part, if present.

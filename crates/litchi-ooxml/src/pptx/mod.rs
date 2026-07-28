@@ -63,6 +63,7 @@ pub mod backgrounds;
 pub mod changes_information;
 pub mod color_map;
 pub mod comments;
+pub mod controls;
 pub mod customshow;
 pub mod embedded_fonts;
 pub mod extended_guides;
@@ -92,6 +93,7 @@ pub mod show_events;
 pub mod shapes;
 pub mod slide;
 pub mod smartart;
+pub mod table_styles;
 pub mod tags;
 pub mod template;
 pub mod theme;
@@ -138,6 +140,9 @@ pub use modern_comments::{
     update_modern_comment, update_modern_comment_reply,
 };
 pub use customshow::{CustomShow, CustomShowList};
+pub use controls::{
+    Persistence as ControlPersistence, PptxControlBinary, PptxControlDescriptor, PptxSlideControl,
+};
 pub use embedded_fonts::{
     EmbeddedFont, EmbeddedFontConformance, EmbeddedFontFace, EmbeddedFontLicensing,
     EmbeddedFontResource, EmbeddedFontStyle, PresentationEmbeddedFonts, add_embedded_font,
@@ -253,6 +258,7 @@ pub use show_events::{
 };
 pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
+pub use table_styles::{TableStyleDefinition, TableStyleList, TableStylePartKind};
 pub use tags::{
     ProgrammableTag, SlideTagList, TagExtensionAttribute, TagList, TagListConformance,
     parse_tag_list, write_tag_list,

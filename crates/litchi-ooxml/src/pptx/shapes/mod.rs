@@ -14,5 +14,5 @@ pub mod textframe;
 
 pub use base::{BaseShape, Shape, ShapeType};
 pub use picture::Picture;
-pub use table::{Table, TableCell, TableRow};
+pub use table::{Table, TableCell, TableProperties, TableRow};
 pub use textframe::TextFrame;

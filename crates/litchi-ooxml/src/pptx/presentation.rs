@@ -2,6 +2,7 @@
 use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
+use crate::pptx::controls::{ControlLoadLimits, PptxSlideControl, load_slide_controls};
 use crate::pptx::handout::HandoutMaster;
 use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotations};
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
@@ -1085,6 +1086,27 @@ impl<'a> Presentation<'a> {
         Ok(objects)
     }
 
+    /// Discover bounded, inert slide controls (ActiveX/OCX) and their
+    /// resolved controls-part descriptors.
+    ///
+    /// This never instantiates a control, resolves a CLSID, decodes binary
+    /// control state, executes a macro, or follows an external relationship.
+    pub fn controls(&self) -> Result<Vec<PptxSlideControl>> {
+        let mut controls = Vec::new();
+        let mut limits = ControlLoadLimits::default();
+
+        for (slide_index, slide) in self.slides()?.iter().enumerate() {
+            controls.extend(load_slide_controls(
+                self.package,
+                slide_index,
+                slide.part().part(),
+                &mut limits,
+            )?);
+        }
+
+        Ok(controls)
+    }
+
     /// Load the presentation's WebVTT caption tracks.
     ///
     /// Internal tracks are parsed as bounded inert text. External targets are
@@ -1120,6 +1142,14 @@ impl<'a> Presentation<'a> {
     pub fn view_properties(&self) -> Result<Option<crate::pptx::view_properties::ViewProperties>> {
         crate::pptx::view_properties::load_from_package(self.package)
             .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+    }
+
+    /// Load the presentation's table styles part, if the package declares one.
+    ///
+    /// The returned inventory reports stored style metadata only; cell style
+    /// payloads are never resolved or rendered.
+    pub fn table_styles(&self) -> Result<Option<crate::pptx::table_styles::TableStyleList>> {
+        crate::pptx::table_styles::load_table_styles(self.package)
     }
 
     /// Load typed presentation settings, if the package contains them.
