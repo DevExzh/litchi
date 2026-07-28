@@ -3,15 +3,47 @@
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+
+const TRANSITIONAL_RELATIONSHIPS_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+const VML_NAMESPACE: &[u8] = b"urn:schemas-microsoft-com:vml";
+const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
 #[derive(Debug, Clone)]
 pub struct Numbering {
     pub(crate) abstract_nums: Vec<AbstractNum>,
     pub(crate) nums: Vec<Num>,
+    pub(crate) picture_bullets: Vec<PictureBullet>,
+}
+
+/// A picture bullet definition (`w:numPicBullet`) from `numbering.xml`.
+///
+/// The image itself lives in a package part referenced through a relationship;
+/// only the inert relationship ID is captured here, never the image bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PictureBullet {
+    id: u32,
+    image_relationship_id: Option<String>,
+}
+
+impl PictureBullet {
+    /// The `w:numPicBulletId` key referenced by `w:lvlPicBulletId` on a level.
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Relationship ID of the bullet image, when the definition carries one.
+    pub fn image_relationship_id(&self) -> Option<&str> {
+        self.image_relationship_id.as_deref()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -316,11 +348,18 @@ struct PendingLevel {
     in_override: bool,
 }
 
+struct PendingPictureBullet {
+    depth: usize,
+    id: u32,
+    image_relationship_id: Option<String>,
+}
+
 impl Numbering {
     pub fn new() -> Self {
         Self {
             abstract_nums: Vec::new(),
             nums: Vec::new(),
+            picture_bullets: Vec::new(),
         }
     }
 
@@ -342,6 +381,12 @@ impl Numbering {
     pub fn get_num(&self, id: u32) -> Option<&Num> {
         self.nums.iter().find(|value| value.id == id)
     }
+    pub fn picture_bullets(&self) -> &[PictureBullet] {
+        &self.picture_bullets
+    }
+    pub fn get_picture_bullet(&self, id: u32) -> Option<&PictureBullet> {
+        self.picture_bullets.iter().find(|value| value.id == id)
+    }
 
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
         let xml = crate::common::mce::process_part(part)?;
@@ -351,6 +396,7 @@ impl Numbering {
         let mut num: Option<PendingNum> = None;
         let mut level_override: Option<PendingOverride> = None;
         let mut level: Option<PendingLevel> = None;
+        let mut picture_bullet: Option<PendingPictureBullet> = None;
         let mut depth = 0usize;
 
         loop {
@@ -374,6 +420,7 @@ impl Numbering {
                         &mut num,
                         &mut level_override,
                         &mut level,
+                        &mut picture_bullet,
                     )?;
                 },
                 Event::Empty(element) => {
@@ -389,11 +436,26 @@ impl Numbering {
                         &mut num,
                         &mut level_override,
                         &mut level,
+                        &mut picture_bullet,
                     )?;
                 },
                 Event::End(element) => {
                     if is_wordprocessing_namespace(&namespace) {
                         match element.local_name().as_ref() {
+                            b"numPicBullet"
+                                if picture_bullet
+                                    .as_ref()
+                                    .is_some_and(|value| value.depth == depth) =>
+                            {
+                                let pending = picture_bullet.take().expect("bullet checked");
+                                push_picture_bullet(
+                                    &mut result.picture_bullets,
+                                    PictureBullet {
+                                        id: pending.id,
+                                        image_relationship_id: pending.image_relationship_id,
+                                    },
+                                )?;
+                            },
                             b"lvl" if level.as_ref().is_some_and(|value| value.depth == depth) => {
                                 finish_level(
                                     &mut abstract_num,
@@ -459,7 +521,8 @@ impl Numbering {
                         || abstract_num.is_some()
                         || num.is_some()
                         || level_override.is_some()
-                        || level.is_some() =>
+                        || level.is_some()
+                        || picture_bullet.is_some() =>
                 {
                     return Err(invalid("unterminated numbering XML"));
                 },
@@ -480,6 +543,7 @@ impl Numbering {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn begin_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -490,12 +554,23 @@ fn begin_element(
     num: &mut Option<PendingNum>,
     level_override: &mut Option<PendingOverride>,
     level: &mut Option<PendingLevel>,
+    picture_bullet: &mut Option<PendingPictureBullet>,
 ) -> Result<()> {
+    if let Some(pending) = picture_bullet.as_mut() {
+        return capture_picture_bullet_image(namespace, element, decoder, resolver, pending);
+    }
     if !is_wordprocessing_namespace(namespace) {
         return Ok(());
     }
     let name = element.local_name();
     match name.as_ref() {
+        b"numPicBullet" if abstract_num.is_none() && num.is_none() => {
+            *picture_bullet = Some(PendingPictureBullet {
+                depth,
+                id: required_u32(element, b"numPicBulletId", decoder, resolver)?,
+                image_relationship_id: None,
+            });
+        },
         b"abstractNum" => {
             if abstract_num.is_some() || num.is_some() {
                 return Err(invalid("nested numbering definitions are invalid"));
@@ -571,6 +646,7 @@ fn begin_element(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn empty_element(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
@@ -582,11 +658,24 @@ fn empty_element(
     num: &mut Option<PendingNum>,
     level_override: &mut Option<PendingOverride>,
     level: &mut Option<PendingLevel>,
+    picture_bullet: &mut Option<PendingPictureBullet>,
 ) -> Result<()> {
+    if let Some(pending) = picture_bullet.as_mut() {
+        return capture_picture_bullet_image(namespace, element, decoder, resolver, pending);
+    }
     if !is_wordprocessing_namespace(namespace) {
         return Ok(());
     }
     match element.local_name().as_ref() {
+        b"numPicBullet" if abstract_num.is_none() && num.is_none() => {
+            push_picture_bullet(
+                &mut result.picture_bullets,
+                PictureBullet {
+                    id: required_u32(element, b"numPicBulletId", decoder, resolver)?,
+                    image_relationship_id: None,
+                },
+            )?;
+        },
         b"abstractNum" => {
             if abstract_num.is_some() || num.is_some() {
                 return Err(invalid("nested numbering definitions are invalid"));
@@ -844,6 +933,88 @@ fn push_num(values: &mut Vec<Num>, value: Num) -> Result<()> {
     Ok(())
 }
 
+fn push_picture_bullet(values: &mut Vec<PictureBullet>, value: PictureBullet) -> Result<()> {
+    if values.iter().any(|item| item.id == value.id) {
+        return Err(invalid(&format!(
+            "duplicate picture bullet ID {}",
+            value.id
+        )));
+    }
+    values.push(value);
+    Ok(())
+}
+
+/// Capture the first image relationship inside a `w:numPicBullet` definition.
+///
+/// Word writes the bullet picture either as VML (`v:imagedata r:id`) or as
+/// DrawingML (`a:blip r:embed`/`a:link`); everything else inside `w:pict` is
+/// inert shape geometry and is ignored.
+fn capture_picture_bullet_image(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    pending: &mut PendingPictureBullet,
+) -> Result<()> {
+    if pending.image_relationship_id.is_some() {
+        return Ok(());
+    }
+    let names: &[&[u8]] = match namespace {
+        ResolveResult::Bound(Namespace(uri)) if *uri == VML_NAMESPACE => {
+            match element.local_name().as_ref() {
+                b"imagedata" => &[b"id"],
+                _ => return Ok(()),
+            }
+        },
+        ResolveResult::Bound(Namespace(uri))
+            if *uri == DRAWINGML_NAMESPACE || *uri == STRICT_DRAWINGML_NAMESPACE =>
+        {
+            match element.local_name().as_ref() {
+                b"blip" => &[b"embed", b"link"],
+                _ => return Ok(()),
+            }
+        },
+        _ => return Ok(()),
+    };
+    pending.image_relationship_id = relationship_attribute(element, names, decoder, resolver)?;
+    Ok(())
+}
+
+fn relationship_attribute(
+    element: &BytesStart<'_>,
+    names: &[&[u8]],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if !names.contains(&attribute.key.local_name().as_ref()) {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        let is_relationship_attribute = matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(uri))
+                if uri == TRANSITIONAL_RELATIONSHIPS_NAMESPACE
+                    || uri == STRICT_RELATIONSHIPS_NAMESPACE
+        );
+        if !is_relationship_attribute {
+            continue;
+        }
+        if value.is_some() {
+            return Err(invalid("duplicate picture bullet image relationship"));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    Ok(value)
+}
+
 fn required_string(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -977,6 +1148,70 @@ mod tests {
         assert_eq!(level.restart, LevelRestart::Never);
         assert!(level.legal);
         assert_eq!(value.nums()[0].overrides()[0].start_override, Some(5));
+    }
+
+    #[test]
+    fn parses_vml_picture_bullet_definition() {
+        let value = parse(br##"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:numPicBullet w:numPicBulletId="3"><w:pict><v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75" xmlns:o="urn:schemas-microsoft-com:office:office"/><v:shape id="_x0000_i1025" type="#_x0000_t75" style="width:12pt;height:12pt" o:bullet="t"><v:imagedata r:id="rId4" o:title="bullet"/></v:shape></w:pict></w:numPicBullet><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlPicBulletId w:val="3"/></w:lvl></w:abstractNum></w:numbering>"##).unwrap();
+        assert_eq!(value.picture_bullets().len(), 1);
+        let bullet = value.get_picture_bullet(3).expect("picture bullet 3");
+        assert_eq!(bullet.id(), 3);
+        assert_eq!(bullet.image_relationship_id(), Some("rId4"));
+        assert!(value.get_picture_bullet(4).is_none());
+        assert_eq!(
+            value.abstract_nums()[0].levels()[0].picture_bullet_id,
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn parses_drawingml_picture_bullet_definition() {
+        let value = parse(br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:numPicBullet w:numPicBulletId="1"><w:pict><a:blip r:embed="rId9"/></w:pict></w:numPicBullet></w:numbering>"#).unwrap();
+        let bullet = value.get_picture_bullet(1).expect("picture bullet 1");
+        assert_eq!(bullet.image_relationship_id(), Some("rId9"));
+    }
+
+    #[test]
+    fn parses_picture_bullet_without_image() {
+        let value = parse(br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numPicBullet w:numPicBulletId="0"><w:pict/></w:numPicBullet><w:numPicBullet w:numPicBulletId="2"/></w:numbering>"#).unwrap();
+        assert_eq!(value.picture_bullets().len(), 2);
+        assert_eq!(value.get_picture_bullet(0).unwrap().image_relationship_id(), None);
+        assert_eq!(value.get_picture_bullet(2).unwrap().image_relationship_id(), None);
+    }
+
+    #[test]
+    fn rejects_duplicate_picture_bullet_ids() {
+        let duplicate = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numPicBullet w:numPicBulletId="1"/><w:numPicBullet w:numPicBulletId="1"/></w:numbering>"#;
+        assert!(parse(duplicate).is_err());
+    }
+
+    #[test]
+    fn parses_libreoffice_picture_bullet_fixture() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let relative =
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx";
+        let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
+            .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
+        let uri = PackURI::new("/word/numbering.xml").expect("valid numbering URI");
+        let bytes = package
+            .blob_for(&uri)
+            .unwrap_or_else(|error| panic!("failed to load numbering part: {error}"));
+        let part = BlobPart::new(uri, "application/xml".to_owned(), bytes);
+        let numbering = Numbering::extract_from_part(&part).unwrap();
+        let bullet = numbering
+            .get_picture_bullet(0)
+            .expect("fixture defines picture bullet 0");
+        // LibreOffice stripped the image payload from this fixture; only the
+        // definition shell and the level linkage remain.
+        assert_eq!(bullet.image_relationship_id(), None);
+        let level = numbering
+            .abstract_nums()
+            .iter()
+            .flat_map(|abstract_num| abstract_num.levels())
+            .find(|level| level.picture_bullet_id.is_some())
+            .expect("fixture level references a picture bullet");
+        assert_eq!(level.picture_bullet_id, Some(0));
+        assert!(numbering.get_picture_bullet(level.picture_bullet_id.unwrap()).is_some());
     }
 
     #[test]

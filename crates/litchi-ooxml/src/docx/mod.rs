@@ -173,7 +173,7 @@ pub use modern_comments::{
     store_modern_comment_metadata, write_comments_extended, write_comments_extensible,
     write_comments_ids, write_people,
 };
-pub use numbering::{AbstractNum, Num, Numbering};
+pub use numbering::{AbstractNum, Num, Numbering, PictureBullet};
 pub use package::Package;
 pub use paragraph::{
     Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
@@ -181,7 +181,10 @@ pub use paragraph::{
 };
 pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
-pub use settings::{AttachedTemplate, DocumentSettings, ProtectionType, SmartTagType};
+pub use settings::{
+    AttachedTemplate, CompatibilityOption, CompatibilitySetting, DocumentSettings,
+    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ProtectionType, SmartTagType,
+};
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
 // Re-export the shared semantic SmartArt model for authoring.

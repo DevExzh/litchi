@@ -7,6 +7,7 @@ use crate::docx::mail_merge::{
     MailMergeSettings, parse_settings_mail_merge, validate_mail_merge_relationships,
 };
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
+use crate::docx::numbering::NumberFormat;
 use crate::docx::variables::DocumentVariables;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
@@ -87,6 +88,14 @@ pub struct DocumentSettings {
     mail_merge: Option<MailMergeSettings>,
     /// Inert external attached-template reference.
     attached_template: Option<AttachedTemplate>,
+    /// On/off compatibility option flags from `w:compat`.
+    compatibility_options: Vec<CompatibilityOption>,
+    /// `w:compatSetting` triples from `w:compat`.
+    compatibility_settings: Vec<CompatibilitySetting>,
+    /// Document-level footnote properties from `w:footnotePr`.
+    footnote_properties: Option<NoteNumberingProperties>,
+    /// Document-level endnote properties from `w:endnotePr`.
+    endnote_properties: Option<NoteNumberingProperties>,
 }
 
 /// A smart-tag vocabulary declaration from `settings.xml`.
@@ -114,6 +123,168 @@ impl SmartTagType {
     #[inline]
     pub fn url(&self) -> &str {
         &self.url
+    }
+}
+
+/// `w:compatSetting` name identifying the targeted Word compatibility mode.
+pub const COMPATIBILITY_MODE_SETTING_NAME: &str = "compatibilityMode";
+/// `w:compatSetting` URI under which Word stores its compatibility settings.
+pub const COMPATIBILITY_SETTING_URI: &str = "http://schemas.microsoft.com/office/word";
+
+/// An on/off compatibility option flag from `w:compat` (for example
+/// `w:useFELayout`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompatibilityOption {
+    name: String,
+    enabled: bool,
+}
+
+impl CompatibilityOption {
+    /// Local element name of the option (for example `useFELayout`).
+    #[inline]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Whether the option is enabled.
+    #[inline]
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
+/// A `w:compatSetting` name/URI/value triple from `w:compat`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompatibilitySetting {
+    name: String,
+    uri: String,
+    value: String,
+}
+
+impl CompatibilitySetting {
+    /// Return the setting name (for example `compatibilityMode`).
+    #[inline]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Return the URI scoping the setting name.
+    #[inline]
+    pub fn uri(&self) -> &str {
+        &self.uri
+    }
+
+    /// Return the raw setting value.
+    #[inline]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+}
+
+/// Placement of footnote or endnote text (`ST_FtnPos`/`ST_EdnPos`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NotePosition {
+    /// At the bottom of the page.
+    PageBottom,
+    /// Immediately beneath the page's text.
+    BeneathText,
+    /// At the end of the section.
+    SectionEnd,
+    /// At the end of the document.
+    DocumentEnd,
+    /// A position token outside the standardized value set.
+    Other(String),
+}
+
+impl NotePosition {
+    fn from_xml(value: String) -> Self {
+        match value.as_str() {
+            "pageBottom" => Self::PageBottom,
+            "beneathText" => Self::BeneathText,
+            "sectEnd" => Self::SectionEnd,
+            "docEnd" => Self::DocumentEnd,
+            _ => Self::Other(value),
+        }
+    }
+
+    /// Get the XML value for this position.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::PageBottom => "pageBottom",
+            Self::BeneathText => "beneathText",
+            Self::SectionEnd => "sectEnd",
+            Self::DocumentEnd => "docEnd",
+            Self::Other(value) => value,
+        }
+    }
+}
+
+/// Numbering restart behavior for footnotes or endnotes (`w:numRestart`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoteNumberingRestart {
+    /// Numbering continues throughout the document.
+    Continuous,
+    /// Numbering restarts at each section.
+    EachSection,
+    /// Numbering restarts at each page.
+    EachPage,
+}
+
+impl NoteNumberingRestart {
+    fn from_xml(value: &str) -> Result<Self> {
+        match value {
+            "continuous" => Ok(Self::Continuous),
+            "eachSect" => Ok(Self::EachSection),
+            "eachPage" => Ok(Self::EachPage),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid note numbering restart value '{value}'"
+            ))),
+        }
+    }
+
+    /// Get the XML value for this restart behavior.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Continuous => "continuous",
+            Self::EachSection => "eachSect",
+            Self::EachPage => "eachPage",
+        }
+    }
+}
+
+/// Document-level footnote or endnote properties from `w:footnotePr` or
+/// `w:endnotePr` in `settings.xml`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NoteNumberingProperties {
+    position: Option<NotePosition>,
+    format: Option<NumberFormat>,
+    start: Option<u32>,
+    restart: Option<NoteNumberingRestart>,
+}
+
+impl NoteNumberingProperties {
+    /// Return the note placement, when specified.
+    #[inline]
+    pub fn position(&self) -> Option<&NotePosition> {
+        self.position.as_ref()
+    }
+
+    /// Return the numbering format, when specified (defaults to decimal).
+    #[inline]
+    pub fn format(&self) -> Option<&NumberFormat> {
+        self.format.as_ref()
+    }
+
+    /// Return the first note number, when specified.
+    #[inline]
+    pub fn start(&self) -> Option<u32> {
+        self.start
+    }
+
+    /// Return the numbering restart behavior, when specified.
+    #[inline]
+    pub fn restart(&self) -> Option<NoteNumberingRestart> {
+        self.restart
     }
 }
 
@@ -165,6 +336,10 @@ impl DocumentSettings {
             do_not_embed_smart_tags: false,
             mail_merge: None,
             attached_template: None,
+            compatibility_options: Vec::new(),
+            compatibility_settings: Vec::new(),
+            footnote_properties: None,
+            endnote_properties: None,
         }
     }
 
@@ -216,6 +391,44 @@ impl DocumentSettings {
         self.attached_template.as_ref()
     }
 
+    /// Return the on/off compatibility option flags in document order.
+    #[inline]
+    pub fn compatibility_options(&self) -> &[CompatibilityOption] {
+        &self.compatibility_options
+    }
+
+    /// Return the `w:compatSetting` triples in document order.
+    #[inline]
+    pub fn compatibility_settings(&self) -> &[CompatibilitySetting] {
+        &self.compatibility_settings
+    }
+
+    /// Look up a `w:compatSetting` triple by name and URI.
+    pub fn compatibility_setting(&self, name: &str, uri: &str) -> Option<&CompatibilitySetting> {
+        self.compatibility_settings
+            .iter()
+            .find(|setting| setting.name == name && setting.uri == uri)
+    }
+
+    /// Return the Word compatibility mode (`compatibilityMode` value), when
+    /// declared — for example `15` targets Word 2013 behavior.
+    pub fn compatibility_mode(&self) -> Option<u32> {
+        self.compatibility_setting(COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI)
+            .and_then(|setting| setting.value.parse().ok())
+    }
+
+    /// Return the document-level footnote properties, if present.
+    #[inline]
+    pub fn footnote_properties(&self) -> Option<&NoteNumberingProperties> {
+        self.footnote_properties.as_ref()
+    }
+
+    /// Return the document-level endnote properties, if present.
+    #[inline]
+    pub fn endnote_properties(&self) -> Option<&NoteNumberingProperties> {
+        self.endnote_properties.as_ref()
+    }
+
     /// Extract settings from a settings.xml part.
     ///
     /// # Arguments
@@ -242,6 +455,8 @@ impl DocumentSettings {
         let mut saw_root = false;
         let mut saw_do_not_embed_smart_tags = false;
         let mut saw_attached_template = false;
+        let mut saw_compat = false;
+        let mut pending_group: Option<PendingGroup> = None;
 
         loop {
             let decoder = reader.decoder();
@@ -260,15 +475,25 @@ impl DocumentSettings {
                     if depth == 1 {
                         validate_settings_root(&namespace, &element, saw_root)?;
                         saw_root = true;
-                    } else if depth == 2 && saw_root && is_wordprocessing_namespace(&namespace) {
-                        parse_setting(
-                            &element,
-                            decoder,
-                            &resolver,
-                            &mut settings,
-                            &mut saw_do_not_embed_smart_tags,
-                            &mut saw_attached_template,
-                        )?;
+                    } else if saw_root && is_wordprocessing_namespace(&namespace) {
+                        if depth == 2 {
+                            if let Some(group) =
+                                begin_settings_group(&element, &settings, &mut saw_compat)?
+                            {
+                                pending_group = Some(group);
+                            } else {
+                                parse_setting(
+                                    &element,
+                                    decoder,
+                                    &resolver,
+                                    &mut settings,
+                                    &mut saw_do_not_embed_smart_tags,
+                                    &mut saw_attached_template,
+                                )?;
+                            }
+                        } else if depth == 3 && let Some(group) = pending_group.as_mut() {
+                            parse_group_child(group, &element, decoder, &resolver)?;
+                        }
                     }
                 },
                 Event::Empty(element) => {
@@ -278,21 +503,31 @@ impl DocumentSettings {
                     if child_depth == 1 {
                         validate_settings_root(&namespace, &element, saw_root)?;
                         saw_root = true;
-                    } else if child_depth == 2
-                        && saw_root
-                        && is_wordprocessing_namespace(&namespace)
-                    {
-                        parse_setting(
-                            &element,
-                            decoder,
-                            &resolver,
-                            &mut settings,
-                            &mut saw_do_not_embed_smart_tags,
-                            &mut saw_attached_template,
-                        )?;
+                    } else if saw_root && is_wordprocessing_namespace(&namespace) {
+                        if child_depth == 2 {
+                            if let Some(group) =
+                                begin_settings_group(&element, &settings, &mut saw_compat)?
+                            {
+                                finish_settings_group(&mut settings, group)?;
+                            } else {
+                                parse_setting(
+                                    &element,
+                                    decoder,
+                                    &resolver,
+                                    &mut settings,
+                                    &mut saw_do_not_embed_smart_tags,
+                                    &mut saw_attached_template,
+                                )?;
+                            }
+                        } else if child_depth == 3 && let Some(group) = pending_group.as_mut() {
+                            parse_group_child(group, &element, decoder, &resolver)?;
+                        }
                     }
                 },
                 Event::End(_) => {
+                    if depth == 2 && let Some(group) = pending_group.take() {
+                        finish_settings_group(&mut settings, group)?;
+                    }
                     depth = depth.checked_sub(1).ok_or_else(|| {
                         OoxmlError::InvalidFormat("invalid Word settings XML nesting".into())
                     })?;
@@ -328,6 +563,175 @@ fn validate_settings_root(
         return Err(OoxmlError::InvalidFormat(
             "settings part has an invalid or trailing root element".into(),
         ));
+    }
+    Ok(())
+}
+
+/// A grouped settings element (`w:compat`, `w:footnotePr`, `w:endnotePr`)
+/// currently being collected from the stream.
+enum PendingGroup {
+    Compatibility {
+        options: Vec<CompatibilityOption>,
+        settings: Vec<CompatibilitySetting>,
+    },
+    FootnoteProperties(NoteNumberingProperties),
+    EndnoteProperties(NoteNumberingProperties),
+}
+
+fn begin_settings_group(
+    element: &BytesStart<'_>,
+    settings: &DocumentSettings,
+    saw_compat: &mut bool,
+) -> Result<Option<PendingGroup>> {
+    match element.local_name().as_ref() {
+        b"compat" => {
+            if std::mem::replace(saw_compat, true) {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate compat settings group".into(),
+                ));
+            }
+            Ok(Some(PendingGroup::Compatibility {
+                options: Vec::new(),
+                settings: Vec::new(),
+            }))
+        },
+        b"footnotePr" => {
+            if settings.footnote_properties.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate footnotePr settings group".into(),
+                ));
+            }
+            Ok(Some(PendingGroup::FootnoteProperties(
+                NoteNumberingProperties::default(),
+            )))
+        },
+        b"endnotePr" => {
+            if settings.endnote_properties.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate endnotePr settings group".into(),
+                ));
+            }
+            Ok(Some(PendingGroup::EndnoteProperties(
+                NoteNumberingProperties::default(),
+            )))
+        },
+        _ => Ok(None),
+    }
+}
+
+fn finish_settings_group(settings: &mut DocumentSettings, group: PendingGroup) -> Result<()> {
+    match group {
+        PendingGroup::Compatibility {
+            options,
+            settings: triples,
+        } => {
+            settings.compatibility_options = options;
+            settings.compatibility_settings = triples;
+        },
+        PendingGroup::FootnoteProperties(properties) => {
+            if settings.footnote_properties.replace(properties).is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate footnotePr settings group".into(),
+                ));
+            }
+        },
+        PendingGroup::EndnoteProperties(properties) => {
+            if settings.endnote_properties.replace(properties).is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate endnotePr settings group".into(),
+                ));
+            }
+        },
+    }
+    Ok(())
+}
+
+fn parse_group_child(
+    group: &mut PendingGroup,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<()> {
+    match group {
+        PendingGroup::Compatibility { options, settings } => {
+            if element.local_name().as_ref() == b"compatSetting" {
+                settings.push(CompatibilitySetting {
+                    name: required_attribute(
+                        element,
+                        b"name",
+                        decoder,
+                        resolver,
+                        "compatSetting name",
+                    )?,
+                    uri: required_attribute(element, b"uri", decoder, resolver, "compatSetting URI")?,
+                    value: required_attribute(
+                        element,
+                        b"val",
+                        decoder,
+                        resolver,
+                        "compatSetting value",
+                    )?,
+                });
+            } else {
+                options.push(CompatibilityOption {
+                    name: String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
+                    enabled: parse_on_off(element, decoder, resolver)?,
+                });
+            }
+        },
+        PendingGroup::FootnoteProperties(properties)
+        | PendingGroup::EndnoteProperties(properties) => {
+            parse_note_property_child(properties, element, decoder, resolver)?;
+        },
+    }
+    Ok(())
+}
+
+fn parse_note_property_child(
+    properties: &mut NoteNumberingProperties,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<()> {
+    match element.local_name().as_ref() {
+        b"pos" => {
+            if properties.position.is_some() {
+                return Err(OoxmlError::InvalidFormat("duplicate note position".into()));
+            }
+            let value = required_attribute(element, b"val", decoder, resolver, "note position")?;
+            properties.position = Some(NotePosition::from_xml(value));
+        },
+        b"numFmt" => {
+            if properties.format.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate note numbering format".into(),
+                ));
+            }
+            let value = required_attribute(element, b"val", decoder, resolver, "note numFmt")?;
+            properties.format = Some(NumberFormat::parse(&value));
+        },
+        b"numStart" => {
+            if properties.start.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate note numbering start".into(),
+                ));
+            }
+            let value = required_attribute(element, b"val", decoder, resolver, "note numStart")?;
+            properties.start = Some(value.parse().map_err(|_| {
+                OoxmlError::InvalidFormat(format!("invalid note numbering start '{value}'"))
+            })?);
+        },
+        b"numRestart" => {
+            if properties.restart.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate note numbering restart".into(),
+                ));
+            }
+            let value = required_attribute(element, b"val", decoder, resolver, "note numRestart")?;
+            properties.restart = Some(NoteNumberingRestart::from_xml(&value)?);
+        },
+        // `w:footnote`/`w:endnote` separator references carry no properties.
+        _ => {},
     }
     Ok(())
 }
@@ -1124,6 +1528,131 @@ mod tests {
 
         let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:doNotEmbedSmartTags/><w:doNotEmbedSmartTags/></w:settings>"#;
         assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+    }
+
+    #[test]
+    fn parses_compat_options_and_settings() {
+        let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:zoom w:percent="100"/><w:compat><w:useFELayout/><w:doNotExpandShiftReturn w:val="off"/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="14"/><w:compatSetting w:name="enableOpenTypeFeatures" w:uri="http://schemas.microsoft.com/office/word" w:val="1"/></w:compat><w:rsids/></w:settings>"#;
+        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+        assert_eq!(settings.zoom_percent(), Some(100));
+        assert_eq!(settings.compatibility_options().len(), 2);
+        assert_eq!(settings.compatibility_options()[0].name(), "useFELayout");
+        assert!(settings.compatibility_options()[0].is_enabled());
+        assert_eq!(
+            settings.compatibility_options()[1].name(),
+            "doNotExpandShiftReturn"
+        );
+        assert!(!settings.compatibility_options()[1].is_enabled());
+        assert_eq!(settings.compatibility_settings().len(), 2);
+        let mode = settings
+            .compatibility_setting(
+                COMPATIBILITY_MODE_SETTING_NAME,
+                COMPATIBILITY_SETTING_URI,
+            )
+            .unwrap();
+        assert_eq!(mode.value(), "14");
+        assert_eq!(settings.compatibility_mode(), Some(14));
+        assert!(settings.compatibility_setting("missing", COMPATIBILITY_SETTING_URI).is_none());
+    }
+
+    #[test]
+    fn parses_empty_and_strict_compat_groups() {
+        let empty = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat/></w:settings>"#;
+        let settings = DocumentSettings::extract_from_xml(empty).unwrap();
+        assert!(settings.compatibility_options().is_empty());
+        assert!(settings.compatibility_settings().is_empty());
+        assert_eq!(settings.compatibility_mode(), None);
+
+        let strict = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:compat><s:compatSetting s:name="compatibilityMode" s:uri="http://schemas.microsoft.com/office/word" s:val="15"/></s:compat></s:settings>"#;
+        let settings = DocumentSettings::extract_from_xml(strict).unwrap();
+        assert_eq!(settings.compatibility_mode(), Some(15));
+    }
+
+    #[test]
+    fn rejects_invalid_compat_groups() {
+        let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat/><w:compat/></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+
+        let missing_value = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word"/></w:compat></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(missing_value).is_err());
+
+        let unterminated = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat>"#;
+        assert!(DocumentSettings::extract_from_xml(unterminated).is_err());
+    }
+
+    #[test]
+    fn parses_document_level_note_properties() {
+        let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:footnote w:type="separator" w:id="-1"/><w:pos w:val="pageBottom"/><w:numFmt w:val="lowerRoman"/><w:numStart w:val="2"/><w:numRestart w:val="eachPage"/></w:footnotePr><w:endnotePr><w:pos w:val="docEnd"/><w:numFmt w:val="upperLetter"/></w:endnotePr></w:settings>"#;
+        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+
+        let footnotes = settings.footnote_properties().unwrap();
+        assert_eq!(footnotes.position(), Some(&NotePosition::PageBottom));
+        assert_eq!(footnotes.format(), Some(&NumberFormat::LowerRoman));
+        assert_eq!(footnotes.start(), Some(2));
+        assert_eq!(
+            footnotes.restart(),
+            Some(NoteNumberingRestart::EachPage)
+        );
+
+        let endnotes = settings.endnote_properties().unwrap();
+        assert_eq!(endnotes.position(), Some(&NotePosition::DocumentEnd));
+        assert_eq!(endnotes.format(), Some(&NumberFormat::UpperLetter));
+        assert_eq!(endnotes.start(), None);
+        assert_eq!(endnotes.restart(), None);
+    }
+
+    #[test]
+    fn note_property_enums_round_trip() {
+        for (raw, expected) in [
+            ("pageBottom", NotePosition::PageBottom),
+            ("beneathText", NotePosition::BeneathText),
+            ("sectEnd", NotePosition::SectionEnd),
+            ("docEnd", NotePosition::DocumentEnd),
+        ] {
+            assert_eq!(NotePosition::from_xml(raw.to_owned()), expected);
+            assert_eq!(expected.as_str(), raw);
+        }
+        let extension = NotePosition::from_xml("vendorPosition".to_owned());
+        assert_eq!(extension.as_str(), "vendorPosition");
+
+        for (raw, expected) in [
+            ("continuous", NoteNumberingRestart::Continuous),
+            ("eachSect", NoteNumberingRestart::EachSection),
+            ("eachPage", NoteNumberingRestart::EachPage),
+        ] {
+            assert_eq!(NoteNumberingRestart::from_xml(raw).unwrap(), expected);
+            assert_eq!(expected.as_str(), raw);
+        }
+        assert!(NoteNumberingRestart::from_xml("sometimes").is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_note_property_groups() {
+        let duplicate = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr/><w:footnotePr/></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(duplicate).is_err());
+
+        let bad_start = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnotePr><w:numStart w:val="soon"/></w:endnotePr></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(bad_start).is_err());
+
+        let bad_restart = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numRestart w:val="sometimes"/></w:footnotePr></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(bad_restart).is_err());
+
+        let duplicate_child = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnotePr><w:numFmt w:val="decimal"/><w:numFmt w:val="bullet"/></w:footnotePr></w:settings>"#;
+        assert!(DocumentSettings::extract_from_xml(duplicate_child).is_err());
+    }
+
+    #[test]
+    fn parses_bundled_settings_resource() {
+        let settings =
+            DocumentSettings::extract_from_xml(include_bytes!("resources/settings.xml")).unwrap();
+        assert_eq!(settings.compatibility_mode(), Some(14));
+        assert_eq!(settings.compatibility_settings().len(), 4);
+        assert!(
+            settings
+                .compatibility_options()
+                .iter()
+                .any(|option| option.name() == "useFELayout" && option.is_enabled())
+        );
     }
 
     fn attached_template_part(

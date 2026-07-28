@@ -293,6 +293,7 @@ mod tests {
                 abstract_num_id: 1,
                 overrides: Vec::new(),
             }],
+            picture_bullets: Vec::new(),
         }
     }
 
