@@ -27,6 +27,7 @@ pub(crate) const DATE_FLAG: u32 = 0x000004;
 pub(crate) const STRING_FLAG: u32 = 0x000008;
 pub(crate) const RICH_TEXT_FLAG: u32 = 0x000010;
 pub(crate) const STYLE_FLAG: u32 = 0x000020;
+pub(crate) const TEXT_STYLE_FLAG: u32 = 0x000040;
 pub(crate) const CONDITIONAL_STYLE_FLAG: u32 = 0x000080;
 pub(crate) const CONDITIONAL_STYLE_APPLIED_RULE_FLAG: u32 = 0x000100;
 pub(crate) const FORMULA_FLAG: u32 = 0x000200;
@@ -381,6 +382,10 @@ impl BncCell {
         self.u32_field(STYLE_FLAG)
     }
 
+    pub(crate) fn text_style_identifier(&self) -> Option<u32> {
+        self.u32_field(TEXT_STYLE_FLAG)
+    }
+
     pub(crate) fn conditional_style_identifier(&self) -> Option<u32> {
         self.u32_field(CONDITIONAL_STYLE_FLAG)
     }
@@ -697,6 +702,15 @@ impl BncCell {
         }
     }
 
+    pub(crate) fn set_text_style_identifier(&mut self, identifier: Option<u32>) {
+        if let Some(identifier) = identifier {
+            self.fields
+                .insert(TEXT_STYLE_FLAG, identifier.to_le_bytes().to_vec());
+        } else {
+            self.fields.remove(&TEXT_STYLE_FLAG);
+        }
+    }
+
     pub(crate) fn set_comment_identifier(&mut self, identifier: Option<u32>) {
         if let Some(identifier) = identifier {
             self.fields
@@ -975,6 +989,25 @@ mod tests {
         assert_eq!(cleared.conditional_style_identifier(), None);
         assert_eq!(cleared.conditional_style_applied_rule(), None);
         assert_eq!(cleared.stored_value(), StoredValue::Number);
+    }
+
+    #[test]
+    fn text_and_cell_styles_use_independent_keys() {
+        let mut cell = BncCell::minimal();
+        cell.set_string(3);
+        cell.set_style_identifier(Some(7));
+        cell.set_text_style_identifier(Some(11));
+
+        let mut reparsed = BncCell::parse(&cell.encode()).unwrap();
+        assert_eq!(reparsed.style_identifier(), Some(7));
+        assert_eq!(reparsed.text_style_identifier(), Some(11));
+        assert_eq!(reparsed.stored_value(), StoredValue::Text(3));
+
+        reparsed.set_text_style_identifier(None);
+        let cleared = BncCell::parse(&reparsed.encode()).unwrap();
+        assert_eq!(cleared.style_identifier(), Some(7));
+        assert_eq!(cleared.text_style_identifier(), None);
+        assert_eq!(cleared.stored_value(), StoredValue::Text(3));
     }
 
     #[test]

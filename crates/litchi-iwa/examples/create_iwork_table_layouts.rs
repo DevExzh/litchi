@@ -1,14 +1,15 @@
-//! Create Pages, Numbers, and Keynote files with native table-cell text layouts.
+//! Create Pages, Numbers, and Keynote files with native table-cell text layouts and alignment.
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
-use litchi_iwa::pages::PagesDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_layout::{
     TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
 };
+use litchi_iwa::text::TextAlignment;
 
 const ROW: usize = 1;
 const COLUMN: usize = 1;
@@ -16,15 +17,43 @@ const INSET_POINTS: f32 = 8.0;
 const CELL_TEXT: &str = "Wrapped text\nwith an 8 pt inset";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let arguments = std::env::args().skip(1).collect::<Vec<_>>();
     let output = PathBuf::from(
-        std::env::args()
-            .nth(1)
-            .ok_or("usage: create_iwork_table_layouts <output-directory>")?,
+        arguments
+            .first()
+            .ok_or("usage: create_iwork_table_layouts <output-directory> [--verify-only]")?,
     );
-    std::fs::create_dir_all(&output)?;
-    create_numbers(&output.join("table-layouts.numbers"))?;
-    create_pages(&output.join("table-layouts.pages"))?;
-    create_keynote(&output.join("table-layouts.key"))?;
+    if arguments.get(1).map(String::as_str) != Some("--verify-only") {
+        std::fs::create_dir_all(&output)?;
+        create_numbers(&output.join("table-layouts.numbers"))?;
+        create_pages(&output.join("table-layouts.pages"))?;
+        create_keynote(&output.join("table-layouts.key"))?;
+    }
+    verify(&output)?;
+    Ok(())
+}
+
+fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let numbers = NumbersEditor::open(output.join("table-layouts.numbers"))?;
+    let numbers_table = numbers.tables()?.remove(0);
+    assert_eq!(
+        numbers.table_cell_text_alignment(numbers_table.object_id, ROW, COLUMN)?,
+        TextAlignment::Center
+    );
+
+    let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
+    let pages_table = pages.tables()?.remove(0);
+    assert_eq!(
+        pages.table_cell_text_alignment(pages_table.model_object_id, ROW, COLUMN)?,
+        TextAlignment::Right
+    );
+
+    let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
+    let keynote_table = keynote.slide_tables(0)?.remove(0);
+    assert_eq!(
+        keynote.slide_table_cell_text_alignment(0, keynote_table.model_object_id, ROW, COLUMN)?,
+        TextAlignment::Justified
+    );
     Ok(())
 }
 
@@ -50,6 +79,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         layout(TableCellVerticalAlignment::Middle)?,
     )?;
+    editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Center)?;
     editor.save(output)?;
     Ok(())
 }
@@ -67,6 +97,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         layout(TableCellVerticalAlignment::Bottom)?,
     )?;
+    editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Right)?;
     editor.save(output)?;
     Ok(())
 }
@@ -99,6 +130,13 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         layout(TableCellVerticalAlignment::Middle)?,
+    )?;
+    editor.set_slide_table_cell_text_alignment(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        TextAlignment::Justified,
     )?;
     editor.save(output)?;
     Ok(())

@@ -137,6 +137,8 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 
 /// A resolved direct reply in a Numbers cell-comment thread.
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
+/// Horizontal text alignment shared by native Numbers table cells.
+pub type NumbersTableCellTextAlignment = TextAlignment;
 
 /// Storage identity and rule count of conditional highlighting attached to one cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2746,6 +2748,51 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the effective horizontal text alignment for one zero-based table cell.
+    pub fn table_cell_text_alignment(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextAlignment> {
+        cell_text_alignment::alignment(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a local horizontal text-alignment override.
+    pub fn set_table_cell_text_alignment(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        alignment: NumbersTableCellTextAlignment,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_text_alignment::set_alignment(&mut staged, table_id, row, column, alignment)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_alignment(table_id, row, column)? != alignment {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text alignment failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local horizontal alignment and restore the inherited table style.
+    pub fn reset_table_cell_text_alignment(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_text_alignment::reset_alignment(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective fill for one zero-based table cell.
     pub fn table_cell_fill(
         &self,
@@ -3841,6 +3888,34 @@ pub(crate) fn table_cell_layout_in_package(
     cell_layout::cell_layout(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_text_alignment_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextAlignment> {
+    cell_text_alignment::alignment(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_alignment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    alignment: TextAlignment,
+) -> Result<()> {
+    cell_text_alignment::set_alignment(package, table_id, row, column, alignment)
+}
+
+pub(crate) fn reset_table_cell_text_alignment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_text_alignment::reset_alignment(package, table_id, row, column)
+}
+
 pub(crate) fn table_cell_number_format_in_package(
     package: &IWorkPackage,
     table_id: u64,
@@ -4519,6 +4594,7 @@ mod cell_fill;
 mod cell_layout;
 mod cell_merge;
 mod cell_style;
+mod cell_text_alignment;
 mod column_insert;
 mod conditional_highlight;
 mod date_time_fields;

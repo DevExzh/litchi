@@ -101,6 +101,7 @@ pub use crate::table_cell_number_format::{
     TableCellNumberFormat as KeynoteTableCellNumberFormat,
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
+pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
 /// Lossless header/footer configuration shared by native iWork tables.
@@ -1587,6 +1588,78 @@ impl KeynoteEditor {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_layout_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective horizontal text alignment for one slide-table cell.
+    pub fn slide_table_cell_text_alignment(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextAlignment> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_alignment_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a local horizontal text-alignment override.
+    pub fn set_slide_table_cell_text_alignment(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        alignment: KeynoteTableCellTextAlignment,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_alignment_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            alignment,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_alignment(slide_index, model_object_id, row, column)?
+            != alignment
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell text alignment failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local horizontal alignment and restore the inherited table style.
+    pub fn reset_slide_table_cell_text_alignment(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_alignment_in_package(
             &mut staged,
             model_object_id,
             row,

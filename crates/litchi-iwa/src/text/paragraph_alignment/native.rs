@@ -115,6 +115,25 @@ pub(crate) struct ParagraphStyleOverrides {
 }
 
 impl ParagraphStyleOverrides {
+    pub(crate) fn alignment(alignment: TextAlignment) -> Self {
+        Self {
+            alignment: Some(alignment),
+            ..Self::default()
+        }
+    }
+
+    pub(crate) const fn direct_alignment(&self) -> Option<TextAlignment> {
+        self.alignment
+    }
+
+    pub(crate) fn set_alignment(&mut self, alignment: TextAlignment) {
+        self.alignment = Some(alignment);
+    }
+
+    pub(crate) fn clear_alignment(&mut self) {
+        self.alignment = None;
+    }
+
     pub(super) fn count(&self) -> u32 {
         u32::from(self.bold.is_some())
             + u32::from(self.italic.is_some())
@@ -205,7 +224,7 @@ pub(crate) fn locate_style(
     })
 }
 
-pub(super) fn inherited_alignment(
+pub(crate) fn inherited_alignment(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextAlignment> {
@@ -768,7 +787,7 @@ pub(crate) fn variation_object(
     Ok(object)
 }
 
-pub(super) fn replace_variation(
+pub(crate) fn replace_variation(
     package: &mut IWorkPackage,
     archive_name: &str,
     style_id: u64,
