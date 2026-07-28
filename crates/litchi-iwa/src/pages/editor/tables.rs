@@ -105,13 +105,16 @@ pub use crate::table_cell_number_format::{
     TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
 };
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
+pub use crate::text::TextBackground as PagesTableCellTextBackground;
 pub use crate::text::TextBaselineShift as PagesTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as PagesTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as PagesTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as PagesTableCellTextDecorations;
 pub use crate::text::TextFont as PagesTableCellTextFont;
 pub use crate::text::TextLigatures as PagesTableCellTextLigatures;
+pub use crate::text::TextOutline as PagesTableCellTextOutline;
 pub use crate::text::TextScript as PagesTableCellTextScript;
+pub use crate::text::TextShadow as PagesTableCellTextShadow;
 pub use crate::text::TextStyle as PagesTableCellTextStyle;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
@@ -1336,6 +1339,73 @@ impl PagesEditor {
         Ok(changed)
     }
 
+    /// Read the effective background painted behind one body-table cell's text.
+    pub fn table_cell_text_background(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextBackground> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_background_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell text-background override.
+    pub fn set_table_cell_text_background(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        background: PagesTableCellTextBackground,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_background_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            background,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_background(model_object_id, row, column)? != background {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell text background failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text background and restore the inherited value.
+    pub fn reset_table_cell_text_background(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_background_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective custom baseline displacement of one body-table cell.
     pub fn table_cell_text_baseline_shift(
         &self,
@@ -1806,6 +1876,73 @@ impl PagesEditor {
         Ok(changed)
     }
 
+    /// Read the effective outline of one body-table cell's text.
+    pub fn table_cell_text_outline(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextOutline> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_outline_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell text outline.
+    pub fn set_table_cell_text_outline(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        outline: PagesTableCellTextOutline,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_outline_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            outline,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_outline(model_object_id, row, column)? != outline {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell text outline failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text outline and restore the inherited value.
+    pub fn reset_table_cell_text_outline(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_outline_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read effective normal, superscript, or subscript formatting.
     pub fn table_cell_text_script(
         &self,
@@ -1860,6 +1997,73 @@ impl PagesEditor {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_script_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective drop shadow of one body-table cell's text.
+    pub fn table_cell_text_shadow(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextShadow> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_shadow_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell text drop shadow.
+    pub fn set_table_cell_text_shadow(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        shadow: PagesTableCellTextShadow,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_shadow_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            shadow,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_shadow(model_object_id, row, column)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell text shadow failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text shadow and restore the inherited value.
+    pub fn reset_table_cell_text_shadow(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_shadow_in_package(
             &mut staged,
             model_object_id,
             row,

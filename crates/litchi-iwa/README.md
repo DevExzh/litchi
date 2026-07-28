@@ -1290,8 +1290,9 @@ removing the stale legacy row payloads.
 Native table cells in Numbers, Pages, and Keynote expose typed horizontal
 alignment, validated PostScript font identity, foreground color, underline,
 strikethrough, capitalization, normal/superscript/subscript selection, custom
-baseline shift, validated character spacing, ligature policy, and whole-cell
-point-size, bold, and italic CRUD. These properties compose in one
+baseline shift, validated character spacing, ligature policy, solid text
+background, native outline, drop shadow, and whole-cell point-size, bold, and
+italic CRUD. These properties compose in one
 paragraph-style variation, use copy-on-write when a style is shared, preserve
 unrelated overrides, and reclaim private style objects and list entries when
 their last local property is reset. The

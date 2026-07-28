@@ -103,13 +103,16 @@ pub use crate::table_cell_number_format::{
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
+pub use crate::text::TextBackground as KeynoteTableCellTextBackground;
 pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as KeynoteTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as KeynoteTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as KeynoteTableCellTextDecorations;
 pub use crate::text::TextFont as KeynoteTableCellTextFont;
 pub use crate::text::TextLigatures as KeynoteTableCellTextLigatures;
+pub use crate::text::TextOutline as KeynoteTableCellTextOutline;
 pub use crate::text::TextScript as KeynoteTableCellTextScript;
+pub use crate::text::TextShadow as KeynoteTableCellTextShadow;
 pub use crate::text::TextStyle as KeynoteTableCellTextStyle;
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
@@ -1682,6 +1685,78 @@ impl KeynoteEditor {
         Ok(changed)
     }
 
+    /// Read the effective text background of one slide-table cell.
+    pub fn slide_table_cell_text_background(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextBackground> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_background_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell text-background override.
+    pub fn set_slide_table_cell_text_background(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        background: KeynoteTableCellTextBackground,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_background_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            background,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_background(slide_index, model_object_id, row, column)?
+            != background
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell text background failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text background and restore the inherited value.
+    pub fn reset_slide_table_cell_text_background(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_background_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective custom baseline displacement of one slide-table cell.
     pub fn slide_table_cell_text_baseline_shift(
         &self,
@@ -2195,6 +2270,78 @@ impl KeynoteEditor {
         Ok(changed)
     }
 
+    /// Read the effective text outline of one slide-table cell.
+    pub fn slide_table_cell_text_outline(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextOutline> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_outline_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell text-outline override.
+    pub fn set_slide_table_cell_text_outline(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        outline: KeynoteTableCellTextOutline,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_outline_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            outline,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_outline(slide_index, model_object_id, row, column)?
+            != outline
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell text outline failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text outline and restore the inherited value.
+    pub fn reset_slide_table_cell_text_outline(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_outline_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read effective normal, superscript, or subscript formatting.
     pub fn slide_table_cell_text_script(
         &self,
@@ -2254,6 +2401,78 @@ impl KeynoteEditor {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_script_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective text shadow of one slide-table cell.
+    pub fn slide_table_cell_text_shadow(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextShadow> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_shadow_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell text-shadow override.
+    pub fn set_slide_table_cell_text_shadow(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        shadow: KeynoteTableCellTextShadow,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_shadow_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            shadow,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_shadow(slide_index, model_object_id, row, column)?
+            != shadow
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell text shadow failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text shadow and restore the inherited value.
+    pub fn reset_slide_table_cell_text_shadow(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_shadow_in_package(
             &mut staged,
             model_object_id,
             row,

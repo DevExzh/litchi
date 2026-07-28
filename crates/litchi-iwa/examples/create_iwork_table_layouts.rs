@@ -10,9 +10,9 @@ use litchi_iwa::table_cell_layout::{
     TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
 };
 use litchi_iwa::text::{
-    TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextFont, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,
-    TextUnderline,
+    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -84,8 +84,20 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         TextLigatures::RequiredOnly
     );
     assert_eq!(
+        numbers.table_cell_text_background(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_text_background()?
+    );
+    assert_eq!(
+        numbers.table_cell_text_outline(numbers_table.object_id, ROW, COLUMN)?,
+        TextOutline::standard()
+    );
+    assert_eq!(
         numbers.table_cell_text_script(numbers_table.object_id, ROW, COLUMN)?,
         TextScript::Superscript
+    );
+    assert_eq!(
+        numbers.table_cell_text_shadow(numbers_table.object_id, ROW, COLUMN)?,
+        TextShadow::standard()
     );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
@@ -127,8 +139,20 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         TextLigatures::All
     );
     assert_eq!(
+        pages.table_cell_text_background(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_text_background()?
+    );
+    assert_eq!(
+        pages.table_cell_text_outline(pages_table.model_object_id, ROW, COLUMN)?,
+        TextOutline::standard()
+    );
+    assert_eq!(
         pages.table_cell_text_script(pages_table.model_object_id, ROW, COLUMN)?,
         TextScript::Subscript
+    );
+    assert_eq!(
+        pages.table_cell_text_shadow(pages_table.model_object_id, ROW, COLUMN)?,
+        TextShadow::standard()
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -185,8 +209,20 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         TextLigatures::RequiredOnly
     );
     assert_eq!(
+        keynote.slide_table_cell_text_background(0, keynote_table.model_object_id, ROW, COLUMN,)?,
+        keynote_text_background()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_text_outline(0, keynote_table.model_object_id, ROW, COLUMN)?,
+        TextOutline::standard()
+    );
+    assert_eq!(
         keynote.slide_table_cell_text_script(0, keynote_table.model_object_id, ROW, COLUMN)?,
         TextScript::Superscript
+    );
+    assert_eq!(
+        keynote.slide_table_cell_text_shadow(0, keynote_table.model_object_id, ROW, COLUMN)?,
+        TextShadow::standard()
     );
     Ok(())
 }
@@ -247,6 +283,45 @@ fn keynote_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     const GREEN: f32 = 0.55;
     const BLUE: f32 = 0.28;
     RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+}
+
+fn numbers_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+    const RED: f32 = 0.96;
+    const GREEN: f32 = 0.86;
+    const BLUE: f32 = 0.25;
+    Ok(TextBackground::Color(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?))
+}
+
+fn pages_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+    const RED: f32 = 0.70;
+    const GREEN: f32 = 0.92;
+    const BLUE: f32 = 0.96;
+    Ok(TextBackground::Color(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?))
+}
+
+fn keynote_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+    const RED: f32 = 0.98;
+    const GREEN: f32 = 0.70;
+    const BLUE: f32 = 0.28;
+    Ok(TextBackground::Color(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?))
 }
 
 const fn numbers_text_decorations() -> TextDecorations {
@@ -323,7 +398,10 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers_character_spacing()?,
     )?;
     editor.set_table_cell_text_ligatures(table_id, ROW, COLUMN, TextLigatures::RequiredOnly)?;
+    editor.set_table_cell_text_background(table_id, ROW, COLUMN, numbers_text_background()?)?;
+    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Superscript)?;
+    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
     editor.save(output)?;
     Ok(())
 }
@@ -360,7 +438,10 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         pages_character_spacing()?,
     )?;
     editor.set_table_cell_text_ligatures(table_id, ROW, COLUMN, TextLigatures::All)?;
+    editor.set_table_cell_text_background(table_id, ROW, COLUMN, pages_text_background()?)?;
+    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Subscript)?;
+    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
     editor.save(output)?;
     Ok(())
 }
@@ -457,12 +538,33 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         TextLigatures::RequiredOnly,
     )?;
+    editor.set_slide_table_cell_text_background(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_text_background()?,
+    )?;
+    editor.set_slide_table_cell_text_outline(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        TextOutline::standard(),
+    )?;
     editor.set_slide_table_cell_text_script(
         0,
         table.model_object_id,
         ROW,
         COLUMN,
         TextScript::Superscript,
+    )?;
+    editor.set_slide_table_cell_text_shadow(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        TextShadow::standard(),
     )?;
     editor.save(output)?;
     Ok(())

@@ -99,9 +99,9 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) baseline_shift: Option<TextBaselineShift>,
     pub(crate) character_spacing: Option<TextCharacterSpacing>,
     pub(crate) ligatures: Option<TextLigatures>,
-    pub(super) outline: Option<TextOutline>,
-    pub(super) shadow: Option<TextShadow>,
-    pub(super) background: Option<TextBackground>,
+    pub(crate) outline: Option<TextOutline>,
+    pub(crate) shadow: Option<TextShadow>,
+    pub(crate) background: Option<TextBackground>,
     pub(crate) underline: Option<TextUnderline>,
     pub(crate) strikethrough: Option<TextStrikethrough>,
     pub(crate) alignment: Option<TextAlignment>,
@@ -272,21 +272,21 @@ pub(crate) fn inherited_text_ligatures(
     inheritance::text_ligatures(package, first_style_id)
 }
 
-pub(super) fn inherited_text_outline(
+pub(crate) fn inherited_text_outline(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextOutline> {
     inheritance::text_outline(package, first_style_id)
 }
 
-pub(super) fn inherited_text_shadow(
+pub(crate) fn inherited_text_shadow(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextShadow> {
     inheritance::text_shadow(package, first_style_id)
 }
 
-pub(super) fn inherited_text_background(
+pub(crate) fn inherited_text_background(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextBackground> {

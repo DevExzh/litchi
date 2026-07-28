@@ -139,6 +139,8 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Typed solid background painted behind a whole Numbers table cell's text.
+pub type NumbersTableCellTextBackground = TextBackground;
 /// Validated custom baseline displacement applied to a whole Numbers cell.
 pub type NumbersTableCellTextBaselineShift = TextBaselineShift;
 /// Typed capitalization applied to a whole Numbers table cell.
@@ -153,8 +155,12 @@ pub type NumbersTableCellTextDecorations = TextDecorations;
 pub type NumbersTableCellTextFont = TextFont;
 /// Typed ligature policy applied to a whole Numbers table cell.
 pub type NumbersTableCellTextLigatures = TextLigatures;
+/// Typed outline applied to a whole Numbers table cell's text.
+pub type NumbersTableCellTextOutline = TextOutline;
 /// Typed normal, superscript, or subscript formatting for a whole Numbers cell.
 pub type NumbersTableCellTextScript = TextScript;
+/// Typed drop shadow applied to a whole Numbers table cell's text.
+pub type NumbersTableCellTextShadow = TextShadow;
 /// Whole-cell point size, bold, and italic formatting.
 pub type NumbersTableCellTextStyle = TextStyle;
 
@@ -2811,6 +2817,51 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the effective background painted behind one table cell's text.
+    pub fn table_cell_text_background(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextBackground> {
+        cell_paragraph_style::background(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell text-background override.
+    pub fn set_table_cell_text_background(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        background: NumbersTableCellTextBackground,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_background(&mut staged, table_id, row, column, background)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_background(table_id, row, column)? != background {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text background failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text background and restore the inherited value.
+    pub fn reset_table_cell_text_background(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_background(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective custom baseline displacement of one table cell.
     pub fn table_cell_text_baseline_shift(
         &self,
@@ -3135,6 +3186,51 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the effective outline of one table cell's text.
+    pub fn table_cell_text_outline(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextOutline> {
+        cell_paragraph_style::outline(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell text outline.
+    pub fn set_table_cell_text_outline(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        outline: NumbersTableCellTextOutline,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_outline(&mut staged, table_id, row, column, outline)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_outline(table_id, row, column)? != outline {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text outline failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text outline and restore the inherited value.
+    pub fn reset_table_cell_text_outline(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_outline(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read effective normal, superscript, or subscript formatting.
     pub fn table_cell_text_script(
         &self,
@@ -3174,6 +3270,51 @@ impl NumbersEditor {
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_style::reset_script(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective drop shadow of one table cell's text.
+    pub fn table_cell_text_shadow(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextShadow> {
+        cell_paragraph_style::shadow(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell text drop shadow.
+    pub fn set_table_cell_text_shadow(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        shadow: NumbersTableCellTextShadow,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_shadow(&mut staged, table_id, row, column, shadow)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_shadow(table_id, row, column)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text shadow failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text shadow and restore the inherited value.
+    pub fn reset_table_cell_text_shadow(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_shadow(&mut staged, table_id, row, column)?;
         if changed {
             *self = Self::from_bytes(&staged.to_bytes()?)?;
         }
@@ -4348,6 +4489,34 @@ pub(crate) fn reset_table_cell_text_alignment_in_package(
     cell_paragraph_style::reset_alignment(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_text_background_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextBackground> {
+    cell_paragraph_style::background(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_background_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    background: TextBackground,
+) -> Result<()> {
+    cell_paragraph_style::set_background(package, table_id, row, column, background)
+}
+
+pub(crate) fn reset_table_cell_text_background_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_background(package, table_id, row, column)
+}
+
 pub(crate) fn table_cell_text_baseline_shift_in_package(
     package: &IWorkPackage,
     table_id: u64,
@@ -4544,6 +4713,34 @@ pub(crate) fn reset_table_cell_text_ligatures_in_package(
     cell_paragraph_style::reset_ligatures(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_text_outline_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextOutline> {
+    cell_paragraph_style::outline(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_outline_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    outline: TextOutline,
+) -> Result<()> {
+    cell_paragraph_style::set_outline(package, table_id, row, column, outline)
+}
+
+pub(crate) fn reset_table_cell_text_outline_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_outline(package, table_id, row, column)
+}
+
 pub(crate) fn table_cell_text_script_in_package(
     package: &IWorkPackage,
     table_id: u64,
@@ -4570,6 +4767,34 @@ pub(crate) fn reset_table_cell_text_script_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_paragraph_style::reset_script(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_shadow_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextShadow> {
+    cell_paragraph_style::shadow(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_shadow_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    shadow: TextShadow,
+) -> Result<()> {
+    cell_paragraph_style::set_shadow(package, table_id, row, column, shadow)
+}
+
+pub(crate) fn reset_table_cell_text_shadow_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_shadow(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_text_style_in_package(

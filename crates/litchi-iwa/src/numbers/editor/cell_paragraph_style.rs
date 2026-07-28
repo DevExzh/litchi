@@ -68,6 +68,57 @@ pub(super) fn reset_alignment(
     )
 }
 
+pub(super) fn background(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextBackground> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Background,
+    )? {
+        CellParagraphProperty::Background(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell text background resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_background(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextBackground,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Background(value),
+    )
+}
+
+pub(super) fn reset_background(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Background,
+    )
+}
+
 pub(super) fn baseline_shift(
     package: &IWorkPackage,
     table_id: u64,
@@ -425,6 +476,57 @@ pub(super) fn reset_ligatures(
     )
 }
 
+pub(super) fn outline(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextOutline> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Outline,
+    )? {
+        CellParagraphProperty::Outline(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell text outline resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_outline(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextOutline,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Outline(value),
+    )
+}
+
+pub(super) fn reset_outline(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Outline,
+    )
+}
+
 pub(super) fn script(
     package: &IWorkPackage,
     table_id: u64,
@@ -473,6 +575,57 @@ pub(super) fn reset_script(
         row,
         column,
         CellParagraphPropertyKind::Script,
+    )
+}
+
+pub(super) fn shadow(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextShadow> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Shadow,
+    )? {
+        CellParagraphProperty::Shadow(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell text shadow resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_shadow(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextShadow,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Shadow(value),
+    )
+}
+
+pub(super) fn reset_shadow(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Shadow,
     )
 }
 
@@ -1156,8 +1309,9 @@ mod tests {
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
     use crate::text::{
-        TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
-        TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextUnderline,
+        TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+        TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript,
+        TextShadow, TextStrikethrough, TextUnderline,
     };
 
     fn test_color() -> RgbaColor {
@@ -1166,6 +1320,14 @@ mod tests {
         const BLUE: f32 = 0.14;
         const ALPHA: f32 = 1.0;
         RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap()
+    }
+
+    fn test_background() -> TextBackground {
+        const RED: f32 = 0.95;
+        const GREEN: f32 = 0.82;
+        const BLUE: f32 = 0.20;
+        const ALPHA: f32 = 1.0;
+        TextBackground::Color(RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap())
     }
 
     fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
@@ -1352,7 +1514,10 @@ mod tests {
         let capitalization = TextCapitalization::TitleCase;
         let character_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
         let ligatures = TextLigatures::RequiredOnly;
+        let background = test_background();
+        let outline = TextOutline::standard();
         let script = TextScript::Superscript;
+        let shadow = TextShadow::standard();
 
         editor
             .set_table_cell_text_style(table_id, 1, 1, styled)
@@ -1379,7 +1544,16 @@ mod tests {
             .set_table_cell_text_ligatures(table_id, 1, 1, ligatures)
             .unwrap();
         editor
+            .set_table_cell_text_background(table_id, 1, 1, background)
+            .unwrap();
+        editor
+            .set_table_cell_text_outline(table_id, 1, 1, outline)
+            .unwrap();
+        editor
             .set_table_cell_text_script(table_id, 1, 1, script)
+            .unwrap();
+        editor
+            .set_table_cell_text_shadow(table_id, 1, 1, shadow)
             .unwrap();
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
         assert_eq!(
@@ -1419,8 +1593,20 @@ mod tests {
             ligatures
         );
         assert_eq!(
+            editor.table_cell_text_background(table_id, 1, 1).unwrap(),
+            background
+        );
+        assert_eq!(
+            editor.table_cell_text_outline(table_id, 1, 1).unwrap(),
+            outline
+        );
+        assert_eq!(
             editor.table_cell_text_script(table_id, 1, 1).unwrap(),
             script
+        );
+        assert_eq!(
+            editor.table_cell_text_shadow(table_id, 1, 1).unwrap(),
+            shadow
         );
 
         assert!(
@@ -1456,6 +1642,25 @@ mod tests {
                 .reset_table_cell_text_ligatures(table_id, 1, 1)
                 .unwrap()
         );
+        assert!(
+            editor
+                .reset_table_cell_text_background(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            editor.table_cell_text_outline(table_id, 1, 1).unwrap(),
+            outline
+        );
+        assert!(
+            editor
+                .reset_table_cell_text_outline(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            editor.table_cell_text_shadow(table_id, 1, 1).unwrap(),
+            shadow
+        );
+        assert!(editor.reset_table_cell_text_shadow(table_id, 1, 1).unwrap());
 
         assert!(
             editor
@@ -1590,6 +1795,26 @@ mod tests {
         );
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
 
+        let background = test_background();
+        editor
+            .set_table_cell_text_background(table_id, 1, 1, background)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor.table_cell_text_background(table_id, 1, 1).unwrap(),
+            background
+        );
+        assert_eq!(
+            editor.table_cell_text_background(table_id, 1, 2).unwrap(),
+            TextBackground::None
+        );
+        assert!(
+            editor
+                .reset_table_cell_text_background(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+
         editor
             .set_table_cell_text_decorations(table_id, 1, 1, decorations)
             .unwrap();
@@ -1718,6 +1943,9 @@ mod tests {
             TextDecorations::new(TextUnderline::Single, TextStrikethrough::None);
         let pages_baseline_shift = TextBaselineShift::from_points(-1.5).unwrap();
         let pages_spacing = TextCharacterSpacing::from_percent(8.0).unwrap();
+        let pages_background = test_background();
+        let pages_outline = TextOutline::standard();
+        let pages_shadow = TextShadow::standard();
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Aligned", 2, 2)
             .build()
@@ -1751,7 +1979,16 @@ mod tests {
             .set_table_cell_text_ligatures(pages_table, 1, 1, TextLigatures::All)
             .unwrap();
         pages
+            .set_table_cell_text_background(pages_table, 1, 1, pages_background)
+            .unwrap();
+        pages
+            .set_table_cell_text_outline(pages_table, 1, 1, pages_outline)
+            .unwrap();
+        pages
             .set_table_cell_text_script(pages_table, 1, 1, TextScript::Subscript)
+            .unwrap();
+        pages
+            .set_table_cell_text_shadow(pages_table, 1, 1, pages_shadow)
             .unwrap();
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1799,8 +2036,20 @@ mod tests {
             TextLigatures::All
         );
         assert_eq!(
+            pages.table_cell_text_background(pages_table, 1, 1).unwrap(),
+            pages_background
+        );
+        assert_eq!(
+            pages.table_cell_text_outline(pages_table, 1, 1).unwrap(),
+            pages_outline
+        );
+        assert_eq!(
             pages.table_cell_text_script(pages_table, 1, 1).unwrap(),
             TextScript::Subscript
+        );
+        assert_eq!(
+            pages.table_cell_text_shadow(pages_table, 1, 1).unwrap(),
+            pages_shadow
         );
         assert!(
             pages
@@ -1824,7 +2073,22 @@ mod tests {
         );
         assert!(
             pages
+                .reset_table_cell_text_background(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_outline(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
                 .reset_table_cell_text_script(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_shadow(pages_table, 1, 1)
                 .unwrap()
         );
         assert!(
@@ -1852,6 +2116,9 @@ mod tests {
             TextDecorations::new(TextUnderline::None, TextStrikethrough::Single);
         let keynote_baseline_shift = TextBaselineShift::from_points(2.0).unwrap();
         let keynote_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
+        let keynote_background = test_background();
+        let keynote_outline = TextOutline::standard();
+        let keynote_shadow = TextShadow::standard();
         let mut keynote = KeynoteDocumentBuilder::new()
             .title("Aligned")
             .build()
@@ -1933,6 +2200,18 @@ mod tests {
             )
             .unwrap();
         keynote
+            .set_slide_table_cell_text_background(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                keynote_background,
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_text_outline(0, table.model_object_id, 1, 1, keynote_outline)
+            .unwrap();
+        keynote
             .set_slide_table_cell_text_script(
                 0,
                 table.model_object_id,
@@ -1940,6 +2219,9 @@ mod tests {
                 1,
                 TextScript::Superscript,
             )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_text_shadow(0, table.model_object_id, 1, 1, keynote_shadow)
             .unwrap();
         let mut keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
@@ -1999,9 +2281,27 @@ mod tests {
         );
         assert_eq!(
             keynote
+                .slide_table_cell_text_background(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_background
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_outline(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_outline
+        );
+        assert_eq!(
+            keynote
                 .slide_table_cell_text_script(0, table.model_object_id, 1, 1)
                 .unwrap(),
             TextScript::Superscript
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_shadow(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_shadow
         );
         assert!(
             keynote
@@ -2025,7 +2325,22 @@ mod tests {
         );
         assert!(
             keynote
+                .reset_slide_table_cell_text_background(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_outline(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
                 .reset_slide_table_cell_text_script(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_shadow(0, table.model_object_id, 1, 1)
                 .unwrap()
         );
         assert!(
@@ -2120,7 +2435,22 @@ mod tests {
         );
         assert!(
             editor
+                .set_table_cell_text_background(table_id, 1, 2, test_background())
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_outline(table_id, 1, 2, TextOutline::standard())
+                .is_err()
+        );
+        assert!(
+            editor
                 .set_table_cell_text_script(table_id, 1, 2, TextScript::Superscript)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_shadow(table_id, 1, 2, TextShadow::standard())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
