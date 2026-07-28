@@ -200,7 +200,7 @@ pub(super) fn set_in_package(
     }
     clear_in_package(package, table_id, row, column)?;
     let location = locate_cell(package, table_id, row, column)?;
-    set_at_location(package, location, row, column, rules)
+    set_at_location(package, &location, row, column, rules)
 }
 
 pub(super) fn set_attached_in_package(
@@ -217,7 +217,7 @@ pub(super) fn set_attached_in_package(
     }
     clear_attached_in_package(package, table_id, row, column)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
-    set_at_location(package, location, row, column, rules)
+    set_at_location(package, &location, row, column, rules)
 }
 
 fn validate_rules(rules: &[TableCellConditionalHighlightRule]) -> Result<()> {
@@ -236,7 +236,7 @@ fn validate_rules(rules: &[TableCellConditionalHighlightRule]) -> Result<()> {
 
 fn set_at_location(
     package: &mut IWorkPackage,
-    location: CellLocation,
+    location: &CellLocation,
     row: usize,
     column: usize,
     rules: &[TableCellConditionalHighlightRule],
@@ -270,7 +270,7 @@ fn set_at_location(
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
 
     let (list_archive, model_archive, conditional_owner_uid) =
-        ensure_conditional_style_table(package, &location, list_id)?;
+        ensure_conditional_style_table(package, location, list_id)?;
     let style_set_id = first_graph_id;
     let formula_owner_uuid =
         formula_owner_uuid_for_table(&parse_table_uuid(&location.descriptor.model.table_id)?);
@@ -306,16 +306,16 @@ fn set_at_location(
             column,
         )?;
     }
-    let applied_rule = applied_rule_for_cell(package, &location, column, rules)?;
+    let applied_rule = applied_rule_for_cell(package, location, column, rules)?;
     update_cell(
         package,
-        &location,
+        location,
         row,
         column,
         Some(list_identifier),
         Some(applied_rule),
     )?;
-    let mut modified = vec![location.tile_archive, list_archive];
+    let mut modified = vec![location.tile_archive.clone(), list_archive];
     if !modified.contains(&model_archive) {
         modified.push(model_archive);
     }

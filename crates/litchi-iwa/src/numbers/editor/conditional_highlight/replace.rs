@@ -29,8 +29,13 @@ pub(super) fn try_at_location(
         return Ok(false);
     };
     let (resolved, entry) = resolve_entry(package, location, list_identifier)?;
-    if entry.entry.refcount != 1 {
-        return Ok(false);
+    if entry.entry.refcount == 0 {
+        return Err(Error::InvalidFormat(format!(
+            "conditional-highlight list entry {list_identifier} has a zero reference count"
+        )));
+    }
+    if entry.entry.refcount > 1 {
+        return copy_on_write(package, location, row, column, rules, &resolved, &entry);
     }
     let style_set_id = entry
         .entry
@@ -117,6 +122,36 @@ pub(super) fn try_at_location(
         &existing,
         &replacement.identifiers,
     )?;
+    Ok(true)
+}
+
+fn copy_on_write(
+    package: &mut IWorkPackage,
+    location: &CellLocation,
+    row: usize,
+    column: usize,
+    rules: &[TableCellConditionalHighlightRule],
+    resolved: &ResolvedTableDataList,
+    entry: &LocatedTableDataListEntry,
+) -> Result<bool> {
+    let owner_uid = location
+        .descriptor
+        .model
+        .conditional_style_formula_owner_id
+        .as_ref()
+        .and_then(cfuuid_as_uuid)
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers conditional-style formula owner is missing".to_owned())
+        })?;
+    dependencies::remove_volatile_host(package, owner_uid, row, column)?;
+    decrement_table_data_list_entry(
+        package,
+        &location.object_locations,
+        resolved,
+        entry,
+        tst::table_data_list::ListType::ConditionalStyle,
+    )?;
+    set_at_location(package, location, row, column, rules)?;
     Ok(true)
 }
 

@@ -35,6 +35,39 @@ fn applied_rule(editor: &NumbersEditor, table_id: u64, row: usize, column: usize
         .conditional_style_applied_rule()
 }
 
+fn share_conditional_highlight(
+    editor: &mut NumbersEditor,
+    table_id: u64,
+    row: usize,
+    source_column: usize,
+    target_column: usize,
+) -> TableCellConditionalHighlightInfo {
+    let shared = info_in_package(&editor.package, table_id, row, source_column)
+        .unwrap()
+        .unwrap();
+    let target = locate_cell(&editor.package, table_id, row, target_column).unwrap();
+    let (resolved, entry) =
+        resolve_entry(&editor.package, &target, shared.list_identifier).unwrap();
+    increment_table_data_list_entry(
+        &mut editor.package,
+        &target.object_locations,
+        &resolved,
+        &entry,
+        tst::table_data_list::ListType::ConditionalStyle,
+    )
+    .unwrap();
+    update_cell(
+        &mut editor.package,
+        &target,
+        row,
+        target_column,
+        Some(shared.list_identifier),
+        Some(CONDITIONAL_STYLE_NO_APPLIED_RULE),
+    )
+    .unwrap();
+    shared
+}
+
 #[test]
 fn scratch_document_conditional_highlights_create_replace_and_delete() {
     let mut editor = NumbersDocumentBuilder::new()
@@ -278,6 +311,139 @@ fn variable_size_replacement_retains_and_reclaims_conditional_children() {
             .cell_conditional_highlight_rules(table_id, 1, 1)
             .unwrap(),
         Some(grown[..1].to_vec())
+    );
+}
+
+#[test]
+fn shared_conditional_graph_replacement_is_copy_on_write() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
+    let initial = [rule(
+        TableCellConditionalHighlightCondition::LessThan(zero),
+        red,
+    )];
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
+        .unwrap();
+    let shared = share_conditional_highlight(&mut editor, table_id, 1, 1, 2);
+
+    let replacement = [rule(
+        TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(zero),
+        green,
+    )];
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &replacement)
+        .unwrap();
+
+    let edited = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let untouched = info_in_package(&editor.package, table_id, 1, 2)
+        .unwrap()
+        .unwrap();
+    assert_ne!(edited.list_identifier, shared.list_identifier);
+    assert_ne!(edited.style_set_object_id, shared.style_set_object_id);
+    assert_eq!(untouched.list_identifier, shared.list_identifier);
+    assert_eq!(untouched.style_set_object_id, shared.style_set_object_id);
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap(),
+        Some(replacement.to_vec())
+    );
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 2)
+            .unwrap(),
+        Some(initial.to_vec())
+    );
+    for (info, expected_refcount) in [(edited, 1), (untouched, 1)] {
+        let location = locate_cell(&editor.package, table_id, info.row, info.column).unwrap();
+        let (_resolved, entry) =
+            resolve_entry(&editor.package, &location, info.list_identifier).unwrap();
+        assert_eq!(entry.entry.refcount, expected_refcount);
+    }
+}
+
+#[test]
+fn shared_conditional_copy_on_write_rolls_back_after_late_failure() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
+    let rules = [rule(
+        TableCellConditionalHighlightCondition::LessThan(zero),
+        red,
+    )];
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &rules)
+        .unwrap();
+    let shared = share_conditional_highlight(&mut editor, table_id, 1, 1, 2);
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let (resolved, _entry) =
+        resolve_entry(&editor.package, &location, shared.list_identifier).unwrap();
+    editor
+        .package
+        .update_archive(&resolved.table_archive, |archive| {
+            let object = archive.object_mut(resolved.table_id).ok_or_else(|| {
+                Error::InvalidFormat("conditional-style table missing".to_owned())
+            })?;
+            let message_index = table_data_list_message_index(
+                object,
+                tst::table_data_list::ListType::ConditionalStyle,
+            )
+            .ok_or_else(|| Error::InvalidFormat("conditional-style payload missing".to_owned()))?;
+            let mut list = TableDataList::decode(object.messages[message_index].data.as_slice())?;
+            list.next_list_id = u32::MAX;
+            let message_type = object.messages[message_index].type_;
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data: list.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let next_object_before = next_object_identifier(&editor.package).unwrap();
+
+    assert!(
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, 1, &rules)
+            .is_err()
+    );
+
+    assert_eq!(
+        next_object_identifier(&editor.package).unwrap(),
+        next_object_before
+    );
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let (_resolved, entry) =
+        resolve_entry(&editor.package, &location, shared.list_identifier).unwrap();
+    assert_eq!(entry.entry.refcount, 2);
+    assert_eq!(
+        info_in_package(&editor.package, table_id, 1, 1)
+            .unwrap()
+            .unwrap()
+            .style_set_object_id,
+        shared.style_set_object_id
+    );
+    assert_eq!(
+        info_in_package(&editor.package, table_id, 1, 2)
+            .unwrap()
+            .unwrap()
+            .style_set_object_id,
+        shared.style_set_object_id
     );
 }
 
