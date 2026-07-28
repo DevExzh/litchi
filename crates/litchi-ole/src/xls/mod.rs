@@ -30,6 +30,10 @@ mod data_validation;
 mod calculation;
 mod chart;
 
+/// BIFF8 chart future-record (FRT) records: `ChartFrtInfo`, `CatLab`,
+/// `StartBlock`, and `EndBlock`.
+mod chart_frt;
+
 /// BIFF8 worksheet scenario manager records.
 mod scenario;
 
@@ -227,6 +231,10 @@ pub use calculation::{
     XlsWorksheetCalculation,
 };
 pub use chart::*;
+pub use chart_frt::{
+    XlsCatLab, XlsCatLabAlignment, XlsChartBlockObjectKind, XlsChartFrtInfo, XlsChartFrtVersion,
+    XlsChartFutureRecordRange, XlsEndBlock, XlsStartBlock,
+};
 pub use cell::XlsCell;
 pub use comments::CommentVisibility;
 pub use conditional_format::{
