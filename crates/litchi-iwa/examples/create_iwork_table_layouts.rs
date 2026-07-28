@@ -10,11 +10,12 @@ use litchi_iwa::table_cell_layout::{
     TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
 };
 use litchi_iwa::text::{
-    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints,
-    ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -109,6 +110,14 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_paragraph_spacing(numbers_table.object_id, ROW, COLUMN)?,
         numbers_paragraph_spacing()?
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_indents(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_paragraph_indents()?
+    );
+    assert_eq!(
+        numbers.table_cell_paragraph_tab_stops(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_paragraph_tab_stops()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -171,6 +180,14 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         pages.table_cell_paragraph_spacing(pages_table.model_object_id, ROW, COLUMN)?,
         pages_paragraph_spacing()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_indents(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_paragraph_indents()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_tab_stops(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_paragraph_tab_stops()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -259,6 +276,24 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             COLUMN,
         )?,
         keynote_paragraph_spacing()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_indents(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+        )?,
+        keynote_paragraph_indents()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_tab_stops(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+        )?,
+        keynote_paragraph_tab_stops()?
     );
     Ok(())
 }
@@ -448,6 +483,86 @@ fn keynote_paragraph_spacing() -> Result<ParagraphSpacing, litchi_iwa::Error> {
     paragraph_spacing(BEFORE_POINTS, AFTER_POINTS)
 }
 
+fn paragraph_indents(
+    first_line_points: f32,
+    left_points: f32,
+    right_points: f32,
+) -> Result<ParagraphIndents, litchi_iwa::Error> {
+    Ok(ParagraphIndents::new(
+        ParagraphIndentPoints::from_points(first_line_points)?,
+        ParagraphIndentPoints::from_points(left_points)?,
+        ParagraphIndentPoints::from_points(right_points)?,
+    ))
+}
+
+fn numbers_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
+    const FIRST_LINE_POINTS: f32 = 4.0;
+    const LEFT_POINTS: f32 = 8.0;
+    const RIGHT_POINTS: f32 = 6.0;
+    paragraph_indents(FIRST_LINE_POINTS, LEFT_POINTS, RIGHT_POINTS)
+}
+
+fn pages_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
+    const FIRST_LINE_POINTS: f32 = 6.0;
+    const LEFT_POINTS: f32 = 12.0;
+    const RIGHT_POINTS: f32 = 8.0;
+    paragraph_indents(FIRST_LINE_POINTS, LEFT_POINTS, RIGHT_POINTS)
+}
+
+fn keynote_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
+    const FIRST_LINE_POINTS: f32 = 8.0;
+    const LEFT_POINTS: f32 = 16.0;
+    const RIGHT_POINTS: f32 = 10.0;
+    paragraph_indents(FIRST_LINE_POINTS, LEFT_POINTS, RIGHT_POINTS)
+}
+
+fn numbers_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
+    const CENTER_POINTS: f32 = 36.0;
+    const DECIMAL_POINTS: f32 = 72.0;
+    ParagraphTabStops::new(vec![
+        ParagraphTabStop::new(
+            ParagraphTabPosition::from_points(CENTER_POINTS)?,
+            ParagraphTabAlignment::Center,
+        ),
+        ParagraphTabStop::new(
+            ParagraphTabPosition::from_points(DECIMAL_POINTS)?,
+            ParagraphTabAlignment::Decimal,
+        )
+        .with_leader(ParagraphTabLeader::new(".")?),
+    ])
+}
+
+fn pages_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
+    const LEFT_POINTS: f32 = 42.0;
+    const RIGHT_POINTS: f32 = 78.0;
+    ParagraphTabStops::new(vec![
+        ParagraphTabStop::new(
+            ParagraphTabPosition::from_points(LEFT_POINTS)?,
+            ParagraphTabAlignment::Left,
+        ),
+        ParagraphTabStop::new(
+            ParagraphTabPosition::from_points(RIGHT_POINTS)?,
+            ParagraphTabAlignment::Right,
+        )
+        .with_leader(ParagraphTabLeader::new("-")?),
+    ])
+}
+
+fn keynote_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
+    const CENTER_POINTS: f32 = 48.0;
+    const RIGHT_POINTS: f32 = 84.0;
+    ParagraphTabStops::new(vec![
+        ParagraphTabStop::new(
+            ParagraphTabPosition::from_points(CENTER_POINTS)?,
+            ParagraphTabAlignment::Center,
+        ),
+        ParagraphTabStop::new(
+            ParagraphTabPosition::from_points(RIGHT_POINTS)?,
+            ParagraphTabAlignment::Right,
+        ),
+    ])
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Layouts")
@@ -491,6 +606,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers_paragraph_line_spacing(),
     )?;
     editor.set_table_cell_paragraph_spacing(table_id, ROW, COLUMN, numbers_paragraph_spacing()?)?;
+    editor.set_table_cell_paragraph_indents(table_id, ROW, COLUMN, numbers_paragraph_indents()?)?;
+    editor.set_table_cell_paragraph_tab_stops(
+        table_id,
+        ROW,
+        COLUMN,
+        numbers_paragraph_tab_stops()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -538,6 +660,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         pages_paragraph_line_spacing()?,
     )?;
     editor.set_table_cell_paragraph_spacing(table_id, ROW, COLUMN, pages_paragraph_spacing()?)?;
+    editor.set_table_cell_paragraph_indents(table_id, ROW, COLUMN, pages_paragraph_indents()?)?;
+    editor.set_table_cell_paragraph_tab_stops(
+        table_id,
+        ROW,
+        COLUMN,
+        pages_paragraph_tab_stops()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -675,6 +804,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         keynote_paragraph_spacing()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_indents(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_paragraph_indents()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_tab_stops(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_paragraph_tab_stops()?,
     )?;
     editor.save(output)?;
     Ok(())

@@ -102,8 +102,10 @@ pub use crate::table_cell_number_format::{
     TableCellNumberFormat as KeynoteTableCellNumberFormat,
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
+pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
+pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
 pub use crate::text::TextBackground as KeynoteTableCellTextBackground;
 pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
@@ -1822,6 +1824,154 @@ impl KeynoteEditor {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_paragraph_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective first-line, left, and right paragraph indents.
+    pub fn slide_table_cell_paragraph_indents(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellParagraphIndents> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_indents_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell paragraph indents.
+    pub fn set_slide_table_cell_paragraph_indents(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        indents: KeynoteTableCellParagraphIndents,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_indents_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            indents,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_indents(slide_index, model_object_id, row, column)?
+            != indents
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph indents failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local paragraph indents and restore the inherited table style.
+    pub fn reset_slide_table_cell_paragraph_indents(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_indents_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the ordered explicit ruler tab stops for one slide-table cell.
+    pub fn slide_table_cell_paragraph_tab_stops(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellParagraphTabStops> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_tab_stops_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell ruler tab stops.
+    pub fn set_slide_table_cell_paragraph_tab_stops(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        stops: KeynoteTableCellParagraphTabStops,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_tab_stops_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            stops.clone(),
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_tab_stops(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+        )? != stops
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph tab stops failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local ruler tab stops and restore the inherited table style.
+    pub fn reset_slide_table_cell_paragraph_tab_stops(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_tab_stops_in_package(
             &mut staged,
             model_object_id,
             row,

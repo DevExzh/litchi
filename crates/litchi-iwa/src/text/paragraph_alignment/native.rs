@@ -108,10 +108,10 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) line_spacing: Option<ParagraphLineSpacing>,
     pub(crate) space_before: Option<ParagraphSpacingPoints>,
     pub(crate) space_after: Option<ParagraphSpacingPoints>,
-    pub(super) first_line_indent: Option<ParagraphIndentPoints>,
-    pub(super) left_indent: Option<ParagraphIndentPoints>,
-    pub(super) right_indent: Option<ParagraphIndentPoints>,
-    pub(super) tab_stops: Option<ParagraphTabStops>,
+    pub(crate) first_line_indent: Option<ParagraphIndentPoints>,
+    pub(crate) left_indent: Option<ParagraphIndentPoints>,
+    pub(crate) right_indent: Option<ParagraphIndentPoints>,
+    pub(crate) tab_stops: Option<ParagraphTabStops>,
 }
 
 impl ParagraphStyleOverrides {
@@ -307,14 +307,14 @@ pub(crate) fn inherited_spacing(
     inheritance::spacing(package, first_style_id)
 }
 
-pub(super) fn inherited_indents(
+pub(crate) fn inherited_indents(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<ParagraphIndents> {
     inheritance::indents(package, first_style_id)
 }
 
-pub(super) fn inherited_tab_stops(
+pub(crate) fn inherited_tab_stops(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<ParagraphTabStops> {

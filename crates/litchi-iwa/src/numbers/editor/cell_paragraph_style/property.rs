@@ -2,16 +2,17 @@
 
 use crate::shapes::RgbaColor;
 use crate::text::paragraph_alignment::native::{
-    ParagraphStyleOverrides, inherited_alignment, inherited_line_spacing, inherited_spacing,
-    inherited_text_background, inherited_text_baseline_shift, inherited_text_capitalization,
-    inherited_text_character_spacing, inherited_text_color, inherited_text_decorations,
-    inherited_text_font, inherited_text_ligatures, inherited_text_outline, inherited_text_script,
-    inherited_text_shadow, inherited_text_style,
+    ParagraphStyleOverrides, inherited_alignment, inherited_indents, inherited_line_spacing,
+    inherited_spacing, inherited_tab_stops, inherited_text_background,
+    inherited_text_baseline_shift, inherited_text_capitalization, inherited_text_character_spacing,
+    inherited_text_color, inherited_text_decorations, inherited_text_font,
+    inherited_text_ligatures, inherited_text_outline, inherited_text_script, inherited_text_shadow,
+    inherited_text_style,
 };
 use crate::text::{
-    ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
-    TextOutline, TextScript, TextShadow, TextStyle,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStyle,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -25,12 +26,14 @@ pub(super) enum CellParagraphProperty {
     Color(RgbaColor),
     Decorations(TextDecorations),
     Font(TextFont),
+    Indents(ParagraphIndents),
     Ligatures(TextLigatures),
     LineSpacing(ParagraphLineSpacing),
     Outline(TextOutline),
     Script(TextScript),
     Shadow(TextShadow),
     Spacing(ParagraphSpacing),
+    TabStops(ParagraphTabStops),
     TextStyle(TextStyle),
 }
 
@@ -44,12 +47,14 @@ pub(super) enum CellParagraphPropertyKind {
     Color,
     Decorations,
     Font,
+    Indents,
     Ligatures,
     LineSpacing,
     Outline,
     Script,
     Shadow,
     Spacing,
+    TabStops,
     TextStyle,
 }
 
@@ -64,12 +69,14 @@ impl CellParagraphProperty {
             Self::Color(_) => CellParagraphPropertyKind::Color,
             Self::Decorations(_) => CellParagraphPropertyKind::Decorations,
             Self::Font(_) => CellParagraphPropertyKind::Font,
+            Self::Indents(_) => CellParagraphPropertyKind::Indents,
             Self::Ligatures(_) => CellParagraphPropertyKind::Ligatures,
             Self::LineSpacing(_) => CellParagraphPropertyKind::LineSpacing,
             Self::Outline(_) => CellParagraphPropertyKind::Outline,
             Self::Script(_) => CellParagraphPropertyKind::Script,
             Self::Shadow(_) => CellParagraphPropertyKind::Shadow,
             Self::Spacing(_) => CellParagraphPropertyKind::Spacing,
+            Self::TabStops(_) => CellParagraphPropertyKind::TabStops,
             Self::TextStyle(_) => CellParagraphPropertyKind::TextStyle,
         }
     }
@@ -104,6 +111,9 @@ impl CellParagraphProperty {
             CellParagraphPropertyKind::Font => {
                 inherited_text_font(package, style_id).map(Self::Font)
             },
+            CellParagraphPropertyKind::Indents => {
+                inherited_indents(package, style_id).map(Self::Indents)
+            },
             CellParagraphPropertyKind::Ligatures => {
                 inherited_text_ligatures(package, style_id).map(Self::Ligatures)
             },
@@ -121,6 +131,9 @@ impl CellParagraphProperty {
             },
             CellParagraphPropertyKind::Spacing => {
                 inherited_spacing(package, style_id).map(Self::Spacing)
+            },
+            CellParagraphPropertyKind::TabStops => {
+                inherited_tab_stops(package, style_id).map(Self::TabStops)
             },
             CellParagraphPropertyKind::TextStyle => {
                 inherited_text_style(package, style_id).map(Self::TextStyle)
@@ -161,6 +174,12 @@ impl CellParagraphProperty {
             (Self::Font(value), Self::Font(inherited)) => {
                 overrides.font = (value != inherited).then(|| value.clone());
             },
+            (Self::Indents(value), Self::Indents(inherited)) => {
+                overrides.first_line_indent =
+                    (value.first_line != inherited.first_line).then_some(value.first_line);
+                overrides.left_indent = (value.left != inherited.left).then_some(value.left);
+                overrides.right_indent = (value.right != inherited.right).then_some(value.right);
+            },
             (Self::Ligatures(value), Self::Ligatures(inherited)) => {
                 overrides.ligatures = (value != inherited).then_some(*value);
             },
@@ -179,6 +198,9 @@ impl CellParagraphProperty {
             (Self::Spacing(value), Self::Spacing(inherited)) => {
                 overrides.space_before = (value.before != inherited.before).then_some(value.before);
                 overrides.space_after = (value.after != inherited.after).then_some(value.after);
+            },
+            (Self::TabStops(value), Self::TabStops(inherited)) => {
+                overrides.tab_stops = (value != inherited).then(|| value.clone());
             },
             (Self::TextStyle(value), Self::TextStyle(inherited)) => {
                 overrides.point_size =
@@ -207,12 +229,14 @@ impl CellParagraphPropertyKind {
             Self::Color => "text color",
             Self::Decorations => "text decorations",
             Self::Font => "font",
+            Self::Indents => "paragraph indents",
             Self::Ligatures => "ligatures",
             Self::LineSpacing => "paragraph line spacing",
             Self::Outline => "text outline",
             Self::Script => "baseline script",
             Self::Shadow => "text shadow",
             Self::Spacing => "paragraph spacing",
+            Self::TabStops => "paragraph tab stops",
             Self::TextStyle => "character formatting",
         }
     }
@@ -227,12 +251,18 @@ impl CellParagraphPropertyKind {
             Self::Color => overrides.font_color.is_some(),
             Self::Decorations => overrides.underline.is_some() || overrides.strikethrough.is_some(),
             Self::Font => overrides.font.is_some(),
+            Self::Indents => {
+                overrides.first_line_indent.is_some()
+                    || overrides.left_indent.is_some()
+                    || overrides.right_indent.is_some()
+            },
             Self::Ligatures => overrides.ligatures.is_some(),
             Self::LineSpacing => overrides.line_spacing.is_some(),
             Self::Outline => overrides.outline.is_some(),
             Self::Script => overrides.script.is_some(),
             Self::Shadow => overrides.shadow.is_some(),
             Self::Spacing => overrides.space_before.is_some() || overrides.space_after.is_some(),
+            Self::TabStops => overrides.tab_stops.is_some(),
             Self::TextStyle => {
                 overrides.point_size.is_some()
                     || overrides.bold.is_some()
@@ -254,6 +284,11 @@ impl CellParagraphPropertyKind {
                 overrides.strikethrough = None;
             },
             Self::Font => overrides.font = None,
+            Self::Indents => {
+                overrides.first_line_indent = None;
+                overrides.left_indent = None;
+                overrides.right_indent = None;
+            },
             Self::Ligatures => overrides.ligatures = None,
             Self::LineSpacing => overrides.line_spacing = None,
             Self::Outline => overrides.outline = None,
@@ -263,6 +298,7 @@ impl CellParagraphPropertyKind {
                 overrides.space_before = None;
                 overrides.space_after = None;
             },
+            Self::TabStops => overrides.tab_stops = None,
             Self::TextStyle => {
                 overrides.point_size = None;
                 overrides.bold = None;

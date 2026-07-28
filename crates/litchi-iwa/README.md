@@ -1292,8 +1292,9 @@ alignment, validated PostScript font identity, foreground color, underline,
 strikethrough, capitalization, normal/superscript/subscript selection, custom
 baseline shift, validated character spacing, ligature policy, solid text
 background, native outline, drop shadow, native line-spacing modes,
-before/after paragraph spacing, and whole-cell point-size, bold, and italic
-CRUD. These properties compose in one
+before/after paragraph spacing, first-line/left/right indents, ordered typed
+ruler tab stops, and whole-cell point-size, bold, and italic CRUD. These
+properties compose in one
 paragraph-style variation, use copy-on-write when a style is shared, preserve
 unrelated overrides, and reclaim private style objects and list entries when
 their last local property is reset. The

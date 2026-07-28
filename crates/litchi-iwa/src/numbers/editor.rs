@@ -139,10 +139,14 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Typed first-line, left, and right indents for a Numbers table cell.
+pub type NumbersTableCellParagraphIndents = ParagraphIndents;
 /// Typed native line spacing applied to a whole Numbers table cell.
 pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
 /// Typed before/after paragraph spacing applied to a whole Numbers table cell.
 pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
+/// Ordered explicit ruler tab stops for a Numbers table cell.
+pub type NumbersTableCellParagraphTabStops = ParagraphTabStops;
 /// Typed solid background painted behind a whole Numbers table cell's text.
 pub type NumbersTableCellTextBackground = TextBackground;
 /// Validated custom baseline displacement applied to a whole Numbers cell.
@@ -2911,6 +2915,96 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read effective first-line, left, and right paragraph indents.
+    pub fn table_cell_paragraph_indents(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphIndents> {
+        cell_paragraph_style::indents(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell paragraph indents.
+    pub fn set_table_cell_paragraph_indents(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        indents: NumbersTableCellParagraphIndents,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_indents(&mut staged, table_id, row, column, indents)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_indents(table_id, row, column)? != indents {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph indents failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local paragraph indents and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_indents(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_indents(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the ordered explicit ruler tab stops for one table cell.
+    pub fn table_cell_paragraph_tab_stops(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphTabStops> {
+        cell_paragraph_style::tab_stops(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell ruler tab stops.
+    pub fn set_table_cell_paragraph_tab_stops(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        stops: NumbersTableCellParagraphTabStops,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_tab_stops(&mut staged, table_id, row, column, stops.clone())?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_tab_stops(table_id, row, column)? != stops {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph tab stops failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local ruler tab stops and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_tab_stops(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_tab_stops(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective background painted behind one table cell's text.
     pub fn table_cell_text_background(
         &self,
@@ -4637,6 +4731,62 @@ pub(crate) fn reset_table_cell_paragraph_spacing_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_paragraph_style::reset_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_indents_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphIndents> {
+    cell_paragraph_style::indents(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_indents_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    indents: ParagraphIndents,
+) -> Result<()> {
+    cell_paragraph_style::set_indents(package, table_id, row, column, indents)
+}
+
+pub(crate) fn reset_table_cell_paragraph_indents_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_indents(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_tab_stops_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphTabStops> {
+    cell_paragraph_style::tab_stops(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_tab_stops_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    stops: ParagraphTabStops,
+) -> Result<()> {
+    cell_paragraph_style::set_tab_stops(package, table_id, row, column, stops)
+}
+
+pub(crate) fn reset_table_cell_paragraph_tab_stops_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_tab_stops(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_text_background_in_package(

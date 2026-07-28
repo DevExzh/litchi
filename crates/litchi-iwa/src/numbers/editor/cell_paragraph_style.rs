@@ -170,6 +170,109 @@ pub(super) fn reset_spacing(
     )
 }
 
+pub(super) fn indents(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphIndents> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Indents,
+    )? {
+        CellParagraphProperty::Indents(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell paragraph indents resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_indents(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: ParagraphIndents,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Indents(value),
+    )
+}
+
+pub(super) fn reset_indents(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Indents,
+    )
+}
+
+pub(super) fn tab_stops(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphTabStops> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::TabStops,
+    )? {
+        CellParagraphProperty::TabStops(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell paragraph tab stops resolved as another paragraph property"
+                .to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_tab_stops(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: ParagraphTabStops,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::TabStops(value),
+    )
+}
+
+pub(super) fn reset_tab_stops(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::TabStops,
+    )
+}
+
 pub(super) fn background(
     package: &IWorkPackage,
     table_id: u64,
@@ -1411,8 +1514,10 @@ mod tests {
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
     use crate::text::{
-        ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphSpacing,
-        ParagraphSpacingPoints, TextBackground, TextBaselineShift, TextCapitalization,
+        ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
+        ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints,
+        ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+        ParagraphTabStops, TextBackground, TextBaselineShift, TextCapitalization,
         TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
         TextScript, TextShadow, TextStrikethrough, TextUnderline,
     };
@@ -1444,6 +1549,34 @@ mod tests {
             ParagraphSpacingPoints::from_points(BEFORE_POINTS).unwrap(),
             ParagraphSpacingPoints::from_points(AFTER_POINTS).unwrap(),
         )
+    }
+
+    fn test_indents() -> ParagraphIndents {
+        const FIRST_LINE_POINTS: f32 = 4.0;
+        const LEFT_POINTS: f32 = 8.0;
+        const RIGHT_POINTS: f32 = 6.0;
+        ParagraphIndents::new(
+            ParagraphIndentPoints::from_points(FIRST_LINE_POINTS).unwrap(),
+            ParagraphIndentPoints::from_points(LEFT_POINTS).unwrap(),
+            ParagraphIndentPoints::from_points(RIGHT_POINTS).unwrap(),
+        )
+    }
+
+    fn test_tab_stops() -> ParagraphTabStops {
+        const CENTER_POINTS: f32 = 36.0;
+        const DECIMAL_POINTS: f32 = 72.0;
+        ParagraphTabStops::new(vec![
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(CENTER_POINTS).unwrap(),
+                ParagraphTabAlignment::Center,
+            ),
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(DECIMAL_POINTS).unwrap(),
+                ParagraphTabAlignment::Decimal,
+            )
+            .with_leader(ParagraphTabLeader::new(".").unwrap()),
+        ])
+        .unwrap()
     }
 
     fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
@@ -1636,6 +1769,8 @@ mod tests {
         let shadow = TextShadow::standard();
         let line_spacing = test_line_spacing();
         let paragraph_spacing = test_paragraph_spacing();
+        let indents = test_indents();
+        let tab_stops = test_tab_stops();
 
         editor
             .set_table_cell_text_style(table_id, 1, 1, styled)
@@ -1678,6 +1813,12 @@ mod tests {
             .unwrap();
         editor
             .set_table_cell_paragraph_spacing(table_id, 1, 1, paragraph_spacing)
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_indents(table_id, 1, 1, indents)
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_tab_stops(table_id, 1, 1, tab_stops.clone())
             .unwrap();
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
         assert_eq!(
@@ -1741,6 +1882,16 @@ mod tests {
         assert_eq!(
             editor.table_cell_paragraph_spacing(table_id, 1, 1).unwrap(),
             paragraph_spacing
+        );
+        assert_eq!(
+            editor.table_cell_paragraph_indents(table_id, 1, 1).unwrap(),
+            indents
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_tab_stops(table_id, 1, 1)
+                .unwrap(),
+            tab_stops
         );
 
         assert!(
@@ -1809,6 +1960,22 @@ mod tests {
         assert!(
             editor
                 .reset_table_cell_paragraph_line_spacing(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_tab_stops(table_id, 1, 1)
+                .unwrap(),
+            tab_stops
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_indents(table_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_tab_stops(table_id, 1, 1)
                 .unwrap()
         );
 
@@ -1989,6 +2156,50 @@ mod tests {
         );
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
 
+        let indents = test_indents();
+        editor
+            .set_table_cell_paragraph_indents(table_id, 1, 1, indents)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor.table_cell_paragraph_indents(table_id, 1, 1).unwrap(),
+            indents
+        );
+        assert_eq!(
+            editor.table_cell_paragraph_indents(table_id, 1, 2).unwrap(),
+            ParagraphIndents::NONE
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_indents(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+
+        let tab_stops = test_tab_stops();
+        editor
+            .set_table_cell_paragraph_tab_stops(table_id, 1, 1, tab_stops.clone())
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor
+                .table_cell_paragraph_tab_stops(table_id, 1, 1)
+                .unwrap(),
+            tab_stops
+        );
+        assert!(
+            editor
+                .table_cell_paragraph_tab_stops(table_id, 1, 2)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_tab_stops(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+
         let background = test_background();
         editor
             .set_table_cell_text_background(table_id, 1, 1, background)
@@ -2142,6 +2353,8 @@ mod tests {
         let pages_shadow = TextShadow::standard();
         let pages_line_spacing = test_line_spacing();
         let pages_paragraph_spacing = test_paragraph_spacing();
+        let pages_indents = test_indents();
+        let pages_tab_stops = test_tab_stops();
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Aligned", 2, 2)
             .build()
@@ -2191,6 +2404,12 @@ mod tests {
             .unwrap();
         pages
             .set_table_cell_paragraph_spacing(pages_table, 1, 1, pages_paragraph_spacing)
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_indents(pages_table, 1, 1, pages_indents)
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_tab_stops(pages_table, 1, 1, pages_tab_stops.clone())
             .unwrap();
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -2265,6 +2484,18 @@ mod tests {
                 .unwrap(),
             pages_paragraph_spacing
         );
+        assert_eq!(
+            pages
+                .table_cell_paragraph_indents(pages_table, 1, 1)
+                .unwrap(),
+            pages_indents
+        );
+        assert_eq!(
+            pages
+                .table_cell_paragraph_tab_stops(pages_table, 1, 1)
+                .unwrap(),
+            pages_tab_stops
+        );
         assert!(
             pages
                 .reset_table_cell_text_capitalization(pages_table, 1, 1)
@@ -2317,6 +2548,16 @@ mod tests {
         );
         assert!(
             pages
+                .reset_table_cell_paragraph_indents(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_paragraph_tab_stops(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
                 .reset_table_cell_text_decorations(pages_table, 1, 1)
                 .unwrap()
         );
@@ -2345,6 +2586,8 @@ mod tests {
         let keynote_shadow = TextShadow::standard();
         let keynote_line_spacing = test_line_spacing();
         let keynote_paragraph_spacing = test_paragraph_spacing();
+        let keynote_indents = test_indents();
+        let keynote_tab_stops = test_tab_stops();
         let mut keynote = KeynoteDocumentBuilder::new()
             .title("Aligned")
             .build()
@@ -2467,6 +2710,18 @@ mod tests {
                 keynote_paragraph_spacing,
             )
             .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_indents(0, table.model_object_id, 1, 1, keynote_indents)
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_tab_stops(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                keynote_tab_stops.clone(),
+            )
+            .unwrap();
         let mut keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -2559,6 +2814,18 @@ mod tests {
                 .unwrap(),
             keynote_paragraph_spacing
         );
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_indents(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_indents
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_tab_stops(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_tab_stops
+        );
         assert!(
             keynote
                 .reset_slide_table_cell_text_capitalization(0, table.model_object_id, 1, 1)
@@ -2607,6 +2874,16 @@ mod tests {
         assert!(
             keynote
                 .reset_slide_table_cell_paragraph_line_spacing(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_paragraph_indents(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_paragraph_tab_stops(0, table.model_object_id, 1, 1)
                 .unwrap()
         );
         assert!(
@@ -2707,6 +2984,16 @@ mod tests {
         assert!(
             editor
                 .set_table_cell_paragraph_spacing(table_id, 1, 2, test_paragraph_spacing())
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_paragraph_indents(table_id, 1, 2, test_indents())
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_paragraph_tab_stops(table_id, 1, 2, test_tab_stops())
                 .is_err()
         );
         assert!(
