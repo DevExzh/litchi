@@ -210,7 +210,8 @@ impl<'arena> MtefBinaryParser<'arena> {
         num_objs: usize,
     ) -> Result<Option<Box<MtefObjectList>>, MtefError> {
         let mut head: Option<Box<MtefObjectList>> = None;
-        let mut curr: Option<*mut MtefObjectList> = None;
+        // Tail slot: always points at the `next` cell to fill (safe tail-pointer idiom).
+        let mut tail = &mut head;
         let mut tally = 0;
         let start_pos = self.pos; // For error reporting
 
@@ -373,17 +374,10 @@ impl<'arena> MtefBinaryParser<'arena> {
                     next: None,
                 });
 
-                // Link into the list
-                match curr {
-                    Some(curr_ptr) => unsafe {
-                        (*curr_ptr).next = Some(new_node);
-                        curr = (*curr_ptr).next.as_mut().map(|n| n.as_mut() as *mut _);
-                    },
-                    None => {
-                        head = Some(new_node);
-                        curr = head.as_mut().map(|n| n.as_mut() as *mut _);
-                    },
-                }
+                // Link into the list at the tail slot, then advance it.
+                *tail = Some(new_node);
+                let node = tail.as_mut().expect("node was just inserted");
+                tail = &mut node.next;
 
                 tally += 1;
 
@@ -683,7 +677,8 @@ impl<'arena> MtefBinaryParser<'arena> {
 
         let n_stops = self.read_u8()? as i16;
         let mut head: Option<Box<MtefTabstop>> = None;
-        let mut curr: Option<*mut MtefTabstop> = None;
+        // Tail slot: always points at the `next` cell to fill (safe tail-pointer idiom).
+        let mut tail = &mut head;
 
         for _ in 0..n_stops {
             let r#type = self.read_u8()? as i16;
@@ -695,16 +690,9 @@ impl<'arena> MtefBinaryParser<'arena> {
                 next: None,
             });
 
-            match curr {
-                Some(curr_ptr) => unsafe {
-                    (*curr_ptr).next = Some(new_tabstop);
-                    curr = Some((*curr_ptr).next.as_mut().unwrap().as_mut() as *mut _);
-                },
-                None => {
-                    head = Some(new_tabstop);
-                    curr = head.as_mut().map(|n| n.as_mut() as *mut _);
-                },
-            }
+            *tail = Some(new_tabstop);
+            let node = tail.as_mut().expect("node was just inserted");
+            tail = &mut node.next;
         }
 
         Ok(MtefRuler {
@@ -855,7 +843,7 @@ impl<'arena> MtefBinaryParser<'arena> {
         if self.pos >= self.data.len() {
             return Err(MtefError::UnexpectedEof);
         }
-        let val = unsafe { *self.data.get_unchecked(self.pos) };
+        let val = self.data[self.pos];
         self.pos += 1;
         Ok(val)
     }
