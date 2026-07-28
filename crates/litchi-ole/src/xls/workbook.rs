@@ -160,6 +160,8 @@ pub struct XlsWorkbook<R: Read + Seek> {
     table_styles: Option<crate::xls::table_styles::XlsTableStyles>,
     shared_string_index: XlsResult<Option<crate::xls::shared_string_index::XlsSharedStringIndex>>,
     workbook_view: crate::xls::workbook_view::XlsWorkbookView,
+    /// Workbook-wide custom views (`UserBView` records), in record order.
+    custom_views: Vec<crate::xls::custom_view::XlsWorkbookCustomView>,
     function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
     external_links: crate::xls::external_link::XlsExternalLinks,
     pivot_caches: Vec<crate::xls::PivotCache>,
@@ -243,6 +245,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             table_styles: None,
             shared_string_index: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
+            custom_views: Vec::new(),
             function_groups: None,
             tolerance: XlsToleranceReport::default(),
         };
@@ -298,6 +301,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             table_styles: None,
             shared_string_index: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
+            custom_views: Vec::new(),
             function_groups: None,
             tolerance: XlsToleranceReport::default(),
         };
@@ -583,6 +587,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 crate::xls::style_ext::STYLE_EXT_RECORD_TYPE => {
                     self.style_extensions
                         .push(crate::xls::style_ext::XlsStyleExt::parse(&record.data)?);
+                },
+                crate::xls::custom_view::USER_B_VIEW_RECORD_TYPE => {
+                    self.custom_views
+                        .push(crate::xls::custom_view::XlsWorkbookCustomView::parse(&record.data)?);
                 },
                 crate::xls::book_ext::BOOK_EXT_RECORD_TYPE => {
                     if self.book_ext.is_some() {
@@ -998,6 +1006,35 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 crate::xls::data_table::TABLE_RECORD_TYPE => { // Table
                     worksheet.add_data_table(crate::xls::data_table::XlsDataTable::parse(&record.data)?);
                 }
+                crate::xls::custom_view::USER_S_VIEW_BEGIN_RECORD_TYPE => { // UserSViewBegin
+                    let begin =
+                        crate::xls::custom_view::XlsSheetCustomViewBegin::parse(&record.data)?;
+                    // CUSTOMVIEW = UserSViewBegin *CUSTOMVIEWCONTENT
+                    // UserSViewEnd: the inner records duplicate ordinary
+                    // sheet settings for the view, so consume them inertly
+                    // instead of feeding them to the sheet collectors.
+                    let end = loop {
+                        let next = record_iter.next().ok_or_else(|| XlsError::InvalidRecord {
+                            record_type: crate::xls::custom_view::USER_S_VIEW_BEGIN_RECORD_TYPE,
+                            message: "UserSViewBegin is not closed by a UserSViewEnd".to_string(),
+                        })??;
+                        if next.header.record_type
+                            == crate::xls::custom_view::USER_S_VIEW_END_RECORD_TYPE
+                        {
+                            break crate::xls::custom_view::XlsSheetCustomViewEnd::parse(
+                                &next.data,
+                            )?;
+                        }
+                    };
+                    worksheet
+                        .add_custom_view(crate::xls::custom_view::XlsSheetCustomView::new(begin, end));
+                }
+                crate::xls::custom_view::USER_S_VIEW_END_RECORD_TYPE => { // UserSViewEnd
+                    return Err(XlsError::InvalidRecord {
+                        record_type: crate::xls::custom_view::USER_S_VIEW_END_RECORD_TYPE,
+                        message: "UserSViewEnd without a matching UserSViewBegin".to_string(),
+                    });
+                }
                 crate::xls::phonetic_info::PHONETIC_INFO_RECORD_TYPE => { // PhoneticInfo
                     if worksheet.phonetic_info().is_some() {
                         return Err(XlsError::InvalidRecord {
@@ -1217,6 +1254,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Workbook window state and stable sheet identifiers.
     pub fn workbook_view(&self) -> &crate::xls::workbook_view::XlsWorkbookView {
         &self.workbook_view
+    }
+
+    /// Workbook-wide custom views (`UserBView` records), in record order.
+    ///
+    /// The views are inert: applying one is a UI operation this reader never
+    /// performs.
+    pub fn custom_views(&self) -> &[crate::xls::custom_view::XlsWorkbookCustomView] {
+        &self.custom_views
     }
 
     /// Built-in and custom function categories, when the FNGROUPS collection exists.

@@ -19,8 +19,10 @@ const HCENTER_RECORD_TYPE: u16 = 0x0083;
 const VCENTER_RECORD_TYPE: u16 = 0x0084;
 const SETUP_RECORD_TYPE: u16 = 0x00a1;
 const HEADER_FOOTER_RECORD_TYPE: u16 = 0x089c;
-const USER_SVIEW_BEGIN_RECORD_TYPE: u16 = 0x01aa;
-const USER_SVIEW_END_RECORD_TYPE: u16 = 0x01ab;
+use super::custom_view::{
+    USER_S_VIEW_BEGIN_RECORD_TYPE as USER_SVIEW_BEGIN_RECORD_TYPE,
+    USER_S_VIEW_END_RECORD_TYPE as USER_SVIEW_END_RECORD_TYPE,
+};
 
 fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
     XlsError::InvalidRecord {

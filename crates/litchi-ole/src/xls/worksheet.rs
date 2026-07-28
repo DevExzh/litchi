@@ -80,6 +80,8 @@ pub struct XlsWorksheet {
     phonetic_info: Option<crate::xls::phonetic_info::XlsPhoneticInfo>,
     /// Query tables (QUERYTABLE sequences), in record order.
     query_tables: Vec<crate::xls::query_table::XlsQueryTable>,
+    /// Custom views (UserSViewBegin…UserSViewEnd brackets), in record order.
+    custom_views: Vec<crate::xls::custom_view::XlsSheetCustomView>,
 }
 
 impl XlsWorksheet {
@@ -123,6 +125,7 @@ impl XlsWorksheet {
             data_tables: Vec::new(),
             phonetic_info: None,
             query_tables: Vec::new(),
+            custom_views: Vec::new(),
         }
     }
 
@@ -166,6 +169,7 @@ impl XlsWorksheet {
             data_tables: Vec::new(),
             phonetic_info: None,
             query_tables: Vec::new(),
+            custom_views: Vec::new(),
         }
     }
 
@@ -355,6 +359,17 @@ impl XlsWorksheet {
         query_tables: Vec<crate::xls::query_table::XlsQueryTable>,
     ) {
         self.query_tables = query_tables;
+    }
+
+    /// Custom views of this worksheet (UserSViewBegin…UserSViewEnd
+    /// brackets), in record order. The records are inert: applying a view is
+    /// a UI operation this reader never performs.
+    pub fn custom_views(&self) -> &[crate::xls::custom_view::XlsSheetCustomView] {
+        &self.custom_views
+    }
+
+    pub(crate) fn add_custom_view(&mut self, view: crate::xls::custom_view::XlsSheetCustomView) {
+        self.custom_views.push(view);
     }
 
     // -- Filter mode --

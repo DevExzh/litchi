@@ -118,6 +118,9 @@ mod theme;
 /// BIFF8 `PhoneticInfo` record: phonetic-string format and visible ranges.
 mod phonetic_info;
 
+/// BIFF8 custom-view records (`UserBView`, `UserSViewBegin`, `UserSViewEnd`).
+mod custom_view;
+
 /// BIFF8 worksheet default dimensions and outline workspace metadata.
 mod sheet_layout;
 
@@ -286,6 +289,11 @@ pub use style_ext::{XlsStyleCategory, XlsStyleExt};
 pub use theme::XlsTheme;
 pub use phonetic_info::{
     XlsPhoneticAlignment, XlsPhoneticFormat, XlsPhoneticInfo, XlsPhoneticRange, XlsPhoneticType,
+};
+pub use custom_view::{
+    XlsChartSheetCustomViewBegin, XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay,
+    XlsCustomViewTopLeft, XlsSheetCustomView, XlsSheetCustomViewBegin, XlsSheetCustomViewEnd,
+    XlsWorkbookCustomView,
 };
 pub use data_table::{
     XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange,
