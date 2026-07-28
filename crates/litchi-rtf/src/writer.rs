@@ -7773,6 +7773,28 @@ impl<W: Write> RtfWriter<W> {
         if let Some(offset_y) = section.properties.page_number_offset_y {
             self.write_control_word("pgny", Some(offset_y))?;
         }
+        section
+            .properties
+            .page_number_heading
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if let Some(level) = section.properties.page_number_heading.level {
+            self.write_control_word("pgnhn", Some(i32::from(level)))?;
+        }
+        if let Some(separator) = section.properties.page_number_heading.separator {
+            self.write_control_word(separator.control_word(), None)?;
+        }
+        section
+            .properties
+            .document_grid
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if let Some(line_grid) = section.properties.document_grid.line_grid {
+            self.write_control_word("sectlinegrid", Some(line_grid))?;
+        }
+        if let Some(grid_type) = section.properties.document_grid.grid_type {
+            self.write_control_word(grid_type.control_word(), None)?;
+        }
         self.write_control_word(
             match section.properties.vertical_alignment {
                 VerticalAlignment::Top => "vertalt",

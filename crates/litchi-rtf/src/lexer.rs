@@ -820,6 +820,10 @@ pub enum ControlWord<'a> {
     PageNumberRestart(crate::PageNumberRestart),
     PageNumberOffsetX(i32),
     PageNumberOffsetY(i32),
+    PageNumberHeadingLevel(Option<i32>),
+    PageNumberHeadingSeparator(crate::PageNumberHeadingSeparator),
+    SectionLineGrid(Option<i32>),
+    SectionDocumentGrid(crate::SectionDocumentGridType),
     ParagraphRevisionAuthor(i32),
     ParagraphRevisionDate(i32),
     SectionRevisionAuthor(i32),
@@ -2896,6 +2900,32 @@ impl<'a> Lexer<'a> {
             "pgncont" => ControlWord::PageNumberRestart(crate::PageNumberRestart::Continuous),
             "pgnx" => ControlWord::PageNumberOffsetX(param_value),
             "pgny" => ControlWord::PageNumberOffsetY(param_value),
+            "pgnhn" => ControlWord::PageNumberHeadingLevel(param),
+            "pgnhnsh" => {
+                ControlWord::PageNumberHeadingSeparator(crate::PageNumberHeadingSeparator::Hyphen)
+            },
+            "pgnhnsp" => {
+                ControlWord::PageNumberHeadingSeparator(crate::PageNumberHeadingSeparator::Period)
+            },
+            "pgnhnsc" => {
+                ControlWord::PageNumberHeadingSeparator(crate::PageNumberHeadingSeparator::Colon)
+            },
+            "pgnhnsm" => {
+                ControlWord::PageNumberHeadingSeparator(crate::PageNumberHeadingSeparator::EmDash)
+            },
+            "pgnhnsn" => {
+                ControlWord::PageNumberHeadingSeparator(crate::PageNumberHeadingSeparator::EnDash)
+            },
+            "sectlinegrid" => ControlWord::SectionLineGrid(param),
+            "sectspecifyl" => {
+                ControlWord::SectionDocumentGrid(crate::SectionDocumentGridType::LinesAndCharacters)
+            },
+            "sectspecifycl" => {
+                ControlWord::SectionDocumentGrid(crate::SectionDocumentGridType::CharactersOnly)
+            },
+            "sectspecifygen" => {
+                ControlWord::SectionDocumentGrid(crate::SectionDocumentGridType::Default)
+            },
             "prauth" => ControlWord::ParagraphRevisionAuthor(param_value),
             "prdate" => ControlWord::ParagraphRevisionDate(param_value),
             "srauth" => ControlWord::SectionRevisionAuthor(param_value),

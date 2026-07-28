@@ -277,11 +277,13 @@ pub use protection_user::{
 pub use review_display::DocumentReviewDisplay;
 pub use revision_save::RevisionSaveMetadata;
 pub use section::{
-    HeaderFooter, HeaderFooterParagraph, HeaderFooterType, MAX_SECTION_COLUMN_TWIPS,
-    MAX_SECTION_COLUMNS, MAX_SECTION_LINE_DISTANCE, MAX_SECTION_LINE_INCREMENT,
-    MAX_SECTION_LINE_START, Note, PageNumberFormat, PageNumberRestart, PageOrientation, Section,
-    SectionBreakType, SectionColumn, SectionColumns, SectionLineNumberRestart,
-    SectionLineNumbering, SectionProperties, VerticalAlignment,
+    HeaderFooter, HeaderFooterParagraph, HeaderFooterType, MAX_PAGE_NUMBER_HEADING_LEVEL,
+    MAX_SECTION_COLUMN_TWIPS, MAX_SECTION_COLUMNS, MAX_SECTION_LINE_DISTANCE,
+    MAX_SECTION_LINE_GRID_TWIPS, MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START, Note,
+    PageNumberFormat, PageNumberHeadingSeparator, PageNumberRestart, PageOrientation, Section,
+    SectionBreakType, SectionColumn, SectionColumns, SectionDocumentGrid, SectionDocumentGridType,
+    SectionLineNumberRestart, SectionLineNumbering, SectionPageNumberHeading, SectionProperties,
+    VerticalAlignment,
 };
 pub use section::{SectionFootnotePlacement, SectionNoteOptions};
 pub use shape::{

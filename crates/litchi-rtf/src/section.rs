@@ -21,6 +21,12 @@ pub const MAX_SECTION_LINE_DISTANCE: i32 = 31_680;
 /// Maximum retained starting line number.
 pub const MAX_SECTION_LINE_START: u32 = 1_000_000;
 
+/// Maximum heading level usable as a page-number prefix (`pgnhn`).
+pub const MAX_PAGE_NUMBER_HEADING_LEVEL: i32 = 9;
+
+/// Maximum accepted section line-grid pitch, in twips.
+pub const MAX_SECTION_LINE_GRID_TWIPS: i32 = 31_680;
+
 /// One explicitly sized section column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SectionColumn {
@@ -422,6 +428,118 @@ impl SectionNoteOptions {
     }
 }
 
+/// Separator drawn between the heading number and the page number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageNumberHeadingSeparator {
+    /// Hyphen separator (`pgnhnsh`).
+    Hyphen,
+    /// Period separator (`pgnhnsp`).
+    Period,
+    /// Colon separator (`pgnhnsc`).
+    Colon,
+    /// Em-dash separator (`pgnhnsm`).
+    EmDash,
+    /// En-dash separator (`pgnhnsn`).
+    EnDash,
+}
+
+impl PageNumberHeadingSeparator {
+    /// The canonical RTF control word for this separator.
+    pub fn control_word(&self) -> &'static str {
+        match self {
+            Self::Hyphen => "pgnhnsh",
+            Self::Period => "pgnhnsp",
+            Self::Colon => "pgnhnsc",
+            Self::EmDash => "pgnhnsm",
+            Self::EnDash => "pgnhnsn",
+        }
+    }
+}
+
+/// Heading-number prefix applied to section page numbers (`pgnhn` family).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SectionPageNumberHeading {
+    /// Heading level used to prefix page numbers (`pgnhnN`). `Some(0)`
+    /// explicitly disables the prefix; `None` means the control was not
+    /// authored. Values are bounded by [`MAX_PAGE_NUMBER_HEADING_LEVEL`].
+    pub level: Option<u8>,
+    /// Separator drawn between the heading number and the page number.
+    pub separator: Option<PageNumberHeadingSeparator>,
+}
+
+impl SectionPageNumberHeading {
+    /// Whether no heading-number controls were authored.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Validate heading-number values against implementation safety bounds.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self
+            .level
+            .is_some_and(|value| i32::from(value) > MAX_PAGE_NUMBER_HEADING_LEVEL)
+        {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF page-number heading level must be in 0..={MAX_PAGE_NUMBER_HEADING_LEVEL}"
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// Document grid used to lay out a section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionDocumentGridType {
+    /// Line and character grid (`sectspecifyl`).
+    LinesAndCharacters,
+    /// Character grid only (`sectspecifycl`).
+    CharactersOnly,
+    /// Default grid marker (`sectspecifygen`): neither `sectspecifycl` nor
+    /// `sectspecifyl` was authored by the producing application.
+    Default,
+}
+
+impl SectionDocumentGridType {
+    /// The canonical RTF control word for this grid type.
+    pub fn control_word(&self) -> &'static str {
+        match self {
+            Self::LinesAndCharacters => "sectspecifyl",
+            Self::CharactersOnly => "sectspecifycl",
+            Self::Default => "sectspecifygen",
+        }
+    }
+}
+
+/// Explicit section document-grid settings.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SectionDocumentGrid {
+    /// Line-grid pitch for the section in twips (`sectlinegridN`).
+    pub line_grid: Option<i32>,
+    /// Explicit grid type (`sectspecifyl` / `sectspecifycl` /
+    /// `sectspecifygen`).
+    pub grid_type: Option<SectionDocumentGridType>,
+}
+
+impl SectionDocumentGrid {
+    /// Whether no document-grid controls were authored.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Validate grid values against implementation safety bounds.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self
+            .line_grid
+            .is_some_and(|value| !(0..=MAX_SECTION_LINE_GRID_TWIPS).contains(&value))
+        {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF section line-grid pitch must be in 0..={MAX_SECTION_LINE_GRID_TWIPS} twips"
+            )));
+        }
+        Ok(())
+    }
+}
+
 /// Section properties
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionProperties {
@@ -468,6 +586,11 @@ pub struct SectionProperties {
     pub page_number_offset_x: Option<i32>,
     /// Vertical page-number position offset in twips (`\pgnyN`).
     pub page_number_offset_y: Option<i32>,
+    /// Heading-number prefix applied to page numbers (`\pgnhn` family).
+    pub page_number_heading: SectionPageNumberHeading,
+    /// Document-grid settings for the section (`\sectlinegridN`,
+    /// `\sectspecifyl` / `\sectspecifycl` / `\sectspecifygen`).
+    pub document_grid: SectionDocumentGrid,
     /// Author/date metadata for the revision that changed this section's
     /// properties (`\srauthN`, `\srdateN`).
     pub revision: crate::RevisionMetadata,
@@ -505,6 +628,8 @@ impl Default for SectionProperties {
             page_number_restart: None,
             page_number_offset_x: None,
             page_number_offset_y: None,
+            page_number_heading: SectionPageNumberHeading::default(),
+            document_grid: SectionDocumentGrid::default(),
             revision: crate::RevisionMetadata::default(),
             vertical_alignment: VerticalAlignment::default(),
             line_numbering: SectionLineNumbering::default(),

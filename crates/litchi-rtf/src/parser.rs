@@ -443,6 +443,10 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::PageNumberRestart(_)
             | ControlWord::PageNumberOffsetX(_)
             | ControlWord::PageNumberOffsetY(_)
+            | ControlWord::PageNumberHeadingLevel(_)
+            | ControlWord::PageNumberHeadingSeparator(_)
+            | ControlWord::SectionLineGrid(_)
+            | ControlWord::SectionDocumentGrid(_)
             | ControlWord::SectionRevisionAuthor(_)
             | ControlWord::SectionRevisionDate(_)
             | ControlWord::VerticalAlignTop
@@ -8763,7 +8767,7 @@ impl<'a> Parser<'a> {
     fn apply_section_control(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
         use super::section::{PageOrientation, SectionBreakType, VerticalAlignment};
 
-        let is_line_numbering_control = matches!(
+        let is_body_scoped_section_control = matches!(
             control,
             ControlWord::LineNumbering(_)
                 | ControlWord::LineNumberDistance(_)
@@ -8771,8 +8775,12 @@ impl<'a> Parser<'a> {
                 | ControlWord::LineNumberRestartSection
                 | ControlWord::LineNumberRestartPage
                 | ControlWord::LineNumberContinuous
+                | ControlWord::PageNumberHeadingLevel(_)
+                | ControlWord::PageNumberHeadingSeparator(_)
+                | ControlWord::SectionLineGrid(_)
+                | ControlWord::SectionDocumentGrid(_)
         );
-        if is_line_numbering_control
+        if is_body_scoped_section_control
             && self.current_state()?.destination != Destination::DocumentBody
         {
             return Ok(true);
@@ -9114,6 +9122,32 @@ impl<'a> Parser<'a> {
             },
             ControlWord::PageNumberOffsetY(value) => {
                 properties.page_number_offset_y = Some(*value);
+            },
+            ControlWord::PageNumberHeadingLevel(value) => {
+                let value = value.unwrap_or(0);
+                if !(0..=super::section::MAX_PAGE_NUMBER_HEADING_LEVEL).contains(&value) {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF page-number heading level must be in 0..={}",
+                        super::section::MAX_PAGE_NUMBER_HEADING_LEVEL
+                    )));
+                }
+                properties.page_number_heading.level = Some(value as u8);
+            },
+            ControlWord::PageNumberHeadingSeparator(separator) => {
+                properties.page_number_heading.separator = Some(*separator);
+            },
+            ControlWord::SectionLineGrid(value) => {
+                let value = value.unwrap_or(360);
+                if !(0..=super::section::MAX_SECTION_LINE_GRID_TWIPS).contains(&value) {
+                    return Err(RtfError::MalformedDocument(format!(
+                        "RTF section line-grid pitch must be in 0..={} twips",
+                        super::section::MAX_SECTION_LINE_GRID_TWIPS
+                    )));
+                }
+                properties.document_grid.line_grid = Some(value);
+            },
+            ControlWord::SectionDocumentGrid(grid_type) => {
+                properties.document_grid.grid_type = Some(*grid_type);
             },
             ControlWord::SectionRevisionAuthor(value) => {
                 properties.revision.author = Some(nonnegative_author_index(*value, "srauth")?);
