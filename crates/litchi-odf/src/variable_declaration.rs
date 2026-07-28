@@ -675,6 +675,8 @@ pub struct OdfVariableDeclarations {
     pub dde_connection_uses: Vec<crate::OdfDdeConnectionUse>,
     /// Optional document-wide bibliography formatting and sorting policy from styles metadata.
     pub bibliography_configuration: Option<crate::OdfBibliographyConfiguration>,
+    /// Inert `text:alphabetical-index-auto-mark-file` references in document order.
+    pub auto_mark_files: Vec<crate::OdfAlphabeticalIndexAutoMarkFile>,
 }
 
 impl OdfVariableDeclarations {
@@ -764,6 +766,7 @@ pub(crate) fn parse_variable_declaration_parts(
     result.dde_connection_uses = dde.uses;
     result.bibliography_configuration =
         crate::bibliography_configuration::parse_bibliography_configuration_parts(parts)?;
+    result.auto_mark_files = crate::auto_mark_file::parse_auto_mark_file_parts(parts)?;
     Ok(result)
 }
 

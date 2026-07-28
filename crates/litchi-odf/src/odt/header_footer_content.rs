@@ -24,11 +24,45 @@ const MAX_FIELDS: usize = 16_384;
 const MAX_FIELD_ATTRIBUTES: usize = 128;
 pub(super) const MAX_EXPANDED_SPACES: usize = 1_000_000;
 
+/// The ODF 1.3 `style:region-*` column region wrapping a header/footer block.
+///
+/// Multi-column headers and footers replace their plain paragraphs with
+/// `style:region-left`, `style:region-center`, and `style:region-right`
+/// wrappers, each containing the paragraphs of that column.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum HeaderFooterColumnRegion {
+    Left,
+    Center,
+    Right,
+}
+
+impl HeaderFooterColumnRegion {
+    fn parse(local_name: &[u8]) -> Option<Self> {
+        match local_name {
+            b"region-left" => Some(Self::Left),
+            b"region-center" => Some(Self::Center),
+            b"region-right" => Some(Self::Right),
+            _ => None,
+        }
+    }
+
+    /// Normative document order of the region wrappers.
+    fn order(self) -> u8 {
+        match self {
+            Self::Left => 0,
+            Self::Center => 1,
+            Self::Right => 2,
+        }
+    }
+}
+
 /// One paragraph or heading in a header/footer region.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HeaderFooterBlock {
     /// The paragraph's `text:style-name`, when present.
     pub style_name: Option<String>,
+    /// The column region containing this block, for multi-column headers/footers.
+    pub column_region: Option<HeaderFooterColumnRegion>,
     /// Inline content in document order.
     pub content: Vec<HeaderFooterInline>,
 }
@@ -195,6 +229,9 @@ struct Region {
     blocks: Vec<HeaderFooterBlock>,
     block: Option<ActiveBlock>,
     field: Option<ActiveField>,
+    column_region: Option<ActiveColumnRegion>,
+    last_column_region_order: Option<u8>,
+    has_plain_blocks: bool,
     token_count: usize,
     field_count: usize,
     expanded_spaces: usize,
@@ -203,6 +240,11 @@ struct Region {
 struct ActiveBlock {
     depth: usize,
     block: HeaderFooterBlock,
+}
+
+struct ActiveColumnRegion {
+    kind: HeaderFooterColumnRegion,
+    depth: usize,
 }
 
 struct ActiveField {
@@ -308,6 +350,11 @@ pub(super) fn parse_header_footer_blocks(
                 }
                 if region.as_ref().is_some_and(|active| active.depth == depth) {
                     let active = region.take().expect("checked header/footer region");
+                    if active.column_region.is_some() || active.block.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "unterminated header/footer column region or block".to_string(),
+                        ));
+                    }
                     if namespace != Some(STYLE_NAMESPACE)
                         || HeaderFooterKind::parse(element.local_name().as_ref())
                             != Some(active.kind)
@@ -350,6 +397,9 @@ impl Region {
             blocks: Vec::new(),
             block: None,
             field: None,
+            column_region: None,
+            last_column_region_order: None,
+            has_plain_blocks: false,
             token_count: 0,
             field_count: 0,
             expanded_spaces: 0,
@@ -365,11 +415,33 @@ impl Region {
         empty: bool,
     ) -> Result<()> {
         let local = element.local_name();
+        if self.block.is_none()
+            && namespace == Some(STYLE_NAMESPACE)
+            && let Some(kind) = HeaderFooterColumnRegion::parse(local.as_ref())
+        {
+            self.start_column_region(kind, depth, empty)?;
+            return Ok(());
+        }
         if namespace == Some(TEXT_NAMESPACE) && matches!(local.as_ref(), b"p" | b"h") {
             if self.block.is_some() {
                 return Err(Error::InvalidFormat(
                     "nested header/footer paragraph or heading".to_string(),
                 ));
+            }
+            if local.as_ref() == b"h" && self.column_region.is_some() {
+                return Err(Error::InvalidFormat(
+                    "style:region-* column regions may contain only text:p".to_string(),
+                ));
+            }
+            let column_region = self.column_region.as_ref().map(|region| region.kind);
+            if column_region.is_none() {
+                if self.last_column_region_order.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "header/footer mixes plain blocks with style:region-* column regions"
+                            .to_string(),
+                    ));
+                }
+                self.has_plain_blocks = true;
             }
             if self.blocks.len() >= MAX_BLOCKS {
                 return Err(limit_error("block"));
@@ -378,6 +450,7 @@ impl Region {
                 depth,
                 block: HeaderFooterBlock {
                     style_name: namespaced_attr(reader, element, TEXT_NAMESPACE, b"style-name")?,
+                    column_region,
                     content: Vec::new(),
                 },
             });
@@ -425,6 +498,37 @@ impl Region {
         Ok(())
     }
 
+    fn start_column_region(
+        &mut self,
+        kind: HeaderFooterColumnRegion,
+        depth: usize,
+        empty: bool,
+    ) -> Result<()> {
+        if self.column_region.is_some() {
+            return Err(Error::InvalidFormat(
+                "nested style:region-* column regions".to_string(),
+            ));
+        }
+        if self.has_plain_blocks {
+            return Err(Error::InvalidFormat(
+                "header/footer mixes plain blocks with style:region-* column regions".to_string(),
+            ));
+        }
+        if self
+            .last_column_region_order
+            .is_some_and(|order| kind.order() <= order)
+        {
+            return Err(Error::InvalidFormat(
+                "style:region-* column regions are duplicated or out of order".to_string(),
+            ));
+        }
+        self.last_column_region_order = Some(kind.order());
+        if !empty {
+            self.column_region = Some(ActiveColumnRegion { kind, depth });
+        }
+        Ok(())
+    }
+
     fn end_element(&mut self, namespace: Option<&[u8]>, local: &[u8], depth: usize) -> Result<()> {
         if self
             .field
@@ -450,6 +554,26 @@ impl Region {
                 ));
             }
             self.finish_block()?;
+        }
+        if self
+            .column_region
+            .as_ref()
+            .is_some_and(|region| region.depth == depth)
+        {
+            if namespace != Some(STYLE_NAMESPACE)
+                || HeaderFooterColumnRegion::parse(local)
+                    != Some(self.column_region.as_ref().expect("checked region").kind)
+            {
+                return Err(Error::InvalidFormat(
+                    "malformed style:region-* column region nesting".to_string(),
+                ));
+            }
+            if self.block.is_some() || self.field.is_some() {
+                return Err(Error::InvalidFormat(
+                    "unterminated header/footer block inside a column region".to_string(),
+                ));
+            }
+            self.column_region = None;
         }
         Ok(())
     }
@@ -1211,5 +1335,105 @@ mod tests {
         );
         let nested = format!("{}x{}", "<t:span>".repeat(129), "</t:span>".repeat(129));
         assert!(parse_header_footer_blocks(&wrap(&nested)).is_err());
+    }
+
+    fn column_region_document(content: &str) -> String {
+        format!(
+            r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:master-styles><s:master-page s:name="A"><s:header>{content}</s:header></s:master-page></o:master-styles></o:document-styles>"#
+        )
+    }
+
+    #[test]
+    fn attributes_blocks_to_ordered_column_regions() {
+        let xml = column_region_document(
+            r#"<s:region-left><t:p t:style-name="Left">Left <t:page-number>1</t:page-number></t:p></s:region-left><s:region-center><t:p>Center</t:p><t:p>Second</t:p></s:region-center><s:region-right><t:p>Right</t:p></s:region-right>"#,
+        );
+        let regions = parse_header_footer_blocks(&xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
+        assert_eq!(blocks.len(), 4);
+        assert_eq!(
+            blocks[0].column_region,
+            Some(HeaderFooterColumnRegion::Left)
+        );
+        assert_eq!(blocks[0].style_name.as_deref(), Some("Left"));
+        assert_eq!(
+            blocks[1].column_region,
+            Some(HeaderFooterColumnRegion::Center)
+        );
+        assert_eq!(
+            blocks[2].column_region,
+            Some(HeaderFooterColumnRegion::Center)
+        );
+        assert_eq!(
+            blocks[3].column_region,
+            Some(HeaderFooterColumnRegion::Right)
+        );
+        assert!(
+            matches!(&blocks[1].content[0], HeaderFooterInline::Text(text) if text == "Center")
+        );
+    }
+
+    #[test]
+    fn accepts_empty_and_skipped_column_regions() {
+        let xml = column_region_document(
+            r#"<s:region-left/><s:region-right><t:p/></s:region-right>"#,
+        );
+        let regions = parse_header_footer_blocks(&xml).unwrap();
+        let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(
+            blocks[0].column_region,
+            Some(HeaderFooterColumnRegion::Right)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_column_region_usage() {
+        // Duplicate or out-of-order regions.
+        assert!(
+            parse_header_footer_blocks(&column_region_document(
+                r#"<s:region-right/><s:region-left><t:p/></s:region-left>"#
+            ))
+            .is_err()
+        );
+        assert!(
+            parse_header_footer_blocks(&column_region_document(
+                r#"<s:region-left/><s:region-left/>"#
+            ))
+            .is_err()
+        );
+        // Plain blocks must not be mixed with column regions.
+        assert!(
+            parse_header_footer_blocks(&column_region_document(
+                r#"<t:p>Plain</t:p><s:region-left><t:p/></s:region-left>"#
+            ))
+            .is_err()
+        );
+        assert!(
+            parse_header_footer_blocks(&column_region_document(
+                r#"<s:region-left><t:p/></s:region-left><t:p>Plain</t:p>"#
+            ))
+            .is_err()
+        );
+        // Regions cannot nest and may contain only paragraphs.
+        assert!(
+            parse_header_footer_blocks(&column_region_document(
+                r#"<s:region-left><s:region-center><t:p/></s:region-center></s:region-left>"#
+            ))
+            .is_err()
+        );
+        assert!(
+            parse_header_footer_blocks(&column_region_document(
+                r#"<s:region-left><t:h>Heading</t:h></s:region-left>"#
+            ))
+            .is_err()
+        );
+        // Unterminated regions are malformed.
+        assert!(
+            parse_header_footer_blocks(&column_region_document(
+                r#"<s:region-left><t:p>open</t:p>"#
+            ))
+            .is_err()
+        );
     }
 }

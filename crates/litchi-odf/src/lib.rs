@@ -63,6 +63,8 @@
 //! - ✅ Generated indexes, source templates, and cached index bodies
 //! - ✅ Point/range index source marks and inert bibliography records
 //! - ✅ Point/range cross-reference targets with exact positions and text
+//! - ✅ Header/footer left/center/right column region (`style:region-*`) attribution
+//! - ✅ Inert `text:alphabetical-index-auto-mark-file` concordance references
 //!
 //! ### Writing (`odt/builder.rs`, `odt/mutable.rs`)
 //! - ✅ DocumentBuilder for creating new ODT files
@@ -327,6 +329,7 @@ pub use elements::field::{
 };
 mod chart_properties;
 mod annotation_package;
+mod auto_mark_file;
 mod data_pilot_package;
 mod ods_definition_package;
 mod dde_connection;
@@ -420,6 +423,7 @@ pub use annotation_package::{
     OdfAnnotation, OdfAnnotationAnchor, OdfAnnotationInfo, OdfAnnotationPosition,
     OdfAnnotationUpdate,
 };
+pub use auto_mark_file::OdfAlphabeticalIndexAutoMarkFile;
 pub use data_pilot_package::DataPilotTableUpdate;
 pub use ods_definition_package::{DatabaseRangeUpdate, NamedDefinitionUpdate};
 pub use drawing_page_properties::{
@@ -684,7 +688,7 @@ pub use ods::{
 pub use odt::{
     AlphabeticalIndexSource, BibliographyIndexSource, ChangeType, Document, DocumentBuilder,
     HeaderFooter,
-    HeaderFooterKind, IllustrationIndexSource, MasterPage, MasterPageChild, MasterPageChildKind,
+    HeaderFooterColumnRegion, HeaderFooterKind, IllustrationIndexSource, MasterPage, MasterPageChild, MasterPageChildKind,
     MutableDocument, Note, NoteClass, ObjectIndexSource, OdfFrameAnchor, OdfImageFormat, OdfLength,
     OdtSectionBlock,
     OdtTrackedPosition, OdtTrackedStory,
