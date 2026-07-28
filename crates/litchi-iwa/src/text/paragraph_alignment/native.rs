@@ -104,7 +104,7 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(super) background: Option<TextBackground>,
     pub(super) underline: Option<TextUnderline>,
     pub(super) strikethrough: Option<TextStrikethrough>,
-    pub(super) alignment: Option<TextAlignment>,
+    pub(crate) alignment: Option<TextAlignment>,
     pub(super) line_spacing: Option<ParagraphLineSpacing>,
     pub(super) space_before: Option<ParagraphSpacingPoints>,
     pub(super) space_after: Option<ParagraphSpacingPoints>,
@@ -115,25 +115,6 @@ pub(crate) struct ParagraphStyleOverrides {
 }
 
 impl ParagraphStyleOverrides {
-    pub(crate) fn alignment(alignment: TextAlignment) -> Self {
-        Self {
-            alignment: Some(alignment),
-            ..Self::default()
-        }
-    }
-
-    pub(crate) const fn direct_alignment(&self) -> Option<TextAlignment> {
-        self.alignment
-    }
-
-    pub(crate) fn set_alignment(&mut self, alignment: TextAlignment) {
-        self.alignment = Some(alignment);
-    }
-
-    pub(crate) fn clear_alignment(&mut self) {
-        self.alignment = None;
-    }
-
     pub(super) fn count(&self) -> u32 {
         u32::from(self.bold.is_some())
             + u32::from(self.italic.is_some())

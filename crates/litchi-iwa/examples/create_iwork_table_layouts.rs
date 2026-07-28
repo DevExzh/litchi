@@ -9,11 +9,14 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_layout::{
     TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
 };
-use litchi_iwa::text::TextAlignment;
+use litchi_iwa::text::{TextAlignment, TextPointSize, TextStyle};
 
 const ROW: usize = 1;
 const COLUMN: usize = 1;
 const INSET_POINTS: f32 = 8.0;
+const NUMBERS_TEXT_POINTS: f32 = 18.0;
+const PAGES_TEXT_POINTS: f32 = 17.0;
+const KEYNOTE_TEXT_POINTS: f32 = 19.0;
 const CELL_TEXT: &str = "Wrapped text\nwith an 8 pt inset";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,6 +43,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_text_alignment(numbers_table.object_id, ROW, COLUMN)?,
         TextAlignment::Center
     );
+    assert_eq!(
+        numbers.table_cell_text_style(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_text_style()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -47,12 +54,20 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         pages.table_cell_text_alignment(pages_table.model_object_id, ROW, COLUMN)?,
         TextAlignment::Right
     );
+    assert_eq!(
+        pages.table_cell_text_style(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_text_style()?
+    );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
     let keynote_table = keynote.slide_tables(0)?.remove(0);
     assert_eq!(
         keynote.slide_table_cell_text_alignment(0, keynote_table.model_object_id, ROW, COLUMN)?,
         TextAlignment::Justified
+    );
+    assert_eq!(
+        keynote.slide_table_cell_text_style(0, keynote_table.model_object_id, ROW, COLUMN)?,
+        keynote_text_style()?
     );
     Ok(())
 }
@@ -64,6 +79,22 @@ fn layout(alignment: TableCellVerticalAlignment) -> Result<TableCellLayout, litc
         .with_insets(TableCellInsets::uniform(TableCellInset::from_points(
             INSET_POINTS,
         )?)))
+}
+
+fn numbers_text_style() -> Result<TextStyle, litchi_iwa::Error> {
+    Ok(TextStyle::new(TextPointSize::from_points(NUMBERS_TEXT_POINTS)?).with_bold(true))
+}
+
+fn pages_text_style() -> Result<TextStyle, litchi_iwa::Error> {
+    Ok(TextStyle::new(TextPointSize::from_points(PAGES_TEXT_POINTS)?).with_italic(true))
+}
+
+fn keynote_text_style() -> Result<TextStyle, litchi_iwa::Error> {
+    Ok(
+        TextStyle::new(TextPointSize::from_points(KEYNOTE_TEXT_POINTS)?)
+            .with_bold(true)
+            .with_italic(true),
+    )
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -80,6 +111,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         layout(TableCellVerticalAlignment::Middle)?,
     )?;
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Center)?;
+    editor.set_table_cell_text_style(table_id, ROW, COLUMN, numbers_text_style()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -98,6 +130,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         layout(TableCellVerticalAlignment::Bottom)?,
     )?;
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Right)?;
+    editor.set_table_cell_text_style(table_id, ROW, COLUMN, pages_text_style()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -137,6 +170,13 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         TextAlignment::Justified,
+    )?;
+    editor.set_slide_table_cell_text_style(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_text_style()?,
     )?;
     editor.save(output)?;
     Ok(())

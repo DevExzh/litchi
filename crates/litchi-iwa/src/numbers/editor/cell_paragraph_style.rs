@@ -1,16 +1,19 @@
-//! Copy-on-write horizontal alignment for native table-cell paragraph styles.
+//! Copy-on-write paragraph-style properties for native table cells.
+
+mod property;
 
 use prost::Message;
 
 use super::*;
 use crate::text::paragraph_alignment::native::{
-    ParagraphStyleOverrides, inherited_alignment, locate_style, parent_style_id, replace_variation,
-    stylesheet_id, variation_object,
+    ParagraphStyleOverrides, locate_style, parent_style_id, replace_variation, stylesheet_id,
+    variation_object,
 };
 use crate::text::style_registry::{
     register_private_style, register_style_reference, unregister_owner_reference_if_unused,
     unregister_private_style,
 };
+use property::{CellParagraphProperty, CellParagraphPropertyKind};
 
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 
@@ -20,12 +23,18 @@ pub(super) fn alignment(
     row: usize,
     column: usize,
 ) -> Result<TextAlignment> {
-    let descriptor = model::attached_table_descriptor(package, table_id)?;
-    validate_coordinate(&descriptor, row, column)?;
-    let locations = storage::object_locations(package)?;
-    let style_id = local_style_id(package, &descriptor, &locations, row, column)?
-        .unwrap_or_else(|| base_style_id(&descriptor, row, column));
-    inherited_alignment(package, style_id)
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Alignment,
+    )? {
+        CellParagraphProperty::Alignment(value) => Ok(value),
+        CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+            "iWork table-cell alignment resolved as character formatting".to_owned(),
+        )),
+    }
 }
 
 pub(super) fn set_alignment(
@@ -35,7 +44,105 @@ pub(super) fn set_alignment(
     column: usize,
     value: TextAlignment,
 ) -> Result<()> {
-    if alignment(package, table_id, row, column)? == value {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Alignment(value),
+    )
+}
+
+pub(super) fn reset_alignment(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Alignment,
+    )
+}
+
+pub(super) fn text_style(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextStyle> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::TextStyle,
+    )? {
+        CellParagraphProperty::TextStyle(value) => Ok(value),
+        CellParagraphProperty::Alignment(_) => Err(Error::InvalidFormat(
+            "iWork table-cell character formatting resolved as alignment".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_text_style(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextStyle,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::TextStyle(value),
+    )
+}
+
+pub(super) fn reset_text_style(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::TextStyle,
+    )
+}
+
+fn property(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    kind: CellParagraphPropertyKind,
+) -> Result<CellParagraphProperty> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    validate_coordinate(&descriptor, row, column)?;
+    let locations = storage::object_locations(package)?;
+    let style_id = local_style_id(package, &descriptor, &locations, row, column)?
+        .unwrap_or_else(|| base_style_id(&descriptor, row, column));
+    CellParagraphProperty::inherited(package, style_id, kind)
+}
+
+fn set_property(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: CellParagraphProperty,
+) -> Result<()> {
+    let kind = value.kind();
+    if property(package, table_id, row, column, kind)? == value {
         return Ok(());
     }
     let mut staged = package.clone();
@@ -63,6 +170,7 @@ pub(super) fn set_alignment(
             |reference| reference.identifier,
         );
     let current_style = locate_style(&staged, current_style_id)?;
+    let current_value = CellParagraphProperty::inherited(&staged, current_style_id, kind)?;
 
     if let Some(entry) = old_entry
         && entry.entry.refcount == 1
@@ -77,10 +185,22 @@ pub(super) fn set_alignment(
             &current_style.message.data,
         )?
     {
-        overrides.set_alignment(value);
+        let parent_id = parent_style_id(&current_style.style, current_style_id)?;
+        let inherited = CellParagraphProperty::inherited(&staged, parent_id, kind)?;
+        if value == inherited {
+            drop(staged);
+            if !reset_property(package, table_id, row, column, kind)? {
+                return Err(Error::InvalidFormat(format!(
+                    "iWork table-cell {} could not restore its inherited value",
+                    kind.name()
+                )));
+            }
+            return Ok(());
+        }
+        value.apply_to(&mut overrides, inherited)?;
         let replacement = variation_object(
             current_style_id,
-            parent_style_id(&current_style.style, current_style_id)?,
+            parent_id,
             stylesheet_id(&current_style.style, current_style_id)?,
             overrides,
         )?;
@@ -90,7 +210,7 @@ pub(super) fn set_alignment(
             current_style_id,
             replacement,
         )?;
-        verify_alignment(&staged, table_id, row, column, value)?;
+        verify_property(&staged, table_id, row, column, value)?;
         *package = staged;
         return Ok(());
     }
@@ -107,12 +227,9 @@ pub(super) fn set_alignment(
                 "iWork paragraph style {current_style_id} has no stylesheet"
             ))
         })?;
-    let variation = variation_object(
-        new_style_id,
-        current_style_id,
-        stylesheet_id,
-        ParagraphStyleOverrides::alignment(value),
-    )?;
+    let mut overrides = ParagraphStyleOverrides::default();
+    value.apply_to(&mut overrides, current_value)?;
+    let variation = variation_object(new_style_id, current_style_id, stylesheet_id, overrides)?;
     crate::shapes::insert_style_variation(
         &mut staged,
         &current_style.archive_name,
@@ -147,16 +264,17 @@ pub(super) fn set_alignment(
         }
     }
     set_package_last_object_identifier(&mut staged, new_style_id)?;
-    verify_alignment(&staged, table_id, row, column, value)?;
+    verify_property(&staged, table_id, row, column, value)?;
     *package = staged;
     Ok(())
 }
 
-pub(super) fn reset_alignment(
+fn reset_property(
     package: &mut IWorkPackage,
     table_id: u64,
     row: usize,
     column: usize,
+    kind: CellParagraphPropertyKind,
 ) -> Result<bool> {
     let descriptor = model::attached_table_descriptor(package, table_id)?;
     validate_coordinate(&descriptor, row, column)?;
@@ -189,11 +307,11 @@ pub(super) fn reset_alignment(
     else {
         return Ok(false);
     };
-    if overrides.direct_alignment().is_none() {
+    if !kind.has_direct(&overrides) {
         return Ok(false);
     }
     let parent_id = parent_style_id(&style.style, style_id)?;
-    let inherited = inherited_alignment(package, parent_id)?;
+    let inherited = CellParagraphProperty::inherited(package, parent_id, kind)?;
 
     if entry.entry.refcount == 1
         && style_is_exclusive_to_list(
@@ -204,7 +322,7 @@ pub(super) fn reset_alignment(
         )?
     {
         let mut staged = package.clone();
-        overrides.clear_alignment();
+        kind.clear(&mut overrides);
         if overrides.is_empty() {
             let location = model::locate_attached_cell(&staged, table_id, row, column)?;
             let base_id = base_style_id(&descriptor, row, column);
@@ -248,14 +366,14 @@ pub(super) fn reset_alignment(
             )?;
             replace_variation(&mut staged, &style.archive_name, style_id, replacement)?;
         }
-        verify_alignment(&staged, table_id, row, column, inherited)?;
+        verify_property(&staged, table_id, row, column, inherited)?;
         *package = staged;
         return Ok(true);
     }
 
     let mut staged = package.clone();
     let location = model::locate_attached_cell(&staged, table_id, row, column)?;
-    overrides.clear_alignment();
+    kind.clear(&mut overrides);
     if overrides.is_empty() {
         let base_id = base_style_id(&descriptor, row, column);
         if parent_id == base_id {
@@ -313,7 +431,7 @@ pub(super) fn reset_alignment(
             style_id,
         )?;
     }
-    verify_alignment(&staged, table_id, row, column, inherited)?;
+    verify_property(&staged, table_id, row, column, inherited)?;
     *package = staged;
     Ok(true)
 }
@@ -605,17 +723,18 @@ fn style_has_children(package: &IWorkPackage, style_id: u64) -> Result<bool> {
     Ok(false)
 }
 
-fn verify_alignment(
+fn verify_property(
     package: &IWorkPackage,
     table_id: u64,
     row: usize,
     column: usize,
-    expected: TextAlignment,
+    expected: CellParagraphProperty,
 ) -> Result<()> {
-    if alignment(package, table_id, row, column)? != expected {
-        return Err(Error::InvalidFormat(
-            "iWork table-cell text alignment failed validation".to_owned(),
-        ));
+    if property(package, table_id, row, column, expected.kind())? != expected {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table-cell {} failed validation",
+            expected.kind().name()
+        )));
     }
     Ok(())
 }
@@ -627,6 +746,7 @@ mod tests {
     use crate::numbers::{CellValue, NumbersDocumentBuilder};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use crate::text::TextPointSize;
 
     fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
@@ -789,7 +909,141 @@ mod tests {
     }
 
     #[test]
-    fn scratch_alignment_round_trips_in_pages_and_keynote() {
+    fn text_style_composes_with_alignment_and_reclaims_independently() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(table_id, 1, 1, CellValue::Text("Styled".to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .unwrap();
+        let style_id = explicit_style_id(&editor, table_id, 1, 1);
+        let styled = TextStyle::new(TextPointSize::from_points(18.0).unwrap())
+            .with_bold(true)
+            .with_italic(true);
+
+        editor
+            .set_table_cell_text_style(table_id, 1, 1, styled)
+            .unwrap();
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
+        assert_eq!(
+            editor.table_cell_text_style(table_id, 1, 1).unwrap(),
+            styled
+        );
+        assert_eq!(
+            editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
+            TextAlignment::Center
+        );
+
+        editor
+            .set_table_cell_text_style(table_id, 1, 1, TextStyle::default())
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_text_style(table_id, 1, 1).unwrap(),
+            TextStyle::default()
+        );
+        assert!(!editor.reset_table_cell_text_style(table_id, 1, 1).unwrap());
+        editor
+            .set_table_cell_text_style(table_id, 1, 1, styled)
+            .unwrap();
+        assert!(editor.reset_table_cell_text_style(table_id, 1, 1).unwrap());
+        assert_eq!(
+            editor.table_cell_text_style(table_id, 1, 1).unwrap(),
+            TextStyle::default()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
+        assert!(!editor.reset_table_cell_text_style(table_id, 1, 1).unwrap());
+        assert!(
+            editor
+                .reset_table_cell_text_alignment(table_id, 1, 1)
+                .unwrap()
+        );
+        assert!(editor.package.iwa_entry_names().all(|archive_name| {
+            editor
+                .package
+                .archive(archive_name)
+                .unwrap()
+                .object(style_id)
+                .is_none()
+        }));
+    }
+
+    #[test]
+    fn shared_text_style_uses_copy_on_write() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        for column in 1..=2 {
+            editor
+                .set_cell(
+                    table_id,
+                    1,
+                    column,
+                    CellValue::Text(format!("Column {column}")),
+                )
+                .unwrap();
+        }
+        editor
+            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .unwrap();
+        let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
+        let locations = storage::object_locations(&editor.package).unwrap();
+        let key = text_style_key(&editor.package, &descriptor, 1, 1)
+            .unwrap()
+            .unwrap();
+        let resolved = storage::resolve_table_data_list(
+            &editor.package,
+            &locations,
+            descriptor.model.base_data_store.style_table.identifier,
+            tst::table_data_list::ListType::Style,
+        )
+        .unwrap();
+        let entry = style_entry(&resolved, Some(key)).unwrap().unwrap();
+        storage::increment_table_data_list_entry(
+            &mut editor.package,
+            &locations,
+            &resolved,
+            entry,
+            tst::table_data_list::ListType::Style,
+        )
+        .unwrap();
+        let target = model::locate_attached_cell(&editor.package, table_id, 1, 2).unwrap();
+        write_text_style_key(&mut editor.package, &target, 1, 2, Some(key)).unwrap();
+        let shared_style_id = explicit_style_id(&editor, table_id, 1, 1);
+        let styled = TextStyle::new(TextPointSize::from_points(20.0).unwrap()).with_bold(true);
+
+        editor
+            .set_table_cell_text_style(table_id, 1, 1, styled)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor.table_cell_text_style(table_id, 1, 1).unwrap(),
+            styled
+        );
+        assert_eq!(
+            editor.table_cell_text_style(table_id, 1, 2).unwrap(),
+            TextStyle::default()
+        );
+        assert_eq!(
+            editor.table_cell_text_alignment(table_id, 1, 2).unwrap(),
+            TextAlignment::Center
+        );
+
+        assert!(editor.reset_table_cell_text_style(table_id, 1, 1).unwrap());
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert!(!editor.reset_table_cell_text_style(table_id, 1, 1).unwrap());
+    }
+
+    #[test]
+    fn scratch_paragraph_styles_round_trip_in_pages_and_keynote() {
+        let pages_style =
+            TextStyle::new(TextPointSize::from_points(17.0).unwrap()).with_italic(true);
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Aligned", 2, 2)
             .build()
@@ -798,17 +1052,26 @@ mod tests {
         pages
             .set_table_cell_text_alignment(pages_table, 1, 1, TextAlignment::Justified)
             .unwrap();
+        pages
+            .set_table_cell_text_style(pages_table, 1, 1, pages_style)
+            .unwrap();
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_text_alignment(pages_table, 1, 1).unwrap(),
             TextAlignment::Justified
         );
+        assert_eq!(
+            pages.table_cell_text_style(pages_table, 1, 1).unwrap(),
+            pages_style
+        );
         assert!(
             pages
-                .reset_table_cell_text_alignment(pages_table, 1, 1)
+                .reset_table_cell_text_style(pages_table, 1, 1)
                 .unwrap()
         );
 
+        let keynote_style =
+            TextStyle::new(TextPointSize::from_points(19.0).unwrap()).with_bold(true);
         let mut keynote = KeynoteDocumentBuilder::new()
             .title("Aligned")
             .build()
@@ -835,6 +1098,9 @@ mod tests {
                 TextAlignment::Left,
             )
             .unwrap();
+        keynote
+            .set_slide_table_cell_text_style(0, table.model_object_id, 1, 1, keynote_style)
+            .unwrap();
         let mut keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -843,15 +1109,21 @@ mod tests {
                 .unwrap(),
             TextAlignment::Left
         );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_style(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_style
+        );
         assert!(
             keynote
-                .reset_slide_table_cell_text_alignment(0, table.model_object_id, 1, 1)
+                .reset_slide_table_cell_text_style(0, table.model_object_id, 1, 1)
                 .unwrap()
         );
     }
 
     #[test]
-    fn invalid_alignment_coordinate_is_transactional() {
+    fn invalid_paragraph_style_coordinate_is_transactional() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(2, 2)
             .build()
@@ -861,6 +1133,11 @@ mod tests {
         assert!(
             editor
                 .set_table_cell_text_alignment(table_id, 2, 1, TextAlignment::Center)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_style(table_id, 1, 2, TextStyle::default())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

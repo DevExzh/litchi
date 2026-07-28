@@ -139,6 +139,8 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Whole-cell point size, bold, and italic formatting.
+pub type NumbersTableCellTextStyle = TextStyle;
 
 /// Storage identity and rule count of conditional highlighting attached to one cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2755,7 +2757,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
     ) -> Result<NumbersTableCellTextAlignment> {
-        cell_text_alignment::alignment(&self.package, table_id, row, column)
+        cell_paragraph_style::alignment(&self.package, table_id, row, column)
     }
 
     /// Create or replace a local horizontal text-alignment override.
@@ -2767,7 +2769,7 @@ impl NumbersEditor {
         alignment: NumbersTableCellTextAlignment,
     ) -> Result<()> {
         let mut staged = self.package.clone();
-        cell_text_alignment::set_alignment(&mut staged, table_id, row, column, alignment)?;
+        cell_paragraph_style::set_alignment(&mut staged, table_id, row, column, alignment)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         if verified.table_cell_text_alignment(table_id, row, column)? != alignment {
             return Err(Error::InvalidFormat(
@@ -2786,7 +2788,52 @@ impl NumbersEditor {
         column: usize,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
-        let changed = cell_text_alignment::reset_alignment(&mut staged, table_id, row, column)?;
+        let changed = cell_paragraph_style::reset_alignment(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective whole-cell point size, bold, and italic formatting.
+    pub fn table_cell_text_style(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextStyle> {
+        cell_paragraph_style::text_style(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell point size, bold, and italic formatting.
+    pub fn set_table_cell_text_style(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        style: NumbersTableCellTextStyle,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_text_style(&mut staged, table_id, row, column, style)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_style(table_id, row, column)? != style {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text style failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local point size, bold, and italic formatting.
+    pub fn reset_table_cell_text_style(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_text_style(&mut staged, table_id, row, column)?;
         if changed {
             *self = Self::from_bytes(&staged.to_bytes()?)?;
         }
@@ -3894,7 +3941,7 @@ pub(crate) fn table_cell_text_alignment_in_package(
     row: usize,
     column: usize,
 ) -> Result<TextAlignment> {
-    cell_text_alignment::alignment(package, table_id, row, column)
+    cell_paragraph_style::alignment(package, table_id, row, column)
 }
 
 pub(crate) fn set_table_cell_text_alignment_in_package(
@@ -3904,7 +3951,7 @@ pub(crate) fn set_table_cell_text_alignment_in_package(
     column: usize,
     alignment: TextAlignment,
 ) -> Result<()> {
-    cell_text_alignment::set_alignment(package, table_id, row, column, alignment)
+    cell_paragraph_style::set_alignment(package, table_id, row, column, alignment)
 }
 
 pub(crate) fn reset_table_cell_text_alignment_in_package(
@@ -3913,7 +3960,35 @@ pub(crate) fn reset_table_cell_text_alignment_in_package(
     row: usize,
     column: usize,
 ) -> Result<bool> {
-    cell_text_alignment::reset_alignment(package, table_id, row, column)
+    cell_paragraph_style::reset_alignment(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_style_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextStyle> {
+    cell_paragraph_style::text_style(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_style_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    style: TextStyle,
+) -> Result<()> {
+    cell_paragraph_style::set_text_style(package, table_id, row, column, style)
+}
+
+pub(crate) fn reset_table_cell_text_style_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_text_style(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_number_format_in_package(
@@ -4593,8 +4668,8 @@ mod cell_data_format;
 mod cell_fill;
 mod cell_layout;
 mod cell_merge;
+mod cell_paragraph_style;
 mod cell_style;
-mod cell_text_alignment;
 mod column_insert;
 mod conditional_highlight;
 mod date_time_fields;

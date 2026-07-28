@@ -1287,6 +1287,14 @@ retain complete BNC-v5 mirrors beside legacy pre-BNC rows are validated and
 promoted atomically on first edit, making the modern buffers authoritative and
 removing the stale legacy row payloads.
 
+Native table cells in Numbers, Pages, and Keynote expose typed horizontal
+alignment and whole-cell point-size, bold, and italic CRUD. These properties
+compose in one paragraph-style variation, use copy-on-write when a style is
+shared, preserve unrelated overrides, and reclaim private style objects and
+list entries when their last local property is reset. The
+`create_iwork_table_layouts` example creates and verifies all three formats
+from scratch.
+
 Numbers sheet names (including nested form-based sheets), table names, and
 required table-model dimensions are patched at the protobuf wire level.
 Unrecognized Apple fields retain their bytes and position, while duplicate
