@@ -320,6 +320,7 @@ mod paragraph_flow;
 mod paragraph_line_spacing;
 mod paragraph_margin;
 mod paragraph_tab_stop;
+mod paragraph_writing_mode;
 mod style_columns;
 mod table_cell_properties;
 mod table_column_properties;
@@ -624,6 +625,11 @@ pub use paragraph_tab_stop::{
     ParagraphTabLeaderColor, ParagraphTabLeaderStyle, ParagraphTabLeaderType,
     ParagraphTabLeaderWidth, ParagraphTabStop, ParagraphTabStopType, ParagraphTabStops,
     parse_paragraph_style_tab_stops,
+};
+pub use paragraph_writing_mode::{
+    ParagraphStyleWritingMode, ParagraphStyleWritingModeSet, ParagraphWritingMode,
+    ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
+    set_paragraph_style_writing_mode_xml,
 };
 pub use ruby_family::{
     RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,

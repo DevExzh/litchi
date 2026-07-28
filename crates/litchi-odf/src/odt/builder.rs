@@ -79,6 +79,7 @@ pub struct DocumentBuilder {
     paragraph_border_styles: Vec<crate::ParagraphStyleBorder>,
     paragraph_alignment_styles: Vec<crate::ParagraphStyleAlignment>,
     paragraph_break_styles: Vec<crate::ParagraphStyleBreaks>,
+    paragraph_writing_mode_styles: Vec<crate::ParagraphStyleWritingMode>,
     table_row_property_styles: Vec<crate::TableRowStyleProperties>,
     table_column_property_styles: Vec<crate::TableColumnStyleProperties>,
     table_cell_property_styles: Vec<crate::TableCellStyleProperties>,
@@ -144,6 +145,7 @@ impl DocumentBuilder {
             paragraph_border_styles: Vec::new(),
             paragraph_alignment_styles: Vec::new(),
             paragraph_break_styles: Vec::new(),
+            paragraph_writing_mode_styles: Vec::new(),
             table_row_property_styles: Vec::new(),
             table_column_property_styles: Vec::new(),
             table_cell_property_styles: Vec::new(),
@@ -370,6 +372,10 @@ impl DocumentBuilder {
                 .paragraph_break_styles
                 .iter()
                 .any(|x| matches(&x.name, x.is_default_style))
+            || self
+                .paragraph_writing_mode_styles
+                .iter()
+                .any(|x| matches(&x.name, x.is_default_style))
     }
 
     /// Add a named or default paragraph style carrying typed margin properties.
@@ -473,6 +479,33 @@ impl DocumentBuilder {
             ));
         }
         self.paragraph_break_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a named or default paragraph style carrying typed writing-mode and
+    /// register properties.
+    pub fn add_paragraph_writing_mode_style(
+        &mut self,
+        style: crate::ParagraphStyleWritingMode,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_writing_mode_styles.len() >= 4096
+            || self
+                .paragraph_writing_mode_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive paragraph writing-mode style".to_string(),
+            ));
+        }
+        if self.paragraph_style_identity_taken(&style.name, style.is_default_style) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "paragraph writing-mode style conflicts with another typed paragraph style"
+                    .to_string(),
+            ));
+        }
+        self.paragraph_writing_mode_styles.push(style);
         Ok(self)
     }
 
@@ -1794,6 +1827,18 @@ impl DocumentBuilder {
                 .map(|x| {
                     x.to_xml_fragment()
                         .expect("validated paragraph break style")
+                })
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.paragraph_writing_mode_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .paragraph_writing_mode_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated paragraph writing-mode style")
                 })
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
