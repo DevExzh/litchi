@@ -27,6 +27,8 @@ pub struct TextBox<'a> {
     text_ruler: Option<TextRuler>,
     /// Header/footer metacharacter placeholders in the textbox
     metachars: Vec<crate::ppt::text_metachar::PowerPointTextMetachar>,
+    /// Outline text references tying the textbox to outline text bodies
+    outline_text_refs: Vec<crate::ppt::text_si_exception::PowerPointOutlineTextRef>,
     /// PowerPoint 9 picture-bullet and automatic-numbering extensions
     text_style_extension9: Option<TextStyleExtension9>,
     /// PowerPoint 10 alternate-script font extensions
@@ -55,6 +57,7 @@ impl<'a> TextBox<'a> {
             paragraph_runs: Vec::new(),
             text_ruler: None,
             metachars: Vec::new(),
+            outline_text_refs: Vec::new(),
             text_style_extension9: None,
             text_style_extension10: None,
             text_style_extension11: None,
@@ -73,7 +76,7 @@ impl<'a> TextBox<'a> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
-        let (text, runs, paragraph_runs, text_ruler, metachars) = if let Some(textbox_record) =
+        let (text, runs, paragraph_runs, text_ruler, metachars, outline_text_refs) = if let Some(textbox_record) =
             Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
         {
             let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
@@ -83,9 +86,10 @@ impl<'a> TextBox<'a> {
                 wrapper.paragraph_runs().to_vec(),
                 wrapper.text_ruler().cloned(),
                 wrapper.metachars().to_vec(),
+                wrapper.outline_text_refs().to_vec(),
             )
         } else {
-            (String::new(), Vec::new(), Vec::new(), None, Vec::new())
+            (String::new(), Vec::new(), Vec::new(), None, Vec::new(), Vec::new())
         };
         let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
         let text_style_extension9 = record.extract_text_style_extension9()?;
@@ -105,6 +109,7 @@ impl<'a> TextBox<'a> {
             paragraph_runs,
             text_ruler,
             metachars,
+            outline_text_refs,
             text_style_extension9,
             text_style_extension10,
             text_style_extension11,
@@ -142,6 +147,7 @@ impl<'a> TextBox<'a> {
             paragraph_runs,
             text_ruler: None,
             metachars: Vec::new(),
+            outline_text_refs: Vec::new(),
             text_style_extension9: None,
             text_style_extension10: None,
             text_style_extension11: None,
@@ -394,6 +400,12 @@ impl<'a> TextBox<'a> {
     /// formatted, or laid out.
     pub fn metachars(&self) -> &[crate::ppt::text_metachar::PowerPointTextMetachar] {
         &self.metachars
+    }
+
+    /// Outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) tying
+    /// this text box to outline text bodies.
+    pub fn outline_text_refs(&self) -> &[crate::ppt::text_si_exception::PowerPointOutlineTextRef] {
+        &self.outline_text_refs
     }
 
     /// Get PowerPoint 9 picture-bullet and automatic-numbering extensions.

@@ -39,6 +39,16 @@ impl<'a> SlideAtomsSet<'a> {
         self.slide_persist_atom.get_slide_id()
     }
 
+    /// Validated outline text references (`OutlineTextRefAtom`, MS-PPT
+    /// 2.9.78) tying this slide's shapes to outline text bodies.
+    pub fn outline_text_refs(&self) -> Result<Vec<crate::ppt::PowerPointOutlineTextRef>> {
+        self.slide_records
+            .iter()
+            .filter(|record| record.record_type == crate::consts::PptRecordType::OutlineTextRefAtom)
+            .map(|record| crate::ppt::PowerPointOutlineTextRef::parse_record(record))
+            .collect()
+    }
+
     /// Parse range-anchored actions from every text body in this slide set.
     pub fn text_interactions(&self) -> Result<Vec<crate::ppt::PowerPointTextBodyInteractions>> {
         self.text_interactions_with_limits(crate::ppt::PowerPointTextInteractionLimits::default())

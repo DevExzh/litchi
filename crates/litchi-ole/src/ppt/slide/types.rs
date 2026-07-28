@@ -26,6 +26,7 @@ pub struct Slide<'doc> {
     slide_id: u32,
     slide_list_text: String,
     outline_text_interactions: Vec<crate::ppt::PowerPointTextBodyInteractions>,
+    outline_text_refs: Vec<crate::ppt::PowerPointOutlineTextRef>,
     /// Slide number (1-based for display)
     slide_number: usize,
     /// Slide record
@@ -60,6 +61,7 @@ impl<'doc> Slide<'doc> {
             slide_id: data.slide_id,
             slide_list_text: data.slide_list_text,
             outline_text_interactions: data.outline_text_interactions,
+            outline_text_refs: data.outline_text_refs,
             slide_number,
             doc_data: doc_data_ref,
             record: data.record,
@@ -194,6 +196,12 @@ impl<'doc> Slide<'doc> {
     /// Range-anchored actions stored with outline/placeholder text.
     pub fn outline_text_interactions(&self) -> &[crate::ppt::PowerPointTextBodyInteractions] {
         &self.outline_text_interactions
+    }
+
+    /// Validated outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78)
+    /// tying this slide's shapes to outline text bodies.
+    pub fn outline_text_refs(&self) -> &[crate::ppt::PowerPointOutlineTextRef] {
+        &self.outline_text_refs
     }
 
     /// Return every shape-scoped programmable-tag container on this slide.

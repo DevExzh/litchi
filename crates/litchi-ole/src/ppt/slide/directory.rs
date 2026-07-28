@@ -21,6 +21,7 @@ pub struct SlideDirectoryEntry {
     text_placeholder_count: u32,
     list_text: String,
     outline_text_interactions: Vec<crate::ppt::PowerPointTextBodyInteractions>,
+    outline_text_refs: Vec<crate::ppt::PowerPointOutlineTextRef>,
 }
 
 impl SlideDirectoryEntry {
@@ -46,6 +47,11 @@ impl SlideDirectoryEntry {
 
     pub fn outline_text_interactions(&self) -> &[crate::ppt::PowerPointTextBodyInteractions] {
         &self.outline_text_interactions
+    }
+
+    /// Validated outline text references of this slide's shapes.
+    pub fn outline_text_refs(&self) -> &[crate::ppt::PowerPointOutlineTextRef] {
+        &self.outline_text_refs
     }
 }
 
@@ -215,6 +221,7 @@ impl SlideDirectory {
                     text_placeholder_count,
                     list_text: String::new(),
                     outline_text_interactions: Vec::new(),
+                    outline_text_refs: Vec::new(),
                 });
                 by_slide_id.insert(slide_id, index);
                 by_persist_id.insert(persist_id, index);
@@ -228,6 +235,7 @@ impl SlideDirectory {
                     )));
                 };
                 entries[index].outline_text_interactions = set.text_interactions()?;
+                entries[index].outline_text_refs = set.outline_text_refs()?;
             }
         }
 

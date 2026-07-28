@@ -286,6 +286,62 @@ impl Presentation {
         Ok(None)
     }
 
+    /// The default language and spelling settings for document text
+    /// (`TextSIExceptionAtom`, MS-PPT 2.9.31), when declared.
+    pub fn text_special_info_defaults(
+        &self,
+    ) -> Result<Option<crate::ppt::text_si_exception::PowerPointTextSpecialInfoDefaults>> {
+        for record in self.parser.find_records_ref() {
+            if record.record_type == PptRecordType::TextSpecialInfoDefaultAtom {
+                return crate::ppt::text_si_exception::PowerPointTextSpecialInfoDefaults::parse_record(
+                    record,
+                )
+                .map(Some);
+            }
+        }
+        Ok(None)
+    }
+
+    /// All outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) in
+    /// the document stream, in stream order.
+    ///
+    /// The atoms tie shape text boxes to outline text bodies and mostly live
+    /// in the Escher text boxes of slide shapes, so they are collected both
+    /// from the record tree and from every drawing-group text box.
+    pub fn outline_text_refs(&self) -> Result<Vec<crate::ppt::PowerPointOutlineTextRef>> {
+        use crate::ppt::PowerPointOutlineTextRef;
+
+        fn collect(record: &PptRecord, out: &mut Vec<PowerPointOutlineTextRef>) -> Result<()> {
+            if record.record_type == PptRecordType::PPDrawing {
+                let (escher, _) = super::shapes::escher::EscherRecord::parse(&record.data, 0)?;
+                collect_escher(&escher, out)?;
+            } else if record.record_type == PptRecordType::OutlineTextRefAtom {
+                out.push(PowerPointOutlineTextRef::parse_record(record)?);
+            }
+            Ok(())
+        }
+
+        fn collect_escher(
+            record: &super::shapes::escher::EscherRecord<'_>,
+            out: &mut Vec<PowerPointOutlineTextRef>,
+        ) -> Result<()> {
+            if record.record_type == super::shapes::escher::EscherRecordType::ClientTextbox {
+                let wrapper = crate::ppt::EscherTextboxWrapper::new(record.data.to_vec())?;
+                out.extend_from_slice(wrapper.outline_text_refs());
+            }
+            for child in &record.children {
+                collect_escher(child, out)?;
+            }
+            Ok(())
+        }
+
+        let mut result = Vec::new();
+        for record in self.parser.find_records_ref() {
+            collect(record, &mut result)?;
+        }
+        Ok(result)
+    }
+
     /// Parse document-level PowerPoint 12 settings and round-trip metadata.
     pub fn powerpoint12_document_properties(&self) -> Result<PowerPoint12DocumentProperties> {
         let mut documents = self

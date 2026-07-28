@@ -108,6 +108,7 @@ impl<'doc> SlideFactory<'doc> {
             slide_id: entry.slide_id(),
             slide_list_text: entry.list_text().to_string(),
             outline_text_interactions: entry.outline_text_interactions().to_vec(),
+            outline_text_refs: entry.outline_text_refs().to_vec(),
             offset,
             record,
             doc_data: self.doc_data,
@@ -144,6 +145,7 @@ pub struct SlideData<'doc> {
     pub(crate) slide_list_text: String,
     /// Range-anchored actions from SlideListWithText text bodies.
     pub(crate) outline_text_interactions: Vec<crate::ppt::PowerPointTextBodyInteractions>,
+    pub(crate) outline_text_refs: Vec<crate::ppt::PowerPointOutlineTextRef>,
     /// Byte offset in document stream
     pub offset: usize,
     /// Parsed Slide record
@@ -195,6 +197,7 @@ impl<'doc> SlideData<'doc> {
             slide_id: persist_id,
             slide_list_text: String::new(),
             outline_text_interactions: Vec::new(),
+            outline_text_refs: Vec::new(),
             offset,
             record,
             doc_data,

@@ -100,7 +100,7 @@ pub enum PptRecordType {
     ExternalWavAudioEmbeddedAtom = 0x1013,
     RoundTripColorMapping12Atom = 0x040F,
     /// PowerPoint 12 notes-master text styles atom
-    RoundTripNotesMasterTextStyles12Atom = 0x01C5,
+    RoundTripNotesMasterTextStyles12Atom = 0x0427,
     /// PowerPoint 12 original main-master identifier atom
     RoundTripOriginalMainMasterId12Atom = 0x041C,
     /// PowerPoint 12 composite master identifier atom
@@ -229,6 +229,10 @@ pub enum PptRecordType {
     NormalViewSetInfo9 = 1044,
     /// Normal view set info 9 atom record
     NormalViewSetInfo9Atom = 1045,
+    /// Outline text reference atom record
+    OutlineTextRefAtom = 3998,
+    /// Text special info default atom record
+    TextSpecialInfoDefaultAtom = 4009,
     /// Slide number metachar atom record
     SlideNumberMCAtom = 4056,
     /// Date time MC atom record
@@ -435,7 +439,7 @@ impl From<u16> for PptRecordType {
             2022 => PptRecordType::Sound,
             2023 => PptRecordType::SoundData,
             0x0FC9 => PptRecordType::Handout,
-            0x01C5 => PptRecordType::RoundTripNotesMasterTextStyles12Atom,
+            0x0427 => PptRecordType::RoundTripNotesMasterTextStyles12Atom,
             0x040E => PptRecordType::RoundTripTheme12Atom,
             0x0406 => PptRecordType::DocRoutingSlipAtom,
             0x0401 => PptRecordType::SlideShowDocInfoAtom,
@@ -528,6 +532,8 @@ impl From<u16> for PptRecordType {
             4083 => PptRecordType::InteractiveInfoAtom,
             4085 => PptRecordType::UserEditAtom,
             4086 => PptRecordType::CurrentUserAtom,
+            3998 => PptRecordType::OutlineTextRefAtom,
+            4009 => PptRecordType::TextSpecialInfoDefaultAtom,
             1043 => PptRecordType::NotesTextViewInfo9,
             1044 => PptRecordType::NormalViewSetInfo9,
             1045 => PptRecordType::NormalViewSetInfo9Atom,

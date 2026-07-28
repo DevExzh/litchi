@@ -32,6 +32,8 @@ pub struct EscherTextboxWrapper {
     text_interactions: Vec<PowerPointTextInteraction>,
     /// Header/footer metacharacter placeholders in the textbox.
     metachars: Vec<super::text_metachar::PowerPointTextMetachar>,
+    /// Outline text references tying the textbox to outline text bodies.
+    outline_text_refs: Vec<super::text_si_exception::PowerPointOutlineTextRef>,
 }
 
 impl EscherTextboxWrapper {
@@ -70,6 +72,11 @@ impl EscherTextboxWrapper {
         }
         let text_interactions = Self::text_interactions_from_records(&child_records, limits)?;
         let metachars = super::text_metachar::metachars_from_records(child_records.iter())?;
+        let outline_text_refs = child_records
+            .iter()
+            .filter(|record| record.record_type == crate::consts::PptRecordType::OutlineTextRefAtom)
+            .map(super::text_si_exception::PowerPointOutlineTextRef::parse_record)
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {
             data,
@@ -80,6 +87,7 @@ impl EscherTextboxWrapper {
             text_ruler,
             text_interactions,
             metachars,
+            outline_text_refs,
         })
     }
 
@@ -210,6 +218,12 @@ impl EscherTextboxWrapper {
     /// formatted, or laid out.
     pub fn metachars(&self) -> &[super::text_metachar::PowerPointTextMetachar] {
         &self.metachars
+    }
+
+    /// Outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) tying
+    /// this textbox to outline text bodies.
+    pub fn outline_text_refs(&self) -> &[super::text_si_exception::PowerPointOutlineTextRef] {
+        &self.outline_text_refs
     }
 
     /// Find a StyleTextPropAtom record.

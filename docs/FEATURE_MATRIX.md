@@ -375,7 +375,7 @@ conversion, fonts, and image conversion are optional.
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | OLE2 presentation streams and writer/editor APIs |
 | Slides, masters, and persist mapping | ✅ | ✅ | ✅ | Slide management, main masters, and persist-object lookup |
-| Text, runs, and formatting | ✅ | ✅ | ✅ | Text boxes, placeholders, fonts, colors, paragraphs, and runs |
+| Text, runs, and formatting | ✅ | ✅ | ✅ | Text boxes, placeholders, fonts, colors, paragraphs, runs, `TextSIExceptionAtom` language/spelling defaults, and `OutlineTextRefAtom` outline references |
 | Shapes, groups, and OfficeArt | ✅ | ✅ | ✅ | AutoShapes, groups, anchors, fills, gradients, lines, and Escher records |
 | Pictures | ✅ | ✅ | ✅ | JPEG/PNG/BLIP resources and writer support |
 | Tables | ✅ | ✅ | ✅ | Table group/grid/cell extraction and table authoring (rows, columns, cell text, cell dimensions) |
