@@ -122,6 +122,7 @@ pub mod text_bookmark;
 pub mod text_extensions;
 pub mod text_interaction;
 pub mod text_metachar;
+pub mod view_set_info;
 pub mod text_prop;
 pub mod text_ruler;
 pub mod text_run;
@@ -309,6 +310,10 @@ pub use text_interaction::{
     PowerPointTextInteractionLimits, PowerPointTextRange, PowerPointTextType,
 };
 pub use text_metachar::{PowerPointMetacharKind, PowerPointTextMetachar};
+pub use view_set_info::{
+    PowerPointNormalViewSet, PowerPointNormalViewSetInfo, PowerPointNormalViewSetPayload,
+    PowerPointNotesTextViewInfo, PowerPointViewBarState,
+};
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
 pub use text_ruler::{TextRuler, TextRulerLevel, parse_default_text_ruler};
 pub use text_run::{

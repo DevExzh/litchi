@@ -146,6 +146,8 @@ impl PptRecord {
                 | PptRecordType::ExObjList
                 | PptRecordType::VBAInfo
                 | PptRecordType::SlideListWithText
+                | PptRecordType::NormalViewSetInfo9
+                | PptRecordType::NotesTextViewInfo9
                 | PptRecordType::Environment
                 | PptRecordType::FontCollection
                 | PptRecordType::FontCollection10

@@ -223,6 +223,12 @@ pub enum PptRecordType {
     UserEditAtom = 4085,
     /// Current user atom record
     CurrentUserAtom = 4086,
+    /// Notes text view info 9 container
+    NotesTextViewInfo9 = 1043,
+    /// Normal view set info 9 container
+    NormalViewSetInfo9 = 1044,
+    /// Normal view set info 9 atom record
+    NormalViewSetInfo9Atom = 1045,
     /// Slide number metachar atom record
     SlideNumberMCAtom = 4056,
     /// Date time MC atom record
@@ -522,6 +528,9 @@ impl From<u16> for PptRecordType {
             4083 => PptRecordType::InteractiveInfoAtom,
             4085 => PptRecordType::UserEditAtom,
             4086 => PptRecordType::CurrentUserAtom,
+            1043 => PptRecordType::NotesTextViewInfo9,
+            1044 => PptRecordType::NormalViewSetInfo9,
+            1045 => PptRecordType::NormalViewSetInfo9Atom,
             4056 => PptRecordType::SlideNumberMCAtom,
             4087 => PptRecordType::DateTimeMCAtom,
             4088 => PptRecordType::GenericDateMCAtom,

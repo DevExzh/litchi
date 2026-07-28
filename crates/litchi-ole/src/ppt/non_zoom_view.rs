@@ -138,7 +138,7 @@ impl PowerPointNoZoomViewInfo {
         &self.ignored3
     }
 
-    fn parse(data: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != ATOM_DATA_LEN {
             return Err(corrupted(format!(
                 "NoZoomViewInfoAtom payload length must be {ATOM_DATA_LEN}, got {}",

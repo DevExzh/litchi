@@ -42,7 +42,7 @@ pub mod record_type {
     /// TextRuler
     pub const TEXT_RULER_ATOM: u16 = 0x0FA2;
     /// NotesTextViewInfo
-    pub const NOTES_TEXT_VIEW_INFO: u16 = 0x03F5;
+    pub const NOTES_TEXT_VIEW_INFO: u16 = 0x0413;
 }
 
 // =============================================================================
