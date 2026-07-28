@@ -312,7 +312,9 @@ mod list_label_alignment;
 mod list_style;
 pub mod named_expression;
 mod outline_style;
+mod paragraph_alignment;
 mod paragraph_border;
+mod paragraph_break;
 mod paragraph_drop_cap;
 mod paragraph_flow;
 mod paragraph_line_spacing;
@@ -586,10 +588,18 @@ pub use outline_style::{
     OdfOutlineStyle, OdfOutlineStyles, OdfOutlineTextAlign, OdfOutlineTextProperties,
     parse_outline_styles, remove_outline_style_xml, set_outline_style_xml,
 };
+pub use paragraph_alignment::{
+    ParagraphAlignment, ParagraphStyleAlignment, ParagraphStyleAlignmentSet, ParagraphTextAlign,
+    ParagraphVerticalAlign, parse_paragraph_style_alignments, set_paragraph_style_alignment_xml,
+};
 pub use paragraph_border::{
     ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
     ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, ParagraphStyleBorderSet,
     parse_paragraph_style_borders, set_paragraph_style_border_xml,
+};
+pub use paragraph_break::{
+    ParagraphBreak, ParagraphBreaks, ParagraphPageNumber, ParagraphStyleBreaks,
+    ParagraphStyleBreaksSet, parse_paragraph_style_breaks, set_paragraph_style_breaks_xml,
 };
 pub use paragraph_drop_cap::{
     DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,

@@ -77,6 +77,8 @@ pub struct DocumentBuilder {
     paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
     paragraph_margin_styles: Vec<crate::ParagraphStyleMargins>,
     paragraph_border_styles: Vec<crate::ParagraphStyleBorder>,
+    paragraph_alignment_styles: Vec<crate::ParagraphStyleAlignment>,
+    paragraph_break_styles: Vec<crate::ParagraphStyleBreaks>,
     table_row_property_styles: Vec<crate::TableRowStyleProperties>,
     table_column_property_styles: Vec<crate::TableColumnStyleProperties>,
     table_cell_property_styles: Vec<crate::TableCellStyleProperties>,
@@ -140,6 +142,8 @@ impl DocumentBuilder {
             paragraph_flow_styles: Vec::new(),
             paragraph_margin_styles: Vec::new(),
             paragraph_border_styles: Vec::new(),
+            paragraph_alignment_styles: Vec::new(),
+            paragraph_break_styles: Vec::new(),
             table_row_property_styles: Vec::new(),
             table_column_property_styles: Vec::new(),
             table_cell_property_styles: Vec::new(),
@@ -358,6 +362,14 @@ impl DocumentBuilder {
                 .paragraph_border_styles
                 .iter()
                 .any(|x| matches(&x.name, x.is_default_style))
+            || self
+                .paragraph_alignment_styles
+                .iter()
+                .any(|x| matches(&x.name, x.is_default_style))
+            || self
+                .paragraph_break_styles
+                .iter()
+                .any(|x| matches(&x.name, x.is_default_style))
     }
 
     /// Add a named or default paragraph style carrying typed margin properties.
@@ -408,6 +420,59 @@ impl DocumentBuilder {
             ));
         }
         self.paragraph_border_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a named or default paragraph style carrying typed alignment
+    /// properties.
+    pub fn add_paragraph_alignment_style(
+        &mut self,
+        style: crate::ParagraphStyleAlignment,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_alignment_styles.len() >= 4096
+            || self
+                .paragraph_alignment_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive paragraph alignment style".to_string(),
+            ));
+        }
+        if self.paragraph_style_identity_taken(&style.name, style.is_default_style) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "paragraph alignment style conflicts with another typed paragraph style"
+                    .to_string(),
+            ));
+        }
+        self.paragraph_alignment_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a named or default paragraph style carrying typed break, page-number,
+    /// and line-numbering properties.
+    pub fn add_paragraph_break_style(
+        &mut self,
+        style: crate::ParagraphStyleBreaks,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_break_styles.len() >= 4096
+            || self
+                .paragraph_break_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive paragraph break style".to_string(),
+            ));
+        }
+        if self.paragraph_style_identity_taken(&style.name, style.is_default_style) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "paragraph break style conflicts with another typed paragraph style".to_string(),
+            ));
+        }
+        self.paragraph_break_styles.push(style);
         Ok(self)
     }
 
@@ -1705,6 +1770,30 @@ impl DocumentBuilder {
                 .map(|x| {
                     x.to_xml_fragment()
                         .expect("validated paragraph border style")
+                })
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.paragraph_alignment_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .paragraph_alignment_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated paragraph alignment style")
+                })
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.paragraph_break_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .paragraph_break_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated paragraph break style")
                 })
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
