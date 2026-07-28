@@ -31,7 +31,17 @@ pub(crate) fn preset_style_object(
     native::style_object(identifier, stylesheet_id, preset)
 }
 
-pub(super) fn paragraph_list(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphList> {
+/// Locate a canonical list preset owned by one stylesheet.
+pub(crate) fn preset_style_id(
+    package: &IWorkPackage,
+    stylesheet_id: u64,
+    preset: ParagraphList,
+) -> Result<Option<u64>> {
+    let archive_name = object_archive_name(package, stylesheet_id)?;
+    native::find_preset_style(package, &archive_name, stylesheet_id, preset)
+}
+
+pub(crate) fn paragraph_list(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphList> {
     let storage = storage::locate(package, storage_id)?;
     let style = native::locate_style(package, storage.style_id)?;
     native::paragraph_list(&style.style)

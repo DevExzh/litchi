@@ -6,14 +6,14 @@ const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6011;
 
 #[derive(Debug)]
 pub(super) struct RichTextEntryLocation {
-    table_id: u64,
-    table_archive: String,
-    payload_id: u64,
-    payload_archive: String,
-    storage_id: u64,
-    storage_archive: String,
-    refcount: u32,
-    owner: TableDataListEntryOwner,
+    pub(super) table_id: u64,
+    pub(super) table_archive: String,
+    pub(super) payload_id: u64,
+    pub(super) payload_archive: String,
+    pub(super) storage_id: u64,
+    pub(super) storage_archive: String,
+    pub(super) refcount: u32,
+    pub(super) owner: TableDataListEntryOwner,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -845,6 +845,37 @@ pub(super) fn rewrite_table_model_comment_table_wire(
     Ok(data)
 }
 
+pub(super) fn rewrite_table_model_rich_text_table_wire(
+    original: &[u8],
+    previous: &TableModelArchive,
+    current: &TableModelArchive,
+) -> Result<Vec<u8>> {
+    let mut expected = current.clone();
+    expected.base_data_store.rich_text_table = previous.base_data_store.rich_text_table;
+    if expected != *previous {
+        return Err(Error::InvalidFormat(
+            "Numbers table model changed outside its rich-text-table reference".to_owned(),
+        ));
+    }
+    let replacement = current
+        .base_data_store
+        .rich_text_table
+        .as_ref()
+        .map(Message::encode_to_vec);
+    let data = patch_nested_length_delimited_field(
+        original,
+        &[4, 17],
+        previous.base_data_store.rich_text_table.is_some(),
+        replacement.as_deref(),
+    )?;
+    if TableModelArchive::decode(data.as_slice())? != *current {
+        return Err(Error::InvalidFormat(
+            "Numbers table-model rich-text-table wire mutation failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn rewrite_table_model_conditional_style_wire(
     original: &[u8],
     previous: &TableModelArchive,
@@ -1354,7 +1385,8 @@ pub(super) fn set_rich_text(
     replacement: &str,
 ) -> Result<u32> {
     let entry = rich_text_entry_location(package, locations, model, identifier)?;
-    if entry.refcount == 1 {
+    let shared_across_lists = rich_text_payload_entry_count(package, entry.payload_id)? > 1;
+    if entry.refcount == 1 && !shared_across_lists {
         let mut text = IWorkTextEditor::from_package(package.clone());
         text.set_text(entry.storage_id, replacement)?;
         *package = text.into_package();
@@ -1460,7 +1492,7 @@ pub(super) fn set_rich_text(
         .ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers rich-text table has no entry {identifier}"))
         })?;
-    if old_entry.entry.refcount < 2 || old_entry.owner != entry.owner {
+    if (!shared_across_lists && old_entry.entry.refcount < 2) || old_entry.owner != entry.owner {
         return Err(Error::InvalidFormat(format!(
             "Numbers rich-text entry {identifier} stopped being shared during copy-on-write"
         )));
@@ -1521,6 +1553,47 @@ pub(super) fn set_rich_text(
     text.set_text(new_storage_id, replacement)?;
     *package = text.into_package();
     Ok(key)
+}
+
+fn rich_text_payload_entry_count(package: &IWorkPackage, payload_id: u64) -> Result<usize> {
+    let mut count = 0;
+    for archive_name in package.iwa_entry_names() {
+        let archive = package.archive(archive_name)?;
+        for object in &archive.objects {
+            for message in &object.messages {
+                if message.type_ == 6_005 {
+                    let list = TableDataList::decode(message.data.as_slice())?;
+                    if list.list_type == tst::table_data_list::ListType::RichTextPayload as i32 {
+                        count += list
+                            .entries
+                            .iter()
+                            .filter(|entry| {
+                                entry
+                                    .rich_text_payload
+                                    .as_ref()
+                                    .is_some_and(|reference| reference.identifier == payload_id)
+                            })
+                            .count();
+                    }
+                } else if message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE {
+                    let segment = TableDataListSegment::decode(message.data.as_slice())?;
+                    if segment.list_type == tst::table_data_list::ListType::RichTextPayload as i32 {
+                        count += segment
+                            .entries
+                            .iter()
+                            .filter(|entry| {
+                                entry
+                                    .rich_text_payload
+                                    .as_ref()
+                                    .is_some_and(|reference| reference.identifier == payload_id)
+                            })
+                            .count();
+                    }
+                }
+            }
+        }
+    }
+    Ok(count)
 }
 
 pub(super) fn rich_text_cell_id(row: usize, column: usize) -> Result<tst::CellId> {

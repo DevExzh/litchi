@@ -106,6 +106,7 @@ pub use crate::table_cell_number_format::{
 };
 pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
+pub use crate::text::ParagraphList as PagesTableCellParagraphList;
 pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
@@ -1464,6 +1465,73 @@ impl PagesEditor {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_paragraph_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the canonical list preset applied uniformly to one body-table cell.
+    pub fn table_cell_paragraph_list(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellParagraphList> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Promote a plain text cell when necessary and apply one native list preset.
+    pub fn set_table_cell_paragraph_list(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        list: PagesTableCellParagraphList,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            list,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list(model_object_id, row, column)? != list {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph list failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the canonical None list preset for one body-table cell.
+    pub fn reset_table_cell_paragraph_list(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_list_in_package(
             &mut staged,
             model_object_id,
             row,

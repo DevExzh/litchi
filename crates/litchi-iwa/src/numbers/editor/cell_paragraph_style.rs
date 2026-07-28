@@ -17,6 +17,21 @@ use property::{CellParagraphProperty, CellParagraphPropertyKind};
 
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 
+pub(super) fn style_context(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<(u64, u64)> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    validate_coordinate(&descriptor, row, column)?;
+    let locations = storage::object_locations(package)?;
+    let style_id = local_style_id(package, &descriptor, &locations, row, column)?
+        .unwrap_or_else(|| base_style_id(&descriptor, row, column));
+    let style = locate_style(package, style_id)?;
+    Ok((style_id, stylesheet_id(&style.style, style_id)?))
+}
+
 pub(super) fn alignment(
     package: &IWorkPackage,
     table_id: u64,

@@ -83,8 +83,10 @@ pub use number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentFormat, TextNumberAttachmentId,
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
 };
-pub(crate) use paragraph_list::preset_style_object;
 pub use paragraph_list::{ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement};
+pub(crate) use paragraph_list::{
+    paragraph_list as paragraph_list_in_storage, preset_style_id, preset_style_object,
+};
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
     ParagraphTabStops,

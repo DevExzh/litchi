@@ -104,6 +104,7 @@ pub use crate::table_cell_number_format::{
 };
 pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
+pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
 pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
@@ -1824,6 +1825,78 @@ impl KeynoteEditor {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_paragraph_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the canonical list preset applied uniformly to one slide-table cell.
+    pub fn slide_table_cell_paragraph_list(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellParagraphList> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Promote a plain text cell when necessary and apply one native list preset.
+    pub fn set_slide_table_cell_paragraph_list(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        list: KeynoteTableCellParagraphList,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            list,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_list(slide_index, model_object_id, row, column)?
+            != list
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph list failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the canonical None list preset for one slide-table cell.
+    pub fn reset_slide_table_cell_paragraph_list(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_list_in_package(
             &mut staged,
             model_object_id,
             row,

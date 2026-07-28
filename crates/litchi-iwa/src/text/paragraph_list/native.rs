@@ -23,7 +23,7 @@ const BULLET_BASELINE_OFFSET_POINTS: f32 = -1.0;
 const DEFAULT_LABEL_SCALE: f32 = 1.0;
 const BULLET_GLYPH: &str = "•";
 const NONE_OVERRIDE_COUNT: u32 = 4;
-const BULLET_OVERRIDE_COUNT: u32 = 7;
+const BULLET_OVERRIDE_COUNT: u32 = 5;
 const NUMBER_OVERRIDE_COUNT: u32 = 6;
 
 pub(super) struct ListStyleLocation {
@@ -178,7 +178,13 @@ pub(super) fn style_object(
 
 fn matches_preset(style: &tswp::ListStyleArchive, preset: ParagraphList) -> bool {
     let expected = canonical_archive(preset);
-    if preset == ParagraphList::None && style.label_types.is_empty() {
+    if preset == ParagraphList::None
+        && (style.label_types.is_empty()
+            || style
+                .label_types
+                .iter()
+                .all(|label| *label == LabelType::KNone as i32))
+    {
         return style.strings.is_empty()
             && style.number_types.is_empty()
             && style.images.is_empty();

@@ -1,0 +1,636 @@
+//! Native rich-text promotion and paragraph-list CRUD for table cells.
+
+use super::*;
+
+const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
+const RICH_TEXT_PAYLOAD_MESSAGE_TYPE: u32 = 6_218;
+const STORAGE_MESSAGE_TYPE: u32 = 2_001;
+const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
+
+pub(super) fn paragraph_list(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphList> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        return Ok(ParagraphList::None);
+    };
+    crate::text::paragraph_list_in_storage(package, storage_id)
+}
+
+pub(super) fn set_paragraph_list(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    list: ParagraphList,
+) -> Result<()> {
+    if paragraph_list(package, table_id, row, column)? == list {
+        return Ok(());
+    }
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list(storage_id, list)?;
+    staged = text.into_package();
+    if paragraph_list(&staged, table_id, row, column)? != list {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph-list update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    if paragraph_list(package, table_id, row, column)? == ParagraphList::None {
+        return Ok(false);
+    }
+    set_paragraph_list(package, table_id, row, column, ParagraphList::None)?;
+    Ok(true)
+}
+
+fn existing_storage_id(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<u64>> {
+    let location = model::locate_attached_cell(package, table_id, row, column)?;
+    let Some(data) = storage::read_tile_cell(
+        package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        column,
+    )?
+    else {
+        return Ok(None);
+    };
+    match BncCell::parse(&data)?.stored_value() {
+        StoredValue::Empty | StoredValue::Text(_) => Ok(None),
+        StoredValue::RichText(key) => Ok(Some(
+            storage::rich_text_entry_location(
+                package,
+                &location.object_locations,
+                &location.descriptor.model,
+                key,
+            )?
+            .storage_id,
+        )),
+        _ => Err(Error::ParseError(
+            "Paragraph lists require an empty or textual iWork table cell".to_owned(),
+        )),
+    }
+}
+
+fn ensure_storage(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<u64> {
+    table_sparse_storage::ensure_attached_cell_storage(package, table_id, row, column)?;
+    let location = model::locate_attached_cell(package, table_id, row, column)?;
+    let data = storage::read_tile_cell(
+        package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        column,
+    )?;
+    let stored = data
+        .as_deref()
+        .map(BncCell::parse)
+        .transpose()?
+        .map_or(StoredValue::Empty, |cell| cell.stored_value());
+    match stored {
+        StoredValue::RichText(key) => {
+            let entry = storage::rich_text_entry_location(
+                package,
+                &location.object_locations,
+                &location.descriptor.model,
+                key,
+            )?;
+            let text = package
+                .archive(&entry.storage_archive)?
+                .object(entry.storage_id)
+                .and_then(|object| object.messages.first())
+                .map(|message| tswp::StorageArchive::decode(message.data.as_slice()))
+                .transpose()?
+                .and_then(|storage| storage.text.into_iter().next())
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "iWork rich-text storage {} has no text",
+                        entry.storage_id
+                    ))
+                })?;
+            let new_key = storage::set_rich_text(
+                package,
+                &location.object_locations,
+                &location.descriptor.model,
+                key,
+                row,
+                column,
+                &text,
+            )?;
+            if new_key == key {
+                return Ok(entry.storage_id);
+            }
+            storage::set_encoded_cell_value(
+                package,
+                table_id,
+                row,
+                column,
+                model::EncodedValue::RichText(new_key),
+            )?;
+            let locations = storage::object_locations(package)?;
+            let descriptor = model::attached_table_descriptor(package, table_id)?;
+            Ok(
+                storage::rich_text_entry_location(package, &locations, &descriptor.model, new_key)?
+                    .storage_id,
+            )
+        },
+        StoredValue::Empty | StoredValue::Text(_) => {
+            promote_plain_cell(package, table_id, row, column, stored, &location)
+        },
+        _ => Err(Error::ParseError(
+            "Paragraph lists require an empty or textual iWork table cell".to_owned(),
+        )),
+    }
+}
+
+fn promote_plain_cell(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    stored: StoredValue,
+    location: &model::CellLocation,
+) -> Result<u64> {
+    let old_string_key = match stored {
+        StoredValue::Text(key) => Some(key),
+        StoredValue::Empty => None,
+        _ => unreachable!("plain-cell promotion receives only plain stored values"),
+    };
+    let text = if let Some(key) = old_string_key {
+        let string_table = location
+            .descriptor
+            .model
+            .base_data_store
+            .string_table
+            .identifier;
+        storage::resolve_table_string_values(
+            package,
+            &location.object_locations,
+            string_table,
+            &HashSet::from([key]),
+        )?
+        .remove(&key)
+        .ok_or_else(|| Error::InvalidFormat(format!("Numbers string table has no entry {key}")))?
+    } else {
+        String::new()
+    };
+    let (paragraph_style_id, stylesheet_id) =
+        cell_paragraph_style::style_context(package, table_id, row, column)?;
+    let list_style_id = crate::text::preset_style_id(package, stylesheet_id, ParagraphList::None)?
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork stylesheet {stylesheet_id} has no canonical None list preset"
+            ))
+        })?;
+
+    let archive_name = location
+        .object_locations
+        .get(&table_id)
+        .cloned()
+        .ok_or_else(|| Error::InvalidFormat(format!("iWork table model {table_id} is missing")))?;
+    let mut next_id = next_object_identifier(package)?;
+    let rich_text_table_id = location
+        .descriptor
+        .model
+        .base_data_store
+        .rich_text_table
+        .as_ref()
+        .map(|reference| reference.identifier);
+    let list_id = match rich_text_table_id {
+        Some(identifier) => identifier,
+        None => take_id(&mut next_id)?,
+    };
+    let storage_id = take_id(&mut next_id)?;
+    let payload_id = take_id(&mut next_id)?;
+
+    if rich_text_table_id.is_none() {
+        let list = TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            next_list_id: 1,
+            entries: Vec::new(),
+            segments: Vec::new(),
+            is_new_for_bnc: Some(true),
+        };
+        let mut object = ArchiveObject::new(
+            list_id,
+            vec![RawMessage {
+                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                data: list.encode_to_vec(),
+            }],
+        )?;
+        object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+        package.update_archive(&archive_name, |archive| archive.insert_object(object))?;
+        attach_rich_text_table(package, &archive_name, table_id, list_id)?;
+    }
+
+    let storage_archive = cell_storage(&text, stylesheet_id, paragraph_style_id, list_style_id)?;
+    let storage_references = crate::text::editor::storage_object_references(&storage_archive);
+    let mut storage_object = ArchiveObject::new(
+        storage_id,
+        vec![RawMessage {
+            type_: STORAGE_MESSAGE_TYPE,
+            data: storage_archive.encode_to_vec(),
+        }],
+    )?;
+    storage_object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+    storage_object.archive_info.message_infos[0].object_references = storage_references;
+
+    let payload = tst::RichTextPayloadArchive {
+        storage: tsp::Reference {
+            identifier: storage_id,
+            ..Default::default()
+        },
+        range: None,
+        cellid: storage::rich_text_cell_id(row, column)?,
+    };
+    let mut payload_object = ArchiveObject::new(
+        payload_id,
+        vec![RawMessage {
+            type_: RICH_TEXT_PAYLOAD_MESSAGE_TYPE,
+            data: payload.encode_to_vec(),
+        }],
+    )?;
+    payload_object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+    payload_object.archive_info.message_infos[0]
+        .object_references
+        .push(storage_id);
+    package.update_archive(&archive_name, |archive| {
+        archive.insert_object(storage_object)?;
+        archive.insert_object(payload_object)
+    })?;
+
+    let locations = storage::object_locations(package)?;
+    let resolved = storage::resolve_table_data_list(
+        package,
+        &locations,
+        list_id,
+        tst::table_data_list::ListType::RichTextPayload,
+    )?;
+    let key = storage::next_table_data_list_key(&resolved.list, &resolved.entries)?;
+    package.update_archive(&archive_name, |archive| {
+        let object = archive.object_mut(list_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork rich-text table {list_id} is missing"))
+        })?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == TABLE_DATA_LIST_MESSAGE_TYPE)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("iWork rich-text table {list_id} has no payload"))
+            })?;
+        let previous = TableDataList::decode(object.messages[message_index].data.as_slice())?;
+        let mut current = previous.clone();
+        current.next_list_id = key
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("iWork rich-text key overflow".to_owned()))?;
+        current.entries.push(tst::table_data_list::ListEntry {
+            key,
+            refcount: 1,
+            rich_text_payload: Some(tsp::Reference {
+                identifier: payload_id,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        let data = storage::rewrite_table_data_list_wire(
+            object.messages[message_index].data.as_slice(),
+            &previous,
+            &current,
+        )?;
+        let message_type = object.messages[message_index].type_;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+        object.archive_info.message_infos[message_index]
+            .object_references
+            .push(payload_id);
+        Ok(())
+    })?;
+    storage::set_encoded_cell_value(
+        package,
+        table_id,
+        row,
+        column,
+        model::EncodedValue::RichText(key),
+    )?;
+    if let Some(old_key) = old_string_key {
+        let string_table = location
+            .descriptor
+            .model
+            .base_data_store
+            .string_table
+            .identifier;
+        storage::update_string_table(
+            package,
+            &location.object_locations,
+            string_table,
+            Some(old_key),
+            None,
+        )?;
+    }
+    set_package_last_object_identifier(package, payload_id)?;
+    Ok(storage_id)
+}
+
+fn attach_rich_text_table(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    table_id: u64,
+    list_id: u64,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork table model {table_id} is missing"))
+        })?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == 6_000 || message.type_ == 6_001)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("iWork table model {table_id} has no payload"))
+            })?;
+        let previous = TableModelArchive::decode(object.messages[message_index].data.as_slice())?;
+        let mut current = previous.clone();
+        current.base_data_store.rich_text_table = Some(tsp::Reference {
+            identifier: list_id,
+            ..Default::default()
+        });
+        let data = storage::rewrite_table_model_rich_text_table_wire(
+            object.messages[message_index].data.as_slice(),
+            &previous,
+            &current,
+        )?;
+        let message_type = object.messages[message_index].type_;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+        )?;
+        object.archive_info.message_infos[message_index]
+            .object_references
+            .push(list_id);
+        Ok(())
+    })
+}
+
+fn cell_storage(
+    text: &str,
+    stylesheet_id: u64,
+    paragraph_style_id: u64,
+    list_style_id: u64,
+) -> Result<tswp::StorageArchive> {
+    let object_table = |identifier| tswp::ObjectAttributeTable {
+        entries: vec![tswp::object_attribute_table::ObjectAttribute {
+            character_index: 0,
+            object: Some(tsp::Reference {
+                identifier,
+                ..Default::default()
+            }),
+        }],
+    };
+    let paragraph_starts = paragraph_starts(text)?;
+    let para_data = || tswp::ParaDataAttributeTable {
+        entries: paragraph_starts
+            .iter()
+            .copied()
+            .map(
+                |character_index| tswp::para_data_attribute_table::ParaDataAttribute {
+                    character_index,
+                    first: 0,
+                    second: 0,
+                },
+            )
+            .collect(),
+    };
+    Ok(tswp::StorageArchive {
+        kind: Some(tswp::storage_archive::KindType::Cell as i32),
+        style_sheet: Some(tsp::Reference {
+            identifier: stylesheet_id,
+            ..Default::default()
+        }),
+        text: vec![text.to_owned()],
+        in_document: Some(true),
+        table_para_style: Some(object_table(paragraph_style_id)),
+        table_para_data: Some(para_data()),
+        table_list_style: Some(object_table(list_style_id)),
+        table_para_starts: Some(para_data()),
+        table_para_bidi: Some(para_data()),
+        table_drop_cap_style: Some(tswp::ObjectAttributeTable {
+            entries: vec![tswp::object_attribute_table::ObjectAttribute {
+                character_index: 0,
+                object: None,
+            }],
+        }),
+        ..Default::default()
+    })
+}
+
+fn paragraph_starts(text: &str) -> Result<Vec<u32>> {
+    let mut starts = vec![0];
+    let mut utf16_index = 0_u32;
+    for character in text.chars() {
+        utf16_index = utf16_index
+            .checked_add(character.len_utf16() as u32)
+            .ok_or_else(|| Error::ParseError("iWork cell text exceeds UTF-16 limits".to_owned()))?;
+        if character == '\n' {
+            starts.push(utf16_index);
+        }
+    }
+    Ok(starts)
+}
+
+fn take_id(next: &mut u64) -> Result<u64> {
+    let identifier = *next;
+    *next = next
+        .checked_add(1)
+        .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+    Ok(identifier)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::numbers::NumbersDocumentBuilder;
+    use crate::pages::PagesDocumentBuilder;
+    use crate::shapes::{DrawablePoint, DrawableSize};
+
+    const ROW: usize = 1;
+    const COLUMN: usize = 1;
+    const TEXT: &str = "First paragraph\nSecond paragraph";
+
+    #[test]
+    fn scratch_documents_promote_plain_cells_and_roundtrip_lists() {
+        let mut numbers = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let numbers_table = numbers.tables().unwrap()[0].object_id;
+        numbers
+            .set_cell(numbers_table, ROW, COLUMN, CellValue::Text(TEXT.to_owned()))
+            .unwrap();
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list(numbers_table, ROW, COLUMN)
+                .unwrap(),
+            ParagraphList::None
+        );
+        numbers
+            .set_table_cell_paragraph_list(numbers_table, ROW, COLUMN, ParagraphList::Bullet)
+            .unwrap();
+        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list(numbers_table, ROW, COLUMN)
+                .unwrap(),
+            ParagraphList::Bullet
+        );
+        assert!(
+            numbers
+                .reset_table_cell_paragraph_list(numbers_table, ROW, COLUMN)
+                .unwrap()
+        );
+        assert!(
+            !numbers
+                .reset_table_cell_paragraph_list(numbers_table, ROW, COLUMN)
+                .unwrap()
+        );
+
+        let mut pages = PagesDocumentBuilder::new()
+            .body_table("Lists", 3, 3)
+            .build()
+            .unwrap();
+        let pages_table = pages.tables().unwrap()[0].model_object_id;
+        pages
+            .set_table_cell(pages_table, ROW, COLUMN, CellValue::Text(TEXT.to_owned()))
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_list(pages_table, ROW, COLUMN, ParagraphList::Numbered)
+            .unwrap();
+        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages
+                .table_cell_paragraph_list(pages_table, ROW, COLUMN)
+                .unwrap(),
+            ParagraphList::Numbered
+        );
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let table = keynote
+            .add_slide_table(
+                0,
+                "Lists",
+                3,
+                3,
+                DrawablePoint { x: 100.0, y: 100.0 },
+                DrawableSize {
+                    width: 600.0,
+                    height: 300.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                CellValue::Text(TEXT.to_owned()),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_list(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                ParagraphList::Bullet,
+            )
+            .unwrap();
+        let keynote =
+            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_list(0, table.model_object_id, ROW, COLUMN,)
+                .unwrap(),
+            ParagraphList::Bullet
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn duplicated_rich_text_cells_are_list_copy_on_write() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let source = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(source, ROW, COLUMN, CellValue::Text(TEXT.to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_list(source, ROW, COLUMN, ParagraphList::Bullet)
+            .unwrap();
+        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        editor
+            .set_table_cell_paragraph_list(duplicate, ROW, COLUMN, ParagraphList::Numbered)
+            .unwrap();
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list(source, ROW, COLUMN)
+                .unwrap(),
+            ParagraphList::Bullet
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list(duplicate, ROW, COLUMN)
+                .unwrap(),
+            ParagraphList::Numbered
+        );
+    }
+
+    #[test]
+    fn invalid_coordinate_is_transactional() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let table = editor.tables().unwrap()[0].object_id;
+        let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_table_cell_paragraph_list(table, 2, 0, ParagraphList::Bullet)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+}

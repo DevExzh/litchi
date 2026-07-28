@@ -11,11 +11,11 @@ use litchi_iwa::table_cell_layout::{
 };
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphLineSpacingPoints, ParagraphList, ParagraphSpacing, ParagraphSpacingPoints,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
+    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -118,6 +118,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_paragraph_tab_stops(numbers_table.object_id, ROW, COLUMN)?,
         numbers_paragraph_tab_stops()?
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_list(numbers_table.object_id, ROW, COLUMN)?,
+        ParagraphList::Bullet
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -188,6 +192,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         pages.table_cell_paragraph_tab_stops(pages_table.model_object_id, ROW, COLUMN)?,
         pages_paragraph_tab_stops()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list(pages_table.model_object_id, ROW, COLUMN)?,
+        ParagraphList::Numbered
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -294,6 +302,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             COLUMN,
         )?,
         keynote_paragraph_tab_stops()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_list(0, keynote_table.model_object_id, ROW, COLUMN,)?,
+        ParagraphList::Bullet
     );
     Ok(())
 }
@@ -613,6 +625,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbers_paragraph_tab_stops()?,
     )?;
+    editor.set_table_cell_paragraph_list(table_id, ROW, COLUMN, ParagraphList::Bullet)?;
     editor.save(output)?;
     Ok(())
 }
@@ -667,6 +680,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         pages_paragraph_tab_stops()?,
     )?;
+    editor.set_table_cell_paragraph_list(table_id, ROW, COLUMN, ParagraphList::Numbered)?;
     editor.save(output)?;
     Ok(())
 }
@@ -818,6 +832,13 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         keynote_paragraph_tab_stops()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_list(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        ParagraphList::Bullet,
     )?;
     editor.save(output)?;
     Ok(())

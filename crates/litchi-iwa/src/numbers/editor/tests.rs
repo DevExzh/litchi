@@ -835,6 +835,43 @@ fn comment_table_reference_mutation_preserves_nested_unknown_fields_exactly() {
 }
 
 #[test]
+fn rich_text_table_reference_mutation_is_strict_and_preserves_unknown_fields() {
+    let baseline = TableModelArchive {
+        table_id: "table".to_owned(),
+        table_name: "Table 1".to_owned(),
+        number_of_rows: 1,
+        number_of_columns: 1,
+        base_data_store: tst::DataStore::default(),
+        ..Default::default()
+    };
+    let mut original = crate::wire::transform_length_delimited_fields_at_path(
+        &baseline.encode_to_vec(),
+        &[4],
+        |store| {
+            let mut store = store.to_vec();
+            append_unknown_varint(&mut store, 98, 980);
+            Ok(store)
+        },
+    )
+    .unwrap();
+    append_unknown_varint(&mut original, 99, 990);
+    let previous = TableModelArchive::decode(original.as_slice()).unwrap();
+    let mut current = previous.clone();
+    current.base_data_store.rich_text_table = Some(Reference {
+        identifier: 123,
+        ..Default::default()
+    });
+
+    let changed = rewrite_table_model_rich_text_table_wire(&original, &previous, &current).unwrap();
+    let restored = rewrite_table_model_rich_text_table_wire(&changed, &current, &previous).unwrap();
+    assert_eq!(restored, original);
+
+    let mut malformed = current;
+    malformed.number_of_rows = 2;
+    assert!(rewrite_table_model_rich_text_table_wire(&original, &previous, &malformed).is_err());
+}
+
+#[test]
 fn formula_dependency_wire_mutations_preserve_deep_unknown_fields_exactly() {
     let record = tsce::CellRecordExpandedArchive {
         column: 1,

@@ -145,6 +145,8 @@ pub type NumbersTableCellParagraphIndents = ParagraphIndents;
 pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
 /// Typed before/after paragraph spacing applied to a whole Numbers table cell.
 pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
+/// Canonical native list preset applied uniformly to a Numbers table cell.
+pub type NumbersTableCellParagraphList = ParagraphList;
 /// Ordered explicit ruler tab stops for a Numbers table cell.
 pub type NumbersTableCellParagraphTabStops = ParagraphTabStops;
 /// Typed solid background painted behind a whole Numbers table cell's text.
@@ -2915,6 +2917,52 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the canonical list preset applied uniformly to a table cell.
+    pub fn table_cell_paragraph_list(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphList> {
+        cell_paragraph_list::paragraph_list(&self.package, table_id, row, column)
+    }
+
+    /// Promote a plain text cell when necessary and apply one native list preset.
+    pub fn set_table_cell_paragraph_list(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        list: NumbersTableCellParagraphList,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list(&mut staged, table_id, row, column, list)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list(table_id, row, column)? != list {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the canonical None list preset for a table cell.
+    pub fn reset_table_cell_paragraph_list(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_list::reset_paragraph_list(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read effective first-line, left, and right paragraph indents.
     pub fn table_cell_paragraph_indents(
         &self,
@@ -4733,6 +4781,34 @@ pub(crate) fn reset_table_cell_paragraph_spacing_in_package(
     cell_paragraph_style::reset_spacing(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_paragraph_list_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphList> {
+    cell_paragraph_list::paragraph_list(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    list: ParagraphList,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list(package, table_id, row, column, list)
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list(package, table_id, row, column)
+}
+
 pub(crate) fn table_cell_paragraph_indents_in_package(
     package: &IWorkPackage,
     table_id: u64,
@@ -5802,6 +5878,7 @@ mod cell_data_format;
 mod cell_fill;
 mod cell_layout;
 mod cell_merge;
+mod cell_paragraph_list;
 mod cell_paragraph_style;
 mod cell_style;
 mod column_insert;
