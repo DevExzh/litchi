@@ -309,10 +309,12 @@ pub mod drawing_stroke_dash;
 pub mod elements;
 mod footnote_separator;
 mod list_label_alignment;
+mod list_style;
 pub mod named_expression;
 mod outline_style;
 mod paragraph_drop_cap;
 mod paragraph_flow;
+mod paragraph_line_spacing;
 mod paragraph_tab_stop;
 mod style_columns;
 mod table_properties;
@@ -503,6 +505,11 @@ pub use list_label_alignment::{
     LabelFollowedBy, ListLabelLength, ListLevelLabelAlignment, ListLevelLabelAlignmentSet,
     ListStyleKind, ListStyleLevelLabelAlignment, parse_list_level_label_alignments,
 };
+pub use list_style::{
+    BulletRelativeSize, ListLevelBulletStyle, ListLevelImageSource, ListLevelKind,
+    ListLevelNumberStyle, ListLevelStyle, ListStyle, ListStyleSet, MAX_LIST_STYLE_LEVEL,
+    parse_list_styles,
+};
 pub use litchi_core::RGBColor as Color;
 pub use litchi_core::unit::{Length, LengthUnit};
 pub use media::{OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource};
@@ -582,6 +589,11 @@ pub use paragraph_drop_cap::{
 pub use paragraph_flow::{
     HyphenationKeep, HyphenationLadder, Keep, LineBreak, ParagraphFlowProperties,
     ParagraphStyleFlow, ParagraphStyleFlowSet, PunctuationWrap, parse_paragraph_style_flows,
+};
+pub use paragraph_line_spacing::{
+    LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing,
+    ParagraphStyleLineSpacing, ParagraphStyleLineSpacingSet, TextAlignLast, TextAutospace,
+    parse_paragraph_style_line_spacings,
 };
 pub use paragraph_tab_stop::{
     MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
