@@ -337,6 +337,40 @@ impl Workbook {
         discover_vba_project(&self.package, workbook)
     }
 
+    /// The theme part of this workbook (ECMA-376 DrawingML theme), when
+    /// present. Theme-indexed colors in fonts, fills, borders, tab colors,
+    /// and charts resolve against the returned color scheme.
+    pub fn theme(&self) -> crate::error::Result<Option<crate::xlsx::theme::XlsxTheme>> {
+        use litchi_opc::constants::relationship_type as rt;
+
+        let workbook_part = self.package.get_part(&self.workbook_uri)?;
+        let declared = workbook_part
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == rt::THEME)
+            .map(|relationship| relationship.target_partname())
+            .transpose()?;
+        let (uri, well_known) = match declared {
+            Some(uri) => (uri, false),
+            None => (
+                PackURI::new("/xl/theme/theme1.xml")
+                    .map_err(crate::error::OoxmlError::InvalidFormat)?,
+                true,
+            ),
+        };
+        let part = match self.package.get_part(&uri) {
+            Ok(part) => part,
+            Err(error) if well_known => {
+                let _ = error;
+                return Ok(None);
+            },
+            Err(error) => return Err(error.into()),
+        };
+        let xml = std::str::from_utf8(part.blob())
+            .map_err(|error| crate::error::OoxmlError::InvalidFormat(error.to_string()))?;
+        crate::xlsx::theme::XlsxTheme::parse(xml).map(Some)
+    }
+
     /// Attach a cache-free, inert MS-OVBA project and convert this package to XLSM/XLTM.
     pub fn set_vba_project(
         &mut self,

@@ -74,6 +74,7 @@ pub mod sparkline;
 pub mod styles;
 pub mod table;
 pub mod template;
+pub mod theme;
 pub mod threaded_comments;
 pub mod views;
 pub mod volatile_dependencies;
