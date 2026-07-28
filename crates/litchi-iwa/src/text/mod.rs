@@ -84,11 +84,12 @@ pub use number_attachment_types::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
 };
 pub use paragraph_list::{
-    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphListStart,
+    ParagraphList, ParagraphListBullet, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart,
 };
 pub(crate) use paragraph_list::{
     paragraph_list as paragraph_list_in_storage,
+    paragraph_list_bullet as paragraph_list_bullet_in_storage,
     paragraph_list_level as paragraph_list_level_in_storage,
     paragraph_list_levels as paragraph_list_levels_in_storage,
     paragraph_list_numbering as paragraph_list_numbering_in_storage,

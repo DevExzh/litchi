@@ -223,6 +223,63 @@ pub(super) fn set_paragraph_list_numbering(
     Ok(())
 }
 
+pub(super) fn paragraph_list_bullet(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListBullet> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Err(Error::InvalidFormat(
+            "plain iWork table cells are not text-bullet lists".to_owned(),
+        ));
+    };
+    crate::text::paragraph_list_bullet_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_bullet(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    bullet: &ParagraphListBullet,
+) -> Result<()> {
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_bullet(storage_id, paragraph, bullet)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_bullet_in_storage(&staged, storage_id, paragraph)? != *bullet {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph text-bullet update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list_bullet(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(false);
+    };
+    let mut text = IWorkTextEditor::from_package(package.clone());
+    let changed = text.reset_paragraph_list_bullet(storage_id, paragraph)?;
+    if changed {
+        *package = text.into_package();
+    }
+    Ok(changed)
+}
+
 fn existing_storage_id(
     package: &IWorkPackage,
     table_id: u64,
@@ -943,6 +1000,177 @@ mod tests {
                 .slide_table_cell_paragraph_lists(0, table.model_object_id, ROW, COLUMN,)
                 .unwrap(),
             expected
+        );
+    }
+
+    #[test]
+    fn scratch_documents_roundtrip_custom_cell_bullets_in_every_suite() {
+        let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
+        let arrow = ParagraphListBullet::new("➡").unwrap();
+
+        let mut numbers = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let numbers_table = numbers.tables().unwrap()[0].object_id;
+        numbers
+            .set_cell(
+                numbers_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        numbers
+            .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        numbers
+            .set_table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph, &arrow)
+            .unwrap();
+        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph)
+                .unwrap(),
+            arrow
+        );
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_lists(numbers_table, ROW, COLUMN)
+                .unwrap(),
+            mixed_lists()
+        );
+        assert!(
+            numbers
+                .reset_table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph)
+                .unwrap()
+        );
+        assert!(
+            !numbers
+                .reset_table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph)
+                .unwrap()
+        );
+
+        let mut pages = PagesDocumentBuilder::new()
+            .body_table("Bullets", 3, 3)
+            .build()
+            .unwrap();
+        let pages_table = pages.tables().unwrap()[0].model_object_id;
+        pages
+            .set_table_cell(
+                pages_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_lists(pages_table, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_list_bullet(pages_table, ROW, COLUMN, paragraph, &arrow)
+            .unwrap();
+        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages
+                .table_cell_paragraph_list_bullet(pages_table, ROW, COLUMN, paragraph)
+                .unwrap(),
+            arrow
+        );
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let table = keynote
+            .add_slide_table(
+                0,
+                "Bullets",
+                3,
+                3,
+                DrawablePoint { x: 100.0, y: 100.0 },
+                DrawableSize {
+                    width: 600.0,
+                    height: 300.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_lists(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                &mixed_lists(),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_list_bullet(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                paragraph,
+                &arrow,
+            )
+            .unwrap();
+        let keynote =
+            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_list_bullet(
+                    0,
+                    table.model_object_id,
+                    ROW,
+                    COLUMN,
+                    paragraph,
+                )
+                .unwrap(),
+            arrow
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn duplicated_rich_text_cells_are_custom_bullet_copy_on_write() {
+        let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
+        let arrow = ParagraphListBullet::new("➡").unwrap();
+        let diamond = ParagraphListBullet::new("◆").unwrap();
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let source = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_list_bullet(source, ROW, COLUMN, paragraph, &arrow)
+            .unwrap();
+        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        editor
+            .set_table_cell_paragraph_list_bullet(duplicate, ROW, COLUMN, paragraph, &diamond)
+            .unwrap();
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_bullet(source, ROW, COLUMN, paragraph)
+                .unwrap(),
+            arrow
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_bullet(duplicate, ROW, COLUMN, paragraph)
+                .unwrap(),
+            diamond
         );
     }
 

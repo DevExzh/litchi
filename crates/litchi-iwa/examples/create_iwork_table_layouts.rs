@@ -11,13 +11,13 @@ use litchi_iwa::table_cell_layout::{
 };
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
-    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphLineSpacingPoints, ParagraphList, ParagraphListBullet, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement,
+    ParagraphListStart, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
+    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -137,6 +137,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         )?,
         restarted_numbering()?
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_list_bullet(
+            numbers_table.object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_bullet()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -224,6 +233,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             numbered_paragraph_start()?,
         )?,
         restarted_numbering()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list_bullet(
+            pages_table.model_object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_bullet()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -354,6 +372,16 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         )?,
         restarted_numbering()?
     );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_list_bullet(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_bullet()?
+    );
     Ok(())
 }
 
@@ -393,6 +421,14 @@ fn nested_paragraph_levels() -> Result<Vec<ParagraphListLevelPlacement>, litchi_
 
 fn numbered_paragraph_start() -> Result<ParagraphStart, litchi_iwa::Error> {
     ParagraphStart::from_utf16_index(32)
+}
+
+fn bullet_paragraph_start() -> Result<ParagraphStart, litchi_iwa::Error> {
+    ParagraphStart::from_utf16_index(13)
+}
+
+fn custom_bullet() -> Result<ParagraphListBullet, litchi_iwa::Error> {
+    ParagraphListBullet::new("➡")
 }
 
 fn restarted_numbering() -> Result<ParagraphListNumbering, litchi_iwa::Error> {
@@ -720,6 +756,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbered_paragraph_start()?,
         restarted_numbering()?,
     )?;
+    editor.set_table_cell_paragraph_list_bullet(
+        table_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        &custom_bullet()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -788,6 +831,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbered_paragraph_start()?,
         restarted_numbering()?,
+    )?;
+    editor.set_table_cell_paragraph_list_bullet(
+        table_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        &custom_bullet()?,
     )?;
     editor.save(output)?;
     Ok(())
@@ -963,6 +1013,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbered_paragraph_start()?,
         restarted_numbering()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_list_bullet(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        &custom_bullet()?,
     )?;
     editor.save(output)?;
     Ok(())

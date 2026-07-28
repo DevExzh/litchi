@@ -43,12 +43,12 @@ use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
 use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
-    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
-    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing,
+    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
     TextShadow, TextStorageInfo, TextStyle,
 };
@@ -148,6 +148,8 @@ pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
 pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
 /// Canonical native list preset applied uniformly to a Numbers table cell.
 pub type NumbersTableCellParagraphList = ParagraphList;
+/// A validated custom text-bullet marker in a Numbers table cell.
+pub type NumbersTableCellParagraphListBullet = ParagraphListBullet;
 /// A validated zero-based list nesting level in a Numbers table cell.
 pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
@@ -1149,6 +1151,49 @@ impl NumbersEditor {
         text.set_paragraph_list_numbering(graph.storage_id, paragraph, numbering)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
+    }
+
+    /// Read one sheet text-box paragraph's effective text-bullet marker.
+    pub fn sheet_text_box_paragraph_list_bullet(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListBullet> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_bullet(graph.storage_id, paragraph)
+    }
+
+    /// Set one sheet text-box paragraph's text-bullet marker.
+    pub fn set_sheet_text_box_paragraph_list_bullet(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        bullet: &ParagraphListBullet,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_bullet(graph.storage_id, paragraph, bullet)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore Apple's standard `•` marker for one sheet text-box paragraph.
+    pub fn reset_sheet_text_box_paragraph_list_bullet(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list_bullet(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
     }
 
     /// Read effective uniform underline and strikethrough formatting.
@@ -3149,6 +3194,67 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Read one table-cell paragraph's effective text-bullet marker.
+    pub fn table_cell_paragraph_list_bullet(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListBullet> {
+        cell_paragraph_list::paragraph_list_bullet(&self.package, table_id, row, column, paragraph)
+    }
+
+    /// Set one table-cell paragraph's text-bullet marker.
+    pub fn set_table_cell_paragraph_list_bullet(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        bullet: &NumbersTableCellParagraphListBullet,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_bullet(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            bullet,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_bullet(table_id, row, column, paragraph)? != *bullet {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph text bullet failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard `•` marker for one table-cell paragraph.
+    pub fn reset_table_cell_paragraph_list_bullet(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_bullet(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read effective first-line, left, and right paragraph indents.
     pub fn table_cell_paragraph_indents(
         &self,
@@ -5065,6 +5171,39 @@ pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
     cell_paragraph_list::set_paragraph_list_numbering(
         package, table_id, row, column, paragraph, numbering,
     )
+}
+
+pub(crate) fn table_cell_paragraph_list_bullet_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListBullet> {
+    cell_paragraph_list::paragraph_list_bullet(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_bullet_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    bullet: &ParagraphListBullet,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_bullet(
+        package, table_id, row, column, paragraph, bullet,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_bullet_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_bullet(package, table_id, row, column, paragraph)
 }
 
 pub(crate) fn table_cell_paragraph_indents_in_package(

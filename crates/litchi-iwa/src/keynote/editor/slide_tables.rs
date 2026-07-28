@@ -105,6 +105,7 @@ pub use crate::table_cell_number_format::{
 pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
+pub use crate::text::ParagraphListBullet as KeynoteTableCellParagraphListBullet;
 pub use crate::text::ParagraphListLevel as KeynoteTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as KeynoteTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumbering;
@@ -2109,6 +2110,89 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read one slide-table paragraph's effective text-bullet marker.
+    pub fn slide_table_cell_paragraph_list_bullet(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<KeynoteTableCellParagraphListBullet> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_bullet_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one slide-table paragraph's text-bullet marker.
+    pub fn set_slide_table_cell_paragraph_list_bullet(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        bullet: &KeynoteTableCellParagraphListBullet,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_bullet_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            bullet,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_list_bullet(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != *bullet
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph text bullet failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard `•` marker for one slide-table paragraph.
+    pub fn reset_slide_table_cell_paragraph_list_bullet(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_list_bullet_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read effective first-line, left, and right paragraph indents.

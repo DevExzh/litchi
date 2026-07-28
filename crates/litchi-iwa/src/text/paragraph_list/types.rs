@@ -4,6 +4,7 @@ use super::super::drop_cap::ParagraphStart;
 use crate::{Error, Result};
 
 const MAX_PARAGRAPH_LIST_LEVEL: u8 = 8;
+const MAX_PARAGRAPH_LIST_BULLET_CHARACTERS: usize = 32;
 
 /// A canonical paragraph-list presentation understood by all three iWork apps.
 ///
@@ -158,6 +159,58 @@ impl ParagraphListNumbering {
     }
 }
 
+/// A validated text marker used by one bullet-list level.
+///
+/// iWork accepts a short sequence of printable characters, not just a single
+/// Unicode scalar. Newlines and control characters are rejected because they
+/// cannot be represented by the native bullet inspector.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ParagraphListBullet(Box<str>);
+
+impl ParagraphListBullet {
+    /// Apple's standard text bullet.
+    pub const STANDARD: &'static str = "•";
+
+    /// Construct a validated custom text bullet.
+    pub fn new(value: impl Into<Box<str>>) -> Result<Self> {
+        let value = value.into();
+        let character_count = value.chars().count();
+        if character_count == 0 {
+            return Err(Error::InvalidFormat(
+                "paragraph list bullet must not be empty".to_owned(),
+            ));
+        }
+        if character_count > MAX_PARAGRAPH_LIST_BULLET_CHARACTERS {
+            return Err(Error::InvalidFormat(format!(
+                "paragraph list bullet must not exceed {MAX_PARAGRAPH_LIST_BULLET_CHARACTERS} characters"
+            )));
+        }
+        if value.chars().any(char::is_control) {
+            return Err(Error::InvalidFormat(
+                "paragraph list bullet must not contain control characters".to_owned(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    /// Borrow the marker exactly as iWork displays it.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Default for ParagraphListBullet {
+    fn default() -> Self {
+        Self(Self::STANDARD.into())
+    }
+}
+
+impl AsRef<str> for ParagraphListBullet {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,5 +239,17 @@ mod tests {
             ParagraphListNumbering::from_native(0).unwrap(),
             ParagraphListNumbering::Continue
         );
+    }
+
+    #[test]
+    fn text_bullets_are_nonempty_printable_and_bounded() {
+        assert_eq!(
+            ParagraphListBullet::default().as_str(),
+            ParagraphListBullet::STANDARD
+        );
+        assert_eq!(ParagraphListBullet::new("➡").unwrap().as_str(), "➡");
+        assert!(ParagraphListBullet::new("").is_err());
+        assert!(ParagraphListBullet::new("a\nb").is_err());
+        assert!(ParagraphListBullet::new("x".repeat(33)).is_err());
     }
 }

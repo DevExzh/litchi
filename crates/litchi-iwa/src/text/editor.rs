@@ -74,11 +74,12 @@ use super::paragraph_alignment::{
     text_script, text_shadow, text_style,
 };
 use super::paragraph_list::{
-    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
-    ParagraphListPlacement, paragraph_list, paragraph_list_level, paragraph_list_levels,
-    paragraph_list_numbering, paragraph_lists, reset_paragraph_list, reset_paragraph_list_level,
-    set_paragraph_list, set_paragraph_list_level, set_paragraph_list_numbering,
-    set_paragraph_lists,
+    ParagraphList, ParagraphListBullet, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumbering, ParagraphListPlacement, paragraph_list, paragraph_list_bullet,
+    paragraph_list_level, paragraph_list_levels, paragraph_list_numbering, paragraph_lists,
+    reset_paragraph_list, reset_paragraph_list_bullet, reset_paragraph_list_level,
+    set_paragraph_list, set_paragraph_list_bullet, set_paragraph_list_level,
+    set_paragraph_list_numbering, set_paragraph_lists,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::position::{TextPosition, TextRange};
@@ -777,6 +778,58 @@ impl IWorkTextEditor {
         }
         self.package = staged;
         Ok(())
+    }
+
+    /// Read the effective text-bullet marker at one paragraph's list level.
+    pub fn paragraph_list_bullet(
+        &self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListBullet> {
+        paragraph_list_bullet(&self.package, object_id, paragraph)
+    }
+
+    /// Atomically set one bullet-list paragraph's marker.
+    pub fn set_paragraph_list_bullet(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+        bullet: &ParagraphListBullet,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list_bullet(&mut staged, object_id, paragraph, bullet)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list_bullet(&verified, object_id, paragraph)? != *bullet {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph text-bullet update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore Apple's standard `•` marker at one bullet-list paragraph.
+    pub fn reset_paragraph_list_bullet(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_list_bullet(&mut staged, object_id, paragraph)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if paragraph_list_bullet(&verified, object_id, paragraph)?.as_str()
+                != ParagraphListBullet::STANDARD
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork paragraph text-bullet reset failed round-trip validation".to_owned(),
+                ));
+            }
+            self.package = staged;
+        }
+        Ok(changed)
     }
 
     /// Read effective uniform underline and strikethrough formatting.

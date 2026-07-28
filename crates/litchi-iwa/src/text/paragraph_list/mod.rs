@@ -1,5 +1,6 @@
 //! Transactional paragraph-list CRUD shared by Pages, Numbers, and Keynote.
 
+mod bullet;
 mod levels;
 mod native;
 mod numbering;
@@ -14,10 +15,12 @@ use crate::text::style_registry::{
 use crate::{Error, IWorkPackage, Result};
 
 pub use types::{
-    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphListStart,
+    ParagraphList, ParagraphListBullet, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart,
 };
 
+pub(crate) use bullet::paragraph_list_bullet;
+pub(super) use bullet::{reset_paragraph_list_bullet, set_paragraph_list_bullet};
 pub(crate) use levels::{paragraph_list_level, paragraph_list_levels};
 pub(super) use levels::{reset_paragraph_list_level, set_paragraph_list_level};
 pub(crate) use numbering::paragraph_list_numbering;
@@ -47,8 +50,7 @@ pub(crate) fn preset_style_id(
 
 pub(crate) fn paragraph_list(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphList> {
     let storage = storage::locate(package, storage_id)?;
-    let style = native::locate_style(package, storage.style_id)?;
-    native::paragraph_list(&style.style)
+    native::resolved_paragraph_list(package, storage.style_id)
 }
 
 pub(crate) fn paragraph_lists(
@@ -60,10 +62,9 @@ pub(crate) fn paragraph_lists(
         .boundaries
         .into_iter()
         .map(|(index, style_id)| {
-            let style = native::locate_style(package, style_id)?;
             Ok(ParagraphListPlacement::new(
                 crate::text::ParagraphStart::from_utf16_index(index as usize)?,
-                native::paragraph_list(&style.style)?,
+                native::resolved_paragraph_list(package, style_id)?,
             ))
         })
         .collect()
@@ -102,7 +103,7 @@ pub(super) fn set_paragraph_lists(
                 "iWork text storage {storage_id} mixes unrelated list styles"
             )));
         }
-        native::paragraph_list(&style.style)?;
+        native::resolved_paragraph_list(package, style_id)?;
     }
 
     let mut staged = package.clone();
@@ -238,7 +239,7 @@ pub(super) fn set_paragraph_list(
 ) -> Result<()> {
     let storage = storage::locate(package, storage_id)?;
     let current = native::locate_style(package, storage.style_id)?;
-    if native::paragraph_list(&current.style).ok() == Some(list) {
+    if native::resolved_paragraph_list(package, storage.style_id).ok() == Some(list) {
         return Ok(());
     }
     let stylesheet_id = native::stylesheet_id(package, &current.style, storage.style_id)?;
@@ -304,8 +305,8 @@ pub(super) fn set_paragraph_list(
 
 pub(super) fn reset_paragraph_list(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     let storage = storage::locate(package, storage_id)?;
-    let current = native::locate_style(package, storage.style_id)?;
-    if native::paragraph_list(&current.style).ok() == Some(ParagraphList::None) {
+    if native::resolved_paragraph_list(package, storage.style_id).ok() == Some(ParagraphList::None)
+    {
         return Ok(false);
     }
     set_paragraph_list(package, storage_id, ParagraphList::None)?;

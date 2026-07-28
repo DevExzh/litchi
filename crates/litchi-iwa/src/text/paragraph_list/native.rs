@@ -8,13 +8,17 @@ use prost::Message;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::tswp::list_style_archive::{LabelGeometry, LabelType, NumberType};
 use crate::protobuf::{tsp, tss, tswp};
+use crate::wire::{patch_varint_field, rewrite_repeated_length_delimited_fields};
 use crate::{Error, IWorkPackage, Result};
 
 use super::types::ParagraphList;
 
 const LIST_STYLE_MESSAGE_TYPE: u32 = 2_023;
+const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const LIST_LEVEL_COUNT: usize = 9;
+const OVERRIDE_COUNT_FIELD: u32 = 10;
+const STRINGS_FIELD: u32 = 16;
 const FONT_EM_POINTS: f32 = 11.0;
 const NONE_INDENT_STEP_POINTS: f32 = 36.0;
 const BULLET_INDENT_STEP_POINTS: f32 = 9.0;
@@ -118,6 +122,224 @@ pub(super) fn paragraph_list(style: &tswp::ListStyleArchive) -> Result<Paragraph
     Err(Error::InvalidFormat(
         "iWork list style is not a supported canonical None, Bullet, or Numbered preset".to_owned(),
     ))
+}
+
+pub(super) fn resolved_paragraph_list(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<ParagraphList> {
+    let mut current_id = style_id;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(current_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list-style inheritance contains a cycle at {current_id}"
+            )));
+        }
+        let style = locate_style(package, current_id)?.style;
+        if let Ok(preset) = paragraph_list(&style) {
+            return Ok(preset);
+        }
+        current_id = parent_style_id(&style, current_id)?;
+    }
+}
+
+pub(super) fn effective_bullet_strings(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<Vec<String>> {
+    if resolved_paragraph_list(package, style_id)? != ParagraphList::Bullet {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} is not a text-bullet list"
+        )));
+    }
+    let mut current_id = style_id;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(current_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list-style inheritance contains a cycle at {current_id}"
+            )));
+        }
+        let style = locate_style(package, current_id)?.style;
+        if !style.strings.is_empty() {
+            validate_bullet_strings(current_id, &style.strings)?;
+            return Ok(style.strings);
+        }
+        current_id = parent_style_id(&style, current_id)?;
+    }
+}
+
+pub(super) fn parent_style_id(style: &tswp::ListStyleArchive, style_id: u64) -> Result<u64> {
+    style
+        .super_
+        .parent
+        .as_ref()
+        .map(|parent| parent.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork list-style variation {style_id} has no parent"
+            ))
+        })
+}
+
+pub(super) fn variation_object(
+    identifier: u64,
+    parent_style_id: u64,
+    stylesheet_id: u64,
+    strings: Vec<String>,
+) -> Result<ArchiveObject> {
+    validate_bullet_strings(identifier, &strings)?;
+    let style = tswp::ListStyleArchive {
+        super_: tss::StyleArchive {
+            parent: Some(reference(parent_style_id)),
+            is_variation: Some(true),
+            stylesheet: Some(reference(stylesheet_id)),
+            ..Default::default()
+        },
+        override_count: Some(1),
+        strings,
+        ..Default::default()
+    };
+    let data = style.encode_to_vec();
+    tswp::ListStyleArchive::decode(data.as_slice())?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: LIST_STYLE_MESSAGE_TYPE,
+            data,
+        }],
+    )?;
+    let info = &mut object.archive_info.message_infos[0];
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.object_references.push(parent_style_id);
+    Ok(object)
+}
+
+pub(super) fn replace_direct_bullet_strings(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+    strings: &[String],
+) -> Result<()> {
+    validate_bullet_strings(style_id, strings)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let data = patch_direct_bullet_strings(&original.data, style_id, strings)?;
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn patch_direct_bullet_strings(data: &[u8], style_id: u64, strings: &[String]) -> Result<Vec<u8>> {
+    validate_bullet_strings(style_id, strings)?;
+    let style = tswp::ListStyleArchive::decode(data)?;
+    let had_direct_strings = !style.strings.is_empty();
+    if had_direct_strings {
+        validate_bullet_strings(style_id, &style.strings)?;
+    }
+    let encoded = strings
+        .iter()
+        .map(|string| string.as_bytes().to_vec())
+        .collect::<Vec<_>>();
+    let mut patched = rewrite_repeated_length_delimited_fields(data, STRINGS_FIELD, &encoded)?;
+    if !had_direct_strings {
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} override count overflowed"
+                ))
+            })?;
+        patched = patch_varint_field(
+            &patched,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+    }
+    let decoded = tswp::ListStyleArchive::decode(patched.as_slice())?;
+    if decoded.strings != strings {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} bullet update failed validation"
+        )));
+    }
+    Ok(patched)
+}
+
+pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+    let mut storage_references = 0usize;
+    for archive_name in package.iwa_entry_names() {
+        for object in package.archive(archive_name)?.objects {
+            for message in &object.messages {
+                if STORAGE_MESSAGE_TYPES.contains(&message.type_)
+                    && let Ok(storage) = tswp::StorageArchive::decode(message.data.as_slice())
+                {
+                    storage_references += storage
+                        .table_list_style
+                        .iter()
+                        .flat_map(|table| &table.entries)
+                        .filter(|entry| {
+                            entry
+                                .object
+                                .as_ref()
+                                .is_some_and(|reference| reference.identifier == style_id)
+                        })
+                        .count();
+                }
+                if message.type_ == LIST_STYLE_MESSAGE_TYPE
+                    && let Ok(style) = tswp::ListStyleArchive::decode(message.data.as_slice())
+                    && style
+                        .super_
+                        .parent
+                        .as_ref()
+                        .is_some_and(|parent| parent.identifier == style_id)
+                {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    Ok(storage_references == 1)
+}
+
+fn validate_bullet_strings(style_id: u64, strings: &[String]) -> Result<()> {
+    if strings.len() != LIST_LEVEL_COUNT {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text-bullet list style {style_id} must define {LIST_LEVEL_COUNT} levels, found {}",
+            strings.len()
+        )));
+    }
+    if strings.iter().any(String::is_empty) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text-bullet list style {style_id} contains an empty marker"
+        )));
+    }
+    Ok(())
 }
 
 pub(super) fn find_preset_style(
@@ -300,5 +522,35 @@ mod tests {
         let mut invalid = canonical_archive(ParagraphList::Bullet);
         invalid.strings[0] = "-".to_owned();
         assert!(paragraph_list(&invalid).is_err());
+    }
+
+    #[test]
+    fn bullet_variations_encode_all_nine_levels() {
+        let mut strings = vec![BULLET_GLYPH.to_owned(); LIST_LEVEL_COUNT];
+        strings[1] = "➡".to_owned();
+        let object = variation_object(10, 8, 3, strings.clone()).unwrap();
+        let style = tswp::ListStyleArchive::decode(object.messages[0].data.as_slice()).unwrap();
+        assert_eq!(style.override_count, Some(1));
+        assert_eq!(style.strings, strings);
+        assert_eq!(style.super_.parent.unwrap().identifier, 8);
+        assert_eq!(style.super_.stylesheet.unwrap().identifier, 3);
+        assert_eq!(object.archive_info.message_infos[0].object_references, [8]);
+    }
+
+    #[test]
+    fn bullet_updates_preserve_unknown_wire_fields() {
+        let mut style = canonical_archive(ParagraphList::Bullet).encode_to_vec();
+        let unknown = [0x98, 0x06, 0x07];
+        style.extend_from_slice(&unknown);
+        let mut strings = vec![BULLET_GLYPH.to_owned(); LIST_LEVEL_COUNT];
+        strings[3] = "◆".to_owned();
+        let patched = patch_direct_bullet_strings(&style, 10, &strings).unwrap();
+        assert!(patched.ends_with(&unknown));
+        assert_eq!(
+            tswp::ListStyleArchive::decode(patched.as_slice())
+                .unwrap()
+                .strings,
+            strings
+        );
     }
 }
