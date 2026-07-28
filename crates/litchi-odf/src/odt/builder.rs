@@ -75,6 +75,8 @@ pub struct DocumentBuilder {
     paragraph_drop_cap_styles: Vec<crate::ParagraphStyleDropCap>,
     list_level_label_alignments: Vec<crate::ListStyleLevelLabelAlignment>,
     paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
+    paragraph_margin_styles: Vec<crate::ParagraphStyleMargins>,
+    paragraph_border_styles: Vec<crate::ParagraphStyleBorder>,
     table_row_property_styles: Vec<crate::TableRowStyleProperties>,
     table_column_property_styles: Vec<crate::TableColumnStyleProperties>,
     table_cell_property_styles: Vec<crate::TableCellStyleProperties>,
@@ -136,6 +138,8 @@ impl DocumentBuilder {
             paragraph_drop_cap_styles: Vec::new(),
             list_level_label_alignments: Vec::new(),
             paragraph_flow_styles: Vec::new(),
+            paragraph_margin_styles: Vec::new(),
+            paragraph_border_styles: Vec::new(),
             table_row_property_styles: Vec::new(),
             table_column_property_styles: Vec::new(),
             table_cell_property_styles: Vec::new(),
@@ -327,6 +331,83 @@ impl DocumentBuilder {
             ));
         }
         self.paragraph_flow_styles.push(style);
+        Ok(self)
+    }
+
+    /// Whether another typed paragraph style family already uses this identity.
+    fn paragraph_style_identity_taken(&self, name: &Option<String>, is_default: bool) -> bool {
+        let matches = |x_name: &Option<String>, x_default: bool| {
+            *x_name == *name && x_default == is_default
+        };
+        self.paragraph_tab_styles
+            .iter()
+            .any(|x| matches(&x.name, x.is_default_style))
+            || self
+                .paragraph_drop_cap_styles
+                .iter()
+                .any(|x| matches(&x.name, x.is_default_style))
+            || self
+                .paragraph_flow_styles
+                .iter()
+                .any(|x| matches(&x.name, x.is_default_style))
+            || self
+                .paragraph_margin_styles
+                .iter()
+                .any(|x| matches(&x.name, x.is_default_style))
+            || self
+                .paragraph_border_styles
+                .iter()
+                .any(|x| matches(&x.name, x.is_default_style))
+    }
+
+    /// Add a named or default paragraph style carrying typed margin properties.
+    pub fn add_paragraph_margin_style(
+        &mut self,
+        style: crate::ParagraphStyleMargins,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_margin_styles.len() >= 4096
+            || self
+                .paragraph_margin_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive paragraph margin style".to_string(),
+            ));
+        }
+        if self.paragraph_style_identity_taken(&style.name, style.is_default_style) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "paragraph margin style conflicts with another typed paragraph style".to_string(),
+            ));
+        }
+        self.paragraph_margin_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a named or default paragraph style carrying typed border and
+    /// background properties.
+    pub fn add_paragraph_border_style(
+        &mut self,
+        style: crate::ParagraphStyleBorder,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.paragraph_border_styles.len() >= 4096
+            || self
+                .paragraph_border_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive paragraph border style".to_string(),
+            ));
+        }
+        if self.paragraph_style_identity_taken(&style.name, style.is_default_style) {
+            return Err(litchi_core::Error::InvalidFormat(
+                "paragraph border style conflicts with another typed paragraph style".to_string(),
+            ));
+        }
+        self.paragraph_border_styles.push(style);
         Ok(self)
     }
 
@@ -1601,6 +1682,30 @@ impl DocumentBuilder {
                 .paragraph_flow_styles
                 .iter()
                 .map(|x| x.to_xml_fragment().expect("validated paragraph flow style"))
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.paragraph_margin_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .paragraph_margin_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated paragraph margin style")
+                })
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.paragraph_border_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .paragraph_border_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated paragraph border style")
+                })
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }

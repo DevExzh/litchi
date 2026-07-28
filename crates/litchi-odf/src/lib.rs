@@ -312,9 +312,11 @@ mod list_label_alignment;
 mod list_style;
 pub mod named_expression;
 mod outline_style;
+mod paragraph_border;
 mod paragraph_drop_cap;
 mod paragraph_flow;
 mod paragraph_line_spacing;
+mod paragraph_margin;
 mod paragraph_tab_stop;
 mod style_columns;
 mod table_cell_properties;
@@ -584,6 +586,11 @@ pub use outline_style::{
     OdfOutlineStyle, OdfOutlineStyles, OdfOutlineTextAlign, OdfOutlineTextProperties,
     parse_outline_styles, remove_outline_style_xml, set_outline_style_xml,
 };
+pub use paragraph_border::{
+    ParagraphBackgroundTransparency, ParagraphBorder, ParagraphBorderProperties,
+    ParagraphBorderWidth, ParagraphBorderWidths, ParagraphStyleBorder, ParagraphStyleBorderSet,
+    parse_paragraph_style_borders, set_paragraph_style_border_xml,
+};
 pub use paragraph_drop_cap::{
     DropCapDistance, DropCapLength, ParagraphDropCap, ParagraphStyleDropCap,
     ParagraphStyleDropCapSet, parse_paragraph_style_drop_caps,
@@ -596,6 +603,11 @@ pub use paragraph_line_spacing::{
     LineHeight, LineHeightPercent, LineSpacingLength, ParagraphLineSpacing,
     ParagraphStyleLineSpacing, ParagraphStyleLineSpacingSet, TextAlignLast, TextAutospace,
     parse_paragraph_style_line_spacings,
+};
+pub use paragraph_margin::{
+    ParagraphHorizontalMargin, ParagraphMargins, ParagraphStyleMargins, ParagraphStyleMarginsSet,
+    ParagraphTextIndent, ParagraphVerticalMargin, parse_paragraph_style_margins,
+    set_paragraph_style_margins_xml,
 };
 pub use paragraph_tab_stop::{
     MAX_PARAGRAPH_TAB_STOPS, OdfTabStopPosition, ParagraphStyleTabStopSet, ParagraphStyleTabStops,
