@@ -48,6 +48,9 @@ pub(super) fn clear_at_location(
     }
     let mut owned_object_ids =
         conditional_style_owned_object_ids(package, &locations, style_set_object_id)?;
+    if entry.entry.refcount == 1 {
+        ownership::ensure_children_are_private(package, style_set_object_id, &owned_object_ids)?;
+    }
     owned_object_ids.push(style_set_object_id);
     let removed = decrement_table_data_list_entry(
         package,
@@ -59,25 +62,14 @@ pub(super) fn clear_at_location(
     update_cell(package, &location, row, column, None, None)?;
     let mut modified_entries = vec![location.tile_archive.clone(), resolved.table_archive];
     if removed {
-        let style_archive = locations.get(&style_set_object_id).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork conditional-highlight style set {style_set_object_id} is missing"
-            ))
-        })?;
-        if let Some(component) = component_identifier_for_entry(package, style_archive)? {
-            for identifier in &owned_object_ids {
-                remove_component_external_references_to_object(package, component, *identifier)?;
-            }
-            remove_component_object_uuids(package, component, &owned_object_ids)?;
-        }
         for identifier in &owned_object_ids {
             if let Some(archive_name) = locations.get(identifier)
                 && !modified_entries.contains(archive_name)
             {
                 modified_entries.push(archive_name.clone());
             }
-            remove_object_or_empty_entry(package, &locations, *identifier)?;
         }
+        ownership::remove_owned_objects(package, &locations, &owned_object_ids)?;
         release_package_identifier_suffix(package, &owned_object_ids)?;
     }
     advance_save_tokens_for_entries(package, &modified_entries)

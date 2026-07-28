@@ -63,7 +63,7 @@ pub(super) fn try_at_location(
         .clone();
     let replacement = replacement_identifiers(package, &existing, rules.len())?;
     let removed = removed_identifiers(&existing, rules.len());
-    ensure_children_are_private(package, style_set_id, &removed)?;
+    ownership::ensure_children_are_private(package, style_set_id, &removed)?;
 
     let owner_uid = location
         .descriptor
@@ -93,7 +93,7 @@ pub(super) fn try_at_location(
         &replacement.identifiers,
         &location.object_locations,
     )?;
-    remove_children(package, &removed, &location.object_locations)?;
+    ownership::remove_owned_objects(package, &location.object_locations, &removed)?;
     if replacement.added.is_empty() {
         release_package_identifier_suffix(package, &removed)?;
     } else if let Some(last) = replacement.added.last().copied() {
@@ -277,41 +277,6 @@ fn rule_style_identifiers(
     })
 }
 
-fn ensure_children_are_private(
-    package: &IWorkPackage,
-    style_set_id: u64,
-    removed: &[u64],
-) -> Result<()> {
-    if removed.is_empty() {
-        return Ok(());
-    }
-    let removed = removed.iter().copied().collect::<HashSet<_>>();
-    for archive_name in package.iwa_entry_names() {
-        for object in package.archive(archive_name)?.objects {
-            if object.archive_info.identifier == Some(style_set_id) {
-                continue;
-            }
-            for info in &object.archive_info.message_infos {
-                let shared = info
-                    .object_references
-                    .iter()
-                    .chain(
-                        info.field_infos
-                            .iter()
-                            .flat_map(|field| &field.object_references),
-                    )
-                    .find(|identifier| removed.contains(identifier));
-                if let Some(identifier) = shared {
-                    return Err(Error::InvalidFormat(format!(
-                        "conditional-highlight child {identifier} is shared by another object"
-                    )));
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
 fn register_added_children(
     package: &mut IWorkPackage,
     style_archive: &str,
@@ -365,39 +330,6 @@ fn register_added_children(
                 }
             }
         }
-    }
-    Ok(())
-}
-
-fn remove_children(
-    package: &mut IWorkPackage,
-    removed: &[u64],
-    locations: &HashMap<u64, String>,
-) -> Result<()> {
-    let mut by_component = HashMap::<u64, Vec<u64>>::new();
-    for identifier in removed {
-        let archive_name = locations.get(identifier).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "conditional-highlight child {identifier} is missing"
-            ))
-        })?;
-        if let Some(component) = component_identifier_for_entry(package, archive_name)? {
-            remove_component_external_references_to_object(package, component, *identifier)?;
-            by_component.entry(component).or_default().push(*identifier);
-        }
-        remove_object_or_empty_entry(package, locations, *identifier)?;
-    }
-    for (component, identifiers) in by_component {
-        let registered = component_uuid_identifiers(package, component)?;
-        let registered = identifiers
-            .into_iter()
-            .filter(|identifier| {
-                registered
-                    .as_ref()
-                    .is_some_and(|registered| registered.contains(identifier))
-            })
-            .collect::<Vec<_>>();
-        remove_component_object_uuids(package, component, &registered)?;
     }
     Ok(())
 }

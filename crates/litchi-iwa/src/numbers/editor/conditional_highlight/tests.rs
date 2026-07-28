@@ -121,6 +121,37 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
     editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &initial[..1])
         .unwrap();
+    let graph = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let children = replace::conditional_style_rule_identifiers(
+        &editor.package,
+        &location.object_locations,
+        graph.style_set_object_id,
+    )
+    .unwrap()
+    .into_iter()
+    .flat_map(|identifiers| [identifiers.text_style, identifiers.cell_style])
+    .collect::<Vec<_>>();
+    let graph_identifiers = children
+        .iter()
+        .copied()
+        .chain(std::iter::once(graph.style_set_object_id))
+        .collect::<Vec<_>>();
+    let graph_components = graph_identifiers
+        .iter()
+        .filter_map(|identifier| {
+            location
+                .object_locations
+                .get(identifier)
+                .map(|archive_name| {
+                    component_identifier_for_entry(&editor.package, archive_name)
+                        .unwrap()
+                        .unwrap()
+                })
+        })
+        .collect::<HashSet<_>>();
     assert_eq!(
         editor
             .cell_conditional_highlighting(table_id, 1, 1)
@@ -150,6 +181,81 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
             .cell_conditional_highlight_rules(table_id, 1, 1)
             .unwrap()
             .is_none()
+    );
+    for identifier in graph_identifiers {
+        assert!(editor.package.iwa_entry_names().all(|name| {
+            editor
+                .package
+                .archive(name)
+                .unwrap()
+                .object(identifier)
+                .is_none()
+        }));
+        assert!(graph_components.iter().all(|component| {
+            component_uuid_identifiers(&editor.package, *component)
+                .unwrap()
+                .is_none_or(|registered| !registered.contains(&identifier))
+        }));
+    }
+}
+
+#[test]
+fn shared_conditional_child_rejects_deletion_transactionally() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
+    editor
+        .set_cell_conditional_highlighting(
+            table_id,
+            1,
+            1,
+            &[rule(
+                TableCellConditionalHighlightCondition::LessThan(zero),
+                red,
+            )],
+        )
+        .unwrap();
+    let graph = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let child = replace::conditional_style_rule_identifiers(
+        &editor.package,
+        &location.object_locations,
+        graph.style_set_object_id,
+    )
+    .unwrap()[0]
+        .text_style;
+    let model_archive = location.object_locations[&table_id].clone();
+    editor
+        .package
+        .update_archive(&model_archive, |archive| {
+            let model = archive
+                .object_mut(table_id)
+                .ok_or_else(|| Error::InvalidFormat("table model is missing".to_owned()))?;
+            model.archive_info.message_infos[0]
+                .object_references
+                .push(child);
+            Ok(())
+        })
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+
+    let error = editor
+        .clear_cell_conditional_highlighting(table_id, 1, 1)
+        .unwrap_err();
+
+    assert!(error.to_string().contains("shared by another object"));
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .cell_conditional_highlighting(table_id, 1, 1)
+            .unwrap()
+            .is_some()
     );
 }
 
