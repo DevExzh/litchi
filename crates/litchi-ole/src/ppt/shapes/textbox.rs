@@ -25,6 +25,8 @@ pub struct TextBox<'a> {
     paragraph_runs: Vec<ParagraphRun>,
     /// Textbox-specific ruler overrides
     text_ruler: Option<TextRuler>,
+    /// Header/footer metacharacter placeholders in the textbox
+    metachars: Vec<crate::ppt::text_metachar::PowerPointTextMetachar>,
     /// PowerPoint 9 picture-bullet and automatic-numbering extensions
     text_style_extension9: Option<TextStyleExtension9>,
     /// PowerPoint 10 alternate-script font extensions
@@ -52,6 +54,7 @@ impl<'a> TextBox<'a> {
             runs: Vec::new(),
             paragraph_runs: Vec::new(),
             text_ruler: None,
+            metachars: Vec::new(),
             text_style_extension9: None,
             text_style_extension10: None,
             text_style_extension11: None,
@@ -70,7 +73,7 @@ impl<'a> TextBox<'a> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
-        let (text, runs, paragraph_runs, text_ruler) = if let Some(textbox_record) =
+        let (text, runs, paragraph_runs, text_ruler, metachars) = if let Some(textbox_record) =
             Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
         {
             let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
@@ -79,9 +82,10 @@ impl<'a> TextBox<'a> {
                 wrapper.runs().to_vec(),
                 wrapper.paragraph_runs().to_vec(),
                 wrapper.text_ruler().cloned(),
+                wrapper.metachars().to_vec(),
             )
         } else {
-            (String::new(), Vec::new(), Vec::new(), None)
+            (String::new(), Vec::new(), Vec::new(), None, Vec::new())
         };
         let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
         let text_style_extension9 = record.extract_text_style_extension9()?;
@@ -100,6 +104,7 @@ impl<'a> TextBox<'a> {
             runs,
             paragraph_runs,
             text_ruler,
+            metachars,
             text_style_extension9,
             text_style_extension10,
             text_style_extension11,
@@ -136,6 +141,7 @@ impl<'a> TextBox<'a> {
             runs,
             paragraph_runs,
             text_ruler: None,
+            metachars: Vec::new(),
             text_style_extension9: None,
             text_style_extension10: None,
             text_style_extension11: None,
@@ -381,6 +387,13 @@ impl<'a> TextBox<'a> {
     /// Get textbox-specific tab, margin, and indent overrides.
     pub fn text_ruler(&self) -> Option<&TextRuler> {
         self.text_ruler.as_ref()
+    }
+
+    /// Header/footer metacharacter placeholders in this text box, in record
+    /// order (MS-PPT 2.9.47-2.9.52). Placeholders are never substituted,
+    /// formatted, or laid out.
+    pub fn metachars(&self) -> &[crate::ppt::text_metachar::PowerPointTextMetachar] {
+        &self.metachars
     }
 
     /// Get PowerPoint 9 picture-bullet and automatic-numbering extensions.

@@ -208,6 +208,58 @@ impl Presentation {
             .collect()
     }
 
+    /// All header/footer metacharacter placeholders found in the document
+    /// stream, in stream order.
+    ///
+    /// Slide-number, header, footer, and date placeholders (MS-PPT
+    /// 2.9.47-2.9.52) mostly live in master text boxes. They are collected
+    /// both from outline text bodies and from the Escher text boxes of slide,
+    /// notes, and master drawing groups. They are inert: placeholders are
+    /// never substituted, formatted, or laid out.
+    pub fn text_metachars(&self) -> Result<Vec<crate::ppt::text_metachar::PowerPointTextMetachar>> {
+        use crate::ppt::text_metachar::PowerPointTextMetachar;
+
+        fn collect(record: &PptRecord, out: &mut Vec<PowerPointTextMetachar>) -> Result<()> {
+            if record.record_type == PptRecordType::PPDrawing {
+                let (escher, _) = super::shapes::escher::EscherRecord::parse(&record.data, 0)?;
+                collect_escher(&escher, out)?;
+            } else if matches!(
+                record.record_type,
+                PptRecordType::SlideNumberMCAtom
+                    | PptRecordType::GenericDateMCAtom
+                    | PptRecordType::HeaderMCAtom
+                    | PptRecordType::FooterMCAtom
+                    | PptRecordType::DateTimeMCAtom
+                    | PptRecordType::RtfDateTimeMCAtom
+            ) {
+                out.extend(crate::ppt::text_metachar::metachars_from_records(
+                    [record].into_iter(),
+                )?);
+            }
+            Ok(())
+        }
+
+        fn collect_escher(
+            record: &super::shapes::escher::EscherRecord<'_>,
+            out: &mut Vec<PowerPointTextMetachar>,
+        ) -> Result<()> {
+            if record.record_type == super::shapes::escher::EscherRecordType::ClientTextbox {
+                let wrapper = crate::ppt::EscherTextboxWrapper::new(record.data.to_vec())?;
+                out.extend_from_slice(wrapper.metachars());
+            }
+            for child in &record.children {
+                collect_escher(child, out)?;
+            }
+            Ok(())
+        }
+
+        let mut result = Vec::new();
+        for record in self.parser.find_records_ref() {
+            collect(record, &mut result)?;
+        }
+        Ok(result)
+    }
+
     /// Parse document-level PowerPoint 12 settings and round-trip metadata.
     pub fn powerpoint12_document_properties(&self) -> Result<PowerPoint12DocumentProperties> {
         let mut documents = self

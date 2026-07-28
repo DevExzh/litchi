@@ -387,7 +387,7 @@ conversion, fonts, and image conversion are optional.
 | Animations | ✅ | ✅ | ✅ | Build steps, triggers, motion paths, and transactional editor |
 | Transitions and slide timings | ✅ | ✅ | ✅ | Transition type/speed/direction and advance timing |
 | Custom slide shows | ✅ | ✅ | ✅ | Named show containers and slide-ID lists |
-| Headers and footers | ✅ | ✅ | ✅ | Presentation and slide header/footer records |
+| Headers and footers | ✅ | ✅ | ✅ | Presentation and slide header/footer records plus typed metachar placeholder positions and date formats |
 | View information and guides | ✅ | ✅ | ✅ | View state, guides, and related settings |
 | Audio/video | 🟡 | ✅ | 🟡 | Strict sound collections include typed built-in-description IDs and borrowed WAV/AIFF payloads; deterministic bounded authoring covers built-in and exact embedded animation/action resources with shared-reference planning, while dangling, conflicting, malformed, oversized, and linked-without-external-media resources are refused; linked/embedded external-media metadata is read, but broader media authoring remains bounded |
 | Embedded OLE objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve package storages; payloads remain inert |

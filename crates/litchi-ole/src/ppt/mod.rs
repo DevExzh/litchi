@@ -121,6 +121,7 @@ pub mod smart_tags;
 pub mod text_bookmark;
 pub mod text_extensions;
 pub mod text_interaction;
+pub mod text_metachar;
 pub mod text_prop;
 pub mod text_ruler;
 pub mod text_run;
@@ -307,6 +308,7 @@ pub use text_interaction::{
     PowerPointShapeTextInteractionEntry, PowerPointTextBodyInteractions, PowerPointTextInteraction,
     PowerPointTextInteractionLimits, PowerPointTextRange, PowerPointTextType,
 };
+pub use text_metachar::{PowerPointMetacharKind, PowerPointTextMetachar};
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
 pub use text_ruler::{TextRuler, TextRulerLevel, parse_default_text_ruler};
 pub use text_run::{

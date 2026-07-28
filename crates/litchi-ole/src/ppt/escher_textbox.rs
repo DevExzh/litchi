@@ -30,6 +30,8 @@ pub struct EscherTextboxWrapper {
     text_ruler: Option<TextRuler>,
     /// Range-anchored click and mouse-over actions.
     text_interactions: Vec<PowerPointTextInteraction>,
+    /// Header/footer metacharacter placeholders in the textbox.
+    metachars: Vec<super::text_metachar::PowerPointTextMetachar>,
 }
 
 impl EscherTextboxWrapper {
@@ -67,6 +69,7 @@ impl EscherTextboxWrapper {
             ));
         }
         let text_interactions = Self::text_interactions_from_records(&child_records, limits)?;
+        let metachars = super::text_metachar::metachars_from_records(child_records.iter())?;
 
         Ok(Self {
             data,
@@ -76,6 +79,7 @@ impl EscherTextboxWrapper {
             paragraph_runs,
             text_ruler,
             text_interactions,
+            metachars,
         })
     }
 
@@ -199,6 +203,13 @@ impl EscherTextboxWrapper {
     /// Strictly paired text-range interactions in record order.
     pub fn text_interactions(&self) -> &[PowerPointTextInteraction] {
         &self.text_interactions
+    }
+
+    /// Header/footer metacharacter placeholders in this textbox, in record
+    /// order (MS-PPT 2.9.47-2.9.52). Placeholders are never substituted,
+    /// formatted, or laid out.
+    pub fn metachars(&self) -> &[super::text_metachar::PowerPointTextMetachar] {
+        &self.metachars
     }
 
     /// Find a StyleTextPropAtom record.

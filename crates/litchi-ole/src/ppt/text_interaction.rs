@@ -247,6 +247,8 @@ pub struct PowerPointTextBodyInteractions {
     pub text_type: PowerPointTextType,
     pub text: String,
     pub interactions: Vec<PowerPointTextInteraction>,
+    /// Header/footer metacharacter placeholders in this body, in record order.
+    pub metachars: Vec<crate::ppt::text_metachar::PowerPointTextMetachar>,
 }
 
 /// Text interactions attached to one OfficeArt shape.
@@ -299,11 +301,13 @@ pub(crate) fn parse_text_bodies(
             let interactions =
                 PowerPointTextInteraction::parse_records(body.iter().copied(), text_units, limits)?;
             let text = exact_text_from_records(body.iter().copied())?;
+            let metachars = crate::ppt::text_metachar::metachars_from_records(body.iter().copied())?;
             result.push(PowerPointTextBodyInteractions {
                 text_header_instance: header.instance,
                 text_type,
                 text,
                 interactions,
+                metachars,
             });
         }
         offset = end;

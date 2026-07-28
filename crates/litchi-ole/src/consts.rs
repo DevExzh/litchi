@@ -223,8 +223,18 @@ pub enum PptRecordType {
     UserEditAtom = 4085,
     /// Current user atom record
     CurrentUserAtom = 4086,
+    /// Slide number metachar atom record
+    SlideNumberMCAtom = 4056,
     /// Date time MC atom record
     DateTimeMCAtom = 4087,
+    /// Generic date metachar atom record
+    GenericDateMCAtom = 4088,
+    /// Header metachar atom record
+    HeaderMCAtom = 4089,
+    /// Footer metachar atom record
+    FooterMCAtom = 4090,
+    /// RTF date time metachar atom record
+    RtfDateTimeMCAtom = 4117,
     /// Programmable tags container
     ProgTags = 0x1388,
     /// Programmable string tag container
@@ -512,7 +522,12 @@ impl From<u16> for PptRecordType {
             4083 => PptRecordType::InteractiveInfoAtom,
             4085 => PptRecordType::UserEditAtom,
             4086 => PptRecordType::CurrentUserAtom,
+            4056 => PptRecordType::SlideNumberMCAtom,
             4087 => PptRecordType::DateTimeMCAtom,
+            4088 => PptRecordType::GenericDateMCAtom,
+            4089 => PptRecordType::HeaderMCAtom,
+            4090 => PptRecordType::FooterMCAtom,
+            4117 => PptRecordType::RtfDateTimeMCAtom,
             0x1388 => PptRecordType::ProgTags,
             0x1389 => PptRecordType::ProgStringTag,
             0x138A => PptRecordType::ProgBinaryTag,
