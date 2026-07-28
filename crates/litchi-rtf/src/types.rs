@@ -812,6 +812,39 @@ impl AnimatedTextEffect {
     }
 }
 
+/// East Asian emphasis mark selected by an `\acc*` character control.
+///
+/// The marks are mutually exclusive; the last control in a run wins. The
+/// control words are fixed by the RTF 1.9.1 specification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EmphasisMark {
+    /// No emphasis mark (`\accnone` or the default state).
+    #[default]
+    None,
+    /// Dot emphasis mark (`\accdot`).
+    Dot,
+    /// Comma emphasis mark (`\acccomma`).
+    Comma,
+    /// Under-dot emphasis mark (`\accunderdot`).
+    UnderDot,
+    /// Circle emphasis mark (`\acccircle`).
+    Circle,
+}
+
+impl EmphasisMark {
+    /// Return the RTF control word selecting this mark, without the backslash.
+    #[inline]
+    pub const fn control_word(self) -> &'static str {
+        match self {
+            Self::None => "accnone",
+            Self::Dot => "accdot",
+            Self::Comma => "acccomma",
+            Self::UnderDot => "accunderdot",
+            Self::Circle => "acccircle",
+        }
+    }
+}
+
 /// Explicit bidirectional precedence for a character run or paragraph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextDirection {
@@ -1057,6 +1090,8 @@ pub struct Formatting {
     pub character_grid: Option<CharacterGrid>,
     /// Animated text effect from `\animtextN`.
     pub animated_text: AnimatedTextEffect,
+    /// East Asian emphasis mark from an `\acc*` control.
+    pub emphasis_mark: EmphasisMark,
     /// Associated complex-script character properties.
     pub associated: AssociatedCharacterFormatting,
 }
@@ -1104,6 +1139,7 @@ impl Default for Formatting {
             complex_script: None,
             character_grid: None,
             animated_text: AnimatedTextEffect::default(),
+            emphasis_mark: EmphasisMark::default(),
             associated: AssociatedCharacterFormatting::default(),
         }
     }

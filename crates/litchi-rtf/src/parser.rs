@@ -850,8 +850,15 @@ fn animated_text(value: Option<i32>) -> RtfResult<crate::AnimatedTextEffect> {
     })
 }
 
-fn paper_source_bin(value: Option<i32>, name: &str) -> RtfResult<u16> {
-    let value = value.ok_or_else(|| {
+fn emphasis_mark(
+    mark: crate::EmphasisMark,
+    value: Option<i32>,
+) -> RtfResult<crate::EmphasisMark> {
+    require_parameterless(value, mark.control_word())?;
+    Ok(mark)
+}
+
+fn paper_source_bin(value: Option<i32>, name: &str) -> RtfResult<u16> {    let value = value.ok_or_else(|| {
         RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
     })?;
     u16::try_from(value).map_err(|_| {
@@ -7522,6 +7529,9 @@ impl<'a> Parser<'a> {
             ControlWord::AnimatedText(value) => {
                 state.formatting.animated_text = animated_text(*value)?;
             },
+            ControlWord::EmphasisMark(mark, value) => {
+                state.formatting.emphasis_mark = emphasis_mark(*mark, *value)?;
+            },
             ControlWord::FontSize(size) => {
                 if let Some(nz) = NonZeroU16::new((*size).max(0) as u16) {
                     state.formatting.font_size = nz;
@@ -13107,6 +13117,7 @@ impl<'a> Parser<'a> {
             ControlWord::FontComplexScript(_) => "complex-script",
             ControlWord::CharacterGrid(_) => "character-grid",
             ControlWord::AnimatedText(_) => "animated-text",
+            ControlWord::EmphasisMark(..) => "emphasis-mark",
             _ => return None,
         })
     }
@@ -14357,6 +14368,9 @@ impl<'a> Parser<'a> {
             },
             ControlWord::AnimatedText(value) => {
                 state.formatting.animated_text = animated_text(*value)?;
+            },
+            ControlWord::EmphasisMark(mark, value) => {
+                state.formatting.emphasis_mark = emphasis_mark(*mark, *value)?;
             },
             ControlWord::Plain => {
                 state.formatting = Formatting::default();

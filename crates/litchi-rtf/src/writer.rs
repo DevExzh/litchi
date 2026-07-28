@@ -5603,6 +5603,9 @@ impl<W: Write> RtfWriter<W> {
         if fmt.animated_text != crate::AnimatedTextEffect::None {
             self.write_control_word("animtext", Some(fmt.animated_text.rtf_value()))?;
         }
+        if fmt.emphasis_mark != crate::EmphasisMark::None {
+            self.write_control_word(fmt.emphasis_mark.control_word(), None)?;
+        }
 
         if let Some(language) = fmt.language {
             self.write_control_word("lang", Some(language.rtf_value()))?;

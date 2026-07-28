@@ -41,6 +41,7 @@ pub enum ControlWord<'a> {
     FontComplexScript(Option<i32>),
     CharacterGrid(Option<i32>),
     AnimatedText(Option<i32>),
+    EmphasisMark(crate::EmphasisMark, Option<i32>),
     NoWidowControl(Option<i32>),
     LegacySectionNumberingLevel(i32),
     LegacyParagraphNumbering(Option<i32>),
@@ -2051,6 +2052,11 @@ impl<'a> Lexer<'a> {
             "fcs" => ControlWord::FontComplexScript(param),
             "cgrid" => ControlWord::CharacterGrid(param),
             "animtext" => ControlWord::AnimatedText(param),
+            "accnone" => ControlWord::EmphasisMark(crate::EmphasisMark::None, param),
+            "accdot" => ControlWord::EmphasisMark(crate::EmphasisMark::Dot, param),
+            "acccomma" => ControlWord::EmphasisMark(crate::EmphasisMark::Comma, param),
+            "accunderdot" => ControlWord::EmphasisMark(crate::EmphasisMark::UnderDot, param),
+            "acccircle" => ControlWord::EmphasisMark(crate::EmphasisMark::Circle, param),
 
             // Paragraph
             "par" => ControlWord::Par,

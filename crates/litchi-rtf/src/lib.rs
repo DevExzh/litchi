@@ -314,7 +314,8 @@ pub use theme::DocumentTheme;
 pub use types::{
     Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
     AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
-    DocumentElement, EmbeddedFont, EmbeddedFontFormat, Font, FontFamily, FontPitch, FontRef,
+    DocumentElement, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, Font, FontFamily, FontPitch,
+    FontRef,
     FontTable, FontTheme, Formatting, Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph,
     ParagraphContent, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
     ParagraphLineBreaking, ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping,
