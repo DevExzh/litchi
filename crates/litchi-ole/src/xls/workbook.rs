@@ -164,6 +164,8 @@ pub struct XlsWorkbook<R: Read + Seek> {
     custom_views: Vec<crate::xls::custom_view::XlsWorkbookCustomView>,
     /// Real-time data (RTD) topics (`RealTimeData` records), in record order.
     real_time_data: Vec<crate::xls::real_time_data::XlsRealTimeData>,
+    /// MDX (OLAP cube) metadata from the workbook globals `METADATA` production.
+    mdx_metadata: crate::xls::mdx_metadata::XlsMdxMetadata,
     /// Published Web pages (`WebPub` records), in record order.
     web_publications: Vec<crate::xls::web_pub::XlsWebPub>,
     function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
@@ -251,6 +253,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             custom_views: Vec::new(),
             real_time_data: Vec::new(),
+            mdx_metadata: crate::xls::mdx_metadata::XlsMdxMetadata::default(),
             web_publications: Vec::new(),
             function_groups: None,
             tolerance: XlsToleranceReport::default(),
@@ -309,6 +312,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             custom_views: Vec::new(),
             real_time_data: Vec::new(),
+            mdx_metadata: crate::xls::mdx_metadata::XlsMdxMetadata::default(),
             web_publications: Vec::new(),
             function_groups: None,
             tolerance: XlsToleranceReport::default(),
@@ -621,6 +625,27 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 crate::xls::web_pub::WEB_PUB_RECORD_TYPE => {
                     self.web_publications
                         .push(crate::xls::web_pub::XlsWebPub::parse(&record.data)?);
+                },
+                crate::xls::mdx_metadata::MDT_INFO_RECORD_TYPE
+                | crate::xls::mdx_metadata::MDX_STR_RECORD_TYPE
+                | crate::xls::mdx_metadata::MDX_TUPLE_RECORD_TYPE
+                | crate::xls::mdx_metadata::MDX_SET_RECORD_TYPE
+                | crate::xls::mdx_metadata::MDX_PROP_RECORD_TYPE
+                | crate::xls::mdx_metadata::MDX_KPI_RECORD_TYPE
+                | crate::xls::mdx_metadata::MDB_RECORD_TYPE => {
+                    // METADATA records are continued by ContinueFrt12 (MS-XLS
+                    // 2.1): the logical payload is the record body plus any
+                    // trailing ContinueFrt12 bodies.
+                    let mut payload = record.data.clone();
+                    while records.get(i + 1).is_some_and(|next| {
+                        next.header.record_type
+                            == crate::xls::mdx_metadata::CONTINUE_FRT12_RECORD_TYPE
+                    }) {
+                        i += 1;
+                        payload.extend_from_slice(&records[i].data);
+                    }
+                    self.mdx_metadata
+                        .push_record(record.header.record_type, &payload)?;
                 },
                 crate::xls::book_ext::BOOK_EXT_RECORD_TYPE => {
                     if self.book_ext.is_some() {
@@ -1306,6 +1331,15 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// value, and the subscribed cells.
     pub fn real_time_data(&self) -> &[crate::xls::real_time_data::XlsRealTimeData] {
         &self.real_time_data
+    }
+
+    /// MDX (OLAP cube) metadata collected from the workbook globals
+    /// `METADATA` production; empty when the workbook carries none.
+    ///
+    /// The metadata is inert: connection names and MDX unique names are stored
+    /// verbatim and no OLAP server is ever contacted.
+    pub fn mdx_metadata(&self) -> &crate::xls::mdx_metadata::XlsMdxMetadata {
+        &self.mdx_metadata
     }
 
     /// Web pages published from the workbook globals, in record order.

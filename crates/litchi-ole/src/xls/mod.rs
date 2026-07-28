@@ -175,6 +175,9 @@ pub mod revision_log;
 /// BIFF8 `WebPub` record: typed, inert Web publishing metadata.
 mod web_pub;
 
+/// BIFF8 `METADATA` production: typed, inert MDX (OLAP cube) metadata records.
+pub mod mdx_metadata;
+
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 pub mod pivot_table;
@@ -287,6 +290,11 @@ pub use query_table::{
     XlsTextFieldFormat, XlsTextQuery,
 };
 pub use real_time_data::{XlsRealTimeData, XlsRtdCell, XlsRtdValue};
+pub use mdx_metadata::{
+    XlsCubeFunction, XlsKpiProperty, XlsMdb, XlsMdtInfo, XlsMdtInfoFlags, XlsMdxKpi,
+    XlsMdxMetadata, XlsMdxMetadataDir, XlsMdxMetadataRecord, XlsMdxProp, XlsMdxSet,
+    XlsMdxSetSortOrder, XlsMdxTuple,
+};
 pub use revision_log::{
     REVISION_LOG_STREAM_NAME, XlsOpaqueRevisionRecord, XlsRevision, XlsRevisionChange,
     XlsRevisionHeader, XlsRevisionLog, XlsRrdChgCellRevision, XlsRrdInsDelRevision,

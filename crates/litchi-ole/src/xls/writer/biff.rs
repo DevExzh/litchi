@@ -376,6 +376,13 @@ pub fn write_theme<W: Write>(writer: &mut W, value: &crate::xls::XlsTheme) -> Xl
     workbook::write_theme(writer, value)
 }
 
+pub fn write_mdx_metadata<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsMdxMetadata,
+) -> XlsResult<()> {
+    workbook::write_mdx_metadata(writer, value)
+}
+
 pub fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
     workbook::write_xfcrc(writer, xf_count)
 }

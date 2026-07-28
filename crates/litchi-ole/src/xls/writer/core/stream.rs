@@ -98,6 +98,7 @@ pub(crate) fn generate_workbook_stream(
     file_sharing: Option<&XlsFileSharing>,
     book_ext: Option<&crate::xls::XlsBookExt>,
     theme: Option<&crate::xls::XlsTheme>,
+    mdx_metadata: Option<&crate::xls::XlsMdxMetadata>,
     real_time_data: &[crate::xls::XlsRealTimeData],
     web_publications: &[crate::xls::XlsWebPub],
     xf_extensions: &[crate::xls::XlsXfExt],
@@ -581,6 +582,14 @@ pub(crate) fn generate_workbook_stream(
     // globals grammar.
     if let Some(theme) = theme {
         biff::write_theme(&mut stream, theme)?;
+    }
+
+    // METADATA follows the Theme/custom-view region in the workbook globals
+    // grammar.
+    if let Some(metadata) = mdx_metadata
+        && !metadata.is_empty()
+    {
+        biff::write_mdx_metadata(&mut stream, metadata)?;
     }
 
     // EOF record (end of workbook globals)

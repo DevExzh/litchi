@@ -390,6 +390,32 @@ pub fn write_theme<W: Write>(writer: &mut W, value: &crate::xls::XlsTheme) -> Xl
     Ok(())
 }
 
+/// Write the workbook globals `METADATA` production (MS-XLS 2.1): every MDX
+/// metadata record in ABNF order, chunking oversized payloads into
+/// ContinueFrt12 records (MS-XLS 2.4.61).
+///
+/// Record types: 0x0884–0x088A
+pub fn write_mdx_metadata<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsMdxMetadata,
+) -> XlsResult<()> {
+    for (record_type, payload) in value.to_record_payloads()? {
+        let mut chunks = payload.chunks(MAX_RECORD_DATA);
+        let first = chunks.next().expect("MDX metadata payload is never empty");
+        write_record_header(writer, record_type, first.len() as u16)?;
+        writer.write_all(first)?;
+        for chunk in chunks {
+            write_record_header(
+                writer,
+                crate::xls::mdx_metadata::CONTINUE_FRT12_RECORD_TYPE,
+                chunk.len() as u16,
+            )?;
+            writer.write_all(chunk)?;
+        }
+    }
+    Ok(())
+}
+
 /// Write an XFCRC record (MS-XLS 2.4.354) declaring `xf_count` XF records.
 ///
 /// Record type: 0x087C

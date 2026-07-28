@@ -1317,6 +1317,8 @@ pub struct XlsWriter {
     custom_table_styles: Option<XlsCustomTableStyles>,
     book_ext: Option<crate::xls::XlsBookExt>,
     theme: Option<crate::xls::XlsTheme>,
+    /// MDX (OLAP cube) metadata emitted as the globals `METADATA` production.
+    mdx_metadata: Option<crate::xls::XlsMdxMetadata>,
     /// Real-time data (RTD) topics emitted as `RealTimeData` records.
     real_time_data: Vec<crate::xls::XlsRealTimeData>,
     /// Web pages published from the workbook globals (`WebPub` records).
@@ -1352,6 +1354,7 @@ impl XlsWriter {
             custom_table_styles: None,
             book_ext: None,
             theme: None,
+            mdx_metadata: None,
             real_time_data: Vec::new(),
             web_publications: Vec::new(),
             xf_extensions: Vec::new(),
@@ -3374,6 +3377,13 @@ impl XlsWriter {
         self.theme = theme;
     }
 
+    /// Set the MDX (OLAP cube) metadata emitted as the workbook globals
+    /// `METADATA` production (MS-XLS 2.1); `None` emits no records. Oversized
+    /// record payloads are chunked into ContinueFrt12 records automatically.
+    pub fn set_mdx_metadata(&mut self, metadata: Option<crate::xls::XlsMdxMetadata>) {
+        self.mdx_metadata = metadata;
+    }
+
     /// Set the `XFExt` formatting property extensions (MS-XLS 2.4.355)
     /// emitted after the XF table. Each extension's `xf_index` is validated
     /// against the written XF record count when the workbook is saved.
@@ -4093,6 +4103,7 @@ impl XlsWriter {
             self.file_sharing.as_ref(),
             self.book_ext.as_ref(),
             self.theme.as_ref(),
+            self.mdx_metadata.as_ref(),
             &self.real_time_data,
             &self.web_publications,
             &self.xf_extensions,
