@@ -296,7 +296,7 @@ fn validate_entries(
     Ok(())
 }
 
-fn require_paragraph_start(
+pub(super) fn require_paragraph_start(
     storage_id: u64,
     paragraph: ParagraphStart,
     starts: &[u32],
@@ -310,7 +310,7 @@ fn require_paragraph_start(
     )))
 }
 
-fn paragraph_starts(text: &[String]) -> Result<Vec<u32>> {
+pub(super) fn paragraph_starts(text: &[String]) -> Result<Vec<u32>> {
     let mut starts = vec![0];
     let mut index = 0u32;
     let mut previous_was_carriage_return = false;

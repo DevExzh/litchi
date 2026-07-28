@@ -56,6 +56,43 @@ pub(super) fn reset_paragraph_list(
     Ok(true)
 }
 
+pub(super) fn paragraph_lists(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<ParagraphListPlacement>> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        return Ok(vec![ParagraphListPlacement::new(
+            ParagraphStart::ZERO,
+            ParagraphList::None,
+        )]);
+    };
+    crate::text::paragraph_lists_in_storage(package, storage_id)
+}
+
+pub(super) fn set_paragraph_lists(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    placements: &[ParagraphListPlacement],
+) -> Result<()> {
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_lists(storage_id, placements)?;
+    staged = text.into_package();
+    let expected = IWorkTextEditor::from_package(staged.clone()).paragraph_lists(storage_id)?;
+    if paragraph_lists(&staged, table_id, row, column)? != expected {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph-list placements failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
 fn existing_storage_id(
     package: &IWorkPackage,
     table_id: u64,
@@ -487,6 +524,21 @@ mod tests {
     const ROW: usize = 1;
     const COLUMN: usize = 1;
     const TEXT: &str = "First paragraph\nSecond paragraph";
+    const MIXED_TEXT: &str = "😀 first\nSecond\nThird";
+
+    fn mixed_lists() -> Vec<ParagraphListPlacement> {
+        vec![
+            ParagraphListPlacement::new(ParagraphStart::ZERO, ParagraphList::None),
+            ParagraphListPlacement::new(
+                ParagraphStart::from_utf16_index(9).unwrap(),
+                ParagraphList::Bullet,
+            ),
+            ParagraphListPlacement::new(
+                ParagraphStart::from_utf16_index(16).unwrap(),
+                ParagraphList::Numbered,
+            ),
+        ]
+    }
 
     #[test]
     fn scratch_documents_promote_plain_cells_and_roundtrip_lists() {
@@ -616,6 +668,155 @@ mod tests {
                 .unwrap(),
             ParagraphList::Numbered
         );
+    }
+
+    #[test]
+    fn scratch_documents_roundtrip_mixed_cell_lists_in_every_suite() {
+        let expected = mixed_lists();
+        let mut numbers = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let numbers_table = numbers.tables().unwrap()[0].object_id;
+        numbers
+            .set_cell(
+                numbers_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        numbers
+            .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &expected)
+            .unwrap();
+        let numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_lists(numbers_table, ROW, COLUMN)
+                .unwrap(),
+            expected
+        );
+
+        let mut pages = PagesDocumentBuilder::new()
+            .body_table("Mixed Lists", 3, 3)
+            .build()
+            .unwrap();
+        let pages_table = pages.tables().unwrap()[0].model_object_id;
+        pages
+            .set_table_cell(
+                pages_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_lists(pages_table, ROW, COLUMN, &expected)
+            .unwrap();
+        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages
+                .table_cell_paragraph_lists(pages_table, ROW, COLUMN)
+                .unwrap(),
+            expected
+        );
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let table = keynote
+            .add_slide_table(
+                0,
+                "Mixed Lists",
+                3,
+                3,
+                DrawablePoint { x: 100.0, y: 100.0 },
+                DrawableSize {
+                    width: 600.0,
+                    height: 300.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_lists(0, table.model_object_id, ROW, COLUMN, &expected)
+            .unwrap();
+        let keynote =
+            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_lists(0, table.model_object_id, ROW, COLUMN,)
+                .unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn duplicated_rich_text_cells_are_mixed_list_copy_on_write() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let source = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        let replacement = vec![ParagraphListPlacement::new(
+            ParagraphStart::ZERO,
+            ParagraphList::Numbered,
+        )];
+        editor
+            .set_table_cell_paragraph_lists(duplicate, ROW, COLUMN, &replacement)
+            .unwrap();
+        assert_eq!(
+            editor
+                .table_cell_paragraph_lists(source, ROW, COLUMN)
+                .unwrap(),
+            mixed_lists()
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_lists(duplicate, ROW, COLUMN)
+                .unwrap(),
+            replacement
+        );
+    }
+
+    #[test]
+    fn invalid_mixed_list_boundary_is_transactional() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let table = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(table, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+        let invalid = [
+            ParagraphListPlacement::new(ParagraphStart::ZERO, ParagraphList::None),
+            ParagraphListPlacement::new(
+                ParagraphStart::from_utf16_index(8).unwrap(),
+                ParagraphList::Bullet,
+            ),
+        ];
+        assert!(
+            editor
+                .set_table_cell_paragraph_lists(table, ROW, COLUMN, &invalid)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
     }
 
     #[test]

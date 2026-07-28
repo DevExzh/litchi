@@ -20,12 +20,36 @@ pub enum ParagraphList {
     Numbered,
 }
 
+/// One list preset boundary at a validated UTF-16 paragraph start.
+///
+/// The preset remains effective until the next placement. A complete placement
+/// list always begins at [`ParagraphStart::ZERO`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ParagraphListPlacement {
+    pub paragraph: ParagraphStart,
+    pub list: ParagraphList,
+}
+
+impl ParagraphListPlacement {
+    pub const fn new(paragraph: ParagraphStart, list: ParagraphList) -> Self {
+        Self { paragraph, list }
+    }
+}
+
 impl ParagraphList {
     pub(crate) const fn native_name(self) -> &'static str {
         match self {
             Self::None => "None",
             Self::Bullet => "Bullet",
             Self::Numbered => "Numbered",
+        }
+    }
+
+    pub(crate) const fn preset_index(self) -> usize {
+        match self {
+            Self::None => 0,
+            Self::Bullet => 1,
+            Self::Numbered => 2,
         }
     }
 }

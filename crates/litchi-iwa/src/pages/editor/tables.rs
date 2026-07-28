@@ -107,6 +107,7 @@ pub use crate::table_cell_number_format::{
 pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;
+pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
@@ -1543,6 +1544,56 @@ impl PagesEditor {
             *self = verified;
         }
         Ok(changed)
+    }
+
+    /// Read all paragraph-scoped list preset boundaries in one body-table cell.
+    pub fn table_cell_paragraph_lists(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<PagesTableCellParagraphListPlacement>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_lists_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Promote a plain cell when necessary and replace all list preset boundaries.
+    pub fn set_table_cell_paragraph_lists(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        placements: &[PagesTableCellParagraphListPlacement],
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_lists_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            placements,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        let expected = crate::numbers::editor::table_cell_paragraph_lists_in_package(
+            &staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if verified.table_cell_paragraph_lists(model_object_id, row, column)? != expected {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph-list placements failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read effective first-line, left, and right paragraph indents.

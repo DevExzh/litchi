@@ -74,9 +74,10 @@ use super::paragraph_alignment::{
     text_script, text_shadow, text_style,
 };
 use super::paragraph_list::{
-    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, paragraph_list,
-    paragraph_list_level, paragraph_list_levels, reset_paragraph_list, reset_paragraph_list_level,
-    set_paragraph_list, set_paragraph_list_level,
+    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListPlacement,
+    paragraph_list, paragraph_list_level, paragraph_list_levels, paragraph_lists,
+    reset_paragraph_list, reset_paragraph_list_level, set_paragraph_list, set_paragraph_list_level,
+    set_paragraph_lists,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::position::{TextPosition, TextRange};
@@ -660,6 +661,34 @@ impl IWorkTextEditor {
             self.package = staged;
         }
         Ok(changed)
+    }
+
+    /// Read every canonical list-preset boundary in a text storage.
+    pub fn paragraph_lists(&self, object_id: u64) -> Result<Vec<ParagraphListPlacement>> {
+        paragraph_lists(&self.package, object_id)
+    }
+
+    /// Atomically replace all list-preset boundaries in a text storage.
+    ///
+    /// Placements must be strictly increasing validated paragraph starts and
+    /// begin at [`ParagraphStart::ZERO`]. Adjacent equal presets are coalesced.
+    pub fn set_paragraph_lists(
+        &mut self,
+        object_id: u64,
+        placements: &[ParagraphListPlacement],
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_lists(&mut staged, object_id, placements)?;
+        let expected = paragraph_lists(&staged, object_id)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_lists(&verified, object_id)? != expected {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph-list placements failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
     }
 
     /// Read every effective list-level boundary in a text storage.

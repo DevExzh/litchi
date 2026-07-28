@@ -44,12 +44,12 @@ use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
-    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
-    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
-    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
-    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -147,6 +147,8 @@ pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
 pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
 /// Canonical native list preset applied uniformly to a Numbers table cell.
 pub type NumbersTableCellParagraphList = ParagraphList;
+/// One paragraph-scoped list preset boundary in a Numbers table cell.
+pub type NumbersTableCellParagraphListPlacement = ParagraphListPlacement;
 /// Ordered explicit ruler tab stops for a Numbers table cell.
 pub type NumbersTableCellParagraphTabStops = ParagraphTabStops;
 /// Typed solid background painted behind a whole Numbers table cell's text.
@@ -2963,6 +2965,37 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read all paragraph-scoped list preset boundaries in a table cell.
+    pub fn table_cell_paragraph_lists(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<NumbersTableCellParagraphListPlacement>> {
+        cell_paragraph_list::paragraph_lists(&self.package, table_id, row, column)
+    }
+
+    /// Promote a plain cell when necessary and replace all list preset boundaries.
+    pub fn set_table_cell_paragraph_lists(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        placements: &[NumbersTableCellParagraphListPlacement],
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_lists(&mut staged, table_id, row, column, placements)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let expected = cell_paragraph_list::paragraph_lists(&staged, table_id, row, column)?;
+        if verified.table_cell_paragraph_lists(table_id, row, column)? != expected {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph-list placements failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Read effective first-line, left, and right paragraph indents.
     pub fn table_cell_paragraph_indents(
         &self,
@@ -4807,6 +4840,25 @@ pub(crate) fn reset_table_cell_paragraph_list_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_lists_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<ParagraphListPlacement>> {
+    cell_paragraph_list::paragraph_lists(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_lists_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    placements: &[ParagraphListPlacement],
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_lists(package, table_id, row, column, placements)
 }
 
 pub(crate) fn table_cell_paragraph_indents_in_package(

@@ -11,11 +11,12 @@ use litchi_iwa::table_cell_layout::{
 };
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphList, ParagraphSpacing, ParagraphSpacingPoints,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
-    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphLineSpacingPoints, ParagraphList, ParagraphListPlacement, ParagraphSpacing,
+    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
+    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
+    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -27,7 +28,7 @@ const KEYNOTE_TEXT_POINTS: f32 = 19.0;
 const NUMBERS_FONT_NAME: &str = "CourierNewPSMT";
 const PAGES_FONT_NAME: &str = "AvenirNext-Regular";
 const KEYNOTE_FONT_NAME: &str = "Menlo-Regular";
-const CELL_TEXT: &str = "Wrapped text\nwith an 8 pt inset";
+const CELL_TEXT: &str = "Wrapped text\nwith an 8 pt inset\nThird paragraph";
 const OPAQUE: f32 = 1.0;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -119,8 +120,8 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers_paragraph_tab_stops()?
     );
     assert_eq!(
-        numbers.table_cell_paragraph_list(numbers_table.object_id, ROW, COLUMN)?,
-        ParagraphList::Bullet
+        numbers.table_cell_paragraph_lists(numbers_table.object_id, ROW, COLUMN)?,
+        mixed_paragraph_lists()?
     );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
@@ -194,8 +195,8 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         pages_paragraph_tab_stops()?
     );
     assert_eq!(
-        pages.table_cell_paragraph_list(pages_table.model_object_id, ROW, COLUMN)?,
-        ParagraphList::Numbered
+        pages.table_cell_paragraph_lists(pages_table.model_object_id, ROW, COLUMN)?,
+        mixed_paragraph_lists()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -304,8 +305,8 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         keynote_paragraph_tab_stops()?
     );
     assert_eq!(
-        keynote.slide_table_cell_paragraph_list(0, keynote_table.model_object_id, ROW, COLUMN,)?,
-        ParagraphList::Bullet
+        keynote.slide_table_cell_paragraph_lists(0, keynote_table.model_object_id, ROW, COLUMN,)?,
+        mixed_paragraph_lists()?
     );
     Ok(())
 }
@@ -317,6 +318,17 @@ fn layout(alignment: TableCellVerticalAlignment) -> Result<TableCellLayout, litc
         .with_insets(TableCellInsets::uniform(TableCellInset::from_points(
             INSET_POINTS,
         )?)))
+}
+
+fn mixed_paragraph_lists() -> Result<Vec<ParagraphListPlacement>, litchi_iwa::Error> {
+    Ok(vec![
+        ParagraphListPlacement::new(ParagraphStart::ZERO, ParagraphList::None),
+        ParagraphListPlacement::new(ParagraphStart::from_utf16_index(13)?, ParagraphList::Bullet),
+        ParagraphListPlacement::new(
+            ParagraphStart::from_utf16_index(32)?,
+            ParagraphList::Numbered,
+        ),
+    ])
 }
 
 fn numbers_text_style() -> Result<TextStyle, litchi_iwa::Error> {
@@ -625,7 +637,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbers_paragraph_tab_stops()?,
     )?;
-    editor.set_table_cell_paragraph_list(table_id, ROW, COLUMN, ParagraphList::Bullet)?;
+    editor.set_table_cell_paragraph_lists(table_id, ROW, COLUMN, &mixed_paragraph_lists()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -680,7 +692,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         pages_paragraph_tab_stops()?,
     )?;
-    editor.set_table_cell_paragraph_list(table_id, ROW, COLUMN, ParagraphList::Numbered)?;
+    editor.set_table_cell_paragraph_lists(table_id, ROW, COLUMN, &mixed_paragraph_lists()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -833,12 +845,12 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         keynote_paragraph_tab_stops()?,
     )?;
-    editor.set_slide_table_cell_paragraph_list(
+    editor.set_slide_table_cell_paragraph_lists(
         0,
         table.model_object_id,
         ROW,
         COLUMN,
-        ParagraphList::Bullet,
+        &mixed_paragraph_lists()?,
     )?;
     editor.save(output)?;
     Ok(())
