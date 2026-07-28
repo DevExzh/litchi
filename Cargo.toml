@@ -68,7 +68,7 @@ sha2          = "0.11"
 smallvec      = "1.15"
 snap          = "1"
 soapberry-zip    = { path = "crates/soapberry-zip" }
-statrs        = "0.18"
+statrs        = "0.19"
 sxd-document  = "0.3"
 sxd-xpath     = "0.4"
 
