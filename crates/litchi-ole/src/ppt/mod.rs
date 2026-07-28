@@ -122,6 +122,7 @@ pub mod slide_sync;
 pub mod smart_tags;
 pub mod text_bookmark;
 pub mod text_extensions;
+pub mod text_format_exception;
 pub mod text_interaction;
 pub mod text_metachar;
 pub mod text_si_exception;
@@ -315,6 +316,10 @@ pub use text_extensions::{
     TextMasterStyleExtension10, TextParagraphExtension9, TextSpecialInfoExtension9,
     TextSpecialInfoExtension11, TextStyleExtension9, TextStyleExtension9Run, TextStyleExtension10,
     TextStyleExtension11, VersionedTextDefaults, VersionedTextMasterStyles,
+};
+pub use text_format_exception::{
+    PowerPointBulletFlags, PowerPointCFStyle, PowerPointTextCFException,
+    PowerPointTextPFException, PowerPointWrapFlags,
 };
 pub use text_interaction::{
     PowerPointShapeTextInteractionEntry, PowerPointTextBodyInteractions, PowerPointTextInteraction,

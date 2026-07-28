@@ -53,6 +53,26 @@ pub struct PowerPointColorIndex {
     pub kind: PowerPointColorIndexKind,
 }
 
+impl PowerPointColorIndex {
+    /// Parse one four-byte `ColorIndexStruct` (MS-PPT 2.12.2).
+    pub(crate) fn parse_bytes(data: &[u8]) -> Result<Self> {
+        let [red, green, blue, index]: [u8; 4] = data
+            .try_into()
+            .map_err(|_| PptError::Corrupted("ColorIndexStruct is truncated".to_string()))?;
+        Ok(Self {
+            red,
+            green,
+            blue,
+            kind: PowerPointColorIndexKind::parse(index)?,
+        })
+    }
+
+    /// Serialize as a four-byte `ColorIndexStruct`.
+    pub(crate) fn to_bytes(self) -> [u8; 4] {
+        [self.red, self.green, self.blue, self.kind as u8]
+    }
+}
+
 /// The nine defined `SlideShowDocInfoAtom` flags.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PowerPointSlideShowFlags {
