@@ -78,6 +78,8 @@ pub struct XlsWorksheet {
     data_tables: Vec<crate::xls::data_table::XlsDataTable>,
     /// Default phonetic format and visible phonetic ranges (PHONETICINFO).
     phonetic_info: Option<crate::xls::phonetic_info::XlsPhoneticInfo>,
+    /// Query tables (QUERYTABLE sequences), in record order.
+    query_tables: Vec<crate::xls::query_table::XlsQueryTable>,
 }
 
 impl XlsWorksheet {
@@ -120,6 +122,7 @@ impl XlsWorksheet {
             sheet_ext: None,
             data_tables: Vec::new(),
             phonetic_info: None,
+            query_tables: Vec::new(),
         }
     }
 
@@ -162,6 +165,7 @@ impl XlsWorksheet {
             sheet_ext: None,
             data_tables: Vec::new(),
             phonetic_info: None,
+            query_tables: Vec::new(),
         }
     }
 
@@ -335,6 +339,22 @@ impl XlsWorksheet {
 
     pub(crate) fn set_phonetic_info(&mut self, value: crate::xls::phonetic_info::XlsPhoneticInfo) {
         self.phonetic_info = Some(value);
+    }
+
+    /// Query tables of this worksheet (QUERYTABLE sequences), in record order.
+    ///
+    /// All connection strings, command text, URLs, and file paths are inert:
+    /// stored verbatim and never opened, resolved, contacted, refreshed, or
+    /// executed.
+    pub fn query_tables(&self) -> &[crate::xls::query_table::XlsQueryTable] {
+        &self.query_tables
+    }
+
+    pub(crate) fn set_query_tables(
+        &mut self,
+        query_tables: Vec<crate::xls::query_table::XlsQueryTable>,
+    ) {
+        self.query_tables = query_tables;
     }
 
     // -- Filter mode --

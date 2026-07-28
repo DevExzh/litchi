@@ -814,6 +814,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         let mut consolidation_collector = crate::xls::consolidation::ConsolidationCollector::new();
         let mut formula_error_collector = crate::xls::formula_errors::FormulaErrorCollector::new();
         let mut list_object_collector = crate::xls::list_object::ListObjectCollector::new();
+        // The query-table collector must see records before the sort-data
+        // collector: a QUERYTABLE sequence may end with a SortData record
+        // (0x0895) that must not be mistaken for the sheet-level sort.
+        let mut query_table_collector = crate::xls::query_table::QueryTableCollector::new();
         let mut sort_data_collector = crate::xls::sort_data::SortDataCollector::default();
         let mut row_block_index_collector =
             crate::xls::row_block_index::RowBlockIndexCollector::new(
@@ -844,10 +848,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             consolidation_collector.feed_record(record.header.record_type, &record.data)?;
             formula_error_collector.feed_record(record.header.record_type, &record.data)?;
             list_object_collector.feed_record(record.header.record_type, &record.data)?;
-            if let Some(sort_data) =
-                sort_data_collector.feed_record(record.header.record_type, &record.data)?
-            {
-                worksheet.set_sort_data(sort_data);
+            let query_table_consumed =
+                query_table_collector.feed_record(record.header.record_type, &record.data);
+            if !query_table_consumed {
+                if let Some(sort_data) =
+                    sort_data_collector.feed_record(record.header.record_type, &record.data)?
+                {
+                    worksheet.set_sort_data(sort_data);
+                }
             }
             row_block_index_collector.feed_record(
                 record_position,
@@ -934,7 +942,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 pending_string_formula = Some(formula);
             }
 
-            if pivot_table_collector.feed_record(record.header.record_type, &record.data).map_err(|error| {
+            if !query_table_consumed && pivot_table_collector.feed_record(record.header.record_type, &record.data).map_err(|error| {
                 XlsError::InvalidRecord {
                     record_type: record.header.record_type,
                     message: error.to_string(),
@@ -1166,6 +1174,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         for table in pivot_table_collector.finish()? {
             worksheet.add_pivot_table(table);
         }
+        worksheet.set_query_tables(query_table_collector.finish());
         sort_data_collector.finish()?;
 
         worksheet.set_comments(comment_collector.finish()?);

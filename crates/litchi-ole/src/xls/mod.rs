@@ -157,6 +157,9 @@ pub mod autofilter;
 /// Extended BIFF8 range-sort metadata (`SortData` and `SortCond12`).
 mod sort_data;
 
+/// BIFF8 `QUERYTABLE` sequence: typed, inert query tables and connections.
+mod query_table;
+
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 pub mod pivot_table;
@@ -263,6 +266,11 @@ pub use page_setup::{
     XlsPrintOrientation, XlsPrintSetup,
 };
 pub use palette::{XlsColor, XlsPalette};
+pub use query_table::{
+    XlsHtmlFormatting, XlsOleDbConnection, XlsQueryParameter, XlsQueryParameterType,
+    XlsQuerySource, XlsQueryTable, XlsTextCodePage, XlsTextDelimiter, XlsTextField,
+    XlsTextFieldFormat, XlsTextQuery,
+};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,

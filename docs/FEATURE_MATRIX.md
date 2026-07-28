@@ -329,6 +329,7 @@ conversion, fonts, and image conversion are optional.
 | Structured tables/ListObjects | ✅ | ✅ | ✅ | ListObject, AutoFilter12, web/XML, and external-source metadata |
 | Auto-filter and sort | ✅ | ✅ | ✅ | Filter conditions, filter modes, and sort records |
 | External workbook, DDE, and OLE links | ✅ | ✅ | ✅ | Inert links, caches, names, and monikers; never refreshed automatically |
+| Query tables and external connections | 🟡 | ✅ | ❌ | Typed inert `QUERYTABLE` sequence (`Qsi`/`DbQuery`/`ParamQry`/`SXString`/`QsiSXTag`/`DBQueryExt`/`ExtString`/`TxtQry`/`OleDbConn`): typed source kinds (ODBC/DAO/Web/OLE DB/text/ADO), command text, connection strings, parameters with prompts, text-query delimiters/fields/file, OLE DB connections, refresh metadata, and verbatim future bytes; connection strings, SQL, URLs, and file paths are never opened, resolved, contacted, refreshed, or executed |
 | Embedded OLE objects | ✅ | ✅ | ✅ | Package editor CRUD; embedded payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
 | Page setup, headers/footers, and breaks | ✅ | ✅ | ✅ | Print/page records, page-break authoring, and typed `HeaderFooter` even/first-page text with scale/align flags |
