@@ -120,6 +120,7 @@ pub mod slide_round_trip;
 pub mod slide_show_settings;
 pub mod slide_sync;
 pub mod smart_tags;
+pub mod style_text_prop;
 pub mod text_bookmark;
 pub mod text_extensions;
 pub mod text_format_exception;
@@ -316,6 +317,9 @@ pub use text_extensions::{
     TextMasterStyleExtension10, TextParagraphExtension9, TextSpecialInfoExtension9,
     TextSpecialInfoExtension11, TextStyleExtension9, TextStyleExtension9Run, TextStyleExtension10,
     TextStyleExtension11, VersionedTextDefaults, VersionedTextMasterStyles,
+};
+pub use style_text_prop::{
+    PowerPointStyleTextPropAtom, PowerPointTextCFRun, PowerPointTextPFRun,
 };
 pub use text_format_exception::{
     PowerPointBulletFlags, PowerPointCFStyle, PowerPointTextCFException,

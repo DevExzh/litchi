@@ -428,7 +428,7 @@ impl PowerPointTextCFException {
     }
 
     /// Serialize the structure without any record header.
-    fn to_payload(&self) -> Vec<u8> {
+    pub(crate) fn to_payload(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&self.masks.to_le_bytes());
         if let Some(font_style) = self.font_style {
@@ -850,7 +850,7 @@ impl PowerPointTextPFException {
     }
 
     /// Serialize the structure without any record header or reserved field.
-    fn to_payload(&self) -> Vec<u8> {
+    pub(crate) fn to_payload(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&self.masks.to_le_bytes());
         if let Some(bullet_flags) = self.bullet_flags {
