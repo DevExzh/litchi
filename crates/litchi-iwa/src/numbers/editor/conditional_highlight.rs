@@ -8,14 +8,16 @@ mod read;
 mod tests;
 mod write;
 
-use chrono::{Local, NaiveDate};
+use chrono::{Days, Local, Months, NaiveDate};
 use prost::Message;
 
 use super::*;
 use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
 use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightDate,
-    TableCellConditionalHighlightDateRange, TableCellConditionalHighlightRule,
+    TableCellConditionalHighlightDateOffsetDirection, TableCellConditionalHighlightDatePeriod,
+    TableCellConditionalHighlightDatePeriodUnit, TableCellConditionalHighlightDateRange,
+    TableCellConditionalHighlightRule,
 };
 use native::{
     BINARY_FUNCTION_ARGUMENT_COUNT, BOOLEAN_VALUE_TYPE_CODE, BooleanPredicateKind,
@@ -585,7 +587,7 @@ fn applied_rule_for_cell(
             },
         },
     };
-    let today = rules
+    let date_context = rules
         .iter()
         .any(|rule| {
             matches!(
@@ -593,12 +595,15 @@ fn applied_rule_for_cell(
                 TableCellConditionalHighlightCondition::DateIsToday
                     | TableCellConditionalHighlightCondition::DateIsYesterday
                     | TableCellConditionalHighlightCondition::DateIsTomorrow
+                    | TableCellConditionalHighlightCondition::DateIsInNext(_)
+                    | TableCellConditionalHighlightCondition::DateIsInLast(_)
+                    | TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_)
             )
         })
-        .then(current_reference_date_midnight_seconds);
+        .then(current_date_context);
     rules
         .iter()
-        .position(|rule| condition_matches_at(&rule.condition, &value, today))
+        .position(|rule| condition_matches_at(&rule.condition, &value, date_context))
         .map(|index| {
             u32::try_from(index).map_err(|_| {
                 Error::ParseError("conditional-highlight rule index exceeds u32".to_owned())
@@ -618,22 +623,24 @@ enum ConditionalCellValue {
     Text(String),
 }
 
+#[derive(Clone, Copy)]
+struct ConditionalDateContext {
+    today: NaiveDate,
+    apple_seconds: f64,
+}
+
 #[cfg(test)]
 fn condition_matches(
     condition: &TableCellConditionalHighlightCondition,
     value: &ConditionalCellValue,
 ) -> bool {
-    condition_matches_at(
-        condition,
-        value,
-        Some(current_reference_date_midnight_seconds()),
-    )
+    condition_matches_at(condition, value, Some(current_date_context()))
 }
 
 fn condition_matches_at(
     condition: &TableCellConditionalHighlightCondition,
     value: &ConditionalCellValue,
-    today: Option<f64>,
+    date_context: Option<ConditionalDateContext>,
 ) -> bool {
     match (condition, value) {
         (TableCellConditionalHighlightCondition::CellIsBlank, ConditionalCellValue::Blank) => true,
@@ -673,16 +680,58 @@ fn condition_matches_at(
         (
             TableCellConditionalHighlightCondition::DateIsToday,
             ConditionalCellValue::Date(value),
-        ) => today.is_some_and(|today| *value >= today && *value < today + SECONDS_PER_DAY),
+        ) => date_context.is_some_and(|context| {
+            *value >= context.apple_seconds && *value < context.apple_seconds + SECONDS_PER_DAY
+        }),
         (
             TableCellConditionalHighlightCondition::DateIsYesterday,
             ConditionalCellValue::Date(value),
-        ) => today.is_some_and(|today| *value >= today - SECONDS_PER_DAY && *value < today),
+        ) => date_context.is_some_and(|context| {
+            *value >= context.apple_seconds - SECONDS_PER_DAY && *value < context.apple_seconds
+        }),
         (
             TableCellConditionalHighlightCondition::DateIsTomorrow,
             ConditionalCellValue::Date(value),
-        ) => today.is_some_and(|today| {
-            *value >= today + SECONDS_PER_DAY && *value < today + 2.0 * SECONDS_PER_DAY
+        ) => date_context.is_some_and(|context| {
+            *value >= context.apple_seconds + SECONDS_PER_DAY
+                && *value < context.apple_seconds + 2.0 * SECONDS_PER_DAY
+        }),
+        (
+            TableCellConditionalHighlightCondition::DateIsInNext(period),
+            ConditionalCellValue::Date(value),
+        ) => date_context.is_some_and(|context| {
+            shifted_date(
+                context.today,
+                *period,
+                TableCellConditionalHighlightDateOffsetDirection::FromNow,
+            )
+            .is_some_and(|upper| {
+                *value >= context.apple_seconds
+                    && *value < date_to_apple_seconds(upper) + SECONDS_PER_DAY
+            })
+        }),
+        (
+            TableCellConditionalHighlightCondition::DateIsInLast(period),
+            ConditionalCellValue::Date(value),
+        ) => date_context.is_some_and(|context| {
+            shifted_date(
+                context.today,
+                *period,
+                TableCellConditionalHighlightDateOffsetDirection::Ago,
+            )
+            .is_some_and(|lower| {
+                *value >= date_to_apple_seconds(lower)
+                    && *value < context.apple_seconds + SECONDS_PER_DAY
+            })
+        }),
+        (
+            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(offset),
+            ConditionalCellValue::Date(value),
+        ) => date_context.is_some_and(|context| {
+            shifted_date(context.today, offset.period(), offset.direction()).is_some_and(|target| {
+                let lower = date_to_apple_seconds(target);
+                *value >= lower && *value < lower + SECONDS_PER_DAY
+            })
         }),
         (
             TableCellConditionalHighlightCondition::DateIs(date),
@@ -774,14 +823,65 @@ fn condition_matches_at(
     }
 }
 
-fn current_reference_date_midnight_seconds() -> f64 {
+fn current_date_context() -> ConditionalDateContext {
+    let today = Local::now().date_naive();
+    ConditionalDateContext {
+        today,
+        apple_seconds: date_to_apple_seconds(today),
+    }
+}
+
+fn date_to_apple_seconds(date: NaiveDate) -> f64 {
     let epoch = NaiveDate::from_ymd_opt(APPLE_EPOCH_YEAR, APPLE_EPOCH_MONTH, APPLE_EPOCH_DAY)
         .expect("the Apple epoch is a valid calendar date");
-    Local::now()
-        .date_naive()
-        .signed_duration_since(epoch)
-        .num_days() as f64
-        * SECONDS_PER_DAY
+    date.signed_duration_since(epoch).num_days() as f64 * SECONDS_PER_DAY
+}
+
+fn shifted_date(
+    date: NaiveDate,
+    period: TableCellConditionalHighlightDatePeriod,
+    direction: TableCellConditionalHighlightDateOffsetDirection,
+) -> Option<NaiveDate> {
+    let forward = matches!(
+        direction,
+        TableCellConditionalHighlightDateOffsetDirection::FromNow
+    );
+    match period.unit() {
+        TableCellConditionalHighlightDatePeriodUnit::Days => {
+            shift_days(date, u64::from(period.count()), forward)
+        },
+        TableCellConditionalHighlightDatePeriodUnit::Weeks => period
+            .count()
+            .checked_mul(7)
+            .and_then(|days| shift_days(date, u64::from(days), forward)),
+        TableCellConditionalHighlightDatePeriodUnit::Months => {
+            shift_months(date, period.count(), forward)
+        },
+        TableCellConditionalHighlightDatePeriodUnit::Quarters => period
+            .count()
+            .checked_mul(3)
+            .and_then(|months| shift_months(date, months, forward)),
+        TableCellConditionalHighlightDatePeriodUnit::Years => period
+            .count()
+            .checked_mul(12)
+            .and_then(|months| shift_months(date, months, forward)),
+    }
+}
+
+fn shift_days(date: NaiveDate, days: u64, forward: bool) -> Option<NaiveDate> {
+    if forward {
+        date.checked_add_days(Days::new(days))
+    } else {
+        date.checked_sub_days(Days::new(days))
+    }
+}
+
+fn shift_months(date: NaiveDate, months: u32, forward: bool) -> Option<NaiveDate> {
+    if forward {
+        date.checked_add_months(Months::new(months))
+    } else {
+        date.checked_sub_months(Months::new(months))
+    }
 }
 
 fn equals_case_insensitive(value: &str, expected: &str) -> bool {

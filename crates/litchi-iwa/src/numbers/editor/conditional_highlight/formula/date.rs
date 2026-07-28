@@ -1,6 +1,13 @@
 //! Canonical formula graphs for calendar-date conditional-highlight predicates.
 
+mod period;
+
 use super::*;
+
+pub(super) use period::{
+    nodes as period_nodes, quantity_node_index as period_quantity_node_index,
+    validate as validate_period,
+};
 
 const SECONDS_PER_DAY: f64 = 86_400.0;
 const DURATION_UNIT: i32 = 3;

@@ -1,5 +1,7 @@
 //! Strictly typed conditional-highlight rules shared by iWork table editors.
 
+use std::num::NonZeroU32;
+
 use chrono::NaiveDate;
 
 use crate::shapes::RgbaColor;
@@ -123,6 +125,90 @@ impl TableCellConditionalHighlightDateRange {
     }
 }
 
+/// Calendar unit used by a relative date-period rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TableCellConditionalHighlightDatePeriodUnit {
+    Days,
+    Weeks,
+    Months,
+    Quarters,
+    Years,
+}
+
+impl TableCellConditionalHighlightDatePeriodUnit {
+    const fn month_multiplier(self) -> Option<u32> {
+        match self {
+            Self::Days | Self::Weeks => None,
+            Self::Months => Some(1),
+            Self::Quarters => Some(3),
+            Self::Years => Some(12),
+        }
+    }
+}
+
+/// Positive quantity and calendar unit used by a relative date rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TableCellConditionalHighlightDatePeriod {
+    count: NonZeroU32,
+    unit: TableCellConditionalHighlightDatePeriodUnit,
+}
+
+impl TableCellConditionalHighlightDatePeriod {
+    pub fn new(count: u32, unit: TableCellConditionalHighlightDatePeriodUnit) -> Result<Self> {
+        let count = NonZeroU32::new(count).ok_or_else(|| {
+            Error::ParseError("iWork conditional-highlight date periods must be nonzero".to_owned())
+        })?;
+        if unit
+            .month_multiplier()
+            .is_some_and(|multiplier| count.get().checked_mul(multiplier).is_none())
+        {
+            return Err(Error::ParseError(
+                "iWork conditional-highlight date period is too large".to_owned(),
+            ));
+        }
+        Ok(Self { count, unit })
+    }
+
+    pub const fn count(self) -> u32 {
+        self.count.get()
+    }
+
+    pub const fn unit(self) -> TableCellConditionalHighlightDatePeriodUnit {
+        self.unit
+    }
+}
+
+/// Direction of an exact date offset relative to today.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TableCellConditionalHighlightDateOffsetDirection {
+    Ago,
+    FromNow,
+}
+
+/// Exact relative date expressed as a period before or after today.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TableCellConditionalHighlightDateOffset {
+    period: TableCellConditionalHighlightDatePeriod,
+    direction: TableCellConditionalHighlightDateOffsetDirection,
+}
+
+impl TableCellConditionalHighlightDateOffset {
+    pub const fn new(
+        period: TableCellConditionalHighlightDatePeriod,
+        direction: TableCellConditionalHighlightDateOffsetDirection,
+    ) -> Self {
+        Self { period, direction }
+    }
+
+    pub const fn period(self) -> TableCellConditionalHighlightDatePeriod {
+        self.period
+    }
+
+    pub const fn direction(self) -> TableCellConditionalHighlightDateOffsetDirection {
+        self.direction
+    }
+}
+
 /// Non-empty text operand used by a conditional-highlight rule.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TableCellConditionalHighlightText(Box<str>);
@@ -161,6 +247,9 @@ pub enum TableCellConditionalHighlightCondition {
     DateIsBefore(TableCellConditionalHighlightDate),
     DateIsAfter(TableCellConditionalHighlightDate),
     DateIsBetween(TableCellConditionalHighlightDateRange),
+    DateIsInNext(TableCellConditionalHighlightDatePeriod),
+    DateIsInLast(TableCellConditionalHighlightDatePeriod),
+    DateIsOffsetFromToday(TableCellConditionalHighlightDateOffset),
     EqualTo(TableCellConditionalHighlightNumber),
     NotEqualTo(TableCellConditionalHighlightNumber),
     GreaterThan(TableCellConditionalHighlightNumber),
@@ -196,7 +285,10 @@ impl TableCellConditionalHighlightCondition {
             | Self::DateIs(_)
             | Self::DateIsBefore(_)
             | Self::DateIsAfter(_)
-            | Self::DateIsBetween(_) => None,
+            | Self::DateIsBetween(_)
+            | Self::DateIsInNext(_)
+            | Self::DateIsInLast(_)
+            | Self::DateIsOffsetFromToday(_) => None,
             Self::EqualTo(value)
             | Self::NotEqualTo(value)
             | Self::GreaterThan(value)
@@ -234,6 +326,9 @@ impl TableCellConditionalHighlightCondition {
             | Self::DateIsBefore(_)
             | Self::DateIsAfter(_)
             | Self::DateIsBetween(_)
+            | Self::DateIsInNext(_)
+            | Self::DateIsInLast(_)
+            | Self::DateIsOffsetFromToday(_)
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
@@ -276,6 +371,9 @@ impl TableCellConditionalHighlightCondition {
             | Self::DateIsBefore(_)
             | Self::DateIsAfter(_)
             | Self::DateIsBetween(_)
+            | Self::DateIsInNext(_)
+            | Self::DateIsInLast(_)
+            | Self::DateIsOffsetFromToday(_)
             | Self::EqualTo(_)
             | Self::NotEqualTo(_)
             | Self::GreaterThan(_)
@@ -299,6 +397,20 @@ impl TableCellConditionalHighlightCondition {
     pub const fn date_range(&self) -> Option<TableCellConditionalHighlightDateRange> {
         match self {
             Self::DateIsBetween(range) => Some(*range),
+            _ => None,
+        }
+    }
+
+    pub const fn date_period(&self) -> Option<TableCellConditionalHighlightDatePeriod> {
+        match self {
+            Self::DateIsInNext(period) | Self::DateIsInLast(period) => Some(*period),
+            _ => None,
+        }
+    }
+
+    pub const fn date_offset(&self) -> Option<TableCellConditionalHighlightDateOffset> {
+        match self {
+            Self::DateIsOffsetFromToday(offset) => Some(*offset),
             _ => None,
         }
     }
@@ -416,5 +528,21 @@ mod tests {
         let earlier = TableCellConditionalHighlightDate::from_ymd(2026, 7, 26).unwrap();
         assert!(TableCellConditionalHighlightDateRange::new(earlier, date).is_ok());
         assert!(TableCellConditionalHighlightDateRange::new(date, earlier).is_err());
+    }
+
+    #[test]
+    fn date_periods_are_positive_typed_and_overflow_checked() {
+        use TableCellConditionalHighlightDateOffsetDirection as Direction;
+        use TableCellConditionalHighlightDatePeriodUnit as Unit;
+
+        assert!(TableCellConditionalHighlightDatePeriod::new(0, Unit::Days).is_err());
+        assert!(TableCellConditionalHighlightDatePeriod::new(u32::MAX, Unit::Years).is_err());
+        let period = TableCellConditionalHighlightDatePeriod::new(3, Unit::Quarters).unwrap();
+        assert_eq!(period.count(), 3);
+        assert_eq!(period.unit(), Unit::Quarters);
+
+        let offset = TableCellConditionalHighlightDateOffset::new(period, Direction::Ago);
+        assert_eq!(offset.period(), period);
+        assert_eq!(offset.direction(), Direction::Ago);
     }
 }

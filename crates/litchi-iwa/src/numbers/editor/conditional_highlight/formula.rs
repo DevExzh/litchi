@@ -7,6 +7,7 @@ mod date;
 mod sign;
 mod text;
 
+use super::native::DatePeriodPredicateKind;
 use super::*;
 
 pub(super) fn encode(
@@ -20,6 +21,10 @@ pub(super) fn encode(
         (NativePredicateKind::Boolean(kind), _) => boolean::nodes(kind, formula_owner_uuid)?,
         (NativePredicateKind::RelativeDate(kind), _) => {
             date::relative_nodes(kind, formula_owner_uuid)
+        },
+        (NativePredicateKind::DatePeriod(kind), _) => {
+            let (period, direction) = date_period_operands(condition)?;
+            date::period_nodes(kind, period, direction, formula_owner_uuid)?
         },
         (
             NativePredicateKind::FixedDate(kind),
@@ -121,6 +126,10 @@ pub(super) fn validate(
         (NativePredicateKind::Checkbox(kind), _) => checkbox::validate(formula, kind),
         (NativePredicateKind::Boolean(kind), _) => boolean::validate(formula, kind),
         (NativePredicateKind::RelativeDate(kind), _) => date::validate_relative(formula, kind),
+        (NativePredicateKind::DatePeriod(kind), _) => {
+            let (period, direction) = date_period_operands(condition)?;
+            date::validate_period(formula, kind, period, direction)
+        },
         (
             NativePredicateKind::FixedDate(kind),
             TableCellConditionalHighlightCondition::DateIsBetween(range),
@@ -157,6 +166,32 @@ pub(super) fn validate(
             kind,
             condition.text().ok_or_else(invalid_formula)?.as_str(),
         ),
+    }
+}
+
+pub(super) fn date_period_quantity_node_index(
+    kind: DatePeriodPredicateKind,
+    condition: &TableCellConditionalHighlightCondition,
+) -> Result<i32> {
+    let (period, _) = date_period_operands(condition)?;
+    Ok(date::period_quantity_node_index(kind, period.unit()))
+}
+
+fn date_period_operands(
+    condition: &TableCellConditionalHighlightCondition,
+) -> Result<(
+    crate::table_cell_conditional_highlight::TableCellConditionalHighlightDatePeriod,
+    Option<
+        crate::table_cell_conditional_highlight::TableCellConditionalHighlightDateOffsetDirection,
+    >,
+)> {
+    match condition {
+        TableCellConditionalHighlightCondition::DateIsInNext(period)
+        | TableCellConditionalHighlightCondition::DateIsInLast(period) => Ok((*period, None)),
+        TableCellConditionalHighlightCondition::DateIsOffsetFromToday(offset) => {
+            Ok((offset.period(), Some(offset.direction())))
+        },
+        _ => Err(invalid_formula()),
     }
 }
 

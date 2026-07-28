@@ -3,6 +3,7 @@
 use super::*;
 use crate::table_cell_conditional_highlight::{
     TableCellConditionalHighlightCondition, TableCellConditionalHighlightDate,
+    TableCellConditionalHighlightDateOffset, TableCellConditionalHighlightDatePeriod,
     TableCellConditionalHighlightDateRange, TableCellConditionalHighlightNumber,
     TableCellConditionalHighlightText,
 };
@@ -47,8 +48,11 @@ pub(super) const UNARY_FUNCTION_ARGUMENT_COUNT: u32 = 1;
 pub(super) const ZERO_FUNCTION_ARGUMENT_COUNT: u32 = 0;
 pub(super) const TODAY_FUNCTION_INDEX: u32 = 154;
 pub(super) const DATE_DAY_FUNCTION_INDEX: u32 = 41;
+pub(super) const DATE_DIFFERENCE_FUNCTION_INDEX: u32 = 40;
+pub(super) const DATE_ADD_MONTHS_FUNCTION_INDEX: u32 = 47;
 pub(super) const DATE_MONTH_FUNCTION_INDEX: u32 = 94;
 pub(super) const DATE_YEAR_FUNCTION_INDEX: u32 = 167;
+pub(super) const DATE_DURATION_FROM_WEEKS_DAYS_FUNCTION_INDEX: u32 = 212;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
@@ -82,7 +86,10 @@ impl NumericPredicateKind {
             | TableCellConditionalHighlightCondition::DateIs(_)
             | TableCellConditionalHighlightCondition::DateIsBefore(_)
             | TableCellConditionalHighlightCondition::DateIsAfter(_)
-            | TableCellConditionalHighlightCondition::DateIsBetween(_) => None,
+            | TableCellConditionalHighlightCondition::DateIsBetween(_)
+            | TableCellConditionalHighlightCondition::DateIsInNext(_)
+            | TableCellConditionalHighlightCondition::DateIsInLast(_)
+            | TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_) => None,
             TableCellConditionalHighlightCondition::EqualTo(_) => Some(Self::EqualTo),
             TableCellConditionalHighlightCondition::NotEqualTo(_) => Some(Self::NotEqualTo),
             TableCellConditionalHighlightCondition::GreaterThan(_) => Some(Self::GreaterThan),
@@ -254,6 +261,43 @@ impl FixedDatePredicateKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub(super) enum DatePeriodPredicateKind {
+    InNext = 24,
+    InLast = 25,
+    OffsetFromToday = 26,
+}
+
+impl DatePeriodPredicateKind {
+    pub(super) const fn native_value(self) -> i32 {
+        self as i32
+    }
+
+    pub(super) const fn period_condition(
+        self,
+        period: TableCellConditionalHighlightDatePeriod,
+    ) -> Option<TableCellConditionalHighlightCondition> {
+        match self {
+            Self::InNext => Some(TableCellConditionalHighlightCondition::DateIsInNext(period)),
+            Self::InLast => Some(TableCellConditionalHighlightCondition::DateIsInLast(period)),
+            Self::OffsetFromToday => None,
+        }
+    }
+
+    pub(super) const fn offset_condition(
+        self,
+        offset: TableCellConditionalHighlightDateOffset,
+    ) -> Option<TableCellConditionalHighlightCondition> {
+        match self {
+            Self::OffsetFromToday => {
+                Some(TableCellConditionalHighlightCondition::DateIsOffsetFromToday(offset))
+            },
+            Self::InNext | Self::InLast => None,
+        }
+    }
+}
+
 impl CheckboxPredicateKind {
     pub(super) const fn native_value(self) -> i32 {
         self as i32
@@ -383,6 +427,7 @@ pub(super) enum NativePredicateKind {
     Cell(CellPredicateKind),
     Checkbox(CheckboxPredicateKind),
     Boolean(BooleanPredicateKind),
+    DatePeriod(DatePeriodPredicateKind),
     FixedDate(FixedDatePredicateKind),
     Numeric(NumericPredicateKind),
     NumericSign(NumericSignPredicateKind),
@@ -438,6 +483,15 @@ impl NativePredicateKind {
             TableCellConditionalHighlightCondition::DateIsBetween(_) => {
                 return Self::FixedDate(FixedDatePredicateKind::Between);
             },
+            TableCellConditionalHighlightCondition::DateIsInNext(_) => {
+                return Self::DatePeriod(DatePeriodPredicateKind::InNext);
+            },
+            TableCellConditionalHighlightCondition::DateIsInLast(_) => {
+                return Self::DatePeriod(DatePeriodPredicateKind::InLast);
+            },
+            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_) => {
+                return Self::DatePeriod(DatePeriodPredicateKind::OffsetFromToday);
+            },
             _ => {},
         }
         NumericPredicateKind::from_condition(condition).map_or_else(
@@ -477,6 +531,7 @@ impl NativePredicateKind {
             Self::Cell(kind) => kind.native_value(),
             Self::Checkbox(kind) => kind.native_value(),
             Self::Boolean(kind) => kind.native_value(),
+            Self::DatePeriod(kind) => kind.native_value(),
             Self::FixedDate(kind) => kind.native_value(),
             Self::Numeric(kind) => kind.native_value(),
             Self::NumericSign(kind) => kind.native_value(),
@@ -499,6 +554,18 @@ impl TryFrom<i32> for NativePredicateKind {
     type Error = Error;
 
     fn try_from(value: i32) -> Result<Self> {
+        match value {
+            value if value == DatePeriodPredicateKind::InNext.native_value() => {
+                return Ok(Self::DatePeriod(DatePeriodPredicateKind::InNext));
+            },
+            value if value == DatePeriodPredicateKind::InLast.native_value() => {
+                return Ok(Self::DatePeriod(DatePeriodPredicateKind::InLast));
+            },
+            value if value == DatePeriodPredicateKind::OffsetFromToday.native_value() => {
+                return Ok(Self::DatePeriod(DatePeriodPredicateKind::OffsetFromToday));
+            },
+            _ => {},
+        }
         match value {
             value if value == FixedDatePredicateKind::Equal.native_value() => {
                 return Ok(Self::FixedDate(FixedDatePredicateKind::Equal));
@@ -737,6 +804,21 @@ mod tests {
             FixedDatePredicateKind::Between,
         ] {
             let kind = NativePredicateKind::FixedDate(date);
+            assert_eq!(
+                NativePredicateKind::try_from(kind.native_value()).unwrap(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn native_date_period_predicate_values_are_reversible() {
+        for period in [
+            DatePeriodPredicateKind::InNext,
+            DatePeriodPredicateKind::InLast,
+            DatePeriodPredicateKind::OffsetFromToday,
+        ] {
+            let kind = NativePredicateKind::DatePeriod(period);
             assert_eq!(
                 NativePredicateKind::try_from(kind.native_value()).unwrap(),
                 kind

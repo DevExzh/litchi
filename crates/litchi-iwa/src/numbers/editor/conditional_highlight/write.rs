@@ -47,6 +47,11 @@ pub(super) fn insert_conditional_style_graph(
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
                 PREDICATE_UNUSED_ARGUMENT_INDEX,
             ),
+            NativePredicateKind::DatePeriod(kind) => (
+                PREDICATE_CELL_ARGUMENT_INDEX,
+                formula::date_period_quantity_node_index(kind, &rule.condition)?,
+                PREDICATE_UNUSED_ARGUMENT_INDEX,
+            ),
             NativePredicateKind::Checkbox(_) => (
                 PREDICATE_CELL_ARGUMENT_INDEX,
                 PREDICATE_NUMBER_ARGUMENT_INDEX,
@@ -130,8 +135,11 @@ pub(super) fn insert_conditional_style_graph(
                         table_uid: Some(*formula_owner_uuid),
                         preserve_column: Some(false),
                         preserve_row: Some(false),
-                        ..Default::default()
+                        is_spanning_column: Some(false),
+                        is_spanning_row: Some(false),
                     }),
+                    preserve_row: Some(false),
+                    preserve_column: Some(false),
                     ..Default::default()
                 }),
                 param_value1: Some(first_argument),
@@ -256,6 +264,12 @@ fn predicate_arguments(
     }
     if let Some(range) = condition.date_range() {
         return Ok((date_argument(range.lower()), date_argument(range.upper())));
+    }
+    if let Some(period) = condition.date_period() {
+        return Ok((number_argument(f64::from(period.count()))?, none()));
+    }
+    if let Some(offset) = condition.date_offset() {
+        return Ok((number_argument(f64::from(offset.period().count()))?, none()));
     }
     if let Some(value) = condition.single_operand() {
         return Ok((number_argument(value.get())?, none()));

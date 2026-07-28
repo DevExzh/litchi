@@ -2,7 +2,9 @@ use super::*;
 use crate::numbers::NumbersDocumentBuilder;
 use crate::shapes::{RgbColorSpace, RgbaColor};
 use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightDate, TableCellConditionalHighlightDateRange,
+    TableCellConditionalHighlightDate, TableCellConditionalHighlightDateOffset,
+    TableCellConditionalHighlightDateOffsetDirection, TableCellConditionalHighlightDatePeriod,
+    TableCellConditionalHighlightDatePeriodUnit, TableCellConditionalHighlightDateRange,
     TableCellConditionalHighlightNumber, TableCellConditionalHighlightRange,
     TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
 };
@@ -230,7 +232,8 @@ fn relative_date_predicates_round_trip_apply_and_observe_day_boundaries() {
         .build()
         .unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
-    let today = current_reference_date_midnight_seconds();
+    let context = current_date_context();
+    let today = context.apple_seconds;
     let midday = SECONDS_PER_DAY / 2.0;
     for (column, value) in [
         (1, today + midday),
@@ -338,24 +341,137 @@ fn relative_date_predicates_round_trip_apply_and_observe_day_boundaries() {
         assert!(condition_matches_at(
             &condition,
             &ConditionalCellValue::Date(start),
-            Some(today)
+            Some(context)
         ));
         assert!(condition_matches_at(
             &condition,
             &ConditionalCellValue::Date(start + SECONDS_PER_DAY - 1.0),
-            Some(today)
+            Some(context)
         ));
         assert!(!condition_matches_at(
             &condition,
             &ConditionalCellValue::Date(start - 1.0),
-            Some(today)
+            Some(context)
         ));
         assert!(!condition_matches_at(
             &condition,
             &ConditionalCellValue::Date(start + SECONDS_PER_DAY),
-            Some(today)
+            Some(context)
         ));
     }
+}
+
+#[test]
+fn date_period_predicates_round_trip_all_units_and_use_calendar_boundaries() {
+    use TableCellConditionalHighlightDateOffsetDirection as Direction;
+    use TableCellConditionalHighlightDatePeriodUnit as Unit;
+
+    let units = [
+        Unit::Days,
+        Unit::Weeks,
+        Unit::Months,
+        Unit::Quarters,
+        Unit::Years,
+    ];
+    let mut conditions = Vec::with_capacity(20);
+    for unit in units {
+        let period = TableCellConditionalHighlightDatePeriod::new(2, unit).unwrap();
+        conditions.extend([
+            TableCellConditionalHighlightCondition::DateIsInNext(period),
+            TableCellConditionalHighlightCondition::DateIsInLast(period),
+            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(
+                TableCellConditionalHighlightDateOffset::new(period, Direction::Ago),
+            ),
+            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(
+                TableCellConditionalHighlightDateOffset::new(period, Direction::FromNow),
+            ),
+        ]);
+    }
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    for (chunk_index, condition_chunk) in conditions.chunks(10).enumerate() {
+        let column = chunk_index + 1;
+        let rules: Vec<_> = condition_chunk
+            .iter()
+            .cloned()
+            .map(|condition| rule(condition, red))
+            .collect();
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, column, &rules)
+            .unwrap();
+        assert_eq!(
+            editor
+                .cell_conditional_highlight_rules(table_id, 1, column)
+                .unwrap(),
+            Some(rules)
+        );
+
+        let info = info_in_package(&editor.package, table_id, 1, column)
+            .unwrap()
+            .unwrap();
+        let location = locate_cell(&editor.package, table_id, 1, column).unwrap();
+        let archive = editor
+            .package
+            .archive(&location.object_locations[&info.style_set_object_id])
+            .unwrap();
+        let set = archive
+            .object(info.style_set_object_id)
+            .unwrap()
+            .messages
+            .iter()
+            .find_map(|message| {
+                (message.type_ == 6_010).then(|| {
+                    tst::ConditionalStyleSetArchive::decode(message.data.as_slice()).unwrap()
+                })
+            })
+            .unwrap();
+        for (index, condition) in condition_chunk.iter().enumerate() {
+            let kind = NativePredicateKind::from_condition(condition);
+            let NativePredicateKind::DatePeriod(period_kind) = kind else {
+                panic!("expected date-period predicate");
+            };
+            let current = set.rules.as_ref().unwrap().rule[index]
+                .predicate
+                .as_ref()
+                .unwrap();
+            let prepivot = &set.rules_prepivot[index].predicate;
+            assert_eq!(current.predicate_type, period_kind.native_value());
+            assert_eq!(prepivot.predicate_type, period_kind.native_value());
+            assert_eq!(
+                prepivot.param_index1,
+                formula::date_period_quantity_node_index(period_kind, condition).unwrap()
+            );
+            assert_eq!(
+                current.formula.as_ref().unwrap().ast_node_array.ast_node,
+                prepivot.formula.ast_node_array.ast_node
+            );
+        }
+    }
+
+    let today = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
+    let context = ConditionalDateContext {
+        today,
+        apple_seconds: date_to_apple_seconds(today),
+    };
+    let month = TableCellConditionalHighlightDatePeriod::new(1, Unit::Months).unwrap();
+    let leap_day = date_to_apple_seconds(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap());
+    let exact = TableCellConditionalHighlightCondition::DateIsOffsetFromToday(
+        TableCellConditionalHighlightDateOffset::new(month, Direction::FromNow),
+    );
+    assert!(condition_matches_at(
+        &exact,
+        &ConditionalCellValue::Date(leap_day),
+        Some(context)
+    ));
+    assert!(!condition_matches_at(
+        &exact,
+        &ConditionalCellValue::Date(leap_day + SECONDS_PER_DAY),
+        Some(context)
+    ));
 }
 
 #[test]

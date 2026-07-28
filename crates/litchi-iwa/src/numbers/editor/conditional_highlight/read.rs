@@ -2,8 +2,11 @@
 
 use prost::Message;
 
+use super::native::DatePeriodPredicateKind;
 use super::*;
 use crate::table_cell_conditional_highlight::{
+    TableCellConditionalHighlightDateOffset, TableCellConditionalHighlightDateOffsetDirection,
+    TableCellConditionalHighlightDatePeriod, TableCellConditionalHighlightDatePeriodUnit,
     TableCellConditionalHighlightNumber, TableCellConditionalHighlightRange,
     TableCellConditionalHighlightRule, TableCellConditionalHighlightStyle,
     TableCellConditionalHighlightText,
@@ -124,8 +127,13 @@ fn decode_predicate(
 ) -> Result<TableCellConditionalHighlightCondition> {
     let kind = NativePredicateKind::try_from(predicate.predicate_type)
         .map_err(|_| unsupported_rule_graph())?;
-    let expected_indexes = match kind {
+    let base_indexes = match kind {
         NativePredicateKind::Cell(_) | NativePredicateKind::RelativeDate(_) => (
+            PREDICATE_CELL_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+        ),
+        NativePredicateKind::DatePeriod(_) => (
             PREDICATE_CELL_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
             PREDICATE_UNUSED_ARGUMENT_INDEX,
@@ -191,9 +199,6 @@ fn decode_predicate(
         kind.prepivot_native_value() != prepivot.predicate_type
             || prepivot.qualifier1 != PREDICATE_QUALIFIER_NONE
             || prepivot.qualifier2 != PREDICATE_QUALIFIER_NONE
-            || prepivot.param_index0 != expected_indexes.0
-            || prepivot.param_index1 != expected_indexes.1
-            || prepivot.param_index2 != expected_indexes.2
     }) {
         return Err(unsupported_rule_graph());
     }
@@ -202,11 +207,28 @@ fn decode_predicate(
         NativePredicateKind::Checkbox(kind) => decode_checkbox_predicate(predicate, kind)?,
         NativePredicateKind::Boolean(kind) => decode_boolean_predicate(predicate, kind)?,
         NativePredicateKind::FixedDate(kind) => decode_fixed_date_predicate(predicate, kind)?,
+        NativePredicateKind::DatePeriod(kind) => decode_date_period_predicate(predicate, kind)?,
         NativePredicateKind::Numeric(kind) => decode_numeric_predicate(predicate, kind)?,
         NativePredicateKind::NumericSign(kind) => decode_sign_predicate(predicate, kind)?,
         NativePredicateKind::RelativeDate(kind) => decode_date_predicate(predicate, kind)?,
         NativePredicateKind::Text(kind) => decode_text_predicate(predicate, kind)?,
     };
+    let expected_indexes = match kind {
+        NativePredicateKind::DatePeriod(kind) => (
+            PREDICATE_CELL_ARGUMENT_INDEX,
+            formula::date_period_quantity_node_index(kind, &condition)
+                .map_err(|_| unsupported_rule_graph())?,
+            PREDICATE_UNUSED_ARGUMENT_INDEX,
+        ),
+        _ => base_indexes,
+    };
+    if prepivot.is_some_and(|prepivot| {
+        prepivot.param_index0 != expected_indexes.0
+            || prepivot.param_index1 != expected_indexes.1
+            || prepivot.param_index2 != expected_indexes.2
+    }) {
+        return Err(unsupported_rule_graph());
+    }
     formula::validate(
         predicate
             .formula
@@ -221,6 +243,58 @@ fn decode_predicate(
             .map_err(|_| unsupported_rule_graph())?;
     }
     Ok(condition)
+}
+
+fn decode_date_period_predicate(
+    predicate: &tst::FormulaPredicateArchive,
+    kind: DatePeriodPredicateKind,
+) -> Result<TableCellConditionalHighlightCondition> {
+    if predicate
+        .param_value2
+        .as_ref()
+        .map(|argument| argument.arg_type)
+        != Some(PREDICATE_ARGUMENT_NONE)
+    {
+        return Err(unsupported_rule_graph());
+    }
+    let value = decode_number_argument(predicate.param_value1.as_ref())?.get();
+    if value.fract() != 0.0 || !(1.0..=f64::from(u32::MAX)).contains(&value) {
+        return Err(unsupported_rule_graph());
+    }
+    let count = value as u32;
+    let formula = predicate
+        .formula
+        .as_ref()
+        .ok_or_else(unsupported_rule_graph)?;
+    let units = [
+        TableCellConditionalHighlightDatePeriodUnit::Days,
+        TableCellConditionalHighlightDatePeriodUnit::Weeks,
+        TableCellConditionalHighlightDatePeriodUnit::Months,
+        TableCellConditionalHighlightDatePeriodUnit::Quarters,
+        TableCellConditionalHighlightDatePeriodUnit::Years,
+    ];
+    for unit in units {
+        let period = TableCellConditionalHighlightDatePeriod::new(count, unit)
+            .map_err(|_| unsupported_rule_graph())?;
+        if let Some(condition) = kind.period_condition(period)
+            && formula::validate(formula, NativePredicateKind::DatePeriod(kind), &condition).is_ok()
+        {
+            return Ok(condition);
+        }
+        for direction in [
+            TableCellConditionalHighlightDateOffsetDirection::Ago,
+            TableCellConditionalHighlightDateOffsetDirection::FromNow,
+        ] {
+            let offset = TableCellConditionalHighlightDateOffset::new(period, direction);
+            if let Some(condition) = kind.offset_condition(offset)
+                && formula::validate(formula, NativePredicateKind::DatePeriod(kind), &condition)
+                    .is_ok()
+            {
+                return Ok(condition);
+            }
+        }
+    }
+    Err(unsupported_rule_graph())
 }
 
 fn decode_checkbox_predicate(
