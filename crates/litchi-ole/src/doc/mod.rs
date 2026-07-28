@@ -89,6 +89,7 @@ pub use package::{DocEncryptionKind, DocError, DocOpenOptions, Package};
 pub use equation::{DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation};
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
+pub use parts::auto_summary::{AutoSummaryRange, DocumentAutoSummary};
 pub use parts::chp::CharacterConditionalFormatting;
 pub use parts::document_properties::{
     CompatibilityOptions60, DocumentProperties, DocumentPropertiesBase, DocumentPropertyVersion,
@@ -111,6 +112,7 @@ pub use parts::document_properties_2002::{
 pub use parts::document_properties_2003::{
     DocumentProtectionMode, DocumentStateToolbars, Dop2003, ReadingModePageLock,
 };
+pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::fields::CompareField;
 pub use parts::fields::{AutoNumberField, AutoNumberFieldKind};
 pub use parts::fields::{
@@ -187,6 +189,9 @@ pub use parts::proofing::{
 };
 pub use parts::protection::{
     DocumentProtectedRanges, ProtectedRange, ProtectionUser, ProtectionUserRole, UidSel,
+};
+pub use parts::rmd_threading::{
+    DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage,
 };
 pub use parts::rsids::DocumentRsids;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};

@@ -1,4 +1,5 @@
 pub mod associated_strings;
+pub mod auto_summary;
 pub mod bookmarks;
 /// Internal parts for parsing DOC file structures.
 ///
@@ -18,6 +19,7 @@ pub mod document_properties_2000;
 pub mod document_properties_2002;
 pub mod document_properties_2003;
 pub mod document_properties_97;
+pub mod embedded_fonts;
 pub mod fib;
 pub mod fields;
 pub mod fkp;
@@ -38,6 +40,7 @@ pub mod piece_table;
 pub mod proofing;
 pub mod protection;
 pub mod revisions;
+pub mod rmd_threading;
 pub mod rsids;
 pub mod saved_by;
 pub mod sections;

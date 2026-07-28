@@ -9,6 +9,7 @@ use super::hyperlink::Hyperlink;
 use super::package::{DocError, DocOpenOptions, Result};
 use super::paragraph::{Paragraph, Run};
 use super::parts::associated_strings::DocumentAssociatedStrings;
+use super::parts::auto_summary::DocumentAutoSummary;
 use super::parts::bookmarks::BookmarksTable;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
@@ -27,6 +28,7 @@ use super::parts::fields::{
     TableOfContentsEntryField, TableOfContentsField, UserIdentityField, non_plcf_field_texts,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
+use super::parts::embedded_fonts::DocumentEmbeddedFonts;
 use super::parts::form_fields::FormFieldData;
 use super::parts::glossary::{AttachedGlossary, GlossaryMetadata};
 use super::parts::headers::HeadersTable;
@@ -40,6 +42,7 @@ use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
 use super::parts::revisions::RevisionAuthorTable;
+use super::parts::rmd_threading::DocumentRmdThreading;
 use super::parts::saved_by::SavedByTable;
 use super::parts::protection::DocumentProtectedRanges;
 use super::parts::rsids::DocumentRsids;
@@ -110,6 +113,12 @@ pub struct Document {
     smart_tags: Option<DocumentSmartTags>,
     /// Revision-save identifiers assigned in the document.
     rsids: Option<DocumentRsids>,
+    /// E-mail review threading data parallel to the revision-author table.
+    rmd_threading: Option<DocumentRmdThreading>,
+    /// Embedded TrueType font descriptions.
+    embedded_fonts: Option<DocumentEmbeddedFonts>,
+    /// AutoSummary priority ranges for the main document.
+    auto_summary: Option<DocumentAutoSummary>,
     /// Word 2003 range-level protection ("editable ranges") metadata.
     protected_ranges: Option<DocumentProtectedRanges>,
     /// Mail-merge data-source state (`Pms` and the ODSO property set).
@@ -264,6 +273,9 @@ impl Document {
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
         let rsids = DocumentRsids::parse(&fib, &table_stream)?;
+        let rmd_threading = DocumentRmdThreading::parse(&fib, &table_stream)?;
+        let embedded_fonts = DocumentEmbeddedFonts::parse(&fib, &table_stream)?;
+        let auto_summary = DocumentAutoSummary::parse(&fib, &table_stream)?;
         let protected_ranges = DocumentProtectedRanges::parse(&fib, &table_stream)?;
         let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
         let subdocuments = DocumentSubdocuments::parse(&fib, &table_stream)?;
@@ -361,6 +373,9 @@ impl Document {
             bookmarks_table,
             smart_tags,
             rsids,
+            rmd_threading,
+            embedded_fonts,
+            auto_summary,
             protected_ranges,
             mail_merge,
             subdocuments,
@@ -1934,6 +1949,30 @@ impl Document {
     /// when the document carries a `PLRSID` table.
     pub fn rsids(&self) -> Option<&DocumentRsids> {
         self.rsids.as_ref()
+    }
+
+    /// E-mail review threading data parallel to the revision-author table
+    /// (MS-DOC 2.9.230), when the document carries an `RmdThreading`.
+    ///
+    /// The data is inert: message identifiers are exposed verbatim and no
+    /// message is ever contacted, opened, or rendered.
+    pub fn rmd_threading(&self) -> Option<&DocumentRmdThreading> {
+        self.rmd_threading.as_ref()
+    }
+
+    /// Embedded TrueType font descriptions from the `SttbTtmbd` table
+    /// (MS-DOC 2.9.296), when the document embeds fonts.
+    ///
+    /// The metadata is inert: font data stays in the `WordDocument` stream
+    /// and is never loaded, installed, or executed.
+    pub fn embedded_fonts(&self) -> Option<&DocumentEmbeddedFonts> {
+        self.embedded_fonts.as_ref()
+    }
+
+    /// AutoSummary priority ranges for the main document (MS-DOC 2.8.4),
+    /// when the document carries a `PlcfAsumy`.
+    pub fn auto_summary(&self) -> Option<&DocumentAutoSummary> {
+        self.auto_summary.as_ref()
     }
 
     /// Word 2003 range-level protection ("editable ranges") metadata, when
