@@ -219,6 +219,11 @@ pub use parts::structured_tags::{
 pub use parts::subdocuments::{
     DocumentSubdocuments, ReferencedFileKind, ReferencedFileName, Subdocument,
 };
+pub use parts::table_char_cache::{TableCharEntry, TableCharInfo, TableCharacterCache};
+pub use parts::text_services::{TextServicesTables, Uim, UimEntry, UimGuidTable, UimTable};
+pub use parts::textbox_breaks::{
+    TextBoxBreak, TextBoxBreakEntry, TextBoxBreakKind, TextBoxBreakTable, TextBoxBreakTables,
+};
 pub use parts::tap::TableStyleCondition;
 pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,

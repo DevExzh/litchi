@@ -42,6 +42,9 @@ use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
 use super::parts::grammar_cookies::GrammarCookieTables;
+use super::parts::table_char_cache::TableCharacterCache;
+use super::parts::text_services::TextServicesTables;
+use super::parts::textbox_breaks::TextBoxBreakTables;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::rmd_threading::DocumentRmdThreading;
 use super::parts::saved_by::SavedByTable;
@@ -152,6 +155,12 @@ pub struct Document {
     proofing_tables: Result<ProofingTables>,
     /// Deferred strict grammar-checker cookie metadata parse
     grammar_cookies: Result<GrammarCookieTables>,
+    /// Deferred strict deprecated table-character cache parse
+    table_char_cache: Result<Option<TableCharacterCache>>,
+    /// Deferred strict textbox break-table metadata parse
+    textbox_breaks: Result<TextBoxBreakTables>,
+    /// Deferred strict Text Services Framework metadata parse
+    text_services: Result<TextServicesTables>,
     /// Deferred strict Word 97/2000 save-history metadata parse
     saved_by_table: Result<SavedByTable>,
     /// Deferred strict glossary-only AutoText metadata parse
@@ -308,6 +317,9 @@ impl Document {
         let list_templates = ListTemplateTable::parse(&fib, &table_stream)?;
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
         let grammar_cookies = GrammarCookieTables::parse(&fib, &table_stream);
+        let table_char_cache = TableCharacterCache::parse(&fib, &table_stream);
+        let textbox_breaks = TextBoxBreakTables::parse(&fib, &table_stream);
+        let text_services = TextServicesTables::parse(&fib, &table_stream);
         let saved_by_table = SavedByTable::parse(&fib, &table_stream);
         let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream).and_then(|metadata| {
             if let Some(metadata) = &metadata {
@@ -414,6 +426,9 @@ impl Document {
             list_templates,
             proofing_tables,
             grammar_cookies,
+            table_char_cache,
+            textbox_breaks,
+            text_services,
             saved_by_table,
             glossary_metadata,
             attached_glossary,
@@ -735,6 +750,40 @@ impl Document {
     pub fn grammar_cookie_tables(&self) -> Result<&GrammarCookieTables> {
         self.grammar_cookies.as_ref().map_err(|error| {
             DocError::Corrupted(format!("invalid grammar cookie metadata: {error}"))
+        })
+    }
+
+    /// Strictly access the deprecated table-character cache (`PlcfTch`).
+    ///
+    /// Parsing is deferred because Word itself is instructed to ignore this
+    /// producer cache. The cache is exposed as metadata only and is never
+    /// acted upon.
+    pub fn table_character_cache(&self) -> Result<Option<&TableCharacterCache>> {
+        self.table_char_cache
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(|error| DocError::Corrupted(format!("invalid table character cache: {error}")))
+    }
+
+    /// Strictly access the main and header textbox break tables.
+    ///
+    /// Parsing is deferred so malformed optional metadata does not prevent the
+    /// document's primary text from opening. The version-specific `Tbkd` flag
+    /// bits are producer caches and are never interpreted.
+    pub fn textbox_break_tables(&self) -> Result<&TextBoxBreakTables> {
+        self.textbox_breaks.as_ref().map_err(|error| {
+            DocError::Corrupted(format!("invalid textbox break metadata: {error}"))
+        })
+    }
+
+    /// Strictly access Text Services Framework records and their GUID table.
+    ///
+    /// Parsing is deferred so malformed optional metadata does not prevent the
+    /// document's primary text from opening. Service-provided payloads remain
+    /// opaque and are never interpreted.
+    pub fn text_services_tables(&self) -> Result<&TextServicesTables> {
+        self.text_services.as_ref().map_err(|error| {
+            DocError::Corrupted(format!("invalid text services metadata: {error}"))
         })
     }
 
