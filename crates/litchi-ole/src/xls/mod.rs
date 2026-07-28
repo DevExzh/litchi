@@ -166,6 +166,12 @@ mod query_table;
 /// BIFF8 `RealTimeData` record: typed, inert real-time data (RTD) topics.
 mod real_time_data;
 
+/// Typed, inert readers for the shared-workbook RRD revision record family.
+pub mod revision_records;
+
+/// BIFF8 shared-workbook `Revision Log` stream (MS-XLS 2.1.7.14).
+pub mod revision_log;
+
 /// BIFF8 `WebPub` record: typed, inert Web publishing metadata.
 mod web_pub;
 
@@ -281,6 +287,17 @@ pub use query_table::{
     XlsTextFieldFormat, XlsTextQuery,
 };
 pub use real_time_data::{XlsRealTimeData, XlsRtdCell, XlsRtdValue};
+pub use revision_log::{
+    REVISION_LOG_STREAM_NAME, XlsOpaqueRevisionRecord, XlsRevision, XlsRevisionChange,
+    XlsRevisionHeader, XlsRevisionLog, XlsRrdChgCellRevision, XlsRrdInsDelRevision,
+    XlsRrdMoveRevision,
+};
+pub use revision_records::{
+    XlsFileLock, XlsFileLockPurpose, XlsRevisionCellContent, XlsRevisionCellLocation,
+    XlsRevisionCellRange, XlsRevisionRecordHeader, XlsRevisionType, XlsRrInsertSh, XlsRrTabId,
+    XlsRrdChgCell, XlsRrdConflict, XlsRrdHead, XlsRrdInfo, XlsRrdInsDel, XlsRrdMove,
+    XlsRrdRenSheet, XlsRrdUserView, XlsShortDtr, XlsUsrExcl,
+};
 pub use web_pub::{XlsWebPageType, XlsWebPub, XlsWebPubRange, XlsWebSourceType};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,

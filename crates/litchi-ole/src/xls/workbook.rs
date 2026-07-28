@@ -1478,6 +1478,28 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         crate::ovba::VbaProject::open(&mut self.ole_file, &path, limits).map(Some)
     }
 
+    /// Whether the CFB container holds a shared-workbook `Revision Log` stream
+    /// (MS-XLS 2.1.7.14).
+    pub fn has_revision_log(&self) -> bool {
+        crate::xls::revision_log::find_revision_log_stream(&self.ole_file.list_streams())
+            .is_some()
+    }
+
+    /// Parse the shared-workbook `Revision Log` stream, when present.
+    ///
+    /// The result is a typed, inert model of the RRD revision records.
+    /// Parsing never applies, rejects, or replays any recorded revision.
+    pub fn revision_log(&mut self) -> XlsResult<Option<crate::xls::revision_log::XlsRevisionLog>> {
+        let Some(name) = crate::xls::revision_log::find_revision_log_stream(
+            &self.ole_file.list_streams(),
+        )
+        .map(str::to_owned) else {
+            return Ok(None);
+        };
+        let data = self.ole_file.open_stream(&[name.as_str()])?;
+        crate::xls::revision_log::parse_revision_log_stream(&data).map(Some)
+    }
+
     pub fn environment(&self) -> &crate::xls::environment::XlsWorkbookEnvironment {
         &self.environment
     }

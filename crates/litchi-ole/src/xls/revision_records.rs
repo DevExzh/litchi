@@ -1,0 +1,2263 @@
+//! Typed, inert readers for the BIFF8 shared-workbook revision records.
+//!
+//! These records live in the `Revision Log` stream (MS-XLS 2.1.7.14) of a
+//! shared workbook. Every reader validates the fixed record envelope and the
+//! `MUST`-level constraints of the corresponding MS-XLS 2.4 section. Variable
+//! substructures that are specified elsewhere (DXFN differential formats,
+//! `CellParsedFormula` token arrays, and `Ducr` undo data) are preserved raw;
+//! parsing them never executes or applies the recorded revision.
+
+use super::{XlsError, XlsResult};
+
+/// MS-XLS 2.4.226 `RRDHead` record type (record enumeration value 312).
+pub(crate) const RRD_HEAD_RECORD_TYPE: u16 = 0x0138;
+/// MS-XLS 2.4.228 `RRDInsDel` record type (record enumeration value 311).
+pub(crate) const RRD_INS_DEL_RECORD_TYPE: u16 = 0x0137;
+/// MS-XLS 2.4.231 `RRDMove` record type (record enumeration value 320).
+pub(crate) const RRD_MOVE_RECORD_TYPE: u16 = 0x0140;
+/// MS-XLS 2.4.223 `RRDChgCell` record type (record enumeration value 315).
+pub(crate) const RRD_CHG_CELL_RECORD_TYPE: u16 = 0x013B;
+/// MS-XLS 2.4.241 `RRTabId` record type (record enumeration value 317).
+pub(crate) const RR_TAB_ID_RECORD_TYPE: u16 = 0x013D;
+/// MS-XLS 2.4.234 `RRDRenSheet` record type (record enumeration value 318).
+pub(crate) const RRD_REN_SHEET_RECORD_TYPE: u16 = 0x013E;
+/// MS-XLS 2.4.238 `RRFormat` record type (record enumeration value 330).
+pub(crate) const RR_FORMAT_RECORD_TYPE: u16 = 0x014A;
+/// MS-XLS 2.4.222 `RRAutoFmt` record type (record enumeration value 331).
+pub(crate) const RR_AUTO_FMT_RECORD_TYPE: u16 = 0x014B;
+/// MS-XLS 2.4.239 `RRInsertSh` record type (record enumeration value 333).
+pub(crate) const RR_INSERT_SH_RECORD_TYPE: u16 = 0x014D;
+/// MS-XLS 2.4.232 `RRDMoveBegin` record type (record enumeration value 334).
+pub(crate) const RRD_MOVE_BEGIN_RECORD_TYPE: u16 = 0x014E;
+/// MS-XLS 2.4.233 `RRDMoveEnd` record type (record enumeration value 335).
+pub(crate) const RRD_MOVE_END_RECORD_TYPE: u16 = 0x014F;
+/// MS-XLS 2.4.229 `RRDInsDelBegin` record type (record enumeration value 336).
+pub(crate) const RRD_INS_DEL_BEGIN_RECORD_TYPE: u16 = 0x0150;
+/// MS-XLS 2.4.230 `RRDInsDelEnd` record type (record enumeration value 337).
+pub(crate) const RRD_INS_DEL_END_RECORD_TYPE: u16 = 0x0151;
+/// MS-XLS 2.4.224 `RRDConflict` record type (record enumeration value 338).
+pub(crate) const RRD_CONFLICT_RECORD_TYPE: u16 = 0x0152;
+/// MS-XLS 2.4.225 `RRDDefName` record type (record enumeration value 339).
+pub(crate) const RRD_DEF_NAME_RECORD_TYPE: u16 = 0x0153;
+/// MS-XLS 2.4.235 `RRDRstEtxp` record type (record enumeration value 340).
+pub(crate) const RRD_RST_ETXP_RECORD_TYPE: u16 = 0x0154;
+/// MS-XLS 2.4.339 `UsrExcl` record type (record enumeration value 404).
+pub(crate) const USR_EXCL_RECORD_TYPE: u16 = 0x0194;
+/// MS-XLS 2.4.116 `FileLock` record type (record enumeration value 405).
+pub(crate) const FILE_LOCK_RECORD_TYPE: u16 = 0x0195;
+/// MS-XLS 2.4.227 `RRDInfo` record type (record enumeration value 406).
+pub(crate) const RRD_INFO_RECORD_TYPE: u16 = 0x0196;
+/// MS-XLS 2.4.237 `RRDUserView` record type (record enumeration value 428).
+pub(crate) const RRD_USER_VIEW_RECORD_TYPE: u16 = 0x01AC;
+/// MS-XLS 2.4.236 `RRDTQSIF` record type (record enumeration value 2056).
+pub(crate) const RRD_TQSIF_RECORD_TYPE: u16 = 0x0808;
+/// MS-XLS 2.4.179 `Note` record type (record enumeration value 28).
+pub(crate) const NOTE_RECORD_TYPE: u16 = 0x001C;
+/// MS-XLS 2.4.92 `EOF` record type (record enumeration value 10).
+pub(crate) const EOF_RECORD_TYPE: u16 = 0x000A;
+/// MS-XLS 2.4.58 `Continue` record type (record enumeration value 60).
+pub(crate) const CONTINUE_RECORD_TYPE: u16 = 0x003C;
+
+/// Byte length of the BIFF record header (`rt` + `cb`).
+pub(crate) const RECORD_HEADER_LEN: usize = 4;
+/// Byte length of the fixed RRD structure (MS-XLS 2.5.220).
+const RRD_LEN: usize = 14;
+/// Minimum legal `RRD.cbMemory` value (MS-XLS 2.5.220).
+const RRD_MIN_MEMORY_SIZE: u32 = 26;
+/// `RRDHead.rrd.cbMemory` is fixed to this sentinel and MUST be ignored.
+const RRD_HEAD_MEMORY_SENTINEL: u32 = 0xFFFF_FFFF;
+/// `RRD.tabid` value marking a revision that belongs to no specific sheet.
+const NO_SHEET_TAB_ID: u16 = 0xFFFF;
+/// Byte length of a Ref8U structure (MS-XLS 2.5.209).
+const REF8U_LEN: usize = 8;
+/// Maximum Ref8U column index (MS-XLS 2.5.209 ColU constraint).
+const REF8U_MAX_COLUMN: u16 = 0x00FF;
+/// Byte length of a ShortDTR structure (MS-XLS 2.5.239).
+const SHORT_DTR_LEN: usize = 8;
+/// Byte length of a GUID as stored in these records (MS-DTYP 2.3.4).
+const GUID_LEN: usize = 16;
+/// Maximum characters of the `RRDHead.stUser` name.
+const RRD_HEAD_MAX_USER_CHARS: usize = 54;
+/// Byte length of the fixed `RRDHead.stUser` field.
+const RRD_HEAD_USER_FIELD_LEN: usize = 114;
+/// Maximum characters of the `UsrExcl.stUser` name.
+const USR_EXCL_MAX_USER_CHARS: usize = 0x0036;
+/// Fixed character count of the `UsrExcl.stUser` field.
+const USR_EXCL_USER_FIELD_CHARS: usize = 147;
+/// Byte length of the `UsrExcl` fixed part before `stUser`.
+const USR_EXCL_PREFIX_LEN: usize = 4 + SHORT_DTR_LEN + 2;
+/// Maximum characters of the `FileLock.stUsrName` name.
+const FILE_LOCK_MAX_USER_CHARS: usize = 52;
+/// Total byte length of the `FileLock` record payload.
+const FILE_LOCK_PAYLOAD_LEN: usize = 162;
+/// Byte length of the fixed `RRDRenSheet` sheet-name fields.
+const REN_SHEET_NAME_FIELD_LEN: usize = 255;
+/// Maximum `RRDRenSheet`/`RRInsertSh` name characters when compressed.
+const REN_SHEET_MAX_COMPRESSED_CHARS: u16 = 227;
+/// Maximum `RRDRenSheet`/`RRInsertSh` name characters when UTF-16.
+const REN_SHEET_MAX_UTF16_CHARS: u16 = 127;
+/// Byte length of the fixed `RRInsertSh.stName` field.
+const INSERT_SH_NAME_FIELD_LEN: usize = 256;
+/// Maximum `RRTabId` sheet identifiers (above this the record is absent).
+const MAX_TAB_ID_COUNT: usize = 4112;
+/// Fixed `RRDInfo` payload length.
+const RRD_INFO_PAYLOAD_LEN: usize = 50;
+/// Fixed `RRDUserView` payload length.
+const RRD_USER_VIEW_PAYLOAD_LEN: usize = RRD_LEN + GUID_LEN;
+/// `RRDChgCell` fixed part: RRD + 4 flag bytes + RgceLoc + cbOldVal + cetxpRst.
+const RRD_CHG_CELL_FIXED_LEN: usize = RRD_LEN + 4 + 4 + 4 + 2;
+/// Minimum byte length of a `CellParsedFormula` old cell value.
+const MIN_FORMULA_VALUE_LEN: u32 = 0x18;
+/// `XLUnicodeStringNoCch` option bit selecting UTF-16 characters.
+const STRING_HIGH_BYTE: u8 = 0x01;
+
+fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
+    XlsError::InvalidRecord {
+        record_type,
+        message: message.into(),
+    }
+}
+
+fn read_u16(data: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+fn read_i16(data: &[u8], offset: usize) -> i16 {
+    i16::from_le_bytes([data[offset], data[offset + 1]])
+}
+
+fn read_u32(data: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+fn read_i32(data: &[u8], offset: usize) -> i32 {
+    i32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
+}
+
+/// Revision kind stored in `RRD.revt` (MS-XLS 2.5.212 RevisionType).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XlsRevisionType {
+    InsertRow,
+    InsertColumn,
+    DeleteRow,
+    DeleteColumn,
+    CellMove,
+    InsertSheet,
+    Sort,
+    ChangeCell,
+    RenameSheet,
+    DefineName,
+    Format,
+    AutoFormat,
+    Note,
+    Header,
+    Conflict,
+    AddView,
+    DeleteView,
+    TrashQueryTableField,
+}
+
+impl XlsRevisionType {
+    /// Decode the MS-XLS 2.5.212 enumeration value.
+    pub fn from_u16(record_type: u16, value: u16) -> XlsResult<Self> {
+        match value {
+            0x0000 => Ok(Self::InsertRow),
+            0x0001 => Ok(Self::InsertColumn),
+            0x0002 => Ok(Self::DeleteRow),
+            0x0003 => Ok(Self::DeleteColumn),
+            0x0004 => Ok(Self::CellMove),
+            0x0005 => Ok(Self::InsertSheet),
+            0x0007 => Ok(Self::Sort),
+            0x0008 => Ok(Self::ChangeCell),
+            0x0009 => Ok(Self::RenameSheet),
+            0x000A => Ok(Self::DefineName),
+            0x000B => Ok(Self::Format),
+            0x000C => Ok(Self::AutoFormat),
+            0x000D => Ok(Self::Note),
+            0x0020 => Ok(Self::Header),
+            0x0025 => Ok(Self::Conflict),
+            0x002B => Ok(Self::AddView),
+            0x002C => Ok(Self::DeleteView),
+            0x002E => Ok(Self::TrashQueryTableField),
+            other => Err(invalid(
+                record_type,
+                format!("unknown revision type 0x{other:04X}"),
+            )),
+        }
+    }
+
+    /// The MS-XLS 2.5.212 enumeration value.
+    pub fn to_u16(self) -> u16 {
+        match self {
+            Self::InsertRow => 0x0000,
+            Self::InsertColumn => 0x0001,
+            Self::DeleteRow => 0x0002,
+            Self::DeleteColumn => 0x0003,
+            Self::CellMove => 0x0004,
+            Self::InsertSheet => 0x0005,
+            Self::Sort => 0x0007,
+            Self::ChangeCell => 0x0008,
+            Self::RenameSheet => 0x0009,
+            Self::DefineName => 0x000A,
+            Self::Format => 0x000B,
+            Self::AutoFormat => 0x000C,
+            Self::Note => 0x000D,
+            Self::Header => 0x0020,
+            Self::Conflict => 0x0025,
+            Self::AddView => 0x002B,
+            Self::DeleteView => 0x002C,
+            Self::TrashQueryTableField => 0x002E,
+        }
+    }
+}
+
+/// Date and time of a revision action (MS-XLS 2.5.239 ShortDTR).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct XlsShortDtr {
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    weekday: u8,
+}
+
+impl XlsShortDtr {
+    /// Parse the fixed 8-byte structure with Gregorian calendar validation.
+    pub fn parse(record_type: u16, data: &[u8]) -> XlsResult<Self> {
+        if data.len() != SHORT_DTR_LEN {
+            return Err(invalid(
+                record_type,
+                format!(
+                    "ShortDTR has {} bytes; expected {SHORT_DTR_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let value = Self {
+            year: read_u16(data, 0),
+            month: data[2],
+            day: data[3],
+            hour: data[4],
+            minute: data[5],
+            second: data[6],
+            weekday: data[7],
+        };
+        if !(1900..=9999).contains(&value.year) {
+            return Err(invalid(record_type, "ShortDTR year is out of range"));
+        }
+        if !(1..=12).contains(&value.month) {
+            return Err(invalid(record_type, "ShortDTR month is out of range"));
+        }
+        if !(1..=31).contains(&value.day) {
+            return Err(invalid(record_type, "ShortDTR day is out of range"));
+        }
+        if value.hour > 23 {
+            return Err(invalid(record_type, "ShortDTR hour is out of range"));
+        }
+        if value.minute > 59 {
+            return Err(invalid(record_type, "ShortDTR minute is out of range"));
+        }
+        if value.second > 59 {
+            return Err(invalid(record_type, "ShortDTR second is out of range"));
+        }
+        if value.weekday > 7 {
+            return Err(invalid(record_type, "ShortDTR weekday is out of range"));
+        }
+        Ok(value)
+    }
+
+    pub fn year(&self) -> u16 {
+        self.year
+    }
+    pub fn month(&self) -> u8 {
+        self.month
+    }
+    pub fn day(&self) -> u8 {
+        self.day
+    }
+    pub fn hour(&self) -> u8 {
+        self.hour
+    }
+    pub fn minute(&self) -> u8 {
+        self.minute
+    }
+    pub fn second(&self) -> u8 {
+        self.second
+    }
+    /// Weekday: 0 = unspecified, 1 = Monday, ..., 7 = Sunday.
+    pub fn weekday(&self) -> u8 {
+        self.weekday
+    }
+}
+
+/// Cell range used by insert/delete and move revisions (MS-XLS 2.5.209 Ref8U).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct XlsRevisionCellRange {
+    first_row: u16,
+    last_row: u16,
+    first_column: u16,
+    last_column: u16,
+}
+
+impl XlsRevisionCellRange {
+    /// Parse the fixed 8-byte structure, enforcing the ordering constraints.
+    pub fn parse(record_type: u16, data: &[u8]) -> XlsResult<Self> {
+        if data.len() != REF8U_LEN {
+            return Err(invalid(
+                record_type,
+                format!("Ref8U has {} bytes; expected {REF8U_LEN}", data.len()),
+            ));
+        }
+        let value = Self {
+            first_row: read_u16(data, 0),
+            last_row: read_u16(data, 2),
+            first_column: read_u16(data, 4),
+            last_column: read_u16(data, 6),
+        };
+        if value.first_row > value.last_row {
+            return Err(invalid(record_type, "Ref8U first row exceeds last row"));
+        }
+        if value.first_column > value.last_column {
+            return Err(invalid(
+                record_type,
+                "Ref8U first column exceeds last column",
+            ));
+        }
+        if value.last_column > REF8U_MAX_COLUMN {
+            return Err(invalid(record_type, "Ref8U column exceeds 0x00FF"));
+        }
+        Ok(value)
+    }
+
+    pub fn first_row(&self) -> u16 {
+        self.first_row
+    }
+    pub fn last_row(&self) -> u16 {
+        self.last_row
+    }
+    pub fn first_column(&self) -> u16 {
+        self.first_column
+    }
+    pub fn last_column(&self) -> u16 {
+        self.last_column
+    }
+}
+
+/// Location of a changed cell (MS-XLS 2.5.198.109 RgceLoc).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct XlsRevisionCellLocation {
+    row: u16,
+    column_flags: u16,
+}
+
+impl XlsRevisionCellLocation {
+    fn parse(data: &[u8]) -> Self {
+        Self {
+            row: read_u16(data, 0),
+            column_flags: read_u16(data, 2),
+        }
+    }
+
+    /// Zero-based row coordinate.
+    pub fn row(&self) -> u16 {
+        self.row
+    }
+
+    /// Zero-based column coordinate (the low 14 bits of the ColRelU).
+    pub fn column(&self) -> u16 {
+        self.column_flags & 0x3FFF
+    }
+
+    /// Whether the column coordinate is a relative reference.
+    pub fn is_column_relative(&self) -> bool {
+        self.column_flags & 0x4000 != 0
+    }
+
+    /// Whether the row coordinate is a relative reference.
+    pub fn is_row_relative(&self) -> bool {
+        self.column_flags & 0x8000 != 0
+    }
+}
+
+/// The fixed RRD structure shared by all revision records (MS-XLS 2.5.220).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct XlsRevisionRecordHeader {
+    memory_size: u32,
+    revision_id: i32,
+    revision_type: XlsRevisionType,
+    accepted: bool,
+    undo_action: bool,
+    deleted_at_edge_of_sort: bool,
+    tab_id: u16,
+}
+
+impl XlsRevisionRecordHeader {
+    /// Parse the 14-byte structure. `is_head` selects the RRDHead-specific
+    /// `cbMemory` rule (fixed sentinel instead of the >= 26 minimum).
+    pub fn parse(record_type: u16, data: &[u8], is_head: bool) -> XlsResult<Self> {
+        if data.len() < RRD_LEN {
+            return Err(invalid(
+                record_type,
+                format!("RRD has {} bytes; expected at least {RRD_LEN}", data.len()),
+            ));
+        }
+        let memory_size = read_u32(data, 0);
+        let revision_id = read_i32(data, 4);
+        let revision_type = XlsRevisionType::from_u16(record_type, read_u16(data, 8))?;
+        let flags = read_u16(data, 10);
+        if flags & 0xFFF4 != 0 {
+            return Err(invalid(record_type, "RRD contains reserved flag bits"));
+        }
+        if !is_head && memory_size < RRD_MIN_MEMORY_SIZE {
+            return Err(invalid(
+                record_type,
+                format!("RRD cbMemory is {memory_size}; minimum is {RRD_MIN_MEMORY_SIZE}"),
+            ));
+        }
+        if is_head && memory_size != RRD_HEAD_MEMORY_SENTINEL {
+            return Err(invalid(
+                record_type,
+                "RRDHead cbMemory is not the 0xFFFFFFFF sentinel",
+            ));
+        }
+        if revision_id < 0 {
+            return Err(invalid(record_type, "RRD revid is negative"));
+        }
+        Ok(Self {
+            memory_size,
+            revision_id,
+            revision_type,
+            accepted: flags & 0x0001 != 0,
+            undo_action: flags & 0x0002 != 0,
+            deleted_at_edge_of_sort: flags & 0x0008 != 0,
+            tab_id: read_u16(data, 12),
+        })
+    }
+
+    /// In-memory size of the revision record structure (ignored for RRDHead).
+    pub fn memory_size(&self) -> u32 {
+        self.memory_size
+    }
+    pub fn revision_id(&self) -> i32 {
+        self.revision_id
+    }
+    pub fn revision_type(&self) -> XlsRevisionType {
+        self.revision_type
+    }
+    pub fn is_accepted(&self) -> bool {
+        self.accepted
+    }
+    pub fn is_undo_action(&self) -> bool {
+        self.undo_action
+    }
+    pub fn is_deleted_at_edge_of_sort(&self) -> bool {
+        self.deleted_at_edge_of_sort
+    }
+    /// Sheet the revision belongs to; `None` for the 0xFFFF "no sheet" marker.
+    pub fn tab_id(&self) -> Option<u16> {
+        if self.tab_id == NO_SHEET_TAB_ID {
+            None
+        } else {
+            Some(self.tab_id)
+        }
+    }
+
+    fn require_reviewable(&self, record_type: u16) -> XlsResult<()> {
+        if self.revision_id <= 0 {
+            return Err(invalid(
+                record_type,
+                "reviewable revision has a non-positive revid",
+            ));
+        }
+        Ok(())
+    }
+
+    fn require_sheet(&self, record_type: u16) -> XlsResult<()> {
+        if self.tab_id == NO_SHEET_TAB_ID {
+            return Err(invalid(record_type, "revision does not specify a sheet"));
+        }
+        Ok(())
+    }
+}
+
+/// Decode an `XLUnicodeStringNoCch` inside a fixed-size field of `field`
+/// bytes: one option-flags byte followed by `cch` characters. Characters past
+/// `cch` are ignored per MS-XLS 2.5.294.
+fn decode_fixed_string(
+    record_type: u16,
+    field: &[u8],
+    cch: usize,
+    context: &str,
+) -> XlsResult<String> {
+    let Some((&flags, characters)) = field.split_first() else {
+        return Err(invalid(record_type, format!("{context} field is empty")));
+    };
+    if flags & !STRING_HIGH_BYTE != 0 {
+        return Err(invalid(
+            record_type,
+            format!("{context} contains reserved string option bits"),
+        ));
+    }
+    let wide = flags & STRING_HIGH_BYTE != 0;
+    let byte_count = cch
+        .checked_mul(if wide { 2 } else { 1 })
+        .ok_or_else(|| invalid(record_type, format!("{context} length overflows")))?;
+    let bytes = characters.get(..byte_count).ok_or_else(|| {
+        invalid(
+            record_type,
+            format!("{context} characters exceed the fixed field"),
+        )
+    })?;
+    if wide {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units)
+            .map_err(|_| invalid(record_type, format!("{context} contains invalid UTF-16")))
+    } else {
+        Ok(bytes.iter().map(|&byte| char::from(byte)).collect())
+    }
+}
+
+/// Validate the MS-XLS name-length split for `RRDRenSheet` and `RRInsertSh`.
+fn validate_sheet_name_chars(
+    record_type: u16,
+    field: &[u8],
+    cch: u16,
+    context: &str,
+) -> XlsResult<()> {
+    let wide = field
+        .first()
+        .map(|flags| flags & STRING_HIGH_BYTE != 0)
+        .unwrap_or(false);
+    let maximum = if wide {
+        REN_SHEET_MAX_UTF16_CHARS
+    } else {
+        REN_SHEET_MAX_COMPRESSED_CHARS
+    };
+    if cch > maximum {
+        return Err(invalid(
+            record_type,
+            format!("{context} has {cch} characters; maximum is {maximum}"),
+        ));
+    }
+    Ok(())
+}
+
+/// MS-XLS 2.4.227 `RRDInfo`: shared-workbook revision-tracking state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrdInfo {
+    biff_version: u16,
+    shared: bool,
+    disk_has_revisions: bool,
+    auto_delete_revisions: bool,
+    track_revisions: bool,
+    exclusive: bool,
+    guid: [u8; GUID_LEN],
+    root_guid: [u8; GUID_LEN],
+    revision_id: i32,
+    version: u32,
+    history_preserved_off: bool,
+    history_protected: bool,
+    history_interval_days: u16,
+}
+
+impl XlsRrdInfo {
+    /// Parse the fixed 50-byte record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        if data.len() != RRD_INFO_PAYLOAD_LEN {
+            return Err(invalid(
+                RRD_INFO_RECORD_TYPE,
+                format!(
+                    "RRDInfo payload has {} bytes; expected {RRD_INFO_PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        if read_u16(data, 2) != 0 {
+            return Err(invalid(
+                RRD_INFO_RECORD_TYPE,
+                "RRDInfo reserved1 is nonzero",
+            ));
+        }
+        let flags = read_u16(data, 4);
+        if flags & 0xFFE0 != 0 {
+            return Err(invalid(
+                RRD_INFO_RECORD_TYPE,
+                "RRDInfo contains reserved flag bits",
+            ));
+        }
+        let flags2 = read_u16(data, 44);
+        if flags2 & 0xFFFC != 0 {
+            return Err(invalid(
+                RRD_INFO_RECORD_TYPE,
+                "RRDInfo contains reserved flag bits",
+            ));
+        }
+        let mut guid = [0u8; GUID_LEN];
+        guid.copy_from_slice(&data[6..22]);
+        let mut root_guid = [0u8; GUID_LEN];
+        root_guid.copy_from_slice(&data[22..38]);
+        let value = Self {
+            biff_version: read_u16(data, 0),
+            shared: flags & 0x0001 != 0,
+            disk_has_revisions: flags & 0x0002 != 0,
+            auto_delete_revisions: flags & 0x0004 != 0,
+            track_revisions: flags & 0x0008 != 0,
+            exclusive: flags & 0x0010 != 0,
+            guid,
+            root_guid,
+            revision_id: read_i32(data, 38),
+            version: read_u32(data, 42),
+            history_preserved_off: flags2 & 0x0001 != 0,
+            history_protected: flags2 & 0x0002 != 0,
+            history_interval_days: read_u16(data, 46),
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    fn validate(&self) -> XlsResult<()> {
+        let invalid_info = |message: &str| invalid(RRD_INFO_RECORD_TYPE, message);
+        if self.shared && self.exclusive {
+            return Err(invalid_info("RRDInfo is both shared and exclusive"));
+        }
+        if self.track_revisions && !self.shared {
+            return Err(invalid_info("RRDInfo tracks revisions without sharing"));
+        }
+        if self.disk_has_revisions && !self.track_revisions {
+            return Err(invalid_info(
+                "RRDInfo has on-disk revisions without revision tracking",
+            ));
+        }
+        if self.auto_delete_revisions && !self.track_revisions {
+            return Err(invalid_info(
+                "RRDInfo auto-deletes revisions without revision tracking",
+            ));
+        }
+        if self.revision_id < 0 {
+            return Err(invalid_info("RRDInfo revid is negative"));
+        }
+        if self.history_interval_days > 0x7FFF {
+            return Err(invalid_info("RRDInfo history interval exceeds 0x7FFF"));
+        }
+        if self.history_preserved_off {
+            if self.history_interval_days != 0 {
+                return Err(invalid_info(
+                    "RRDInfo disables history with a nonzero interval",
+                ));
+            }
+            if !self.shared {
+                return Err(invalid_info("RRDInfo disables history without sharing"));
+            }
+        } else if !self.exclusive && self.history_interval_days == 0 {
+            return Err(invalid_info(
+                "RRDInfo preserves history with a zero interval",
+            ));
+        }
+        if self.history_protected && !self.shared {
+            return Err(invalid_info("RRDInfo protects history without sharing"));
+        }
+        Ok(())
+    }
+
+    /// Major BIFF version last used to save the shared workbook.
+    pub fn biff_version(&self) -> u16 {
+        self.biff_version
+    }
+    pub fn is_shared(&self) -> bool {
+        self.shared
+    }
+    pub fn disk_has_revisions(&self) -> bool {
+        self.disk_has_revisions
+    }
+    pub fn auto_delete_revisions(&self) -> bool {
+        self.auto_delete_revisions
+    }
+    pub fn track_revisions(&self) -> bool {
+        self.track_revisions
+    }
+    pub fn is_exclusive(&self) -> bool {
+        self.exclusive
+    }
+    /// GUID of the most recent revision header (or all-zero).
+    pub fn guid(&self) -> &[u8; GUID_LEN] {
+        &self.guid
+    }
+    /// GUID of the last saved revision header (or all-zero).
+    pub fn root_guid(&self) -> &[u8; GUID_LEN] {
+        &self.root_guid
+    }
+    pub fn revision_id(&self) -> i32 {
+        self.revision_id
+    }
+    pub fn version(&self) -> u32 {
+        self.version
+    }
+    /// Whether revision history is discarded (`fNoRevHist`).
+    pub fn history_disabled(&self) -> bool {
+        self.history_preserved_off
+    }
+    pub fn history_protected(&self) -> bool {
+        self.history_protected
+    }
+    /// Days for which revision history is kept; ignored when exclusive.
+    pub fn history_interval_days(&self) -> u16 {
+        self.history_interval_days
+    }
+}
+
+/// MS-XLS 2.4.116 `FileLock`: a lock held on the shared workbook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XlsFileLockPurpose {
+    NotLocked,
+    WritingUserInfo,
+    MergingRevisions,
+    MakeExclusive,
+    DeleteOrRename,
+}
+
+impl XlsFileLockPurpose {
+    fn from_u32(value: u32) -> XlsResult<Self> {
+        match value {
+            0x0000_0000 => Ok(Self::NotLocked),
+            0x0001_0001 => Ok(Self::WritingUserInfo),
+            0x0001_0002 => Ok(Self::MergingRevisions),
+            0x0001_0004 => Ok(Self::MakeExclusive),
+            0x0001_0008 => Ok(Self::DeleteOrRename),
+            other => Err(invalid(
+                FILE_LOCK_RECORD_TYPE,
+                format!("FileLock has unknown purpose 0x{other:08X}"),
+            )),
+        }
+    }
+}
+
+/// MS-XLS 2.4.116 `FileLock` record. Inert: reading it never acquires or
+/// releases any lock.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsFileLock {
+    purpose: XlsFileLockPurpose,
+    user_name: String,
+    unused: Vec<u8>,
+}
+
+impl XlsFileLock {
+    /// Parse the fixed 162-byte record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        if data.len() != FILE_LOCK_PAYLOAD_LEN {
+            return Err(invalid(
+                FILE_LOCK_RECORD_TYPE,
+                format!(
+                    "FileLock payload has {} bytes; expected {FILE_LOCK_PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let purpose = XlsFileLockPurpose::from_u32(read_u32(data, 0))?;
+        let cch = usize::from(read_u16(data, 4));
+        if cch > FILE_LOCK_MAX_USER_CHARS {
+            return Err(invalid(
+                FILE_LOCK_RECORD_TYPE,
+                format!("FileLock user name has {cch} characters; maximum is 52"),
+            ));
+        }
+        let user_name =
+            decode_fixed_string(FILE_LOCK_RECORD_TYPE, &data[6..], cch, "FileLock stUsrName")?;
+        // stUsrName spans cch (2 bytes) + option flags (1 byte) + characters.
+        let string_end = 6
+            + 1
+            + if data[6] & STRING_HIGH_BYTE != 0 {
+                2 * cch
+            } else {
+                cch
+            };
+        Ok(Self {
+            purpose,
+            user_name,
+            unused: data[string_end..].to_vec(),
+        })
+    }
+
+    pub fn purpose(&self) -> XlsFileLockPurpose {
+        self.purpose
+    }
+    pub fn user_name(&self) -> &str {
+        &self.user_name
+    }
+    pub fn unused_bytes(&self) -> &[u8] {
+        &self.unused
+    }
+}
+
+/// MS-XLS 2.4.339 `UsrExcl`: an exclusive lock on the shared workbook.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsUsrExcl {
+    exclusive: bool,
+    date_time: XlsShortDtr,
+    user_name: String,
+}
+
+impl XlsUsrExcl {
+    /// Parse the record payload: `fExclusive`, `sdtr`, `cchUser`, and the
+    /// fixed 147-character `stUser` field.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        if data.len() < USR_EXCL_PREFIX_LEN + 1 + USR_EXCL_USER_FIELD_CHARS {
+            return Err(invalid(
+                USR_EXCL_RECORD_TYPE,
+                format!(
+                    "UsrExcl payload has {} bytes; expected at least {}",
+                    data.len(),
+                    USR_EXCL_PREFIX_LEN + 1 + USR_EXCL_USER_FIELD_CHARS
+                ),
+            ));
+        }
+        let exclusive = match read_u32(data, 0) {
+            0 => false,
+            1 => true,
+            other => {
+                return Err(invalid(
+                    USR_EXCL_RECORD_TYPE,
+                    format!("UsrExcl fExclusive is 0x{other:08X}; expected a Boolean"),
+                ));
+            },
+        };
+        let date_time = XlsShortDtr::parse(USR_EXCL_RECORD_TYPE, &data[4..12])?;
+        let cch = read_u16(data, 12);
+        if usize::from(cch) > USR_EXCL_MAX_USER_CHARS {
+            return Err(invalid(
+                USR_EXCL_RECORD_TYPE,
+                format!("UsrExcl user name has {cch} characters; maximum is 54"),
+            ));
+        }
+        let field = &data[14..];
+        let wide = field[0] & STRING_HIGH_BYTE != 0;
+        let field_len = 1 + USR_EXCL_USER_FIELD_CHARS * if wide { 2 } else { 1 };
+        if field.len() != field_len {
+            return Err(invalid(
+                USR_EXCL_RECORD_TYPE,
+                format!(
+                    "UsrExcl stUser field has {} bytes; expected {field_len}",
+                    field.len()
+                ),
+            ));
+        }
+        let user_name = decode_fixed_string(
+            USR_EXCL_RECORD_TYPE,
+            field,
+            usize::from(cch),
+            "UsrExcl stUser",
+        )?;
+        Ok(Self {
+            exclusive,
+            date_time,
+            user_name,
+        })
+    }
+
+    pub fn is_exclusive(&self) -> bool {
+        self.exclusive
+    }
+    pub fn date_time(&self) -> XlsShortDtr {
+        self.date_time
+    }
+    pub fn user_name(&self) -> &str {
+        &self.user_name
+    }
+}
+
+/// MS-XLS 2.4.226 `RRDHead`: metadata for one user's set of revisions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrdHead {
+    guid: [u8; GUID_LEN],
+    code_page: u16,
+    user_name: String,
+    saved_at: XlsShortDtr,
+    next_tab_id: i16,
+}
+
+impl XlsRrdHead {
+    /// Parse the fixed 158-byte record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        const PAYLOAD_LEN: usize =
+            RRD_LEN + GUID_LEN + 2 + 2 + RRD_HEAD_USER_FIELD_LEN + SHORT_DTR_LEN + 2;
+        if data.len() != PAYLOAD_LEN {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                format!(
+                    "RRDHead payload has {} bytes; expected {PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, data, true)?;
+        if header.revision_type != XlsRevisionType::Header {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                "RRDHead revision type is not REVTHEADER",
+            ));
+        }
+        if header.revision_id != 0 {
+            return Err(invalid(RRD_HEAD_RECORD_TYPE, "RRDHead has a nonzero revid"));
+        }
+        let mut guid = [0u8; GUID_LEN];
+        guid.copy_from_slice(&data[RRD_LEN..RRD_LEN + GUID_LEN]);
+        let cch_offset = RRD_LEN + GUID_LEN + 2;
+        let cch = read_u16(data, cch_offset);
+        if usize::from(cch) > RRD_HEAD_MAX_USER_CHARS {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                format!("RRDHead user name has {cch} characters; maximum is 54"),
+            ));
+        }
+        let field_offset = cch_offset + 2;
+        let user_name = decode_fixed_string(
+            RRD_HEAD_RECORD_TYPE,
+            &data[field_offset..field_offset + RRD_HEAD_USER_FIELD_LEN],
+            usize::from(cch),
+            "RRDHead stUser",
+        )?;
+        let dtr_offset = field_offset + RRD_HEAD_USER_FIELD_LEN;
+        let saved_at = XlsShortDtr::parse(
+            RRD_HEAD_RECORD_TYPE,
+            &data[dtr_offset..dtr_offset + SHORT_DTR_LEN],
+        )?;
+        let next_tab_id = read_i16(data, dtr_offset + SHORT_DTR_LEN);
+        if next_tab_id < -1 {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                "RRDHead tabidMac is less than -1",
+            ));
+        }
+        Ok(Self {
+            guid,
+            code_page: read_u16(data, RRD_LEN + GUID_LEN),
+            user_name,
+            saved_at,
+            next_tab_id,
+        })
+    }
+
+    /// Identifier of this set of revisions.
+    pub fn guid(&self) -> &[u8; GUID_LEN] {
+        &self.guid
+    }
+    /// Sheet code page; 1200 means Unicode.
+    pub fn code_page(&self) -> u16 {
+        self.code_page
+    }
+    pub fn user_name(&self) -> &str {
+        &self.user_name
+    }
+    pub fn saved_at(&self) -> XlsShortDtr {
+        self.saved_at
+    }
+    /// Next available sheet identifier (`tabidMac`).
+    pub fn next_tab_id(&self) -> i16 {
+        self.next_tab_id
+    }
+}
+
+/// MS-XLS 2.4.241 `RRTabId`: sheet identifiers in BoundSheet8 order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrTabId {
+    sheet_ids: Vec<u16>,
+}
+
+impl XlsRrTabId {
+    /// Parse the record payload, an array of 2-byte sheet identifiers.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        if data.len() % 2 != 0 {
+            return Err(invalid(
+                RR_TAB_ID_RECORD_TYPE,
+                "RRTabId payload has an odd byte count",
+            ));
+        }
+        let sheet_ids = data
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        if sheet_ids.len() > MAX_TAB_ID_COUNT {
+            return Err(invalid(
+                RR_TAB_ID_RECORD_TYPE,
+                format!(
+                    "RRTabId has {} sheet identifiers; maximum is {MAX_TAB_ID_COUNT}",
+                    sheet_ids.len()
+                ),
+            ));
+        }
+        Ok(Self { sheet_ids })
+    }
+
+    pub fn sheet_ids(&self) -> &[u16] {
+        &self.sheet_ids
+    }
+}
+
+/// MS-XLS 2.4.234 `RRDRenSheet`: old and new names of a renamed sheet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrdRenSheet {
+    header: XlsRevisionRecordHeader,
+    old_name: String,
+    new_name: String,
+}
+
+impl XlsRrdRenSheet {
+    /// Parse the fixed 528-byte record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        const PAYLOAD_LEN: usize =
+            RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN;
+        if data.len() != PAYLOAD_LEN {
+            return Err(invalid(
+                RRD_REN_SHEET_RECORD_TYPE,
+                format!(
+                    "RRDRenSheet payload has {} bytes; expected {PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RRD_REN_SHEET_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RRD_REN_SHEET_RECORD_TYPE)?;
+        if header.revision_type != XlsRevisionType::RenameSheet {
+            return Err(invalid(
+                RRD_REN_SHEET_RECORD_TYPE,
+                "RRDRenSheet revision type is not REVTRENSHEET",
+            ));
+        }
+        header.require_sheet(RRD_REN_SHEET_RECORD_TYPE)?;
+        let old_cch = read_u16(data, RRD_LEN);
+        let old_field = &data[RRD_LEN + 2..RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN];
+        validate_sheet_name_chars(
+            RRD_REN_SHEET_RECORD_TYPE,
+            old_field,
+            old_cch,
+            "RRDRenSheet stOldName",
+        )?;
+        let old_name = decode_fixed_string(
+            RRD_REN_SHEET_RECORD_TYPE,
+            old_field,
+            usize::from(old_cch),
+            "RRDRenSheet stOldName",
+        )?;
+        let new_offset = RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN;
+        let new_cch = read_u16(data, new_offset);
+        let new_field = &data[new_offset + 2..new_offset + 2 + REN_SHEET_NAME_FIELD_LEN];
+        validate_sheet_name_chars(
+            RRD_REN_SHEET_RECORD_TYPE,
+            new_field,
+            new_cch,
+            "RRDRenSheet stNewName",
+        )?;
+        let new_name = decode_fixed_string(
+            RRD_REN_SHEET_RECORD_TYPE,
+            new_field,
+            usize::from(new_cch),
+            "RRDRenSheet stNewName",
+        )?;
+        Ok(Self {
+            header,
+            old_name,
+            new_name,
+        })
+    }
+
+    pub fn header(&self) -> &XlsRevisionRecordHeader {
+        &self.header
+    }
+    pub fn old_name(&self) -> &str {
+        &self.old_name
+    }
+    pub fn new_name(&self) -> &str {
+        &self.new_name
+    }
+}
+
+/// MS-XLS 2.4.228 `RRDInsDel`: an insertion or deletion of rows or columns.
+///
+/// The `Ducr` undo array is preserved raw; applying it would replay formula
+/// edits, which an inert reader must not do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrdInsDel {
+    header: XlsRevisionRecordHeader,
+    end_of_list: bool,
+    range: XlsRevisionCellRange,
+    undo_count: u32,
+    undo_data: Vec<u8>,
+}
+
+impl XlsRrdInsDel {
+    /// Parse the record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        const FIXED_LEN: usize = RRD_LEN + 2 + REF8U_LEN + 4;
+        if data.len() < FIXED_LEN {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                format!(
+                    "RRDInsDel payload has {} bytes; expected at least {FIXED_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RRD_INS_DEL_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RRD_INS_DEL_RECORD_TYPE)?;
+        match header.revision_type {
+            XlsRevisionType::InsertRow
+            | XlsRevisionType::InsertColumn
+            | XlsRevisionType::DeleteRow
+            | XlsRevisionType::DeleteColumn => {},
+            _ => {
+                return Err(invalid(
+                    RRD_INS_DEL_RECORD_TYPE,
+                    "RRDInsDel revision type is not an insert/delete",
+                ));
+            },
+        }
+        header.require_sheet(RRD_INS_DEL_RECORD_TYPE)?;
+        let flags = read_u16(data, RRD_LEN);
+        if flags & 0xFFFE != 0 {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel contains reserved flag bits",
+            ));
+        }
+        let end_of_list = flags & 0x0001 != 0;
+        if end_of_list && header.revision_type != XlsRevisionType::InsertRow {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel fEndOfList is set for a non row-insert",
+            ));
+        }
+        let range = XlsRevisionCellRange::parse(
+            RRD_INS_DEL_RECORD_TYPE,
+            &data[RRD_LEN + 2..RRD_LEN + 2 + REF8U_LEN],
+        )?;
+        let undo_count = read_u32(data, RRD_LEN + 2 + REF8U_LEN);
+        let undo_data = data[FIXED_LEN..].to_vec();
+        if undo_count == 0 && !undo_data.is_empty() {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel has undo bytes but a zero undo count",
+            ));
+        }
+        if undo_count > 0 && undo_data.is_empty() {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel is missing its Ducr undo data",
+            ));
+        }
+        Ok(Self {
+            header,
+            end_of_list,
+            range,
+            undo_count,
+            undo_data,
+        })
+    }
+
+    pub fn header(&self) -> &XlsRevisionRecordHeader {
+        &self.header
+    }
+    pub fn is_end_of_list(&self) -> bool {
+        self.end_of_list
+    }
+    pub fn range(&self) -> XlsRevisionCellRange {
+        self.range
+    }
+    pub fn undo_count(&self) -> u32 {
+        self.undo_count
+    }
+    /// Raw `Ducr` undo array (MS-XLS 2.5.71), preserved without interpreting.
+    pub fn undo_data(&self) -> &[u8] {
+        &self.undo_data
+    }
+}
+
+/// MS-XLS 2.4.231 `RRDMove`: a moved cell range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrdMove {
+    header: XlsRevisionRecordHeader,
+    source: XlsRevisionCellRange,
+    destination: XlsRevisionCellRange,
+    source_tab_id: u16,
+    undo_count: u32,
+    undo_data: Vec<u8>,
+}
+
+impl XlsRrdMove {
+    /// Parse the record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        const FIXED_LEN: usize = RRD_LEN + 2 * REF8U_LEN + 2 + 4;
+        if data.len() < FIXED_LEN {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                format!(
+                    "RRDMove payload has {} bytes; expected at least {FIXED_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RRD_MOVE_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RRD_MOVE_RECORD_TYPE)?;
+        if header.revision_type != XlsRevisionType::CellMove {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                "RRDMove revision type is not REVTMOVE",
+            ));
+        }
+        header.require_sheet(RRD_MOVE_RECORD_TYPE)?;
+        let source =
+            XlsRevisionCellRange::parse(RRD_MOVE_RECORD_TYPE, &data[RRD_LEN..RRD_LEN + REF8U_LEN])?;
+        let destination = XlsRevisionCellRange::parse(
+            RRD_MOVE_RECORD_TYPE,
+            &data[RRD_LEN + REF8U_LEN..RRD_LEN + 2 * REF8U_LEN],
+        )?;
+        let source_tab_id = read_u16(data, RRD_LEN + 2 * REF8U_LEN);
+        let undo_count = read_u32(data, RRD_LEN + 2 * REF8U_LEN + 2);
+        let undo_data = data[FIXED_LEN..].to_vec();
+        if undo_count == 0 && !undo_data.is_empty() {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                "RRDMove has undo bytes but a zero undo count",
+            ));
+        }
+        if undo_count > 0 && undo_data.is_empty() {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                "RRDMove is missing its Ducr undo data",
+            ));
+        }
+        Ok(Self {
+            header,
+            source,
+            destination,
+            source_tab_id,
+            undo_count,
+            undo_data,
+        })
+    }
+
+    pub fn header(&self) -> &XlsRevisionRecordHeader {
+        &self.header
+    }
+    pub fn source(&self) -> XlsRevisionCellRange {
+        self.source
+    }
+    pub fn destination(&self) -> XlsRevisionCellRange {
+        self.destination
+    }
+    /// Sheet on which the source range resides.
+    pub fn source_tab_id(&self) -> u16 {
+        self.source_tab_id
+    }
+    pub fn undo_count(&self) -> u32 {
+        self.undo_count
+    }
+    /// Raw `Ducr` undo array (MS-XLS 2.5.71), preserved without interpreting.
+    pub fn undo_data(&self) -> &[u8] {
+        &self.undo_data
+    }
+}
+
+/// MS-XLS 2.4.239 `RRInsertSh`: an inserted sheet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrInsertSh {
+    header: XlsRevisionRecordHeader,
+    position: u16,
+    name: String,
+}
+
+impl XlsRrInsertSh {
+    /// Parse the fixed 276-byte record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        const PAYLOAD_LEN: usize = RRD_LEN + 2 + 2 + 2 + INSERT_SH_NAME_FIELD_LEN;
+        if data.len() != PAYLOAD_LEN {
+            return Err(invalid(
+                RR_INSERT_SH_RECORD_TYPE,
+                format!(
+                    "RRInsertSh payload has {} bytes; expected {PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RR_INSERT_SH_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RR_INSERT_SH_RECORD_TYPE)?;
+        if header.revision_type != XlsRevisionType::InsertSheet {
+            return Err(invalid(
+                RR_INSERT_SH_RECORD_TYPE,
+                "RRInsertSh revision type is not REVTINSERTSH",
+            ));
+        }
+        header.require_sheet(RR_INSERT_SH_RECORD_TYPE)?;
+        if read_u16(data, RRD_LEN + 2) != 0 {
+            return Err(invalid(
+                RR_INSERT_SH_RECORD_TYPE,
+                "RRInsertSh reserved field is nonzero",
+            ));
+        }
+        let cch = read_u16(data, RRD_LEN + 4);
+        let name_field = &data[RRD_LEN + 6..RRD_LEN + 6 + INSERT_SH_NAME_FIELD_LEN];
+        validate_sheet_name_chars(
+            RR_INSERT_SH_RECORD_TYPE,
+            name_field,
+            cch,
+            "RRInsertSh stName",
+        )?;
+        let name = decode_fixed_string(
+            RR_INSERT_SH_RECORD_TYPE,
+            name_field,
+            usize::from(cch),
+            "RRInsertSh stName",
+        )?;
+        Ok(Self {
+            header,
+            position: read_u16(data, RRD_LEN),
+            name,
+        })
+    }
+
+    pub fn header(&self) -> &XlsRevisionRecordHeader {
+        &self.header
+    }
+    /// Position of the new sheet in the workbook (`itabPos`).
+    pub fn position(&self) -> u16 {
+        self.position
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// Kind of cell contents recorded by an `RRDChgCell` revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XlsRevisionCellContent {
+    Blank,
+    RkNumber,
+    Xnum,
+    RichExtendedString,
+    BoolError,
+    Formula,
+}
+
+impl XlsRevisionCellContent {
+    fn from_bits(record_type: u16, bits: u32, context: &str) -> XlsResult<Self> {
+        match bits {
+            0x0 => Ok(Self::Blank),
+            0x1 => Ok(Self::RkNumber),
+            0x2 => Ok(Self::Xnum),
+            0x3 => Ok(Self::RichExtendedString),
+            0x4 => Ok(Self::BoolError),
+            0x5 => Ok(Self::Formula),
+            other => Err(invalid(
+                record_type,
+                format!("RRDChgCell {context} has unknown content type {other}"),
+            )),
+        }
+    }
+}
+
+/// MS-XLS 2.4.223 `RRDChgCell`: a cell-change revision.
+///
+/// The variable tail — optional DXFN differential formats followed by the old
+/// and new cell values (RK numbers, Xnum doubles, rich extended strings,
+/// Boolean/error values, or parsed formulas) — is preserved raw. `cbOldVal`
+/// is validated against the MS-XLS size table, but the values themselves are
+/// not decoded: rich strings and `CellParsedFormula` token arrays are
+/// variable-length structures specified outside the revision record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XlsRrdChgCell {
+    header: XlsRevisionRecordHeader,
+    new_content: XlsRevisionCellContent,
+    old_content: XlsRevisionCellContent,
+    lotus_prefix: bool,
+    has_old_format: bool,
+    old_format_empty: bool,
+    reset_to_style_format: bool,
+    clear_style_format: bool,
+    has_new_format: bool,
+    new_format_empty: bool,
+    display_format: u8,
+    phonetic_shown: bool,
+    old_phonetic_shown: bool,
+    formula_adjusted: bool,
+    location: XlsRevisionCellLocation,
+    old_value_size: u32,
+    formatting_run_count: u16,
+    tail: Vec<u8>,
+}
+
+impl XlsRrdChgCell {
+    /// Parse the record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        if data.len() < RRD_CHG_CELL_FIXED_LEN {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                format!(
+                    "RRDChgCell payload has {} bytes; expected at least {RRD_CHG_CELL_FIXED_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, data, false)?;
+        if header.revision_type != XlsRevisionType::ChangeCell {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell revision type is not REVTCHANGECELL",
+            ));
+        }
+        if header.is_deleted_at_edge_of_sort() {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell sets fDelAtEdgeOfSort",
+            ));
+        }
+        header.require_sheet(RRD_CHG_CELL_RECORD_TYPE)?;
+        let flags = read_u32(data, RRD_LEN);
+        if flags & 0xF800_C000 != 0 {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell contains reserved flag bits",
+            ));
+        }
+        let new_content =
+            XlsRevisionCellContent::from_bits(RRD_CHG_CELL_RECORD_TYPE, flags & 0x7, "vt")?;
+        let old_content = XlsRevisionCellContent::from_bits(
+            RRD_CHG_CELL_RECORD_TYPE,
+            (flags >> 3) & 0x7,
+            "vtOld",
+        )?;
+        let location = XlsRevisionCellLocation::parse(&data[RRD_LEN + 4..RRD_LEN + 8]);
+        let old_value_size = read_u32(data, RRD_LEN + 8);
+        let expected_old_size = match old_content {
+            XlsRevisionCellContent::Blank => Some(0),
+            XlsRevisionCellContent::RkNumber => Some(4),
+            XlsRevisionCellContent::Xnum => Some(8),
+            XlsRevisionCellContent::BoolError => Some(2),
+            XlsRevisionCellContent::RichExtendedString | XlsRevisionCellContent::Formula => None,
+        };
+        if let Some(expected) = expected_old_size {
+            if old_value_size != expected {
+                return Err(invalid(
+                    RRD_CHG_CELL_RECORD_TYPE,
+                    format!(
+                        "RRDChgCell cbOldVal is {old_value_size}; expected {expected} for the old content type"
+                    ),
+                ));
+            }
+        }
+        if old_content == XlsRevisionCellContent::Formula && old_value_size < MIN_FORMULA_VALUE_LEN
+        {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell old formula is smaller than 24 bytes",
+            ));
+        }
+        let formatting_run_count = read_u16(data, RRD_LEN + 12);
+        let tail = data[RRD_CHG_CELL_FIXED_LEN..].to_vec();
+        let old_value_size_usize = usize::try_from(old_value_size).map_err(|_| {
+            invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell cbOldVal overflows usize",
+            )
+        })?;
+        if old_value_size_usize > tail.len() {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell old value extends past the record payload",
+            ));
+        }
+        Ok(Self {
+            header,
+            new_content,
+            old_content,
+            lotus_prefix: flags & 0x0040 != 0,
+            has_old_format: flags & 0x0100 != 0,
+            old_format_empty: flags & 0x0200 != 0,
+            reset_to_style_format: flags & 0x0400 != 0,
+            clear_style_format: flags & 0x0800 != 0,
+            has_new_format: flags & 0x1000 != 0,
+            new_format_empty: flags & 0x2000 != 0,
+            display_format: ((flags >> 16) & 0xFF) as u8,
+            phonetic_shown: flags & 0x0100_0000 != 0,
+            old_phonetic_shown: flags & 0x0200_0000 != 0,
+            formula_adjusted: flags & 0x0400_0000 != 0,
+            location,
+            old_value_size,
+            formatting_run_count,
+            tail,
+        })
+    }
+
+    pub fn header(&self) -> &XlsRevisionRecordHeader {
+        &self.header
+    }
+    pub fn new_content(&self) -> XlsRevisionCellContent {
+        self.new_content
+    }
+    pub fn old_content(&self) -> XlsRevisionCellContent {
+        self.old_content
+    }
+    /// Whether Lotus 1-2-3 prefix characters are present (`f123Prefix`).
+    pub fn has_lotus_prefix(&self) -> bool {
+        self.lotus_prefix
+    }
+    pub fn has_old_format(&self) -> bool {
+        self.has_old_format
+    }
+    pub fn old_format_empty(&self) -> bool {
+        self.old_format_empty
+    }
+    /// `fXfDxf`: reset the cell format to the cell style before applying `dxf`.
+    pub fn resets_to_style_format(&self) -> bool {
+        self.reset_to_style_format
+    }
+    /// `fStyXfDxf`: clear the cell format before applying `dxf`.
+    pub fn clears_style_format(&self) -> bool {
+        self.clear_style_format
+    }
+    pub fn has_new_format(&self) -> bool {
+        self.has_new_format
+    }
+    pub fn new_format_empty(&self) -> bool {
+        self.new_format_empty
+    }
+    /// Number format used to display the new cell contents (`ifmtDisp`).
+    pub fn display_format(&self) -> u8 {
+        self.display_format
+    }
+    pub fn phonetic_shown(&self) -> bool {
+        self.phonetic_shown
+    }
+    pub fn old_phonetic_shown(&self) -> bool {
+        self.old_phonetic_shown
+    }
+    /// Whether the change came from a formula adjustment (`fEOLFmlaUpdate`).
+    pub fn formula_adjusted(&self) -> bool {
+        self.formula_adjusted
+    }
+    pub fn location(&self) -> XlsRevisionCellLocation {
+        self.location
+    }
+    /// Byte size of the old cell contents (`cbOldVal`).
+    pub fn old_value_size(&self) -> u32 {
+        self.old_value_size
+    }
+    /// Number of `RRDRstEtxp` records that follow (`cetxpRst`).
+    pub fn formatting_run_count(&self) -> u16 {
+        self.formatting_run_count
+    }
+    /// Raw tail: optional DXFN formats followed by the old and new values.
+    pub fn tail(&self) -> &[u8] {
+        &self.tail
+    }
+}
+
+/// MS-XLS 2.4.224 `RRDConflict`: resolution of a conflict between revisions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsRrdConflict {
+    header: XlsRevisionRecordHeader,
+}
+
+impl XlsRrdConflict {
+    /// Parse the record payload, which is the RRD structure alone.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        if data.len() != RRD_LEN {
+            return Err(invalid(
+                RRD_CONFLICT_RECORD_TYPE,
+                format!(
+                    "RRDConflict payload has {} bytes; expected {RRD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RRD_CONFLICT_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RRD_CONFLICT_RECORD_TYPE)?;
+        if header.revision_type != XlsRevisionType::Conflict {
+            return Err(invalid(
+                RRD_CONFLICT_RECORD_TYPE,
+                "RRDConflict revision type is not REVTCONFLICT",
+            ));
+        }
+        Ok(Self { header })
+    }
+
+    pub fn header(&self) -> &XlsRevisionRecordHeader {
+        &self.header
+    }
+}
+
+/// MS-XLS 2.4.237 `RRDUserView`: a custom-view revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct XlsRrdUserView {
+    header: XlsRevisionRecordHeader,
+    guid: [u8; GUID_LEN],
+}
+
+impl XlsRrdUserView {
+    /// Parse the fixed 30-byte record payload.
+    pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
+        if data.len() != RRD_USER_VIEW_PAYLOAD_LEN {
+            return Err(invalid(
+                RRD_USER_VIEW_RECORD_TYPE,
+                format!(
+                    "RRDUserView payload has {} bytes; expected {RRD_USER_VIEW_PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = XlsRevisionRecordHeader::parse(RRD_USER_VIEW_RECORD_TYPE, data, false)?;
+        if header.revision_id != 0 {
+            return Err(invalid(
+                RRD_USER_VIEW_RECORD_TYPE,
+                "RRDUserView has a nonzero revid",
+            ));
+        }
+        if !matches!(
+            header.revision_type,
+            XlsRevisionType::AddView | XlsRevisionType::DeleteView
+        ) {
+            return Err(invalid(
+                RRD_USER_VIEW_RECORD_TYPE,
+                "RRDUserView revision type is not a view revision",
+            ));
+        }
+        if header.tab_id().is_some() {
+            return Err(invalid(
+                RRD_USER_VIEW_RECORD_TYPE,
+                "RRDUserView corresponds to a specific sheet",
+            ));
+        }
+        let mut guid = [0u8; GUID_LEN];
+        guid.copy_from_slice(&data[RRD_LEN..RRD_LEN + GUID_LEN]);
+        Ok(Self { header, guid })
+    }
+
+    pub fn header(&self) -> &XlsRevisionRecordHeader {
+        &self.header
+    }
+    /// Identifier of the custom view whose revision this record describes.
+    pub fn guid(&self) -> &[u8; GUID_LEN] {
+        &self.guid
+    }
+}
+
+/// Validate that an empty begin/end marker record has no payload.
+pub(crate) fn validate_empty_marker(record_type: u16, data: &[u8], name: &str) -> XlsResult<()> {
+    if !data.is_empty() {
+        return Err(invalid(
+            record_type,
+            format!("{name} payload has {} bytes; expected 0", data.len()),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a valid 14-byte RRD structure (cbMemory = 26, no flags).
+    fn rrd(revt: u16, revid: i32, tabid: u16) -> [u8; RRD_LEN] {
+        let mut data = [0u8; RRD_LEN];
+        data[0..4].copy_from_slice(&26u32.to_le_bytes());
+        data[4..8].copy_from_slice(&revid.to_le_bytes());
+        data[8..10].copy_from_slice(&revt.to_le_bytes());
+        data[12..14].copy_from_slice(&tabid.to_le_bytes());
+        data
+    }
+
+    fn short_dtr_bytes() -> [u8; SHORT_DTR_LEN] {
+        let mut data = [0u8; SHORT_DTR_LEN];
+        data[0..2].copy_from_slice(&2024u16.to_le_bytes());
+        data[2] = 1;
+        data[3] = 15;
+        data[4] = 10;
+        data[5] = 30;
+        data[6] = 5;
+        data[7] = 1;
+        data
+    }
+
+    /// Fixed-size XLUnicodeStringNoCch field holding a compressed string.
+    fn string_field(field_len: usize, text: &str) -> Vec<u8> {
+        let mut field = vec![0u8; field_len];
+        field[1..1 + text.len()].copy_from_slice(text.as_bytes());
+        field
+    }
+
+    #[test]
+    fn revision_type_round_trips_all_spec_values() {
+        for value in [
+            0x0000u16, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0007, 0x0008, 0x0009, 0x000A,
+            0x000B, 0x000C, 0x000D, 0x0020, 0x0025, 0x002B, 0x002C, 0x002E,
+        ] {
+            let kind = XlsRevisionType::from_u16(RRD_HEAD_RECORD_TYPE, value).unwrap();
+            assert_eq!(kind.to_u16(), value);
+        }
+        assert!(XlsRevisionType::from_u16(RRD_HEAD_RECORD_TYPE, 0x0006).is_err());
+        assert!(XlsRevisionType::from_u16(RRD_HEAD_RECORD_TYPE, 0xFFFF).is_err());
+    }
+
+    #[test]
+    fn short_dtr_validates_calendar_ranges() {
+        let dtr = XlsShortDtr::parse(RRD_HEAD_RECORD_TYPE, &short_dtr_bytes()).unwrap();
+        assert_eq!(dtr.year(), 2024);
+        assert_eq!(dtr.month(), 1);
+        assert_eq!(dtr.day(), 15);
+        assert_eq!(dtr.hour(), 10);
+        assert_eq!(dtr.minute(), 30);
+        assert_eq!(dtr.second(), 5);
+        assert_eq!(dtr.weekday(), 1);
+
+        assert!(XlsShortDtr::parse(RRD_HEAD_RECORD_TYPE, &[0; 7]).is_err());
+        for (index, value) in [
+            (0usize, 0u8), // year low byte -> year 0
+            (2, 0),        // month 0
+            (2, 13),       // month 13
+            (3, 0),        // day 0
+            (3, 32),       // day 32
+            (4, 24),       // hour 24
+            (5, 60),       // minute 60
+            (6, 60),       // second 60
+            (7, 8),        // weekday 8
+        ] {
+            let mut data = short_dtr_bytes();
+            data[index] = value;
+            if index == 0 {
+                data[1] = 0;
+            }
+            assert!(
+                XlsShortDtr::parse(RRD_HEAD_RECORD_TYPE, &data).is_err(),
+                "index {index} value {value} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn ref8u_validates_ordering_and_column_cap() {
+        let mut data = [0u8; REF8U_LEN];
+        data[0..2].copy_from_slice(&5u16.to_le_bytes());
+        data[2..4].copy_from_slice(&9u16.to_le_bytes());
+        data[4..6].copy_from_slice(&2u16.to_le_bytes());
+        data[6..8].copy_from_slice(&0x00FFu16.to_le_bytes());
+        let range = XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &data).unwrap();
+        assert_eq!(range.first_row(), 5);
+        assert_eq!(range.last_row(), 9);
+        assert_eq!(range.first_column(), 2);
+        assert_eq!(range.last_column(), 0x00FF);
+
+        let mut swapped_rows = data;
+        swapped_rows[0..2].copy_from_slice(&10u16.to_le_bytes());
+        assert!(XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &swapped_rows).is_err());
+        let mut over_column = data;
+        over_column[6..8].copy_from_slice(&0x0100u16.to_le_bytes());
+        assert!(XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &over_column).is_err());
+        assert!(XlsRevisionCellRange::parse(RRD_INS_DEL_RECORD_TYPE, &data[..7]).is_err());
+    }
+
+    #[test]
+    fn rrd_header_validates_memory_flags_and_revid() {
+        let header =
+            XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &rrd(0x0008, 3, 1), false)
+                .unwrap();
+        assert_eq!(header.memory_size(), 26);
+        assert_eq!(header.revision_id(), 3);
+        assert_eq!(header.revision_type(), XlsRevisionType::ChangeCell);
+        assert_eq!(header.tab_id(), Some(1));
+        assert!(!header.is_accepted());
+
+        let mut small_memory = rrd(0x0008, 3, 1);
+        small_memory[0..4].copy_from_slice(&25u32.to_le_bytes());
+        assert!(
+            XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &small_memory, false).is_err()
+        );
+        // RRDHead requires the sentinel instead of the minimum.
+        assert!(
+            XlsRevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, &rrd(0x0020, 0, 0xFFFF), true)
+                .is_err()
+        );
+        let mut head = rrd(0x0020, 0, 0xFFFF);
+        head[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        let header = XlsRevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, &head, true).unwrap();
+        assert_eq!(header.tab_id(), None);
+
+        let mut flags = rrd(0x0008, 3, 1);
+        flags[10] = 0x10; // reserved bit
+        assert!(XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &flags, false).is_err());
+        let mut negative = rrd(0x0008, 3, 1);
+        negative[4..8].copy_from_slice(&(-1i32).to_le_bytes());
+        assert!(
+            XlsRevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, &negative, false).is_err()
+        );
+        assert!(
+            XlsRevisionRecordHeader::parse(
+                RRD_CHG_CELL_RECORD_TYPE,
+                &rrd(0x0008, 3, 1)[..13],
+                false
+            )
+            .is_err()
+        );
+    }
+
+    /// Build a valid 50-byte RRDInfo payload (shared, tracked, 30-day history).
+    fn rrd_info_payload() -> Vec<u8> {
+        let mut data = vec![0u8; RRD_INFO_PAYLOAD_LEN];
+        data[0..2].copy_from_slice(&8u16.to_le_bytes()); // wXLVer = BIFF8
+        data[4..6].copy_from_slice(&0x000Bu16.to_le_bytes()); // shared|diskHasRev|revTrack
+        data[6] = 0xAA; // guid marker
+        data[22] = 0xBB; // guidRoot marker
+        data[38..42].copy_from_slice(&7i32.to_le_bytes()); // revid
+        data[42..46].copy_from_slice(&1u32.to_le_bytes()); // version
+        data[46..48].copy_from_slice(&30u16.to_le_bytes()); // interval
+        data
+    }
+
+    #[test]
+    fn rrd_info_parses_flags_and_guids() {
+        let info = XlsRrdInfo::parse_payload(&rrd_info_payload()).unwrap();
+        assert_eq!(info.biff_version(), 8);
+        assert!(info.is_shared());
+        assert!(info.disk_has_revisions());
+        assert!(info.track_revisions());
+        assert!(!info.is_exclusive());
+        assert!(!info.auto_delete_revisions());
+        assert_eq!(info.guid()[0], 0xAA);
+        assert_eq!(info.root_guid()[0], 0xBB);
+        assert_eq!(info.revision_id(), 7);
+        assert_eq!(info.version(), 1);
+        assert!(!info.history_disabled());
+        assert!(!info.history_protected());
+        assert_eq!(info.history_interval_days(), 30);
+    }
+
+    #[test]
+    fn rrd_info_enforces_flag_consistency() {
+        let assert_flag_error = |flags: u16, flags2: u16, interval: u16| {
+            let mut data = rrd_info_payload();
+            data[4..6].copy_from_slice(&flags.to_le_bytes());
+            data[44..46].copy_from_slice(&flags2.to_le_bytes());
+            data[46..48].copy_from_slice(&interval.to_le_bytes());
+            assert!(
+                XlsRrdInfo::parse_payload(&data).is_err(),
+                "flags {flags:#06X} flags2 {flags2:#06X} interval {interval} must fail"
+            );
+        };
+        assert!(XlsRrdInfo::parse_payload(&rrd_info_payload()[..49]).is_err());
+        assert_flag_error(0x0011, 0, 30); // shared + exclusive
+        assert_flag_error(0x0008, 0, 30); // revTrack without shared
+        assert_flag_error(0x0003, 0, 30); // diskHasRev without revTrack
+        assert_flag_error(0x0005, 0, 30); // revHist without revTrack
+        assert_flag_error(0x000B, 0, 0); // preserved history with zero interval
+        assert_flag_error(0x000B, 0x0001, 30); // fNoRevHist with nonzero interval
+        assert_flag_error(0x0000, 0x0001, 0); // fNoRevHist without shared
+        assert_flag_error(0x0000, 0x0002, 0); // fProtRev without shared
+        assert_flag_error(0x000B, 0, 0x8000); // interval above 0x7FFF
+        assert_flag_error(0x002B, 0, 30); // reserved flag bit
+        assert_flag_error(0x000B, 0x0004, 30); // reserved flag bit in flags2
+        let mut reserved1 = rrd_info_payload();
+        reserved1[2] = 1;
+        assert!(XlsRrdInfo::parse_payload(&reserved1).is_err());
+        let mut negative_revid = rrd_info_payload();
+        negative_revid[38..42].copy_from_slice(&(-1i32).to_le_bytes());
+        assert!(XlsRrdInfo::parse_payload(&negative_revid).is_err());
+
+        // Exclusive workbooks ignore the history interval entirely.
+        let mut exclusive = rrd_info_payload();
+        exclusive[4..6].copy_from_slice(&0x0010u16.to_le_bytes());
+        exclusive[46..48].copy_from_slice(&0u16.to_le_bytes());
+        assert!(
+            XlsRrdInfo::parse_payload(&exclusive)
+                .unwrap()
+                .is_exclusive()
+        );
+    }
+
+    #[test]
+    fn file_lock_parses_fixed_envelope() {
+        let mut data = vec![0u8; FILE_LOCK_PAYLOAD_LEN];
+        data[0..4].copy_from_slice(&0x0001_0002u32.to_le_bytes());
+        data[4..6].copy_from_slice(&4u16.to_le_bytes());
+        data[7..11].copy_from_slice(b"Yves");
+        let lock = XlsFileLock::parse_payload(&data).unwrap();
+        assert_eq!(lock.purpose(), XlsFileLockPurpose::MergingRevisions);
+        assert_eq!(lock.user_name(), "Yves");
+        assert_eq!(lock.unused_bytes().len(), FILE_LOCK_PAYLOAD_LEN - 6 - 1 - 4);
+
+        assert!(XlsFileLock::parse_payload(&data[..161]).is_err());
+        let mut bad_purpose = data.clone();
+        bad_purpose[0..4].copy_from_slice(&0x0001_0003u32.to_le_bytes());
+        assert!(XlsFileLock::parse_payload(&bad_purpose).is_err());
+        let mut long_name = data.clone();
+        long_name[4..6].copy_from_slice(&53u16.to_le_bytes());
+        assert!(XlsFileLock::parse_payload(&long_name).is_err());
+        let mut reserved_flags = data;
+        reserved_flags[6] = 0x02;
+        assert!(XlsFileLock::parse_payload(&reserved_flags).is_err());
+    }
+
+    fn usr_excl_payload(wide: bool) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&1u32.to_le_bytes()); // fExclusive
+        data.extend_from_slice(&short_dtr_bytes());
+        data.extend_from_slice(&4u16.to_le_bytes()); // cchUser
+        let field_len = 1 + USR_EXCL_USER_FIELD_CHARS * if wide { 2 } else { 1 };
+        let mut field = vec![0u8; field_len];
+        if wide {
+            field[0] = 1;
+            for (index, unit) in "Lock".encode_utf16().enumerate() {
+                field[1 + index * 2..3 + index * 2].copy_from_slice(&unit.to_le_bytes());
+            }
+        } else {
+            field[1..5].copy_from_slice(b"Lock");
+        }
+        data.extend_from_slice(&field);
+        data
+    }
+
+    #[test]
+    fn usr_excl_parses_both_string_widths() {
+        let lock = XlsUsrExcl::parse_payload(&usr_excl_payload(false)).unwrap();
+        assert!(lock.is_exclusive());
+        assert_eq!(lock.user_name(), "Lock");
+        assert_eq!(lock.date_time().year(), 2024);
+
+        let wide = XlsUsrExcl::parse_payload(&usr_excl_payload(true)).unwrap();
+        assert_eq!(wide.user_name(), "Lock");
+
+        let mut bad_bool = usr_excl_payload(false);
+        bad_bool[0..4].copy_from_slice(&2u32.to_le_bytes());
+        assert!(XlsUsrExcl::parse_payload(&bad_bool).is_err());
+        let mut bad_size = usr_excl_payload(false);
+        bad_size.pop();
+        assert!(XlsUsrExcl::parse_payload(&bad_size).is_err());
+        let mut long_name = usr_excl_payload(false);
+        long_name[12..14].copy_from_slice(&55u16.to_le_bytes());
+        assert!(XlsUsrExcl::parse_payload(&long_name).is_err());
+    }
+
+    /// Build a valid 158-byte RRDHead payload.
+    fn rrd_head_payload() -> Vec<u8> {
+        let mut data = Vec::with_capacity(158);
+        let mut header = rrd(0x0020, 0, 0xFFFF);
+        header[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+        data.extend_from_slice(&header);
+        data.extend_from_slice(&[0xCC; GUID_LEN]);
+        data.extend_from_slice(&1200u16.to_le_bytes()); // Unicode code page
+        data.extend_from_slice(&5u16.to_le_bytes()); // cchUser
+        data.extend_from_slice(&string_field(RRD_HEAD_USER_FIELD_LEN, "Alice"));
+        data.extend_from_slice(&short_dtr_bytes());
+        data.extend_from_slice(&3i16.to_le_bytes()); // tabidMac
+        data
+    }
+
+    #[test]
+    fn rrd_head_parses_metadata() {
+        let head = XlsRrdHead::parse_payload(&rrd_head_payload()).unwrap();
+        assert_eq!(head.guid(), &[0xCC; GUID_LEN]);
+        assert_eq!(head.code_page(), 1200);
+        assert_eq!(head.user_name(), "Alice");
+        assert_eq!(head.saved_at().day(), 15);
+        assert_eq!(head.next_tab_id(), 3);
+
+        assert!(XlsRrdHead::parse_payload(&rrd_head_payload()[..157]).is_err());
+        let mut bad_revt = rrd_head_payload();
+        bad_revt[8..10].copy_from_slice(&0x0008u16.to_le_bytes());
+        assert!(XlsRrdHead::parse_payload(&bad_revt).is_err());
+        let mut bad_revid = rrd_head_payload();
+        bad_revid[4..8].copy_from_slice(&1i32.to_le_bytes());
+        assert!(XlsRrdHead::parse_payload(&bad_revid).is_err());
+        let mut long_name = rrd_head_payload();
+        long_name[32..34].copy_from_slice(&55u16.to_le_bytes());
+        assert!(XlsRrdHead::parse_payload(&long_name).is_err());
+        let mut bad_tabid_mac = rrd_head_payload();
+        bad_tabid_mac[156..158].copy_from_slice(&(-2i16).to_le_bytes());
+        assert!(XlsRrdHead::parse_payload(&bad_tabid_mac).is_err());
+
+        // tabidMac = -1 is legal.
+        let mut minus_one = rrd_head_payload();
+        minus_one[156..158].copy_from_slice(&(-1i16).to_le_bytes());
+        assert_eq!(
+            XlsRrdHead::parse_payload(&minus_one).unwrap().next_tab_id(),
+            -1
+        );
+    }
+
+    #[test]
+    fn rr_tab_id_parses_identifier_array() {
+        let mut data = Vec::new();
+        for id in [1u16, 7, 42] {
+            data.extend_from_slice(&id.to_le_bytes());
+        }
+        assert_eq!(
+            XlsRrTabId::parse_payload(&data).unwrap().sheet_ids(),
+            &[1, 7, 42]
+        );
+        assert!(XlsRrTabId::parse_payload(&data[..5]).is_err());
+        let mut too_many = Vec::new();
+        for id in 0..4113u16 {
+            too_many.extend_from_slice(&id.to_le_bytes());
+        }
+        assert!(XlsRrTabId::parse_payload(&too_many).is_err());
+    }
+
+    /// Build a valid 528-byte RRDRenSheet payload.
+    fn ren_sheet_payload() -> Vec<u8> {
+        let mut data = Vec::with_capacity(528);
+        data.extend_from_slice(&rrd(0x0009, 11, 2));
+        data.extend_from_slice(&4u16.to_le_bytes());
+        data.extend_from_slice(&string_field(REN_SHEET_NAME_FIELD_LEN, "Old1"));
+        data.extend_from_slice(&4u16.to_le_bytes());
+        data.extend_from_slice(&string_field(REN_SHEET_NAME_FIELD_LEN, "New1"));
+        data
+    }
+
+    #[test]
+    fn ren_sheet_parses_old_and_new_names() {
+        let sheet = XlsRrdRenSheet::parse_payload(&ren_sheet_payload()).unwrap();
+        assert_eq!(sheet.old_name(), "Old1");
+        assert_eq!(sheet.new_name(), "New1");
+        assert_eq!(sheet.header().tab_id(), Some(2));
+
+        assert!(XlsRrdRenSheet::parse_payload(&ren_sheet_payload()[..527]).is_err());
+        let mut bad_revt = ren_sheet_payload();
+        bad_revt[8..10].copy_from_slice(&0x0008u16.to_le_bytes());
+        assert!(XlsRrdRenSheet::parse_payload(&bad_revt).is_err());
+        let mut no_sheet = ren_sheet_payload();
+        no_sheet[12..14].copy_from_slice(&0xFFFFu16.to_le_bytes());
+        assert!(XlsRrdRenSheet::parse_payload(&no_sheet).is_err());
+        let mut zero_revid = ren_sheet_payload();
+        zero_revid[4..8].copy_from_slice(&0i32.to_le_bytes());
+        assert!(XlsRrdRenSheet::parse_payload(&zero_revid).is_err());
+        let mut long_name = ren_sheet_payload();
+        long_name[14..16].copy_from_slice(&228u16.to_le_bytes());
+        assert!(XlsRrdRenSheet::parse_payload(&long_name).is_err());
+        // UTF-16 names are limited to 127 characters.
+        let mut wide = ren_sheet_payload();
+        wide[14..16].copy_from_slice(&128u16.to_le_bytes());
+        wide[16] = 1;
+        assert!(XlsRrdRenSheet::parse_payload(&wide).is_err());
+    }
+
+    fn ins_del_payload(revt: u16, flags: u16) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&rrd(revt, 12, 3));
+        data.extend_from_slice(&flags.to_le_bytes());
+        data.extend_from_slice(&5u16.to_le_bytes()); // rwFirst
+        data.extend_from_slice(&9u16.to_le_bytes()); // rwLast
+        data.extend_from_slice(&0u16.to_le_bytes()); // colFirst
+        data.extend_from_slice(&3u16.to_le_bytes()); // colLast
+        data.extend_from_slice(&0u32.to_le_bytes()); // cUcr
+        data
+    }
+
+    #[test]
+    fn ins_del_validates_revision_kind_and_undo() {
+        let insert = XlsRrdInsDel::parse_payload(&ins_del_payload(0x0000, 0x0001)).unwrap();
+        assert_eq!(insert.header().revision_type(), XlsRevisionType::InsertRow);
+        assert!(insert.is_end_of_list());
+        assert_eq!(insert.range().first_row(), 5);
+        assert_eq!(insert.range().last_column(), 3);
+        assert_eq!(insert.undo_count(), 0);
+        assert!(insert.undo_data().is_empty());
+
+        // fEndOfList is only meaningful for row inserts.
+        assert!(XlsRrdInsDel::parse_payload(&ins_del_payload(0x0002, 0x0001)).is_err());
+        // Sort revisions are not insert/delete revisions.
+        assert!(XlsRrdInsDel::parse_payload(&ins_del_payload(0x0007, 0)).is_err());
+        // Reserved flags.
+        assert!(XlsRrdInsDel::parse_payload(&ins_del_payload(0x0000, 0x0002)).is_err());
+
+        // Undo bytes require a matching count.
+        let mut stray_undo = ins_del_payload(0x0000, 0);
+        stray_undo.extend_from_slice(&[1, 2, 3]);
+        assert!(XlsRrdInsDel::parse_payload(&stray_undo).is_err());
+        let mut missing_undo = ins_del_payload(0x0000, 0);
+        let len = missing_undo.len();
+        missing_undo[len - 4..].copy_from_slice(&2u32.to_le_bytes());
+        assert!(XlsRrdInsDel::parse_payload(&missing_undo).is_err());
+
+        // Raw Ducr bytes are preserved when the count is nonzero.
+        let mut with_undo = ins_del_payload(0x0000, 0);
+        let len = with_undo.len();
+        with_undo[len - 4..].copy_from_slice(&1u32.to_le_bytes());
+        with_undo.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+        let parsed = XlsRrdInsDel::parse_payload(&with_undo).unwrap();
+        assert_eq!(parsed.undo_count(), 1);
+        assert_eq!(parsed.undo_data(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+    }
+
+    fn move_payload() -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&rrd(0x0004, 13, 1));
+        for (first, last) in [(1u16, 2u16), (10, 12)] {
+            data.extend_from_slice(&first.to_le_bytes());
+            data.extend_from_slice(&last.to_le_bytes());
+            data.extend_from_slice(&0u16.to_le_bytes());
+            data.extend_from_slice(&1u16.to_le_bytes());
+        }
+        data.extend_from_slice(&1u16.to_le_bytes()); // tabidSrc
+        data.extend_from_slice(&0u32.to_le_bytes()); // cUcr
+        data
+    }
+
+    #[test]
+    fn move_parses_source_and_destination() {
+        let moved = XlsRrdMove::parse_payload(&move_payload()).unwrap();
+        assert_eq!(moved.source().first_row(), 1);
+        assert_eq!(moved.destination().first_row(), 10);
+        assert_eq!(moved.source_tab_id(), 1);
+
+        let mut bad_revt = move_payload();
+        bad_revt[8..10].copy_from_slice(&0x0000u16.to_le_bytes());
+        assert!(XlsRrdMove::parse_payload(&bad_revt).is_err());
+        let mut no_sheet = move_payload();
+        no_sheet[12..14].copy_from_slice(&0xFFFFu16.to_le_bytes());
+        assert!(XlsRrdMove::parse_payload(&no_sheet).is_err());
+        assert!(XlsRrdMove::parse_payload(&move_payload()[..20]).is_err());
+    }
+
+    fn insert_sh_payload() -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&rrd(0x0005, 14, 4));
+        data.extend_from_slice(&1u16.to_le_bytes()); // itabPos
+        data.extend_from_slice(&0u16.to_le_bytes()); // reserved
+        data.extend_from_slice(&5u16.to_le_bytes()); // cch
+        data.extend_from_slice(&string_field(INSERT_SH_NAME_FIELD_LEN, "Added"));
+        data
+    }
+
+    #[test]
+    fn insert_sh_parses_position_and_name() {
+        let sheet = XlsRrInsertSh::parse_payload(&insert_sh_payload()).unwrap();
+        assert_eq!(sheet.position(), 1);
+        assert_eq!(sheet.name(), "Added");
+        assert_eq!(sheet.header().tab_id(), Some(4));
+
+        let mut reserved = insert_sh_payload();
+        reserved[16..18].copy_from_slice(&1u16.to_le_bytes());
+        assert!(XlsRrInsertSh::parse_payload(&reserved).is_err());
+        let mut bad_revt = insert_sh_payload();
+        bad_revt[8..10].copy_from_slice(&0x0009u16.to_le_bytes());
+        assert!(XlsRrInsertSh::parse_payload(&bad_revt).is_err());
+        assert!(XlsRrInsertSh::parse_payload(&insert_sh_payload()[..275]).is_err());
+    }
+
+    /// Build an RRDChgCell payload: blank old value, Xnum new value.
+    fn chg_cell_payload() -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&rrd(0x0008, 15, 1));
+        // vt = Xnum (2), vtOld = Blank (0), ifmtDisp = 0, fPhShow set.
+        let flags: u32 = 0x0002 | 0x0100_0000;
+        data.extend_from_slice(&flags.to_le_bytes());
+        data.extend_from_slice(&7u16.to_le_bytes()); // row
+        data.extend_from_slice(&2u16.to_le_bytes()); // column
+        data.extend_from_slice(&0u32.to_le_bytes()); // cbOldVal
+        data.extend_from_slice(&1u16.to_le_bytes()); // cetxpRst
+        data.extend_from_slice(&3.5f64.to_le_bytes()); // num
+        data
+    }
+
+    #[test]
+    fn chg_cell_parses_flags_and_location() {
+        let cell = XlsRrdChgCell::parse_payload(&chg_cell_payload()).unwrap();
+        assert_eq!(cell.new_content(), XlsRevisionCellContent::Xnum);
+        assert_eq!(cell.old_content(), XlsRevisionCellContent::Blank);
+        assert!(cell.phonetic_shown());
+        assert!(!cell.old_phonetic_shown());
+        assert!(!cell.has_old_format());
+        assert_eq!(cell.location().row(), 7);
+        assert_eq!(cell.location().column(), 2);
+        assert!(!cell.location().is_row_relative());
+        assert_eq!(cell.old_value_size(), 0);
+        assert_eq!(cell.formatting_run_count(), 1);
+        assert_eq!(cell.tail(), &3.5f64.to_le_bytes());
+
+        let mut bad_revt = chg_cell_payload();
+        bad_revt[8..10].copy_from_slice(&0x0004u16.to_le_bytes());
+        assert!(XlsRrdChgCell::parse_payload(&bad_revt).is_err());
+        let mut edge_of_sort = chg_cell_payload();
+        edge_of_sort[10] = 0x08;
+        assert!(XlsRrdChgCell::parse_payload(&edge_of_sort).is_err());
+        let mut no_sheet = chg_cell_payload();
+        no_sheet[12..14].copy_from_slice(&0xFFFFu16.to_le_bytes());
+        assert!(XlsRrdChgCell::parse_payload(&no_sheet).is_err());
+        let mut reserved = chg_cell_payload();
+        reserved[17] |= 0x80; // reserved2 bit
+        assert!(XlsRrdChgCell::parse_payload(&reserved).is_err());
+        assert!(XlsRrdChgCell::parse_payload(&chg_cell_payload()[..25]).is_err());
+    }
+
+    #[test]
+    fn chg_cell_validates_old_value_size_table() {
+        // vtOld = RkNumber (1) requires cbOldVal = 4.
+        let mut data = Vec::new();
+        data.extend_from_slice(&rrd(0x0008, 15, 1));
+        data.extend_from_slice(&(1u32 << 3).to_le_bytes()); // vt = Blank, vtOld = Rk
+        data.extend_from_slice(&7u16.to_le_bytes());
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(&4u32.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&42u32.to_le_bytes()); // rkOld
+        let cell = XlsRrdChgCell::parse_payload(&data).unwrap();
+        assert_eq!(cell.old_content(), XlsRevisionCellContent::RkNumber);
+        assert_eq!(cell.old_value_size(), 4);
+
+        let mut wrong_size = data.clone();
+        wrong_size[22..26].copy_from_slice(&5u32.to_le_bytes());
+        assert!(XlsRrdChgCell::parse_payload(&wrong_size).is_err());
+
+        // An old formula must be at least 24 bytes.
+        let mut formula = data.clone();
+        formula[14..18].copy_from_slice(&(5u32 << 3).to_le_bytes());
+        formula[22..26].copy_from_slice(&8u32.to_le_bytes());
+        assert!(XlsRrdChgCell::parse_payload(&formula).is_err());
+
+        // Unknown content type bits (6/7) are rejected.
+        let mut unknown = data;
+        unknown[14..18].copy_from_slice(&7u32.to_le_bytes());
+        assert!(XlsRrdChgCell::parse_payload(&unknown).is_err());
+    }
+
+    #[test]
+    fn conflict_and_user_view_validate_rrd_invariants() {
+        let conflict = XlsRrdConflict::parse_payload(&rrd(0x0025, 16, 0xFFFF)).unwrap();
+        assert_eq!(conflict.header().revision_type(), XlsRevisionType::Conflict);
+        assert!(XlsRrdConflict::parse_payload(&rrd(0x0025, 0, 0xFFFF)).is_err());
+        assert!(XlsRrdConflict::parse_payload(&rrd(0x0008, 16, 0xFFFF)).is_err());
+        assert!(XlsRrdConflict::parse_payload(&rrd(0x0025, 16, 0xFFFF)[..13]).is_err());
+
+        let mut view = Vec::new();
+        view.extend_from_slice(&rrd(0x002B, 0, 0xFFFF));
+        view.extend_from_slice(&[0x42; GUID_LEN]);
+        let view = XlsRrdUserView::parse_payload(&view).unwrap();
+        assert_eq!(view.header().revision_type(), XlsRevisionType::AddView);
+        assert_eq!(view.guid(), &[0x42; GUID_LEN]);
+
+        let mut sheet_scoped = Vec::new();
+        sheet_scoped.extend_from_slice(&rrd(0x002B, 0, 1));
+        sheet_scoped.extend_from_slice(&[0x42; GUID_LEN]);
+        assert!(XlsRrdUserView::parse_payload(&sheet_scoped).is_err());
+        let mut bad_revid = Vec::new();
+        bad_revid.extend_from_slice(&rrd(0x002B, 5, 0xFFFF));
+        bad_revid.extend_from_slice(&[0x42; GUID_LEN]);
+        assert!(XlsRrdUserView::parse_payload(&bad_revid).is_err());
+    }
+
+    #[test]
+    fn empty_markers_reject_payloads() {
+        assert!(validate_empty_marker(RRD_MOVE_BEGIN_RECORD_TYPE, &[], "RRDMoveBegin").is_ok());
+        assert!(validate_empty_marker(RRD_MOVE_END_RECORD_TYPE, &[0], "RRDMoveEnd").is_err());
+    }
+}
