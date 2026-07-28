@@ -420,7 +420,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                     self.sheets[sheet_index].set_parsed_worksheet_index(worksheet_index);
                 },
                 Err(error @ XlsError::InvalidRecord { record_type, .. })
-                    if pivot_table::is_worksheet_view_record(record_type) => return Err(error),
+                    if pivot_table::is_worksheet_view_record(record_type) =>
+                {
+                    return Err(error);
+                },
                 Err(_) => {},
             }
         }
@@ -979,9 +982,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         } = &formula
                         {
                             if let Some(anchor) = ptg_exp_anchor(formula) {
-                                if let Some(rendered) = shared_formulas
-                                    .get(&anchor)
-                                    .and_then(|template| template.render(formula_context, *row, *col))
+                                if let Some(rendered) =
+                                    shared_formulas.get(&anchor).and_then(|template| {
+                                        template.render(formula_context, *row, *col)
+                                    })
                                 {
                                     cell.set_rendered_formula(Some(rendered));
                                 }
@@ -1005,12 +1009,14 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 pending_string_formula = Some(formula);
             }
 
-            if !query_table_consumed && pivot_table_collector.feed_record(record.header.record_type, &record.data).map_err(|error| {
-                XlsError::InvalidRecord {
-                    record_type: record.header.record_type,
-                    message: error.to_string(),
-                }
-            })? {
+            if !query_table_consumed
+                && pivot_table_collector
+                    .feed_record(record.header.record_type, &record.data)
+                    .map_err(|error| XlsError::InvalidRecord {
+                        record_type: record.header.record_type,
+                        message: error.to_string(),
+                    })?
+            {
                 continue;
             }
 
@@ -1249,10 +1255,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 }
 
                 // --- Filter mode (FILTERMODE 0x009B) ---
-                rt if rt == autofilter::FILTERMODE_TYPE => {
-                    if autofilter::parse_filtermode(&record.data).is_ok() {
-                        worksheet.set_filter_mode(true);
-                    }
+                rt if rt == autofilter::FILTERMODE_TYPE
+                    && autofilter::parse_filtermode(&record.data).is_ok() =>
+                {
+                    worksheet.set_filter_mode(true);
                 }
 
                 _ => {
@@ -1373,8 +1379,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     }
 
     pub fn summary_information(&mut self) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
-        match self.ole_file.property_set_stream(&["\u{0005}SummaryInformation"]) {
-            Ok(value) => Ok(Some(value)), Err(litchi_cfb::OleError::StreamNotFound) => Ok(None), Err(error) => Err(error.into()),
+        match self
+            .ole_file
+            .property_set_stream(&["\u{0005}SummaryInformation"])
+        {
+            Ok(value) => Ok(Some(value)),
+            Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+            Err(error) => Err(error.into()),
         }
     }
 
@@ -1391,37 +1402,58 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         )
     }
 
-    pub fn document_summary_information(&mut self) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
-        match self.ole_file.property_set_stream(&["\u{0005}DocumentSummaryInformation"]) {
-            Ok(value) => Ok(Some(value)), Err(litchi_cfb::OleError::StreamNotFound) => Ok(None), Err(error) => Err(error.into()),
+    pub fn document_summary_information(
+        &mut self,
+    ) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
+        match self
+            .ole_file
+            .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
+        {
+            Ok(value) => Ok(Some(value)),
+            Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+            Err(error) => Err(error.into()),
         }
     }
 
     pub fn user_defined_properties(&mut self) -> XlsResult<Option<litchi_cfb::PropertySet>> {
-        Ok(self.document_summary_information()?.and_then(|stream| stream.section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID).cloned()))
+        Ok(self.document_summary_information()?.and_then(|stream| {
+            stream
+                .section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID)
+                .cloned()
+        }))
     }
 
     /// Global PivotCache ordinal-to-storage-stream map from SXStreamID records.
-    pub fn pivot_cache_stream_ids(&self) -> &[u16] { &self.pivot_cache_stream_ids }
+    pub fn pivot_cache_stream_ids(&self) -> &[u16] {
+        &self.pivot_cache_stream_ids
+    }
 
     /// Resolves a worksheet PivotTable's global cache link.
     pub fn pivot_cache_for_table(
         &self,
         table: &crate::xls::pivot_table::PivotTable,
     ) -> XlsResult<&crate::xls::PivotCache> {
-        let stream_id = *self.pivot_cache_stream_ids.get(usize::from(table.cache_index()))
+        let stream_id = *self
+            .pivot_cache_stream_ids
+            .get(usize::from(table.cache_index()))
             .ok_or_else(|| XlsError::InvalidRecord {
                 record_type: crate::xls::pivot_table::SXVIEW_TYPE,
                 message: "PivotTable global cache index is out of range".to_string(),
             })?;
-        self.pivot_caches.iter().find(|cache| cache.stream_id() == stream_id).ok_or_else(|| XlsError::InvalidRecord {
-            record_type: crate::xls::pivot_table::SXVIEW_TYPE,
-            message: "PivotTable SXStreamID has no matching cache storage".to_string(),
-        })
+        self.pivot_caches
+            .iter()
+            .find(|cache| cache.stream_id() == stream_id)
+            .ok_or_else(|| XlsError::InvalidRecord {
+                record_type: crate::xls::pivot_table::SXVIEW_TYPE,
+                message: "PivotTable SXStreamID has no matching cache storage".to_string(),
+            })
     }
 
     /// Parsed PivotTables on one worksheet.
-    pub fn worksheet_pivot_tables(&self, index: usize) -> XlsResult<&[crate::xls::pivot_table::PivotTable]> {
+    pub fn worksheet_pivot_tables(
+        &self,
+        index: usize,
+    ) -> XlsResult<&[crate::xls::pivot_table::PivotTable]> {
         Ok(self.xls_worksheet(index)?.pivot_tables())
     }
 
@@ -1515,8 +1547,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Whether the CFB container holds a shared-workbook `Revision Log` stream
     /// (MS-XLS 2.1.7.14).
     pub fn has_revision_log(&self) -> bool {
-        crate::xls::revision_log::find_revision_log_stream(&self.ole_file.list_streams())
-            .is_some()
+        crate::xls::revision_log::find_revision_log_stream(&self.ole_file.list_streams()).is_some()
     }
 
     /// Parse the shared-workbook `Revision Log` stream, when present.
@@ -1524,10 +1555,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// The result is a typed, inert model of the RRD revision records.
     /// Parsing never applies, rejects, or replays any recorded revision.
     pub fn revision_log(&mut self) -> XlsResult<Option<crate::xls::revision_log::XlsRevisionLog>> {
-        let Some(name) = crate::xls::revision_log::find_revision_log_stream(
-            &self.ole_file.list_streams(),
-        )
-        .map(str::to_owned) else {
+        let Some(name) =
+            crate::xls::revision_log::find_revision_log_stream(&self.ole_file.list_streams())
+                .map(str::to_owned)
+        else {
             return Ok(None);
         };
         let data = self.ole_file.open_stream(&[name.as_str()])?;

@@ -31,7 +31,9 @@ pub enum PivotCacheError {
 }
 
 impl PivotCacheError {
-    pub const fn code(self) -> u16 { self as u16 }
+    pub const fn code(self) -> u16 {
+        self as u16
+    }
 }
 
 impl TryFrom<u16> for PivotCacheError {
@@ -46,7 +48,10 @@ impl TryFrom<u16> for PivotCacheError {
             0x1D => Ok(Self::Name),
             0x24 => Ok(Self::Number),
             0x2A => Ok(Self::NotAvailable),
-            _ => Err(cache_invalid(0x00CB, format!("invalid BIFF error code 0x{value:04X}"))),
+            _ => Err(cache_invalid(
+                0x00CB,
+                format!("invalid BIFF error code 0x{value:04X}"),
+            )),
         }
     }
 }
@@ -78,10 +83,17 @@ impl TryFrom<u16> for PivotCacheDateGroupUnit {
     type Error = XlsError;
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            1 => Ok(Self::Seconds), 2 => Ok(Self::Minutes), 3 => Ok(Self::Hours),
-            4 => Ok(Self::Days), 5 => Ok(Self::Months), 6 => Ok(Self::Quarters),
+            1 => Ok(Self::Seconds),
+            2 => Ok(Self::Minutes),
+            3 => Ok(Self::Hours),
+            4 => Ok(Self::Days),
+            5 => Ok(Self::Months),
+            6 => Ok(Self::Quarters),
             7 => Ok(Self::Years),
-            _ => Err(cache_invalid(0x00D8, format!("unsupported date grouping unit {value}"))),
+            _ => Err(cache_invalid(
+                0x00D8,
+                format!("unsupported date grouping unit {value}"),
+            )),
         }
     }
 }
@@ -133,8 +145,22 @@ impl PivotCacheGrouping {
 }
 
 impl PivotCacheDateTime {
-    pub fn try_new(year: u16, month: u16, day: u8, hour: u8, minute: u8, second: u8) -> XlsResult<Self> {
-        let value = Self { year, month, day, hour, minute, second };
+    pub fn try_new(
+        year: u16,
+        month: u16,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> XlsResult<Self> {
+        let value = Self {
+            year,
+            month,
+            day,
+            hour,
+            minute,
+            second,
+        };
         value.validate()?;
         Ok(value)
     }
@@ -148,27 +174,48 @@ impl PivotCacheDateTime {
             2 => 28,
             _ => 0,
         };
-        let sentinel = self.year == 1900 && self.month == 1 && self.day == 0
-            && self.hour == 0 && self.minute == 0 && self.second == 0;
+        let sentinel = self.year == 1900
+            && self.month == 1
+            && self.day == 0
+            && self.hour == 0
+            && self.minute == 0
+            && self.second == 0;
         if !(1900..=9999).contains(&self.year)
             || max_day == 0
             || (!sentinel && !(1..=max_day).contains(&self.day))
-            || self.hour > 23 || self.minute > 59 || self.second > 59
+            || self.hour > 23
+            || self.minute > 59
+            || self.second > 59
         {
-            return Err(cache_invalid(0x00CE, format!(
-                "invalid PivotCache date/time {:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-                self.year, self.month, self.day, self.hour, self.minute, self.second
-            )));
+            return Err(cache_invalid(
+                0x00CE,
+                format!(
+                    "invalid PivotCache date/time {:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                    self.year, self.month, self.day, self.hour, self.minute, self.second
+                ),
+            ));
         }
         Ok(())
     }
 
-    pub const fn year(self) -> u16 { self.year }
-    pub const fn month(self) -> u16 { self.month }
-    pub const fn day(self) -> u8 { self.day }
-    pub const fn hour(self) -> u8 { self.hour }
-    pub const fn minute(self) -> u8 { self.minute }
-    pub const fn second(self) -> u8 { self.second }
+    pub const fn year(self) -> u16 {
+        self.year
+    }
+    pub const fn month(self) -> u16 {
+        self.month
+    }
+    pub const fn day(self) -> u8 {
+        self.day
+    }
+    pub const fn hour(self) -> u8 {
+        self.hour
+    }
+    pub const fn minute(self) -> u8 {
+        self.minute
+    }
+    pub const fn second(self) -> u8 {
+        self.second
+    }
 }
 
 /// A typed PivotCache shared or resolved row item.
@@ -183,18 +230,28 @@ pub enum PivotCacheItem {
 }
 
 impl From<String> for PivotCacheItem {
-    fn from(value: String) -> Self { Self::String(value) }
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
 }
 
 impl From<&str> for PivotCacheItem {
-    fn from(value: &str) -> Self { Self::String(value.to_string()) }
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
 }
 
 impl PivotCacheItem {
     pub(crate) fn validate(&self) -> XlsResult<()> {
         match self {
-            Self::String(value) if value.is_empty() => Err(cache_invalid(0x00CD, "empty strings must use PivotCacheItem::Empty")),
-            Self::Number(value) if !value.is_finite() => Err(cache_invalid(0x00C9, "PivotCache numeric items must be finite")),
+            Self::String(value) if value.is_empty() => Err(cache_invalid(
+                0x00CD,
+                "empty strings must use PivotCacheItem::Empty",
+            )),
+            Self::Number(value) if !value.is_finite() => Err(cache_invalid(
+                0x00C9,
+                "PivotCache numeric items must be finite",
+            )),
             Self::DateTime(value) => value.validate(),
             _ => Ok(()),
         }
@@ -206,30 +263,43 @@ impl PivotCacheItem {
             Self::Number(value) => value.to_string(),
             Self::Boolean(value) => if *value { "TRUE" } else { "FALSE" }.to_string(),
             Self::Error(value) => format!("#{value:?}"),
-            Self::DateTime(value) => format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", value.year, value.month, value.day, value.hour, value.minute, value.second),
+            Self::DateTime(value) => format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                value.year, value.month, value.day, value.hour, value.minute, value.second
+            ),
             Self::Empty => String::new(),
         }
     }
 }
 
 pub(crate) fn pivot_cache_data_flags(items: &[PivotCacheItem]) -> u16 {
-    let (mut text, mut integer, mut double, mut date, mut blank) = (false, false, false, false, false);
+    let (mut text, mut integer, mut double, mut date, mut blank) =
+        (false, false, false, false, false);
     for item in items {
         match item {
-            PivotCacheItem::String(_) | PivotCacheItem::Boolean(_) | PivotCacheItem::Error(_) => text = true,
+            PivotCacheItem::String(_) | PivotCacheItem::Boolean(_) | PivotCacheItem::Error(_) => {
+                text = true
+            },
             PivotCacheItem::Number(value) if value.fract() == 0.0 => integer = true,
             PivotCacheItem::Number(_) => double = true,
             PivotCacheItem::DateTime(_) => date = true,
             PivotCacheItem::Empty => blank = true,
         }
     }
-    if date && blank && !text && !integer && !double { return 0x0980; }
-    if blank { text = true; }
+    if date && blank && !text && !integer && !double {
+        return 0x0980;
+    }
+    if blank {
+        text = true;
+    }
     const FLAGS: [u16; 16] = [
-        0x0000, 0x0480, 0x0520, 0x05A0, 0x0560, 0x05E0, 0x0520, 0x05A0,
-        0x0900, 0x0D80, 0x0D00, 0x0D80, 0x0D00, 0x0D80, 0x0D00, 0x0D80,
+        0x0000, 0x0480, 0x0520, 0x05A0, 0x0560, 0x05E0, 0x0520, 0x05A0, 0x0900, 0x0D80, 0x0D00,
+        0x0D80, 0x0D00, 0x0D80, 0x0D00, 0x0D80,
     ];
-    FLAGS[usize::from(text) | (usize::from(integer) << 1) | (usize::from(double) << 2) | (usize::from(date) << 3)]
+    FLAGS[usize::from(text)
+        | (usize::from(integer) << 1)
+        | (usize::from(double) << 2)
+        | (usize::from(date) << 3)]
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -242,17 +312,34 @@ pub struct PivotCacheField {
     grouping: Option<PivotCacheGrouping>,
 }
 impl PivotCacheField {
-    pub fn name(&self) -> &str { &self.name }
-    pub const fn flags(&self) -> u16 { self.flags }
-    pub fn items(&self) -> &[PivotCacheItem] { &self.items }
-    pub const fn group_parent(&self) -> Option<u16> { self.group_parent }
-    pub const fn group_base(&self) -> Option<u16> { self.group_base }
-    pub fn grouping(&self) -> Option<&PivotCacheGrouping> { self.grouping.as_ref() }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub const fn flags(&self) -> u16 {
+        self.flags
+    }
+    pub fn items(&self) -> &[PivotCacheItem] {
+        &self.items
+    }
+    pub const fn group_parent(&self) -> Option<u16> {
+        self.group_parent
+    }
+    pub const fn group_base(&self) -> Option<u16> {
+        self.group_base
+    }
+    pub fn grouping(&self) -> Option<&PivotCacheGrouping> {
+        self.grouping.as_ref()
+    }
     pub(crate) fn replace_grouping(&mut self, grouping: Option<PivotCacheGrouping>) {
-        self.group_base = match &grouping { Some(PivotCacheGrouping::Discrete(value)) => Some(value.base_field_index), _ => None };
+        self.group_base = match &grouping {
+            Some(PivotCacheGrouping::Discrete(value)) => Some(value.base_field_index),
+            _ => None,
+        };
         self.grouping = grouping;
     }
-    pub(crate) fn set_group_parent(&mut self, parent: Option<u16>) { self.group_parent = parent; }
+    pub(crate) fn set_group_parent(&mut self, parent: Option<u16>) {
+        self.group_parent = parent;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -264,27 +351,53 @@ pub struct PivotCache {
     rows: Vec<Vec<PivotCacheItem>>,
 }
 impl PivotCache {
-    pub const fn stream_id(&self) -> u16 { self.stream_id }
-    pub const fn flags(&self) -> u16 { self.flags }
-    pub const fn record_count(&self) -> u32 { self.record_count }
-    pub fn fields(&self) -> &[PivotCacheField] { &self.fields }
-    pub fn rows(&self) -> &[Vec<PivotCacheItem>] { &self.rows }
-    pub(crate) fn fields_mut(&mut self) -> &mut [PivotCacheField] { &mut self.fields }
+    pub const fn stream_id(&self) -> u16 {
+        self.stream_id
+    }
+    pub const fn flags(&self) -> u16 {
+        self.flags
+    }
+    pub const fn record_count(&self) -> u32 {
+        self.record_count
+    }
+    pub fn fields(&self) -> &[PivotCacheField] {
+        &self.fields
+    }
+    pub fn rows(&self) -> &[Vec<PivotCacheItem>] {
+        &self.rows
+    }
+    pub(crate) fn fields_mut(&mut self) -> &mut [PivotCacheField] {
+        &mut self.fields
+    }
 }
 
 fn cache_invalid(record_type: u16, message: impl Into<String>) -> XlsError {
-    XlsError::InvalidRecord { record_type, message: message.into() }
+    XlsError::InvalidRecord {
+        record_type,
+        message: message.into(),
+    }
 }
 
 fn cache_records(data: &[u8]) -> XlsResult<Vec<(u16, &[u8])>> {
     let mut records = Vec::new();
     let mut offset = 0usize;
     while offset < data.len() {
-        let header = data.get(offset..offset + 4).ok_or(XlsError::InvalidLength { expected: offset + 4, found: data.len() })?;
+        let header = data
+            .get(offset..offset + 4)
+            .ok_or(XlsError::InvalidLength {
+                expected: offset + 4,
+                found: data.len(),
+            })?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
         let len = usize::from(u16::from_le_bytes([header[2], header[3]]));
-        let end = offset.checked_add(4).and_then(|value| value.checked_add(len)).ok_or_else(|| cache_invalid(kind, "PivotCache record length overflow"))?;
-        let body = data.get(offset + 4..end).ok_or(XlsError::InvalidLength { expected: end, found: data.len() })?;
+        let end = offset
+            .checked_add(4)
+            .and_then(|value| value.checked_add(len))
+            .ok_or_else(|| cache_invalid(kind, "PivotCache record length overflow"))?;
+        let body = data.get(offset + 4..end).ok_or(XlsError::InvalidLength {
+            expected: end,
+            found: data.len(),
+        })?;
         records.push((kind, body));
         offset = end;
     }
@@ -292,29 +405,124 @@ fn cache_records(data: &[u8]) -> XlsResult<Vec<(u16, &[u8])>> {
 }
 
 fn parse_cache_string(data: &[u8], record_type: u16) -> XlsResult<(String, usize)> {
-    if data.len() < 3 { return Err(XlsError::InvalidLength { expected: 3, found: data.len() }); }
+    if data.len() < 3 {
+        return Err(XlsError::InvalidLength {
+            expected: 3,
+            found: data.len(),
+        });
+    }
     let count = usize::from(u16::from_le_bytes([data[0], data[1]]));
     let wide = data[2] & 1 != 0;
-    let byte_count = count.checked_mul(if wide { 2 } else { 1 }).ok_or_else(|| cache_invalid(record_type, "PivotCache string length overflow"))?;
-    let end = 3usize.checked_add(byte_count).ok_or_else(|| cache_invalid(record_type, "PivotCache string length overflow"))?;
-    let chars = data.get(3..end).ok_or(XlsError::InvalidLength { expected: end, found: data.len() })?;
+    let byte_count = count
+        .checked_mul(if wide { 2 } else { 1 })
+        .ok_or_else(|| cache_invalid(record_type, "PivotCache string length overflow"))?;
+    let end = 3usize
+        .checked_add(byte_count)
+        .ok_or_else(|| cache_invalid(record_type, "PivotCache string length overflow"))?;
+    let chars = data.get(3..end).ok_or(XlsError::InvalidLength {
+        expected: end,
+        found: data.len(),
+    })?;
     let value = if wide {
-        let units = chars.chunks_exact(2).map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])).collect::<Vec<_>>();
-        String::from_utf16(&units).map_err(|_| cache_invalid(record_type, "invalid UTF-16 PivotCache string"))?
-    } else { chars.iter().map(|byte| char::from(*byte)).collect() };
+        let units = chars
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units)
+            .map_err(|_| cache_invalid(record_type, "invalid UTF-16 PivotCache string"))?
+    } else {
+        chars.iter().map(|byte| char::from(*byte)).collect()
+    };
     Ok((value, end))
 }
 
 fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> {
     let item = match record_type {
-        0x00C9 => { if data.len() != 8 { return Err(XlsError::InvalidLength { expected: 8, found: data.len() }); } PivotCacheItem::Number(f64::from_le_bytes(data.try_into().unwrap())) },
-        0x00CA => { if data.len() != 2 { return Err(XlsError::InvalidLength { expected: 2, found: data.len() }); } match u16::from_le_bytes(data.try_into().unwrap()) { 0 => PivotCacheItem::Boolean(false), 1 => PivotCacheItem::Boolean(true), value => return Err(cache_invalid(record_type, format!("invalid SXBOOLEAN value {value}"))) } },
-        0x00CB => { if data.len() != 2 { return Err(XlsError::InvalidLength { expected: 2, found: data.len() }); } PivotCacheItem::Error(PivotCacheError::try_from(u16::from_le_bytes(data.try_into().unwrap()))?) },
-        0x00CC => { if data.len() != 2 { return Err(XlsError::InvalidLength { expected: 2, found: data.len() }); } PivotCacheItem::Number(f64::from(i16::from_le_bytes(data.try_into().unwrap()))) },
-        0x00CD => { let (value, used) = parse_cache_string(data, record_type)?; if used != data.len() { return Err(cache_invalid(record_type, "trailing SXSTRING payload")); } PivotCacheItem::String(value) },
-        0x00CE => { if data.len() != 8 { return Err(XlsError::InvalidLength { expected: 8, found: data.len() }); } PivotCacheItem::DateTime(PivotCacheDateTime::try_new(u16::from_le_bytes([data[0], data[1]]), u16::from_le_bytes([data[2], data[3]]), data[4], data[5], data[6], data[7])?) },
-        0x00CF => { if !data.is_empty() { return Err(XlsError::InvalidLength { expected: 0, found: data.len() }); } PivotCacheItem::Empty },
-        _ => return Err(cache_invalid(record_type, "unexpected PivotCache item record")),
+        0x00C9 => {
+            if data.len() != 8 {
+                return Err(XlsError::InvalidLength {
+                    expected: 8,
+                    found: data.len(),
+                });
+            }
+            PivotCacheItem::Number(f64::from_le_bytes(data.try_into().unwrap()))
+        },
+        0x00CA => {
+            if data.len() != 2 {
+                return Err(XlsError::InvalidLength {
+                    expected: 2,
+                    found: data.len(),
+                });
+            }
+            match u16::from_le_bytes(data.try_into().unwrap()) {
+                0 => PivotCacheItem::Boolean(false),
+                1 => PivotCacheItem::Boolean(true),
+                value => {
+                    return Err(cache_invalid(
+                        record_type,
+                        format!("invalid SXBOOLEAN value {value}"),
+                    ));
+                },
+            }
+        },
+        0x00CB => {
+            if data.len() != 2 {
+                return Err(XlsError::InvalidLength {
+                    expected: 2,
+                    found: data.len(),
+                });
+            }
+            PivotCacheItem::Error(PivotCacheError::try_from(u16::from_le_bytes(
+                data.try_into().unwrap(),
+            ))?)
+        },
+        0x00CC => {
+            if data.len() != 2 {
+                return Err(XlsError::InvalidLength {
+                    expected: 2,
+                    found: data.len(),
+                });
+            }
+            PivotCacheItem::Number(f64::from(i16::from_le_bytes(data.try_into().unwrap())))
+        },
+        0x00CD => {
+            let (value, used) = parse_cache_string(data, record_type)?;
+            if used != data.len() {
+                return Err(cache_invalid(record_type, "trailing SXSTRING payload"));
+            }
+            PivotCacheItem::String(value)
+        },
+        0x00CE => {
+            if data.len() != 8 {
+                return Err(XlsError::InvalidLength {
+                    expected: 8,
+                    found: data.len(),
+                });
+            }
+            PivotCacheItem::DateTime(PivotCacheDateTime::try_new(
+                u16::from_le_bytes([data[0], data[1]]),
+                u16::from_le_bytes([data[2], data[3]]),
+                data[4],
+                data[5],
+                data[6],
+                data[7],
+            )?)
+        },
+        0x00CF => {
+            if !data.is_empty() {
+                return Err(XlsError::InvalidLength {
+                    expected: 0,
+                    found: data.len(),
+                });
+            }
+            PivotCacheItem::Empty
+        },
+        _ => {
+            return Err(cache_invalid(
+                record_type,
+                "unexpected PivotCache item record",
+            ));
+        },
     };
     item.validate()?;
     Ok(item)
@@ -323,21 +531,44 @@ fn parse_cache_item(record_type: u16, data: &[u8]) -> XlsResult<PivotCacheItem> 
 /// Parse one `_SX_DB_CUR/nnnn` PivotCache stream.
 pub fn parse_pivot_cache_stream(data: &[u8]) -> XlsResult<PivotCache> {
     let records = cache_records(data)?;
-    let (sxdb_type, sxdb) = records.first().ok_or_else(|| cache_invalid(0x00C6, "empty PivotCache stream"))?;
-    if *sxdb_type != 0x00C6 || sxdb.len() < 18 { return Err(cache_invalid(*sxdb_type, "PivotCache must start with SXDB")); }
+    let (sxdb_type, sxdb) = records
+        .first()
+        .ok_or_else(|| cache_invalid(0x00C6, "empty PivotCache stream"))?;
+    if *sxdb_type != 0x00C6 || sxdb.len() < 18 {
+        return Err(cache_invalid(*sxdb_type, "PivotCache must start with SXDB"));
+    }
     let record_count = u32::from_le_bytes(sxdb[0..4].try_into().unwrap());
     let stream_id = u16::from_le_bytes(sxdb[4..6].try_into().unwrap());
     let cache_flags = u16::from_le_bytes(sxdb[6..8].try_into().unwrap());
     let standard_field_count = usize::from(u16::from_le_bytes(sxdb[10..12].try_into().unwrap()));
     let field_count = usize::from(u16::from_le_bytes(sxdb[12..14].try_into().unwrap()));
-    if standard_field_count > field_count { return Err(cache_invalid(0x00C6, "standard PivotCache field count exceeds total count")); }
-    if stream_id == 0 { return Err(cache_invalid(0x00C6, "PivotCache stream ID must be nonzero")); }
+    if standard_field_count > field_count {
+        return Err(cache_invalid(
+            0x00C6,
+            "standard PivotCache field count exceeds total count",
+        ));
+    }
+    if stream_id == 0 {
+        return Err(cache_invalid(
+            0x00C6,
+            "PivotCache stream ID must be nonzero",
+        ));
+    }
     let mut position = 1usize;
-    if records.get(position).is_some_and(|(kind, _)| *kind == 0x0122) { position += 1; }
+    if records
+        .get(position)
+        .is_some_and(|(kind, _)| *kind == 0x0122)
+    {
+        position += 1;
+    }
     let mut fields = Vec::with_capacity(field_count);
     for _ in 0..field_count {
-        let (kind, body) = records.get(position).ok_or_else(|| cache_invalid(0x00C7, "missing SXFDB"))?;
-        if *kind != 0x00C7 || body.len() < 17 { return Err(cache_invalid(*kind, "expected valid SXFDB")); }
+        let (kind, body) = records
+            .get(position)
+            .ok_or_else(|| cache_invalid(0x00C7, "missing SXFDB"))?;
+        if *kind != 0x00C7 || body.len() < 17 {
+            return Err(cache_invalid(*kind, "expected valid SXFDB"));
+        }
         let flags = u16::from_le_bytes(body[0..2].try_into().unwrap());
         let raw_parent = u16::from_le_bytes(body[2..4].try_into().unwrap());
         let raw_base = u16::from_le_bytes(body[4..6].try_into().unwrap());
@@ -345,21 +576,45 @@ pub fn parse_pivot_cache_stream(data: &[u8]) -> XlsResult<PivotCache> {
         let base_count = usize::from(u16::from_le_bytes(body[10..12].try_into().unwrap()));
         let original_count = usize::from(u16::from_le_bytes(body[12..14].try_into().unwrap()));
         let (name, used) = parse_cache_string(&body[14..], 0x00C7)?;
-        if 14 + used != body.len() { return Err(cache_invalid(0x00C7, "trailing SXFDB payload")); }
+        if 14 + used != body.len() {
+            return Err(cache_invalid(0x00C7, "trailing SXFDB payload"));
+        }
         position += 1;
-        let (kind, body) = records.get(position).ok_or_else(|| cache_invalid(0x01BB, "missing SXFDBTYPE"))?;
-        if *kind != 0x01BB || body != &[0, 0] { return Err(cache_invalid(*kind, "invalid SXFDBTYPE")); }
+        let (kind, body) = records
+            .get(position)
+            .ok_or_else(|| cache_invalid(0x01BB, "missing SXFDBTYPE"))?;
+        if *kind != 0x01BB || body != &[0, 0] {
+            return Err(cache_invalid(*kind, "invalid SXFDBTYPE"));
+        }
         position += 1;
         let mut group_items = Vec::with_capacity(group_count);
         for _ in 0..group_count {
-            let (kind, body) = records.get(position).ok_or_else(|| cache_invalid(0x00C7, "missing PivotCache group item"))?;
+            let (kind, body) = records
+                .get(position)
+                .ok_or_else(|| cache_invalid(0x00C7, "missing PivotCache group item"))?;
             group_items.push(parse_cache_item(*kind, body)?);
             position += 1;
         }
         let grouping = if let Some((0x00D9, body)) = records.get(position) {
-            if body.len() != base_count * 2 { return Err(cache_invalid(0x00D9, "SXGROUPINFO size does not match base-item count")); }
-            let item_to_group = body.chunks_exact(2).map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])).collect::<Vec<_>>();
-            if item_to_group.iter().any(|index| usize::from(*index) >= group_items.len()) { return Err(cache_invalid(0x00D9, "SXGROUPINFO group ordinal is out of range")); }
+            if body.len() != base_count * 2 {
+                return Err(cache_invalid(
+                    0x00D9,
+                    "SXGROUPINFO size does not match base-item count",
+                ));
+            }
+            let item_to_group = body
+                .chunks_exact(2)
+                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                .collect::<Vec<_>>();
+            if item_to_group
+                .iter()
+                .any(|index| usize::from(*index) >= group_items.len())
+            {
+                return Err(cache_invalid(
+                    0x00D9,
+                    "SXGROUPINFO group ordinal is out of range",
+                ));
+            }
             position += 1;
             Some(PivotCacheGrouping::Discrete(PivotCacheDiscreteGrouping {
                 base_field_index: raw_base,
@@ -367,76 +622,176 @@ pub fn parse_pivot_cache_stream(data: &[u8]) -> XlsResult<PivotCache> {
                 item_to_group,
             }))
         } else if let Some((0x00D8, body)) = records.get(position) {
-            if body.len() != 2 { return Err(XlsError::InvalidLength { expected: 2, found: body.len() }); }
+            if body.len() != 2 {
+                return Err(XlsError::InvalidLength {
+                    expected: 2,
+                    found: body.len(),
+                });
+            }
             let group_flags = u16::from_le_bytes((*body).try_into().unwrap());
             let group_type = (group_flags >> 2) & 0xF;
             position += 1;
             let mut limits = Vec::with_capacity(3);
             for _ in 0..3 {
-                let (kind, body) = records.get(position).ok_or_else(|| cache_invalid(0x00D8, "missing SXNUMGROUP limit item"))?;
+                let (kind, body) = records
+                    .get(position)
+                    .ok_or_else(|| cache_invalid(0x00D8, "missing SXNUMGROUP limit item"))?;
                 limits.push(parse_cache_item(*kind, body)?);
                 position += 1;
             }
             if group_type == 8 {
-                let numbers = limits.iter().map(|item| match item { PivotCacheItem::Number(value) => Ok(*value), _ => Err(cache_invalid(0x00D8, "numeric grouping limits must be numeric")) }).collect::<XlsResult<Vec<_>>>()?;
+                let numbers = limits
+                    .iter()
+                    .map(|item| match item {
+                        PivotCacheItem::Number(value) => Ok(*value),
+                        _ => Err(cache_invalid(
+                            0x00D8,
+                            "numeric grouping limits must be numeric",
+                        )),
+                    })
+                    .collect::<XlsResult<Vec<_>>>()?;
                 Some(PivotCacheGrouping::Numeric(PivotCacheNumericGrouping {
-                    start: numbers[0], end: numbers[1], step: numbers[2],
-                    auto_start: group_flags & 1 != 0, auto_end: group_flags & 2 != 0,
+                    start: numbers[0],
+                    end: numbers[1],
+                    step: numbers[2],
+                    auto_start: group_flags & 1 != 0,
+                    auto_end: group_flags & 2 != 0,
                     group_items: group_items.clone(),
                 }))
             } else {
-                let start = match limits[0] { PivotCacheItem::DateTime(value) => value, _ => return Err(cache_invalid(0x00D8, "date grouping start must be SXDATETIME")) };
-                let end = match limits[1] { PivotCacheItem::DateTime(value) => value, _ => return Err(cache_invalid(0x00D8, "date grouping end must be SXDATETIME")) };
-                let step = match limits[2] { PivotCacheItem::Number(value) if value >= 1.0 && value <= f64::from(u16::MAX) && value.fract() == 0.0 => value as u16, _ => return Err(cache_invalid(0x00D8, "date grouping step must be a positive integer")) };
+                let start = match limits[0] {
+                    PivotCacheItem::DateTime(value) => value,
+                    _ => {
+                        return Err(cache_invalid(
+                            0x00D8,
+                            "date grouping start must be SXDATETIME",
+                        ));
+                    },
+                };
+                let end = match limits[1] {
+                    PivotCacheItem::DateTime(value) => value,
+                    _ => {
+                        return Err(cache_invalid(
+                            0x00D8,
+                            "date grouping end must be SXDATETIME",
+                        ));
+                    },
+                };
+                let step = match limits[2] {
+                    PivotCacheItem::Number(value)
+                        if value >= 1.0 && value <= f64::from(u16::MAX) && value.fract() == 0.0 =>
+                    {
+                        value as u16
+                    },
+                    _ => {
+                        return Err(cache_invalid(
+                            0x00D8,
+                            "date grouping step must be a positive integer",
+                        ));
+                    },
+                };
                 Some(PivotCacheGrouping::Date(PivotCacheDateGrouping {
-                    unit: PivotCacheDateGroupUnit::try_from(group_type)?, start, end, step,
-                    auto_start: group_flags & 1 != 0, auto_end: group_flags & 2 != 0,
+                    unit: PivotCacheDateGroupUnit::try_from(group_type)?,
+                    start,
+                    end,
+                    step,
+                    auto_start: group_flags & 1 != 0,
+                    auto_end: group_flags & 2 != 0,
                     group_items: group_items.clone(),
                 }))
             }
-        } else { None };
+        } else {
+            None
+        };
         let mut items = Vec::with_capacity(original_count);
         for _ in 0..original_count {
-            let (kind, body) = records.get(position).ok_or_else(|| cache_invalid(0x00C7, "missing shared PivotCache item"))?;
+            let (kind, body) = records
+                .get(position)
+                .ok_or_else(|| cache_invalid(0x00C7, "missing shared PivotCache item"))?;
             items.push(parse_cache_item(*kind, body)?);
             position += 1;
         }
-        if (flags & 1 != 0) != !(items.is_empty() && group_items.is_empty()) { return Err(cache_invalid(0x00C7, "SXFDB item flag/count mismatch")); }
+        if (flags & 1 != 0) == (items.is_empty() && group_items.is_empty()) {
+            return Err(cache_invalid(0x00C7, "SXFDB item flag/count mismatch"));
+        }
         fields.push(PivotCacheField {
             name,
             flags,
             group_parent: (flags & 0x0008 != 0).then_some(raw_parent),
-            group_base: matches!(grouping, Some(PivotCacheGrouping::Discrete(_))).then_some(raw_base),
+            group_base: matches!(grouping, Some(PivotCacheGrouping::Discrete(_)))
+                .then_some(raw_base),
             items,
             grouping,
         });
     }
     let mut rows = Vec::new();
     while let Some((kind, body)) = records.get(position) {
-        if *kind == 0x000A { position += 1; break; }
-        if *kind != 0x00C8 { return Err(cache_invalid(*kind, "expected SXINDEXLIST or EOF")); }
+        if *kind == 0x000A {
+            position += 1;
+            break;
+        }
+        if *kind != 0x00C8 {
+            return Err(cache_invalid(*kind, "expected SXINDEXLIST or EOF"));
+        }
         let mut body_offset = 0usize;
         let mut row = Vec::with_capacity(fields.len());
         position += 1;
         for field in fields.iter().take(standard_field_count) {
             if field.items.is_empty() {
-                let (item_type, item_body) = records.get(position).ok_or_else(|| cache_invalid(0x00C8, "missing inline PivotCache row item"))?;
+                let (item_type, item_body) = records
+                    .get(position)
+                    .ok_or_else(|| cache_invalid(0x00C8, "missing inline PivotCache row item"))?;
                 row.push(parse_cache_item(*item_type, item_body)?);
                 position += 1;
             } else {
                 let width = if field.flags & 0x0200 != 0 { 2 } else { 1 };
-                let encoded = body.get(body_offset..body_offset + width).ok_or(XlsError::InvalidLength { expected: body_offset + width, found: body.len() })?;
-                let index = if width == 2 { usize::from(u16::from_le_bytes(encoded.try_into().unwrap())) } else { usize::from(encoded[0]) };
-                row.push(field.items.get(index).ok_or_else(|| cache_invalid(0x00C8, "SXINDEXLIST item index out of range"))?.clone());
+                let encoded =
+                    body.get(body_offset..body_offset + width)
+                        .ok_or(XlsError::InvalidLength {
+                            expected: body_offset + width,
+                            found: body.len(),
+                        })?;
+                let index = if width == 2 {
+                    usize::from(u16::from_le_bytes(encoded.try_into().unwrap()))
+                } else {
+                    usize::from(encoded[0])
+                };
+                row.push(
+                    field
+                        .items
+                        .get(index)
+                        .ok_or_else(|| {
+                            cache_invalid(0x00C8, "SXINDEXLIST item index out of range")
+                        })?
+                        .clone(),
+                );
                 body_offset += width;
             }
         }
-        if body_offset != body.len() { return Err(cache_invalid(0x00C8, "SXINDEXLIST payload size does not match fields")); }
+        if body_offset != body.len() {
+            return Err(cache_invalid(
+                0x00C8,
+                "SXINDEXLIST payload size does not match fields",
+            ));
+        }
         rows.push(row);
     }
-    if position != records.len() { return Err(cache_invalid(0x000A, "trailing PivotCache records after EOF")); }
-    if cache_flags & 1 != 0 && rows.len() != record_count as usize { return Err(cache_invalid(0x00C6, "saved PivotCache row count mismatch")); }
-    Ok(PivotCache { stream_id, flags: cache_flags, record_count, fields, rows })
+    if position != records.len() {
+        return Err(cache_invalid(
+            0x000A,
+            "trailing PivotCache records after EOF",
+        ));
+    }
+    if cache_flags & 1 != 0 && rows.len() != record_count as usize {
+        return Err(cache_invalid(0x00C6, "saved PivotCache row count mismatch"));
+    }
+    Ok(PivotCache {
+        stream_id,
+        flags: cache_flags,
+        record_count,
+        fields,
+        rows,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -470,8 +825,21 @@ const MAX_PIVOT_ITEMS: usize = 1_048_576;
 const MAX_PIVOT_EXTENSION_BYTES: usize = 1_048_576;
 
 pub(crate) const fn is_worksheet_view_record(record_type: u16) -> bool {
-    matches!(record_type, SXVIEW_TYPE | SXVD_TYPE | SXVI_TYPE | SXIVD_TYPE | SXLI_TYPE | SXPI_TYPE
-        | SXDI_TYPE | SXEX_TYPE | SXVDEX_TYPE | QSI_SX_TAG_TYPE | SXVIEWEX9_TYPE | SXADDL_TYPE)
+    matches!(
+        record_type,
+        SXVIEW_TYPE
+            | SXVD_TYPE
+            | SXVI_TYPE
+            | SXIVD_TYPE
+            | SXLI_TYPE
+            | SXPI_TYPE
+            | SXDI_TYPE
+            | SXEX_TYPE
+            | SXVDEX_TYPE
+            | QSI_SX_TAG_TYPE
+            | SXVIEWEX9_TYPE
+            | SXADDL_TYPE
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -501,10 +869,21 @@ impl PivotAxis {
             0x0002 => Ok(Self::Column),
             0x0004 => Ok(Self::Page),
             0x0008 => Ok(Self::Data),
-            _ => Err(cache_invalid(SXVD_TYPE, format!("invalid PivotTable axis 0x{val:04X}"))),
+            _ => Err(cache_invalid(
+                SXVD_TYPE,
+                format!("invalid PivotTable axis 0x{val:04X}"),
+            )),
         }
     }
-    pub const fn code(self) -> u16 { match self { Self::None => 0, Self::Row => 1, Self::Column => 2, Self::Page => 4, Self::Data => 8 } }
+    pub const fn code(self) -> u16 {
+        match self {
+            Self::None => 0,
+            Self::Row => 1,
+            Self::Column => 2,
+            Self::Page => 4,
+            Self::Data => 8,
+        }
+    }
 }
 
 /// Aggregation function for data items.
@@ -542,9 +921,20 @@ impl PivotFunction {
         }
     }
     pub const fn code(self) -> u16 {
-        match self { Self::Sum => 0, Self::Count => 1, Self::Average => 2, Self::Max => 3,
-            Self::Min => 4, Self::Product => 5, Self::CountNums => 6, Self::StdDev => 7,
-            Self::StdDevP => 8, Self::Var => 9, Self::VarP => 10, Self::Unknown(value) => value }
+        match self {
+            Self::Sum => 0,
+            Self::Count => 1,
+            Self::Average => 2,
+            Self::Max => 3,
+            Self::Min => 4,
+            Self::Product => 5,
+            Self::CountNums => 6,
+            Self::StdDev => 7,
+            Self::StdDevP => 8,
+            Self::Var => 9,
+            Self::VarP => 10,
+            Self::Unknown(value) => value,
+        }
     }
 }
 
@@ -658,13 +1048,24 @@ pub fn parse_sxview(data: &[u8]) -> XlsResult<PivotViewDef> {
     let cch_name = usize::from(binary::read_u16_le_at(data, 40)?);
     let cch_data = usize::from(binary::read_u16_le_at(data, 42)?);
     if usize::from(field_count) > MAX_PIVOT_FIELDS {
-        return Err(cache_invalid(SXVIEW_TYPE, "PivotTable field count exceeds resource bound"));
+        return Err(cache_invalid(
+            SXVIEW_TYPE,
+            "PivotTable field count exceeds resource bound",
+        ));
     }
-    if first_row > last_row || first_col > last_col || first_header_row < first_row
-        || first_header_row > last_row || first_data_row < first_row || first_data_row > last_row
-        || first_data_col < first_col || first_data_col > last_col
+    if first_row > last_row
+        || first_col > last_col
+        || first_header_row < first_row
+        || first_header_row > last_row
+        || first_data_row < first_row
+        || first_data_row > last_row
+        || first_data_col < first_col
+        || first_data_col > last_col
     {
-        return Err(cache_invalid(SXVIEW_TYPE, "invalid or reversed PivotTable output range"));
+        return Err(cache_invalid(
+            SXVIEW_TYPE,
+            "invalid or reversed PivotTable output range",
+        ));
     }
 
     let mut offset = 44;
@@ -756,7 +1157,9 @@ pub fn parse_sxvd(data: &[u8]) -> XlsResult<PivotViewField> {
         None
     };
 
-    if offset != data.len() { return Err(cache_invalid(SXVD_TYPE, "trailing SXVD payload")); }
+    if offset != data.len() {
+        return Err(cache_invalid(SXVD_TYPE, "trailing SXVD payload"));
+    }
     Ok(PivotViewField {
         axis,
         subtotal_count,
@@ -818,11 +1221,21 @@ impl PivotItemType {
 
     pub const fn code(self) -> u16 {
         match self {
-            Self::Data => 0xFE, Self::Default => 0xFF, Self::Sum => 0x00,
-            Self::CountA => 0x01, Self::Average => 0x02, Self::Max => 0x03,
-            Self::Min => 0x04, Self::Product => 0x05, Self::Count => 0x06,
-            Self::StdDev => 0x07, Self::StdDevP => 0x08, Self::Var => 0x09,
-            Self::VarP => 0x0A, Self::Grand => 0x0B, Self::Blank => 0x0C,
+            Self::Data => 0xFE,
+            Self::Default => 0xFF,
+            Self::Sum => 0x00,
+            Self::CountA => 0x01,
+            Self::Average => 0x02,
+            Self::Max => 0x03,
+            Self::Min => 0x04,
+            Self::Product => 0x05,
+            Self::Count => 0x06,
+            Self::StdDev => 0x07,
+            Self::StdDevP => 0x08,
+            Self::Var => 0x09,
+            Self::VarP => 0x0A,
+            Self::Grand => 0x0B,
+            Self::Blank => 0x0C,
             Self::Unknown(value) => value,
         }
     }
@@ -871,7 +1284,9 @@ pub fn parse_sxvi(data: &[u8]) -> XlsResult<PivotViewItem> {
         None
     };
 
-    if offset != data.len() { return Err(cache_invalid(SXVI_TYPE, "trailing SXVI payload")); }
+    if offset != data.len() {
+        return Err(cache_invalid(SXVI_TYPE, "trailing SXVI payload"));
+    }
     Ok(PivotViewItem {
         item_type,
         flags,
@@ -934,7 +1349,9 @@ pub fn parse_sxdi(data: &[u8]) -> XlsResult<PivotDataItem> {
 
     let mut offset = 14;
     let name = read_xl_string_no_cch(data, &mut offset, cch_name)?;
-    if offset != data.len() { return Err(cache_invalid(SXDI_TYPE, "trailing SXDI payload")); }
+    if offset != data.len() {
+        return Err(cache_invalid(SXDI_TYPE, "trailing SXDI payload"));
+    }
 
     Ok(PivotDataItem {
         source_field_index,
@@ -1013,7 +1430,11 @@ pub enum PivotPageSelection {
 
 impl PageFieldEntry {
     pub const fn selection(self) -> PivotPageSelection {
-        if self.item_index == 0x7FFD { PivotPageSelection::All } else { PivotPageSelection::Item(self.item_index) }
+        if self.item_index == 0x7FFD {
+            PivotPageSelection::All
+        } else {
+            PivotPageSelection::Item(self.item_index)
+        }
     }
 }
 
@@ -1023,7 +1444,10 @@ impl PageFieldEntry {
 /// The number of entries is `data.len() / 6`.
 pub fn parse_sxpi(data: &[u8]) -> XlsResult<Vec<PageFieldEntry>> {
     if data.len() % 6 != 0 {
-        return Err(cache_invalid(SXPI_TYPE, "SXPI length is not a multiple of six"));
+        return Err(cache_invalid(
+            SXPI_TYPE,
+            "SXPI length is not a multiple of six",
+        ));
     }
     let entry_count = data.len() / 6;
     let mut entries = Vec::with_capacity(entry_count);
@@ -1074,7 +1498,10 @@ pub struct PivotViewFieldExtension {
 
 pub fn parse_sxvdex(data: &[u8]) -> XlsResult<PivotViewFieldExtension> {
     if data.len() < 20 {
-        return Err(XlsError::InvalidLength { expected: 20, found: data.len() });
+        return Err(XlsError::InvalidLength {
+            expected: 20,
+            found: data.len(),
+        });
     }
     let cch = binary::read_u16_le_at(data, 10)?;
     let mut offset = 20;
@@ -1088,8 +1515,14 @@ pub fn parse_sxvdex(data: &[u8]) -> XlsResult<PivotViewFieldExtension> {
     }
     Ok(PivotViewFieldExtension {
         flags: binary::read_u32_le_at(data, 0)?,
-        auto_sort_data_index: match binary::read_u16_le_at(data, 4)? { u16::MAX => None, value => Some(value) },
-        auto_show_data_index: match binary::read_u16_le_at(data, 6)? { u16::MAX => None, value => Some(value) },
+        auto_sort_data_index: match binary::read_u16_le_at(data, 4)? {
+            u16::MAX => None,
+            value => Some(value),
+        },
+        auto_show_data_index: match binary::read_u16_le_at(data, 6)? {
+            u16::MAX => None,
+            value => Some(value),
+        },
         number_format_index: binary::read_u16_le_at(data, 8)?,
         subtotal_name,
         reserved: data[12..20].try_into().expect("fixed length checked"),
@@ -1105,26 +1538,44 @@ pub struct PivotLayoutLine {
     pub item_indices: Vec<u16>,
 }
 
-fn parse_sxli(data: &[u8], expected_lines: usize, max_indices: usize) -> XlsResult<Vec<PivotLayoutLine>> {
+fn parse_sxli(
+    data: &[u8],
+    expected_lines: usize,
+    max_indices: usize,
+) -> XlsResult<Vec<PivotLayoutLine>> {
     if expected_lines == 0 || data.len() % expected_lines != 0 {
-        return Err(cache_invalid(SXLI_TYPE, "SXLI byte length is inconsistent with its declared line count"));
+        return Err(cache_invalid(
+            SXLI_TYPE,
+            "SXLI byte length is inconsistent with its declared line count",
+        ));
     }
     let line_size = data.len() / expected_lines;
     if line_size < 8 || (line_size - 8) % 2 != 0 {
-        return Err(cache_invalid(SXLI_TYPE, "SXLI has an invalid fixed line size"));
+        return Err(cache_invalid(
+            SXLI_TYPE,
+            "SXLI has an invalid fixed line size",
+        ));
     }
     let index_count = (line_size - 8) / 2;
     if index_count > max_indices {
-        return Err(cache_invalid(SXLI_TYPE, "SXLI item-index count exceeds the PivotTable field count"));
+        return Err(cache_invalid(
+            SXLI_TYPE,
+            "SXLI item-index count exceeds the PivotTable field count",
+        ));
     }
     let mut lines = Vec::with_capacity(expected_lines);
     for line in data.chunks_exact(line_size) {
         let declared_max = usize::from(u16::from_le_bytes([line[4], line[5]]));
         if declared_max > index_count && declared_max != usize::from(u16::MAX) {
-            return Err(cache_invalid(SXLI_TYPE, "SXLI declared item ordinal exceeds its line payload"));
+            return Err(cache_invalid(
+                SXLI_TYPE,
+                "SXLI declared item ordinal exceeds its line payload",
+            ));
         }
         let indices = line[8..]
-            .chunks_exact(2).map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])).collect();
+            .chunks_exact(2)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .collect();
         lines.push(PivotLayoutLine {
             repeated_item_count: u16::from_le_bytes([line[0], line[1]]),
             item_type: u16::from_le_bytes([line[2], line[3]]),
@@ -1151,13 +1602,27 @@ pub struct PivotViewExtension {
     pub vacate_style: Option<String>,
 }
 
-fn parse_optional_sx_string(data: &[u8], offset: &mut usize, cch: u16) -> XlsResult<Option<String>> {
-    if cch == u16::MAX { Ok(None) } else { read_xl_string_no_cch(data, offset, usize::from(cch)).map(Some) }
+fn parse_optional_sx_string(
+    data: &[u8],
+    offset: &mut usize,
+    cch: u16,
+) -> XlsResult<Option<String>> {
+    if cch == u16::MAX {
+        Ok(None)
+    } else {
+        read_xl_string_no_cch(data, offset, usize::from(cch)).map(Some)
+    }
 }
 
 pub fn parse_sxex(data: &[u8]) -> XlsResult<PivotViewExtension> {
-    if data.len() < 24 { return Err(XlsError::InvalidLength { expected: 24, found: data.len() }); }
-    let lengths = [2usize, 4, 6, 18, 20, 22].map(|offset| u16::from_le_bytes([data[offset], data[offset + 1]]));
+    if data.len() < 24 {
+        return Err(XlsError::InvalidLength {
+            expected: 24,
+            found: data.len(),
+        });
+    }
+    let lengths = [2usize, 4, 6, 18, 20, 22]
+        .map(|offset| u16::from_le_bytes([data[offset], data[offset + 1]]));
     let mut offset = 24;
     let error_string = parse_optional_sx_string(data, &mut offset, lengths[0])?;
     let null_string = parse_optional_sx_string(data, &mut offset, lengths[1])?;
@@ -1165,14 +1630,21 @@ pub fn parse_sxex(data: &[u8]) -> XlsResult<PivotViewExtension> {
     let page_field_style = parse_optional_sx_string(data, &mut offset, lengths[3])?;
     let table_style = parse_optional_sx_string(data, &mut offset, lengths[4])?;
     let vacate_style = parse_optional_sx_string(data, &mut offset, lengths[5])?;
-    if offset != data.len() { return Err(cache_invalid(SXEX_TYPE, "trailing SXEX payload")); }
+    if offset != data.len() {
+        return Err(cache_invalid(SXEX_TYPE, "trailing SXEX payload"));
+    }
     Ok(PivotViewExtension {
         format_count: binary::read_u16_le_at(data, 0)?,
         select_count: binary::read_u16_le_at(data, 8)?,
         page_rows: binary::read_u16_le_at(data, 10)?,
         page_cols: binary::read_u16_le_at(data, 12)?,
         flags: binary::read_u32_le_at(data, 14)?,
-        error_string, null_string, tag, page_field_style, table_style, vacate_style,
+        error_string,
+        null_string,
+        tag,
+        page_field_style,
+        table_style,
+        vacate_style,
     })
 }
 
@@ -1191,16 +1663,33 @@ pub struct PivotQueryTag {
 }
 
 fn read_xl_unicode_string(data: &[u8], offset: &mut usize) -> XlsResult<String> {
-    let cch_end = offset.checked_add(2).ok_or_else(|| cache_invalid(QSI_SX_TAG_TYPE, "string offset overflow"))?;
-    let cch_bytes = data.get(*offset..cch_end).ok_or(XlsError::InvalidLength { expected: cch_end, found: data.len() })?;
+    let cch_end = offset
+        .checked_add(2)
+        .ok_or_else(|| cache_invalid(QSI_SX_TAG_TYPE, "string offset overflow"))?;
+    let cch_bytes = data.get(*offset..cch_end).ok_or(XlsError::InvalidLength {
+        expected: cch_end,
+        found: data.len(),
+    })?;
     *offset = cch_end;
-    read_xl_string_no_cch(data, offset, usize::from(u16::from_le_bytes([cch_bytes[0], cch_bytes[1]])))
+    read_xl_string_no_cch(
+        data,
+        offset,
+        usize::from(u16::from_le_bytes([cch_bytes[0], cch_bytes[1]])),
+    )
 }
 
 pub fn parse_qsi_sx_tag(data: &[u8]) -> XlsResult<PivotQueryTag> {
-    if data.len() < 19 { return Err(XlsError::InvalidLength { expected: 19, found: data.len() }); }
+    if data.len() < 19 {
+        return Err(XlsError::InvalidLength {
+            expected: 19,
+            found: data.len(),
+        });
+    }
     if binary::read_u16_le_at(data, 0)? != QSI_SX_TAG_TYPE || data[14] != 16 {
-        return Err(cache_invalid(QSI_SX_TAG_TYPE, "invalid QsiSxTag FRT header"));
+        return Err(cache_invalid(
+            QSI_SX_TAG_TYPE,
+            "invalid QsiSxTag FRT header",
+        ));
     }
     let mut offset = 16;
     let table_name = read_xl_unicode_string(data, &mut offset)?;
@@ -1208,8 +1697,10 @@ pub fn parse_qsi_sx_tag(data: &[u8]) -> XlsResult<PivotQueryTag> {
         table_type: binary::read_u16_le_at(data, 4)?,
         flags: binary::read_u16_le_at(data, 6)?,
         options: binary::read_u32_le_at(data, 8)?,
-        last_refresh_version: data[12], minimum_refresh_version: data[13],
-        first_created_version: data[15], table_name,
+        last_refresh_version: data[12],
+        minimum_refresh_version: data[13],
+        first_created_version: data[15],
+        table_name,
         trailing_payload: data[offset..].to_vec(),
     })
 }
@@ -1225,16 +1716,29 @@ pub struct PivotViewEx9 {
 }
 
 pub fn parse_sxviewex9(data: &[u8]) -> XlsResult<PivotViewEx9> {
-    if data.len() < 17 { return Err(XlsError::InvalidLength { expected: 17, found: data.len() }); }
+    if data.len() < 17 {
+        return Err(XlsError::InvalidLength {
+            expected: 17,
+            found: data.len(),
+        });
+    }
     if binary::read_u16_le_at(data, 0)? != SXVIEWEX9_TYPE {
-        return Err(cache_invalid(SXVIEWEX9_TYPE, "invalid SXVIEWEX9 FRT header"));
+        return Err(cache_invalid(
+            SXVIEWEX9_TYPE,
+            "invalid SXVIEWEX9 FRT header",
+        ));
     }
     let mut offset = 14;
     let grand_total_name = read_xl_unicode_string(data, &mut offset)?;
-    if offset != data.len() { return Err(cache_invalid(SXVIEWEX9_TYPE, "trailing SXVIEWEX9 payload")); }
+    if offset != data.len() {
+        return Err(cache_invalid(SXVIEWEX9_TYPE, "trailing SXVIEWEX9 payload"));
+    }
     Ok(PivotViewEx9 {
-        frt_flags: binary::read_u16_le_at(data, 2)?, report_flags: binary::read_u32_le_at(data, 4)?,
-        view_flags: binary::read_u32_le_at(data, 8)?, auto_format_index: binary::read_u16_le_at(data, 12)?, grand_total_name,
+        frt_flags: binary::read_u16_le_at(data, 2)?,
+        report_flags: binary::read_u32_le_at(data, 4)?,
+        view_flags: binary::read_u32_le_at(data, 8)?,
+        auto_format_index: binary::read_u16_le_at(data, 12)?,
+        grand_total_name,
     })
 }
 
@@ -1248,12 +1752,20 @@ pub struct PivotAdditionalExtension {
 }
 
 pub fn parse_sxaddl(data: &[u8]) -> XlsResult<PivotAdditionalExtension> {
-    if data.len() < 6 { return Err(XlsError::InvalidLength { expected: 6, found: data.len() }); }
+    if data.len() < 6 {
+        return Err(XlsError::InvalidLength {
+            expected: 6,
+            found: data.len(),
+        });
+    }
     if binary::read_u16_le_at(data, 0)? != SXADDL_TYPE {
         return Err(cache_invalid(SXADDL_TYPE, "invalid SXADDL FRT header"));
     }
     Ok(PivotAdditionalExtension {
-        reserved: binary::read_u16_le_at(data, 2)?, class: data[4], kind: data[5], payload: data[6..].to_vec(),
+        reserved: binary::read_u16_le_at(data, 2)?,
+        class: data[4],
+        kind: data[5],
+        payload: data[6..].to_vec(),
     })
 }
 
@@ -1315,10 +1827,16 @@ impl PivotTable {
         }
     }
 
-    pub const fn cache_index(&self) -> u16 { self.view.cache_index }
+    pub const fn cache_index(&self) -> u16 {
+        self.view.cache_index
+    }
 
     /// Returns the cache field addressed by a view-field ordinal.
-    pub fn cache_field<'a>(&self, cache: &'a PivotCache, field_index: u16) -> Option<&'a PivotCacheField> {
+    pub fn cache_field<'a>(
+        &self,
+        cache: &'a PivotCache,
+        field_index: u16,
+    ) -> Option<&'a PivotCacheField> {
         cache.fields().get(usize::from(field_index))
     }
 }
@@ -1338,15 +1856,23 @@ struct PivotTableBuild {
 impl PivotTableBuild {
     fn new(view: PivotViewDef) -> Self {
         Self {
-            table: PivotTable::new(view), row_axis_seen: false, column_axis_seen: false,
-            page_seen: false, row_lines_seen: false, column_lines_seen: false,
-            sxaddl_field_cursor: 0, sxaddl_field_open: false, extension_bytes: 0,
+            table: PivotTable::new(view),
+            row_axis_seen: false,
+            column_axis_seen: false,
+            page_seen: false,
+            row_lines_seen: false,
+            column_lines_seen: false,
+            sxaddl_field_cursor: 0,
+            sxaddl_field_open: false,
+            extension_bytes: 0,
         }
     }
 
     fn fields_complete(&self) -> bool {
         self.table.fields.len() == usize::from(self.table.view.field_count)
-            && self.table.fields.iter().all(|field| field.items.len() == usize::from(field.item_count) && field.extension.is_some())
+            && self.table.fields.iter().all(|field| {
+                field.items.len() == usize::from(field.item_count) && field.extension.is_some()
+            })
     }
 
     fn axes_complete(&self) -> bool {
@@ -1354,22 +1880,38 @@ impl PivotTableBuild {
             && (self.table.view.col_field_count == 0 || self.column_axis_seen)
     }
 
-    fn page_complete(&self) -> bool { self.table.view.page_field_count == 0 || self.page_seen }
-    fn data_complete(&self) -> bool { self.table.data_items.len() == usize::from(self.table.view.data_field_count) }
+    fn page_complete(&self) -> bool {
+        self.table.view.page_field_count == 0 || self.page_seen
+    }
+    fn data_complete(&self) -> bool {
+        self.table.data_items.len() == usize::from(self.table.view.data_field_count)
+    }
     fn lines_complete(&self) -> bool {
         (self.table.view.data_row_count == 0 || self.row_lines_seen)
             && (self.table.view.data_col_count == 0 || self.column_lines_seen)
     }
 
     fn require_fields(&self, record_type: u16) -> XlsResult<()> {
-        if self.fields_complete() { Ok(()) } else { Err(cache_invalid(record_type, "record appears before all SXVD/SXVI/SXVDEx field groups")) }
+        if self.fields_complete() {
+            Ok(())
+        } else {
+            Err(cache_invalid(
+                record_type,
+                "record appears before all SXVD/SXVI/SXVDEx field groups",
+            ))
+        }
     }
 
     fn add_extension_bytes(&mut self, record_type: u16, count: usize) -> XlsResult<()> {
-        self.extension_bytes = self.extension_bytes.checked_add(count)
+        self.extension_bytes = self
+            .extension_bytes
+            .checked_add(count)
             .ok_or_else(|| cache_invalid(record_type, "PivotTable extension size overflow"))?;
         if self.extension_bytes > MAX_PIVOT_EXTENSION_BYTES {
-            return Err(cache_invalid(record_type, "PivotTable extensions exceed resource bound"));
+            return Err(cache_invalid(
+                record_type,
+                "PivotTable extensions exceed resource bound",
+            ));
         }
         Ok(())
     }
@@ -1378,117 +1920,255 @@ impl PivotTableBuild {
         match record_type {
             SXVD_TYPE => {
                 if let Some(previous) = self.table.fields.last()
-                    && (previous.extension.is_none() || previous.items.len() != usize::from(previous.item_count))
+                    && (previous.extension.is_none()
+                        || previous.items.len() != usize::from(previous.item_count))
                 {
-                    return Err(cache_invalid(record_type, "SXVD starts before the previous field group is complete"));
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXVD starts before the previous field group is complete",
+                    ));
                 }
                 if self.table.fields.len() == usize::from(self.table.view.field_count) {
-                    return Err(cache_invalid(record_type, "SXVD count exceeds SXVIEW field count"));
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXVD count exceeds SXVIEW field count",
+                    ));
                 }
                 self.table.fields.push(parse_sxvd(data)?);
-            }
+            },
             SXVI_TYPE => {
-                let field = self.table.fields.last_mut().ok_or_else(|| cache_invalid(record_type, "SXVI appears without SXVD"))?;
-                if field.extension.is_some() { return Err(cache_invalid(record_type, "SXVI appears after SXVDEx")); }
-                if field.items.len() == usize::from(field.item_count) { return Err(cache_invalid(record_type, "SXVI count exceeds SXVD item count")); }
+                let field = self
+                    .table
+                    .fields
+                    .last_mut()
+                    .ok_or_else(|| cache_invalid(record_type, "SXVI appears without SXVD"))?;
+                if field.extension.is_some() {
+                    return Err(cache_invalid(record_type, "SXVI appears after SXVDEx"));
+                }
+                if field.items.len() == usize::from(field.item_count) {
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXVI count exceeds SXVD item count",
+                    ));
+                }
                 let item = parse_sxvi(data)?;
                 field.items.push(item.clone());
                 self.table.items.push(item);
-                if self.table.items.len() > MAX_PIVOT_ITEMS { return Err(cache_invalid(record_type, "PivotTable items exceed resource bound")); }
-            }
+                if self.table.items.len() > MAX_PIVOT_ITEMS {
+                    return Err(cache_invalid(
+                        record_type,
+                        "PivotTable items exceed resource bound",
+                    ));
+                }
+            },
             SXVDEX_TYPE => {
                 let extension = parse_sxvdex(data)?;
-                let field = self.table.fields.last_mut().ok_or_else(|| cache_invalid(record_type, "SXVDEx appears without SXVD"))?;
-                if field.items.len() != usize::from(field.item_count) { return Err(cache_invalid(record_type, "SXVDEx appears before all declared SXVI items")); }
-                if field.extension.replace(extension).is_some() { return Err(cache_invalid(record_type, "duplicate SXVDEx")); }
-            }
+                let field = self
+                    .table
+                    .fields
+                    .last_mut()
+                    .ok_or_else(|| cache_invalid(record_type, "SXVDEx appears without SXVD"))?;
+                if field.items.len() != usize::from(field.item_count) {
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXVDEx appears before all declared SXVI items",
+                    ));
+                }
+                if field.extension.replace(extension).is_some() {
+                    return Err(cache_invalid(record_type, "duplicate SXVDEx"));
+                }
+            },
             SXIVD_TYPE => {
                 self.require_fields(record_type)?;
                 let fields = parse_sxivd(data)?;
                 if self.table.view.row_field_count != 0 && !self.row_axis_seen {
-                    if fields.len() != usize::from(self.table.view.row_field_count) { return Err(cache_invalid(record_type, "row SXIVD count does not match SXVIEW")); }
-                    self.table.row_fields = fields; self.row_axis_seen = true;
+                    if fields.len() != usize::from(self.table.view.row_field_count) {
+                        return Err(cache_invalid(
+                            record_type,
+                            "row SXIVD count does not match SXVIEW",
+                        ));
+                    }
+                    self.table.row_fields = fields;
+                    self.row_axis_seen = true;
                 } else if self.table.view.col_field_count != 0 && !self.column_axis_seen {
-                    if fields.len() != usize::from(self.table.view.col_field_count) { return Err(cache_invalid(record_type, "column SXIVD count does not match SXVIEW")); }
-                    self.table.column_fields = fields; self.column_axis_seen = true;
+                    if fields.len() != usize::from(self.table.view.col_field_count) {
+                        return Err(cache_invalid(
+                            record_type,
+                            "column SXIVD count does not match SXVIEW",
+                        ));
+                    }
+                    self.table.column_fields = fields;
+                    self.column_axis_seen = true;
                 } else {
-                    return Err(cache_invalid(record_type, "duplicate or out-of-order SXIVD"));
+                    return Err(cache_invalid(
+                        record_type,
+                        "duplicate or out-of-order SXIVD",
+                    ));
                 }
-            }
+            },
             SXPI_TYPE => {
                 self.require_fields(record_type)?;
-                if !self.axes_complete() { return Err(cache_invalid(record_type, "SXPI appears before SXIVD axes")); }
-                if self.page_seen || self.table.view.page_field_count == 0 { return Err(cache_invalid(record_type, "duplicate or unexpected SXPI")); }
+                if !self.axes_complete() {
+                    return Err(cache_invalid(record_type, "SXPI appears before SXIVD axes"));
+                }
+                if self.page_seen || self.table.view.page_field_count == 0 {
+                    return Err(cache_invalid(record_type, "duplicate or unexpected SXPI"));
+                }
                 let entries = parse_sxpi(data)?;
-                if entries.len() != usize::from(self.table.view.page_field_count) { return Err(cache_invalid(record_type, "SXPI count does not match SXVIEW")); }
-                self.table.page_entries = entries; self.page_seen = true;
-            }
+                if entries.len() != usize::from(self.table.view.page_field_count) {
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXPI count does not match SXVIEW",
+                    ));
+                }
+                self.table.page_entries = entries;
+                self.page_seen = true;
+            },
             SXDI_TYPE => {
                 self.require_fields(record_type)?;
-                if !self.axes_complete() || !self.page_complete() { return Err(cache_invalid(record_type, "SXDI appears before axes/page fields")); }
-                if self.table.data_items.len() == usize::from(self.table.view.data_field_count) { return Err(cache_invalid(record_type, "SXDI count exceeds SXVIEW")); }
+                if !self.axes_complete() || !self.page_complete() {
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXDI appears before axes/page fields",
+                    ));
+                }
+                if self.table.data_items.len() == usize::from(self.table.view.data_field_count) {
+                    return Err(cache_invalid(record_type, "SXDI count exceeds SXVIEW"));
+                }
                 self.table.data_items.push(parse_sxdi(data)?);
-            }
+            },
             SXLI_TYPE => {
                 self.require_fields(record_type)?;
-                if !self.axes_complete() || !self.page_complete() || !self.data_complete() { return Err(cache_invalid(record_type, "SXLI appears before axis/page/data records")); }
+                if !self.axes_complete() || !self.page_complete() || !self.data_complete() {
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXLI appears before axis/page/data records",
+                    ));
+                }
                 if self.table.view.data_row_count != 0 && !self.row_lines_seen {
-                    self.table.row_lines = parse_sxli(data, usize::from(self.table.view.data_row_count), usize::from(self.table.view.field_count).saturating_add(1))?;
+                    self.table.row_lines = parse_sxli(
+                        data,
+                        usize::from(self.table.view.data_row_count),
+                        usize::from(self.table.view.field_count).saturating_add(1),
+                    )?;
                     self.row_lines_seen = true;
                 } else if self.table.view.data_col_count != 0 && !self.column_lines_seen {
-                    self.table.column_lines = parse_sxli(data, usize::from(self.table.view.data_col_count), usize::from(self.table.view.field_count).saturating_add(1))?;
+                    self.table.column_lines = parse_sxli(
+                        data,
+                        usize::from(self.table.view.data_col_count),
+                        usize::from(self.table.view.field_count).saturating_add(1),
+                    )?;
                     self.column_lines_seen = true;
-                } else { return Err(cache_invalid(record_type, "duplicate or out-of-order SXLI")); }
-            }
+                } else {
+                    return Err(cache_invalid(record_type, "duplicate or out-of-order SXLI"));
+                }
+            },
             SXEX_TYPE => {
                 self.require_fields(record_type)?;
-                if !self.axes_complete() || !self.page_complete() || !self.data_complete() || !self.lines_complete() {
-                    return Err(cache_invalid(record_type, "SXEX appears before the core PivotTable view is complete"));
+                if !self.axes_complete()
+                    || !self.page_complete()
+                    || !self.data_complete()
+                    || !self.lines_complete()
+                {
+                    return Err(cache_invalid(
+                        record_type,
+                        "SXEX appears before the core PivotTable view is complete",
+                    ));
                 }
-                if self.table.extension.replace(parse_sxex(data)?).is_some() { return Err(cache_invalid(record_type, "duplicate SXEX")); }
-            }
+                if self.table.extension.replace(parse_sxex(data)?).is_some() {
+                    return Err(cache_invalid(record_type, "duplicate SXEX"));
+                }
+            },
             QSI_SX_TAG_TYPE => {
-                if self.table.extension.is_none() { return Err(cache_invalid(record_type, "QsiSxTag appears before SXEX")); }
-                if self.table.query_tag.is_some() || self.table.view_ex9.is_some() || !self.table.additional_extensions.is_empty() {
-                    return Err(cache_invalid(record_type, "duplicate or out-of-order QsiSxTag"));
+                if self.table.extension.is_none() {
+                    return Err(cache_invalid(record_type, "QsiSxTag appears before SXEX"));
+                }
+                if self.table.query_tag.is_some()
+                    || self.table.view_ex9.is_some()
+                    || !self.table.additional_extensions.is_empty()
+                {
+                    return Err(cache_invalid(
+                        record_type,
+                        "duplicate or out-of-order QsiSxTag",
+                    ));
                 }
                 self.add_extension_bytes(record_type, data.len())?;
                 let tag = parse_qsi_sx_tag(data)?;
-                if tag.table_name != self.table.view.name { return Err(cache_invalid(record_type, "QsiSxTag table name does not match SXVIEW")); }
+                if tag.table_name != self.table.view.name {
+                    return Err(cache_invalid(
+                        record_type,
+                        "QsiSxTag table name does not match SXVIEW",
+                    ));
+                }
                 self.table.query_tag = Some(tag);
-            }
+            },
             SXVIEWEX9_TYPE => {
-                if self.table.query_tag.is_none() || self.table.view_ex9.is_some() || !self.table.additional_extensions.is_empty() {
-                    return Err(cache_invalid(record_type, "duplicate or out-of-order SXVIEWEX9"));
+                if self.table.query_tag.is_none()
+                    || self.table.view_ex9.is_some()
+                    || !self.table.additional_extensions.is_empty()
+                {
+                    return Err(cache_invalid(
+                        record_type,
+                        "duplicate or out-of-order SXVIEWEX9",
+                    ));
                 }
                 self.add_extension_bytes(record_type, data.len())?;
                 self.table.view_ex9 = Some(parse_sxviewex9(data)?);
-            }
+            },
             SXADDL_TYPE => {
-                if self.table.extension.is_none() { return Err(cache_invalid(record_type, "SXADDL appears before SXEX")); }
+                if self.table.extension.is_none() {
+                    return Err(cache_invalid(record_type, "SXADDL appears before SXEX"));
+                }
                 self.add_extension_bytes(record_type, data.len())?;
                 let extension = parse_sxaddl(data)?;
                 if extension.class == 0x17 {
-                    if self.sxaddl_field_cursor >= self.table.fields.len() { return Err(cache_invalid(record_type, "field SXADDL ordinal exceeds SXVD count")); }
-                    if !self.sxaddl_field_open && extension.kind != 0x00 { return Err(cache_invalid(record_type, "field SXADDL group does not start with a name record")); }
+                    if self.sxaddl_field_cursor >= self.table.fields.len() {
+                        return Err(cache_invalid(
+                            record_type,
+                            "field SXADDL ordinal exceeds SXVD count",
+                        ));
+                    }
+                    if !self.sxaddl_field_open && extension.kind != 0x00 {
+                        return Err(cache_invalid(
+                            record_type,
+                            "field SXADDL group does not start with a name record",
+                        ));
+                    }
                     self.sxaddl_field_open = extension.kind != 0xFF;
-                    self.table.fields[self.sxaddl_field_cursor].additional_extensions.push(extension);
-                    if !self.sxaddl_field_open { self.sxaddl_field_cursor += 1; }
+                    self.table.fields[self.sxaddl_field_cursor]
+                        .additional_extensions
+                        .push(extension);
+                    if !self.sxaddl_field_open {
+                        self.sxaddl_field_cursor += 1;
+                    }
                 } else {
-                    if self.sxaddl_field_open { return Err(cache_invalid(record_type, "view SXADDL interrupts a field extension group")); }
+                    if self.sxaddl_field_open {
+                        return Err(cache_invalid(
+                            record_type,
+                            "view SXADDL interrupts a field extension group",
+                        ));
+                    }
                     self.table.additional_extensions.push(extension);
                 }
-            }
+            },
             _ => return Err(cache_invalid(record_type, "unexpected PivotTable record")),
         }
         Ok(())
     }
 
     fn finish(self) -> XlsResult<PivotTable> {
-        if !self.fields_complete() || !self.axes_complete() || !self.page_complete() || !self.data_complete()
-            || !self.lines_complete() || self.table.extension.is_none() || self.sxaddl_field_open
+        if !self.fields_complete()
+            || !self.axes_complete()
+            || !self.page_complete()
+            || !self.data_complete()
+            || !self.lines_complete()
+            || self.table.extension.is_none()
+            || self.sxaddl_field_open
         {
-            return Err(cache_invalid(SXVIEW_TYPE, "incomplete or unterminated PivotTable worksheet-view record set"));
+            return Err(cache_invalid(
+                SXVIEW_TYPE,
+                "incomplete or unterminated PivotTable worksheet-view record set",
+            ));
         }
         Ok(self.table)
     }
@@ -1501,14 +2181,33 @@ pub(crate) struct PivotTableCollector {
 }
 
 impl PivotTableCollector {
-    pub(crate) fn new() -> Self { Self { current: None, completed: Vec::new() } }
+    pub(crate) fn new() -> Self {
+        Self {
+            current: None,
+            completed: Vec::new(),
+        }
+    }
 
     fn push_current(&mut self) -> XlsResult<()> {
-        let Some(build) = self.current.take() else { return Ok(()); };
+        let Some(build) = self.current.take() else {
+            return Ok(());
+        };
         let table = build.finish()?;
-        if self.completed.len() == MAX_PIVOT_VIEWS_PER_SHEET { return Err(cache_invalid(SXVIEW_TYPE, "PivotTable view count exceeds resource bound")); }
-        if self.completed.iter().any(|prior| ranges_overlap(&prior.view, &table.view)) {
-            return Err(cache_invalid(SXVIEW_TYPE, "overlapping PivotTable output ranges"));
+        if self.completed.len() == MAX_PIVOT_VIEWS_PER_SHEET {
+            return Err(cache_invalid(
+                SXVIEW_TYPE,
+                "PivotTable view count exceeds resource bound",
+            ));
+        }
+        if self
+            .completed
+            .iter()
+            .any(|prior| ranges_overlap(&prior.view, &table.view))
+        {
+            return Err(cache_invalid(
+                SXVIEW_TYPE,
+                "overlapping PivotTable output ranges",
+            ));
         }
         self.completed.push(table);
         Ok(())
@@ -1523,27 +2222,39 @@ impl PivotTableCollector {
             return Ok(true);
         }
         if pivot_record {
-            if self.current.is_none() && record_type == QSI_SX_TAG_TYPE
+            if self.current.is_none()
+                && record_type == QSI_SX_TAG_TYPE
                 && parse_qsi_sx_tag(data)?.table_type != 1
             {
                 return Ok(false);
             }
-            let build = self.current.as_mut().ok_or_else(|| cache_invalid(record_type, "orphan PivotTable worksheet-view record"))?;
+            let build = self.current.as_mut().ok_or_else(|| {
+                cache_invalid(record_type, "orphan PivotTable worksheet-view record")
+            })?;
             build.feed(record_type, data)?;
             return Ok(true);
         }
-        if self.current.as_ref().is_some_and(|build| build.table.extension.is_none()) {
+        if self
+            .current
+            .as_ref()
+            .is_some_and(|build| build.table.extension.is_none())
+        {
             self.push_current()?;
         }
         Ok(false)
     }
 
-    pub(crate) fn finish(mut self) -> XlsResult<Vec<PivotTable>> { self.push_current()?; Ok(self.completed) }
+    pub(crate) fn finish(mut self) -> XlsResult<Vec<PivotTable>> {
+        self.push_current()?;
+        Ok(self.completed)
+    }
 }
 
 fn ranges_overlap(left: &PivotViewDef, right: &PivotViewDef) -> bool {
-    left.first_row <= right.last_row && right.first_row <= left.last_row
-        && left.first_col <= right.last_col && right.first_col <= left.last_col
+    left.first_row <= right.last_row
+        && right.first_row <= left.last_row
+        && left.first_col <= right.last_col
+        && right.first_col <= left.last_col
 }
 
 pub(crate) fn validate_pivot_cache_links(
@@ -1553,40 +2264,98 @@ pub(crate) fn validate_pivot_cache_links(
 ) -> XlsResult<()> {
     for worksheet in worksheets {
         for table in worksheet.pivot_tables() {
-            let stream_id = *cache_stream_ids.get(usize::from(table.view.cache_index)).ok_or_else(|| cache_invalid(SXVIEW_TYPE, "SXVIEW global cache index is out of range"))?;
-            let cache = caches.iter().find(|cache| cache.stream_id() == stream_id)
-                .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "SXStreamID has no matching PivotCache storage stream"))?;
-            if table.fields.len() != cache.fields().len() { return Err(cache_invalid(SXVIEW_TYPE, "SXVIEW field count does not match linked PivotCache")); }
+            let stream_id = *cache_stream_ids
+                .get(usize::from(table.view.cache_index))
+                .ok_or_else(|| {
+                    cache_invalid(SXVIEW_TYPE, "SXVIEW global cache index is out of range")
+                })?;
+            let cache = caches
+                .iter()
+                .find(|cache| cache.stream_id() == stream_id)
+                .ok_or_else(|| {
+                    cache_invalid(
+                        SXVIEW_TYPE,
+                        "SXStreamID has no matching PivotCache storage stream",
+                    )
+                })?;
+            if table.fields.len() != cache.fields().len() {
+                return Err(cache_invalid(
+                    SXVIEW_TYPE,
+                    "SXVIEW field count does not match linked PivotCache",
+                ));
+            }
             validate_axis_fields(table, &table.row_fields, PivotAxis::Row)?;
             validate_axis_fields(table, &table.column_fields, PivotAxis::Column)?;
             for (index, field) in table.fields.iter().enumerate() {
                 let cache_field = &cache.fields()[index];
-                let visible_items = cache_field.grouping().map(PivotCacheGrouping::group_items).unwrap_or(cache_field.items());
+                let visible_items = cache_field
+                    .grouping()
+                    .map(PivotCacheGrouping::group_items)
+                    .unwrap_or(cache_field.items());
                 for item in &field.items {
-                    if item.item_type.code() == 0 && usize::from(item.cache_index) >= visible_items.len() {
-                        return Err(cache_invalid(SXVI_TYPE, "SXVI cache item ordinal is out of range"));
+                    if item.item_type.code() == 0
+                        && usize::from(item.cache_index) >= visible_items.len()
+                    {
+                        return Err(cache_invalid(
+                            SXVI_TYPE,
+                            "SXVI cache item ordinal is out of range",
+                        ));
                     }
                 }
                 if let Some(extension) = &field.extension {
-                    for ordinal in [extension.auto_sort_data_index, extension.auto_show_data_index].into_iter().flatten() {
-                        if usize::from(ordinal) >= table.data_items.len() { return Err(cache_invalid(SXVDEX_TYPE, "SXVDEx data-item ordinal is out of range")); }
+                    for ordinal in [
+                        extension.auto_sort_data_index,
+                        extension.auto_show_data_index,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    {
+                        if usize::from(ordinal) >= table.data_items.len() {
+                            return Err(cache_invalid(
+                                SXVDEX_TYPE,
+                                "SXVDEx data-item ordinal is out of range",
+                            ));
+                        }
                     }
                 }
             }
             for page in &table.page_entries {
-                let field = table.fields.get(usize::from(page.field_index)).ok_or_else(|| cache_invalid(SXPI_TYPE, "SXPI field ordinal is out of range"))?;
+                let field = table
+                    .fields
+                    .get(usize::from(page.field_index))
+                    .ok_or_else(|| {
+                        cache_invalid(SXPI_TYPE, "SXPI field ordinal is out of range")
+                    })?;
                 if field.axis != PivotAxis::Page
                     || !matches!(page.selection(), PivotPageSelection::All)
                         && usize::from(page.item_index) >= field.items.len()
                 {
-                    return Err(cache_invalid(SXPI_TYPE, "SXPI item ordinal or axis is invalid"));
+                    return Err(cache_invalid(
+                        SXPI_TYPE,
+                        "SXPI item ordinal or axis is invalid",
+                    ));
                 }
             }
             for item in &table.data_items {
-                if usize::from(item.source_field_index) >= cache.fields().len() { return Err(cache_invalid(SXDI_TYPE, "SXDI source field ordinal is out of range")); }
+                if usize::from(item.source_field_index) >= cache.fields().len() {
+                    return Err(cache_invalid(
+                        SXDI_TYPE,
+                        "SXDI source field ordinal is out of range",
+                    ));
+                }
                 if item.display_format != 0 {
-                    let base = table.fields.get(usize::from(item.base_field_index)).ok_or_else(|| cache_invalid(SXDI_TYPE, "SXDI base field ordinal is out of range"))?;
-                    if usize::from(item.base_item_index) >= base.items.len() { return Err(cache_invalid(SXDI_TYPE, "SXDI base item ordinal is out of range")); }
+                    let base = table
+                        .fields
+                        .get(usize::from(item.base_field_index))
+                        .ok_or_else(|| {
+                            cache_invalid(SXDI_TYPE, "SXDI base field ordinal is out of range")
+                        })?;
+                    if usize::from(item.base_item_index) >= base.items.len() {
+                        return Err(cache_invalid(
+                            SXDI_TYPE,
+                            "SXDI base item ordinal is out of range",
+                        ));
+                    }
                 }
             }
         }
@@ -1594,18 +2363,37 @@ pub(crate) fn validate_pivot_cache_links(
     Ok(())
 }
 
-fn validate_axis_fields(table: &PivotTable, fields: &[PivotAxisField], axis: PivotAxis) -> XlsResult<()> {
+fn validate_axis_fields(
+    table: &PivotTable,
+    fields: &[PivotAxisField],
+    axis: PivotAxis,
+) -> XlsResult<()> {
     let mut data_layout_seen = false;
     for entry in fields {
         match *entry {
             PivotAxisField::Field(index) => {
-                let field = table.fields.get(usize::from(index)).ok_or_else(|| cache_invalid(SXIVD_TYPE, "SXIVD field ordinal is out of range"))?;
-                if field.axis != axis { return Err(cache_invalid(SXIVD_TYPE, "SXIVD field ordinal references the wrong axis")); }
-            }
+                let field = table.fields.get(usize::from(index)).ok_or_else(|| {
+                    cache_invalid(SXIVD_TYPE, "SXIVD field ordinal is out of range")
+                })?;
+                if field.axis != axis {
+                    return Err(cache_invalid(
+                        SXIVD_TYPE,
+                        "SXIVD field ordinal references the wrong axis",
+                    ));
+                }
+            },
             PivotAxisField::DataLayout => {
-                if data_layout_seen || table.view.data_field_count <= 1 || table.view.data_axis != axis { return Err(cache_invalid(SXIVD_TYPE, "invalid or duplicate SXIVD data-layout field")); }
+                if data_layout_seen
+                    || table.view.data_field_count <= 1
+                    || table.view.data_axis != axis
+                {
+                    return Err(cache_invalid(
+                        SXIVD_TYPE,
+                        "invalid or duplicate SXIVD data-layout field",
+                    ));
+                }
                 data_layout_seen = true;
-            }
+            },
         }
     }
     Ok(())
@@ -1618,8 +2406,13 @@ fn validate_axis_fields(table: &PivotTable, fields: &[PivotAxisField], axis: Piv
 /// Read an XLUnicodeStringNoCch: 1-byte flags then `cch` chars.
 fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> XlsResult<String> {
     if cch == 0 {
-        let end = offset.checked_add(1).ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
-        data.get(*offset..end).ok_or(XlsError::InvalidLength { expected: end, found: data.len() })?;
+        let end = offset
+            .checked_add(1)
+            .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
+        data.get(*offset..end).ok_or(XlsError::InvalidLength {
+            expected: end,
+            found: data.len(),
+        })?;
         *offset = end;
         return Ok(String::new());
     }
@@ -1636,8 +2429,12 @@ fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> XlsResu
     let is_utf16 = flags & 0x01 != 0;
 
     if is_utf16 {
-        let byte_len = cch.checked_mul(2).ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string size overflow"))?;
-        let end = offset.checked_add(byte_len).ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
+        let byte_len = cch
+            .checked_mul(2)
+            .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string size overflow"))?;
+        let end = offset
+            .checked_add(byte_len)
+            .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
         if end > data.len() {
             return Err(XlsError::InvalidLength {
                 expected: end,
@@ -1652,17 +2449,16 @@ fn read_xl_string_no_cch(data: &[u8], offset: &mut usize, cch: usize) -> XlsResu
         String::from_utf16(&words)
             .map_err(|e| XlsError::InvalidData(format!("Invalid UTF-16 in pivot string: {}", e)))
     } else {
-        let end = offset.checked_add(cch).ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
+        let end = offset
+            .checked_add(cch)
+            .ok_or_else(|| cache_invalid(SXVIEW_TYPE, "pivot string offset overflow"))?;
         if end > data.len() {
             return Err(XlsError::InvalidLength {
                 expected: end,
                 found: data.len(),
             });
         }
-        let s: String = data[*offset..end]
-            .iter()
-            .map(|&b| b as char)
-            .collect();
+        let s: String = data[*offset..end].iter().map(|&b| b as char).collect();
         *offset = end;
         Ok(s)
     }
@@ -1689,12 +2485,16 @@ mod worksheet_view_record_tests {
     fn sxex_payload() -> Vec<u8> {
         let mut data = Vec::new();
         data.extend_from_slice(&0u16.to_le_bytes());
-        for _ in 0..3 { data.extend_from_slice(&u16::MAX.to_le_bytes()); }
+        for _ in 0..3 {
+            data.extend_from_slice(&u16::MAX.to_le_bytes());
+        }
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&0x004F_0200u32.to_le_bytes());
-        for _ in 0..3 { data.extend_from_slice(&u16::MAX.to_le_bytes()); }
+        for _ in 0..3 {
+            data.extend_from_slice(&u16::MAX.to_le_bytes());
+        }
         data
     }
 
@@ -1728,7 +2528,10 @@ mod worksheet_view_record_tests {
         let payload = [0x64, 0x08, 0, 0, 0, 2, 0xAA, 0xBB, 0xCC];
         collector.feed_record(SXADDL_TYPE, &payload).unwrap();
         let tables = collector.finish().unwrap();
-        assert_eq!(tables[0].additional_extensions[0].payload, [0xAA, 0xBB, 0xCC]);
+        assert_eq!(
+            tables[0].additional_extensions[0].payload,
+            [0xAA, 0xBB, 0xCC]
+        );
         assert!(parse_sxaddl(&payload[..5]).is_err());
         assert!(parse_sxivd(&[0]).is_err());
         assert!(parse_sxpi(&[0; 5]).is_err());
