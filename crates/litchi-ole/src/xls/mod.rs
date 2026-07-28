@@ -178,6 +178,9 @@ mod web_pub;
 /// BIFF8 `METADATA` production: typed, inert MDX (OLAP cube) metadata records.
 pub mod mdx_metadata;
 
+/// BIFF8 `SXVIEWEX` sequence: typed, inert PivotTable OLAP extension records.
+mod pivot_olap;
+
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 pub mod pivot_table;
@@ -294,6 +297,10 @@ pub use mdx_metadata::{
     XlsCubeFunction, XlsKpiProperty, XlsMdb, XlsMdtInfo, XlsMdtInfoFlags, XlsMdxKpi,
     XlsMdxMetadata, XlsMdxMetadataDir, XlsMdxMetadataRecord, XlsMdxProp, XlsMdxSet,
     XlsMdxSetSortOrder, XlsMdxTuple,
+};
+pub use pivot_olap::{
+    XlsHiddenMemberSet, XlsPivotFieldOlapExt, XlsPivotHierarchy, XlsPivotHierarchyAxis,
+    XlsPivotItemOlapFlags, XlsPivotPageItemOlapExt, XlsPivotViewOlapHeader,
 };
 pub use revision_log::{
     REVISION_LOG_STREAM_NAME, XlsOpaqueRevisionRecord, XlsRevision, XlsRevisionChange,
