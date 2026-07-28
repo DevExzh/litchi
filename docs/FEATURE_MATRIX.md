@@ -411,6 +411,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Metadata | ✅ | ✅ | ✅ | Dublin Core and ODF metadata fields |
 | Styles and data styles | ✅ | ✅ | ✅ | Common, automatic, master, page, text, table, and number styles, plus `style:default-page-layout` fallback layouts |
 | Embedded resource discovery/mutation | 🟡 | ✅ | ✅ | Images, objects, and subdocuments; creation support varies by host family |
+| Client-side image maps | ✅ | ✅ | N/A | Typed `draw:image-map` areas (rectangle/circle/polygon) with inert link metadata and verbatim children |
 | Annotation package CRUD | ✅ | ✅ | ✅ | Text, spreadsheet, and presentation anchors with ordered graph-safe mutation |
 | Forms and controls | ✅ | ✅ | ✅ | Typed nested forms, properties, events, and broad control families |
 | Scripts | 🟡 | ✅ | ✅ | Script package artifacts can be preserved/mutated but are never executed |
