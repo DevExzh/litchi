@@ -409,7 +409,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | `content.xml`, `styles.xml`, `meta.xml`, `settings.xml` | ✅ | ✅ | ✅ | Namespace-aware parsing and package writing |
 | Document/template MIME families | ✅ | ✅ | ✅ | Standard document and template media types listed in Compatibility |
 | Metadata | ✅ | ✅ | ✅ | Dublin Core and ODF metadata fields |
-| Styles and data styles | ✅ | ✅ | ✅ | Common, automatic, master, page, text, table, and number styles |
+| Styles and data styles | ✅ | ✅ | ✅ | Common, automatic, master, page, text, table, and number styles, plus `style:default-page-layout` fallback layouts |
 | Embedded resource discovery/mutation | 🟡 | ✅ | ✅ | Images, objects, and subdocuments; creation support varies by host family |
 | Annotation package CRUD | ✅ | ✅ | ✅ | Text, spreadsheet, and presentation anchors with ordered graph-safe mutation |
 | Forms and controls | ✅ | ✅ | ✅ | Typed nested forms, properties, events, and broad control families |

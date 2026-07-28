@@ -537,6 +537,15 @@ impl Document {
         )
     }
 
+    /// The unnamed fallback page layout (`style:default-page-layout`), when
+    /// the document declares one.
+    pub fn default_page_layout(&self) -> Result<Option<PageLayout>> {
+        self.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| super::page_layout::parse_default_page_layout(styles.xml_content()),
+        )
+    }
+
     /// Return the stored footnote and endnote presentation configurations.
     ///
     /// These style declarations are retained as metadata only. This API does

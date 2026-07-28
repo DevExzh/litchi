@@ -242,6 +242,25 @@ impl crate::FlatOpenDocument {
     }
 }
 
+impl crate::OpenDocumentPackage {
+    /// The unnamed fallback page layout (`style:default-page-layout`) declared
+    /// in packaged `styles.xml`, when present.
+    pub fn default_page_layout(&self) -> Result<Option<crate::odt::PageLayout>> {
+        match self.styles_xml()? {
+            Some(xml) => crate::odt::page_layout::parse_default_page_layout(&xml),
+            None => Ok(None),
+        }
+    }
+}
+
+impl crate::FlatOpenDocument {
+    /// The unnamed fallback page layout (`style:default-page-layout`) declared
+    /// in a flat OpenDocument, when present.
+    pub fn default_page_layout(&self) -> Result<Option<crate::odt::PageLayout>> {
+        crate::odt::page_layout::parse_default_page_layout(self.xml())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

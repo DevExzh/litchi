@@ -151,6 +151,29 @@ enum ChildKind {
 }
 
 pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
+    scan_page_layouts(xml, b"page-layout", true)
+}
+
+/// Parse the optional `style:default-page-layout` of a document: the unnamed
+/// fallback page layout with the same children as `style:page-layout`.
+pub(crate) fn parse_default_page_layout(xml: &str) -> Result<Option<PageLayout>> {
+    let mut layouts = scan_page_layouts(xml, b"default-page-layout", false)?;
+    if layouts.len() > 1 {
+        return Err(Error::InvalidFormat(
+            "document contains more than one style:default-page-layout".to_string(),
+        ));
+    }
+    Ok(layouts.pop())
+}
+
+fn scan_page_layouts(
+    xml: &str,
+    local_name: &'static [u8],
+    require_name: bool,
+) -> Result<Vec<PageLayout>> {
+    // quick-xml strips a UTF-8 BOM and reports positions relative to the
+    // stripped text, so slice against the same view.
+    let xml = xml.strip_prefix('\u{FEFF}').unwrap_or(xml);
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut layouts = Vec::new();
@@ -169,10 +192,10 @@ pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
             Event::Start(element)
                 if active.is_none()
                     && style_element
-                    && element.local_name().as_ref() == b"page-layout" =>
+                    && element.local_name().as_ref() == local_name =>
             {
                 active = Some(PageLayoutBuilder {
-                    layout: parse_page_layout(&reader, &element)?,
+                    layout: parse_page_layout(&reader, &element, require_name)?,
                     start: event_start,
                     depth: 1,
                     child: None,
@@ -181,9 +204,9 @@ pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
             Event::Empty(element)
                 if active.is_none()
                     && style_element
-                    && element.local_name().as_ref() == b"page-layout" =>
+                    && element.local_name().as_ref() == local_name =>
             {
-                let mut layout = parse_page_layout(&reader, &element)?;
+                let mut layout = parse_page_layout(&reader, &element, require_name)?;
                 layout.xml = xml[event_start..event_end].to_string();
                 push_layout(&mut layouts, layout)?;
             },
@@ -252,9 +275,9 @@ pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
                     Error::InvalidFormat("invalid page-layout nesting".to_string())
                 })?;
                 if builder.depth == 0 {
-                    if !style_element || element.local_name().as_ref() != b"page-layout" {
+                    if !style_element || element.local_name().as_ref() != local_name {
                         return Err(Error::InvalidFormat(
-                            "malformed style:page-layout element".to_string(),
+                            "malformed page-layout element".to_string(),
                         ));
                     }
                     let mut finished = active.take().expect("checked page layout");
@@ -269,7 +292,7 @@ pub(crate) fn parse_page_layouts(xml: &str) -> Result<Vec<PageLayout>> {
     }
     if active.is_some() {
         return Err(Error::InvalidFormat(
-            "unterminated style:page-layout element".to_string(),
+            "unterminated page-layout element".to_string(),
         ));
     }
     Ok(layouts)
@@ -362,10 +385,20 @@ fn find_page_layout(xml: &str, expected_name: &str) -> Result<Option<(usize, usi
     }
 }
 
-fn parse_page_layout(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<PageLayout> {
-    let name = style_attr(reader, element, b"name")?.ok_or_else(|| {
-        Error::InvalidFormat("style:page-layout is missing style:name".to_string())
-    })?;
+fn parse_page_layout(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    require_name: bool,
+) -> Result<PageLayout> {
+    let name = match style_attr(reader, element, b"name")? {
+        Some(name) => name,
+        None if require_name => {
+            return Err(Error::InvalidFormat(
+                "style:page-layout is missing style:name".to_string(),
+            ));
+        },
+        None => String::new(),
+    };
     let page_usage = style_attr(reader, element, b"page-usage")?
         .as_deref()
         .map(PageUsage::parse)
