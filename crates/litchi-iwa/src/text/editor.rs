@@ -74,9 +74,10 @@ use super::paragraph_alignment::{
     text_script, text_shadow, text_style,
 };
 use super::paragraph_list::{
-    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListPlacement,
-    paragraph_list, paragraph_list_level, paragraph_list_levels, paragraph_lists,
-    reset_paragraph_list, reset_paragraph_list_level, set_paragraph_list, set_paragraph_list_level,
+    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
+    ParagraphListPlacement, paragraph_list, paragraph_list_level, paragraph_list_levels,
+    paragraph_list_numbering, paragraph_lists, reset_paragraph_list, reset_paragraph_list_level,
+    set_paragraph_list, set_paragraph_list_level, set_paragraph_list_numbering,
     set_paragraph_lists,
 };
 use super::paragraph_tabs::ParagraphTabStops;
@@ -747,6 +748,35 @@ impl IWorkTextEditor {
             self.package = staged;
         }
         Ok(changed)
+    }
+
+    /// Read whether one paragraph continues or restarts numbered-list sequencing.
+    pub fn paragraph_list_numbering(
+        &self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumbering> {
+        paragraph_list_numbering(&self.package, object_id, paragraph)
+    }
+
+    /// Continue or restart numbered-list sequencing at one paragraph.
+    pub fn set_paragraph_list_numbering(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+        numbering: ParagraphListNumbering,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list_numbering(&mut staged, object_id, paragraph, numbering)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list_numbering(&verified, object_id, paragraph)? != numbering {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph list-numbering update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
     }
 
     /// Read effective uniform underline and strikethrough formatting.

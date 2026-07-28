@@ -107,6 +107,7 @@ pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacin
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
 pub use crate::text::ParagraphListLevel as KeynoteTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as KeynoteTableCellParagraphListLevelPlacement;
+pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
@@ -2051,6 +2052,63 @@ impl KeynoteEditor {
             *self = verified;
         }
         Ok(changed)
+    }
+
+    /// Read whether one slide-table paragraph continues or restarts list numbering.
+    pub fn slide_table_cell_paragraph_list_numbering(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<KeynoteTableCellParagraphListNumbering> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_numbering_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Continue or restart numbered-list sequencing at one slide-table paragraph.
+    pub fn set_slide_table_cell_paragraph_list_numbering(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        numbering: KeynoteTableCellParagraphListNumbering,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_numbering_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            numbering,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_list_numbering(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != numbering
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph list numbering failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read effective first-line, left, and right paragraph indents.

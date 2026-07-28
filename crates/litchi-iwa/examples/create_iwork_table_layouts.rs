@@ -12,11 +12,12 @@ use litchi_iwa::table_cell_layout::{
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListPlacement, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
-    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphSpacing,
+    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
+    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
+    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -127,6 +128,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_paragraph_list_levels(numbers_table.object_id, ROW, COLUMN)?,
         nested_paragraph_levels()?
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_list_numbering(
+            numbers_table.object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        restarted_numbering()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -205,6 +215,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         pages.table_cell_paragraph_list_levels(pages_table.model_object_id, ROW, COLUMN)?,
         nested_paragraph_levels()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list_numbering(
+            pages_table.model_object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        restarted_numbering()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -325,6 +344,16 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         )?,
         nested_paragraph_levels()?
     );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_list_numbering(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        restarted_numbering()?
+    );
     Ok(())
 }
 
@@ -360,6 +389,14 @@ fn nested_paragraph_levels() -> Result<Vec<ParagraphListLevelPlacement>, litchi_
             ParagraphListLevel::ZERO,
         ),
     ])
+}
+
+fn numbered_paragraph_start() -> Result<ParagraphStart, litchi_iwa::Error> {
+    ParagraphStart::from_utf16_index(32)
+}
+
+fn restarted_numbering() -> Result<ParagraphListNumbering, litchi_iwa::Error> {
+    Ok(ParagraphListNumbering::StartAt(ParagraphListStart::new(7)?))
 }
 
 fn numbers_text_style() -> Result<TextStyle, litchi_iwa::Error> {
@@ -676,6 +713,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ParagraphStart::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
     )?;
+    editor.set_table_cell_paragraph_list_numbering(
+        table_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        restarted_numbering()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -737,6 +781,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         ParagraphStart::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
+    )?;
+    editor.set_table_cell_paragraph_list_numbering(
+        table_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        restarted_numbering()?,
     )?;
     editor.save(output)?;
     Ok(())
@@ -904,6 +955,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         ParagraphStart::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
+    )?;
+    editor.set_slide_table_cell_paragraph_list_numbering(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        restarted_numbering()?,
     )?;
     editor.save(output)?;
     Ok(())

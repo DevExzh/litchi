@@ -180,6 +180,49 @@ pub(super) fn reset_paragraph_list_level(
     Ok(true)
 }
 
+pub(super) fn paragraph_list_numbering(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumbering> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(ParagraphListNumbering::Continue);
+    };
+    crate::text::paragraph_list_numbering_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_numbering(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    numbering: ParagraphListNumbering,
+) -> Result<()> {
+    if existing_storage_id(package, table_id, row, column)?.is_none()
+        && numbering == ParagraphListNumbering::Continue
+    {
+        return require_plain_cell_paragraph_start(package, table_id, row, column, paragraph);
+    }
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_numbering(storage_id, paragraph, numbering)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_numbering_in_storage(&staged, storage_id, paragraph)?
+        != numbering
+    {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph list-numbering update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
 fn existing_storage_id(
     package: &IWorkPackage,
     table_id: u64,
@@ -1098,6 +1141,139 @@ mod tests {
     }
 
     #[test]
+    fn scratch_documents_roundtrip_cell_list_numbering_in_every_suite() {
+        let paragraph = ParagraphStart::from_utf16_index(16).unwrap();
+        let restart =
+            ParagraphListNumbering::StartAt(crate::text::ParagraphListStart::new(7).unwrap());
+
+        let mut numbers = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let numbers_table = numbers.tables().unwrap()[0].object_id;
+        numbers
+            .set_cell(
+                numbers_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        numbers
+            .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        numbers
+            .set_table_cell_paragraph_list_numbering(numbers_table, ROW, COLUMN, paragraph, restart)
+            .unwrap();
+        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list_numbering(numbers_table, ROW, COLUMN, paragraph)
+                .unwrap(),
+            restart
+        );
+        numbers
+            .set_table_cell_paragraph_list_numbering(
+                numbers_table,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListNumbering::Continue,
+            )
+            .unwrap();
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_lists(numbers_table, ROW, COLUMN)
+                .unwrap(),
+            mixed_lists()
+        );
+
+        let mut pages = PagesDocumentBuilder::new()
+            .body_table("Numbering", 3, 3)
+            .build()
+            .unwrap();
+        let pages_table = pages.tables().unwrap()[0].model_object_id;
+        pages
+            .set_table_cell(
+                pages_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_lists(pages_table, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_list_numbering(pages_table, ROW, COLUMN, paragraph, restart)
+            .unwrap();
+        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages
+                .table_cell_paragraph_list_numbering(pages_table, ROW, COLUMN, paragraph)
+                .unwrap(),
+            restart
+        );
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let table = keynote
+            .add_slide_table(
+                0,
+                "Numbering",
+                3,
+                3,
+                DrawablePoint { x: 100.0, y: 100.0 },
+                DrawableSize {
+                    width: 600.0,
+                    height: 300.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_lists(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                &mixed_lists(),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_list_numbering(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                paragraph,
+                restart,
+            )
+            .unwrap();
+        let keynote =
+            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_list_numbering(
+                    0,
+                    table.model_object_id,
+                    ROW,
+                    COLUMN,
+                    paragraph,
+                )
+                .unwrap(),
+            restart
+        );
+    }
+
+    #[test]
     #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_list_level_copy_on_write() {
         let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
@@ -1151,7 +1327,48 @@ mod tests {
 
     #[test]
     #[allow(deprecated)]
-    fn plain_cell_zero_list_levels_are_validated_no_ops() {
+    fn duplicated_rich_text_cells_are_list_numbering_copy_on_write() {
+        let paragraph = ParagraphStart::from_utf16_index(16).unwrap();
+        let restart =
+            ParagraphListNumbering::StartAt(crate::text::ParagraphListStart::new(7).unwrap());
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let source = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        editor
+            .set_table_cell_paragraph_list_numbering(duplicate, ROW, COLUMN, paragraph, restart)
+            .unwrap();
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_numbering(source, ROW, COLUMN, paragraph)
+                .unwrap(),
+            ParagraphListNumbering::Continue
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_numbering(duplicate, ROW, COLUMN, paragraph)
+                .unwrap(),
+            restart
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_lists(duplicate, ROW, COLUMN)
+                .unwrap(),
+            mixed_lists()
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn plain_cell_default_list_metadata_is_a_validated_no_op() {
         let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
         let invalid = ParagraphStart::from_utf16_index(8).unwrap();
         let mut editor = NumbersDocumentBuilder::new()
@@ -1178,6 +1395,21 @@ mod tests {
                 .reset_table_cell_paragraph_list_level(table, ROW, COLUMN, paragraph)
                 .unwrap()
         );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_numbering(table, ROW, COLUMN, paragraph)
+                .unwrap(),
+            ParagraphListNumbering::Continue
+        );
+        editor
+            .set_table_cell_paragraph_list_numbering(
+                table,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListNumbering::Continue,
+            )
+            .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), before);
 
         assert!(
@@ -1194,6 +1426,22 @@ mod tests {
         assert!(
             editor
                 .reset_table_cell_paragraph_list_level(table, ROW, COLUMN, invalid)
+                .is_err()
+        );
+        assert!(
+            editor
+                .table_cell_paragraph_list_numbering(table, ROW, COLUMN, invalid)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_paragraph_list_numbering(
+                    table,
+                    ROW,
+                    COLUMN,
+                    invalid,
+                    ParagraphListNumbering::Continue,
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

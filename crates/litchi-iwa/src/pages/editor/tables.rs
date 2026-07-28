@@ -109,6 +109,7 @@ pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;
 pub use crate::text::ParagraphListLevel as PagesTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as PagesTableCellParagraphListLevelPlacement;
+pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
@@ -1673,6 +1674,56 @@ impl PagesEditor {
             *self = verified;
         }
         Ok(changed)
+    }
+
+    /// Read whether one body-table paragraph continues or restarts list numbering.
+    pub fn table_cell_paragraph_list_numbering(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<PagesTableCellParagraphListNumbering> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_numbering_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Continue or restart numbered-list sequencing at one body-table paragraph.
+    pub fn set_table_cell_paragraph_list_numbering(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        numbering: PagesTableCellParagraphListNumbering,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_numbering_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            numbering,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_numbering(model_object_id, row, column, paragraph)?
+            != numbering
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph list numbering failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read effective first-line, left, and right paragraph indents.

@@ -44,12 +44,13 @@ use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
-    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
-    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
+    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
+    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -151,6 +152,8 @@ pub type NumbersTableCellParagraphList = ParagraphList;
 pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
 pub type NumbersTableCellParagraphListLevelPlacement = ParagraphListLevelPlacement;
+/// Whether a Numbers table-cell paragraph continues or restarts list numbering.
+pub type NumbersTableCellParagraphListNumbering = ParagraphListNumbering;
 /// One paragraph-scoped list preset boundary in a Numbers table cell.
 pub type NumbersTableCellParagraphListPlacement = ParagraphListPlacement;
 /// Ordered explicit ruler tab stops for a Numbers table cell.
@@ -1119,6 +1122,33 @@ impl NumbersEditor {
             *self = Self::from_package(text.into_package())?;
         }
         Ok(changed)
+    }
+
+    /// Read whether one text-box paragraph continues or restarts list numbering.
+    pub fn sheet_text_box_paragraph_list_numbering(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumbering> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_numbering(graph.storage_id, paragraph)
+    }
+
+    /// Continue or restart numbered-list sequencing at one text-box paragraph.
+    pub fn set_sheet_text_box_paragraph_list_numbering(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        numbering: ParagraphListNumbering,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_numbering(graph.storage_id, paragraph, numbering)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
     }
 
     /// Read effective uniform underline and strikethrough formatting.
@@ -3067,6 +3097,58 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read whether one table-cell paragraph continues or restarts list numbering.
+    pub fn table_cell_paragraph_list_numbering(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumbering> {
+        cell_paragraph_list::paragraph_list_numbering(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Continue or restart numbered-list sequencing at one table-cell paragraph.
+    pub fn set_table_cell_paragraph_list_numbering(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        numbering: NumbersTableCellParagraphListNumbering,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_numbering(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            numbering,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if cell_paragraph_list::paragraph_list_numbering(
+            &verified.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )? != numbering
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list numbering failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
     /// Read effective first-line, left, and right paragraph indents.
     pub fn table_cell_paragraph_indents(
         &self,
@@ -4960,6 +5042,29 @@ pub(crate) fn reset_table_cell_paragraph_list_level_in_package(
     paragraph: ParagraphStart,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_level(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn table_cell_paragraph_list_numbering_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumbering> {
+    cell_paragraph_list::paragraph_list_numbering(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    numbering: ParagraphListNumbering,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_numbering(
+        package, table_id, row, column, paragraph, numbering,
+    )
 }
 
 pub(crate) fn table_cell_paragraph_indents_in_package(

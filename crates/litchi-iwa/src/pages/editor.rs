@@ -32,12 +32,12 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
-    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
-    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
-    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
-    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -761,6 +761,31 @@ impl PagesEditor {
             *self = Self::from_package(staged.into_package())?;
         }
         Ok(changed)
+    }
+
+    /// Read whether one text-box paragraph continues or restarts list numbering.
+    pub fn text_box_paragraph_list_numbering(
+        &self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumbering> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text
+            .paragraph_list_numbering(graph.storage_id, paragraph)
+    }
+
+    /// Continue or restart numbered-list sequencing at one text-box paragraph.
+    pub fn set_text_box_paragraph_list_numbering(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        numbering: ParagraphListNumbering,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_numbering(graph.storage_id, paragraph, numbering)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
     }
 
     /// Read effective uniform underline and strikethrough formatting.
@@ -3935,8 +3960,9 @@ pub use tables::{
     PagesTableCellNumeralSystemFormat, PagesTableCellParagraphIndents,
     PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
     PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
-    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
-    PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
+    PagesTableCellParagraphListNumbering, PagesTableCellParagraphListPlacement,
+    PagesTableCellParagraphSpacing, PagesTableCellParagraphTabStops,
+    PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
     PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
     PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat, PagesTableCellSliderFormat,
     PagesTableCellSliderRange, PagesTableCellStarRatingFormat, PagesTableCellStepperDisplayFormat,

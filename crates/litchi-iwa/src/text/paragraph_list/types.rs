@@ -103,6 +103,61 @@ impl ParagraphListLevelPlacement {
     }
 }
 
+/// A positive starting number for a restarted numbered list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ParagraphListStart(u32);
+
+impl ParagraphListStart {
+    /// The first positive list number.
+    pub const ONE: Self = Self(1);
+
+    /// Construct a validated positive starting number.
+    pub fn new(number: u32) -> Result<Self> {
+        if number == 0 {
+            return Err(Error::InvalidFormat(
+                "paragraph list starting number must be positive".to_owned(),
+            ));
+        }
+        Ok(Self(number))
+    }
+
+    /// Return the native positive starting number.
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+
+    pub(crate) fn from_native(value: u32) -> Result<Self> {
+        Self::new(value)
+    }
+}
+
+/// How one numbered-list paragraph participates in the current sequence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ParagraphListNumbering {
+    /// Continue the preceding numbered sequence.
+    #[default]
+    Continue,
+    /// Restart numbering at the supplied positive number.
+    StartAt(ParagraphListStart),
+}
+
+impl ParagraphListNumbering {
+    pub(crate) const fn native_start(self) -> u32 {
+        match self {
+            Self::Continue => 0,
+            Self::StartAt(start) => start.get(),
+        }
+    }
+
+    pub(crate) fn from_native(value: u32) -> Result<Self> {
+        if value == 0 {
+            Ok(Self::Continue)
+        } else {
+            ParagraphListStart::from_native(value).map(Self::StartAt)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,5 +171,20 @@ mod tests {
         assert_eq!(ParagraphListLevel::new(1).unwrap(), ParagraphListLevel::ONE);
         assert_eq!(ParagraphListLevel::new(8).unwrap(), ParagraphListLevel::MAX);
         assert!(ParagraphListLevel::new(9).is_err());
+    }
+
+    #[test]
+    fn list_start_numbers_are_positive_and_numbering_is_typed() {
+        assert!(ParagraphListStart::new(0).is_err());
+        let seven = ParagraphListStart::new(7).unwrap();
+        assert_eq!(seven.get(), 7);
+        assert_eq!(
+            ParagraphListNumbering::from_native(7).unwrap(),
+            ParagraphListNumbering::StartAt(seven)
+        );
+        assert_eq!(
+            ParagraphListNumbering::from_native(0).unwrap(),
+            ParagraphListNumbering::Continue
+        );
     }
 }

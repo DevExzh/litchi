@@ -2,6 +2,7 @@
 
 mod levels;
 mod native;
+mod numbering;
 mod storage;
 mod types;
 
@@ -13,11 +14,14 @@ use crate::text::style_registry::{
 use crate::{Error, IWorkPackage, Result};
 
 pub use types::{
-    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListPlacement,
+    ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
+    ParagraphListPlacement, ParagraphListStart,
 };
 
 pub(crate) use levels::{paragraph_list_level, paragraph_list_levels};
 pub(super) use levels::{reset_paragraph_list_level, set_paragraph_list_level};
+pub(crate) use numbering::paragraph_list_numbering;
+pub(super) use numbering::set_paragraph_list_numbering;
 
 /// Build one canonical stylesheet object for a source-created document theme.
 ///
@@ -310,5 +314,7 @@ pub(super) fn reset_paragraph_list(package: &mut IWorkPackage, storage_id: u64) 
 
 #[cfg(test)]
 mod level_tests;
+#[cfg(test)]
+mod numbering_tests;
 #[cfg(test)]
 mod tests;
