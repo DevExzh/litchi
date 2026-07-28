@@ -96,6 +96,18 @@ pub struct DocumentSettings {
     footnote_properties: Option<NoteNumberingProperties>,
     /// Document-level endnote properties from `w:endnotePr`.
     endnote_properties: Option<NoteNumberingProperties>,
+    /// Whether applications should recommend write protection (`w:writeProtection`).
+    write_protection: bool,
+    /// Document view mode from `w:view`.
+    view: Option<DocumentView>,
+    /// Proofing completion markers from `w:proofState`.
+    proofing_state: Option<ProofingState>,
+    /// Default tab stop interval in twips from `w:defaultTabStop`.
+    default_tab_stop_twips: Option<u32>,
+    /// Theme font language defaults from `w:themeFontLang`.
+    theme_font_languages: Option<ThemeFontLanguages>,
+    /// Theme color slot remapping from `w:clrSchemeMapping`.
+    color_scheme_mapping: Option<ColorSchemeMapping>,
 }
 
 /// A smart-tag vocabulary declaration from `settings.xml`.
@@ -324,6 +336,430 @@ impl ProtectionType {
     }
 }
 
+/// Document view mode from `w:view` (`ST_View`, ECMA-376 section 17.18.102).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentView {
+    /// No explicit view is specified.
+    None,
+    /// Print layout view.
+    Print,
+    /// Outline view.
+    Outline,
+    /// Master pages view.
+    MasterPages,
+    /// Normal (draft) view.
+    Normal,
+    /// Web layout view.
+    Web,
+}
+
+impl DocumentView {
+    fn from_xml(value: &str) -> Result<Self> {
+        match value {
+            "none" => Ok(Self::None),
+            "print" => Ok(Self::Print),
+            "outline" => Ok(Self::Outline),
+            "masterPages" => Ok(Self::MasterPages),
+            "normal" => Ok(Self::Normal),
+            "web" => Ok(Self::Web),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid document view value '{value}'"
+            ))),
+        }
+    }
+
+    /// Get the XML value for this view mode.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Print => "print",
+            Self::Outline => "outline",
+            Self::MasterPages => "masterPages",
+            Self::Normal => "normal",
+            Self::Web => "web",
+        }
+    }
+}
+
+/// Proofing completion marker (`ST_ProofState`, ECMA-376 section 17.18.67).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProofState {
+    /// Proofing for the region completed without errors.
+    Clean,
+    /// The region changed since proofing last ran.
+    Dirty,
+}
+
+impl ProofState {
+    fn from_xml(value: &str) -> Result<Self> {
+        match value {
+            "clean" => Ok(Self::Clean),
+            "dirty" => Ok(Self::Dirty),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid proof state value '{value}'"
+            ))),
+        }
+    }
+
+    /// Get the XML value for this proof state.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Clean => "clean",
+            Self::Dirty => "dirty",
+        }
+    }
+}
+
+/// Proofing completion markers from `w:proofState` (ECMA-376 section
+/// 17.15.1.66).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProofingState {
+    spelling: Option<ProofState>,
+    grammar: Option<ProofState>,
+}
+
+impl ProofingState {
+    /// Create a proofing state with no markers.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the spelling proofing marker.
+    pub fn set_spelling(&mut self, value: Option<ProofState>) -> &mut Self {
+        self.spelling = value;
+        self
+    }
+
+    /// Set the grammar proofing marker.
+    pub fn set_grammar(&mut self, value: Option<ProofState>) -> &mut Self {
+        self.grammar = value;
+        self
+    }
+
+    /// Return the spelling proofing marker, when specified.
+    #[inline]
+    pub fn spelling(&self) -> Option<ProofState> {
+        self.spelling
+    }
+
+    /// Return the grammar proofing marker, when specified.
+    #[inline]
+    pub fn grammar(&self) -> Option<ProofState> {
+        self.grammar
+    }
+
+    /// Serialize a standalone `w:proofState` fragment.
+    pub fn to_xml(&self, prefix: &str) -> String {
+        let mut xml = format!("<{prefix}:proofState");
+        if let Some(spelling) = self.spelling {
+            xml.push_str(&format!(" {prefix}:spelling=\"{}\"", spelling.as_str()));
+        }
+        if let Some(grammar) = self.grammar {
+            xml.push_str(&format!(" {prefix}:grammar=\"{}\"", grammar.as_str()));
+        }
+        xml.push_str("/>");
+        xml
+    }
+}
+
+/// Maximum accepted length of a `w:themeFontLang` language tag. `ST_Lang`
+/// (ECMA-376 section 17.18.51) is an unbounded string; this bound keeps
+/// hostile documents from forcing unbounded allocations.
+pub const MAX_LANGUAGE_TAG_LENGTH: usize = 255;
+
+fn validate_language_tag(value: &str, description: &str) -> Result<()> {
+    if value.is_empty()
+        || value.len() > MAX_LANGUAGE_TAG_LENGTH
+        || value.chars().any(char::is_control)
+    {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "invalid Word {description} language tag '{value}'"
+        )));
+    }
+    Ok(())
+}
+
+/// Theme font language defaults from `w:themeFontLang` (ECMA-376 section
+/// 17.15.1.91). Each value is an `ST_Lang` BCP 47 tag or LCID string.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ThemeFontLanguages {
+    latin: Option<String>,
+    east_asia: Option<String>,
+    bidi: Option<String>,
+}
+
+impl ThemeFontLanguages {
+    /// Create theme font language defaults with no languages set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the Latin (`w:val`) theme language.
+    pub fn set_latin(&mut self, value: Option<String>) -> Result<&mut Self> {
+        if let Some(tag) = value.as_deref() {
+            validate_language_tag(tag, "Latin theme font")?;
+        }
+        self.latin = value;
+        Ok(self)
+    }
+
+    /// Set the East Asian (`w:eastAsia`) theme language.
+    pub fn set_east_asia(&mut self, value: Option<String>) -> Result<&mut Self> {
+        if let Some(tag) = value.as_deref() {
+            validate_language_tag(tag, "East Asian theme font")?;
+        }
+        self.east_asia = value;
+        Ok(self)
+    }
+
+    /// Set the complex-script (`w:bidi`) theme language.
+    pub fn set_bidi(&mut self, value: Option<String>) -> Result<&mut Self> {
+        if let Some(tag) = value.as_deref() {
+            validate_language_tag(tag, "complex-script theme font")?;
+        }
+        self.bidi = value;
+        Ok(self)
+    }
+
+    /// Return the Latin theme language, when specified.
+    #[inline]
+    pub fn latin(&self) -> Option<&str> {
+        self.latin.as_deref()
+    }
+
+    /// Return the East Asian theme language, when specified.
+    #[inline]
+    pub fn east_asia(&self) -> Option<&str> {
+        self.east_asia.as_deref()
+    }
+
+    /// Return the complex-script theme language, when specified.
+    #[inline]
+    pub fn bidi(&self) -> Option<&str> {
+        self.bidi.as_deref()
+    }
+
+    /// Serialize a standalone `w:themeFontLang` fragment.
+    pub fn to_xml(&self, prefix: &str) -> String {
+        let mut xml = format!("<{prefix}:themeFontLang");
+        for (name, value) in [
+            ("val", &self.latin),
+            ("eastAsia", &self.east_asia),
+            ("bidi", &self.bidi),
+        ] {
+            if let Some(tag) = value {
+                xml.push_str(&format!(" {prefix}:{name}=\""));
+                escape_attribute(&mut xml, tag);
+                xml.push('"');
+            }
+        }
+        xml.push_str("/>");
+        xml
+    }
+}
+
+/// Theme color slot produced by a `w:clrSchemeMapping` value
+/// (`ST_ColorSchemeIndex`, ECMA-376 section 17.18.11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSchemeIndex {
+    /// First dark theme color.
+    Dark1,
+    /// First light theme color.
+    Light1,
+    /// Second dark theme color.
+    Dark2,
+    /// Second light theme color.
+    Light2,
+    /// First accent theme color.
+    Accent1,
+    /// Second accent theme color.
+    Accent2,
+    /// Third accent theme color.
+    Accent3,
+    /// Fourth accent theme color.
+    Accent4,
+    /// Fifth accent theme color.
+    Accent5,
+    /// Sixth accent theme color.
+    Accent6,
+    /// Hyperlink theme color.
+    Hyperlink,
+    /// Followed hyperlink theme color.
+    FollowedHyperlink,
+}
+
+impl ColorSchemeIndex {
+    fn from_xml(value: &str) -> Result<Self> {
+        match value {
+            "dark1" => Ok(Self::Dark1),
+            "light1" => Ok(Self::Light1),
+            "dark2" => Ok(Self::Dark2),
+            "light2" => Ok(Self::Light2),
+            "accent1" => Ok(Self::Accent1),
+            "accent2" => Ok(Self::Accent2),
+            "accent3" => Ok(Self::Accent3),
+            "accent4" => Ok(Self::Accent4),
+            "accent5" => Ok(Self::Accent5),
+            "accent6" => Ok(Self::Accent6),
+            "hyperlink" => Ok(Self::Hyperlink),
+            "followedHyperlink" => Ok(Self::FollowedHyperlink),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid color scheme index value '{value}'"
+            ))),
+        }
+    }
+
+    /// Get the XML value for this theme color slot.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Dark1 => "dark1",
+            Self::Light1 => "light1",
+            Self::Dark2 => "dark2",
+            Self::Light2 => "light2",
+            Self::Accent1 => "accent1",
+            Self::Accent2 => "accent2",
+            Self::Accent3 => "accent3",
+            Self::Accent4 => "accent4",
+            Self::Accent5 => "accent5",
+            Self::Accent6 => "accent6",
+            Self::Hyperlink => "hyperlink",
+            Self::FollowedHyperlink => "followedHyperlink",
+        }
+    }
+}
+
+/// A remappable theme color slot on `w:clrSchemeMapping` (ECMA-376 section
+/// 17.15.1.21).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSchemeSlot {
+    /// First background color slot (`w:bg1`).
+    Background1,
+    /// First text color slot (`w:t1`).
+    Text1,
+    /// Second background color slot (`w:bg2`).
+    Background2,
+    /// Second text color slot (`w:t2`).
+    Text2,
+    /// First accent color slot (`w:accent1`).
+    Accent1,
+    /// Second accent color slot (`w:accent2`).
+    Accent2,
+    /// Third accent color slot (`w:accent3`).
+    Accent3,
+    /// Fourth accent color slot (`w:accent4`).
+    Accent4,
+    /// Fifth accent color slot (`w:accent5`).
+    Accent5,
+    /// Sixth accent color slot (`w:accent6`).
+    Accent6,
+    /// Hyperlink color slot (`w:hyperlink`).
+    Hyperlink,
+    /// Followed hyperlink color slot (`w:followedHyperlink`).
+    FollowedHyperlink,
+}
+
+impl ColorSchemeSlot {
+    /// Number of remappable color slots.
+    pub const COUNT: usize = 12;
+
+    /// Every slot in schema attribute order.
+    pub const ALL: [Self; Self::COUNT] = [
+        Self::Background1,
+        Self::Text1,
+        Self::Background2,
+        Self::Text2,
+        Self::Accent1,
+        Self::Accent2,
+        Self::Accent3,
+        Self::Accent4,
+        Self::Accent5,
+        Self::Accent6,
+        Self::Hyperlink,
+        Self::FollowedHyperlink,
+    ];
+
+    const fn index(self) -> usize {
+        self as usize
+    }
+
+    /// Get the attribute name carrying this slot on `w:clrSchemeMapping`.
+    pub const fn attribute_name(self) -> &'static str {
+        match self {
+            Self::Background1 => "bg1",
+            Self::Text1 => "t1",
+            Self::Background2 => "bg2",
+            Self::Text2 => "t2",
+            Self::Accent1 => "accent1",
+            Self::Accent2 => "accent2",
+            Self::Accent3 => "accent3",
+            Self::Accent4 => "accent4",
+            Self::Accent5 => "accent5",
+            Self::Accent6 => "accent6",
+            Self::Hyperlink => "hyperlink",
+            Self::FollowedHyperlink => "followedHyperlink",
+        }
+    }
+}
+
+/// Theme color slot remapping from `w:clrSchemeMapping` (ECMA-376 section
+/// 17.15.1.21).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ColorSchemeMapping {
+    slots: [Option<ColorSchemeIndex>; ColorSchemeSlot::COUNT],
+}
+
+impl ColorSchemeMapping {
+    /// Create a mapping with every slot left at its default.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Remap a slot to a theme color index.
+    pub fn set(&mut self, slot: ColorSchemeSlot, index: ColorSchemeIndex) -> &mut Self {
+        self.slots[slot.index()] = Some(index);
+        self
+    }
+
+    /// Restore a slot to its default mapping.
+    pub fn clear(&mut self, slot: ColorSchemeSlot) -> &mut Self {
+        self.slots[slot.index()] = None;
+        self
+    }
+
+    /// Return the theme color index a slot maps to, when remapped.
+    #[inline]
+    pub fn get(&self, slot: ColorSchemeSlot) -> Option<ColorSchemeIndex> {
+        self.slots[slot.index()]
+    }
+
+    /// Whether no slot is remapped.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.slots.iter().all(Option::is_none)
+    }
+
+    /// Iterate the remapped slots in schema attribute order.
+    pub fn iter(&self) -> impl Iterator<Item = (ColorSchemeSlot, ColorSchemeIndex)> + '_ {
+        ColorSchemeSlot::ALL
+            .into_iter()
+            .filter_map(|slot| self.get(slot).map(|index| (slot, index)))
+    }
+
+    /// Serialize a standalone `w:clrSchemeMapping` fragment.
+    pub fn to_xml(&self, prefix: &str) -> String {
+        let mut xml = format!("<{prefix}:clrSchemeMapping");
+        for (slot, index) in self.iter() {
+            xml.push_str(&format!(
+                " {prefix}:{}=\"{}\"",
+                slot.attribute_name(),
+                index.as_str()
+            ));
+        }
+        xml.push_str("/>");
+        xml
+    }
+}
+
 impl DocumentSettings {
     /// Create a new DocumentSettings with default values.
     pub fn new() -> Self {
@@ -340,6 +776,12 @@ impl DocumentSettings {
             compatibility_settings: Vec::new(),
             footnote_properties: None,
             endnote_properties: None,
+            write_protection: false,
+            view: None,
+            proofing_state: None,
+            default_tab_stop_twips: None,
+            theme_font_languages: None,
+            color_scheme_mapping: None,
         }
     }
 
@@ -429,6 +871,77 @@ impl DocumentSettings {
         self.endnote_properties.as_ref()
     }
 
+    /// Whether applications should recommend write protection for the
+    /// document (`w:writeProtection`).
+    #[inline]
+    pub fn is_write_protected(&self) -> bool {
+        self.write_protection
+    }
+
+    /// Return the document view mode (`w:view`), when specified.
+    #[inline]
+    pub fn view(&self) -> Option<DocumentView> {
+        self.view
+    }
+
+    /// Return the proofing completion markers (`w:proofState`), if present.
+    #[inline]
+    pub fn proofing_state(&self) -> Option<&ProofingState> {
+        self.proofing_state.as_ref()
+    }
+
+    /// Return the default tab stop interval in twips (`w:defaultTabStop`),
+    /// when specified.
+    #[inline]
+    pub fn default_tab_stop_twips(&self) -> Option<u32> {
+        self.default_tab_stop_twips
+    }
+
+    /// Return the theme font language defaults (`w:themeFontLang`), if
+    /// present.
+    #[inline]
+    pub fn theme_font_languages(&self) -> Option<&ThemeFontLanguages> {
+        self.theme_font_languages.as_ref()
+    }
+
+    /// Return the theme color slot remapping (`w:clrSchemeMapping`), if
+    /// present.
+    #[inline]
+    pub fn color_scheme_mapping(&self) -> Option<&ColorSchemeMapping> {
+        self.color_scheme_mapping.as_ref()
+    }
+
+    /// Serialize the editing view, proofing, and theme default elements
+    /// (`w:writeProtection`, `w:view`, `w:proofState`, `w:defaultTabStop`,
+    /// `w:themeFontLang`, `w:clrSchemeMapping`) in ECMA-376 schema order.
+    pub fn to_editing_settings_xml(&self, prefix: &str) -> String {
+        let mut xml = String::new();
+        if self.write_protection {
+            xml.push_str(&format!("<{prefix}:writeProtection/>"));
+        }
+        if let Some(view) = self.view {
+            xml.push_str(&format!(
+                "<{prefix}:view {prefix}:val=\"{}\"/>",
+                view.as_str()
+            ));
+        }
+        if let Some(state) = &self.proofing_state {
+            xml.push_str(&state.to_xml(prefix));
+        }
+        if let Some(twips) = self.default_tab_stop_twips {
+            xml.push_str(&format!(
+                "<{prefix}:defaultTabStop {prefix}:val=\"{twips}\"/>"
+            ));
+        }
+        if let Some(languages) = &self.theme_font_languages {
+            xml.push_str(&languages.to_xml(prefix));
+        }
+        if let Some(mapping) = &self.color_scheme_mapping {
+            xml.push_str(&mapping.to_xml(prefix));
+        }
+        xml
+    }
+
     /// Extract settings from a settings.xml part.
     ///
     /// # Arguments
@@ -453,8 +966,7 @@ impl DocumentSettings {
         settings.mail_merge = parse_settings_mail_merge(xml_bytes)?;
         let mut depth = 0usize;
         let mut saw_root = false;
-        let mut saw_do_not_embed_smart_tags = false;
-        let mut saw_attached_template = false;
+        let mut seen = SeenSettings::default();
         let mut saw_compat = false;
         let mut pending_group: Option<PendingGroup> = None;
 
@@ -482,14 +994,7 @@ impl DocumentSettings {
                             {
                                 pending_group = Some(group);
                             } else {
-                                parse_setting(
-                                    &element,
-                                    decoder,
-                                    &resolver,
-                                    &mut settings,
-                                    &mut saw_do_not_embed_smart_tags,
-                                    &mut saw_attached_template,
-                                )?;
+                                parse_setting(&element, decoder, &resolver, &mut settings, &mut seen)?;
                             }
                         } else if depth == 3 && let Some(group) = pending_group.as_mut() {
                             parse_group_child(group, &element, decoder, &resolver)?;
@@ -510,14 +1015,7 @@ impl DocumentSettings {
                             {
                                 finish_settings_group(&mut settings, group)?;
                             } else {
-                                parse_setting(
-                                    &element,
-                                    decoder,
-                                    &resolver,
-                                    &mut settings,
-                                    &mut saw_do_not_embed_smart_tags,
-                                    &mut saw_attached_template,
-                                )?;
+                                parse_setting(&element, decoder, &resolver, &mut settings, &mut seen)?;
                             }
                         } else if child_depth == 3 && let Some(group) = pending_group.as_mut() {
                             parse_group_child(group, &element, decoder, &resolver)?;
@@ -736,13 +1234,21 @@ fn parse_note_property_child(
     Ok(())
 }
 
+/// Cardinality flags for on/off settings whose "not seen" state cannot be
+/// told apart from an explicit `false` value.
+#[derive(Debug, Default)]
+struct SeenSettings {
+    do_not_embed_smart_tags: bool,
+    attached_template: bool,
+    write_protection: bool,
+}
+
 fn parse_setting(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
     settings: &mut DocumentSettings,
-    saw_do_not_embed_smart_tags: &mut bool,
-    saw_attached_template: &mut bool,
+    seen: &mut SeenSettings,
 ) -> Result<()> {
     match element.local_name().as_ref() {
         b"documentProtection" => {
@@ -789,7 +1295,7 @@ fn parse_setting(
             });
         },
         b"doNotEmbedSmartTags" => {
-            if std::mem::replace(saw_do_not_embed_smart_tags, true) {
+            if std::mem::replace(&mut seen.do_not_embed_smart_tags, true) {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate doNotEmbedSmartTags setting".into(),
                 ));
@@ -797,7 +1303,7 @@ fn parse_setting(
             settings.do_not_embed_smart_tags = parse_on_off(element, decoder, resolver)?;
         },
         b"attachedTemplate" => {
-            if std::mem::replace(saw_attached_template, true) {
+            if std::mem::replace(&mut seen.attached_template, true) {
                 return Err(OoxmlError::InvalidFormat(
                     "duplicate attachedTemplate setting".into(),
                 ));
@@ -817,6 +1323,81 @@ fn parse_setting(
                 relationship_id,
                 target_uri: String::new(),
             });
+        },
+        b"writeProtection" => {
+            if std::mem::replace(&mut seen.write_protection, true) {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate writeProtection setting".into(),
+                ));
+            }
+            settings.write_protection = parse_on_off(element, decoder, resolver)?;
+        },
+        b"view" => {
+            if settings.view.is_some() {
+                return Err(OoxmlError::InvalidFormat("duplicate view setting".into()));
+            }
+            let value = required_attribute(element, b"val", decoder, resolver, "view mode")?;
+            settings.view = Some(DocumentView::from_xml(&value)?);
+        },
+        b"proofState" => {
+            if settings.proofing_state.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate proofState setting".into(),
+                ));
+            }
+            let mut state = ProofingState::new();
+            if let Some(value) = word_attribute_value(element, b"spelling", decoder, resolver)? {
+                state.set_spelling(Some(ProofState::from_xml(&value)?));
+            }
+            if let Some(value) = word_attribute_value(element, b"grammar", decoder, resolver)? {
+                state.set_grammar(Some(ProofState::from_xml(&value)?));
+            }
+            settings.proofing_state = Some(state);
+        },
+        b"defaultTabStop" => {
+            if settings.default_tab_stop_twips.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate defaultTabStop setting".into(),
+                ));
+            }
+            let value = required_attribute(element, b"val", decoder, resolver, "default tab stop")?;
+            settings.default_tab_stop_twips = Some(value.parse().map_err(|_| {
+                OoxmlError::InvalidFormat(format!("invalid default tab stop '{value}'"))
+            })?);
+        },
+        b"themeFontLang" => {
+            if settings.theme_font_languages.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate themeFontLang setting".into(),
+                ));
+            }
+            let mut languages = ThemeFontLanguages::new();
+            if let Some(value) = word_attribute_value(element, b"val", decoder, resolver)? {
+                languages.set_latin(Some(value))?;
+            }
+            if let Some(value) = word_attribute_value(element, b"eastAsia", decoder, resolver)? {
+                languages.set_east_asia(Some(value))?;
+            }
+            if let Some(value) = word_attribute_value(element, b"bidi", decoder, resolver)? {
+                languages.set_bidi(Some(value))?;
+            }
+            settings.theme_font_languages = Some(languages);
+        },
+        b"clrSchemeMapping" => {
+            if settings.color_scheme_mapping.is_some() {
+                return Err(OoxmlError::InvalidFormat(
+                    "duplicate clrSchemeMapping setting".into(),
+                ));
+            }
+            let mut mapping = ColorSchemeMapping::new();
+            for slot in ColorSchemeSlot::ALL {
+                if let Some(value) =
+                    word_attribute_value(element, slot.attribute_name().as_bytes(), decoder, resolver)?
+                {
+                    mapping.set(slot, ColorSchemeIndex::from_xml(&value)?);
+                }
+            }
+            settings.color_scheme_mapping = Some(mapping);
         },
         _ => {},
     }
@@ -1642,6 +2223,183 @@ mod tests {
     }
 
     #[test]
+    fn parses_view_proofing_and_theme_defaults() {
+        let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:writeProtection/><w:view w:val="print"/><w:proofState w:spelling="clean" w:grammar="dirty"/><w:defaultTabStop w:val="720"/><w:themeFontLang w:val="en-US" w:eastAsia="ja-JP" w:bidi="ar-SA"/><w:clrSchemeMapping w:bg1="light1" w:t1="dark1" w:hyperlink="hyperlink"/></w:settings>"#;
+        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+        assert!(settings.is_write_protected());
+        assert_eq!(settings.view(), Some(DocumentView::Print));
+        let proofing = settings.proofing_state().unwrap();
+        assert_eq!(proofing.spelling(), Some(ProofState::Clean));
+        assert_eq!(proofing.grammar(), Some(ProofState::Dirty));
+        assert_eq!(settings.default_tab_stop_twips(), Some(720));
+        let languages = settings.theme_font_languages().unwrap();
+        assert_eq!(languages.latin(), Some("en-US"));
+        assert_eq!(languages.east_asia(), Some("ja-JP"));
+        assert_eq!(languages.bidi(), Some("ar-SA"));
+        let mapping = settings.color_scheme_mapping().unwrap();
+        assert!(!mapping.is_empty());
+        assert_eq!(
+            mapping.get(ColorSchemeSlot::Background1),
+            Some(ColorSchemeIndex::Light1)
+        );
+        assert_eq!(
+            mapping.get(ColorSchemeSlot::Text1),
+            Some(ColorSchemeIndex::Dark1)
+        );
+        assert_eq!(
+            mapping.get(ColorSchemeSlot::Hyperlink),
+            Some(ColorSchemeIndex::Hyperlink)
+        );
+        assert_eq!(mapping.get(ColorSchemeSlot::Accent1), None);
+
+        let strict = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:writeProtection s:val="off"/><s:view s:val="web"/><s:proofState/></s:settings>"#;
+        let settings = DocumentSettings::extract_from_xml(strict).unwrap();
+        assert!(!settings.is_write_protected());
+        assert_eq!(settings.view(), Some(DocumentView::Web));
+        let proofing = settings.proofing_state().unwrap();
+        assert_eq!(proofing.spelling(), None);
+        assert_eq!(proofing.grammar(), None);
+    }
+
+    #[test]
+    fn editing_settings_enums_round_trip() {
+        for (raw, expected) in [
+            ("none", DocumentView::None),
+            ("print", DocumentView::Print),
+            ("outline", DocumentView::Outline),
+            ("masterPages", DocumentView::MasterPages),
+            ("normal", DocumentView::Normal),
+            ("web", DocumentView::Web),
+        ] {
+            assert_eq!(DocumentView::from_xml(raw).unwrap(), expected);
+            assert_eq!(expected.as_str(), raw);
+        }
+        assert!(DocumentView::from_xml("immersive").is_err());
+
+        for (raw, expected) in [("clean", ProofState::Clean), ("dirty", ProofState::Dirty)] {
+            assert_eq!(ProofState::from_xml(raw).unwrap(), expected);
+            assert_eq!(expected.as_str(), raw);
+        }
+        assert!(ProofState::from_xml("pending").is_err());
+
+        assert_eq!(ColorSchemeSlot::COUNT, 12);
+        for (raw, expected) in [
+            ("dark1", ColorSchemeIndex::Dark1),
+            ("light2", ColorSchemeIndex::Light2),
+            ("accent6", ColorSchemeIndex::Accent6),
+            ("followedHyperlink", ColorSchemeIndex::FollowedHyperlink),
+        ] {
+            assert_eq!(ColorSchemeIndex::from_xml(raw).unwrap(), expected);
+            assert_eq!(expected.as_str(), raw);
+        }
+        assert!(ColorSchemeIndex::from_xml("accent7").is_err());
+    }
+
+    #[test]
+    fn editing_settings_serialize_and_reparse() {
+        let xml = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:writeProtection/><w:view w:val="outline"/><w:proofState w:spelling="dirty"/><w:defaultTabStop w:val="1440"/><w:themeFontLang w:val="en-US" w:bidi="he-IL"/><w:clrSchemeMapping w:bg1="dark2" w:accent3="accent1" w:followedHyperlink="hyperlink"/></w:settings>"#;
+        let settings = DocumentSettings::extract_from_xml(xml).unwrap();
+
+        let fragment = settings.to_editing_settings_xml("w");
+        assert_eq!(
+            fragment,
+            r#"<w:writeProtection/><w:view w:val="outline"/><w:proofState w:spelling="dirty"/><w:defaultTabStop w:val="1440"/><w:themeFontLang w:val="en-US" w:bidi="he-IL"/><w:clrSchemeMapping w:bg1="dark2" w:accent3="accent1" w:followedHyperlink="hyperlink"/>"#
+        );
+
+        let reparsed_xml = format!(
+            r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{fragment}</w:settings>"#
+        );
+        let reparsed = DocumentSettings::extract_from_xml(reparsed_xml.as_bytes()).unwrap();
+        assert_eq!(reparsed.is_write_protected(), settings.is_write_protected());
+        assert_eq!(reparsed.view(), settings.view());
+        assert_eq!(reparsed.proofing_state(), settings.proofing_state());
+        assert_eq!(
+            reparsed.default_tab_stop_twips(),
+            settings.default_tab_stop_twips()
+        );
+        assert_eq!(
+            reparsed.theme_font_languages(),
+            settings.theme_font_languages()
+        );
+        assert_eq!(
+            reparsed.color_scheme_mapping(),
+            settings.color_scheme_mapping()
+        );
+        // Serializing the reparsed settings is stable.
+        assert_eq!(reparsed.to_editing_settings_xml("w"), fragment);
+    }
+
+    #[test]
+    fn editing_settings_builders_write_fragments() {
+        let mut proofing = ProofingState::new();
+        proofing
+            .set_spelling(Some(ProofState::Clean))
+            .set_grammar(Some(ProofState::Dirty));
+        assert_eq!(
+            proofing.to_xml("w"),
+            r#"<w:proofState w:spelling="clean" w:grammar="dirty"/>"#
+        );
+
+        let mut languages = ThemeFontLanguages::new();
+        languages
+            .set_latin(Some("fr-FR".to_owned()))
+            .unwrap()
+            .set_bidi(None)
+            .unwrap();
+        assert!(languages.set_latin(Some(String::new())).is_err());
+        assert_eq!(
+            languages.to_xml("w"),
+            r#"<w:themeFontLang w:val="fr-FR"/>"#
+        );
+
+        let mut mapping = ColorSchemeMapping::new();
+        assert!(mapping.is_empty());
+        mapping
+            .set(ColorSchemeSlot::Background1, ColorSchemeIndex::Light1)
+            .set(ColorSchemeSlot::Text1, ColorSchemeIndex::Dark1);
+        mapping.clear(ColorSchemeSlot::Text1);
+        assert_eq!(
+            mapping.iter().collect::<Vec<_>>(),
+            [(ColorSchemeSlot::Background1, ColorSchemeIndex::Light1)]
+        );
+        assert_eq!(
+            mapping.to_xml("w"),
+            r#"<w:clrSchemeMapping w:bg1="light1"/>"#
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_editing_settings() {
+        let prefix = br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">"#;
+        let suffix = br#"</w:settings>"#;
+        let reject = |body: &[u8]| {
+            let mut xml = prefix.to_vec();
+            xml.extend_from_slice(body);
+            xml.extend_from_slice(suffix);
+            DocumentSettings::extract_from_xml(&xml)
+        };
+
+        assert!(reject(br#"<w:view/>"#).is_err());
+        assert!(reject(br#"<w:view w:val="immersive"/>"#).is_err());
+        assert!(reject(br#"<w:view w:val="print"/><w:view w:val="web"/>"#).is_err());
+        assert!(reject(br#"<w:proofState w:spelling="pending"/>"#).is_err());
+        assert!(reject(br#"<w:proofState w:grammar="maybe"/>"#).is_err());
+        assert!(reject(br#"<w:proofState/><w:proofState/>"#).is_err());
+        assert!(reject(br#"<w:defaultTabStop/>"#).is_err());
+        assert!(reject(br#"<w:defaultTabStop w:val="wide"/>"#).is_err());
+        assert!(reject(br#"<w:defaultTabStop w:val="-720"/>"#).is_err());
+        assert!(reject(br#"<w:defaultTabStop w:val="99999999999999999999"/>"#).is_err());
+        assert!(reject(br#"<w:defaultTabStop w:val="720"/><w:defaultTabStop w:val="720"/>"#).is_err());
+        assert!(reject(br#"<w:themeFontLang w:val=""/>"#).is_err());
+        assert!(reject(br#"<w:themeFontLang w:eastAsia="ja&#0;-JP"/>"#).is_err());
+        assert!(reject(br#"<w:themeFontLang w:val="en-US"/><w:themeFontLang/>"#).is_err());
+        assert!(reject(br#"<w:clrSchemeMapping w:bg1="light7"/>"#).is_err());
+        assert!(reject(br#"<w:clrSchemeMapping/><w:clrSchemeMapping/>"#).is_err());
+        assert!(reject(br#"<w:writeProtection/><w:writeProtection/>"#).is_err());
+        assert!(reject(br#"<w:writeProtection w:val="maybe"/>"#).is_err());
+    }
+
+    #[test]
     fn parses_bundled_settings_resource() {
         let settings =
             DocumentSettings::extract_from_xml(include_bytes!("resources/settings.xml")).unwrap();
@@ -1653,6 +2411,29 @@ mod tests {
                 .iter()
                 .any(|option| option.name() == "useFELayout" && option.is_enabled())
         );
+        let proofing = settings.proofing_state().unwrap();
+        assert_eq!(proofing.spelling(), Some(ProofState::Clean));
+        assert_eq!(proofing.grammar(), Some(ProofState::Clean));
+        assert_eq!(settings.default_tab_stop_twips(), Some(720));
+        let languages = settings.theme_font_languages().unwrap();
+        assert_eq!(languages.latin(), Some("en-US"));
+        assert_eq!(languages.east_asia(), Some("ja-JP"));
+        let mapping = settings.color_scheme_mapping().unwrap();
+        for (slot, expected) in [
+            (ColorSchemeSlot::Background1, ColorSchemeIndex::Light1),
+            (ColorSchemeSlot::Text1, ColorSchemeIndex::Dark1),
+            (ColorSchemeSlot::Background2, ColorSchemeIndex::Light2),
+            (ColorSchemeSlot::Text2, ColorSchemeIndex::Dark2),
+            (ColorSchemeSlot::Accent1, ColorSchemeIndex::Accent1),
+            (ColorSchemeSlot::Accent6, ColorSchemeIndex::Accent6),
+            (ColorSchemeSlot::Hyperlink, ColorSchemeIndex::Hyperlink),
+            (
+                ColorSchemeSlot::FollowedHyperlink,
+                ColorSchemeIndex::FollowedHyperlink,
+            ),
+        ] {
+            assert_eq!(mapping.get(slot), Some(expected));
+        }
     }
 
     fn attached_template_part(

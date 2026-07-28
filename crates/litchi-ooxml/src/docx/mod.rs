@@ -182,8 +182,10 @@ pub use paragraph::{
 pub use revision::{Revision, RevisionType};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use settings::{
-    AttachedTemplate, CompatibilityOption, CompatibilitySetting, DocumentSettings,
-    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ProtectionType, SmartTagType,
+    AttachedTemplate, ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatibilityOption,
+    CompatibilitySetting, DocumentSettings, DocumentView, MAX_LANGUAGE_TAG_LENGTH,
+    NoteNumberingProperties, NoteNumberingRestart, NotePosition, ProofState, ProofingState,
+    ProtectionType, SmartTagType, ThemeFontLanguages,
 };
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
