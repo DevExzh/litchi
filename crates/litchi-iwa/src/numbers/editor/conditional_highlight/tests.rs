@@ -475,6 +475,79 @@ fn date_period_predicates_round_trip_all_units_and_use_calendar_boundaries() {
 }
 
 #[test]
+fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
+    use TableCellConditionalHighlightDatePeriodUnit as Unit;
+
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let period = TableCellConditionalHighlightDatePeriod::new(2, Unit::Days).unwrap();
+    let rule = rule(
+        TableCellConditionalHighlightCondition::DateIsInNext(period),
+        red,
+    );
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    for column in 1..=2 {
+        editor
+            .set_cell_conditional_highlighting(table_id, 1, column, std::slice::from_ref(&rule))
+            .unwrap();
+    }
+
+    let entry = editor
+        .package
+        .calculation_engine_entry_name()
+        .unwrap()
+        .unwrap();
+    let archive = editor.package.archive(entry).unwrap();
+    let owners = archive
+        .objects
+        .iter()
+        .filter_map(|object| {
+            object.messages.iter().find_map(|message| {
+                (message.type_ == 4_008)
+                    .then(|| {
+                        tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
+                            .unwrap()
+                    })
+                    .filter(|owner| matches!(owner.owner_kind, Some(3 | 35)))
+            })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(owners.len(), 2);
+    let conditional = owners
+        .iter()
+        .find(|owner| owner.owner_kind == Some(3))
+        .unwrap();
+    let records = &conditional.cell_dependencies.as_ref().unwrap().cell_record;
+    assert_eq!(
+        records
+            .iter()
+            .map(|record| (record.row, record.column))
+            .collect::<Vec<_>>(),
+        vec![(1, 1), (1, 2)]
+    );
+    let tile_id = conditional
+        .tiled_cell_dependencies
+        .as_ref()
+        .unwrap()
+        .cell_record_tiles[0]
+        .identifier;
+    let tile = archive
+        .object(tile_id)
+        .unwrap()
+        .messages
+        .iter()
+        .find_map(|message| {
+            (message.type_ == 4_009)
+                .then(|| tsce::CellRecordTileArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    assert_eq!(tile.cell_records, *records);
+}
+
+#[test]
 fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
     let exact = TableCellConditionalHighlightDate::from_ymd(2026, 7, 27).unwrap();
     let lower = TableCellConditionalHighlightDate::from_ymd(2026, 7, 26).unwrap();

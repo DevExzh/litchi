@@ -1,6 +1,7 @@
 //! Conditional-highlight references stored by table cells.
 
 mod delete;
+mod dependencies;
 mod formula;
 mod native;
 mod read;
@@ -258,7 +259,7 @@ fn set_at_location(
         })?)
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
 
-    let (list_archive, model_archive) =
+    let (list_archive, model_archive, conditional_owner_uid) =
         ensure_conditional_style_table(package, &location, list_id)?;
     let style_set_id = first_graph_id;
     let formula_owner_uuid =
@@ -283,6 +284,18 @@ fn set_at_location(
         add_component_object_uuids(package, component, &ids)?;
     }
     set_package_last_object_identifier(package, last_graph_id.max(list_id))?;
+    if rules
+        .iter()
+        .any(|rule| is_volatile_date_condition(&rule.condition))
+    {
+        dependencies::ensure_volatile_owner(
+            package,
+            &parse_table_uuid(&location.descriptor.model.table_id)?,
+            conditional_owner_uid,
+            row,
+            column,
+        )?;
+    }
     let applied_rule = applied_rule_for_cell(package, &location, column, rules)?;
     update_cell(
         package,
@@ -303,7 +316,7 @@ fn ensure_conditional_style_table(
     package: &mut IWorkPackage,
     location: &CellLocation,
     list_id: u64,
-) -> Result<(String, String)> {
+) -> Result<(String, String, tsp::Uuid)> {
     if let Some(reference) = &location
         .descriptor
         .model
@@ -319,7 +332,18 @@ fn ensure_conditional_style_table(
                     reference.identifier
                 ))
             })?;
-        return Ok((archive.clone(), archive.clone()));
+        let owner_uid = location
+            .descriptor
+            .model
+            .conditional_style_formula_owner_id
+            .as_ref()
+            .and_then(cfuuid_as_uuid)
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Numbers conditional-style formula owner is missing".to_owned(),
+                )
+            })?;
+        return Ok((archive.clone(), archive.clone(), owner_uid));
     }
     let model_archive = location
         .object_locations
@@ -331,7 +355,8 @@ fn ensure_conditional_style_table(
             ))
         })?
         .clone();
-    let owner = fresh_cfuuid();
+    let owner_uid = fresh_uuid();
+    let owner = uuid_as_cfuuid(&owner_uid);
     package.update_archive(&model_archive, |archive| {
         archive.insert_object(ArchiveObject::new(
             list_id,
@@ -385,7 +410,7 @@ fn ensure_conditional_style_table(
         add_message_object_reference(object, message_index, list_id, list_id);
         Ok(())
     })?;
-    Ok((model_archive.clone(), model_archive))
+    Ok((model_archive.clone(), model_archive, owner_uid))
 }
 
 fn append_conditional_style_entry(
@@ -462,12 +487,43 @@ fn parse_table_uuid(value: &str) -> Result<tsp::Uuid> {
     })
 }
 
-fn fresh_cfuuid() -> tsp::CfuuidArchive {
+fn fresh_uuid() -> tsp::Uuid {
     let bytes = litchi_core::id::generate_guid_bytes();
-    uuid_as_cfuuid(&tsp::Uuid {
+    tsp::Uuid {
         upper: u64::from_be_bytes(bytes[..8].try_into().expect("fixed-size UUID upper half")),
-        lower: u64::from_be_bytes(bytes[8..].try_into().expect("fixed-size UUID lower half")),
-    })
+        lower: u64::from_be_bytes(bytes[8..].try_into().expect("fixed-size UUID lower half"))
+            .max(3),
+    }
+}
+
+fn cfuuid_as_uuid(uuid: &tsp::CfuuidArchive) -> Option<tsp::Uuid> {
+    let words = || {
+        Some(tsp::Uuid {
+            lower: u64::from(uuid.uuid_w0?) | (u64::from(uuid.uuid_w1?) << 32),
+            upper: u64::from(uuid.uuid_w2?) | (u64::from(uuid.uuid_w3?) << 32),
+        })
+    };
+    let bytes = || {
+        let bytes: [u8; 16] = uuid.uuid_bytes.as_deref()?.try_into().ok()?;
+        let value = u128::from_be_bytes(bytes);
+        Some(tsp::Uuid {
+            lower: value as u64,
+            upper: (value >> 64) as u64,
+        })
+    };
+    words().or_else(bytes)
+}
+
+fn is_volatile_date_condition(condition: &TableCellConditionalHighlightCondition) -> bool {
+    matches!(
+        condition,
+        TableCellConditionalHighlightCondition::DateIsToday
+            | TableCellConditionalHighlightCondition::DateIsYesterday
+            | TableCellConditionalHighlightCondition::DateIsTomorrow
+            | TableCellConditionalHighlightCondition::DateIsInNext(_)
+            | TableCellConditionalHighlightCondition::DateIsInLast(_)
+            | TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_)
+    )
 }
 
 fn resolve_entry(

@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) fn append_formula_owners_to_engine(
+pub(in crate::numbers::editor) fn append_formula_owners_to_engine(
     original: &[u8],
     owner_ids: &[u64],
     owner_map_entries: &[tsce::owner_id_map_archive::OwnerIdMapArchiveEntry],
