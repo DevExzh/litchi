@@ -139,6 +139,8 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Strict PostScript font identity applied to a whole Numbers table cell.
+pub type NumbersTableCellTextFont = TextFont;
 /// Whole-cell point size, bold, and italic formatting.
 pub type NumbersTableCellTextStyle = TextStyle;
 
@@ -2795,6 +2797,51 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the effective PostScript font identity of one table cell.
+    pub fn table_cell_text_font(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextFont> {
+        cell_paragraph_style::font(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell PostScript font override.
+    pub fn set_table_cell_text_font(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        font: NumbersTableCellTextFont,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_font(&mut staged, table_id, row, column, font.clone())?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_font(table_id, row, column)? != font {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell font failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local font override and restore the inherited table font.
+    pub fn reset_table_cell_text_font(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_font(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read effective whole-cell point size, bold, and italic formatting.
     pub fn table_cell_text_style(
         &self,
@@ -3961,6 +4008,34 @@ pub(crate) fn reset_table_cell_text_alignment_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_paragraph_style::reset_alignment(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_font_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextFont> {
+    cell_paragraph_style::font(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_font_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    font: TextFont,
+) -> Result<()> {
+    cell_paragraph_style::set_font(package, table_id, row, column, font)
+}
+
+pub(crate) fn reset_table_cell_text_font_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_font(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_text_style_in_package(

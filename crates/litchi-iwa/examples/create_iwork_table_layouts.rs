@@ -9,7 +9,7 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_cell_layout::{
     TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
 };
-use litchi_iwa::text::{TextAlignment, TextPointSize, TextStyle};
+use litchi_iwa::text::{TextAlignment, TextFont, TextPointSize, TextStyle};
 
 const ROW: usize = 1;
 const COLUMN: usize = 1;
@@ -17,6 +17,9 @@ const INSET_POINTS: f32 = 8.0;
 const NUMBERS_TEXT_POINTS: f32 = 18.0;
 const PAGES_TEXT_POINTS: f32 = 17.0;
 const KEYNOTE_TEXT_POINTS: f32 = 19.0;
+const NUMBERS_FONT_NAME: &str = "CourierNewPSMT";
+const PAGES_FONT_NAME: &str = "AvenirNext-Regular";
+const KEYNOTE_FONT_NAME: &str = "Menlo-Regular";
 const CELL_TEXT: &str = "Wrapped text\nwith an 8 pt inset";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,6 +50,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_text_style(numbers_table.object_id, ROW, COLUMN)?,
         numbers_text_style()?
     );
+    assert_eq!(
+        numbers.table_cell_text_font(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_text_font()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -58,6 +65,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         pages.table_cell_text_style(pages_table.model_object_id, ROW, COLUMN)?,
         pages_text_style()?
     );
+    assert_eq!(
+        pages.table_cell_text_font(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_text_font()?
+    );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
     let keynote_table = keynote.slide_tables(0)?.remove(0);
@@ -68,6 +79,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         keynote.slide_table_cell_text_style(0, keynote_table.model_object_id, ROW, COLUMN)?,
         keynote_text_style()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_text_font(0, keynote_table.model_object_id, ROW, COLUMN)?,
+        keynote_text_font()?
     );
     Ok(())
 }
@@ -97,6 +112,18 @@ fn keynote_text_style() -> Result<TextStyle, litchi_iwa::Error> {
     )
 }
 
+fn numbers_text_font() -> Result<TextFont, litchi_iwa::Error> {
+    TextFont::named(NUMBERS_FONT_NAME)
+}
+
+fn pages_text_font() -> Result<TextFont, litchi_iwa::Error> {
+    TextFont::named(PAGES_FONT_NAME)
+}
+
+fn keynote_text_font() -> Result<TextFont, litchi_iwa::Error> {
+    TextFont::named(KEYNOTE_FONT_NAME)
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Layouts")
@@ -112,6 +139,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Center)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, numbers_text_style()?)?;
+    editor.set_table_cell_text_font(table_id, ROW, COLUMN, numbers_text_font()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -131,6 +159,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Right)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, pages_text_style()?)?;
+    editor.set_table_cell_text_font(table_id, ROW, COLUMN, pages_text_font()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -177,6 +206,13 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         keynote_text_style()?,
+    )?;
+    editor.set_slide_table_cell_text_font(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_text_font()?,
     )?;
     editor.save(output)?;
     Ok(())

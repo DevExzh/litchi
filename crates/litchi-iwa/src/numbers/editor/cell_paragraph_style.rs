@@ -31,9 +31,11 @@ pub(super) fn alignment(
         CellParagraphPropertyKind::Alignment,
     )? {
         CellParagraphProperty::Alignment(value) => Ok(value),
-        CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
-            "iWork table-cell alignment resolved as character formatting".to_owned(),
-        )),
+        CellParagraphProperty::Font(_) | CellParagraphProperty::TextStyle(_) => {
+            Err(Error::InvalidFormat(
+                "iWork table-cell alignment resolved as another paragraph property".to_owned(),
+            ))
+        },
     }
 }
 
@@ -68,6 +70,59 @@ pub(super) fn reset_alignment(
     )
 }
 
+pub(super) fn font(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextFont> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Font,
+    )? {
+        CellParagraphProperty::Font(value) => Ok(value),
+        CellParagraphProperty::Alignment(_) | CellParagraphProperty::TextStyle(_) => {
+            Err(Error::InvalidFormat(
+                "iWork table-cell font resolved as another paragraph property".to_owned(),
+            ))
+        },
+    }
+}
+
+pub(super) fn set_font(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextFont,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Font(value),
+    )
+}
+
+pub(super) fn reset_font(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Font,
+    )
+}
+
 pub(super) fn text_style(
     package: &IWorkPackage,
     table_id: u64,
@@ -82,9 +137,12 @@ pub(super) fn text_style(
         CellParagraphPropertyKind::TextStyle,
     )? {
         CellParagraphProperty::TextStyle(value) => Ok(value),
-        CellParagraphProperty::Alignment(_) => Err(Error::InvalidFormat(
-            "iWork table-cell character formatting resolved as alignment".to_owned(),
-        )),
+        CellParagraphProperty::Alignment(_) | CellParagraphProperty::Font(_) => {
+            Err(Error::InvalidFormat(
+                "iWork table-cell character formatting resolved as another paragraph property"
+                    .to_owned(),
+            ))
+        },
     }
 }
 
@@ -197,7 +255,7 @@ fn set_property(
             }
             return Ok(());
         }
-        value.apply_to(&mut overrides, inherited)?;
+        value.apply_to(&mut overrides, &inherited)?;
         let replacement = variation_object(
             current_style_id,
             parent_id,
@@ -210,7 +268,7 @@ fn set_property(
             current_style_id,
             replacement,
         )?;
-        verify_property(&staged, table_id, row, column, value)?;
+        verify_property(&staged, table_id, row, column, &value)?;
         *package = staged;
         return Ok(());
     }
@@ -228,7 +286,7 @@ fn set_property(
             ))
         })?;
     let mut overrides = ParagraphStyleOverrides::default();
-    value.apply_to(&mut overrides, current_value)?;
+    value.apply_to(&mut overrides, &current_value)?;
     let variation = variation_object(new_style_id, current_style_id, stylesheet_id, overrides)?;
     crate::shapes::insert_style_variation(
         &mut staged,
@@ -264,7 +322,7 @@ fn set_property(
         }
     }
     set_package_last_object_identifier(&mut staged, new_style_id)?;
-    verify_property(&staged, table_id, row, column, value)?;
+    verify_property(&staged, table_id, row, column, &value)?;
     *package = staged;
     Ok(())
 }
@@ -366,7 +424,7 @@ fn reset_property(
             )?;
             replace_variation(&mut staged, &style.archive_name, style_id, replacement)?;
         }
-        verify_property(&staged, table_id, row, column, inherited)?;
+        verify_property(&staged, table_id, row, column, &inherited)?;
         *package = staged;
         return Ok(true);
     }
@@ -431,7 +489,7 @@ fn reset_property(
             style_id,
         )?;
     }
-    verify_property(&staged, table_id, row, column, inherited)?;
+    verify_property(&staged, table_id, row, column, &inherited)?;
     *package = staged;
     Ok(true)
 }
@@ -728,9 +786,9 @@ fn verify_property(
     table_id: u64,
     row: usize,
     column: usize,
-    expected: CellParagraphProperty,
+    expected: &CellParagraphProperty,
 ) -> Result<()> {
-    if property(package, table_id, row, column, expected.kind())? != expected {
+    if property(package, table_id, row, column, expected.kind())? != *expected {
         return Err(Error::InvalidFormat(format!(
             "iWork table-cell {} failed validation",
             expected.kind().name()
@@ -746,7 +804,7 @@ mod tests {
     use crate::numbers::{CellValue, NumbersDocumentBuilder};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
-    use crate::text::TextPointSize;
+    use crate::text::{TextFont, TextPointSize};
 
     fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
@@ -909,7 +967,7 @@ mod tests {
     }
 
     #[test]
-    fn text_style_composes_with_alignment_and_reclaims_independently() {
+    fn character_properties_compose_with_alignment_and_reclaim_independently() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(2, 2)
             .build()
@@ -925,9 +983,13 @@ mod tests {
         let styled = TextStyle::new(TextPointSize::from_points(18.0).unwrap())
             .with_bold(true)
             .with_italic(true);
+        let font = TextFont::named("CourierNewPSMT").unwrap();
 
         editor
             .set_table_cell_text_style(table_id, 1, 1, styled)
+            .unwrap();
+        editor
+            .set_table_cell_text_font(table_id, 1, 1, font.clone())
             .unwrap();
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
         assert_eq!(
@@ -938,6 +1000,7 @@ mod tests {
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
             TextAlignment::Center
         );
+        assert_eq!(editor.table_cell_text_font(table_id, 1, 1).unwrap(), font);
 
         editor
             .set_table_cell_text_style(table_id, 1, 1, TextStyle::default())
@@ -947,6 +1010,18 @@ mod tests {
             TextStyle::default()
         );
         assert!(!editor.reset_table_cell_text_style(table_id, 1, 1).unwrap());
+        editor
+            .set_table_cell_text_font(table_id, 1, 1, TextFont::default())
+            .unwrap();
+        assert_eq!(
+            editor.table_cell_text_font(table_id, 1, 1).unwrap(),
+            TextFont::default()
+        );
+        assert!(!editor.reset_table_cell_text_font(table_id, 1, 1).unwrap());
+        editor
+            .set_table_cell_text_font(table_id, 1, 1, font)
+            .unwrap();
+        assert!(editor.reset_table_cell_text_font(table_id, 1, 1).unwrap());
         editor
             .set_table_cell_text_style(table_id, 1, 1, styled)
             .unwrap();
@@ -970,6 +1045,71 @@ mod tests {
                 .object(style_id)
                 .is_none()
         }));
+    }
+
+    #[test]
+    fn shared_font_uses_copy_on_write() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 3)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        for column in 1..=2 {
+            editor
+                .set_cell(
+                    table_id,
+                    1,
+                    column,
+                    CellValue::Text(format!("Column {column}")),
+                )
+                .unwrap();
+        }
+        editor
+            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .unwrap();
+        let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
+        let locations = storage::object_locations(&editor.package).unwrap();
+        let key = text_style_key(&editor.package, &descriptor, 1, 1)
+            .unwrap()
+            .unwrap();
+        let resolved = storage::resolve_table_data_list(
+            &editor.package,
+            &locations,
+            descriptor.model.base_data_store.style_table.identifier,
+            tst::table_data_list::ListType::Style,
+        )
+        .unwrap();
+        let entry = style_entry(&resolved, Some(key)).unwrap().unwrap();
+        storage::increment_table_data_list_entry(
+            &mut editor.package,
+            &locations,
+            &resolved,
+            entry,
+            tst::table_data_list::ListType::Style,
+        )
+        .unwrap();
+        let target = model::locate_attached_cell(&editor.package, table_id, 1, 2).unwrap();
+        write_text_style_key(&mut editor.package, &target, 1, 2, Some(key)).unwrap();
+        let shared_style_id = explicit_style_id(&editor, table_id, 1, 1);
+        let font = TextFont::named("CourierNewPSMT").unwrap();
+
+        editor
+            .set_table_cell_text_font(table_id, 1, 1, font.clone())
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(editor.table_cell_text_font(table_id, 1, 1).unwrap(), font);
+        assert_eq!(
+            editor.table_cell_text_font(table_id, 1, 2).unwrap(),
+            TextFont::default()
+        );
+        assert_eq!(
+            editor.table_cell_text_alignment(table_id, 1, 2).unwrap(),
+            TextAlignment::Center
+        );
+
+        assert!(editor.reset_table_cell_text_font(table_id, 1, 1).unwrap());
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert!(!editor.reset_table_cell_text_font(table_id, 1, 1).unwrap());
     }
 
     #[test]
@@ -1044,6 +1184,7 @@ mod tests {
     fn scratch_paragraph_styles_round_trip_in_pages_and_keynote() {
         let pages_style =
             TextStyle::new(TextPointSize::from_points(17.0).unwrap()).with_italic(true);
+        let pages_font = TextFont::named("AvenirNext-Regular").unwrap();
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Aligned", 2, 2)
             .build()
@@ -1055,6 +1196,9 @@ mod tests {
         pages
             .set_table_cell_text_style(pages_table, 1, 1, pages_style)
             .unwrap();
+        pages
+            .set_table_cell_text_font(pages_table, 1, 1, pages_font.clone())
+            .unwrap();
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_text_alignment(pages_table, 1, 1).unwrap(),
@@ -1064,6 +1208,11 @@ mod tests {
             pages.table_cell_text_style(pages_table, 1, 1).unwrap(),
             pages_style
         );
+        assert_eq!(
+            pages.table_cell_text_font(pages_table, 1, 1).unwrap(),
+            pages_font
+        );
+        assert!(pages.reset_table_cell_text_font(pages_table, 1, 1).unwrap());
         assert!(
             pages
                 .reset_table_cell_text_style(pages_table, 1, 1)
@@ -1072,6 +1221,7 @@ mod tests {
 
         let keynote_style =
             TextStyle::new(TextPointSize::from_points(19.0).unwrap()).with_bold(true);
+        let keynote_font = TextFont::named("Menlo-Regular").unwrap();
         let mut keynote = KeynoteDocumentBuilder::new()
             .title("Aligned")
             .build()
@@ -1101,6 +1251,9 @@ mod tests {
         keynote
             .set_slide_table_cell_text_style(0, table.model_object_id, 1, 1, keynote_style)
             .unwrap();
+        keynote
+            .set_slide_table_cell_text_font(0, table.model_object_id, 1, 1, keynote_font.clone())
+            .unwrap();
         let mut keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1114,6 +1267,17 @@ mod tests {
                 .slide_table_cell_text_style(0, table.model_object_id, 1, 1)
                 .unwrap(),
             keynote_style
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_font(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_font
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_font(0, table.model_object_id, 1, 1)
+                .unwrap()
         );
         assert!(
             keynote
@@ -1138,6 +1302,16 @@ mod tests {
         assert!(
             editor
                 .set_table_cell_text_style(table_id, 1, 2, TextStyle::default())
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_font(
+                    table_id,
+                    1,
+                    2,
+                    TextFont::named("CourierNewPSMT").unwrap(),
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

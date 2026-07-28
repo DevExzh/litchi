@@ -104,6 +104,7 @@ pub use crate::table_cell_number_format::{
     TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
 };
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
+pub use crate::text::TextFont as PagesTableCellTextFont;
 pub use crate::text::TextStyle as PagesTableCellTextStyle;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
@@ -1315,6 +1316,73 @@ impl PagesEditor {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_alignment_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective PostScript font identity of one body-table cell.
+    pub fn table_cell_text_font(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextFont> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_font_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell PostScript font override.
+    pub fn set_table_cell_text_font(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        font: PagesTableCellTextFont,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_font_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            font.clone(),
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_font(model_object_id, row, column)? != font {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell font failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local font override and restore the inherited table font.
+    pub fn reset_table_cell_text_font(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_font_in_package(
             &mut staged,
             model_object_id,
             row,
