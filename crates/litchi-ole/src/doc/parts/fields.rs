@@ -7992,6 +7992,7 @@ fn parse_compare_field_comparison(instruction: &str) -> Option<String> {
     (!comparison.is_empty()).then_some(comparison.to_string())
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_prompt_field_parts(
     instruction: &str,
 ) -> Option<(
@@ -8515,7 +8516,7 @@ fn build_fields(story: FieldStory, markers: &[FieldMarker]) -> Result<Vec<Field>
                 if flags.has_separator != has_separator {
                     return Err(corrupted("grffldEnd.fHasSep disagrees with the FieldList"));
                 }
-                if flags.nested != !stack.is_empty() {
+                if flags.nested == stack.is_empty() {
                     return Err(corrupted(
                         "grffldEnd.fNested disagrees with field containment",
                     ));

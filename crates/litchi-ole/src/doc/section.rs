@@ -421,20 +421,15 @@ impl Default for SectionPageGrid {
 }
 
 /// Text-flow rules applied to all text in a section.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SectionTextFlow {
+    #[default]
     HorizontalNonAsian,
     TopToBottomAsian,
     BottomToTop,
     TopToBottomNonAsian,
     HorizontalAsian,
     VerticalNonAsian,
-}
-
-impl Default for SectionTextFlow {
-    fn default() -> Self {
-        Self::HorizontalNonAsian
-    }
 }
 
 /// A vertical page margin as defined by `sprmSDyaTop` and `sprmSDyaBottom`.

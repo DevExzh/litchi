@@ -167,7 +167,7 @@ fn relocate_fkp_pages(
             let run_count = usize::from(page[WORD_PAGE_SIZE - 1]);
             let fc_bytes = (run_count + 1)
                 .checked_mul(4)
-                .filter(|length| *length <= WORD_PAGE_SIZE - 1)
+                .filter(|length| *length < WORD_PAGE_SIZE)
                 .ok_or_else(|| invalid(format!("{label} FKP run count is invalid")))?;
             for offset in (0..fc_bytes).step_by(4) {
                 let value = read_u32(page, offset, label)?;
@@ -311,8 +311,8 @@ fn pad_regular_stream(stream: &mut Vec<u8>) {
 pub(super) fn merge_attached_glossary(
     main_word: &mut Vec<u8>,
     main_table: &mut Vec<u8>,
-    glossary_word: &mut Vec<u8>,
-    glossary_table: &mut Vec<u8>,
+    glossary_word: &mut [u8],
+    glossary_table: &mut [u8],
 ) -> Result<(), DocWriteError> {
     if main_word.len() < FIB_SIZE || glossary_word.len() < FIB_SIZE {
         return Err(invalid("DOC writer emitted a truncated FIB"));

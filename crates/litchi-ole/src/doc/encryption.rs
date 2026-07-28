@@ -452,7 +452,7 @@ fn ansi_encoding_for_lcid(language_id: u16) -> &'static Encoding {
         },
         0x1e => WINDOWS_874,
         0x1f => WINDOWS_1254,
-        0x25 | 0x26 | 0x27 => WINDOWS_1257,
+        0x25..=0x27 => WINDOWS_1257,
         0x2a => WINDOWS_1258,
         0x2c => match language_id {
             0x082c => WINDOWS_1251,
@@ -475,15 +475,13 @@ fn create_xor_key(password: &[u8]) -> u16 {
         return 0;
     }
     let mut key = XOR_INITIAL_CODE[password.len() - 1];
-    let mut matrix_line = 15 - password.len();
-    for mut byte in password.iter().copied() {
+    for (matrix_line, mut byte) in (15 - password.len()..).zip(password.iter().copied()) {
         for matrix_value in XOR_MATRIX[matrix_line] {
             if byte & 1 != 0 {
                 key ^= matrix_value;
             }
             byte >>= 1;
         }
-        matrix_line += 1;
     }
     key
 }

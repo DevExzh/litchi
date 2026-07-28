@@ -349,7 +349,7 @@ impl DocTrackedRevisionEditor {
 
     fn reject_destructive_interactions(&self, start: u32, end: u32) -> Result<()> {
         let text = read_units(&self.word, &self.pieces, start, end)?;
-        if text.iter().any(|u| matches!(*u, 0x13 | 0x14 | 0x15)) {
+        if text.iter().any(|u| matches!(*u, 0x13..=0x15)) {
             return Err(corrupted("accept/reject would delete a field boundary"));
         }
         for table in &self.cp_tables {
@@ -725,7 +725,14 @@ fn split_transform_chpx(runs: &mut Vec<FcRun>, intervals: &[(u32, u32)],
     let mut output = Vec::new();
     for run in runs.iter() {
         let mut cuts = BTreeSet::from([run.start, run.end]);
-        for (a, b) in intervals { if *a > run.start && *a < run.end { cuts.insert(*a); } if *b > run.start && *b < run.end { cuts.insert(*b); } }
+        for (a, b) in intervals {
+            if *a > run.start && *a < run.end {
+                cuts.insert(*a);
+            }
+            if *b > run.start && *b < run.end {
+                cuts.insert(*b);
+            }
+        }
         let cuts = cuts.into_iter().collect::<Vec<_>>();
         for pair in cuts.windows(2) {
             let covered = intervals.iter().any(|(a, b)| pair[0] >= *a && pair[1] <= *b);
@@ -748,7 +755,7 @@ fn split_transform_chpx(runs: &mut Vec<FcRun>, intervals: &[(u32, u32)],
     Ok(())
 }
 
-fn split_transform_papx(runs: &mut Vec<PapxRun>, intervals: &[(u32, u32)],
+fn split_transform_papx(runs: &mut [PapxRun], intervals: &[(u32, u32)],
     transform: impl Fn(&[u8]) -> Result<Vec<u8>>) -> Result<()> {
     let mut hit = false;
     for run in runs.iter_mut() {
@@ -846,7 +853,7 @@ fn build_papx_page(runs: &[PapxRun]) -> Result<Vec<u8>> {
         cursor &= !1;
         page[bx + i * 13] = u8::try_from(cursor / 2).map_err(|_| corrupted("PAPX offset exceeds byte"))?;
         write_phe(&mut page[bx + i * 13 + 1..bx + i * 13 + 13], run.phe);
-        if prefix == 1 { page[cursor] = ((run.grpprl.len() + 1) / 2) as u8; }
+        if prefix == 1 { page[cursor] = (run.grpprl.len().div_ceil(2)) as u8; }
         else { page[cursor] = 0; page[cursor + 1] = (run.grpprl.len() / 2) as u8; }
         page[cursor + prefix..cursor + prefix + run.grpprl.len()].copy_from_slice(&run.grpprl);
     }
@@ -866,7 +873,7 @@ fn parse_bte(word: &[u8], table: &[u8], index: usize) -> Result<(Vec<u32>, Vec<u
     let mut fcs = Vec::with_capacity(n + 1); let mut pages = Vec::with_capacity(n);
     for i in 0..=n { fcs.push(u32_at(data, i * 4)?); }
     for i in 0..n { pages.push(u32_at(data, (n + 1) * 4 + i * 4)? & 0x003F_FFFF); }
-    if fcs.windows(2).any(|v| v[0] >= v[1]) || pages.iter().any(|v| *v == 0) { return Err(corrupted("bin table ranges are invalid")); }
+    if fcs.windows(2).any(|v| v[0] >= v[1]) || pages.contains(&0) { return Err(corrupted("bin table ranges are invalid")); }
     Ok((fcs, pages))
 }
 
