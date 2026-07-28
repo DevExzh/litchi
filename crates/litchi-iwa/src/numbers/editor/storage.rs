@@ -1386,7 +1386,37 @@ pub(super) fn set_rich_text(
 ) -> Result<u32> {
     let entry = rich_text_entry_location(package, locations, model, identifier)?;
     let shared_across_lists = rich_text_payload_entry_count(package, entry.payload_id)? > 1;
+    let source_storage_archive = package.archive(&entry.storage_archive)?;
+    let source_storage = source_storage_archive
+        .object(entry.storage_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers rich-text storage object {} is missing",
+                entry.storage_id
+            ))
+        })?;
+    if source_storage.messages.len() != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "Cannot safely clone multi-payload Numbers rich-text storage object {}",
+            entry.storage_id
+        )));
+    }
+    let decoded_storage = tswp::StorageArchive::decode(source_storage.messages[0].data.as_slice())
+        .map_err(|_| {
+            Error::InvalidFormat(format!(
+                "Numbers rich-text storage object {} has no TSWP storage payload",
+                entry.storage_id
+            ))
+        })?;
+    let text_is_unchanged = decoded_storage
+        .text
+        .iter()
+        .flat_map(|fragment| fragment.chars())
+        .eq(replacement.chars());
     if entry.refcount == 1 && !shared_across_lists {
+        if text_is_unchanged {
+            return Ok(identifier);
+        }
         let mut text = IWorkTextEditor::from_package(package.clone());
         text.set_text(entry.storage_id, replacement)?;
         *package = text.into_package();
@@ -1403,27 +1433,6 @@ pub(super) fn set_rich_text(
     let new_storage_id = take_identifier(&mut next_identifier)?;
     let new_payload_id = take_identifier(&mut next_identifier)?;
 
-    let source_storage_archive = package.archive(&entry.storage_archive)?;
-    let source_storage = source_storage_archive
-        .object(entry.storage_id)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers rich-text storage object {} is missing",
-                entry.storage_id
-            ))
-        })?;
-    if source_storage.messages.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "Cannot safely clone multi-payload Numbers rich-text storage object {}",
-            entry.storage_id
-        )));
-    }
-    tswp::StorageArchive::decode(source_storage.messages[0].data.as_slice()).map_err(|_| {
-        Error::InvalidFormat(format!(
-            "Numbers rich-text storage object {} has no TSWP storage payload",
-            entry.storage_id
-        ))
-    })?;
     let storage_references = source_storage.archive_info.message_infos[0]
         .object_references
         .clone();
@@ -1549,9 +1558,11 @@ pub(super) fn set_rich_text(
         Ok(())
     })?;
 
-    let mut text = IWorkTextEditor::from_package(package.clone());
-    text.set_text(new_storage_id, replacement)?;
-    *package = text.into_package();
+    if !text_is_unchanged {
+        let mut text = IWorkTextEditor::from_package(package.clone());
+        text.set_text(new_storage_id, replacement)?;
+        *package = text.into_package();
+    }
     Ok(key)
 }
 

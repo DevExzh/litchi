@@ -3934,6 +3934,7 @@ pub use tables::{
     PagesTableCellNegativeNumberStyle, PagesTableCellNumberFormat,
     PagesTableCellNumeralSystemFormat, PagesTableCellParagraphIndents,
     PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
+    PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
     PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
     PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
     PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,

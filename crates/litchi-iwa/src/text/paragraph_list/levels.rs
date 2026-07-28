@@ -18,7 +18,7 @@ const PARAGRAPH_DATA_TABLE_FIELD: u32 = 6;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_LIST_LEVEL_FIELD: u32 = 2;
 
-pub(in crate::text) fn paragraph_list_levels(
+pub(crate) fn paragraph_list_levels(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<Vec<ParagraphListLevelPlacement>> {
@@ -41,7 +41,7 @@ pub(in crate::text) fn paragraph_list_levels(
         .collect()
 }
 
-pub(in crate::text) fn paragraph_list_level(
+pub(crate) fn paragraph_list_level(
     package: &IWorkPackage,
     storage_id: u64,
     paragraph: ParagraphStart,
@@ -139,7 +139,7 @@ fn patch_level(
         let data = transform_length_delimited_field(
             &original.data,
             PARAGRAPH_DATA_TABLE_FIELD,
-            |table| patch_table(table, storage_id, paragraph, level),
+            |table| patch_table(table, storage_id, paragraph, level, &starts),
         )?;
         object.replace_message(
             *index,
@@ -157,6 +157,7 @@ fn patch_table(
     storage_id: u64,
     paragraph: ParagraphStart,
     level: ParagraphListLevel,
+    paragraph_starts: &[u32],
 ) -> Result<Vec<u8>> {
     let payloads = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?;
     let mut entries = payloads
@@ -177,6 +178,24 @@ fn patch_table(
                 "iWork text storage {storage_id} has no paragraph-data boundary at zero"
             ))
         })?;
+    let next_paragraph = paragraph_starts
+        .iter()
+        .copied()
+        .find(|start| *start > target);
+    let next_effective = next_paragraph
+        .map(|next| {
+            entries
+                .iter()
+                .take_while(|(entry, _)| entry.character_index <= next)
+                .last()
+                .map(|(entry, _)| (entry.first, entry.second))
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "iWork text storage {storage_id} has no paragraph-data boundary at zero"
+                    ))
+                })
+        })
+        .transpose()?;
     if let Some((entry, raw)) = entries
         .iter_mut()
         .find(|(entry, _)| entry.character_index == target)
@@ -193,6 +212,20 @@ fn patch_table(
             character_index: target,
             first: u32::from(level.get()),
             second: inherited_second,
+        };
+        let raw = entry.encode_to_vec();
+        entries.push((entry, raw));
+        entries.sort_by_key(|(entry, _)| entry.character_index);
+    }
+    if let Some((next, (next_level, next_second))) = next_paragraph.zip(next_effective)
+        && entries
+            .iter()
+            .all(|(entry, _)| entry.character_index != next)
+    {
+        let entry = tswp::para_data_attribute_table::ParaDataAttribute {
+            character_index: next,
+            first: next_level,
+            second: next_second,
         };
         let raw = entry.encode_to_vec();
         entries.push((entry, raw));
@@ -353,12 +386,13 @@ mod tests {
         }
         .encode_to_vec();
         let paragraph = ParagraphStart::from_utf16_index(4).unwrap();
-        let patched = patch_table(&table, 99, paragraph, ParagraphListLevel::ONE).unwrap();
+        let patched = patch_table(&table, 99, paragraph, ParagraphListLevel::ONE, &[0, 4]).unwrap();
         let decoded = tswp::ParaDataAttributeTable::decode(patched.as_slice()).unwrap();
         assert_eq!(decoded.entries.len(), 2);
         assert!(decoded.entries.iter().all(|entry| entry.second == 7));
 
-        let reset = patch_table(&patched, 99, paragraph, ParagraphListLevel::ZERO).unwrap();
+        let reset =
+            patch_table(&patched, 99, paragraph, ParagraphListLevel::ZERO, &[0, 4]).unwrap();
         let decoded = tswp::ParaDataAttributeTable::decode(reset.as_slice()).unwrap();
         assert_eq!(decoded.entries.len(), 1);
         assert_eq!(decoded.entries[0].second, 7);
@@ -368,5 +402,29 @@ mod tests {
     fn paragraph_starts_span_fragments_and_coalesce_crlf() {
         let text = vec!["A\r".to_owned(), "\nB\u{2029}".to_owned(), "C".to_owned()];
         assert_eq!(paragraph_starts(&text).unwrap(), vec![0, 3, 5]);
+    }
+
+    #[test]
+    fn level_updates_restore_the_following_paragraph() {
+        let table = tswp::ParaDataAttributeTable {
+            entries: vec![tswp::para_data_attribute_table::ParaDataAttribute {
+                character_index: 0,
+                first: 0,
+                second: 0,
+            }],
+        }
+        .encode_to_vec();
+        let paragraph = ParagraphStart::from_utf16_index(4).unwrap();
+        let patched =
+            patch_table(&table, 99, paragraph, ParagraphListLevel::ONE, &[0, 4, 9]).unwrap();
+        let decoded = tswp::ParaDataAttributeTable::decode(patched.as_slice()).unwrap();
+        assert_eq!(
+            decoded
+                .entries
+                .iter()
+                .map(|entry| (entry.character_index, entry.first))
+                .collect::<Vec<_>>(),
+            [(0, 0), (4, 1), (9, 0)]
+        );
     }
 }

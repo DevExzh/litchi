@@ -87,8 +87,10 @@ pub use paragraph_list::{
     ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListPlacement,
 };
 pub(crate) use paragraph_list::{
-    paragraph_list as paragraph_list_in_storage, paragraph_lists as paragraph_lists_in_storage,
-    preset_style_id, preset_style_object,
+    paragraph_list as paragraph_list_in_storage,
+    paragraph_list_level as paragraph_list_level_in_storage,
+    paragraph_list_levels as paragraph_list_levels_in_storage,
+    paragraph_lists as paragraph_lists_in_storage, preset_style_id, preset_style_object,
 };
 pub use paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,

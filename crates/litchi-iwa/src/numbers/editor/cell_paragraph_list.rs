@@ -93,6 +93,93 @@ pub(super) fn set_paragraph_lists(
     Ok(())
 }
 
+pub(super) fn paragraph_list_levels(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<ParagraphListLevelPlacement>> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        return Ok(vec![ParagraphListLevelPlacement::new(
+            ParagraphStart::ZERO,
+            ParagraphListLevel::ZERO,
+        )]);
+    };
+    crate::text::paragraph_list_levels_in_storage(package, storage_id)
+}
+
+pub(super) fn paragraph_list_level(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListLevel> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(ParagraphListLevel::ZERO);
+    };
+    crate::text::paragraph_list_level_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_level(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    level: ParagraphListLevel,
+) -> Result<()> {
+    if existing_storage_id(package, table_id, row, column)?.is_none()
+        && level == ParagraphListLevel::ZERO
+    {
+        return require_plain_cell_paragraph_start(package, table_id, row, column, paragraph);
+    }
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_level(storage_id, paragraph, level)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_level_in_storage(&staged, storage_id, paragraph)? != level {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph list-level update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list_level(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(false);
+    };
+    if crate::text::paragraph_list_level_in_storage(package, storage_id, paragraph)?
+        == ParagraphListLevel::ZERO
+    {
+        return Ok(false);
+    }
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    let changed = text.reset_paragraph_list_level(storage_id, paragraph)?;
+    staged = text.into_package();
+    let actual = crate::text::paragraph_list_level_in_storage(&staged, storage_id, paragraph)?;
+    if !changed || actual != ParagraphListLevel::ZERO {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table-cell paragraph list-level reset failed validation: changed={changed}, actual={actual:?}"
+        )));
+    }
+    *package = staged;
+    Ok(true)
+}
+
 fn existing_storage_id(
     package: &IWorkPackage,
     table_id: u64,
@@ -125,6 +212,68 @@ fn existing_storage_id(
             "Paragraph lists require an empty or textual iWork table cell".to_owned(),
         )),
     }
+}
+
+fn require_plain_cell_paragraph_start(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<()> {
+    let location = model::locate_attached_cell(package, table_id, row, column)?;
+    let data = storage::read_tile_cell(
+        package,
+        &location.tile_archive,
+        location.tile_id,
+        location.tile_row,
+        column,
+    )?;
+    let stored = data
+        .as_deref()
+        .map(BncCell::parse)
+        .transpose()?
+        .map_or(StoredValue::Empty, |cell| cell.stored_value());
+    let text = plain_cell_text(package, &location, stored)?;
+    if paragraph_starts(&text)?
+        .binary_search(&paragraph.utf16_index())
+        .is_ok()
+    {
+        return Ok(());
+    }
+    Err(Error::InvalidFormat(format!(
+        "UTF-16 index {} is not a paragraph start in an iWork table cell",
+        paragraph.utf16_index()
+    )))
+}
+
+fn plain_cell_text(
+    package: &IWorkPackage,
+    location: &model::CellLocation,
+    stored: StoredValue,
+) -> Result<String> {
+    let StoredValue::Text(key) = stored else {
+        return match stored {
+            StoredValue::Empty => Ok(String::new()),
+            _ => Err(Error::ParseError(
+                "Paragraph lists require an empty or textual iWork table cell".to_owned(),
+            )),
+        };
+    };
+    let string_table = location
+        .descriptor
+        .model
+        .base_data_store
+        .string_table
+        .identifier;
+    storage::resolve_table_string_values(
+        package,
+        &location.object_locations,
+        string_table,
+        &HashSet::from([key]),
+    )?
+    .remove(&key)
+    .ok_or_else(|| Error::InvalidFormat(format!("Numbers string table has no entry {key}")))
 }
 
 fn ensure_storage(
@@ -216,24 +365,7 @@ fn promote_plain_cell(
         StoredValue::Empty => None,
         _ => unreachable!("plain-cell promotion receives only plain stored values"),
     };
-    let text = if let Some(key) = old_string_key {
-        let string_table = location
-            .descriptor
-            .model
-            .base_data_store
-            .string_table
-            .identifier;
-        storage::resolve_table_string_values(
-            package,
-            &location.object_locations,
-            string_table,
-            &HashSet::from([key]),
-        )?
-        .remove(&key)
-        .ok_or_else(|| Error::InvalidFormat(format!("Numbers string table has no entry {key}")))?
-    } else {
-        String::new()
-    };
+    let text = plain_cell_text(package, location, stored)?;
     let (paragraph_style_id, stylesheet_id) =
         cell_paragraph_style::style_context(package, table_id, row, column)?;
     let list_style_id = crate::text::preset_style_id(package, stylesheet_id, ParagraphList::None)?
@@ -540,6 +672,20 @@ mod tests {
         ]
     }
 
+    fn nested_second_paragraph() -> Vec<ParagraphListLevelPlacement> {
+        vec![
+            ParagraphListLevelPlacement::new(ParagraphStart::ZERO, ParagraphListLevel::ZERO),
+            ParagraphListLevelPlacement::new(
+                ParagraphStart::from_utf16_index(9).unwrap(),
+                ParagraphListLevel::ONE,
+            ),
+            ParagraphListLevelPlacement::new(
+                ParagraphStart::from_utf16_index(16).unwrap(),
+                ParagraphListLevel::ZERO,
+            ),
+        ]
+    }
+
     #[test]
     fn scratch_documents_promote_plain_cells_and_roundtrip_lists() {
         let mut numbers = NumbersDocumentBuilder::new()
@@ -814,6 +960,265 @@ mod tests {
         assert!(
             editor
                 .set_table_cell_paragraph_lists(table, ROW, COLUMN, &invalid)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn scratch_documents_roundtrip_isolated_cell_list_levels_in_every_suite() {
+        let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
+        let expected = nested_second_paragraph();
+        let mut numbers = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let numbers_table = numbers.tables().unwrap()[0].object_id;
+        numbers
+            .set_cell(
+                numbers_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        numbers
+            .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        numbers
+            .set_table_cell_paragraph_list_level(
+                numbers_table,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListLevel::ONE,
+            )
+            .unwrap();
+        let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list_levels(numbers_table, ROW, COLUMN)
+                .unwrap(),
+            expected
+        );
+        assert!(
+            numbers
+                .reset_table_cell_paragraph_list_level(numbers_table, ROW, COLUMN, paragraph,)
+                .unwrap()
+        );
+        assert!(
+            !numbers
+                .reset_table_cell_paragraph_list_level(numbers_table, ROW, COLUMN, paragraph,)
+                .unwrap()
+        );
+
+        let mut pages = PagesDocumentBuilder::new()
+            .body_table("Nested Lists", 3, 3)
+            .build()
+            .unwrap();
+        let pages_table = pages.tables().unwrap()[0].model_object_id;
+        pages
+            .set_table_cell(
+                pages_table,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_lists(pages_table, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_list_level(
+                pages_table,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListLevel::ONE,
+            )
+            .unwrap();
+        let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            pages
+                .table_cell_paragraph_list_levels(pages_table, ROW, COLUMN)
+                .unwrap(),
+            expected
+        );
+
+        let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+        let table = keynote
+            .add_slide_table(
+                0,
+                "Nested Lists",
+                3,
+                3,
+                DrawablePoint { x: 100.0, y: 100.0 },
+                DrawableSize {
+                    width: 600.0,
+                    height: 300.0,
+                },
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                CellValue::Text(MIXED_TEXT.to_owned()),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_lists(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                &mixed_lists(),
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_list_level(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListLevel::ONE,
+            )
+            .unwrap();
+        let keynote =
+            crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_list_levels(0, table.model_object_id, ROW, COLUMN,)
+                .unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn duplicated_rich_text_cells_are_list_level_copy_on_write() {
+        let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(3, 3)
+            .build()
+            .unwrap();
+        let source = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(source, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
+            .unwrap();
+        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        editor
+            .set_table_cell_paragraph_list_level(
+                duplicate,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListLevel::ONE,
+            )
+            .unwrap();
+        assert!(
+            editor
+                .table_cell_paragraph_list_levels(source, ROW, COLUMN)
+                .unwrap()
+                .iter()
+                .all(|placement| placement.level == ParagraphListLevel::ZERO)
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_levels(duplicate, ROW, COLUMN)
+                .unwrap(),
+            nested_second_paragraph()
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_lists(source, ROW, COLUMN)
+                .unwrap(),
+            mixed_lists()
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_lists(duplicate, ROW, COLUMN)
+                .unwrap(),
+            mixed_lists()
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn plain_cell_zero_list_levels_are_validated_no_ops() {
+        let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
+        let invalid = ParagraphStart::from_utf16_index(8).unwrap();
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let table = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(table, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+
+        editor
+            .set_table_cell_paragraph_list_level(
+                table,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListLevel::ZERO,
+            )
+            .unwrap();
+        assert!(
+            !editor
+                .reset_table_cell_paragraph_list_level(table, ROW, COLUMN, paragraph)
+                .unwrap()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+
+        assert!(
+            editor
+                .set_table_cell_paragraph_list_level(
+                    table,
+                    ROW,
+                    COLUMN,
+                    invalid,
+                    ParagraphListLevel::ZERO,
+                )
+                .is_err()
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_list_level(table, ROW, COLUMN, invalid)
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn invalid_cell_list_level_boundary_is_transactional() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let table = editor.tables().unwrap()[0].object_id;
+        editor
+            .set_cell(table, ROW, COLUMN, CellValue::Text(MIXED_TEXT.to_owned()))
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_table_cell_paragraph_list_level(
+                    table,
+                    ROW,
+                    COLUMN,
+                    ParagraphStart::from_utf16_index(8).unwrap(),
+                    ParagraphListLevel::ONE,
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

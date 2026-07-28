@@ -105,6 +105,8 @@ pub use crate::table_cell_number_format::{
 pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
+pub use crate::text::ParagraphListLevel as KeynoteTableCellParagraphListLevel;
+pub use crate::text::ParagraphListLevelPlacement as KeynoteTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
@@ -1963,6 +1965,92 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read every effective list-level boundary in one slide-table cell.
+    pub fn slide_table_cell_paragraph_list_levels(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<KeynoteTableCellParagraphListLevelPlacement>> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_levels_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Set one paragraph's list level without changing later paragraphs.
+    pub fn set_slide_table_cell_paragraph_list_level(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        level: KeynoteTableCellParagraphListLevel,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_level_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            level,
+        )?;
+        let expected = crate::numbers::editor::table_cell_paragraph_list_levels_in_package(
+            &staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_list_levels(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+        )? != expected
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph list levels failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore one paragraph to the top-level list nesting level.
+    pub fn reset_slide_table_cell_paragraph_list_level(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_list_level_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read effective first-line, left, and right paragraph indents.

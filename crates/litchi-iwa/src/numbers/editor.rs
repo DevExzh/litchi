@@ -147,6 +147,10 @@ pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
 pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
 /// Canonical native list preset applied uniformly to a Numbers table cell.
 pub type NumbersTableCellParagraphList = ParagraphList;
+/// A validated zero-based list nesting level in a Numbers table cell.
+pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
+/// One effective list-level boundary in a Numbers table cell.
+pub type NumbersTableCellParagraphListLevelPlacement = ParagraphListLevelPlacement;
 /// One paragraph-scoped list preset boundary in a Numbers table cell.
 pub type NumbersTableCellParagraphListPlacement = ParagraphListPlacement;
 /// Ordered explicit ruler tab stops for a Numbers table cell.
@@ -2996,6 +3000,73 @@ impl NumbersEditor {
         Ok(())
     }
 
+    /// Read every effective list-level boundary in a table cell.
+    pub fn table_cell_paragraph_list_levels(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<NumbersTableCellParagraphListLevelPlacement>> {
+        cell_paragraph_list::paragraph_list_levels(&self.package, table_id, row, column)
+    }
+
+    /// Set one validated paragraph's list level without changing later paragraphs.
+    pub fn set_table_cell_paragraph_list_level(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        level: NumbersTableCellParagraphListLevel,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_level(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            level,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if cell_paragraph_list::paragraph_list_level(
+            &verified.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )? != level
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list level failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore one paragraph to the top-level list nesting level.
+    pub fn reset_table_cell_paragraph_list_level(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_level(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read effective first-line, left, and right paragraph indents.
     pub fn table_cell_paragraph_indents(
         &self,
@@ -4859,6 +4930,36 @@ pub(crate) fn set_table_cell_paragraph_lists_in_package(
     placements: &[ParagraphListPlacement],
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_lists(package, table_id, row, column, placements)
+}
+
+pub(crate) fn table_cell_paragraph_list_levels_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<ParagraphListLevelPlacement>> {
+    cell_paragraph_list::paragraph_list_levels(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_level_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    level: ParagraphListLevel,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_level(package, table_id, row, column, paragraph, level)
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_level_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_level(package, table_id, row, column, paragraph)
 }
 
 pub(crate) fn table_cell_paragraph_indents_in_package(

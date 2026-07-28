@@ -16,10 +16,8 @@ pub use types::{
     ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListPlacement,
 };
 
-pub(super) use levels::{
-    paragraph_list_level, paragraph_list_levels, reset_paragraph_list_level,
-    set_paragraph_list_level,
-};
+pub(crate) use levels::{paragraph_list_level, paragraph_list_levels};
+pub(super) use levels::{reset_paragraph_list_level, set_paragraph_list_level};
 
 /// Build one canonical stylesheet object for a source-created document theme.
 ///

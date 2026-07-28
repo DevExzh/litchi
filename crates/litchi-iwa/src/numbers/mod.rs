@@ -53,6 +53,7 @@ pub use editor::{
     NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
     NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableCellParagraphIndents,
     NumbersTableCellParagraphLineSpacing, NumbersTableCellParagraphList,
+    NumbersTableCellParagraphListLevel, NumbersTableCellParagraphListLevelPlacement,
     NumbersTableCellParagraphListPlacement, NumbersTableCellParagraphSpacing,
     NumbersTableCellParagraphTabStops, NumbersTableCellTextAlignment,
     NumbersTableCellTextBackground, NumbersTableCellTextBaselineShift,

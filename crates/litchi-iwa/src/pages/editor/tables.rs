@@ -107,6 +107,8 @@ pub use crate::table_cell_number_format::{
 pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;
+pub use crate::text::ParagraphListLevel as PagesTableCellParagraphListLevel;
+pub use crate::text::ParagraphListLevelPlacement as PagesTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
@@ -1594,6 +1596,83 @@ impl PagesEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read every effective list-level boundary in one body-table cell.
+    pub fn table_cell_paragraph_list_levels(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<PagesTableCellParagraphListLevelPlacement>> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_levels_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Set one paragraph's list level without changing later paragraphs.
+    pub fn set_table_cell_paragraph_list_level(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        level: PagesTableCellParagraphListLevel,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_level_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            level,
+        )?;
+        let expected = crate::numbers::editor::table_cell_paragraph_list_levels_in_package(
+            &staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_levels(model_object_id, row, column)? != expected {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph list levels failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore one paragraph to the top-level list nesting level.
+    pub fn reset_table_cell_paragraph_list_level(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_list_level_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read effective first-line, left, and right paragraph indents.

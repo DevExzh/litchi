@@ -11,12 +11,12 @@ use litchi_iwa::table_cell_layout::{
 };
 use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphList, ParagraphListPlacement, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
-    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListPlacement, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
+    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -123,6 +123,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_paragraph_lists(numbers_table.object_id, ROW, COLUMN)?,
         mixed_paragraph_lists()?
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_list_levels(numbers_table.object_id, ROW, COLUMN)?,
+        nested_paragraph_levels()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -197,6 +201,10 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         pages.table_cell_paragraph_lists(pages_table.model_object_id, ROW, COLUMN)?,
         mixed_paragraph_lists()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list_levels(pages_table.model_object_id, ROW, COLUMN)?,
+        nested_paragraph_levels()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -308,6 +316,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         keynote.slide_table_cell_paragraph_lists(0, keynote_table.model_object_id, ROW, COLUMN,)?,
         mixed_paragraph_lists()?
     );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_list_levels(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+        )?,
+        nested_paragraph_levels()?
+    );
     Ok(())
 }
 
@@ -327,6 +344,20 @@ fn mixed_paragraph_lists() -> Result<Vec<ParagraphListPlacement>, litchi_iwa::Er
         ParagraphListPlacement::new(
             ParagraphStart::from_utf16_index(32)?,
             ParagraphList::Numbered,
+        ),
+    ])
+}
+
+fn nested_paragraph_levels() -> Result<Vec<ParagraphListLevelPlacement>, litchi_iwa::Error> {
+    Ok(vec![
+        ParagraphListLevelPlacement::new(ParagraphStart::ZERO, ParagraphListLevel::ZERO),
+        ParagraphListLevelPlacement::new(
+            ParagraphStart::from_utf16_index(13)?,
+            ParagraphListLevel::ONE,
+        ),
+        ParagraphListLevelPlacement::new(
+            ParagraphStart::from_utf16_index(32)?,
+            ParagraphListLevel::ZERO,
         ),
     ])
 }
@@ -638,6 +669,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers_paragraph_tab_stops()?,
     )?;
     editor.set_table_cell_paragraph_lists(table_id, ROW, COLUMN, &mixed_paragraph_lists()?)?;
+    editor.set_table_cell_paragraph_list_level(
+        table_id,
+        ROW,
+        COLUMN,
+        ParagraphStart::from_utf16_index(13)?,
+        ParagraphListLevel::ONE,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -693,6 +731,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         pages_paragraph_tab_stops()?,
     )?;
     editor.set_table_cell_paragraph_lists(table_id, ROW, COLUMN, &mixed_paragraph_lists()?)?;
+    editor.set_table_cell_paragraph_list_level(
+        table_id,
+        ROW,
+        COLUMN,
+        ParagraphStart::from_utf16_index(13)?,
+        ParagraphListLevel::ONE,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -851,6 +896,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         &mixed_paragraph_lists()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_list_level(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        ParagraphStart::from_utf16_index(13)?,
+        ParagraphListLevel::ONE,
     )?;
     editor.save(output)?;
     Ok(())

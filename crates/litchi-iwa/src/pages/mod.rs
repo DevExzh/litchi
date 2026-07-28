@@ -52,6 +52,7 @@ pub use editor::{
     PagesTableCellInsets, PagesTableCellLayout, PagesTableCellNegativeNumberStyle,
     PagesTableCellNumberFormat, PagesTableCellNumeralSystemFormat, PagesTableCellParagraphIndents,
     PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
+    PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
     PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
     PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
     PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
