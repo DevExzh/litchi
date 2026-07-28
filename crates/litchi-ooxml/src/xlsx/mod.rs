@@ -32,6 +32,7 @@ pub mod auto_filter;
 pub mod calculation_chain;
 pub mod calculation_properties;
 pub mod cell;
+pub mod cell_watches;
 pub mod chart;
 pub mod chartsheet;
 mod comments;
@@ -58,8 +59,10 @@ pub mod print_options;
 pub mod printer_settings;
 pub mod query_table;
 pub mod revisions;
+pub mod scenarios;
 mod shared_formula;
 pub mod shared_strings;
+pub mod sheet_calculation_properties;
 pub mod sheet_format;
 pub mod sheet_properties;
 pub mod sheet_protection;
@@ -120,6 +123,10 @@ pub use calculation_properties::{
     parse_workbook_calculation_properties,
 };
 pub use cell::Cell;
+pub use cell_watches::{
+    CellWatchReference, WorksheetCellWatchConformance, WorksheetCellWatches,
+    parse_worksheet_cell_watches, write_worksheet_cell_watches,
+};
 pub use chart::{
     ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
     ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
@@ -169,6 +176,11 @@ pub use revisions::{
     RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, WorkbookRevisions,
     load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
     store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
+};
+pub use scenarios::{
+    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario,
+    WorksheetScenarioConformance, WorksheetScenarioInputCell, WorksheetScenarios,
+    parse_worksheet_scenarios, write_worksheet_scenarios,
 };
 // Re-export shared formatting types
 pub use format::{
@@ -235,6 +247,10 @@ pub use printer_settings::{
     write_worksheet_printer_settings_reference,
 };
 pub use shared_strings::SharedStrings;
+pub use sheet_calculation_properties::{
+    WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
+    parse_worksheet_sheet_calculation_properties, write_worksheet_sheet_calculation_properties,
+};
 pub use sheet_format::{WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties};
 pub use sheet_properties::{
     WorksheetPageSetupProperties, WorksheetSheetProperties, WorksheetSynchronizationReference,

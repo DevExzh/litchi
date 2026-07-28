@@ -16,6 +16,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use super::RichTextRun;
 use super::auto_filter::{AutoFilterDefinition, parse_auto_filter};
 use super::cell::{Cell, CellIterator as XlsxCellIterator, RowIterator as XlsxRowIterator};
+use super::cell_watches::{WorksheetCellWatches, parse_worksheet_cell_watches};
 use super::comments::parse_comments_xml;
 use super::conditional_formatting::{
     ConditionalFormatting as ParsedConditionalFormatting,
@@ -43,6 +44,10 @@ use super::print_options::{WorksheetPrintOptions, parse_worksheet_print_options}
 use super::query_table::{
     QUERY_TABLE_CONTENT_TYPE, WorksheetQueryTable, is_query_table_relationship_type,
     parse_query_table,
+};
+use super::scenarios::{WorksheetScenarios, parse_worksheet_scenarios};
+use super::sheet_calculation_properties::{
+    WorksheetSheetCalculationProperties, parse_worksheet_sheet_calculation_properties,
 };
 use super::sheet_format::{
     WorksheetSheetFormatProperties, parse_worksheet_sheet_format_properties,
@@ -282,6 +287,12 @@ pub struct Worksheet<'a> {
     sheet_format_properties: Option<WorksheetSheetFormatProperties>,
     /// User-reviewed worksheet error-checking exceptions.
     ignored_errors: Option<WorksheetIgnoredErrors>,
+    /// Watch-window cell references tracked by the worksheet.
+    cell_watches: Option<WorksheetCellWatches>,
+    /// Worksheet-level calculation properties from `sheetCalcPr`.
+    sheet_calculation_properties: Option<WorksheetSheetCalculationProperties>,
+    /// Worksheet what-if scenario collection.
+    scenarios: Option<WorksheetScenarios>,
     /// Effective worksheet outline and summary-placement policy.
     outline_properties: Option<WorksheetOutlineProperties>,
     /// Complete worksheet-level properties from `sheetPr`.
@@ -334,6 +345,9 @@ impl<'a> Worksheet<'a> {
             complete_page_setup: None,
             sheet_format_properties: None,
             ignored_errors: None,
+            cell_watches: None,
+            sheet_calculation_properties: None,
+            scenarios: None,
             outline_properties: None,
             sheet_properties: None,
             phonetic_properties: None,
@@ -464,6 +478,10 @@ impl<'a> Worksheet<'a> {
         let sheet_format_properties =
             parse_worksheet_sheet_format_properties(sheet_data.as_bytes())?;
         let ignored_errors = parse_worksheet_ignored_errors(sheet_data.as_bytes())?;
+        let cell_watches = parse_worksheet_cell_watches(sheet_data.as_bytes())?;
+        let sheet_calculation_properties =
+            parse_worksheet_sheet_calculation_properties(sheet_data.as_bytes())?;
+        let scenarios = parse_worksheet_scenarios(sheet_data.as_bytes())?;
         let sheet_properties = parse_worksheet_sheet_properties(sheet_data.as_bytes())?;
         let phonetic_properties = parse_worksheet_phonetic_properties(sheet_data.as_bytes())?;
         let data_consolidation = parse_worksheet_data_consolidation(sheet_data.as_bytes())?;
@@ -508,6 +526,9 @@ impl<'a> Worksheet<'a> {
         self.complete_page_setup = complete_page_setup;
         self.sheet_format_properties = sheet_format_properties;
         self.ignored_errors = ignored_errors;
+        self.cell_watches = cell_watches;
+        self.sheet_calculation_properties = sheet_calculation_properties;
+        self.scenarios = scenarios;
         self.outline_properties = outline_properties;
         self.sheet_properties = sheet_properties;
         self.phonetic_properties = phonetic_properties;
@@ -2069,6 +2090,27 @@ impl<'a> Worksheet<'a> {
     /// User-reviewed worksheet error-checking exceptions, when present.
     pub fn ignored_errors(&self) -> Option<&WorksheetIgnoredErrors> {
         self.ignored_errors.as_ref()
+    }
+
+    // ===== Cell Watches =====
+
+    /// Watch-window cell references tracked by the worksheet, when present.
+    pub fn cell_watches(&self) -> Option<&WorksheetCellWatches> {
+        self.cell_watches.as_ref()
+    }
+
+    // ===== Sheet Calculation Properties =====
+
+    /// Worksheet-level calculation properties, when `sheetCalcPr` is present.
+    pub fn sheet_calculation_properties(&self) -> Option<&WorksheetSheetCalculationProperties> {
+        self.sheet_calculation_properties.as_ref()
+    }
+
+    // ===== Scenarios =====
+
+    /// Worksheet what-if scenario collection, when present.
+    pub fn scenarios(&self) -> Option<&WorksheetScenarios> {
+        self.scenarios.as_ref()
     }
 
     // ===== Outline Properties =====
