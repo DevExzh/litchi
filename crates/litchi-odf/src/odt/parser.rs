@@ -692,7 +692,7 @@ fn validate_protection_key(value: &str) -> Result<()> {
             ));
         }
     }
-    if symbols == 0 || !symbols.is_multiple_of(4) || padding > 2 {
+    if symbols == 0 || symbols % 4 != 0 || padding > 2 {
         return Err(Error::InvalidFormat(
             "text:protection-key is not base64Binary".to_string(),
         ));

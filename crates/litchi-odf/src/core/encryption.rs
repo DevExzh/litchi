@@ -365,7 +365,7 @@ pub(crate) fn decrypt_entry(
         ManifestEncryptionAlgorithm::Aes128Cbc { .. }
             | ManifestEncryptionAlgorithm::Aes192Cbc { .. }
             | ManifestEncryptionAlgorithm::Aes256Cbc { .. }
-    ) && !ciphertext.len().is_multiple_of(16)
+    ) && ciphertext.len() % 16 != 0
     {
         return Err(encryption_failure());
     }
