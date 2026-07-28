@@ -41,6 +41,7 @@ use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
+use super::parts::grammar_cookies::GrammarCookieTables;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::rmd_threading::DocumentRmdThreading;
 use super::parts::saved_by::SavedByTable;
@@ -149,6 +150,8 @@ pub struct Document {
     list_templates: Option<ListTemplateTable>,
     /// Deferred strict spelling/grammar proofing metadata parse
     proofing_tables: Result<ProofingTables>,
+    /// Deferred strict grammar-checker cookie metadata parse
+    grammar_cookies: Result<GrammarCookieTables>,
     /// Deferred strict Word 97/2000 save-history metadata parse
     saved_by_table: Result<SavedByTable>,
     /// Deferred strict glossary-only AutoText metadata parse
@@ -304,6 +307,7 @@ impl Document {
         let list_names = ListNamesTable::parse(&fib, &table_stream)?;
         let list_templates = ListTemplateTable::parse(&fib, &table_stream)?;
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
+        let grammar_cookies = GrammarCookieTables::parse(&fib, &table_stream);
         let saved_by_table = SavedByTable::parse(&fib, &table_stream);
         let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream).and_then(|metadata| {
             if let Some(metadata) = &metadata {
@@ -409,6 +413,7 @@ impl Document {
             list_names,
             list_templates,
             proofing_tables,
+            grammar_cookies,
             saved_by_table,
             glossary_metadata,
             attached_glossary,
@@ -721,6 +726,16 @@ impl Document {
         self.proofing_tables
             .as_ref()
             .map_err(|error| DocError::Corrupted(format!("invalid proofing metadata: {error}")))
+    }
+
+    /// Strictly access current and legacy grammar-checker cookie tables.
+    ///
+    /// Parsing is deferred so nonconforming producer caches do not prevent the document's
+    /// primary text from opening. Cookie payloads remain opaque and are never interpreted.
+    pub fn grammar_cookie_tables(&self) -> Result<&GrammarCookieTables> {
+        self.grammar_cookies.as_ref().map_err(|error| {
+            DocError::Corrupted(format!("invalid grammar cookie metadata: {error}"))
+        })
     }
 
     /// Strictly access the ordered Word 97/2000 save history.

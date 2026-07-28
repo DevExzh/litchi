@@ -27,6 +27,7 @@ pub mod footnotes;
 pub mod form_fields;
 pub mod format_consistency;
 pub mod glossary;
+pub mod grammar_cookies;
 pub mod headers;
 pub mod hyperlinks;
 pub mod images;

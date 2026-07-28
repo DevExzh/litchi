@@ -1,10 +1,12 @@
-//! Word spelling and grammar proofing-state PLCFs.
+//! Word spelling, grammar, and language auto-detection proofing-state PLCFs.
 
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
 
 const SPELLING_FIB_INDEX: usize = 55;
 const GRAMMAR_FIB_INDEX: usize = 90;
+/// Table-pointer index of `fcPlcfLad`/`lcbPlcfLad` (MS-DOC 2.5.7 FibRgFcLcb2000).
+const LANGUAGE_DETECTION_FIB_INDEX: usize = 98;
 const MAX_PROOFING_ENTRIES: usize = 1_000_000;
 const MAX_PROOFING_TABLE_BYTES: usize = 4 + MAX_PROOFING_ENTRIES * 6;
 
@@ -27,9 +29,11 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 pub enum ProofingFeature {
     Spelling,
     Grammar,
+    /// Language auto-detection (`Plcflad`, MS-DOC 2.8.24).
+    LanguageAutoDetect,
 }
 
-/// Allowed `SPLS.splf` proofing states.
+/// Allowed `SPLS.splf` proofing states (MS-DOC 2.9.256).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum ProofingState {
@@ -38,6 +42,8 @@ pub enum ProofingState {
     Edit = 0x4,
     Foreign = 0x5,
     Clean = 0x7,
+    /// `splfNoLAD`: language auto-detection is disabled for the range.
+    NoLad = 0x8,
     Error = 0xA,
     RepeatWord = 0xB,
     UnknownWord = 0xC,
@@ -51,6 +57,7 @@ impl ProofingState {
             0x4 => Ok(Self::Edit),
             0x5 => Ok(Self::Foreign),
             0x7 => Ok(Self::Clean),
+            0x8 => Ok(Self::NoLad),
             0xA => Ok(Self::Error),
             0xB => Ok(Self::RepeatWord),
             0xC => Ok(Self::UnknownWord),
@@ -144,13 +151,30 @@ impl ProofingStatus {
                 if self.state == ProofingState::Error {
                     return Err(corrupted("SpellingSpls does not permit splfErrorMin"));
                 }
+                if self.state == ProofingState::NoLad {
+                    return Err(corrupted("SpellingSpls does not permit splfNoLAD"));
+                }
                 if self.extend || self.typo {
                     return Err(corrupted("SpellingSpls fExtend and fTypo must be zero"));
                 }
             },
             ProofingFeature::Grammar => {
+                if self.state == ProofingState::NoLad {
+                    return Err(corrupted("GrammarSpls does not permit splfNoLAD"));
+                }
                 if self.extend && !self.error {
                     return Err(corrupted("GrammarSpls fExtend requires fError"));
+                }
+            },
+            ProofingFeature::LanguageAutoDetect => {
+                if matches!(
+                    self.state,
+                    ProofingState::Error | ProofingState::RepeatWord | ProofingState::UnknownWord
+                ) {
+                    return Err(corrupted("LadSpls does not permit error states"));
+                }
+                if self.extend || self.typo {
+                    return Err(corrupted("LadSpls fExtend and fTypo must be zero"));
                 }
             },
         }
@@ -361,17 +385,19 @@ fn validate_entries(
     Ok(())
 }
 
-/// Optional spelling and grammar proofing tables for a document.
+/// Optional spelling, grammar, and language auto-detection proofing tables for a document.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProofingTables {
     spelling: Option<ProofingStateTable>,
     grammar: Option<ProofingStateTable>,
+    language_detection: Option<ProofingStateTable>,
 }
 
 impl ProofingTables {
     /// Create a pair of optional proofing tables.
     ///
-    /// Each supplied table must describe the matching proofing feature.
+    /// Each supplied table must describe the matching proofing feature. A
+    /// language auto-detection table can be added with [`ProofingTables::set`].
     pub fn try_new(
         spelling: Option<ProofingStateTable>,
         grammar: Option<ProofingStateTable>,
@@ -388,7 +414,11 @@ impl ProofingTables {
         {
             return Err(corrupted("grammar slot requires a Plcfgram table"));
         }
-        Ok(Self { spelling, grammar })
+        Ok(Self {
+            spelling,
+            grammar,
+            language_detection: None,
+        })
     }
 
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
@@ -411,6 +441,13 @@ impl ProofingTables {
                 ProofingFeature::Grammar,
                 maximum_cp,
             )?,
+            language_detection: parse_fib_table(
+                fib,
+                table_stream,
+                LANGUAGE_DETECTION_FIB_INDEX,
+                ProofingFeature::LanguageAutoDetect,
+                maximum_cp,
+            )?,
         })
     }
 
@@ -421,10 +458,16 @@ impl ProofingTables {
         self.grammar.as_ref()
     }
 
+    /// Language auto-detection state ranges (`Plcflad`, MS-DOC 2.8.24).
+    pub fn language_detection(&self) -> Option<&ProofingStateTable> {
+        self.language_detection.as_ref()
+    }
+
     pub fn get(&self, feature: ProofingFeature) -> Option<&ProofingStateTable> {
         match feature {
             ProofingFeature::Spelling => self.spelling(),
             ProofingFeature::Grammar => self.grammar(),
+            ProofingFeature::LanguageAutoDetect => self.language_detection(),
         }
     }
 
@@ -433,6 +476,7 @@ impl ProofingTables {
         match table.feature() {
             ProofingFeature::Spelling => self.spelling.replace(table),
             ProofingFeature::Grammar => self.grammar.replace(table),
+            ProofingFeature::LanguageAutoDetect => self.language_detection.replace(table),
         }
     }
 
@@ -441,6 +485,7 @@ impl ProofingTables {
         match feature {
             ProofingFeature::Spelling => self.spelling.take(),
             ProofingFeature::Grammar => self.grammar.take(),
+            ProofingFeature::LanguageAutoDetect => self.language_detection.take(),
         }
     }
 }
@@ -562,5 +607,106 @@ mod tests {
         assert!(ProofingStatus::from_raw(ProofingFeature::Grammar, 0x25).is_err());
         assert!(ProofingStatus::from_raw(ProofingFeature::Grammar, 0x1A).is_ok());
         assert!(ProofingStatus::from_raw(ProofingFeature::Grammar, 0x33).is_ok());
+    }
+
+    /// `Plcflad` sample: three LadSpls ranges ending at CP 40.
+    const POI_LANGUAGE_DETECTION: [u8; 22] = [
+        0, 0, 0, 0, 12, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0, 7, 0, 8, 0, 4, 0,
+    ];
+
+    #[test]
+    fn parses_and_round_trips_language_detection_table() {
+        let table = ProofingStateTable::parse_bytes(
+            ProofingFeature::LanguageAutoDetect,
+            &POI_LANGUAGE_DETECTION,
+        )
+        .unwrap();
+        assert_eq!(table.feature(), ProofingFeature::LanguageAutoDetect);
+        assert_eq!(table.terminal_cp(), 40);
+        assert_eq!(table.len(), 3);
+        assert_eq!(
+            table.range(0).unwrap().status().state(),
+            ProofingState::Clean
+        );
+        assert_eq!(
+            table.range(1).unwrap().status().state(),
+            ProofingState::NoLad
+        );
+        assert_eq!(
+            table.range(2).unwrap().status().state(),
+            ProofingState::Edit
+        );
+        assert_eq!(
+            table.to_bytes().unwrap(),
+            POI_LANGUAGE_DETECTION
+        );
+    }
+
+    #[test]
+    fn enforces_language_detection_state_restrictions() {
+        // splfNoLAD is exclusive to language auto-detection.
+        assert!(ProofingStatus::from_raw(ProofingFeature::Spelling, 0x8).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::Grammar, 0x8).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::LanguageAutoDetect, 0x8).is_ok());
+        // LadSpls forbids the error states and the fExtend/fTypo flags.
+        assert!(ProofingStatus::from_raw(ProofingFeature::LanguageAutoDetect, 0x1A).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::LanguageAutoDetect, 0x1B).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::LanguageAutoDetect, 0x27).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::LanguageAutoDetect, 0x47).is_err());
+        assert!(ProofingStatus::from_raw(ProofingFeature::LanguageAutoDetect, 0x13).is_ok());
+    }
+
+    fn fib_with_lad_pointer(offset: u32, length: u32) -> FileInformationBlock {
+        let mut data = vec![0u8; 154 + 99 * 8];
+        data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+        data[2..4].copy_from_slice(&0x00D9u16.to_le_bytes());
+        data[152..154].copy_from_slice(&99u16.to_le_bytes());
+        // FibRgLw97.ccpText at offset 0x4C bounds proofing CPs.
+        data[0x4C..0x50].copy_from_slice(&100u32.to_le_bytes());
+        let pointer = 154 + LANGUAGE_DETECTION_FIB_INDEX * 8;
+        data[pointer..pointer + 4].copy_from_slice(&offset.to_le_bytes());
+        data[pointer + 4..pointer + 8].copy_from_slice(&length.to_le_bytes());
+        FileInformationBlock::parse(&data).unwrap()
+    }
+
+    #[test]
+    fn parses_language_detection_table_through_fib() {
+        let fib = fib_with_lad_pointer(4, POI_LANGUAGE_DETECTION.len() as u32);
+        let mut table_stream = vec![0u8; 4];
+        table_stream.extend_from_slice(&POI_LANGUAGE_DETECTION);
+        let tables = ProofingTables::parse(&fib, &table_stream).unwrap();
+        assert!(tables.spelling().is_none());
+        assert!(tables.grammar().is_none());
+        let lad = tables.language_detection().unwrap();
+        assert_eq!(lad.len(), 3);
+        assert_eq!(
+            tables.get(ProofingFeature::LanguageAutoDetect).unwrap(),
+            lad
+        );
+    }
+
+    #[test]
+    fn rejects_language_detection_cp_beyond_document_parts() {
+        let fib = fib_with_lad_pointer(0, POI_LANGUAGE_DETECTION.len() as u32);
+        let mut bytes = POI_LANGUAGE_DETECTION.to_vec();
+        bytes[12..16].copy_from_slice(&500u32.to_le_bytes());
+        assert!(ProofingTables::parse(&fib, &bytes).is_err());
+    }
+
+    #[test]
+    fn language_detection_slot_round_trips_through_set_and_remove() {
+        let lad = ProofingStateTable::parse_bytes(
+            ProofingFeature::LanguageAutoDetect,
+            &POI_LANGUAGE_DETECTION,
+        )
+        .unwrap();
+        let mut tables = ProofingTables::default();
+        assert!(tables.set(lad.clone()).is_none());
+        assert_eq!(tables.language_detection(), Some(&lad));
+        assert_eq!(
+            tables.remove(ProofingFeature::LanguageAutoDetect),
+            Some(lad)
+        );
+        assert!(tables.language_detection().is_none());
     }
 }

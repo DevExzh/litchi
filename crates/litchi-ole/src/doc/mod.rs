@@ -188,6 +188,10 @@ pub use parts::mail_merge::{
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat, ParagraphListBinding};
 pub use parts::ole_controls::{DocumentOleControls, OleControlInfo};
 pub use parts::pap::ParagraphConditionalFormatting;
+pub use parts::grammar_cookies::{
+    CookieElement, CookieEntry, CookieErrorType, GrammarCookie, GrammarCookiePlc,
+    GrammarCookieTable, GrammarCookieTables, LegacyGrammarCookie, LegacyGrammarCookieTable,
+};
 pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
     ProofingStatus, ProofingTables,
