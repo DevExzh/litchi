@@ -349,6 +349,7 @@ struct State {
     cell_boundaries: SmallVec<[i32; 8]>,
     table_style: Option<u16>,
     table_rsid: Option<u32>,
+    table_row_revision: crate::RevisionMetadata,
     table_row_padding: crate::TableEdgeDistances,
     table_row_spacing: crate::TableEdgeDistances,
     table_row_positioning: crate::FloatingTablePosition,
@@ -374,6 +375,7 @@ struct State {
     pending_cell_spacing: crate::TableEdgeDistances,
     pending_cell_layout: crate::TableCellLayout,
     pending_cell_merge: crate::TableCellMergeState,
+    pending_cell_revision: Option<crate::CellRevision>,
     pending_cell_borders: crate::TableCellBorders,
     pending_cell_shading: crate::TableShading,
     pending_cell_width_unit: Option<crate::TablePreferredWidthUnit>,
@@ -385,6 +387,7 @@ struct State {
     cell_distances: SmallVec<[(crate::TableEdgeDistances, crate::TableEdgeDistances); 8]>,
     cell_layouts: SmallVec<[crate::TableCellLayout; 8]>,
     cell_merges: SmallVec<[crate::TableCellMergeState; 8]>,
+    cell_revisions: SmallVec<[Option<crate::CellRevision>; 8]>,
     cell_decorations: SmallVec<[(crate::TableCellBorders, crate::TableShading); 8]>,
     cell_widths: SmallVec<[Option<crate::TablePreferredWidth>; 8]>,
     /// Current destination (for skipping non-document content)
@@ -436,11 +439,12 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::ColumnSpaceRight(_)
             | ControlWord::ColumnSeparator(_)
             | ControlWord::PageNumberStart(_)
-            | ControlWord::PageNumberDecimal
-            | ControlWord::PageNumberUpperRoman
-            | ControlWord::PageNumberLowerRoman
-            | ControlWord::PageNumberUpperLetter
-            | ControlWord::PageNumberLowerLetter
+            | ControlWord::PageNumberFormat(_)
+            | ControlWord::PageNumberRestart(_)
+            | ControlWord::PageNumberOffsetX(_)
+            | ControlWord::PageNumberOffsetY(_)
+            | ControlWord::SectionRevisionAuthor(_)
+            | ControlWord::SectionRevisionDate(_)
             | ControlWord::VerticalAlignTop
             | ControlWord::VerticalAlignCenter
             | ControlWord::VerticalAlignJustify
@@ -869,6 +873,36 @@ fn table_style_reference(value: Option<i32>) -> RtfResult<u16> {
     })
 }
 
+/// Validate a structural revision-author index (`prauth`, `srauth`,
+/// `trauth`, or a `\cl*auth` control).
+fn nonnegative_author_index(value: i32, name: &str) -> RtfResult<i32> {
+    if value < 0 {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF {name} revision author index cannot be negative"
+        )));
+    }
+    Ok(value)
+}
+
+/// The pending cell revision of the given kind, requiring the matching
+/// `\clins`, `\cldel`, or `\clmrgd` marker to have appeared first.
+fn pending_cell_revision<'a>(
+    state: &'a mut State,
+    kind: crate::CellRevisionKind,
+    name: &str,
+) -> RtfResult<&'a mut crate::CellRevision> {
+    state
+        .pending_cell_revision
+        .as_mut()
+        .filter(|revision| revision.kind == kind)
+        .ok_or_else(|| {
+            RtfError::MalformedDocument(format!(
+                "RTF {name} requires a preceding \\{} cell revision marker",
+                kind.control_word(),
+            ))
+        })
+}
+
 fn associated_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
     match value {
         None | Some(1) => Ok(true),
@@ -1005,6 +1039,7 @@ impl Default for State {
             cell_boundaries: SmallVec::new(),
             table_style: None,
             table_rsid: None,
+            table_row_revision: crate::RevisionMetadata::default(),
             table_row_padding: Default::default(),
             table_row_spacing: Default::default(),
             table_row_positioning: Default::default(),
@@ -1030,6 +1065,7 @@ impl Default for State {
             pending_cell_spacing: Default::default(),
             pending_cell_layout: Default::default(),
             pending_cell_merge: Default::default(),
+            pending_cell_revision: None,
             pending_cell_borders: Default::default(),
             pending_cell_shading: Default::default(),
             pending_cell_width_unit: None,
@@ -1041,6 +1077,7 @@ impl Default for State {
             cell_distances: SmallVec::new(),
             cell_layouts: SmallVec::new(),
             cell_merges: SmallVec::new(),
+            cell_revisions: SmallVec::new(),
             cell_decorations: SmallVec::new(),
             cell_widths: SmallVec::new(),
             destination: Destination::DocumentBody,
@@ -7609,6 +7646,12 @@ impl<'a> Parser<'a> {
             ControlWord::ParagraphRsid(value) => {
                 state.paragraph.paragraph_rsid = Some(*value as u32);
             },
+            ControlWord::ParagraphRevisionAuthor(value) => {
+                state.paragraph.revision.author = Some(nonnegative_author_index(*value, "prauth")?);
+            },
+            ControlWord::ParagraphRevisionDate(value) => {
+                state.paragraph.revision.date = Some(*value);
+            },
             ControlWord::OutlineLevel(value) => {
                 let level = u8::try_from(*value).ok().filter(|level| *level <= 9).ok_or_else(|| {
                     RtfError::MalformedDocument(
@@ -7903,6 +7946,23 @@ impl<'a> Parser<'a> {
                     state.table_rsid = Some(*value as u32);
                 }
             },
+            ControlWord::TableRowRevisionAuthor(value) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    state.table_row_revision.author =
+                        Some(nonnegative_author_index(*value, "trauth")?);
+                }
+            },
+            ControlWord::TableRowRevisionDate(value) => {
+                if matches!(
+                    state.destination,
+                    Destination::DocumentBody | Destination::NestedTableProperties
+                ) {
+                    state.table_row_revision.date = Some(*value);
+                }
+            },
             ControlWord::TableRowDefaults => {
                 // Start a new row definition
                 state.cell_boundaries.clear();
@@ -7918,6 +7978,7 @@ impl<'a> Parser<'a> {
                 state.table_row_geometry = Default::default();
                 state.table_autoformat_flags = Default::default();
                 state.table_row_banding = Default::default();
+                state.table_row_revision = Default::default();
                 state.table_row_index_seen = false;
                 state.table_row_band_index_seen = false;
                 state.table_last_row_seen = false;
@@ -7933,6 +7994,7 @@ impl<'a> Parser<'a> {
                 state.pending_cell_spacing = Default::default();
                 state.pending_cell_layout = Default::default();
                 state.pending_cell_merge = Default::default();
+                state.pending_cell_revision = None;
                 state.pending_cell_borders = Default::default();
                 state.pending_cell_shading = Default::default();
                 state.pending_cell_width_unit = None;
@@ -7944,6 +8006,7 @@ impl<'a> Parser<'a> {
                 state.cell_distances.clear();
                 state.cell_layouts.clear();
                 state.cell_merges.clear();
+                state.cell_revisions.clear();
                 state.cell_decorations.clear();
                 state.cell_widths.clear();
                 let destination = state.destination;
@@ -8188,6 +8251,31 @@ impl<'a> Parser<'a> {
                     ));
                 }
             },
+            ControlWord::CellRevisionMark(kind) => match &mut state.pending_cell_revision {
+                Some(revision) if revision.kind != *kind => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF cell definition has conflicting revision markers".to_string(),
+                    ));
+                },
+                Some(_) => {},
+                slot @ None => {
+                    *slot = Some(crate::CellRevision {
+                        kind: *kind,
+                        metadata: crate::RevisionMetadata::default(),
+                    });
+                },
+            },
+            ControlWord::CellRevisionAuthor(kind, value) => {
+                let revision = pending_cell_revision(state, *kind, kind.author_control_word())?;
+                revision.metadata.author = Some(nonnegative_author_index(
+                    *value,
+                    kind.author_control_word(),
+                )?);
+            },
+            ControlWord::CellRevisionDate(kind, value) => {
+                let revision = pending_cell_revision(state, *kind, kind.date_control_word())?;
+                revision.metadata.date = Some(*value);
+            },
             ControlWord::TableRightToLeft(value) => {
                 let direction = Some(if *value {
                     TextDirection::RightToLeft
@@ -8231,6 +8319,9 @@ impl<'a> Parser<'a> {
                 state
                     .cell_merges
                     .push(std::mem::take(&mut state.pending_cell_merge));
+                state
+                    .cell_revisions
+                    .push(state.pending_cell_revision.take());
                 state.cell_decorations.push((
                     std::mem::take(&mut state.pending_cell_borders),
                     std::mem::take(&mut state.pending_cell_shading),
@@ -8382,10 +8473,12 @@ impl<'a> Parser<'a> {
                 let row_shading = state.table_row_shading;
                 let autoformat_flags = state.table_autoformat_flags;
                 let banding = state.table_row_banding;
+                let row_revision = state.table_row_revision;
                 let boundaries = state.cell_boundaries.clone();
                 let cell_distances = state.cell_distances.clone();
                 let cell_layouts = state.cell_layouts.clone();
                 let cell_merges = state.cell_merges.clone();
+                let cell_revisions = state.cell_revisions.clone();
                 let cell_decorations = state.cell_decorations.clone();
                 let cell_widths = state.cell_widths.clone();
                 let _ = state;
@@ -8408,6 +8501,9 @@ impl<'a> Parser<'a> {
                         if let Some(merge) = cell_merges.get(index) {
                             cell.set_merge(*merge);
                         }
+                        if let Some(revision) = cell_revisions.get(index) {
+                            cell.set_revision(*revision);
+                        }
                         cell.set_right_boundary(boundaries.get(index).copied());
                         cell.set_preferred_width(cell_widths.get(index).copied().flatten());
                         if let Some((borders, shading)) = cell_decorations.get(index) {
@@ -8427,6 +8523,7 @@ impl<'a> Parser<'a> {
                     row.set_geometry(row_geometry);
                     row.set_autoformat_flags(autoformat_flags);
                     row.set_banding(banding);
+                    row.set_revision(row_revision);
                 }
                 self.finalize_row()?;
             },
@@ -8664,9 +8761,7 @@ impl<'a> Parser<'a> {
     }
 
     fn apply_section_control(&mut self, control: &ControlWord<'_>) -> RtfResult<bool> {
-        use super::section::{
-            PageNumberFormat, PageOrientation, SectionBreakType, VerticalAlignment,
-        };
+        use super::section::{PageOrientation, SectionBreakType, VerticalAlignment};
 
         let is_line_numbering_control = matches!(
             control,
@@ -9008,20 +9103,23 @@ impl<'a> Parser<'a> {
                 }
             },
             ControlWord::PageNumberStart(value) => properties.page_number_start = *value,
-            ControlWord::PageNumberDecimal => {
-                properties.page_number_format = PageNumberFormat::Decimal;
+            ControlWord::PageNumberFormat(format) => {
+                properties.page_number_format = *format;
             },
-            ControlWord::PageNumberUpperRoman => {
-                properties.page_number_format = PageNumberFormat::UpperRoman;
+            ControlWord::PageNumberRestart(restart) => {
+                properties.page_number_restart = Some(*restart);
             },
-            ControlWord::PageNumberLowerRoman => {
-                properties.page_number_format = PageNumberFormat::LowerRoman;
+            ControlWord::PageNumberOffsetX(value) => {
+                properties.page_number_offset_x = Some(*value);
             },
-            ControlWord::PageNumberUpperLetter => {
-                properties.page_number_format = PageNumberFormat::UpperLetter;
+            ControlWord::PageNumberOffsetY(value) => {
+                properties.page_number_offset_y = Some(*value);
             },
-            ControlWord::PageNumberLowerLetter => {
-                properties.page_number_format = PageNumberFormat::LowerLetter;
+            ControlWord::SectionRevisionAuthor(value) => {
+                properties.revision.author = Some(nonnegative_author_index(*value, "srauth")?);
+            },
+            ControlWord::SectionRevisionDate(value) => {
+                properties.revision.date = Some(*value);
             },
             ControlWord::VerticalAlignTop => {
                 properties.vertical_alignment = VerticalAlignment::Top;
@@ -14122,6 +14220,12 @@ impl<'a> Parser<'a> {
             ControlWord::ParagraphRsid(value) => {
                 state.paragraph.paragraph_rsid = Some(*value as u32);
             },
+            ControlWord::ParagraphRevisionAuthor(value) => {
+                state.paragraph.revision.author = Some(nonnegative_author_index(*value, "prauth")?);
+            },
+            ControlWord::ParagraphRevisionDate(value) => {
+                state.paragraph.revision.date = Some(*value);
+            },
             ControlWord::OutlineLevel(value) => {
                 let level = u8::try_from(*value).ok().filter(|level| *level <= 9).ok_or_else(|| {
                     RtfError::MalformedDocument(
@@ -16593,6 +16697,9 @@ impl<'a> Parser<'a> {
             if let Some(merge) = state.cell_merges.get(index) {
                 cell.set_merge(*merge);
             }
+            if let Some(revision) = state.cell_revisions.get(index) {
+                cell.set_revision(*revision);
+            }
             cell.set_right_boundary(state.cell_boundaries.get(index).copied());
             cell.set_preferred_width(state.cell_widths.get(index).copied().flatten());
             if let Some((borders, shading)) = state.cell_decorations.get(index) {
@@ -16616,6 +16723,7 @@ impl<'a> Parser<'a> {
             .row
             .set_autoformat_flags(state.table_autoformat_flags);
         builder.row.set_banding(state.table_row_banding);
+        builder.row.set_revision(state.table_row_revision);
         if builder.table.row_count() >= MAX_LOGICAL_TABLE_ROWS {
             return Err(RtfError::MalformedDocument(
                 "RTF logical table exceeds 65536 rows".to_string(),

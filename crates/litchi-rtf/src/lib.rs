@@ -279,9 +279,9 @@ pub use revision_save::RevisionSaveMetadata;
 pub use section::{
     HeaderFooter, HeaderFooterParagraph, HeaderFooterType, MAX_SECTION_COLUMN_TWIPS,
     MAX_SECTION_COLUMNS, MAX_SECTION_LINE_DISTANCE, MAX_SECTION_LINE_INCREMENT,
-    MAX_SECTION_LINE_START, Note, PageNumberFormat, PageOrientation, Section, SectionBreakType,
-    SectionColumn, SectionColumns, SectionLineNumberRestart, SectionLineNumbering,
-    SectionProperties, VerticalAlignment,
+    MAX_SECTION_LINE_START, Note, PageNumberFormat, PageNumberRestart, PageOrientation, Section,
+    SectionBreakType, SectionColumn, SectionColumns, SectionLineNumberRestart,
+    SectionLineNumbering, SectionProperties, VerticalAlignment,
 };
 pub use section::{SectionFootnotePlacement, SectionNoteOptions};
 pub use shape::{
@@ -294,8 +294,8 @@ pub use shape::{
 pub use style_list_filter::{DocumentStyleListFilter, DocumentStyleSortMethod};
 pub use stylesheet::{Style, StyleSheet, StyleType};
 pub use table::{
-    Cell, CellNestedTable, CellStoryEvent, CellStoryReference, FloatingTablePosition,
-    TableCellCoordinate, TableCellPath,
+    Cell, CellNestedTable, CellRevision, CellRevisionKind, CellStoryEvent, CellStoryReference,
+    FloatingTablePosition, TableCellCoordinate, TableCellPath,
     MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_DISTANCE_TWIPS,
     MAX_TABLE_GEOMETRY_TWIPS, MAX_TABLE_NESTING_DEPTH, MAX_TABLE_ROW_INDEX,
     MAX_TABLE_WIDTH_PERCENT, Row, Table, TableAutoformatFlag, TableAutoformatFlags,
@@ -315,8 +315,8 @@ pub use types::{
     DocumentElement, EmbeddedFont, EmbeddedFontFormat, Font, FontFamily, FontPitch, FontRef,
     FontTable, FontTheme, Formatting, Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph,
     ParagraphContent, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
-    ParagraphLineBreaking, ParagraphLogicalIndentation, ParagraphSpacingPolicy,
-    ParagraphWrapping, Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
+    ParagraphLineBreaking, ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping,
+    RevisionMetadata, Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
 };
 pub use user_property::{UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue};
 pub use window_caption::{DocumentWindowCaption, MAX_WINDOW_CAPTION_BYTES};

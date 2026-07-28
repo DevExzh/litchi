@@ -240,6 +240,54 @@ pub struct TableCellMergeState {
     pub vertical: Option<TableCellMergeRole>,
 }
 
+/// Kind of tracked-change revision attached to one table cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CellRevisionKind {
+    /// The cell was inserted as a revision (`\clins`).
+    Inserted,
+    /// The cell was deleted as a revision (`\cldel`).
+    Deleted,
+    /// The cell was removed by a merge revision (`\clmrgd`).
+    MergeDeleted,
+}
+
+impl CellRevisionKind {
+    /// The RTF control word that marks this revision kind.
+    pub const fn control_word(self) -> &'static str {
+        match self {
+            Self::Inserted => "clins",
+            Self::Deleted => "cldel",
+            Self::MergeDeleted => "clmrgd",
+        }
+    }
+
+    /// The RTF control word carrying this revision's author index.
+    pub const fn author_control_word(self) -> &'static str {
+        match self {
+            Self::Inserted => "clinsauth",
+            Self::Deleted => "cldelauth",
+            Self::MergeDeleted => "clmrgdauth",
+        }
+    }
+
+    /// The RTF control word carrying this revision's packed DTTM timestamp.
+    pub const fn date_control_word(self) -> &'static str {
+        match self {
+            Self::Inserted => "clinsdttm",
+            Self::Deleted => "cldeldttm",
+            Self::MergeDeleted => "clmrgddttm",
+        }
+    }
+}
+
+/// Tracked-change revision attached to one table cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CellRevision {
+    pub kind: CellRevisionKind,
+    /// Author/date metadata from the matching `\cl*authN`/`\cl*dttmN` pair.
+    pub metadata: crate::RevisionMetadata,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableHorizontalReference {
     Column,
@@ -712,6 +760,9 @@ pub struct Row<'a> {
     geometry: TableRowGeometry,
     autoformat_flags: TableAutoformatFlags,
     banding: TableRowBanding,
+    /// Author/date metadata for the revision that changed this row
+    /// (`\trauthN`, `\trdateN`).
+    revision: crate::RevisionMetadata,
 }
 
 impl<'a> Row<'a> {
@@ -731,6 +782,7 @@ impl<'a> Row<'a> {
             geometry: Default::default(),
             autoformat_flags: Default::default(),
             banding: Default::default(),
+            revision: crate::RevisionMetadata::default(),
         }
     }
 
@@ -832,6 +884,13 @@ impl<'a> Row<'a> {
     pub fn set_banding(&mut self, value: TableRowBanding) {
         self.banding = value
     }
+    /// Author/date metadata for the revision that changed this row.
+    pub const fn revision(&self) -> crate::RevisionMetadata {
+        self.revision
+    }
+    pub fn set_revision(&mut self, value: crate::RevisionMetadata) {
+        self.revision = value
+    }
 }
 
 impl<'a> Default for Row<'a> {
@@ -853,6 +912,8 @@ pub struct Cell<'a> {
     merge: TableCellMergeState,
     right_boundary: Option<i32>,
     preferred_width: Option<TablePreferredWidth>,
+    /// Tracked-change revision attached to this cell, if any.
+    revision: Option<CellRevision>,
     nested_tables: Vec<CellNestedTable<'a>>,
     shapes: Vec<crate::Shape<'a>>,
     shape_groups: Vec<crate::ShapeGroup<'a>>,
@@ -932,6 +993,7 @@ impl<'a> Cell<'a> {
             merge: Default::default(),
             right_boundary: None,
             preferred_width: None,
+            revision: None,
             nested_tables: Vec::new(),
             shapes: Vec::new(),
             shape_groups: Vec::new(),
@@ -954,6 +1016,7 @@ impl<'a> Cell<'a> {
             merge: Default::default(),
             right_boundary: None,
             preferred_width: None,
+            revision: None,
             nested_tables: Vec::new(),
             shapes: Vec::new(),
             shape_groups: Vec::new(),
@@ -1013,6 +1076,13 @@ impl<'a> Cell<'a> {
     }
     pub fn set_preferred_width(&mut self, value: Option<TablePreferredWidth>) {
         self.preferred_width = value
+    }
+    /// Tracked-change revision attached to this cell, if any.
+    pub const fn revision(&self) -> Option<CellRevision> {
+        self.revision
+    }
+    pub fn set_revision(&mut self, value: Option<CellRevision>) {
+        self.revision = value
     }
     pub fn nested_tables(&self) -> &[CellNestedTable<'a>] {
         &self.nested_tables
@@ -1451,6 +1521,7 @@ impl Row<'_> {
             geometry: self.geometry,
             autoformat_flags: self.autoformat_flags,
             banding: self.banding,
+            revision: self.revision,
         }
     }
 }
@@ -1459,8 +1530,8 @@ impl Cell<'_> {
     /// Detach this cell from the source buffer, cloning any borrowed text.
     ///
     /// See [`Table::into_owned`]; merge roles, borders, shading, layout,
-    /// boundaries, preferred width, nested tables, shapes, and the story event
-    /// ordering are all preserved.
+    /// boundaries, preferred width, revision, nested tables, shapes, and the
+    /// story event ordering are all preserved.
     pub fn into_owned(self) -> Cell<'static> {
         Cell {
             text: Cow::Owned(self.text.into_owned()),
@@ -1472,6 +1543,7 @@ impl Cell<'_> {
             merge: self.merge,
             right_boundary: self.right_boundary,
             preferred_width: self.preferred_width,
+            revision: self.revision,
             nested_tables: self
                 .nested_tables
                 .into_iter()

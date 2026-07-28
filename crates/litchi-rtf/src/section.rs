@@ -184,6 +184,114 @@ pub enum PageNumberFormat {
     UpperLetter,
     /// Lowercase letters (a, b, c...)
     LowerLetter,
+    /// Bidi Arabic alphabetic (`\pgnbidia`)
+    BidiAlphabetic,
+    /// Bidi Arabic abjad (`\pgnbidib`)
+    BidiAbjad,
+    /// Korean Chosung (`\pgnchosung`)
+    KoreanChosung,
+    /// Enclosed circle numbers (`\pgncnum`)
+    Circle,
+    /// Kanji without the digit character (`\pgndbnum`)
+    KanjiDigitless,
+    /// Kanji with the digit character (`\pgndbnumd`)
+    KanjiWithDigit,
+    /// Kanji numbering 3 (`\pgndbnumt`)
+    KanjiThree,
+    /// Kanji numbering 4 (`\pgndbnumk`)
+    KanjiFour,
+    /// Double decimal numbering (`\pgndecd`)
+    DoubleDecimal,
+    /// Korean Ganada (`\pgnganada`)
+    KoreanGanada,
+    /// Chinese numbering 1 (`\pgngbnum`)
+    ChineseOne,
+    /// Chinese numbering 2 (`\pgngbnumd`)
+    ChineseTwo,
+    /// Chinese numbering 3 (`\pgngbnuml`)
+    ChineseThree,
+    /// Chinese numbering 4 (`\pgngbnumk`)
+    ChineseFour,
+    /// Hindi vowels (`\pgnhindia`)
+    HindiVowels,
+    /// Hindi consonants (`\pgnhindib`)
+    HindiConsonants,
+    /// Hindi numbers (`\pgnhindic`)
+    HindiNumbers,
+    /// Hindi descriptive (`\pgnhindid`)
+    HindiDescriptive,
+    /// Thai letters (`\pgnthaia`)
+    ThaiLetters,
+    /// Thai numbers (`\pgnthaib`)
+    ThaiNumbers,
+    /// Thai descriptive (`\pgnthaic`)
+    ThaiDescriptive,
+    /// Vietnamese cardinal (`\pgnvieta`)
+    VietnameseCardinal,
+    /// Zodiac numbering 1 (`\pgnzodiac`)
+    ZodiacOne,
+    /// Zodiac numbering 2 (`\pgnzodiacd`)
+    ZodiacTwo,
+    /// Zodiac numbering 3 (`\pgnzodiacl`)
+    ZodiacThree,
+}
+
+impl PageNumberFormat {
+    /// The RTF control word that selects this page-number format.
+    pub const fn control_word(self) -> &'static str {
+        match self {
+            Self::Decimal => "pgndec",
+            Self::UpperRoman => "pgnucrm",
+            Self::LowerRoman => "pgnlcrm",
+            Self::UpperLetter => "pgnucltr",
+            Self::LowerLetter => "pgnlcltr",
+            Self::BidiAlphabetic => "pgnbidia",
+            Self::BidiAbjad => "pgnbidib",
+            Self::KoreanChosung => "pgnchosung",
+            Self::Circle => "pgncnum",
+            Self::KanjiDigitless => "pgndbnum",
+            Self::KanjiWithDigit => "pgndbnumd",
+            Self::KanjiThree => "pgndbnumt",
+            Self::KanjiFour => "pgndbnumk",
+            Self::DoubleDecimal => "pgndecd",
+            Self::KoreanGanada => "pgnganada",
+            Self::ChineseOne => "pgngbnum",
+            Self::ChineseTwo => "pgngbnumd",
+            Self::ChineseThree => "pgngbnuml",
+            Self::ChineseFour => "pgngbnumk",
+            Self::HindiVowels => "pgnhindia",
+            Self::HindiConsonants => "pgnhindib",
+            Self::HindiNumbers => "pgnhindic",
+            Self::HindiDescriptive => "pgnhindid",
+            Self::ThaiLetters => "pgnthaia",
+            Self::ThaiNumbers => "pgnthaib",
+            Self::ThaiDescriptive => "pgnthaic",
+            Self::VietnameseCardinal => "pgnvieta",
+            Self::ZodiacOne => "pgnzodiac",
+            Self::ZodiacTwo => "pgnzodiacd",
+            Self::ZodiacThree => "pgnzodiacl",
+        }
+    }
+}
+
+/// Whether page numbering restarts at this section or continues from the
+/// preceding one (`\pgnrestart` / `\pgncont`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageNumberRestart {
+    /// Page numbers restart at the `\pgnstartsN` value.
+    Restart,
+    /// Page numbers continue from the preceding section.
+    Continuous,
+}
+
+impl PageNumberRestart {
+    /// The RTF control word that selects this restart behavior.
+    pub const fn control_word(self) -> &'static str {
+        match self {
+            Self::Restart => "pgnrestart",
+            Self::Continuous => "pgncont",
+        }
+    }
 }
 
 /// Vertical alignment of text within a section
@@ -354,6 +462,15 @@ pub struct SectionProperties {
     pub page_number_start: i32,
     /// Page number format
     pub page_number_format: PageNumberFormat,
+    /// Explicit page-number restart behavior (`\pgnrestart` / `\pgncont`).
+    pub page_number_restart: Option<PageNumberRestart>,
+    /// Horizontal page-number position offset in twips (`\pgnxN`).
+    pub page_number_offset_x: Option<i32>,
+    /// Vertical page-number position offset in twips (`\pgnyN`).
+    pub page_number_offset_y: Option<i32>,
+    /// Author/date metadata for the revision that changed this section's
+    /// properties (`\srauthN`, `\srdateN`).
+    pub revision: crate::RevisionMetadata,
     /// Vertical alignment
     pub vertical_alignment: VerticalAlignment,
     /// Typed section line-numbering properties.
@@ -385,6 +502,10 @@ impl Default for SectionProperties {
             columns: SectionColumns::default(),
             page_number_start: 1,
             page_number_format: PageNumberFormat::default(),
+            page_number_restart: None,
+            page_number_offset_x: None,
+            page_number_offset_y: None,
+            revision: crate::RevisionMetadata::default(),
             vertical_alignment: VerticalAlignment::default(),
             line_numbering: SectionLineNumbering::default(),
             note_options: SectionNoteOptions::default(),

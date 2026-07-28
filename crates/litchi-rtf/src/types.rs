@@ -609,6 +609,33 @@ impl ParagraphDropCap {
     }
 }
 
+/// Author and packed DTTM timestamp attached to a structural revision
+/// marker such as `\prauthN`/`\prdateN` or `\srauthN`/`\srdateN`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RevisionMetadata {
+    /// Index into the document's revision-author table (`revtbl`).
+    pub author: Option<i32>,
+    /// Packed signed RTF DTTM value, as used by `\revdttmN`.
+    pub date: Option<i32>,
+}
+
+impl RevisionMetadata {
+    /// Whether neither an author nor a date was authored.
+    pub fn is_empty(&self) -> bool {
+        self.author.is_none() && self.date.is_none()
+    }
+
+    /// Validate the author index against the RTF domain.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.author.is_some_and(|author| author < 0) {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Paragraph properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Paragraph {
@@ -657,6 +684,9 @@ pub struct Paragraph {
     pub list_level: Option<u8>,
     /// Index into the document's ordered inert legacy `pn` record table.
     pub legacy_numbering: Option<u32>,
+    /// Author/date metadata for the revision that inserted this paragraph
+    /// (`\prauthN`, `\prdateN`).
+    pub revision: RevisionMetadata,
 }
 
 impl Paragraph {

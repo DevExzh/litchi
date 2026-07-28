@@ -21,6 +21,7 @@ fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> 
         owned_row.set_geometry(row.geometry());
         owned_row.set_autoformat_flags(row.autoformat_flags());
         owned_row.set_banding(row.banding());
+        owned_row.set_revision(row.revision());
         for cell in row.cells() {
             let mut owned_cell = super::table::Cell::with_distances(
                 Cow::Owned(cell.text().to_string()),
@@ -31,6 +32,7 @@ fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> 
             owned_cell.set_merge(cell.merge());
             owned_cell.set_right_boundary(cell.right_boundary());
             owned_cell.set_preferred_width(cell.preferred_width());
+            owned_cell.set_revision(cell.revision());
             owned_cell.set_borders(cell.borders().clone());
             owned_cell.set_shading(cell.shading());
             for nested in cell.nested_tables() {

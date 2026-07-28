@@ -6055,6 +6055,26 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
+    /// Write author/date metadata for a structural revision marker, after
+    /// validating the author index.
+    fn write_revision_metadata(
+        &mut self,
+        author_control: &'static str,
+        date_control: &'static str,
+        metadata: crate::RevisionMetadata,
+    ) -> io::Result<()> {
+        metadata
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if let Some(author) = metadata.author {
+            self.write_control_word(author_control, Some(author))?;
+        }
+        if let Some(date) = metadata.date {
+            self.write_control_word(date_control, Some(date))?;
+        }
+        Ok(())
+    }
+
     /// Write paragraph properties
     fn write_paragraph_properties(&mut self, para: &Paragraph) -> io::Result<()> {
         if let Some(paragraph_style) = para.paragraph_style {
@@ -6066,6 +6086,7 @@ impl<W: Write> RtfWriter<W> {
         if let Some(outline_level) = para.outline_level {
             self.write_control_word("outlinelevel", Some(i32::from(outline_level)))?;
         }
+        self.write_revision_metadata("prauth", "prdate", para.revision)?;
         self.write_legacy_paragraph_numbering(para.legacy_numbering)?;
         if let Some(direction) = para.direction {
             self.write_control_word(
@@ -6541,6 +6562,7 @@ impl<W: Write> RtfWriter<W> {
         if let Some(table_rsid) = row.table_rsid() {
             self.write_control_word("tblrsid", Some(table_rsid as i32))?;
         }
+        self.write_revision_metadata("trauth", "trdate", row.revision())?;
 
         if let Some(direction) = table_direction {
             self.write_control_word(
@@ -6562,6 +6584,7 @@ impl<W: Write> RtfWriter<W> {
         for (i, cell) in row.cells().iter().enumerate() {
             self.write_table_preferred_width("clftsWidth", "clwWidth", cell.preferred_width())?;
             self.write_table_cell_merge(cell)?;
+            self.write_table_cell_revision(cell)?;
             self.write_table_cell_layout(cell)?;
             self.write_table_cell_borders(cell.borders())?;
             self.write_table_shading("cl", cell.shading())?;
@@ -6698,6 +6721,7 @@ impl<W: Write> RtfWriter<W> {
             if let Some(table_rsid) = row.table_rsid() {
                 self.write_control_word("tblrsid", Some(table_rsid as i32))?;
             }
+            self.write_revision_metadata("trauth", "trdate", row.revision())?;
             if let Some(direction) = table.direction() {
                 self.write_control_word(
                     "taprtl",
@@ -6715,6 +6739,7 @@ impl<W: Write> RtfWriter<W> {
             for (index, cell) in row.cells().iter().enumerate() {
                 self.write_table_preferred_width("clftsWidth", "clwWidth", cell.preferred_width())?;
                 self.write_table_cell_merge(cell)?;
+                self.write_table_cell_revision(cell)?;
                 self.write_table_cell_layout(cell)?;
                 self.write_table_cell_borders(cell.borders())?;
                 self.write_table_shading("cl", cell.shading())?;
@@ -6960,6 +6985,18 @@ impl<W: Write> RtfWriter<W> {
                     crate::TableCellMergeRole::Continuation => "clvmrg",
                 },
                 None,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn write_table_cell_revision(&mut self, cell: &crate::Cell<'_>) -> io::Result<()> {
+        if let Some(revision) = cell.revision() {
+            self.write_control_word(revision.kind.control_word(), None)?;
+            self.write_revision_metadata(
+                revision.kind.author_control_word(),
+                revision.kind.date_control_word(),
+                revision.metadata,
             )?;
         }
         Ok(())
@@ -7658,6 +7695,11 @@ impl<W: Write> RtfWriter<W> {
         if let Some(section_rsid) = section.properties.section_rsid {
             self.write_control_word("sectrsid", Some(section_rsid as i32))?;
         }
+        self.write_revision_metadata(
+            "srauth",
+            "srdate",
+            section.properties.revision,
+        )?;
         if section.properties.title_page {
             self.write_control_word("titlepg", None)?;
         }
@@ -7719,15 +7761,18 @@ impl<W: Write> RtfWriter<W> {
         }
         self.write_control_word("pgnstarts", Some(section.properties.page_number_start))?;
         self.write_control_word(
-            match section.properties.page_number_format {
-                PageNumberFormat::Decimal => "pgndec",
-                PageNumberFormat::UpperRoman => "pgnucrm",
-                PageNumberFormat::LowerRoman => "pgnlcrm",
-                PageNumberFormat::UpperLetter => "pgnucltr",
-                PageNumberFormat::LowerLetter => "pgnlcltr",
-            },
+            section.properties.page_number_format.control_word(),
             None,
         )?;
+        if let Some(restart) = section.properties.page_number_restart {
+            self.write_control_word(restart.control_word(), None)?;
+        }
+        if let Some(offset_x) = section.properties.page_number_offset_x {
+            self.write_control_word("pgnx", Some(offset_x))?;
+        }
+        if let Some(offset_y) = section.properties.page_number_offset_y {
+            self.write_control_word("pgny", Some(offset_y))?;
+        }
         self.write_control_word(
             match section.properties.vertical_alignment {
                 VerticalAlignment::Top => "vertalt",
