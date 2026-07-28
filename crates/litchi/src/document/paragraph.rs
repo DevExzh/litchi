@@ -13,6 +13,7 @@ use crate::ooxml;
 
 /// A paragraph in a Word document.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
 pub enum Paragraph {
     #[cfg(feature = "ole")]
     Doc(ole::doc::Paragraph),

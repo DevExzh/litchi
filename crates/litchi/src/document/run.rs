@@ -12,6 +12,7 @@ use crate::ooxml;
 
 /// A text run in a paragraph.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
 pub enum Run {
     #[cfg(feature = "ole")]
     Doc(ole::doc::Run),
