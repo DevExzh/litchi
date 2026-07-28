@@ -125,6 +125,7 @@ pub mod text_extensions;
 pub mod text_interaction;
 pub mod text_metachar;
 pub mod text_si_exception;
+pub mod text_special_info;
 pub mod view_set_info;
 pub mod text_prop;
 pub mod text_ruler;
@@ -322,6 +323,10 @@ pub use text_interaction::{
 pub use text_metachar::{PowerPointMetacharKind, PowerPointTextMetachar};
 pub use text_si_exception::{
     PowerPointOutlineTextRef, PowerPointSpellingFlags, PowerPointTextSpecialInfoDefaults,
+};
+pub use text_special_info::{
+    PowerPointMasterTextPropLevels, PowerPointMasterTextPropRun, PowerPointTextSIException,
+    PowerPointTextSIRun, PowerPointTextSpecialInfoRuns,
 };
 pub use view_set_info::{
     PowerPointNormalViewSet, PowerPointNormalViewSetInfo, PowerPointNormalViewSetPayload,

@@ -40,6 +40,11 @@ pub struct PowerPointSpellingFlags {
 }
 
 impl PowerPointSpellingFlags {
+    /// Build spelling flags from validated bits (`TextSIException`,
+    /// MS-PPT 2.9.33).
+    pub(crate) const fn from_bits(error: bool, clean: bool) -> Self {
+        Self { error, clean }
+    }
     /// Whether the text is spelled incorrectly.
     pub const fn error(&self) -> bool {
         self.error
