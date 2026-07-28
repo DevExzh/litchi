@@ -2182,9 +2182,12 @@ mod tests {
                 .unwrap(),
             ),
         );
-        editor
+        let created = editor
             .set_table_cell_conditional_highlighting(model_id, 1, 1, std::slice::from_ref(&rule))
             .unwrap();
+        assert_eq!(created.table_id, model_id);
+        assert_eq!((created.row, created.column), (1, 1));
+        assert_eq!(created.rule_count, 1);
         assert_eq!(
             editor
                 .table_cell_conditional_highlighting(model_id, 1, 1)

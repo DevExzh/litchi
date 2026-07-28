@@ -96,9 +96,12 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
         ),
     ];
 
-    editor
+    let created = editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
         .unwrap();
+    assert_eq!(created.table_id, table_id);
+    assert_eq!((created.row, created.column), (1, 1));
+    assert_eq!(created.rule_count, initial.len() as u32);
     assert_eq!(
         editor
             .cell_conditional_highlighting(table_id, 1, 1)

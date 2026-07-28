@@ -69,14 +69,14 @@ impl PagesEditor {
         Ok(())
     }
 
-    /// Replace a body-table cell's conditional highlighting with ordered rules.
+    /// Replace a body-table cell's conditional highlighting and return its storage identity.
     pub fn set_table_cell_conditional_highlighting(
         &mut self,
         model_object_id: u64,
         row: usize,
         column: usize,
         rules: &[crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule],
-    ) -> Result<()> {
+    ) -> Result<PagesTableCellConditionalHighlightInfo> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         crate::numbers::editor::set_table_cell_conditional_highlighting_in_package(
@@ -99,7 +99,16 @@ impl PagesEditor {
                 "Pages conditional-highlight rule count failed validation".to_owned(),
             ));
         }
+        if verified
+            .table_cell_conditional_highlight_rules(model_object_id, row, column)?
+            .as_deref()
+            != Some(rules)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages conditional-highlight rules failed validation".to_owned(),
+            ));
+        }
         *self = verified;
-        Ok(())
+        Ok(actual)
     }
 }

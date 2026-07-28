@@ -73,7 +73,7 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
                 .unwrap(),
         ),
     );
-    editor
+    let created = editor
         .set_slide_table_cell_conditional_highlighting(
             0,
             table.model_object_id,
@@ -82,6 +82,9 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
             std::slice::from_ref(&rule),
         )
         .unwrap();
+    assert_eq!(created.table_id, table.model_object_id);
+    assert_eq!((created.row, created.column), (1, 1));
+    assert_eq!(created.rule_count, 1);
     assert_eq!(
         editor
             .slide_table_cell_conditional_highlighting(0, table.model_object_id, 1, 1)

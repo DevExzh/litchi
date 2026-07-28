@@ -72,7 +72,7 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Replace a slide-table cell's conditional highlighting with ordered rules.
+    /// Replace a slide-table cell's conditional highlighting and return its storage identity.
     pub fn set_slide_table_cell_conditional_highlighting(
         &mut self,
         slide_index: usize,
@@ -80,7 +80,7 @@ impl KeynoteEditor {
         row: usize,
         column: usize,
         rules: &[crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule],
-    ) -> Result<()> {
+    ) -> Result<KeynoteTableCellConditionalHighlightInfo> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         crate::numbers::editor::set_table_cell_conditional_highlighting_in_package(
@@ -103,7 +103,21 @@ impl KeynoteEditor {
                 "Keynote conditional-highlight rule count failed validation".to_owned(),
             ));
         }
+        if verified
+            .slide_table_cell_conditional_highlight_rules(
+                slide_index,
+                model_object_id,
+                row,
+                column,
+            )?
+            .as_deref()
+            != Some(rules)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote conditional-highlight rules failed validation".to_owned(),
+            ));
+        }
         *self = verified;
-        Ok(())
+        Ok(actual)
     }
 }

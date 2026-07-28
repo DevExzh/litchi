@@ -2962,14 +2962,14 @@ impl NumbersEditor {
         Ok(())
     }
 
-    /// Replace a cell's conditional highlighting with ordered rules.
+    /// Replace a cell's conditional highlighting and return its storage identity.
     pub fn set_cell_conditional_highlighting(
         &mut self,
         table_id: u64,
         row: usize,
         column: usize,
         rules: &[TableCellConditionalHighlightRule],
-    ) -> Result<()> {
+    ) -> Result<TableCellConditionalHighlightInfo> {
         let mut staged = self.package.clone();
         conditional_highlight::set_in_package(&mut staged, table_id, row, column, rules)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -2985,8 +2985,17 @@ impl NumbersEditor {
                 "Numbers conditional-highlight rule count failed validation".to_owned(),
             ));
         }
+        if verified
+            .cell_conditional_highlight_rules(table_id, row, column)?
+            .as_deref()
+            != Some(rules)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers conditional-highlight rules failed validation".to_owned(),
+            ));
+        }
         *self = verified;
-        Ok(())
+        Ok(actual)
     }
 
     /// Read the direct replies attached to a cell comment in stored order.
