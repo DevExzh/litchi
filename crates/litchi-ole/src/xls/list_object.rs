@@ -2466,10 +2466,10 @@ impl XlsListObject {
             XlsListObjectSourceMetadata::Xml(v) => v.ignored_fixed_word,
         };
         feature.extend_from_slice(&ignored_fixed_word.to_le_bytes());
-        let mut flags = version.code() << 16
-            | u32::from(self.autofilter) * 0x806
-            | u32::from(self.has_totals) * 0x40
-            | u32::from(single) << 9
+        let mut flags = (version.code() << 16)
+            | (u32::from(self.autofilter) * 0x806)
+            | (u32::from(self.has_totals) * 0x40)
+            | (u32::from(single) << 9)
             | 0x0040_0000;
         match source {
             XlsListObjectSourceMetadata::Web(v) => {
@@ -2698,10 +2698,8 @@ impl XlsListObject {
                 | (u32::from(field.total_array_formula) << 8)
                 | (u32::from(column.total_string.is_some()) << 10)
                 | (u32::from(field.auto_create_calculated_column) << 11);
-            if !self.has_header {
-                if field.header_cache.style_name().is_some() {
-                    field_flags |= 0x200;
-                }
+            if !self.has_header && field.header_cache.style_name().is_some() {
+                field_flags |= 0x200;
             }
             feature.extend_from_slice(&field_flags.to_le_bytes());
             feature.extend_from_slice(&(field.insert_row_format.len() as u32).to_le_bytes());

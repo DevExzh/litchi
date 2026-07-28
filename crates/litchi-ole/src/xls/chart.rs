@@ -2050,6 +2050,7 @@ struct Sheet {
     end: usize,
     kind: u8,
 }
+#[allow(clippy::type_complexity)]
 fn bindings(input: &[u8]) -> XlsResult<(Vec<(usize, usize)>, Vec<Sheet>)> {
     let mut refs = Vec::new();
     for value in ranges(input)? {

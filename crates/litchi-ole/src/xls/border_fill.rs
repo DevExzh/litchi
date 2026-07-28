@@ -222,8 +222,8 @@ pub(crate) fn parse_xf_border_fill(
     let top_color = (border2 & 0x7f) as u16;
     let bottom_color = ((border2 >> 7) & 0x7f) as u16;
     let diagonal_color = ((border2 >> 14) & 0x7f) as u16;
-    let foreground_color = (area & 0x7f) as u16;
-    let background_color = ((area >> 7) & 0x7f) as u16;
+    let foreground_color = area & 0x7f;
+    let background_color = (area >> 7) & 0x7f;
     for (name, color) in [
         ("left border", left_color),
         ("right border", right_color),

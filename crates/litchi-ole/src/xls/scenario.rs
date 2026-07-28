@@ -256,8 +256,9 @@ impl ScenarioCollector {
     }
 
     pub(crate) fn feed_record(&mut self, record_type: u16, data: &[u8]) -> XlsResult<()> {
-        if record_type == CONTINUE_RECORD_TYPE && self.pending_scenario.is_some() {
-            let pending = self.pending_scenario.as_mut().unwrap();
+        if record_type == CONTINUE_RECORD_TYPE
+            && let Some(pending) = self.pending_scenario.as_mut()
+        {
             let new_len = pending.len().checked_add(data.len()).ok_or_else(|| {
                 XlsError::InvalidData("scenario continuation size overflow".to_string())
             })?;

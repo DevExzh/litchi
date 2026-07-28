@@ -1141,7 +1141,7 @@ struct PendingFormatting12 {
 
 enum ParsedExtension {
     Legacy {
-        extension: XlsConditionalExtension,
+        extension: Box<XlsConditionalExtension>,
         group_index: usize,
     },
     Future {
@@ -1248,7 +1248,7 @@ fn parse_cfex(
         return Err(invalid(CFEX_RECORD_TYPE, "CFEx has trailing bytes"));
     }
     Ok(ParsedExtension::Legacy {
-        extension: XlsConditionalExtension {
+        extension: Box::new(XlsConditionalExtension {
             identifier,
             legacy_rule_index: Some(rule_index),
             priority,
@@ -1262,7 +1262,7 @@ fn parse_cfex(
             },
             template_parameters,
             future_rule: None,
-        },
+        }),
         group_index,
     })
 }
@@ -1395,7 +1395,7 @@ impl ConditionalFormatCollector {
                                 "CFEx legacy rule index is out of range",
                             ));
                         }
-                        self.extensions.push(extension)
+                        self.extensions.push(*extension)
                     },
                     ParsedExtension::Future {
                         identifier,

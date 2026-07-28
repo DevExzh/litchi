@@ -112,23 +112,12 @@ impl Default for XlsDataValidationOptions {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct XlsDataValidationTableOptions {
     pub window_closed: bool,
     pub x_left: u32,
     pub y_top: u32,
     pub dropdown_object_id: Option<u16>,
-}
-
-impl Default for XlsDataValidationTableOptions {
-    fn default() -> Self {
-        Self {
-            window_closed: false,
-            x_left: 0,
-            y_top: 0,
-            dropdown_object_id: None,
-        }
-    }
 }
 
 impl XlsDataValidationOperator {

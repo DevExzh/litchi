@@ -184,6 +184,7 @@ pub enum XlsConditionalFormat12Type {
 }
 
 impl XlsConditionalFormat12Type {
+    #[allow(clippy::type_complexity)]
     pub(crate) fn biff_parts(&self) -> (u8, u8, &[u8], &[u8], &[u8], &[u8]) {
         match self {
             Self::CellValue {

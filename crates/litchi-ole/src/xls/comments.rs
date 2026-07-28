@@ -447,7 +447,7 @@ fn parse_cmo_id(data: &[u8]) -> XlsResult<u16> {
     if u16_at(data, 8)? & 0x0002 != 0 {
         return invalid("FtCmo contains its reserved option bit".to_string());
     }
-    Ok(u16_at(data, 6)?)
+    u16_at(data, 6)
 }
 
 fn parse_obj(data: &[u8]) -> XlsResult<Option<CommentObject>> {

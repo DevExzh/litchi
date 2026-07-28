@@ -288,10 +288,7 @@ fn parse_nested_changes(
     cursor: &mut usize,
 ) -> XlsResult<Vec<XlsRevisionChange>> {
     let mut changes = Vec::new();
-    loop {
-        let Some(next) = stream.get(*cursor) else {
-            break;
-        };
+    while let Some(next) = stream.get(*cursor) {
         match next.record_type {
             RRD_CHG_CELL_RECORD_TYPE => {
                 changes.push(XlsRevisionChange::CellChange(Box::new(
