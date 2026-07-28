@@ -2,15 +2,16 @@
 
 use crate::shapes::RgbaColor;
 use crate::text::paragraph_alignment::native::{
-    ParagraphStyleOverrides, inherited_alignment, inherited_text_background,
-    inherited_text_baseline_shift, inherited_text_capitalization, inherited_text_character_spacing,
-    inherited_text_color, inherited_text_decorations, inherited_text_font,
-    inherited_text_ligatures, inherited_text_outline, inherited_text_script, inherited_text_shadow,
-    inherited_text_style,
+    ParagraphStyleOverrides, inherited_alignment, inherited_line_spacing, inherited_spacing,
+    inherited_text_background, inherited_text_baseline_shift, inherited_text_capitalization,
+    inherited_text_character_spacing, inherited_text_color, inherited_text_decorations,
+    inherited_text_font, inherited_text_ligatures, inherited_text_outline, inherited_text_script,
+    inherited_text_shadow, inherited_text_style,
 };
 use crate::text::{
-    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextScript, TextShadow, TextStyle,
+    ParagraphLineSpacing, ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
+    TextOutline, TextScript, TextShadow, TextStyle,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -25,9 +26,11 @@ pub(super) enum CellParagraphProperty {
     Decorations(TextDecorations),
     Font(TextFont),
     Ligatures(TextLigatures),
+    LineSpacing(ParagraphLineSpacing),
     Outline(TextOutline),
     Script(TextScript),
     Shadow(TextShadow),
+    Spacing(ParagraphSpacing),
     TextStyle(TextStyle),
 }
 
@@ -42,9 +45,11 @@ pub(super) enum CellParagraphPropertyKind {
     Decorations,
     Font,
     Ligatures,
+    LineSpacing,
     Outline,
     Script,
     Shadow,
+    Spacing,
     TextStyle,
 }
 
@@ -60,9 +65,11 @@ impl CellParagraphProperty {
             Self::Decorations(_) => CellParagraphPropertyKind::Decorations,
             Self::Font(_) => CellParagraphPropertyKind::Font,
             Self::Ligatures(_) => CellParagraphPropertyKind::Ligatures,
+            Self::LineSpacing(_) => CellParagraphPropertyKind::LineSpacing,
             Self::Outline(_) => CellParagraphPropertyKind::Outline,
             Self::Script(_) => CellParagraphPropertyKind::Script,
             Self::Shadow(_) => CellParagraphPropertyKind::Shadow,
+            Self::Spacing(_) => CellParagraphPropertyKind::Spacing,
             Self::TextStyle(_) => CellParagraphPropertyKind::TextStyle,
         }
     }
@@ -100,6 +107,9 @@ impl CellParagraphProperty {
             CellParagraphPropertyKind::Ligatures => {
                 inherited_text_ligatures(package, style_id).map(Self::Ligatures)
             },
+            CellParagraphPropertyKind::LineSpacing => {
+                inherited_line_spacing(package, style_id).map(Self::LineSpacing)
+            },
             CellParagraphPropertyKind::Outline => {
                 inherited_text_outline(package, style_id).map(Self::Outline)
             },
@@ -108,6 +118,9 @@ impl CellParagraphProperty {
             },
             CellParagraphPropertyKind::Shadow => {
                 inherited_text_shadow(package, style_id).map(Self::Shadow)
+            },
+            CellParagraphPropertyKind::Spacing => {
+                inherited_spacing(package, style_id).map(Self::Spacing)
             },
             CellParagraphPropertyKind::TextStyle => {
                 inherited_text_style(package, style_id).map(Self::TextStyle)
@@ -151,6 +164,9 @@ impl CellParagraphProperty {
             (Self::Ligatures(value), Self::Ligatures(inherited)) => {
                 overrides.ligatures = (value != inherited).then_some(*value);
             },
+            (Self::LineSpacing(value), Self::LineSpacing(inherited)) => {
+                overrides.line_spacing = (value != inherited).then_some(*value);
+            },
             (Self::Outline(value), Self::Outline(inherited)) => {
                 overrides.outline = (value != inherited).then_some(*value);
             },
@@ -159,6 +175,10 @@ impl CellParagraphProperty {
             },
             (Self::Shadow(value), Self::Shadow(inherited)) => {
                 overrides.shadow = (value != inherited).then_some(*value);
+            },
+            (Self::Spacing(value), Self::Spacing(inherited)) => {
+                overrides.space_before = (value.before != inherited.before).then_some(value.before);
+                overrides.space_after = (value.after != inherited.after).then_some(value.after);
             },
             (Self::TextStyle(value), Self::TextStyle(inherited)) => {
                 overrides.point_size =
@@ -188,9 +208,11 @@ impl CellParagraphPropertyKind {
             Self::Decorations => "text decorations",
             Self::Font => "font",
             Self::Ligatures => "ligatures",
+            Self::LineSpacing => "paragraph line spacing",
             Self::Outline => "text outline",
             Self::Script => "baseline script",
             Self::Shadow => "text shadow",
+            Self::Spacing => "paragraph spacing",
             Self::TextStyle => "character formatting",
         }
     }
@@ -206,9 +228,11 @@ impl CellParagraphPropertyKind {
             Self::Decorations => overrides.underline.is_some() || overrides.strikethrough.is_some(),
             Self::Font => overrides.font.is_some(),
             Self::Ligatures => overrides.ligatures.is_some(),
+            Self::LineSpacing => overrides.line_spacing.is_some(),
             Self::Outline => overrides.outline.is_some(),
             Self::Script => overrides.script.is_some(),
             Self::Shadow => overrides.shadow.is_some(),
+            Self::Spacing => overrides.space_before.is_some() || overrides.space_after.is_some(),
             Self::TextStyle => {
                 overrides.point_size.is_some()
                     || overrides.bold.is_some()
@@ -231,9 +255,14 @@ impl CellParagraphPropertyKind {
             },
             Self::Font => overrides.font = None,
             Self::Ligatures => overrides.ligatures = None,
+            Self::LineSpacing => overrides.line_spacing = None,
             Self::Outline => overrides.outline = None,
             Self::Script => overrides.script = None,
             Self::Shadow => overrides.shadow = None,
+            Self::Spacing => {
+                overrides.space_before = None;
+                overrides.space_after = None;
+            },
             Self::TextStyle => {
                 overrides.point_size = None;
                 overrides.bold = None;

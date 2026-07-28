@@ -104,6 +104,8 @@ pub use crate::table_cell_number_format::{
     TableCellNumberFormat as PagesTableCellNumberFormat,
     TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
 };
+pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
+pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
 pub use crate::text::TextBackground as PagesTableCellTextBackground;
 pub use crate::text::TextBaselineShift as PagesTableCellTextBaselineShift;
@@ -1326,6 +1328,140 @@ impl PagesEditor {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_alignment_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective paragraph line spacing for one body-table cell.
+    pub fn table_cell_paragraph_line_spacing(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellParagraphLineSpacing> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_line_spacing_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell paragraph line spacing.
+    pub fn set_table_cell_paragraph_line_spacing(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        spacing: PagesTableCellParagraphLineSpacing,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_line_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            spacing,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_line_spacing(model_object_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph line spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local line spacing and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_line_spacing(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_line_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective before/after paragraph spacing for one body-table cell.
+    pub fn table_cell_paragraph_spacing(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellParagraphSpacing> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_spacing_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell before/after paragraph spacing.
+    pub fn set_table_cell_paragraph_spacing(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        spacing: PagesTableCellParagraphSpacing,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            spacing,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_spacing(model_object_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local before/after spacing and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_spacing(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_spacing_in_package(
             &mut staged,
             model_object_id,
             row,

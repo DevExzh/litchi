@@ -105,9 +105,9 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) underline: Option<TextUnderline>,
     pub(crate) strikethrough: Option<TextStrikethrough>,
     pub(crate) alignment: Option<TextAlignment>,
-    pub(super) line_spacing: Option<ParagraphLineSpacing>,
-    pub(super) space_before: Option<ParagraphSpacingPoints>,
-    pub(super) space_after: Option<ParagraphSpacingPoints>,
+    pub(crate) line_spacing: Option<ParagraphLineSpacing>,
+    pub(crate) space_before: Option<ParagraphSpacingPoints>,
+    pub(crate) space_after: Option<ParagraphSpacingPoints>,
     pub(super) first_line_indent: Option<ParagraphIndentPoints>,
     pub(super) left_indent: Option<ParagraphIndentPoints>,
     pub(super) right_indent: Option<ParagraphIndentPoints>,
@@ -293,14 +293,14 @@ pub(crate) fn inherited_text_background(
     inheritance::text_background(package, first_style_id)
 }
 
-pub(super) fn inherited_line_spacing(
+pub(crate) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<ParagraphLineSpacing> {
     inheritance::line_spacing(package, first_style_id)
 }
 
-pub(super) fn inherited_spacing(
+pub(crate) fn inherited_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<ParagraphSpacing> {

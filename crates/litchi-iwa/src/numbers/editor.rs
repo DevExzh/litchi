@@ -139,6 +139,10 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Typed native line spacing applied to a whole Numbers table cell.
+pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
+/// Typed before/after paragraph spacing applied to a whole Numbers table cell.
+pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
 /// Typed solid background painted behind a whole Numbers table cell's text.
 pub type NumbersTableCellTextBackground = TextBackground;
 /// Validated custom baseline displacement applied to a whole Numbers cell.
@@ -2817,6 +2821,96 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the effective paragraph line spacing for one table cell.
+    pub fn table_cell_paragraph_line_spacing(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphLineSpacing> {
+        cell_paragraph_style::line_spacing(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell paragraph line-spacing override.
+    pub fn set_table_cell_paragraph_line_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        spacing: NumbersTableCellParagraphLineSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_line_spacing(&mut staged, table_id, row, column, spacing)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_line_spacing(table_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph line spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local line spacing and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_line_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_line_spacing(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective before/after paragraph spacing for one table cell.
+    pub fn table_cell_paragraph_spacing(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphSpacing> {
+        cell_paragraph_style::spacing(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell before/after paragraph spacing.
+    pub fn set_table_cell_paragraph_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        spacing: NumbersTableCellParagraphSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_spacing(&mut staged, table_id, row, column, spacing)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_spacing(table_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local before/after spacing and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_spacing(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective background painted behind one table cell's text.
     pub fn table_cell_text_background(
         &self,
@@ -4487,6 +4581,62 @@ pub(crate) fn reset_table_cell_text_alignment_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_paragraph_style::reset_alignment(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_line_spacing_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphLineSpacing> {
+    cell_paragraph_style::line_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_line_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    spacing: ParagraphLineSpacing,
+) -> Result<()> {
+    cell_paragraph_style::set_line_spacing(package, table_id, row, column, spacing)
+}
+
+pub(crate) fn reset_table_cell_paragraph_line_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_line_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_spacing_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphSpacing> {
+    cell_paragraph_style::spacing(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    spacing: ParagraphSpacing,
+) -> Result<()> {
+    cell_paragraph_style::set_spacing(package, table_id, row, column, spacing)
+}
+
+pub(crate) fn reset_table_cell_paragraph_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_spacing(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_text_background_in_package(

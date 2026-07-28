@@ -68,6 +68,108 @@ pub(super) fn reset_alignment(
     )
 }
 
+pub(super) fn line_spacing(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphLineSpacing> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::LineSpacing,
+    )? {
+        CellParagraphProperty::LineSpacing(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell line spacing resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_line_spacing(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: ParagraphLineSpacing,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::LineSpacing(value),
+    )
+}
+
+pub(super) fn reset_line_spacing(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::LineSpacing,
+    )
+}
+
+pub(super) fn spacing(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphSpacing> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Spacing,
+    )? {
+        CellParagraphProperty::Spacing(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell paragraph spacing resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_spacing(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: ParagraphSpacing,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Spacing(value),
+    )
+}
+
+pub(super) fn reset_spacing(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Spacing,
+    )
+}
+
 pub(super) fn background(
     package: &IWorkPackage,
     table_id: u64,
@@ -1309,9 +1411,10 @@ mod tests {
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
     use crate::text::{
-        TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-        TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript,
-        TextShadow, TextStrikethrough, TextUnderline,
+        ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphSpacing,
+        ParagraphSpacingPoints, TextBackground, TextBaselineShift, TextCapitalization,
+        TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
+        TextScript, TextShadow, TextStrikethrough, TextUnderline,
     };
 
     fn test_color() -> RgbaColor {
@@ -1328,6 +1431,19 @@ mod tests {
         const BLUE: f32 = 0.20;
         const ALPHA: f32 = 1.0;
         TextBackground::Color(RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap())
+    }
+
+    fn test_line_spacing() -> ParagraphLineSpacing {
+        ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE)
+    }
+
+    fn test_paragraph_spacing() -> ParagraphSpacing {
+        const BEFORE_POINTS: f32 = 6.0;
+        const AFTER_POINTS: f32 = 9.0;
+        ParagraphSpacing::new(
+            ParagraphSpacingPoints::from_points(BEFORE_POINTS).unwrap(),
+            ParagraphSpacingPoints::from_points(AFTER_POINTS).unwrap(),
+        )
     }
 
     fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
@@ -1491,7 +1607,7 @@ mod tests {
     }
 
     #[test]
-    fn character_properties_compose_with_alignment_and_reclaim_independently() {
+    fn paragraph_properties_compose_with_alignment_and_reclaim_independently() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(2, 2)
             .build()
@@ -1518,6 +1634,8 @@ mod tests {
         let outline = TextOutline::standard();
         let script = TextScript::Superscript;
         let shadow = TextShadow::standard();
+        let line_spacing = test_line_spacing();
+        let paragraph_spacing = test_paragraph_spacing();
 
         editor
             .set_table_cell_text_style(table_id, 1, 1, styled)
@@ -1554,6 +1672,12 @@ mod tests {
             .unwrap();
         editor
             .set_table_cell_text_shadow(table_id, 1, 1, shadow)
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_line_spacing(table_id, 1, 1, line_spacing)
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_spacing(table_id, 1, 1, paragraph_spacing)
             .unwrap();
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
         assert_eq!(
@@ -1608,6 +1732,16 @@ mod tests {
             editor.table_cell_text_shadow(table_id, 1, 1).unwrap(),
             shadow
         );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_line_spacing(table_id, 1, 1)
+                .unwrap(),
+            line_spacing
+        );
+        assert_eq!(
+            editor.table_cell_paragraph_spacing(table_id, 1, 1).unwrap(),
+            paragraph_spacing
+        );
 
         assert!(
             editor
@@ -1661,6 +1795,22 @@ mod tests {
             shadow
         );
         assert!(editor.reset_table_cell_text_shadow(table_id, 1, 1).unwrap());
+        assert_eq!(
+            editor
+                .table_cell_paragraph_line_spacing(table_id, 1, 1)
+                .unwrap(),
+            line_spacing
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_spacing(table_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_line_spacing(table_id, 1, 1)
+                .unwrap()
+        );
 
         assert!(
             editor
@@ -1791,6 +1941,50 @@ mod tests {
         assert!(
             editor
                 .reset_table_cell_text_capitalization(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+
+        let line_spacing = test_line_spacing();
+        editor
+            .set_table_cell_paragraph_line_spacing(table_id, 1, 1, line_spacing)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor
+                .table_cell_paragraph_line_spacing(table_id, 1, 1)
+                .unwrap(),
+            line_spacing
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_line_spacing(table_id, 1, 2)
+                .unwrap(),
+            ParagraphLineSpacing::default()
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_line_spacing(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+
+        let paragraph_spacing = test_paragraph_spacing();
+        editor
+            .set_table_cell_paragraph_spacing(table_id, 1, 1, paragraph_spacing)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor.table_cell_paragraph_spacing(table_id, 1, 1).unwrap(),
+            paragraph_spacing
+        );
+        assert_eq!(
+            editor.table_cell_paragraph_spacing(table_id, 1, 2).unwrap(),
+            ParagraphSpacing::NONE
+        );
+        assert!(
+            editor
+                .reset_table_cell_paragraph_spacing(table_id, 1, 1)
                 .unwrap()
         );
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
@@ -1946,6 +2140,8 @@ mod tests {
         let pages_background = test_background();
         let pages_outline = TextOutline::standard();
         let pages_shadow = TextShadow::standard();
+        let pages_line_spacing = test_line_spacing();
+        let pages_paragraph_spacing = test_paragraph_spacing();
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Aligned", 2, 2)
             .build()
@@ -1989,6 +2185,12 @@ mod tests {
             .unwrap();
         pages
             .set_table_cell_text_shadow(pages_table, 1, 1, pages_shadow)
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_line_spacing(pages_table, 1, 1, pages_line_spacing)
+            .unwrap();
+        pages
+            .set_table_cell_paragraph_spacing(pages_table, 1, 1, pages_paragraph_spacing)
             .unwrap();
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -2051,6 +2253,18 @@ mod tests {
             pages.table_cell_text_shadow(pages_table, 1, 1).unwrap(),
             pages_shadow
         );
+        assert_eq!(
+            pages
+                .table_cell_paragraph_line_spacing(pages_table, 1, 1)
+                .unwrap(),
+            pages_line_spacing
+        );
+        assert_eq!(
+            pages
+                .table_cell_paragraph_spacing(pages_table, 1, 1)
+                .unwrap(),
+            pages_paragraph_spacing
+        );
         assert!(
             pages
                 .reset_table_cell_text_capitalization(pages_table, 1, 1)
@@ -2093,6 +2307,16 @@ mod tests {
         );
         assert!(
             pages
+                .reset_table_cell_paragraph_spacing(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_paragraph_line_spacing(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
                 .reset_table_cell_text_decorations(pages_table, 1, 1)
                 .unwrap()
         );
@@ -2119,6 +2343,8 @@ mod tests {
         let keynote_background = test_background();
         let keynote_outline = TextOutline::standard();
         let keynote_shadow = TextShadow::standard();
+        let keynote_line_spacing = test_line_spacing();
+        let keynote_paragraph_spacing = test_paragraph_spacing();
         let mut keynote = KeynoteDocumentBuilder::new()
             .title("Aligned")
             .build()
@@ -2223,6 +2449,24 @@ mod tests {
         keynote
             .set_slide_table_cell_text_shadow(0, table.model_object_id, 1, 1, keynote_shadow)
             .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_line_spacing(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                keynote_line_spacing,
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_spacing(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                keynote_paragraph_spacing,
+            )
+            .unwrap();
         let mut keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -2303,6 +2547,18 @@ mod tests {
                 .unwrap(),
             keynote_shadow
         );
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_line_spacing(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_line_spacing
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_spacing(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_paragraph_spacing
+        );
         assert!(
             keynote
                 .reset_slide_table_cell_text_capitalization(0, table.model_object_id, 1, 1)
@@ -2341,6 +2597,16 @@ mod tests {
         assert!(
             keynote
                 .reset_slide_table_cell_text_shadow(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_paragraph_spacing(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_paragraph_line_spacing(0, table.model_object_id, 1, 1)
                 .unwrap()
         );
         assert!(
@@ -2431,6 +2697,16 @@ mod tests {
         assert!(
             editor
                 .set_table_cell_text_ligatures(table_id, 1, 2, TextLigatures::All)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_paragraph_line_spacing(table_id, 1, 2, test_line_spacing())
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_paragraph_spacing(table_id, 1, 2, test_paragraph_spacing())
                 .is_err()
         );
         assert!(

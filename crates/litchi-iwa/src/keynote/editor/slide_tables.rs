@@ -102,6 +102,8 @@ pub use crate::table_cell_number_format::{
     TableCellNumberFormat as KeynoteTableCellNumberFormat,
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
+pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
+pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
 pub use crate::text::TextBackground as KeynoteTableCellTextBackground;
 pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
@@ -1672,6 +1674,154 @@ impl KeynoteEditor {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_alignment_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective paragraph line spacing for one slide-table cell.
+    pub fn slide_table_cell_paragraph_line_spacing(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellParagraphLineSpacing> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_line_spacing_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell paragraph line spacing.
+    pub fn set_slide_table_cell_paragraph_line_spacing(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        spacing: KeynoteTableCellParagraphLineSpacing,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_line_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            spacing,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_line_spacing(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+        )? != spacing
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph line spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local line spacing and restore the inherited table style.
+    pub fn reset_slide_table_cell_paragraph_line_spacing(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_line_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective before/after paragraph spacing for one slide-table cell.
+    pub fn slide_table_cell_paragraph_spacing(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellParagraphSpacing> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_spacing_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell before/after paragraph spacing.
+    pub fn set_slide_table_cell_paragraph_spacing(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        spacing: KeynoteTableCellParagraphSpacing,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            spacing,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_spacing(slide_index, model_object_id, row, column)?
+            != spacing
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local before/after spacing and restore the inherited table style.
+    pub fn reset_slide_table_cell_paragraph_spacing(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_paragraph_spacing_in_package(
             &mut staged,
             model_object_id,
             row,

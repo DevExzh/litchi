@@ -4475,6 +4475,7 @@ pub use slide_tables::{
     KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellFractionFormat, KeynoteTableCellInset,
     KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle,
     KeynoteTableCellNumberFormat, KeynoteTableCellNumeralSystemFormat,
+    KeynoteTableCellParagraphLineSpacing, KeynoteTableCellParagraphSpacing,
     KeynoteTableCellPercentageFormat, KeynoteTableCellPopUpMenuFormat,
     KeynoteTableCellPopUpMenuInitialSelection, KeynoteTableCellPopUpMenuItem,
     KeynoteTableCellRegion, KeynoteTableCellScientificFormat, KeynoteTableCellSliderDisplayFormat,

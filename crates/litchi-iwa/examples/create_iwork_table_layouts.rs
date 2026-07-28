@@ -10,9 +10,11 @@ use litchi_iwa::table_cell_layout::{
     TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
 };
 use litchi_iwa::text::{
-    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints,
+    ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
+    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -99,6 +101,14 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_text_shadow(numbers_table.object_id, ROW, COLUMN)?,
         TextShadow::standard()
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_line_spacing(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_paragraph_line_spacing()
+    );
+    assert_eq!(
+        numbers.table_cell_paragraph_spacing(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_paragraph_spacing()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -153,6 +163,14 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         pages.table_cell_text_shadow(pages_table.model_object_id, ROW, COLUMN)?,
         TextShadow::standard()
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_line_spacing(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_paragraph_line_spacing()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_spacing(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_paragraph_spacing()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -223,6 +241,24 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         keynote.slide_table_cell_text_shadow(0, keynote_table.model_object_id, ROW, COLUMN)?,
         TextShadow::standard()
+    );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_line_spacing(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+        )?,
+        keynote_paragraph_line_spacing()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_spacing(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+        )?,
+        keynote_paragraph_spacing()?
     );
     Ok(())
 }
@@ -366,6 +402,52 @@ fn keynote_character_spacing() -> Result<TextCharacterSpacing, litchi_iwa::Error
     TextCharacterSpacing::from_percent(PERCENT)
 }
 
+const fn numbers_paragraph_line_spacing() -> ParagraphLineSpacing {
+    ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE)
+}
+
+fn pages_paragraph_line_spacing() -> Result<ParagraphLineSpacing, litchi_iwa::Error> {
+    const POINTS: f32 = 24.0;
+    Ok(ParagraphLineSpacing::Exactly(
+        ParagraphLineSpacingPoints::from_points(POINTS)?,
+    ))
+}
+
+fn keynote_paragraph_line_spacing() -> Result<ParagraphLineSpacing, litchi_iwa::Error> {
+    const POINTS: f32 = 7.0;
+    Ok(ParagraphLineSpacing::Between(
+        ParagraphLineSpacingPoints::from_points(POINTS)?,
+    ))
+}
+
+fn paragraph_spacing(
+    before_points: f32,
+    after_points: f32,
+) -> Result<ParagraphSpacing, litchi_iwa::Error> {
+    Ok(ParagraphSpacing::new(
+        ParagraphSpacingPoints::from_points(before_points)?,
+        ParagraphSpacingPoints::from_points(after_points)?,
+    ))
+}
+
+fn numbers_paragraph_spacing() -> Result<ParagraphSpacing, litchi_iwa::Error> {
+    const BEFORE_POINTS: f32 = 6.0;
+    const AFTER_POINTS: f32 = 9.0;
+    paragraph_spacing(BEFORE_POINTS, AFTER_POINTS)
+}
+
+fn pages_paragraph_spacing() -> Result<ParagraphSpacing, litchi_iwa::Error> {
+    const BEFORE_POINTS: f32 = 5.0;
+    const AFTER_POINTS: f32 = 8.0;
+    paragraph_spacing(BEFORE_POINTS, AFTER_POINTS)
+}
+
+fn keynote_paragraph_spacing() -> Result<ParagraphSpacing, litchi_iwa::Error> {
+    const BEFORE_POINTS: f32 = 4.0;
+    const AFTER_POINTS: f32 = 7.0;
+    paragraph_spacing(BEFORE_POINTS, AFTER_POINTS)
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Layouts")
@@ -402,6 +484,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Superscript)?;
     editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
+    editor.set_table_cell_paragraph_line_spacing(
+        table_id,
+        ROW,
+        COLUMN,
+        numbers_paragraph_line_spacing(),
+    )?;
+    editor.set_table_cell_paragraph_spacing(table_id, ROW, COLUMN, numbers_paragraph_spacing()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -442,6 +531,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Subscript)?;
     editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
+    editor.set_table_cell_paragraph_line_spacing(
+        table_id,
+        ROW,
+        COLUMN,
+        pages_paragraph_line_spacing()?,
+    )?;
+    editor.set_table_cell_paragraph_spacing(table_id, ROW, COLUMN, pages_paragraph_spacing()?)?;
     editor.save(output)?;
     Ok(())
 }
@@ -565,6 +661,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         TextShadow::standard(),
+    )?;
+    editor.set_slide_table_cell_paragraph_line_spacing(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_paragraph_line_spacing()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_spacing(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_paragraph_spacing()?,
     )?;
     editor.save(output)?;
     Ok(())
