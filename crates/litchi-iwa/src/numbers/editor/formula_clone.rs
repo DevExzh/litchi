@@ -12,7 +12,9 @@ use crate::wire::{
     append_repeated_length_delimited_field, patch_nested_varint_field, patch_varint_field,
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
-pub(super) use dependency_wire::append_formula_owners_to_engine;
+pub(super) use dependency_wire::{
+    append_formula_owners_to_engine, reorder_formula_owners_in_engine,
+};
 use dependency_wire::{
     remap_cell_records, remap_cell_tile_wire, remap_formula_owner, remap_formula_owner_wire,
     remap_range_tile_wire,

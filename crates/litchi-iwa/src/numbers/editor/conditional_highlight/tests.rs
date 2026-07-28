@@ -506,18 +506,76 @@ fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
         .iter()
         .filter_map(|object| {
             object.messages.iter().find_map(|message| {
-                (message.type_ == 4_008)
-                    .then(|| {
+                (message.type_ == 4_008).then(|| {
+                    (
+                        object.archive_info.identifier.unwrap(),
                         tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
-                            .unwrap()
-                    })
-                    .filter(|owner| matches!(owner.owner_kind, Some(3 | 35)))
+                            .unwrap(),
+                    )
+                })
             })
         })
         .collect::<Vec<_>>();
-    assert_eq!(owners.len(), 2);
+    assert_eq!(owners.len(), 13);
+    let mut internal_kinds = owners
+        .iter()
+        .filter_map(|(_, owner)| {
+            (owner.owner_kind != Some(1))
+                .then_some((owner.internal_formula_owner_id, owner.owner_kind.unwrap()))
+        })
+        .collect::<Vec<_>>();
+    internal_kinds.sort_unstable();
+    assert_eq!(
+        internal_kinds
+            .iter()
+            .map(|(_, kind)| *kind)
+            .collect::<Vec<_>>(),
+        vec![7, 200, 4, 11, 3, 10, 5, 6, 35, 12, 8, 9]
+    );
+    let engine = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find_map(|message| {
+            (message.type_ == 4_000)
+                .then(|| tsce::CalculationEngineArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    assert_eq!(engine.dependency_tracker.number_of_formulas, Some(9));
+    let root_kinds = engine
+        .dependency_tracker
+        .formula_owner_dependencies
+        .iter()
+        .map(|reference| {
+            owners
+                .iter()
+                .find(|(identifier, _)| *identifier == reference.identifier)
+                .unwrap()
+                .1
+                .owner_kind
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        root_kinds,
+        vec![9, 8, 12, 35, 6, 5, 10, 3, 11, 4, 200, 1, 7]
+    );
+    let tiled_kinds = owners
+        .iter()
+        .filter_map(|(_, owner)| {
+            (!owner
+                .tiled_cell_dependencies
+                .as_ref()
+                .unwrap()
+                .cell_record_tiles
+                .is_empty())
+            .then_some(owner.owner_kind.unwrap())
+        })
+        .collect::<HashSet<_>>();
+    assert_eq!(tiled_kinds, HashSet::from([8, 35, 3, 200]));
     let conditional = owners
         .iter()
+        .map(|(_, owner)| owner)
         .find(|owner| owner.owner_kind == Some(3))
         .unwrap();
     let records = &conditional.cell_dependencies.as_ref().unwrap().cell_record;

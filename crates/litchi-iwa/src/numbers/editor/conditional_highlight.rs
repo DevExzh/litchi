@@ -42,6 +42,7 @@ use native::{
 
 const MAX_CONDITIONAL_HIGHLIGHT_RULES: usize = CONDITIONAL_STYLE_NO_APPLIED_RULE as usize;
 const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
+const CONDITIONAL_LIST_MESSAGE_VERSION: &[u32] = &[3, 2, 10];
 const APPLE_EPOCH_YEAR: i32 = 2001;
 const APPLE_EPOCH_MONTH: u32 = 1;
 const APPLE_EPOCH_DAY: u32 = 1;
@@ -464,6 +465,8 @@ fn append_conditional_style_entry(
                 data,
             },
         )?;
+        object.archive_info.message_infos[message_index].versions =
+            CONDITIONAL_LIST_MESSAGE_VERSION.to_vec();
         add_message_object_reference(object, message_index, style_set_id, style_set_id);
         Ok(())
     })?;

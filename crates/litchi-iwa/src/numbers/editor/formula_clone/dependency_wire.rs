@@ -86,6 +86,40 @@ pub(in crate::numbers::editor) fn append_formula_owners_to_engine(
     Ok(data)
 }
 
+pub(in crate::numbers::editor) fn reorder_formula_owners_in_engine(
+    original: &[u8],
+    owner_ids: &[u64],
+) -> Result<Vec<u8>> {
+    let previous = tsce::CalculationEngineArchive::decode(original)?;
+    let mut expected = previous.clone();
+    expected.dependency_tracker.formula_owner_dependencies = owner_ids
+        .iter()
+        .map(|identifier| tsp::Reference {
+            identifier: *identifier,
+            ..Default::default()
+        })
+        .collect();
+    let data = transform_length_delimited_field(original, 2, |tracker_data| {
+        let references = owner_ids
+            .iter()
+            .map(|identifier| {
+                tsp::Reference {
+                    identifier: *identifier,
+                    ..Default::default()
+                }
+                .encode_to_vec()
+            })
+            .collect::<Vec<_>>();
+        crate::wire::rewrite_repeated_length_delimited_fields(tracker_data, 6, &references)
+    })?;
+    if tsce::CalculationEngineArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers CalculationEngine formula-owner reorder failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remove_formula_owners_from_engine(
     original: &[u8],
     owner_ids: &HashSet<u64>,

@@ -170,8 +170,18 @@ pub(super) fn insert_conditional_style_graph(
             data: style_set.encode_to_vec(),
         }],
     )?;
-    set_object.archive_info.message_infos[0].versions = NATIVE_MESSAGE_VERSION.to_vec();
-    set_object.archive_info.message_infos[0].object_references = references;
+    let info = &mut set_object.archive_info.message_infos[0];
+    info.versions = NATIVE_MESSAGE_VERSION.to_vec();
+    info.object_references = references.clone();
+    info.field_infos.push(tsp::FieldInfo {
+        path: tsp::FieldPath { path: vec![3] },
+        r#type: Some(tsp::field_info::Type::Message as i32),
+        unknown_field_rule: Some(
+            tsp::field_info::UnknownFieldRule::IgnoreAndPreserveUntilModified as i32,
+        ),
+        object_references: references,
+        ..Default::default()
+    });
     package.update_archive(archive_name, |archive| {
         archive.insert_object(set_object)?;
         for object in objects {
