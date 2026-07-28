@@ -603,6 +603,12 @@ impl Document {
                             elements
                                 .push(DocumentElement::Paragraph(Box::new(Paragraph::Odt(para))));
                         },
+                        DocumentOrderElement::NumberedParagraph(para) => {
+                            // Numbered paragraphs reach the unified API as paragraphs
+                            elements.push(DocumentElement::Paragraph(Box::new(Paragraph::Odt(
+                                para.into_paragraph(),
+                            ))));
+                        },
                         DocumentOrderElement::Heading(heading) => {
                             // Convert heading to paragraph for unified API
                             if let Ok(text) = heading.text() {

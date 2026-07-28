@@ -340,6 +340,9 @@ impl Document {
     ///         DocumentOrderElement::Paragraph(para) => {
     ///             println!("Paragraph: {}", para.text()?);
     ///         },
+    ///         DocumentOrderElement::NumberedParagraph(para) => {
+    ///             println!("Numbered paragraph: {}", para.text()?);
+    ///         },
     ///         DocumentOrderElement::Heading(heading) => {
     ///             println!("Heading: {}", heading.text()?);
     ///         },

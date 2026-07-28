@@ -27,6 +27,8 @@ const MAX_DOCUMENT_DEPTH: usize = 4_096;
 pub enum DocumentOrderElement {
     /// A paragraph or heading element
     Paragraph(Paragraph),
+    /// A `text:numbered-paragraph` element with explicit list numbering
+    NumberedParagraph(super::text::NumberedParagraph),
     /// A heading element (for separate access)
     Heading(Heading),
     /// A table element
@@ -119,6 +121,14 @@ impl DocumentParser {
 
                             element_stack.push((tag_name, element));
                         },
+                        "text:numbered-paragraph" if table_depth == 0 && list_depth == 0 => {
+                            // Start a numbered paragraph outside of tables and lists
+                            let mut element = super::element::Element::new(&tag_name);
+
+                            copy_attributes(&reader, e, &mut element)?;
+
+                            element_stack.push((tag_name, element));
+                        },
                         "text:h" if table_depth == 0 && list_depth == 0 => {
                             // Start a heading outside of tables and lists
                             let mut element = super::element::Element::new(&tag_name);
@@ -155,7 +165,7 @@ impl DocumentParser {
                         },
                         _ if matches!(
                             element_stack.first().map(|(tag, _)| tag.as_str()),
-                            Some("text:p" | "text:h")
+                            Some("text:p" | "text:h" | "text:numbered-paragraph")
                         ) =>
                         {
                             if let Some((_, element)) = element_stack.last_mut() {
@@ -219,6 +229,15 @@ impl DocumentParser {
                                 && let Ok(para) = Paragraph::from_element(element)
                             {
                                 elements.push(DocumentOrderElement::Paragraph(para));
+                            }
+                        },
+                        "text:numbered-paragraph" if table_depth == 0 && list_depth == 0 => {
+                            // Complete a top-level numbered paragraph
+                            if let Some((tag, element)) = element_stack.pop()
+                                && tag == "text:numbered-paragraph"
+                                && let Ok(para) = super::text::NumberedParagraph::from_element(element)
+                            {
+                                elements.push(DocumentOrderElement::NumberedParagraph(para));
                             }
                         },
                         "text:h" if table_depth == 0 && list_depth == 0 => {

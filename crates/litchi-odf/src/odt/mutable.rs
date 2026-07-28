@@ -126,6 +126,9 @@ impl MutableDocument {
             .into_iter()
             .map(|element| match element {
                 DocumentOrderElement::Paragraph(paragraph) => DocumentElement::Paragraph(paragraph),
+                DocumentOrderElement::NumberedParagraph(paragraph) => {
+                    DocumentElement::Paragraph(paragraph.into_paragraph())
+                },
                 DocumentOrderElement::Heading(heading) => DocumentElement::Heading(heading),
                 DocumentOrderElement::Table(table) => DocumentElement::Table(table),
                 DocumentOrderElement::List(list) => DocumentElement::List(list),
@@ -3036,6 +3039,7 @@ mod tests {
             .iter()
             .map(|element| match element {
                 DocumentOrderElement::Paragraph(_) => "paragraph",
+                DocumentOrderElement::NumberedParagraph(_) => "numbered-paragraph",
                 DocumentOrderElement::Heading(_) => "heading",
                 DocumentOrderElement::Table(_) => "table",
                 DocumentOrderElement::List(_) => "list",

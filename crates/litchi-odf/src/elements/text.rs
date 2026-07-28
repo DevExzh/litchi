@@ -59,6 +59,12 @@ impl Paragraph {
         Ok(Self { element })
     }
 
+    /// Wrap an element as a paragraph without a tag check; used when
+    /// converting a `text:numbered-paragraph`.
+    pub(crate) fn from_element_unchecked(element: Element) -> Self {
+        Self { element }
+    }
+
     /// Get the text content of the paragraph
     pub fn text(&self) -> Result<String> {
         Ok(self.element.get_text_recursive())
@@ -128,6 +134,98 @@ impl Paragraph {
     /// Set the style name
     pub fn set_style_name(&mut self, name: &str) {
         self.element.set_attribute("text:style-name", name);
+    }
+}
+
+/// A `text:numbered-paragraph`: a paragraph with explicit list numbering.
+///
+/// The numbering attributes are inert metadata: numbers are never computed,
+/// list styles are never resolved, and no list structure is altered.
+#[derive(Clone, Debug)]
+pub struct NumberedParagraph {
+    element: Element,
+}
+
+impl Default for NumberedParagraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NumberedParagraph {
+    /// Create a new numbered paragraph.
+    pub fn new() -> Self {
+        Self {
+            element: Element::new("text:numbered-paragraph"),
+        }
+    }
+
+    /// Create from an existing element, validating the tag.
+    pub fn from_element(element: Element) -> Result<Self> {
+        if element.tag_name() != "text:numbered-paragraph" {
+            return Err(Error::InvalidFormat(
+                "Element is not a numbered paragraph".to_string(),
+            ));
+        }
+        Ok(Self { element })
+    }
+
+    /// Get the text content of the paragraph.
+    pub fn text(&self) -> Result<String> {
+        Ok(self.element.get_text_recursive())
+    }
+
+    /// Set the text content of the paragraph.
+    pub fn set_text(&mut self, text: &str) {
+        self.element.set_text(text);
+    }
+
+    /// Get the underlying element.
+    pub fn element(&self) -> &Element {
+        &self.element
+    }
+
+    /// The `text:style-name` of the paragraph style.
+    pub fn style_name(&self) -> Option<&str> {
+        self.element.get_attribute("text:style-name")
+    }
+
+    /// The `text:level` nesting level of the paragraph.
+    pub fn level(&self) -> Option<Result<u32>> {
+        self.element
+            .get_attribute("text:level")
+            .map(|value| {
+                value.parse::<u32>().map_err(|_| {
+                    Error::InvalidFormat("text:level is not a non-negative integer".to_string())
+                })
+            })
+    }
+
+    /// The `text:list-id` identifying the list the paragraph belongs to.
+    pub fn list_id(&self) -> Option<&str> {
+        self.element.get_attribute("text:list-id")
+    }
+
+    /// The `text:start-value` restarting numbering at this paragraph.
+    pub fn start_value(&self) -> Option<Result<i32>> {
+        self.element
+            .get_attribute("text:start-value")
+            .map(|value| {
+                value.parse::<i32>().map_err(|_| {
+                    Error::InvalidFormat("text:start-value is not an integer".to_string())
+                })
+            })
+    }
+
+    /// Convert into a plain paragraph view of the same content.
+    pub fn into_paragraph(self) -> Paragraph {
+        Paragraph::from_element_unchecked(self.element)
+    }
+}
+
+impl From<NumberedParagraph> for Element {
+    fn from(para: NumberedParagraph) -> Element {
+        para.element
     }
 }
 

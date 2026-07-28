@@ -425,7 +425,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | Document and template packages, paths, readers, and bytes |
-| Text, paragraphs, spans, and headings | ✅ | ✅ | ✅ | Rich text extraction and mutation, including paragraphs nested inside anchored frames, text boxes, custom shapes, inline annotations, and framed tables; note bodies, ruby text, and tracked changes remain excluded from block extraction |
+| Text, paragraphs, spans, and headings | ✅ | ✅ | ✅ | Rich text extraction and mutation, including `text:numbered-paragraph` blocks with inert numbering attributes and paragraphs nested inside anchored frames, text boxes, custom shapes, inline annotations, and framed tables; note bodies, ruby text, and tracked changes remain excluded from block extraction |
 | Tables | ✅ | ✅ | ✅ | Nested tables, properties, rows, and cells |
 | Lists and outline styles | ✅ | ✅ | ✅ | Ordered/unordered lists, labels, outline levels, alignment, and typed outline-style inspection/mutation; no label regeneration |
 | Sections | ✅ | ✅ | ✅ | Add, wrap, unwrap, replace, remove, and protected/linked metadata |
