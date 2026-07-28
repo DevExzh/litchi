@@ -648,7 +648,5 @@ fn leaf_refs(reference: &str) -> &'static [&'static str] {
 }
 
 fn leaf_is_list(reference: &str) -> bool {
-    match reference {
-        _ => false,
-    }
+    false
 }

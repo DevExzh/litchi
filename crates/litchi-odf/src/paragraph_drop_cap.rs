@@ -713,11 +713,9 @@ pub(crate) fn set_paragraph_style_drop_cap_xml(
                     } else if depth == sd + 2
                         && current.0 == KnownNamespace::Style
                         && current.1 == b"drop-cap"
-                    {
-                        if active.as_mut().unwrap().cap.replace(span).is_some() {
+                        && active.as_mut().unwrap().cap.replace(span).is_some() {
                             return Err(bad("duplicate style:drop-cap"));
                         }
-                    }
                 }
             },
             Ok(Event::Empty(start)) => {
@@ -762,11 +760,9 @@ pub(crate) fn set_paragraph_style_drop_cap_xml(
                     } else if depth == sd + 2
                         && current.0 == KnownNamespace::Style
                         && current.1 == b"drop-cap"
-                    {
-                        if active.as_mut().unwrap().cap.replace(span).is_some() {
+                        && active.as_mut().unwrap().cap.replace(span).is_some() {
                             return Err(bad("duplicate style:drop-cap"));
                         }
-                    }
                 }
             },
             Ok(Event::End(_)) => {

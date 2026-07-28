@@ -1168,11 +1168,9 @@ pub fn set_table_row_style_properties_xml(
                 } else if depth_target.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"table-row-properties"
-                {
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    && active.as_mut().unwrap().properties.replace(span).is_some() {
                         return Err(bad("duplicate style:table-row-properties"));
                     }
-                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;

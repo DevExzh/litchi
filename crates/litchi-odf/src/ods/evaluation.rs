@@ -545,11 +545,10 @@ fn normalize_sheet_name(value: &str) -> Option<String> {
     let mut unescaped = String::with_capacity(unquoted.len());
     let mut characters = unquoted.chars();
     while let Some(character) = characters.next() {
-        if character == '\'' {
-            if characters.next() != Some('\'') {
+        if character == '\''
+            && characters.next() != Some('\'') {
                 return None;
             }
-        }
         unescaped.push(character);
     }
 
@@ -624,7 +623,7 @@ fn parse_a1_coordinate(value: &str) -> SheetResult<(u32, u32)> {
 
     let mut row = 0u32;
     let mut saw_row = false;
-    while let Some(character) = characters.next() {
+    for character in characters {
         if !character.is_ascii_digit() {
             return Err(sheet_error(format!(
                 "invalid ODS cell coordinate '{value}'"

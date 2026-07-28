@@ -655,26 +655,24 @@ fn scan(xml: &str) -> Result<Scan> {
                     return invalid("unexpected child element in generic form control");
                 }
             },
-            Event::Text(text) => {
-                if stack.iter().any(|open| open.control.is_some()) {
+            Event::Text(text)
+                if stack.iter().any(|open| open.control.is_some()) => {
                     let decoded = text.decode().map_err(|error| {
                         Error::InvalidFormat(format!("invalid generic control text: {error}"))
                     })?;
                     if !decoded.trim().is_empty() {
                         return invalid("generic form controls cannot contain character data");
                     }
-                }
-            },
-            Event::CData(text) => {
-                if stack.iter().any(|open| open.control.is_some()) {
+                },
+            Event::CData(text)
+                if stack.iter().any(|open| open.control.is_some()) => {
                     let decoded = text.decode().map_err(|error| {
                         Error::InvalidFormat(format!("invalid generic control CDATA: {error}"))
                     })?;
                     if !decoded.trim().is_empty() {
                         return invalid("generic form controls cannot contain CDATA");
                     }
-                }
-            },
+                },
             Event::GeneralRef(_) if stack.iter().any(|open| open.control.is_some()) => {
                 return invalid("generic form controls cannot contain entity references");
             },

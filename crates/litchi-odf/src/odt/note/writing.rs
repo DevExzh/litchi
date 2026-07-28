@@ -231,8 +231,8 @@ fn scan_locations(xml: &str) -> Result<Scan> {
                     note_requires_text_binding,
                 });
             },
-            Event::Empty(ref element) => {
-                if text_element && element.local_name().as_ref() == b"p" {
+            Event::Empty(ref element)
+                if text_element && element.local_name().as_ref() == b"p" => {
                     let start = event_start(xml, event_end)?;
                     let qname = std::str::from_utf8(element.name().as_ref())
                         .map_err(|_| {
@@ -247,8 +247,7 @@ fn scan_locations(xml: &str) -> Result<Scan> {
                         qname,
                         requires_text_binding: !element.name().as_ref().starts_with(b"text:"),
                     }));
-                }
-            },
+                },
             Event::End(ref element) => {
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     Error::InvalidFormat("note mutation XML stack underflow".to_string())

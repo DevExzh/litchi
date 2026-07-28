@@ -228,7 +228,9 @@ pub struct ChartPlotAreaSpec {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[derive(Default)]
 pub enum ChartCachedValue {
+    #[default]
     Empty,
     Float(f64),
     Percentage(f64),
@@ -239,9 +241,6 @@ pub enum ChartCachedValue {
     String(String),
 }
 
-impl Default for ChartCachedValue {
-    fn default() -> Self { Self::Empty }
-}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ChartCachedCell {
@@ -713,7 +712,7 @@ fn validate_table(table: &ChartCachedTable) -> Result<()> {
         }
         if columns > u64::from(table.columns) { return invalid("cached table row exceeds declared column count"); }
     }
-    if expanded_rows.checked_mul(u64::from(table.columns)).unwrap_or(u64::MAX) > MAX_EXPANDED_CELLS { return invalid("expanded cached table exceeds safety limit"); }
+    if expanded_rows.saturating_mul(u64::from(table.columns)) > MAX_EXPANDED_CELLS { return invalid("expanded cached table exceeds safety limit"); }
     validate_extensions(&table.extensions)
 }
 

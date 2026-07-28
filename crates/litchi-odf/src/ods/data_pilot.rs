@@ -526,9 +526,8 @@ pub(crate) fn parse_data_pilot_range(value: &str) -> Result<ParsedDataPilotRange
                 continue;
             }
             quoted = !quoted;
-        } else if character == ':' && !quoted {
-            if separator.replace(index).is_some() { return Err(invalid_message("invalid data-pilot cell range")); }
-        }
+        } else if character == ':' && !quoted
+            && separator.replace(index).is_some() { return Err(invalid_message("invalid data-pilot cell range")); }
     }
     if quoted { return Err(invalid_message("unterminated quoted sheet name in data-pilot range")); }
     let (first, second) = separator.map_or((value, None), |at| (&value[..at], Some(&value[at + 1..])));

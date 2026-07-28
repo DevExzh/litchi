@@ -1300,11 +1300,9 @@ pub fn set_drawing_page_style_properties_xml(
                 } else if target_depth.is_some_and(|value| depth == value + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"drawing-page-properties"
-                {
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    && active.as_mut().unwrap().properties.replace(span).is_some() {
                         return Err(bad("duplicate style:drawing-page-properties"));
                     }
-                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;

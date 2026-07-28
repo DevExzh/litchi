@@ -942,11 +942,10 @@ fn parse_part(
                     ));
                 }
             },
-            Event::CData(ref value) if pending.is_some() || active.is_some() => {
-                if !value.is_empty() {
+            Event::CData(ref value) if (pending.is_some() || active.is_some())
+                && !value.is_empty() => {
                     return Err(invalid("declaration elements cannot contain CDATA"));
-                }
-            },
+                },
             Event::GeneralRef(_) if pending.is_some() || active.is_some() => {
                 return Err(invalid(
                     "declaration elements cannot contain entity references",
@@ -1390,7 +1389,7 @@ fn nearest_scope(stack: &[Frame]) -> Result<Option<OdfVariableScope>> {
 }
 
 fn container_kind(namespace: Option<&str>, local: &str) -> Option<OdfVariableKind> {
-    (namespace == Some(TEXT)).then(|| match local {
+    (namespace == Some(TEXT)).then_some(match local {
         "variable-decls" => Some(OdfVariableKind::Simple),
         "user-field-decls" => Some(OdfVariableKind::User),
         "sequence-decls" => Some(OdfVariableKind::Sequence),

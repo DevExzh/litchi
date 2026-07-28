@@ -401,11 +401,9 @@ pub fn parse_notes_configurations(xml: &str) -> Result<OdfNotesConfigurations> {
                     return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                 }
                 if namespace == NamespaceKind::Office && element.local_name().as_ref() == b"styles"
-                {
-                    if styles_content_depth.replace(depth).is_some() {
+                    && styles_content_depth.replace(depth).is_some() {
                         return invalid("ODF XML contains nested office:styles elements");
                     }
-                }
                 if namespace == NamespaceKind::Style
                     && element.local_name().as_ref() == b"section-properties"
                     && section_properties_depth.replace(depth).is_some()

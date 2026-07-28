@@ -637,11 +637,9 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                     && local == "presentation-page-layout"
                     && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
                     && parse_layout(&reader, element)?.name == name
-                {
-                    if target.is_some() || open_target.replace((depth, start)).is_some() {
+                    && (target.is_some() || open_target.replace((depth, start)).is_some()) {
                         return invalid("duplicate target presentation page layout");
                     }
-                }
                 stack.push(Frame { namespace, local });
             },
             Event::Empty(ref element) => {
@@ -652,11 +650,9 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                     && local == "presentation-page-layout"
                     && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
                     && parse_layout(&reader, element)?.name == name
-                {
-                    if target.replace(XmlSpan { start, end }).is_some() || open_target.is_some() {
+                    && (target.replace(XmlSpan { start, end }).is_some() || open_target.is_some()) {
                         return invalid("duplicate target presentation page layout");
                     }
-                }
                 if namespace == NamespaceKind::Office && local == "styles" {
                     if styles_site.is_some() {
                         return invalid("multiple office:styles elements are not supported");
@@ -813,7 +809,7 @@ fn validate_decimal(value: &str, complete: &str) -> Result<()> {
     if parts.next().is_some()
         || !integer.bytes().all(|value| value.is_ascii_digit())
         || fraction.is_some_and(|value| !value.bytes().all(|byte| byte.is_ascii_digit()))
-        || integer.is_empty() && fraction.map_or(true, str::is_empty)
+        || integer.is_empty() && fraction.is_none_or(str::is_empty)
     {
         return invalid(format!("invalid presentation measure '{complete}'"));
     }

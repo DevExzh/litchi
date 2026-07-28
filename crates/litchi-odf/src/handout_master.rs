@@ -158,8 +158,8 @@ pub fn parse_handout_master(xml: &str) -> Result<Option<HandoutMaster>> {
                     ));
                 }
             },
-            Event::Empty(element) => {
-                if style_element && element.local_name().as_ref() == b"handout-master" {
+            Event::Empty(element)
+                if style_element && element.local_name().as_ref() == b"handout-master" => {
                     if active.is_some() {
                         return Err(invalid("duplicate style:handout-master element"));
                     }
@@ -197,8 +197,7 @@ pub fn parse_handout_master(xml: &str) -> Result<Option<HandoutMaster>> {
                         shapes_xml: String::new(),
                         xml: xml[event_start..event_end].to_string(),
                     }));
-                }
-            },
+                },
             Event::End(element) => {
                 depth = depth
                     .checked_sub(1)

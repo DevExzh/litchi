@@ -240,7 +240,7 @@ fn select_chart_object(objects: &[OdfEmbeddedObject], index: usize) -> Result<&O
         || object.may_script.is_some()
         || object.applet_name.is_some()
         || object.mime_type.is_some()
-        || object.parameters.len() > 0
+        || !object.parameters.is_empty()
         || object.link_type.as_deref().is_some_and(|value| value != "simple")
         || object.show.as_deref().is_some_and(|value| value != "embed")
         || object.actuate.as_deref().is_some_and(|value| value != "onLoad")
@@ -510,11 +510,10 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
                 }
                 depth = depth.checked_add(1).ok_or_else(|| Error::InvalidFormat("XML depth overflow".to_string()))?;
             },
-            Event::Empty(element) => {
-                if is_object(namespace, element.local_name().as_ref()) {
+            Event::Empty(element)
+                if is_object(namespace, element.local_name().as_ref()) => {
                     spans.push(ObjectSpan { start: event_start, end: event_end, inline_payload: None });
-                }
-            },
+                },
             Event::End(element) => {
                 depth = depth.checked_sub(1).ok_or_else(|| Error::InvalidFormat("XML depth underflow".to_string()))?;
                 if let Some(object) = active.as_mut()
@@ -575,11 +574,10 @@ pub(crate) fn insert_at_host(xml: &str, host: EmbeddedChartHost<'_>, frame: &str
                 }
                 depth = depth.checked_add(1).ok_or_else(|| Error::InvalidFormat("XML depth overflow".to_string()))?;
             },
-            Event::Empty(element) => {
-                if host_matches(&reader, namespace, &element, &host)? {
+            Event::Empty(element)
+                if host_matches(&reader, namespace, &element, &host)? => {
                     return invalid("embedded chart host must not be self-closing");
-                }
-            },
+                },
             Event::End(element) => {
                 depth = depth.checked_sub(1).ok_or_else(|| Error::InvalidFormat("XML depth underflow".to_string()))?;
                 if shapes_depth == Some(depth)

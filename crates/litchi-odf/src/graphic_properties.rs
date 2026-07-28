@@ -250,7 +250,7 @@ fn validate_ref(reference: &str, value: &str) -> Option<GraphicPropertyValue> {
             values
                 .iter()
                 .all(|value| ncname(value, false))
-                .then(|| GraphicPropertyValue::StyleNameRefs(values))
+                .then_some(GraphicPropertyValue::StyleNameRefs(values))
         },
         "horizontal-mirror" => matches!(
             value,
@@ -1134,11 +1134,9 @@ pub fn set_graphic_style_properties_xml(
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == ElementNs::Style
                     && current.1 == b"graphic-properties"
-                {
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    && active.as_mut().unwrap().properties.replace(span).is_some() {
                         return Err(bad("duplicate style:graphic-properties"));
                     }
-                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;

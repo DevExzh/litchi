@@ -507,16 +507,15 @@ fn scan(xml: &str) -> Result<Scan> {
                     }
                 }
             },
-            Event::Text(text) => {
-                if stack.last().is_some_and(|open| open.paragraph) {
+            Event::Text(text)
+                if stack.last().is_some_and(|open| open.paragraph) => {
                     paragraph_text.push_str(&text.decode().map_err(|error| {
                         Error::InvalidFormat(format!("invalid textarea text: {error}"))
                     })?);
                     if paragraph_text.len() > MAX_STRING {
                         return invalid("textarea paragraph exceeds 1 MiB");
                     }
-                }
-            },
+                },
             Event::End(ref element) => {
                 let open = stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("form control XML stack underflow".to_string())

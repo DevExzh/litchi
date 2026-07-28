@@ -1274,7 +1274,7 @@ fn reject_duplicate(
 ) -> Result<()> {
     for item in &form.controls {
         if item.control.name() == replacement.name()
-            && !current.is_some_and(|v| v.name() == item.control.name())
+            && current.is_none_or(|v| v.name() != item.control.name())
         {
             return invalid(format!(
                 "duplicate selection control name '{}'",
@@ -1282,7 +1282,7 @@ fn reject_duplicate(
             ));
         }
         if item.control.xml_id() == replacement.xml_id()
-            && !current.is_some_and(|v| v.xml_id() == item.control.xml_id())
+            && current.is_none_or(|v| v.xml_id() != item.control.xml_id())
         {
             return invalid(format!(
                 "duplicate selection control xml:id '{}'",

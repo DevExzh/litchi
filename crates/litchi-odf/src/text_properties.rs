@@ -841,11 +841,9 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"text-properties"
-                {
-                    if active.as_mut().unwrap().properties.replace(span).is_some() {
+                    && active.as_mut().unwrap().properties.replace(span).is_some() {
                         return Err(bad("duplicate style:text-properties"));
                     }
-                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;

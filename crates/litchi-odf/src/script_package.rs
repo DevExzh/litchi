@@ -221,11 +221,11 @@ fn locate_scripts_element(content: &str) -> Result<(Option<(usize, usize)>, usiz
                 }
                 depth = depth.checked_add(1).ok_or_else(|| Error::InvalidFormat("XML depth overflow".to_string()))?;
             },
-            Event::Empty(element) => {
-                if depth == 1 && is_office_scripts(office_namespace, element.local_name().as_ref()) {
-                    if found.is_some() || active.is_some() { return invalid("multiple office:scripts elements"); }
-                    found = Some((start, end));
-                }
+            Event::Empty(element)
+                if depth == 1 && is_office_scripts(office_namespace, element.local_name().as_ref()) =>
+            {
+                if found.is_some() || active.is_some() { return invalid("multiple office:scripts elements"); }
+                found = Some((start, end));
             },
             Event::End(element) => {
                 depth = depth.checked_sub(1).ok_or_else(|| Error::InvalidFormat("XML depth underflow".to_string()))?;
@@ -331,7 +331,7 @@ fn validate_inert_xml(bytes: &[u8], allow_legacy_doctype: bool) -> Result<()> {
                 depth += 1;
                 if depth > MAX_XML_DEPTH { return invalid("script XML depth limit exceeded"); }
             },
-            Event::Empty(_) => if depth == 0 { roots += 1; },
+            Event::Empty(_) if depth == 0 => roots += 1,
             Event::End(_) => depth = depth.checked_sub(1).ok_or_else(|| Error::InvalidFormat("script XML depth underflow".to_string()))?,
             Event::DocType(value) => {
                 let declaration = value.decode().map_err(|error| Error::InvalidFormat(format!("invalid script XML DTD: {error}")))?;

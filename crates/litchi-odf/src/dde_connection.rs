@@ -250,12 +250,10 @@ fn parse_part(
                 }
             },
             Event::CData(ref value)
-                if pending_declaration.is_some() || pending_use.is_some() || active.is_some() =>
-            {
-                if !value.is_empty() {
+                if (pending_declaration.is_some() || pending_use.is_some() || active.is_some())
+                && !value.is_empty() => {
                     return invalid("DDE connection elements cannot contain CDATA");
-                }
-            },
+                },
             Event::GeneralRef(_)
                 if pending_declaration.is_some() || pending_use.is_some() || active.is_some() =>
             {

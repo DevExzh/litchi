@@ -159,7 +159,7 @@ pub(crate) fn parse_page_sequence(xml: &str) -> Result<Option<OdtPageSequence>> 
                     Frame::PageSequence => {
                         if sequence
                             .as_ref()
-                            .map_or(true, |value| value.master_page_names.is_empty())
+                            .is_none_or(|value| value.master_page_names.is_empty())
                         {
                             return Err(invalid(
                                 "text:page-sequence must contain at least one text:page",

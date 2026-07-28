@@ -558,13 +558,12 @@ fn find_section_site(xml: &str, name: &str) -> Result<SectionSite> {
                         source_end: None,
                         source_depth: None,
                     });
-                } else if element_is(&reader, &element, TEXT_NS, b"section-source") {
-                    if let Some(section) = stack.last_mut()
+                } else if element_is(&reader, &element, TEXT_NS, b"section-source")
+                    && let Some(section) = stack.last_mut()
                         && depth == section.content_depth
                     {
                         section.source_depth = Some(depth + 1);
                     }
-                }
                 depth += 1;
             },
             Event::Empty(element) => {

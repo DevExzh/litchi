@@ -920,7 +920,7 @@ fn reject_duplicate(
     current: Option<&OdfInteractiveControl>,
 ) -> Result<()> {
     for name in &form.names {
-        if name == replacement.name() && !current.is_some_and(|value| value.name() == name) {
+        if name == replacement.name() && current.is_none_or(|value| value.name() != name) {
             return invalid(format!(
                 "duplicate form control name '{}'",
                 replacement.name()
@@ -929,7 +929,7 @@ fn reject_duplicate(
     }
     for item in &form.controls {
         if item.control.xml_id() == replacement.xml_id()
-            && !current.is_some_and(|value| value.xml_id() == item.control.xml_id())
+            && current.is_none_or(|value| value.xml_id() != item.control.xml_id())
         {
             return invalid(format!(
                 "duplicate form control xml:id '{}'",

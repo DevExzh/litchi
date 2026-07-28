@@ -1131,11 +1131,9 @@ pub fn set_table_style_properties_xml(xml: &str, want: &TableStyleProperties) ->
                 } else if td.is_some_and(|x| d == x + 1)
                     && c.0 == Ns::S
                     && c.1 == b"table-properties"
-                {
-                    if active.as_mut().unwrap().properties.replace(s).is_some() {
+                    && active.as_mut().unwrap().properties.replace(s).is_some() {
                         return Err(bad("duplicate style:table-properties"));
                     }
-                }
             },
             Ok(Event::End(_)) => {
                 let end = r.buffer_position() as usize;

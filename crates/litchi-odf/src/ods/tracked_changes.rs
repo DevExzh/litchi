@@ -1961,7 +1961,8 @@ fn resolve_reference(name: &str) -> Result<String> {
     let value = if let Some(value) = builtin {
         value
     } else {
-        let scalar = if let Some(hex) = name.strip_prefix("#x") {
+        
+        if let Some(hex) = name.strip_prefix("#x") {
             u32::from_str_radix(hex, 16).ok()
         } else if let Some(decimal) = name.strip_prefix('#') {
             decimal.parse::<u32>().ok()
@@ -1977,8 +1978,7 @@ fn resolve_reference(name: &str) -> Result<String> {
         .and_then(char::from_u32)
         .ok_or_else(|| {
             Error::InvalidFormat(format!("unsupported tracked-change entity '&{name};'"))
-        })?;
-        scalar
+        })?
     };
     Ok(value.to_string())
 }
