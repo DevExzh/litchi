@@ -272,6 +272,338 @@ pub struct SectionDocumentGrid {
     pub char_space: Option<i32>,
 }
 
+/// Maximum page-border size in eighths of a point for line-style borders
+/// (`ST_EighthPointMeasure`, ECMA-376 §17.18.11).
+const MAX_PAGE_BORDER_LINE_SIZE: u32 = 96;
+/// Maximum page-border size in points for art borders
+/// (`ST_PointMeasure`, ECMA-376 §17.18.68).
+const MAX_PAGE_BORDER_ART_SIZE: u32 = 1638;
+/// Maximum page-border spacing from text or page edge in points
+/// (`w:space` on `CT_Border` is limited to 31, ECMA-376 §17.6.16).
+const MAX_PAGE_BORDER_SPACE: u32 = 31;
+/// Maximum length of a page-border art style name.
+const MAX_PAGE_BORDER_ART_NAME_LEN: usize = 64;
+
+/// Page-border style (`ST_Border`, ECMA-376 §17.18.2).
+///
+/// Line styles map to the fixed `ST_Border` tokens; border artwork uses
+/// [`PageBorderStyle::Art`] with the art token preserved verbatim.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PageBorderStyle {
+    Nil,
+    None,
+    Single,
+    Thick,
+    Double,
+    Dotted,
+    Dashed,
+    DotDash,
+    DotDotDash,
+    Triple,
+    ThinThickSmallGap,
+    ThinThickMediumGap,
+    ThinThickLargeGap,
+    ThickThinSmallGap,
+    ThickThinMediumGap,
+    ThickThinLargeGap,
+    ThinThickThinSmallGap,
+    ThinThickThinMediumGap,
+    ThinThickThinLargeGap,
+    Wave,
+    DoubleWave,
+    DashSmallGap,
+    DashDotStroked,
+    ThreeDEmboss,
+    ThreeDEngrave,
+    Outset,
+    Inset,
+    /// Border artwork token such as `apples` or `starsTop`.
+    Art(String),
+}
+
+impl PageBorderStyle {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Nil => "nil",
+            Self::None => "none",
+            Self::Single => "single",
+            Self::Thick => "thick",
+            Self::Double => "double",
+            Self::Dotted => "dotted",
+            Self::Dashed => "dashed",
+            Self::DotDash => "dotDash",
+            Self::DotDotDash => "dotDotDash",
+            Self::Triple => "triple",
+            Self::ThinThickSmallGap => "thinThickSmallGap",
+            Self::ThinThickMediumGap => "thinThickMediumGap",
+            Self::ThinThickLargeGap => "thinThickLargeGap",
+            Self::ThickThinSmallGap => "thickThinSmallGap",
+            Self::ThickThinMediumGap => "thickThinMediumGap",
+            Self::ThickThinLargeGap => "thickThinLargeGap",
+            Self::ThinThickThinSmallGap => "thinThickThinSmallGap",
+            Self::ThinThickThinMediumGap => "thinThickThinMediumGap",
+            Self::ThinThickThinLargeGap => "thinThickThinLargeGap",
+            Self::Wave => "wave",
+            Self::DoubleWave => "doubleWave",
+            Self::DashSmallGap => "dashSmallGap",
+            Self::DashDotStroked => "dashDotStroked",
+            Self::ThreeDEmboss => "threeDEmboss",
+            Self::ThreeDEngrave => "threeDEngrave",
+            Self::Outset => "outset",
+            Self::Inset => "inset",
+            Self::Art(name) => name.as_str(),
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        Ok(match value {
+            "nil" => Self::Nil,
+            "none" => Self::None,
+            "single" => Self::Single,
+            "thick" => Self::Thick,
+            "double" => Self::Double,
+            "dotted" => Self::Dotted,
+            "dashed" => Self::Dashed,
+            "dotDash" => Self::DotDash,
+            "dotDotDash" => Self::DotDotDash,
+            "triple" => Self::Triple,
+            "thinThickSmallGap" => Self::ThinThickSmallGap,
+            "thinThickMediumGap" => Self::ThinThickMediumGap,
+            "thinThickLargeGap" => Self::ThinThickLargeGap,
+            "thickThinSmallGap" => Self::ThickThinSmallGap,
+            "thickThinMediumGap" => Self::ThickThinMediumGap,
+            "thickThinLargeGap" => Self::ThickThinLargeGap,
+            "thinThickThinSmallGap" => Self::ThinThickThinSmallGap,
+            "thinThickThinMediumGap" => Self::ThinThickThinMediumGap,
+            "thinThickThinLargeGap" => Self::ThinThickThinLargeGap,
+            "wave" => Self::Wave,
+            "doubleWave" => Self::DoubleWave,
+            "dashSmallGap" => Self::DashSmallGap,
+            "dashDotStroked" => Self::DashDotStroked,
+            "threeDEmboss" => Self::ThreeDEmboss,
+            "threeDEngrave" => Self::ThreeDEngrave,
+            "outset" => Self::Outset,
+            "inset" => Self::Inset,
+            art
+                if !art.is_empty()
+                    && art.len() <= MAX_PAGE_BORDER_ART_NAME_LEN
+                    && art.bytes().all(|byte| byte.is_ascii_alphanumeric()) =>
+            {
+                Self::Art(art.to_string())
+            },
+            _ => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "invalid page border style '{value}'"
+                )));
+            },
+        })
+    }
+}
+
+/// Which pages display the section page border (`w:display`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageBorderDisplay {
+    AllPages,
+    FirstPage,
+    NotFirstPage,
+}
+
+impl PageBorderDisplay {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::AllPages => "allPages",
+            Self::FirstPage => "firstPage",
+            Self::NotFirstPage => "notFirstPage",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "allPages" => Ok(Self::AllPages),
+            "firstPage" => Ok(Self::FirstPage),
+            "notFirstPage" => Ok(Self::NotFirstPage),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid page border display '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Page-border measurement origin (`w:offsetFrom`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageBorderOffsetFrom {
+    Page,
+    Text,
+}
+
+impl PageBorderOffsetFrom {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Page => "page",
+            Self::Text => "text",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "page" => Ok(Self::Page),
+            "text" => Ok(Self::Text),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid page border offset '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Whether the page border renders in front of or behind text (`w:zOrder`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageBorderZOrder {
+    Front,
+    Back,
+}
+
+impl PageBorderZOrder {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Front => "front",
+            Self::Back => "back",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "front" => Ok(Self::Front),
+            "back" => Ok(Self::Back),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid page border z-order '{value}'"
+            ))),
+        }
+    }
+}
+
+/// One page-border edge (`CT_Border`, ECMA-376 §17.6.16).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionPageBorder {
+    pub style: PageBorderStyle,
+    /// Border size in eighths of a point for line styles, points for art.
+    pub size: Option<u32>,
+    /// Border offset space in points (`0..=31`).
+    pub space: Option<u32>,
+    /// Border color as `RRGGBB` hex or `auto`.
+    pub color: Option<String>,
+    pub shadow: bool,
+    pub frame: bool,
+}
+
+/// Section page-border settings (`CT_PageBorders`, ECMA-376 §17.6.16).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SectionPageBorders {
+    pub offset_from: PageBorderOffsetFrom,
+    pub z_order: PageBorderZOrder,
+    pub display: PageBorderDisplay,
+    pub top: Option<SectionPageBorder>,
+    pub left: Option<SectionPageBorder>,
+    pub bottom: Option<SectionPageBorder>,
+    pub right: Option<SectionPageBorder>,
+}
+
+impl Default for SectionPageBorders {
+    fn default() -> Self {
+        Self {
+            offset_from: PageBorderOffsetFrom::Page,
+            z_order: PageBorderZOrder::Back,
+            display: PageBorderDisplay::AllPages,
+            top: None,
+            left: None,
+            bottom: None,
+            right: None,
+        }
+    }
+}
+
+/// Paper-source tray codes (`CT_PaperSource`, ECMA-376 §17.6.19).
+///
+/// Values are printer-driver tray codes; `first` applies to the first page,
+/// `other` to the remaining pages of the section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SectionPaperSource {
+    pub first: Option<u32>,
+    pub other: Option<u32>,
+}
+
+/// Line-number restart policy (`ST_LineNumberRestart`, ECMA-376 §17.18.49).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineNumberRestart {
+    NewPage,
+    NewSection,
+    Continuous,
+}
+
+impl LineNumberRestart {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NewPage => "newPage",
+            Self::NewSection => "newSection",
+            Self::Continuous => "continuous",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "newPage" => Ok(Self::NewPage),
+            "newSection" => Ok(Self::NewSection),
+            "continuous" => Ok(Self::Continuous),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid line-number restart '{value}'"
+            ))),
+        }
+    }
+}
+
+/// Section line-numbering settings (`CT_LineNumber`, ECMA-376 §17.6.12).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SectionLineNumbering {
+    /// Line-number increment; lines are numbered when divisible by this value.
+    pub count_by: Option<u32>,
+    /// First line number used by the numbering scheme.
+    pub start: Option<u32>,
+    /// Distance between line numbers and text in twips.
+    pub distance: Option<u32>,
+    pub restart: Option<LineNumberRestart>,
+}
+
+/// Vertical content alignment (`ST_VerticalJc`, ECMA-376 §17.18.100).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionVerticalAlignment {
+    Top,
+    Center,
+    Justified,
+    Bottom,
+}
+
+impl SectionVerticalAlignment {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Top => "top",
+            Self::Center => "center",
+            Self::Justified => "both",
+            Self::Bottom => "bottom",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "top" => Ok(Self::Top),
+            "center" => Ok(Self::Center),
+            "both" => Ok(Self::Justified),
+            "bottom" => Ok(Self::Bottom),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "invalid section vertical alignment '{value}'"
+            ))),
+        }
+    }
+}
+
 /// Typed WordprocessingML `sectPr` properties.
 #[derive(Debug, Clone)]
 pub struct SectionProperties {
@@ -295,6 +627,18 @@ pub struct SectionProperties {
     pub text_direction: Option<SectionTextDirection>,
     pub document_grid: Option<SectionDocumentGrid>,
     pub form_protection: bool,
+    pub paper_source: Option<SectionPaperSource>,
+    pub page_borders: Option<SectionPageBorders>,
+    pub line_numbering: Option<SectionLineNumbering>,
+    pub vertical_alignment: Option<SectionVerticalAlignment>,
+    /// Different first-page header/footer (`w:titlePg`).
+    pub title_page: bool,
+    /// Right-to-left section layout (`w:bidi`).
+    pub bidirectional: bool,
+    /// Gutter positioned on the right side (`w:rtlGutter`).
+    pub rtl_gutter: bool,
+    /// Relationship ID of the printer-settings part (`w:printerSettings`).
+    pub printer_settings_relationship_id: Option<String>,
     preserved_unknown_children: Vec<String>,
 }
 
@@ -321,6 +665,14 @@ impl Default for SectionProperties {
             text_direction: None,
             document_grid: None,
             form_protection: false,
+            paper_source: None,
+            page_borders: None,
+            line_numbering: None,
+            vertical_alignment: None,
+            title_page: false,
+            bidirectional: false,
+            rtl_gutter: false,
+            printer_settings_relationship_id: None,
             preserved_unknown_children: Vec::new(),
         }
     }
@@ -473,14 +825,41 @@ impl SectionProperties {
                     assign_u32(&attrs, "gutter", &mut properties.gutter)?;
                 },
                 "pgNumType" => properties.page_numbering = Some(parse_page_numbering(&raw)?),
+                "paperSrc" => {
+                    let attrs = attributes(&raw)?;
+                    properties.paper_source = Some(SectionPaperSource {
+                        first: attr(&attrs, "first")
+                            .map(|value| parse_u32(value, "first paper source"))
+                            .transpose()?,
+                        other: attr(&attrs, "other")
+                            .map(|value| parse_u32(value, "other paper source"))
+                            .transpose()?,
+                    });
+                },
+                "pgBorders" => properties.page_borders = Some(parse_page_borders(&raw)?),
+                "lnNumType" => {
+                    properties.line_numbering = Some(parse_line_numbering(&raw)?);
+                },
                 "cols" => properties.columns = Some(parse_columns(&raw)?),
                 "formProt" => properties.form_protection = parse_on_off(&raw)?,
+                "vAlign" => {
+                    properties.vertical_alignment = Some(SectionVerticalAlignment::parse(
+                        &required_attr(&raw, b"val")?,
+                    )?);
+                },
+                "titlePg" => properties.title_page = parse_on_off(&raw)?,
                 "textDirection" => {
                     properties.text_direction = Some(SectionTextDirection::parse(&required_attr(
                         &raw, b"val",
                     )?)?);
                 },
+                "bidi" => properties.bidirectional = parse_on_off(&raw)?,
+                "rtlGutter" => properties.rtl_gutter = parse_on_off(&raw)?,
                 "docGrid" => properties.document_grid = Some(parse_grid(&raw)?),
+                "printerSettings" => {
+                    properties.printer_settings_relationship_id =
+                        Some(required_attr(&raw, b"id")?);
+                },
                 _ => properties.preserved_unknown_children.push(raw),
             }
         }
@@ -539,6 +918,45 @@ impl SectionProperties {
                 ));
             }
         }
+        if let Some(borders) = &self.page_borders {
+            for border in [&borders.top, &borders.left, &borders.bottom, &borders.right]
+                .into_iter()
+                .flatten()
+            {
+                if let Some(size) = border.size {
+                    let max = match border.style {
+                        PageBorderStyle::Art(_) => MAX_PAGE_BORDER_ART_SIZE,
+                        _ => MAX_PAGE_BORDER_LINE_SIZE,
+                    };
+                    if size > max {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "page border size {size} exceeds the {max} limit"
+                        )));
+                    }
+                }
+                if let Some(space) = border.space
+                    && space > MAX_PAGE_BORDER_SPACE
+                {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "page border space {space} exceeds the {MAX_PAGE_BORDER_SPACE} limit"
+                    )));
+                }
+                if let Some(color) = &border.color
+                    && !(color == "auto"
+                        || (color.len() == 6
+                            && color.bytes().all(|byte| byte.is_ascii_hexdigit())))
+                {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "invalid page border color '{color}'"
+                    )));
+                }
+            }
+        }
+        if self.printer_settings_relationship_id.as_deref() == Some("") {
+            return Err(OoxmlError::InvalidFormat(
+                "section printer-settings relationship ID is empty".to_string(),
+            ));
+        }
         Ok(())
     }
 
@@ -585,6 +1003,24 @@ impl SectionProperties {
             self.gutter
         )
         .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        if let Some(paper_source) = &self.paper_source {
+            xml.push_str("<w:paperSrc");
+            if let Some(first) = paper_source.first {
+                write!(xml, " w:first=\"{first}\"")
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            }
+            if let Some(other) = paper_source.other {
+                write!(xml, " w:other=\"{other}\"")
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            }
+            xml.push_str("/>");
+        }
+        if let Some(borders) = &self.page_borders {
+            write_page_borders(xml, borders)?;
+        }
+        if let Some(numbering) = &self.line_numbering {
+            write_line_numbering(xml, numbering)?;
+        }
         if let Some(numbering) = &self.page_numbering {
             write_page_numbering(xml, numbering)?;
         }
@@ -594,12 +1030,29 @@ impl SectionProperties {
         if self.form_protection {
             xml.push_str("<w:formProt/>");
         }
+        if let Some(alignment) = self.vertical_alignment {
+            write!(xml, "<w:vAlign w:val=\"{}\"/>", alignment.as_str())
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        }
+        if self.title_page {
+            xml.push_str("<w:titlePg/>");
+        }
         if let Some(direction) = self.text_direction {
             write!(xml, "<w:textDirection w:val=\"{}\"/>", direction.as_str())
                 .map_err(|error| OoxmlError::Xml(error.to_string()))?;
         }
+        if self.bidirectional {
+            xml.push_str("<w:bidi/>");
+        }
+        if self.rtl_gutter {
+            xml.push_str("<w:rtlGutter/>");
+        }
         if let Some(grid) = &self.document_grid {
             write_grid(xml, grid)?;
+        }
+        if let Some(id) = &self.printer_settings_relationship_id {
+            write!(xml, "<w:printerSettings r:id=\"{}\"/>", escape(id))
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
         }
         for child in &self.preserved_unknown_children {
             xml.push_str(child);
@@ -618,11 +1071,19 @@ fn section_child_rank(name: &str) -> Option<u8> {
         "type" => Some(4),
         "pgSz" => Some(5),
         "pgMar" => Some(6),
-        "pgNumType" => Some(7),
-        "cols" => Some(8),
-        "formProt" => Some(9),
-        "textDirection" => Some(10),
-        "docGrid" => Some(11),
+        "paperSrc" => Some(7),
+        "pgBorders" => Some(8),
+        "lnNumType" => Some(9),
+        "pgNumType" => Some(10),
+        "cols" => Some(11),
+        "formProt" => Some(12),
+        "vAlign" => Some(13),
+        "titlePg" => Some(14),
+        "textDirection" => Some(15),
+        "bidi" => Some(16),
+        "rtlGutter" => Some(17),
+        "docGrid" => Some(18),
+        "printerSettings" => Some(19),
         _ => None,
     }
 }
@@ -922,6 +1383,85 @@ fn parse_grid(xml: &str) -> Result<SectionDocumentGrid> {
     })
 }
 
+fn parse_page_borders(xml: &str) -> Result<SectionPageBorders> {
+    let attrs = attributes(xml)?;
+    let mut borders = SectionPageBorders {
+        offset_from: attr(&attrs, "offsetFrom")
+            .map(PageBorderOffsetFrom::parse)
+            .transpose()?
+            .unwrap_or(PageBorderOffsetFrom::Page),
+        z_order: attr(&attrs, "zOrder")
+            .map(PageBorderZOrder::parse)
+            .transpose()?
+            .unwrap_or(PageBorderZOrder::Back),
+        display: attr(&attrs, "display")
+            .map(PageBorderDisplay::parse)
+            .transpose()?
+            .unwrap_or(PageBorderDisplay::AllPages),
+        ..SectionPageBorders::default()
+    };
+    for (name, raw) in direct_nested_children(xml)? {
+        let edge = match name.as_str() {
+            "top" => &mut borders.top,
+            "left" => &mut borders.left,
+            "bottom" => &mut borders.bottom,
+            "right" => &mut borders.right,
+            _ => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "invalid child '{name}' in section page borders"
+                )));
+            },
+        };
+        if edge.is_some() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "duplicate '{name}' page border edge"
+            )));
+        }
+        *edge = Some(parse_page_border(&raw)?);
+    }
+    Ok(borders)
+}
+
+fn parse_page_border(xml: &str) -> Result<SectionPageBorder> {
+    let attrs = attributes(xml)?;
+    let on_off = |name: &str| {
+        attr(&attrs, name).is_some_and(|value| matches!(value, "1" | "true" | "on"))
+    };
+    Ok(SectionPageBorder {
+        style: PageBorderStyle::parse(
+            attr(&attrs, "val")
+                .ok_or_else(|| OoxmlError::InvalidFormat("page border omits style".into()))?,
+        )?,
+        size: attr(&attrs, "sz")
+            .map(|value| parse_u32(value, "page border size"))
+            .transpose()?,
+        space: attr(&attrs, "space")
+            .map(|value| parse_u32(value, "page border space"))
+            .transpose()?,
+        color: attr(&attrs, "color").map(ToOwned::to_owned),
+        shadow: on_off("shadow"),
+        frame: on_off("frame"),
+    })
+}
+
+fn parse_line_numbering(xml: &str) -> Result<SectionLineNumbering> {
+    let attrs = attributes(xml)?;
+    Ok(SectionLineNumbering {
+        count_by: attr(&attrs, "countBy")
+            .map(|value| parse_u32(value, "line-number increment"))
+            .transpose()?,
+        start: attr(&attrs, "start")
+            .map(|value| parse_u32(value, "line-number start"))
+            .transpose()?,
+        distance: attr(&attrs, "distance")
+            .map(|value| parse_u32(value, "line-number distance"))
+            .transpose()?,
+        restart: attr(&attrs, "restart")
+            .map(LineNumberRestart::parse)
+            .transpose()?,
+    })
+}
+
 fn parse_on_off(xml: &str) -> Result<bool> {
     let attrs = attributes(xml)?;
     Ok(attr(&attrs, "val").is_none_or(|value| matches!(value, "1" | "true" | "on")))
@@ -996,6 +1536,81 @@ fn write_grid(xml: &mut String, grid: &SectionDocumentGrid) -> Result<()> {
     Ok(())
 }
 
+fn write_page_borders(xml: &mut String, borders: &SectionPageBorders) -> Result<()> {
+    write!(
+        xml,
+        "<w:pgBorders w:offsetFrom=\"{}\" w:zOrder=\"{}\" w:display=\"{}\"",
+        borders.offset_from.as_str(),
+        borders.z_order.as_str(),
+        borders.display.as_str()
+    )
+    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    let edges = [
+        ("top", &borders.top),
+        ("left", &borders.left),
+        ("bottom", &borders.bottom),
+        ("right", &borders.right),
+    ];
+    if edges.iter().all(|(_, edge)| edge.is_none()) {
+        xml.push_str("/>");
+        return Ok(());
+    }
+    xml.push('>');
+    for (name, edge) in edges {
+        if let Some(border) = edge {
+            write_page_border(xml, name, border)?;
+        }
+    }
+    xml.push_str("</w:pgBorders>");
+    Ok(())
+}
+
+fn write_page_border(xml: &mut String, name: &str, border: &SectionPageBorder) -> Result<()> {
+    write!(xml, "<w:{name} w:val=\"{}\"", escape(border.style.as_str()))
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(size) = border.size {
+        write!(xml, " w:sz=\"{size}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(space) = border.space {
+        write!(xml, " w:space=\"{space}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(color) = &border.color {
+        write!(xml, " w:color=\"{}\"", escape(color))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if border.shadow {
+        xml.push_str(" w:shadow=\"1\"");
+    }
+    if border.frame {
+        xml.push_str(" w:frame=\"1\"");
+    }
+    xml.push_str("/>");
+    Ok(())
+}
+
+fn write_line_numbering(xml: &mut String, numbering: &SectionLineNumbering) -> Result<()> {
+    xml.push_str("<w:lnNumType");
+    if let Some(count_by) = numbering.count_by {
+        write!(xml, " w:countBy=\"{count_by}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(start) = numbering.start {
+        write!(xml, " w:start=\"{start}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(distance) = numbering.distance {
+        write!(xml, " w:distance=\"{distance}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(restart) = numbering.restart {
+        write!(xml, " w:restart=\"{}\"", restart.as_str())
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    xml.push_str("/>");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1017,6 +1632,155 @@ mod tests {
         assert!(SectionProperties::from_xml("<w:sectPr><w:type w:val=\"nextPage\"/><w:type w:val=\"continuous\"/></w:sectPr>").is_err());
         let mut section = SectionProperties::default();
         section.columns = Some(SectionColumns { count: 0, ..SectionColumns::default() });
+        assert!(section.validate().is_err());
+    }
+
+    #[test]
+    fn page_layout_properties_round_trip() {
+        let xml = r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/><w:paperSrc w:first="1" w:other="260"/><w:pgBorders w:offsetFrom="text" w:zOrder="front" w:display="firstPage"><w:top w:val="double" w:sz="8" w:space="24" w:color="FF0000" w:shadow="1"/><w:bottom w:val="starsTop" w:sz="120" w:space="4" w:color="auto" w:frame="true"/></w:pgBorders><w:lnNumType w:countBy="5" w:start="0" w:distance="240" w:restart="newSection"/><w:pgNumType w:fmt="lowerRoman" w:start="3"/><w:cols w:num="2"/><w:vAlign w:val="both"/><w:titlePg/><w:bidi/><w:rtlGutter/><w:printerSettings r:id="rId9"/></w:sectPr>"#;
+        let section = SectionProperties::from_xml(xml).unwrap();
+        assert_eq!(
+            section.paper_source,
+            Some(SectionPaperSource {
+                first: Some(1),
+                other: Some(260),
+            })
+        );
+        let borders = section.page_borders.as_ref().unwrap();
+        assert_eq!(borders.offset_from, PageBorderOffsetFrom::Text);
+        assert_eq!(borders.z_order, PageBorderZOrder::Front);
+        assert_eq!(borders.display, PageBorderDisplay::FirstPage);
+        let top = borders.top.as_ref().unwrap();
+        assert_eq!(top.style, PageBorderStyle::Double);
+        assert_eq!(top.size, Some(8));
+        assert_eq!(top.space, Some(24));
+        assert_eq!(top.color.as_deref(), Some("FF0000"));
+        assert!(top.shadow);
+        assert!(!top.frame);
+        let bottom = borders.bottom.as_ref().unwrap();
+        assert_eq!(bottom.style, PageBorderStyle::Art("starsTop".to_string()));
+        assert_eq!(bottom.size, Some(120));
+        assert_eq!(bottom.color.as_deref(), Some("auto"));
+        assert!(bottom.frame);
+        assert!(borders.left.is_none() && borders.right.is_none());
+        assert_eq!(
+            section.line_numbering,
+            Some(SectionLineNumbering {
+                count_by: Some(5),
+                start: Some(0),
+                distance: Some(240),
+                restart: Some(LineNumberRestart::NewSection),
+            })
+        );
+        assert_eq!(
+            section.vertical_alignment,
+            Some(SectionVerticalAlignment::Justified)
+        );
+        assert!(section.title_page);
+        assert!(section.bidirectional);
+        assert!(section.rtl_gutter);
+        assert_eq!(
+            section.printer_settings_relationship_id.as_deref(),
+            Some("rId9")
+        );
+
+        let mut output = String::new();
+        section.write_xml(&mut output, None).unwrap();
+        let reparsed = SectionProperties::from_xml(&output).unwrap();
+        assert_eq!(reparsed.paper_source, section.paper_source);
+        assert_eq!(reparsed.page_borders, section.page_borders);
+        assert_eq!(reparsed.line_numbering, section.line_numbering);
+        assert_eq!(reparsed.vertical_alignment, section.vertical_alignment);
+        assert!(reparsed.title_page && reparsed.bidirectional && reparsed.rtl_gutter);
+        assert_eq!(
+            reparsed.printer_settings_relationship_id,
+            section.printer_settings_relationship_id
+        );
+    }
+
+    #[test]
+    fn page_layout_defaults_and_empty_edges() {
+        let xml = r#"<w:sectPr><w:pgBorders/><w:lnNumType w:countBy="2"/></w:sectPr>"#;
+        let section = SectionProperties::from_xml(xml).unwrap();
+        let borders = section.page_borders.as_ref().unwrap();
+        assert_eq!(borders.offset_from, PageBorderOffsetFrom::Page);
+        assert_eq!(borders.z_order, PageBorderZOrder::Back);
+        assert_eq!(borders.display, PageBorderDisplay::AllPages);
+        assert_eq!(
+            section.line_numbering,
+            Some(SectionLineNumbering {
+                count_by: Some(2),
+                ..SectionLineNumbering::default()
+            })
+        );
+        let mut output = String::new();
+        section.write_xml(&mut output, None).unwrap();
+        assert!(output.contains("<w:pgBorders w:offsetFrom=\"page\" w:zOrder=\"back\" w:display=\"allPages\"/>"));
+        assert!(output.contains("<w:lnNumType w:countBy=\"2\"/>"));
+    }
+
+    #[test]
+    fn page_border_style_enum_round_trips() {
+        let styles = [
+            PageBorderStyle::Nil,
+            PageBorderStyle::None,
+            PageBorderStyle::Single,
+            PageBorderStyle::Thick,
+            PageBorderStyle::Double,
+            PageBorderStyle::Dotted,
+            PageBorderStyle::Dashed,
+            PageBorderStyle::DotDash,
+            PageBorderStyle::DotDotDash,
+            PageBorderStyle::Triple,
+            PageBorderStyle::ThinThickSmallGap,
+            PageBorderStyle::ThinThickMediumGap,
+            PageBorderStyle::ThinThickLargeGap,
+            PageBorderStyle::ThickThinSmallGap,
+            PageBorderStyle::ThickThinMediumGap,
+            PageBorderStyle::ThickThinLargeGap,
+            PageBorderStyle::ThinThickThinSmallGap,
+            PageBorderStyle::ThinThickThinMediumGap,
+            PageBorderStyle::ThinThickThinLargeGap,
+            PageBorderStyle::Wave,
+            PageBorderStyle::DoubleWave,
+            PageBorderStyle::DashSmallGap,
+            PageBorderStyle::DashDotStroked,
+            PageBorderStyle::ThreeDEmboss,
+            PageBorderStyle::ThreeDEngrave,
+            PageBorderStyle::Outset,
+            PageBorderStyle::Inset,
+        ];
+        for style in &styles {
+            assert_eq!(&PageBorderStyle::parse(style.as_str()).unwrap(), style);
+        }
+        assert_eq!(
+            PageBorderStyle::parse("apples").unwrap(),
+            PageBorderStyle::Art("apples".to_string())
+        );
+        assert!(PageBorderStyle::parse("not a style!").is_err());
+        assert!(PageBorderStyle::parse("").is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_page_layout_properties() {
+        // Unknown enum tokens.
+        assert!(SectionProperties::from_xml("<w:sectPr><w:vAlign w:val=\"diagonal\"/></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:lnNumType w:restart=\"weekly\"/></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders w:offsetFrom=\"margin\"/></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\"/><w:top w:val=\"thick\"/></w:pgBorders></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:diagonal w:val=\"single\"/></w:pgBorders></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top/></w:pgBorders></w:sectPr>").is_err());
+        // Out-of-bounds values rejected through validation.
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\" w:sz=\"97\"/></w:pgBorders></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\" w:space=\"32\"/></w:pgBorders></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"starsTop\" w:sz=\"1639\"/></w:pgBorders></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\" w:color=\"FFF\"/></w:pgBorders></w:sectPr>").is_err());
+        // Schema-order violations.
+        assert!(SectionProperties::from_xml("<w:sectPr><w:pgNumType w:fmt=\"decimal\"/><w:lnNumType w:countBy=\"5\"/></w:sectPr>").is_err());
+        assert!(SectionProperties::from_xml("<w:sectPr><w:printerSettings r:id=\"rId1\"/><w:docGrid/></w:sectPr>").is_err());
+        // Empty relationship ID rejected through validation.
+        let mut section = SectionProperties::default();
+        section.printer_settings_relationship_id = Some(String::new());
         assert!(section.validate().is_err());
     }
 }
