@@ -233,7 +233,7 @@ impl Presentation {
                     | PptRecordType::RtfDateTimeMCAtom
             ) {
                 out.extend(crate::ppt::text_metachar::metachars_from_records(
-                    [record].into_iter(),
+                    [record],
                 )?);
             }
             Ok(())
@@ -889,10 +889,10 @@ impl Presentation {
         let mut values = PowerPointHeaderFooters::parse_record_tree(&records)?;
 
         let mut first_master_display = None;
-        let mut master_ordinal = 0usize;
-        for master in records
+        for (master_ordinal, master) in records
             .iter()
             .filter(|record| record.record_type == PptRecordType::MainMaster)
+            .enumerate()
         {
             if let Some(display) = placeholder_display_from_record(master)? {
                 let scope = PowerPointHeaderFooterScope::Local {
@@ -906,7 +906,6 @@ impl Presentation {
                     first_master_display = Some(display);
                 }
             }
-            master_ordinal += 1;
         }
         let has_master_display = first_master_display.is_some();
         if let Some(display) = first_master_display {

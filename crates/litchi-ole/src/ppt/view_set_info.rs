@@ -150,7 +150,7 @@ impl PowerPointNormalViewSetInfo {
         })
     }
 
-    fn to_bytes(&self) -> Result<Vec<u8>> {
+    fn to_bytes(self) -> Result<Vec<u8>> {
         check_unit_portion(self.left_portion, "leftPortion")?;
         check_unit_portion(self.top_portion, "topPortion")?;
         let mut data = Vec::with_capacity(ATOM_LEN);

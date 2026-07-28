@@ -29,6 +29,7 @@ pub struct PowerPointEnvelopeData {
 
 /// Payload selected by the envelope CLSID.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)] // public payload enum; boxing would break the API
 pub enum PowerPointEnvelopePayload {
     Mso(MsoEnvelope),
     /// A payload whose CLSID-defined syntax is outside MS-OSHARED.

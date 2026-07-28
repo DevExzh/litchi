@@ -154,7 +154,7 @@ impl PowerPointTextSpecialInfoDefaults {
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&TEXT_SPECIAL_INFO_DEFAULT_TYPE.to_le_bytes());
         data.extend_from_slice(
-            &((4 + 2 * mask.count_ones()) as u32).to_le_bytes(),
+            &(4 + 2 * mask.count_ones()).to_le_bytes(),
         );
         data.extend_from_slice(&mask.to_le_bytes());
         if let Some(spelling) = self.spelling {

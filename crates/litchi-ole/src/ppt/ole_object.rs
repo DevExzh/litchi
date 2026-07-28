@@ -774,6 +774,7 @@ fn validate_collection(id_seed: u32, objects: &[PowerPointOleExternalObject]) ->
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_optional_ole_children(
     children: &[PptRecord],
 ) -> Result<(

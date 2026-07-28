@@ -109,7 +109,7 @@ impl PowerPointSlideShowFlags {
 
     fn bits(self) -> Result<u16> {
         self.validate()?;
-        Ok((self.auto_advance as u16) << 0
+        Ok(self.auto_advance as u16
             | (self.will_skip_builds as u16) << 1
             | (self.use_slide_range as u16) << 2
             | (self.use_named_show as u16) << 3
