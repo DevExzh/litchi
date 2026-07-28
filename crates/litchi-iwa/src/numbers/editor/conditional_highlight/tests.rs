@@ -118,6 +118,74 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
 }
 
 #[test]
+fn equal_size_replacement_preserves_conditional_graph_identity() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
+    let initial = [
+        rule(TableCellConditionalHighlightCondition::LessThan(zero), red),
+        rule(
+            TableCellConditionalHighlightCondition::GreaterThan(zero),
+            green,
+        ),
+    ];
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
+        .unwrap();
+    let before = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let child_identifiers = conditional_style_rule_identifiers(
+        &editor.package,
+        &location.object_locations,
+        before.style_set_object_id,
+    )
+    .unwrap();
+
+    let replacement = [
+        rule(
+            TableCellConditionalHighlightCondition::LessThanOrEqualTo(zero),
+            green,
+        ),
+        rule(
+            TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(zero),
+            red,
+        ),
+    ];
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &replacement)
+        .unwrap();
+
+    let after = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    assert_eq!(after.list_identifier, before.list_identifier);
+    assert_eq!(after.style_set_object_id, before.style_set_object_id);
+    assert_eq!(
+        conditional_style_rule_identifiers(
+            &editor.package,
+            &location.object_locations,
+            after.style_set_object_id,
+        )
+        .unwrap(),
+        child_identifiers
+    );
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap(),
+        Some(replacement.to_vec())
+    );
+}
+
+#[test]
 fn empty_or_excessive_rule_sets_are_rejected_transactionally() {
     let mut editor = NumbersDocumentBuilder::new().build().unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;

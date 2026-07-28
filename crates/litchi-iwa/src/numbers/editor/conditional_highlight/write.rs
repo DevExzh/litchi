@@ -1,6 +1,7 @@
 //! Canonical native object-graph encoding for conditional-highlight rules.
 
 use prost::Message;
+use std::collections::HashMap;
 
 use super::*;
 
@@ -9,6 +10,12 @@ const CELL_STYLE_MESSAGE_TYPE: u32 = 6_004;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const NATIVE_MESSAGE_VERSION: &[u32] = &[1, 0, 5];
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct RuleStyleIdentifiers {
+    pub(super) text_style: u64,
+    pub(super) cell_style: u64,
+}
+
 pub(super) fn insert_conditional_style_graph(
     package: &mut IWorkPackage,
     archive_name: &str,
@@ -16,26 +23,87 @@ pub(super) fn insert_conditional_style_graph(
     rules: &[TableCellConditionalHighlightRule],
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<()> {
+    let identifiers = sequential_rule_style_identifiers(style_set_id, rules.len())?;
+    let objects =
+        conditional_style_graph_objects(style_set_id, rules, formula_owner_uuid, &identifiers)?;
+    package.update_archive(archive_name, |archive| {
+        for object in objects {
+            archive.insert_object(object)?;
+        }
+        Ok(())
+    })
+}
+
+pub(super) fn replace_conditional_style_graph(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    object_locations: &HashMap<u64, String>,
+    style_set_id: u64,
+    rules: &[TableCellConditionalHighlightRule],
+    formula_owner_uuid: &tsp::Uuid,
+    identifiers: &[RuleStyleIdentifiers],
+) -> Result<()> {
+    let objects =
+        conditional_style_graph_objects(style_set_id, rules, formula_owner_uuid, identifiers)?;
+    let mut objects = objects.into_iter();
+    let style_set = objects
+        .next()
+        .expect("a conditional-style graph always has a style-set object");
+    package.update_archive(archive_name, |archive| {
+        if archive.upsert_object(style_set)?.is_none() {
+            return Err(Error::InvalidFormat(
+                "conditional-highlight replacement lost its style-set identity".to_owned(),
+            ));
+        }
+        Ok(())
+    })?;
+    let text_style_archive = identifiers
+        .iter()
+        .find_map(|identifiers| object_locations.get(&identifiers.text_style))
+        .cloned()
+        .unwrap_or_else(|| archive_name.to_owned());
+    let cell_style_archive = identifiers
+        .iter()
+        .find_map(|identifiers| object_locations.get(&identifiers.cell_style))
+        .cloned()
+        .unwrap_or_else(|| archive_name.to_owned());
+    for (index, object) in objects.enumerate() {
+        let fallback_archive = if index % 2 == 0 {
+            &text_style_archive
+        } else {
+            &cell_style_archive
+        };
+        let object_archive = object
+            .archive_info
+            .identifier
+            .and_then(|identifier| object_locations.get(&identifier))
+            .unwrap_or(fallback_archive);
+        package.update_archive(object_archive, |archive| {
+            archive.upsert_object(object)?;
+            Ok(())
+        })?;
+    }
+    Ok(())
+}
+
+fn conditional_style_graph_objects(
+    style_set_id: u64,
+    rules: &[TableCellConditionalHighlightRule],
+    formula_owner_uuid: &tsp::Uuid,
+    identifiers: &[RuleStyleIdentifiers],
+) -> Result<Vec<ArchiveObject>> {
+    if identifiers.len() != rules.len() {
+        return Err(Error::InvalidFormat(
+            "conditional-highlight rules and style identifiers differ in length".to_owned(),
+        ));
+    }
     let mut prepivot = Vec::with_capacity(rules.len());
     let mut current = Vec::with_capacity(rules.len());
     let mut objects = Vec::with_capacity(1 + rules.len() * 2);
     let mut references = Vec::with_capacity(rules.len() * 2);
-    for (index, rule) in rules.iter().enumerate() {
-        let offset = u64::try_from(index)
-            .map_err(|_| Error::ParseError("conditional-highlight index exceeds u64".to_owned()))?
-            .checked_mul(2)
-            .ok_or_else(|| {
-                Error::ParseError("conditional-highlight identifier overflow".to_owned())
-            })?;
-        let text_style_id = style_set_id
-            .checked_add(offset)
-            .and_then(|identifier| identifier.checked_add(1))
-            .ok_or_else(|| {
-                Error::ParseError("conditional-highlight identifier overflow".to_owned())
-            })?;
-        let cell_style_id = text_style_id.checked_add(1).ok_or_else(|| {
-            Error::ParseError("conditional-highlight identifier overflow".to_owned())
-        })?;
+    for (rule, identifiers) in rules.iter().zip(identifiers) {
+        let text_style_id = identifiers.text_style;
+        let cell_style_id = identifiers.cell_style;
         let kind = NativePredicateKind::from_condition(&rule.condition);
         let formula = formula::encode(&rule.condition, formula_owner_uuid)?;
         let prepivot_formula = formula::encode_prepivot(&rule.condition, formula_owner_uuid)?;
@@ -182,14 +250,39 @@ pub(super) fn insert_conditional_style_graph(
         object_references: references,
         ..Default::default()
     });
-    package.update_archive(archive_name, |archive| {
-        archive.insert_object(set_object)?;
-        for object in objects {
-            archive.insert_object(object)?;
-        }
-        Ok(())
-    })?;
-    Ok(())
+    objects.insert(0, set_object);
+    Ok(objects)
+}
+
+fn sequential_rule_style_identifiers(
+    style_set_id: u64,
+    rule_count: usize,
+) -> Result<Vec<RuleStyleIdentifiers>> {
+    (0..rule_count)
+        .map(|index| {
+            let offset = u64::try_from(index)
+                .map_err(|_| {
+                    Error::ParseError("conditional-highlight index exceeds u64".to_owned())
+                })?
+                .checked_mul(2)
+                .ok_or_else(|| {
+                    Error::ParseError("conditional-highlight identifier overflow".to_owned())
+                })?;
+            let text_style = style_set_id
+                .checked_add(offset)
+                .and_then(|identifier| identifier.checked_add(1))
+                .ok_or_else(|| {
+                    Error::ParseError("conditional-highlight identifier overflow".to_owned())
+                })?;
+            let cell_style = text_style.checked_add(1).ok_or_else(|| {
+                Error::ParseError("conditional-highlight identifier overflow".to_owned())
+            })?;
+            Ok(RuleStyleIdentifiers {
+                text_style,
+                cell_style,
+            })
+        })
+        .collect()
 }
 
 fn paragraph_style_object(
