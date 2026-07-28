@@ -4,6 +4,7 @@ use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::package_metadata::{add_component_external_reference, add_component_object_uuids};
 use crate::protobuf::{kn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
+use crate::text::{ParagraphList, preset_style_object};
 use crate::wire::{parse_wire_fields, patch_length_delimited_field};
 use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 use plist::Value;
@@ -81,6 +82,8 @@ const SOUNDTRACK: u64 = 134;
 const LIVE_VIDEO_COLLECTION: u64 = 135;
 const DEFAULT_LIVE_VIDEO_SOURCE: u64 = 136;
 const STYLESHEET: u64 = 137;
+const BULLET_LIST_STYLE: u64 = 138;
+const NUMBERED_LIST_STYLE: u64 = 139;
 
 const TABLE_INFO_TEMPLATE: u64 = 9;
 const TABLE_MODEL_TEMPLATE: u64 = 10;
@@ -107,6 +110,8 @@ const STYLESHEET_OBJECTS: &[u64] = &[
     STYLESHEET,
     SLIDE_STYLE,
     LIST_STYLE,
+    BULLET_LIST_STYLE,
+    NUMBERED_LIST_STYLE,
     PARAGRAPH_STYLE,
     CHARACTER_STYLE,
     SHAPE_STYLE,
@@ -514,7 +519,10 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
                 drawing_line_style_presets: repeated_reference(1, SHAPE_STYLE),
             }),
             text: Some(tswp::ThemePresetsArchive {
-                list_style_presets: repeated_reference(5, LIST_STYLE),
+                list_style_presets: [LIST_STYLE, BULLET_LIST_STYLE, NUMBERED_LIST_STYLE]
+                    .into_iter()
+                    .map(reference)
+                    .collect(),
                 character_style_presets: repeated_reference(6, CHARACTER_STYLE),
                 paragraph_style_presets: repeated_reference(13, PARAGRAPH_STYLE),
                 dropcap_style_presets: repeated_reference(6, DROP_CAP_STYLE),
@@ -1049,7 +1057,7 @@ fn para_data_table() -> tswp::ParaDataAttributeTable {
 
 fn stylesheet_archive() -> Result<Archive> {
     let styles = &STYLESHEET_OBJECTS[1..];
-    Ok(Archive {
+    let mut archive = Archive {
         objects: vec![
             object(
                 STYLESHEET,
@@ -1145,7 +1153,18 @@ fn stylesheet_archive() -> Result<Archive> {
                 &[STYLESHEET],
             )?,
         ],
-    })
+    };
+    archive.objects.push(preset_style_object(
+        BULLET_LIST_STYLE,
+        STYLESHEET,
+        ParagraphList::Bullet,
+    )?);
+    archive.objects.push(preset_style_object(
+        NUMBERED_LIST_STYLE,
+        STYLESHEET,
+        ParagraphList::Numbered,
+    )?);
+    Ok(archive)
 }
 
 fn calculation_archive(locale: &str) -> Result<Archive> {
@@ -1262,7 +1281,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
         )
         .collect();
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: STYLESHEET,
+        last_object_identifier: NUMBERED_LIST_STYLE,
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(0),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -1658,6 +1677,36 @@ fn shadow(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generated_theme_exposes_distinct_canonical_list_presets() {
+        let package = KeynoteDocumentBuilder::new().build_package().unwrap();
+        let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
+        let theme = document.object(THEME).unwrap();
+        let theme = IWorkThemeArchive::decode(&theme.messages[0].data).unwrap();
+        let preset_ids = theme
+            .extensions
+            .text
+            .unwrap()
+            .list_style_presets
+            .into_iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            preset_ids,
+            [LIST_STYLE, BULLET_LIST_STYLE, NUMBERED_LIST_STYLE]
+        );
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        assert!(
+            preset_ids
+                .iter()
+                .all(|identifier| stylesheet.object(*identifier).is_some())
+        );
+        assert_eq!(
+            crate::package_metadata::package_last_object_identifier(&package).unwrap(),
+            Some(NUMBERED_LIST_STYLE)
+        );
+    }
 
     #[test]
     fn generated_package_contains_only_synthetic_required_entries() {

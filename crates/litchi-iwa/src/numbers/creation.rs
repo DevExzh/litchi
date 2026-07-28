@@ -3,6 +3,7 @@
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::protobuf::{tn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
+use crate::text::{ParagraphList, preset_style_object};
 use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 use plist::Value;
 use prost::Message;
@@ -66,6 +67,8 @@ const VIEW_STATE: u64 = 36;
 const UI_STATE: u64 = 37;
 const DOCUMENT_METADATA: u64 = 38;
 const FORMULA_OWNER: u64 = 39;
+const BULLET_LIST_STYLE: u64 = 41;
+const NUMBERED_LIST_STYLE: u64 = 42;
 
 const TABLE_FORMULA_OWNER_INTERNAL_ID: u32 = 6;
 
@@ -115,6 +118,8 @@ impl NumbersMessageType {
 const STYLESHEET_OBJECTS: &[u64] = &[
     STYLESHEET,
     LIST_STYLE,
+    BULLET_LIST_STYLE,
+    NUMBERED_LIST_STYLE,
     PARAGRAPH_STYLE,
     CHARACTER_STYLE,
     SHAPE_STYLE,
@@ -345,7 +350,10 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
                 drawing_line_style_presets: repeated_reference(1, SHAPE_STYLE),
             }),
             text: Some(tswp::ThemePresetsArchive {
-                list_style_presets: repeated_reference(5, LIST_STYLE),
+                list_style_presets: [LIST_STYLE, BULLET_LIST_STYLE, NUMBERED_LIST_STYLE]
+                    .into_iter()
+                    .map(reference)
+                    .collect(),
                 character_style_presets: repeated_reference(7, CHARACTER_STYLE),
                 paragraph_style_presets: repeated_reference(6, PARAGRAPH_STYLE),
                 dropcap_style_presets: repeated_reference(6, DROP_CAP_STYLE),
@@ -785,7 +793,7 @@ fn calculation_archive(locale: &str, table_uuid: &tsp::Uuid) -> Result<Archive> 
 
 fn stylesheet_archive() -> Result<Archive> {
     let styles = &STYLESHEET_OBJECTS[1..];
-    Ok(Archive {
+    let mut archive = Archive {
         objects: vec![
             object(
                 STYLESHEET,
@@ -900,7 +908,18 @@ fn stylesheet_archive() -> Result<Archive> {
                 &[STYLESHEET],
             )?,
         ],
-    })
+    };
+    archive.objects.push(preset_style_object(
+        BULLET_LIST_STYLE,
+        STYLESHEET,
+        ParagraphList::Bullet,
+    )?);
+    archive.objects.push(preset_style_object(
+        NUMBERED_LIST_STYLE,
+        STYLESHEET,
+        ParagraphList::Numbered,
+    )?);
+    Ok(archive)
 }
 
 fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
@@ -970,7 +989,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
         },
     ]);
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: STYLESHEET,
+        last_object_identifier: NUMBERED_LIST_STYLE,
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(0),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -1247,6 +1266,36 @@ mod tests {
     use crate::numbers::{
         CellValue, FormulaBinaryOperator, FormulaCellReference, FormulaExpression, NumbersDocument,
     };
+
+    #[test]
+    fn generated_theme_exposes_distinct_canonical_list_presets() {
+        let package = NumbersDocumentBuilder::new().build_package().unwrap();
+        let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
+        let theme = document.object(THEME).unwrap();
+        let theme = IWorkThemeArchive::decode(&theme.messages[0].data).unwrap();
+        let preset_ids = theme
+            .extensions
+            .text
+            .unwrap()
+            .list_style_presets
+            .into_iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            preset_ids,
+            [LIST_STYLE, BULLET_LIST_STYLE, NUMBERED_LIST_STYLE]
+        );
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        assert!(
+            preset_ids
+                .iter()
+                .all(|identifier| stylesheet.object(*identifier).is_some())
+        );
+        assert_eq!(
+            crate::package_metadata::package_last_object_identifier(&package).unwrap(),
+            Some(NUMBERED_LIST_STYLE)
+        );
+    }
 
     #[test]
     fn creates_and_reopens_independent_spreadsheet() {

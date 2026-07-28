@@ -19,6 +19,18 @@ pub(super) use levels::{
     set_paragraph_list_level,
 };
 
+/// Build one canonical stylesheet object for a source-created document theme.
+///
+/// Scratch documents and editor-created private styles must share the same
+/// native nine-level definitions so the apps present consistent presets.
+pub(crate) fn preset_style_object(
+    identifier: u64,
+    stylesheet_id: u64,
+    preset: ParagraphList,
+) -> Result<crate::archive::ArchiveObject> {
+    native::style_object(identifier, stylesheet_id, preset)
+}
+
 pub(super) fn paragraph_list(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphList> {
     let storage = storage::locate(package, storage_id)?;
     let style = native::locate_style(package, storage.style_id)?;

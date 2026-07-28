@@ -11,6 +11,7 @@ use super::editor::{PagesEditor, PagesSectionPageNumbering, PagesSectionStart};
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tst, tswp};
+use crate::text::{ParagraphList, preset_style_object};
 use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
@@ -139,7 +140,6 @@ const TEXT_BOX_STYLE_PRESET_COUNT: usize = 1;
 const IMAGE_STYLE_PRESET_COUNT: usize = 1;
 const MOVIE_STYLE_PRESET_COUNT: usize = 1;
 const DRAWING_LINE_STYLE_PRESET_COUNT: usize = 1;
-const LIST_STYLE_PRESET_COUNT: usize = 1;
 const TOC_ENTRY_STYLE_PRESET_COUNT: usize = 1;
 const TOC_SETTINGS_PRESET_COUNT: usize = 1;
 const CHARACTER_STYLE_PRESET_COUNT: usize = 1;
@@ -184,6 +184,8 @@ enum PagesObjectId {
     FooterEven = 127,
     FooterFirst = 128,
     AnnotationAuthorStorage = 129,
+    BulletListStyle = 130,
+    NumberedListStyle = 131,
 }
 
 impl PagesObjectId {
@@ -192,9 +194,11 @@ impl PagesObjectId {
     }
 }
 
-const STYLESHEET_OBJECTS: [PagesObjectId; 16] = [
+const STYLESHEET_OBJECTS: [PagesObjectId; 18] = [
     PagesObjectId::Stylesheet,
     PagesObjectId::ListStyle,
+    PagesObjectId::BulletListStyle,
+    PagesObjectId::NumberedListStyle,
     PagesObjectId::ParagraphStyle,
     PagesObjectId::CharacterStyle,
     PagesObjectId::LineStyle,
@@ -512,10 +516,14 @@ fn document_archive(
                 ),
             }),
             text: Some(tswp::ThemePresetsArchive {
-                list_style_presets: repeated_reference(
-                    LIST_STYLE_PRESET_COUNT,
+                list_style_presets: [
                     PagesObjectId::ListStyle,
-                ),
+                    PagesObjectId::BulletListStyle,
+                    PagesObjectId::NumberedListStyle,
+                ]
+                .into_iter()
+                .map(reference)
+                .collect(),
                 toc_entry_style_presets: repeated_reference(
                     TOC_ENTRY_STYLE_PRESET_COUNT,
                     PagesObjectId::TocEntryStyle,
@@ -927,6 +935,16 @@ fn stylesheet_archive() -> Result<Archive> {
             &[PagesObjectId::Stylesheet],
         )?,
     ]);
+    objects.push(preset_style_object(
+        PagesObjectId::BulletListStyle.value(),
+        PagesObjectId::Stylesheet.value(),
+        ParagraphList::Bullet,
+    )?);
+    objects.push(preset_style_object(
+        PagesObjectId::NumberedListStyle.value(),
+        PagesObjectId::Stylesheet.value(),
+        ParagraphList::Numbered,
+    )?);
     Ok(Archive { objects })
 }
 
@@ -1020,7 +1038,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity, has_initial_table: bool) -
     components.push(document);
 
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: PagesObjectId::AnnotationAuthorStorage.value(),
+        last_object_identifier: PagesObjectId::NumberedListStyle.value(),
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(INITIAL_REVISION_SEQUENCE),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -1455,6 +1473,40 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+
+    #[test]
+    fn generated_theme_exposes_distinct_canonical_list_presets() {
+        let package = PagesDocumentBuilder::new().build_package().unwrap();
+        let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
+        let theme = document.object(PagesObjectId::Theme.value()).unwrap();
+        let theme = IWorkThemeArchive::decode(&theme.messages[0].data).unwrap();
+        let preset_ids = theme
+            .extensions
+            .text
+            .unwrap()
+            .list_style_presets
+            .into_iter()
+            .map(|reference| reference.identifier)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            preset_ids,
+            [
+                PagesObjectId::ListStyle.value(),
+                PagesObjectId::BulletListStyle.value(),
+                PagesObjectId::NumberedListStyle.value(),
+            ]
+        );
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        assert!(
+            preset_ids
+                .iter()
+                .all(|identifier| stylesheet.object(*identifier).is_some())
+        );
+        assert_eq!(
+            crate::package_metadata::package_last_object_identifier(&package).unwrap(),
+            Some(PagesObjectId::NumberedListStyle.value())
+        );
+    }
 
     const EXPECTED_ENTRIES: [&str; 7] = [
         DOCUMENT_ARCHIVE_ENTRY,
