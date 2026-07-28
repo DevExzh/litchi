@@ -204,6 +204,10 @@ pub use parts::rmd_threading::{
 };
 pub use parts::rsids::DocumentRsids;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};
+pub use parts::captions::{
+    AutoCaptionEntry, AutoCaptionTable, CaptionDefinition, CaptionInfo, CaptionLabelTable,
+    CaptionLocation, CaptionTables, ChapterHeading, ChapterNumbering, ChapterSeparator,
+};
 pub use parts::smart_tags::{
     DocumentSmartTag, DocumentSmartTags, SmartTagBookmarkInfo, SmartTagOrigin,
     SmartTagRecognizerRange, SmartTagRecognizerState,

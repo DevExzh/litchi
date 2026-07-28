@@ -42,6 +42,7 @@ use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
 use super::parts::grammar_cookies::GrammarCookieTables;
+use super::parts::captions::CaptionTables;
 use super::parts::table_char_cache::TableCharacterCache;
 use super::parts::text_services::TextServicesTables;
 use super::parts::textbox_breaks::TextBoxBreakTables;
@@ -163,6 +164,8 @@ pub struct Document {
     text_services: Result<TextServicesTables>,
     /// Deferred strict Word 97/2000 save-history metadata parse
     saved_by_table: Result<SavedByTable>,
+    /// Deferred strict caption label and AutoCaption metadata parse
+    caption_tables: Result<CaptionTables>,
     /// Deferred strict glossary-only AutoText metadata parse
     glossary_metadata: Result<Option<GlossaryMetadata>>,
     /// Deferred strict secondary-FIB glossary parse for templates
@@ -321,6 +324,7 @@ impl Document {
         let textbox_breaks = TextBoxBreakTables::parse(&fib, &table_stream);
         let text_services = TextServicesTables::parse(&fib, &table_stream);
         let saved_by_table = SavedByTable::parse(&fib, &table_stream);
+        let caption_tables = CaptionTables::parse(&fib, &table_stream);
         let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream).and_then(|metadata| {
             if let Some(metadata) = &metadata {
                 metadata.validate_text_boundaries(&text_extractor)?;
@@ -430,6 +434,7 @@ impl Document {
             textbox_breaks,
             text_services,
             saved_by_table,
+            caption_tables,
             glossary_metadata,
             attached_glossary,
             sections,
@@ -795,6 +800,17 @@ impl Document {
         self.saved_by_table
             .as_ref()
             .map_err(|error| DocError::Corrupted(format!("invalid saved-by metadata: {error}")))
+    }
+
+    /// Strictly access the caption label and AutoCaption tables.
+    ///
+    /// Parsing is deferred so malformed optional metadata does not prevent the
+    /// document's primary text from opening. Caption labels remain inert text
+    /// and referenced OLE objects are never activated.
+    pub fn caption_tables(&self) -> Result<&CaptionTables> {
+        self.caption_tables.as_ref().map_err(|error| {
+            DocError::Corrupted(format!("invalid caption metadata: {error}"))
+        })
     }
 
     /// Strictly access glossary-only AutoText and formatted AutoCorrect metadata.

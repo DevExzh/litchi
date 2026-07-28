@@ -1,6 +1,7 @@
 pub mod associated_strings;
 pub mod auto_summary;
 pub mod bookmarks;
+pub mod captions;
 /// Internal parts for parsing DOC file structures.
 ///
 /// This module contains parsers for the binary structures used in
