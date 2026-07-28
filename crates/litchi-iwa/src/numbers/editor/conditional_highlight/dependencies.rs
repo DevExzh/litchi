@@ -4,6 +4,10 @@ use prost::Message;
 
 use super::*;
 
+pub(super) mod removal;
+
+pub(super) use removal::remove_volatile_host;
+
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
 const CELL_RECORD_TILE_MESSAGE_TYPE: u32 = 4_009;

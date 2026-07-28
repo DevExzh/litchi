@@ -10,16 +10,16 @@ use litchi_iwa::protobuf::tn;
 use litchi_iwa::protobuf::tp::{
     DocumentArchive, SectionArchive, SectionTemplateArchive, UserDefinedGuideMapArchive,
 };
-use litchi_iwa::protobuf::tsce::CalculationEngineArchive;
+use litchi_iwa::protobuf::tsce::{CalculationEngineArchive, NamedReferenceManagerArchive};
 use litchi_iwa::protobuf::tsd::CommentStorageArchive;
 use litchi_iwa::protobuf::tsd::GuideStorageArchive;
 use litchi_iwa::protobuf::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorageArchive};
 use litchi_iwa::protobuf::tsp::PackageMetadata;
 use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::{
-    CellStyleArchive, ColumnRowUidMapArchive, HiddenStateFormulaOwnerArchive, TableDataList,
-    TableInfoArchive, TableModelArchive, TableStyleArchive, TableStyleNetworkArchive,
-    TableStylePresetArchive,
+    CellStyleArchive, ColumnRowUidMapArchive, HeaderNameMgrArchive, HiddenStateFormulaOwnerArchive,
+    TableDataList, TableInfoArchive, TableModelArchive, TableStyleArchive,
+    TableStyleNetworkArchive, TableStylePresetArchive,
 };
 use litchi_iwa::protobuf::tswp::{
     BookmarkFieldArchive, CharacterStyleArchive, ColumnStyleArchive, DateTimeSmartFieldArchive,
@@ -355,6 +355,24 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                 && let Ok(engine) = CalculationEngineArchive::decode(message.data.as_slice())
             {
                 println!("  calculation_engine={engine:#?}");
+            }
+            if message.type_ == 4_003
+                && let Ok(manager) = NamedReferenceManagerArchive::decode(message.data.as_slice())
+            {
+                println!("  named_reference_manager={manager:#?}");
+            }
+            if message.type_ == 4_004 {
+                let payload = message
+                    .data
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>();
+                println!("  reference_tracker_hex={payload}");
+            }
+            if message.type_ == 6_366
+                && let Ok(manager) = HeaderNameMgrArchive::decode(message.data.as_slice())
+            {
+                println!("  header_name_manager={manager:#?}");
             }
             if message.type_ == 4_008
                 && let Ok(owner) =

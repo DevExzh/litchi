@@ -480,7 +480,7 @@ fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
 
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let period = TableCellConditionalHighlightDatePeriod::new(2, Unit::Days).unwrap();
-    let rule = rule(
+    let volatile_rule = rule(
         TableCellConditionalHighlightCondition::DateIsInNext(period),
         red,
     );
@@ -491,7 +491,12 @@ fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
     let table_id = editor.tables().unwrap()[0].object_id;
     for column in 1..=2 {
         editor
-            .set_cell_conditional_highlighting(table_id, 1, column, std::slice::from_ref(&rule))
+            .set_cell_conditional_highlighting(
+                table_id,
+                1,
+                column,
+                std::slice::from_ref(&volatile_rule),
+            )
             .unwrap();
     }
 
@@ -499,8 +504,9 @@ fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
         .package
         .calculation_engine_entry_name()
         .unwrap()
-        .unwrap();
-    let archive = editor.package.archive(entry).unwrap();
+        .unwrap()
+        .to_owned();
+    let archive = editor.package.archive(&entry).unwrap();
     let owners = archive
         .objects
         .iter()
@@ -603,6 +609,139 @@ fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
         })
         .unwrap();
     assert_eq!(tile.cell_records, *records);
+
+    editor
+        .clear_cell_conditional_highlighting(table_id, 1, 1)
+        .unwrap();
+    let archive = editor.package.archive(&entry).unwrap();
+    let engine = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find_map(|message| {
+            (message.type_ == 4_000)
+                .then(|| tsce::CalculationEngineArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    assert_eq!(engine.dependency_tracker.number_of_formulas, Some(8));
+    let conditional = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find_map(|message| {
+            (message.type_ == 4_008)
+                .then(|| {
+                    tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice()).unwrap()
+                })
+                .filter(|owner| owner.owner_kind == Some(3))
+        })
+        .unwrap();
+    assert_eq!(
+        conditional
+            .cell_dependencies
+            .as_ref()
+            .unwrap()
+            .cell_record
+            .iter()
+            .map(|record| (record.row, record.column))
+            .collect::<Vec<_>>(),
+        vec![(1, 2)]
+    );
+    assert!(dependencies::removal::contains_coordinate(
+        conditional
+            .volatile_dependencies
+            .as_ref()
+            .unwrap()
+            .volatile_time_cells
+            .as_ref()
+            .unwrap(),
+        1,
+        2
+    ));
+    assert!(!dependencies::removal::contains_coordinate(
+        conditional
+            .volatile_dependencies
+            .as_ref()
+            .unwrap()
+            .volatile_time_cells
+            .as_ref()
+            .unwrap(),
+        1,
+        1
+    ));
+
+    let exact = TableCellConditionalHighlightDate::from_ymd(2026, 7, 28).unwrap();
+    let fixed_rule = rule(TableCellConditionalHighlightCondition::DateIs(exact), red);
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 2, std::slice::from_ref(&fixed_rule))
+        .unwrap();
+    let archive = editor.package.archive(&entry).unwrap();
+    let engine = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find_map(|message| {
+            (message.type_ == 4_000)
+                .then(|| tsce::CalculationEngineArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    assert_eq!(engine.dependency_tracker.number_of_formulas, Some(7));
+    let conditional = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .find_map(|message| {
+            (message.type_ == 4_008)
+                .then(|| {
+                    tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice()).unwrap()
+                })
+                .filter(|owner| owner.owner_kind == Some(3))
+        })
+        .unwrap();
+    assert!(
+        conditional
+            .cell_dependencies
+            .as_ref()
+            .unwrap()
+            .cell_record
+            .is_empty()
+    );
+    assert!(
+        conditional
+            .volatile_dependencies
+            .as_ref()
+            .unwrap()
+            .volatile_time_cells
+            .as_ref()
+            .unwrap()
+            .column_entries
+            .is_empty()
+    );
+    assert!(
+        conditional
+            .uuid_references
+            .as_ref()
+            .unwrap()
+            .table_refs
+            .is_empty()
+    );
+    let tile_id = conditional
+        .tiled_cell_dependencies
+        .as_ref()
+        .unwrap()
+        .cell_record_tiles[0]
+        .identifier;
+    let tile = archive
+        .object(tile_id)
+        .unwrap()
+        .messages
+        .iter()
+        .find_map(|message| {
+            (message.type_ == 4_009)
+                .then(|| tsce::CellRecordTileArchive::decode(message.data.as_slice()).unwrap())
+        })
+        .unwrap();
+    assert!(tile.cell_records.is_empty());
 }
 
 #[test]

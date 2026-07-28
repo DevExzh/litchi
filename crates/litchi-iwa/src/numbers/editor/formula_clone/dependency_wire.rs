@@ -120,6 +120,40 @@ pub(in crate::numbers::editor) fn reorder_formula_owners_in_engine(
     Ok(data)
 }
 
+pub(in crate::numbers::editor) fn decrement_formula_count_in_engine(
+    original: &[u8],
+) -> Result<Vec<u8>> {
+    let previous = tsce::CalculationEngineArchive::decode(original)?;
+    let mut expected = previous.clone();
+    let previous_count = expected
+        .dependency_tracker
+        .number_of_formulas
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers CalculationEngine has no formula count".to_owned())
+        })?;
+    expected.dependency_tracker.number_of_formulas =
+        Some(previous_count.checked_sub(1).ok_or_else(|| {
+            Error::InvalidFormat(
+                "Numbers formula count cannot be decremented below zero".to_owned(),
+            )
+        })?);
+    let data = transform_length_delimited_field(original, 2, |tracker_data| {
+        let tracker = tsce::DependencyTrackerArchive::decode(tracker_data)?;
+        patch_varint_field(
+            tracker_data,
+            5,
+            tracker.number_of_formulas.is_some(),
+            expected.dependency_tracker.number_of_formulas,
+        )
+    })?;
+    if tsce::CalculationEngineArchive::decode(data.as_slice())? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers CalculationEngine formula-count decrement failed validation".to_owned(),
+        ));
+    }
+    Ok(data)
+}
+
 pub(super) fn remove_formula_owners_from_engine(
     original: &[u8],
     owner_ids: &HashSet<u64>,

@@ -37,6 +37,15 @@ pub(super) fn clear_at_location(
                 "iWork conditional-highlight entry {list_identifier} has no style-set reference"
             ))
         })?;
+    if let Some(owner_uid) = location
+        .descriptor
+        .model
+        .conditional_style_formula_owner_id
+        .as_ref()
+        .and_then(cfuuid_as_uuid)
+    {
+        dependencies::remove_volatile_host(package, owner_uid, row, column)?;
+    }
     let mut owned_object_ids =
         conditional_style_owned_object_ids(package, &locations, style_set_object_id)?;
     owned_object_ids.push(style_set_object_id);
