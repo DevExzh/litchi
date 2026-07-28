@@ -82,8 +82,10 @@ pub mod broadcast;
 pub mod chart;
 pub mod client_anchor;
 pub mod client_data;
+pub mod color_scheme;
 pub mod comments;
 pub mod current_user;
+pub mod document_atom;
 pub mod document_properties;
 pub mod document_comparison;
 pub mod document_structure;
@@ -192,6 +194,13 @@ pub use document_properties::{
     PowerPoint10DocumentProperties, PowerPoint12DocumentProperties, PowerPointCustomTableStyles,
     PowerPointGridSpacing, PowerPointPhotoAlbumFrameShape, PowerPointPhotoAlbumLayout,
     PowerPointPhotoAlbumSettings,
+};
+pub use color_scheme::{
+    PowerPointColorScheme, PowerPointColorSchemeAtom, PowerPointColorSchemeAtomKind,
+    PowerPointSchemeColor,
+};
+pub use document_atom::{
+    PowerPointDocumentAtom, PowerPointDocumentDimensions, PowerPointSlideSizeType,
 };
 pub use document_structure::{PowerPointCustomTableStylesPlacement, PowerPointDocumentStructure};
 pub use envelope::PowerPointEnvelopeSettings;

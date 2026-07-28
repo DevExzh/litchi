@@ -822,6 +822,44 @@ impl Presentation {
         crate::ppt::PowerPointDocumentStructure::parse(document)
     }
 
+    /// Return the document-wide `DocumentAtom` (MS-PPT 2.4.2), if present.
+    ///
+    /// Slide geometry, OLE server zoom, master persist references, and display
+    /// flags are inert metadata: no persist object is resolved and nothing is
+    /// rendered. Files with multiple top-level Document containers yield the
+    /// first occurrence.
+    pub fn document_atom(&self) -> Result<Option<crate::ppt::PowerPointDocumentAtom>> {
+        for record in self.parser.find_records_ref() {
+            if record.record_type == PptRecordType::Document
+                && let Some(atom) = record.find_child(PptRecordType::DocumentAtom)
+            {
+                return crate::ppt::PowerPointDocumentAtom::parse(atom).map(Some);
+            }
+        }
+        Ok(None)
+    }
+
+    /// Collect the color-scheme atoms of every slide, notes, main master, and
+    /// handout container in stream order (MS-PPT 2.5.14, 2.5.15).
+    ///
+    /// The colors are inert display metadata: nothing is rendered, resolved
+    /// against a theme, or applied to shapes.
+    pub fn color_schemes(&self) -> Result<Vec<crate::ppt::PowerPointColorSchemeAtom>> {
+        let mut schemes = Vec::new();
+        for record in self.parser.find_records_ref() {
+            if matches!(
+                record.record_type,
+                PptRecordType::Slide
+                    | PptRecordType::Notes
+                    | PptRecordType::MainMaster
+                    | PptRecordType::Handout
+            ) {
+                schemes.extend(crate::ppt::PowerPointColorSchemeAtom::collect(record)?);
+            }
+        }
+        Ok(schemes)
+    }
+
     /// Return inert PowerPoint 9 mail-envelope state, if present.
     ///
     /// This accessor never sends mail, invokes a mail client, or interprets the
