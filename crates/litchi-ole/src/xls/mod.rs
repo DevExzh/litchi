@@ -185,6 +185,10 @@ pub mod mdx_metadata;
 /// BIFF8 `SXVIEWEX` sequence: typed, inert PivotTable OLAP extension records.
 mod pivot_olap;
 
+/// BIFF8 shared-workbook user records (`CUsr`, `CbUsr`, `UsrInfo`) and
+/// routing-slip records (`DocRoute`, `RecipName`).
+mod user_routing;
+
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 pub mod pivot_table;
@@ -309,6 +313,9 @@ pub use mdx_metadata::{
 pub use pivot_olap::{
     XlsHiddenMemberSet, XlsPivotFieldOlapExt, XlsPivotHierarchy, XlsPivotHierarchyAxis,
     XlsPivotItemOlapFlags, XlsPivotPageItemOlapExt, XlsPivotViewOlapHeader,
+};
+pub use user_routing::{
+    XlsCUsr, XlsCbUsr, XlsDocRoute, XlsRecipName, XlsRoutingDelivery, XlsUsrInfo,
 };
 pub use revision_log::{
     REVISION_LOG_STREAM_NAME, XlsOpaqueRevisionRecord, XlsRevision, XlsRevisionChange,
