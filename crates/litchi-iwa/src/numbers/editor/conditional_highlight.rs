@@ -5,6 +5,7 @@ mod dependencies;
 mod formula;
 mod native;
 mod read;
+mod replace;
 #[cfg(test)]
 mod tests;
 mod write;
@@ -194,7 +195,7 @@ pub(super) fn set_in_package(
 ) -> Result<()> {
     validate_rules(rules)?;
     let location = locate_cell(package, table_id, row, column)?;
-    if try_replace_at_location(package, &location, row, column, rules)? {
+    if replace::try_at_location(package, &location, row, column, rules)? {
         return Ok(());
     }
     clear_in_package(package, table_id, row, column)?;
@@ -211,7 +212,7 @@ pub(super) fn set_attached_in_package(
 ) -> Result<()> {
     validate_rules(rules)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
-    if try_replace_at_location(package, &location, row, column, rules)? {
+    if replace::try_at_location(package, &location, row, column, rules)? {
         return Ok(());
     }
     clear_attached_in_package(package, table_id, row, column)?;
@@ -231,176 +232,6 @@ fn validate_rules(rules: &[TableCellConditionalHighlightRule]) -> Result<()> {
         )));
     }
     Ok(())
-}
-
-fn try_replace_at_location(
-    package: &mut IWorkPackage,
-    location: &CellLocation,
-    row: usize,
-    column: usize,
-    rules: &[TableCellConditionalHighlightRule],
-) -> Result<bool> {
-    let Some(cell) = read_tile_cell(
-        package,
-        &location.tile_archive,
-        location.tile_id,
-        location.tile_row,
-        column,
-    )?
-    else {
-        return Ok(false);
-    };
-    let Some(list_identifier) = BncCell::parse(&cell)?.conditional_style_identifier() else {
-        return Ok(false);
-    };
-    let (resolved, entry) = resolve_entry(package, location, list_identifier)?;
-    if entry.entry.refcount != 1 {
-        return Ok(false);
-    }
-    let style_set_id = entry
-        .entry
-        .reference
-        .as_ref()
-        .map(|reference| reference.identifier)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork conditional-highlight entry {list_identifier} has no style-set reference"
-            ))
-        })?;
-    let existing_identifiers =
-        conditional_style_rule_identifiers(package, &location.object_locations, style_set_id)?;
-    if existing_identifiers.len() != rules.len() {
-        return Ok(false);
-    }
-    let mut unique_identifiers = Vec::with_capacity(existing_identifiers.len() * 2);
-    for identifiers in &existing_identifiers {
-        for identifier in [identifiers.text_style, identifiers.cell_style] {
-            if unique_identifiers.contains(&identifier) {
-                return Ok(false);
-            }
-            unique_identifiers.push(identifier);
-        }
-    }
-    let style_archive = location
-        .object_locations
-        .get(&style_set_id)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork conditional-highlight style set {style_set_id} is missing"
-            ))
-        })?
-        .clone();
-    let owner_uid = location
-        .descriptor
-        .model
-        .conditional_style_formula_owner_id
-        .as_ref()
-        .and_then(cfuuid_as_uuid)
-        .ok_or_else(|| {
-            Error::InvalidFormat("Numbers conditional-style formula owner is missing".to_owned())
-        })?;
-    dependencies::remove_volatile_host(package, owner_uid, row, column)?;
-    let table_uuid = parse_table_uuid(&location.descriptor.model.table_id)?;
-    let formula_owner_uuid = formula_owner_uuid_for_table(&table_uuid);
-    write::replace_conditional_style_graph(
-        package,
-        &style_archive,
-        &location.object_locations,
-        style_set_id,
-        rules,
-        &formula_owner_uuid,
-        &existing_identifiers,
-    )?;
-    if rules
-        .iter()
-        .any(|rule| is_volatile_date_condition(&rule.condition))
-    {
-        dependencies::ensure_volatile_owner(package, &table_uuid, owner_uid, row, column)?;
-    }
-    let applied_rule = applied_rule_for_cell(package, location, column, rules)?;
-    update_cell(
-        package,
-        location,
-        row,
-        column,
-        Some(list_identifier),
-        Some(applied_rule),
-    )?;
-    let model_archive = location
-        .object_locations
-        .get(&location.descriptor.object_id)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers table object {} is missing",
-                location.descriptor.object_id
-            ))
-        })?
-        .clone();
-    let mut modified = vec![
-        location.tile_archive.clone(),
-        resolved.table_archive,
-        style_archive,
-    ];
-    for identifiers in &existing_identifiers {
-        for identifier in [identifiers.text_style, identifiers.cell_style] {
-            if let Some(archive_name) = location.object_locations.get(&identifier)
-                && !modified.contains(archive_name)
-            {
-                modified.push(archive_name.clone());
-            }
-        }
-    }
-    if !modified.contains(&model_archive) {
-        modified.push(model_archive);
-    }
-    advance_save_tokens_for_entries(package, &modified)?;
-    Ok(true)
-}
-
-fn conditional_style_rule_identifiers(
-    package: &IWorkPackage,
-    locations: &HashMap<u64, String>,
-    style_set_id: u64,
-) -> Result<Vec<write::RuleStyleIdentifiers>> {
-    let archive_name = locations.get(&style_set_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "iWork conditional-highlight style set {style_set_id} is missing"
-        ))
-    })?;
-    let archive = package.archive(archive_name)?;
-    let object = archive.object(style_set_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "iWork conditional-highlight style set {style_set_id} is missing"
-        ))
-    })?;
-    let set = object
-        .messages
-        .iter()
-        .find_map(|message| {
-            (message.type_ == 6_010)
-                .then(|| tst::ConditionalStyleSetArchive::decode(message.data.as_slice()))
-        })
-        .transpose()?
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork conditional-highlight object {style_set_id} has no style-set payload"
-            ))
-        })?;
-    set.rules_prepivot
-        .iter()
-        .map(|rule| {
-            let identifiers = write::RuleStyleIdentifiers {
-                text_style: rule.text_style.identifier,
-                cell_style: rule.cell_style.identifier,
-            };
-            if identifiers.text_style == 0 || identifiers.cell_style == 0 {
-                return Err(Error::InvalidFormat(
-                    "conditional-highlight rule has a missing style reference".to_owned(),
-                ));
-            }
-            Ok(identifiers)
-        })
-        .collect()
 }
 
 fn set_at_location(

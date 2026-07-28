@@ -141,7 +141,7 @@ fn equal_size_replacement_preserves_conditional_graph_identity() {
         .unwrap()
         .unwrap();
     let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
-    let child_identifiers = conditional_style_rule_identifiers(
+    let child_identifiers = replace::conditional_style_rule_identifiers(
         &editor.package,
         &location.object_locations,
         before.style_set_object_id,
@@ -169,7 +169,7 @@ fn equal_size_replacement_preserves_conditional_graph_identity() {
     assert_eq!(after.list_identifier, before.list_identifier);
     assert_eq!(after.style_set_object_id, before.style_set_object_id);
     assert_eq!(
-        conditional_style_rule_identifiers(
+        replace::conditional_style_rule_identifiers(
             &editor.package,
             &location.object_locations,
             after.style_set_object_id,
@@ -182,6 +182,102 @@ fn equal_size_replacement_preserves_conditional_graph_identity() {
             .cell_conditional_highlight_rules(table_id, 1, 1)
             .unwrap(),
         Some(replacement.to_vec())
+    );
+}
+
+#[test]
+fn variable_size_replacement_retains_and_reclaims_conditional_children() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(2, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
+    let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
+    let zero = TableCellConditionalHighlightNumber::new(0.0).unwrap();
+    let one = TableCellConditionalHighlightNumber::new(1.0).unwrap();
+    let initial = [rule(
+        TableCellConditionalHighlightCondition::LessThan(zero),
+        red,
+    )];
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
+        .unwrap();
+    let before = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let initial_children = replace::conditional_style_rule_identifiers(
+        &editor.package,
+        &location.object_locations,
+        before.style_set_object_id,
+    )
+    .unwrap();
+
+    let grown = [
+        rule(
+            TableCellConditionalHighlightCondition::LessThanOrEqualTo(zero),
+            green,
+        ),
+        rule(
+            TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(one),
+            red,
+        ),
+        rule(TableCellConditionalHighlightCondition::EqualTo(one), green),
+    ];
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &grown)
+        .unwrap();
+    let grown_info = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let grown_location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let grown_children = replace::conditional_style_rule_identifiers(
+        &editor.package,
+        &grown_location.object_locations,
+        grown_info.style_set_object_id,
+    )
+    .unwrap();
+    assert_eq!(grown_info.list_identifier, before.list_identifier);
+    assert_eq!(grown_info.style_set_object_id, before.style_set_object_id);
+    assert_eq!(grown_children[0], initial_children[0]);
+    assert_eq!(grown_children.len(), grown.len());
+
+    let removed = grown_children[1..]
+        .iter()
+        .flat_map(|identifiers| [identifiers.text_style, identifiers.cell_style])
+        .collect::<Vec<_>>();
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &grown[..1])
+        .unwrap();
+    let shrunk_info = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    let shrunk_location = locate_cell(&editor.package, table_id, 1, 1).unwrap();
+    let shrunk_children = replace::conditional_style_rule_identifiers(
+        &editor.package,
+        &shrunk_location.object_locations,
+        shrunk_info.style_set_object_id,
+    )
+    .unwrap();
+    assert_eq!(shrunk_info.list_identifier, before.list_identifier);
+    assert_eq!(shrunk_info.style_set_object_id, before.style_set_object_id);
+    assert_eq!(shrunk_children, initial_children);
+    for identifier in removed {
+        assert!(editor.package.iwa_entry_names().all(|name| {
+            editor
+                .package
+                .archive(name)
+                .unwrap()
+                .object(identifier)
+                .is_none()
+        }));
+    }
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap(),
+        Some(grown[..1].to_vec())
     );
 }
 
@@ -1541,5 +1637,19 @@ fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
             .cell_conditional_highlight_rules(table_id, 1, 1)
             .unwrap(),
         Some(rules.to_vec())
+    );
+    editor
+        .set_cell_conditional_highlighting(table_id, 1, 1, &rules[..1])
+        .unwrap();
+    let replaced = info_in_package(&editor.package, table_id, 1, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(replaced.list_identifier, info.list_identifier);
+    assert_eq!(replaced.style_set_object_id, info.style_set_object_id);
+    assert_eq!(
+        editor
+            .cell_conditional_highlight_rules(table_id, 1, 1)
+            .unwrap(),
+        Some(rules[..1].to_vec())
     );
 }
