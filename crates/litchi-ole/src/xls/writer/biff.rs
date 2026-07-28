@@ -357,6 +357,17 @@ pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsBookExt) 
     workbook::write_book_ext(writer, value)
 }
 
+pub fn write_real_time_data<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsRealTimeData,
+) -> XlsResult<()> {
+    workbook::write_real_time_data(writer, value)
+}
+
+pub fn write_web_pub<W: Write>(writer: &mut W, value: &crate::xls::XlsWebPub) -> XlsResult<()> {
+    workbook::write_web_pub(writer, value)
+}
+
 pub fn write_style_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsStyleExt) -> XlsResult<()> {
     workbook::write_style_ext(writer, value)
 }

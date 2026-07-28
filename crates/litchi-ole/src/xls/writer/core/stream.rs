@@ -98,6 +98,8 @@ pub(crate) fn generate_workbook_stream(
     file_sharing: Option<&XlsFileSharing>,
     book_ext: Option<&crate::xls::XlsBookExt>,
     theme: Option<&crate::xls::XlsTheme>,
+    real_time_data: &[crate::xls::XlsRealTimeData],
+    web_publications: &[crate::xls::XlsWebPub],
     xf_extensions: &[crate::xls::XlsXfExt],
     style_extensions: &[crate::xls::XlsStyleExt],
     worksheets: &[WritableWorksheet],
@@ -541,6 +543,12 @@ pub(crate) fn generate_workbook_stream(
         environment.default_country_code,
         environment.current_country_code,
     )?;
+
+    // RTD precedes RecalcId in the workbook globals grammar.
+    for topic in real_time_data {
+        biff::write_real_time_data(&mut stream, topic)?;
+    }
+
     biff::write_recalc_id(&mut stream, calculation_settings.recalculation_engine_id)?;
 
     if has_pivot_tables {
@@ -556,6 +564,11 @@ pub(crate) fn generate_workbook_stream(
     // SST record (shared string table)
     if !shared_strings.is_empty() {
         biff::write_sst(&mut stream, shared_strings, sst_total)?;
+    }
+
+    // WEBPUB follows ExtSST in the workbook globals grammar.
+    for publication in web_publications {
+        biff::write_web_pub(&mut stream, publication)?;
     }
 
     // BOOKEXT follows the shared-string/web-publishing region in the
@@ -1420,6 +1433,12 @@ pub(crate) fn generate_workbook_stream(
 
         if let Some(code_name) = &worksheet.vba_code_name {
             biff::write_code_name(&mut stream, code_name)?;
+        }
+
+        // WEBPUB follows CodeName and precedes SheetExt in the worksheet
+        // substream grammar.
+        for publication in &worksheet.web_publications {
+            biff::write_web_pub(&mut stream, publication)?;
         }
 
         // SHEETEXT sits after CodeName and before the FEAT records

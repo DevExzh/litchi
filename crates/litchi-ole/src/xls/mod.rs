@@ -163,6 +163,12 @@ mod sort_data;
 /// BIFF8 `QUERYTABLE` sequence: typed, inert query tables and connections.
 mod query_table;
 
+/// BIFF8 `RealTimeData` record: typed, inert real-time data (RTD) topics.
+mod real_time_data;
+
+/// BIFF8 `WebPub` record: typed, inert Web publishing metadata.
+mod web_pub;
+
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 pub mod pivot_table;
@@ -274,6 +280,8 @@ pub use query_table::{
     XlsQuerySource, XlsQueryTable, XlsTextCodePage, XlsTextDelimiter, XlsTextField,
     XlsTextFieldFormat, XlsTextQuery,
 };
+pub use real_time_data::{XlsRealTimeData, XlsRtdCell, XlsRtdValue};
+pub use web_pub::{XlsWebPageType, XlsWebPub, XlsWebPubRange, XlsWebSourceType};
 pub use records::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
     SharedStringProperties,

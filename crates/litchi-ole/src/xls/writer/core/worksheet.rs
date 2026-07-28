@@ -135,6 +135,8 @@ pub(super) struct WritableWorksheet {
     pub data_tables: Vec<(u32, u16, crate::xls::XlsDataTable)>,
     /// Default phonetic format and visible ranges (PHONETICINFO).
     pub phonetic_info: Option<crate::xls::XlsPhoneticInfo>,
+    /// Web pages published from this sheet (`WebPub` records).
+    pub web_publications: Vec<crate::xls::XlsWebPub>,
 }
 
 /// A column-level AutoFilter condition for the writer.
@@ -201,6 +203,7 @@ impl WritableWorksheet {
             tab_color: None,
             data_tables: Vec::new(),
             phonetic_info: None,
+            web_publications: Vec::new(),
         }
     }
 

@@ -311,6 +311,56 @@ pub fn write_book_ext<W: Write>(writer: &mut W, value: &crate::xls::XlsBookExt) 
     Ok(())
 }
 
+/// Maximum data payload of a BIFF8 record.
+const MAX_RECORD_DATA: usize = 8224;
+
+/// Write a REALTIMEDATA record (MS-XLS 2.4.214) with one RTD topic,
+/// chunking oversized payloads into CONTINUEFRT records (MS-XLS 2.4.60).
+///
+/// Record type: 0x0813
+pub fn write_real_time_data<W: Write>(
+    writer: &mut W,
+    value: &crate::xls::XlsRealTimeData,
+) -> XlsResult<()> {
+    let payload = value.to_payload()?;
+    let mut chunks = payload.chunks(MAX_RECORD_DATA);
+    let first = chunks.next().expect("RTD payload is never empty");
+    write_record_header(
+        writer,
+        crate::xls::real_time_data::REAL_TIME_DATA_RECORD_TYPE,
+        first.len() as u16,
+    )?;
+    writer.write_all(first)?;
+    for chunk in chunks {
+        write_record_header(
+            writer,
+            crate::xls::real_time_data::CONTINUE_FRT_RECORD_TYPE,
+            chunk.len() as u16,
+        )?;
+        writer.write_all(chunk)?;
+    }
+    Ok(())
+}
+
+/// Write a WEBPUB record (MS-XLS 2.4.344) with one published Web page.
+///
+/// Record type: 0x0801
+pub fn write_web_pub<W: Write>(writer: &mut W, value: &crate::xls::XlsWebPub) -> XlsResult<()> {
+    let payload = value.to_payload()?;
+    if payload.len() > MAX_RECORD_DATA {
+        return Err(XlsError::InvalidData(
+            "WebPub record exceeds the 8224-byte record limit".to_string(),
+        ));
+    }
+    write_record_header(
+        writer,
+        crate::xls::web_pub::WEB_PUB_RECORD_TYPE,
+        payload.len() as u16,
+    )?;
+    writer.write_all(&payload)?;
+    Ok(())
+}
+
 
 
 /// Write a STYLEEXT record (MS-XLS 2.4.270) with a cell-style extension.
@@ -346,7 +396,7 @@ pub fn write_theme<W: Write>(writer: &mut W, value: &crate::xls::XlsTheme) -> Xl
 pub fn write_xfcrc<W: Write>(writer: &mut W, xf_count: u16) -> XlsResult<()> {
     write_record_header(writer, 0x087C, 20)?;
     writer.write_all(&0x087Cu16.to_le_bytes())?;
-    writer.write_all(&[0; 12]); // FrtHeader remainder + reserved
+    writer.write_all(&[0; 12])?; // FrtHeader remainder + reserved
     writer.write_all(&xf_count.to_le_bytes())?;
     writer.write_all(&0xB463_87D8u32.to_le_bytes())?; // checksum constant
     Ok(())

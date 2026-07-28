@@ -82,6 +82,8 @@ pub struct XlsWorksheet {
     query_tables: Vec<crate::xls::query_table::XlsQueryTable>,
     /// Custom views (UserSViewBegin…UserSViewEnd brackets), in record order.
     custom_views: Vec<crate::xls::custom_view::XlsSheetCustomView>,
+    /// Web pages published from this sheet (`WebPub` records), in record order.
+    web_publications: Vec<crate::xls::web_pub::XlsWebPub>,
 }
 
 impl XlsWorksheet {
@@ -126,6 +128,7 @@ impl XlsWorksheet {
             phonetic_info: None,
             query_tables: Vec::new(),
             custom_views: Vec::new(),
+            web_publications: Vec::new(),
         }
     }
 
@@ -170,6 +173,7 @@ impl XlsWorksheet {
             phonetic_info: None,
             query_tables: Vec::new(),
             custom_views: Vec::new(),
+            web_publications: Vec::new(),
         }
     }
 
@@ -370,6 +374,17 @@ impl XlsWorksheet {
 
     pub(crate) fn add_custom_view(&mut self, view: crate::xls::custom_view::XlsSheetCustomView) {
         self.custom_views.push(view);
+    }
+
+    /// Web pages published from this worksheet (`WebPub` records), in record
+    /// order. The records are inert: destination URLs and paths are never
+    /// opened, resolved, or fetched.
+    pub fn web_publications(&self) -> &[crate::xls::web_pub::XlsWebPub] {
+        &self.web_publications
+    }
+
+    pub(crate) fn add_web_publication(&mut self, publication: crate::xls::web_pub::XlsWebPub) {
+        self.web_publications.push(publication);
     }
 
     // -- Filter mode --

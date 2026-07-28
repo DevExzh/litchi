@@ -1317,6 +1317,10 @@ pub struct XlsWriter {
     custom_table_styles: Option<XlsCustomTableStyles>,
     book_ext: Option<crate::xls::XlsBookExt>,
     theme: Option<crate::xls::XlsTheme>,
+    /// Real-time data (RTD) topics emitted as `RealTimeData` records.
+    real_time_data: Vec<crate::xls::XlsRealTimeData>,
+    /// Web pages published from the workbook globals (`WebPub` records).
+    web_publications: Vec<crate::xls::XlsWebPub>,
     xf_extensions: Vec<crate::xls::XlsXfExt>,
     style_extensions: Vec<crate::xls::XlsStyleExt>,
     encryption: Option<XlsWriterEncryption>,
@@ -1348,6 +1352,8 @@ impl XlsWriter {
             custom_table_styles: None,
             book_ext: None,
             theme: None,
+            real_time_data: Vec::new(),
+            web_publications: Vec::new(),
             xf_extensions: Vec::new(),
             style_extensions: Vec::new(),
             encryption: None,
@@ -3314,6 +3320,38 @@ impl XlsWriter {
         self.book_ext = book_ext;
     }
 
+    /// Append a real-time data (RTD) topic emitted as a `RealTimeData`
+    /// record (MS-XLS 2.4.214) in the workbook globals.
+    ///
+    /// When the topic shares a prefix with the previously added topic, set
+    /// [`crate::xls::XlsRealTimeData::common_prefix_len`] and store only the
+    /// trailing sub-strings in `topic_segments`, matching the on-disk prefix
+    /// compression.
+    pub fn add_real_time_data(&mut self, topic: crate::xls::XlsRealTimeData) {
+        self.real_time_data.push(topic);
+    }
+
+    /// Append a Web page published from the workbook globals, emitted as a
+    /// `WebPub` record (MS-XLS 2.4.344).
+    pub fn add_web_publication(&mut self, publication: crate::xls::XlsWebPub) {
+        self.web_publications.push(publication);
+    }
+
+    /// Append a Web page published from a worksheet, emitted as a `WebPub`
+    /// record (MS-XLS 2.4.344) in that sheet's substream.
+    pub fn add_sheet_web_publication(
+        &mut self,
+        sheet: usize,
+        publication: crate::xls::XlsWebPub,
+    ) -> XlsResult<()> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.web_publications.push(publication);
+        Ok(())
+    }
+
     /// Set a worksheet's default phonetic format and visible phonetic ranges
     /// (PHONETICINFO, MS-XLS 2.4.192); `None` emits no record.
     pub fn set_phonetic_info(
@@ -4055,6 +4093,8 @@ impl XlsWriter {
             self.file_sharing.as_ref(),
             self.book_ext.as_ref(),
             self.theme.as_ref(),
+            &self.real_time_data,
+            &self.web_publications,
             &self.xf_extensions,
             &self.style_extensions,
             &self.worksheets,

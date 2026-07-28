@@ -162,6 +162,10 @@ pub struct XlsWorkbook<R: Read + Seek> {
     workbook_view: crate::xls::workbook_view::XlsWorkbookView,
     /// Workbook-wide custom views (`UserBView` records), in record order.
     custom_views: Vec<crate::xls::custom_view::XlsWorkbookCustomView>,
+    /// Real-time data (RTD) topics (`RealTimeData` records), in record order.
+    real_time_data: Vec<crate::xls::real_time_data::XlsRealTimeData>,
+    /// Published Web pages (`WebPub` records), in record order.
+    web_publications: Vec<crate::xls::web_pub::XlsWebPub>,
     function_groups: Option<crate::xls::function_group::XlsFunctionGroups>,
     external_links: crate::xls::external_link::XlsExternalLinks,
     pivot_caches: Vec<crate::xls::PivotCache>,
@@ -246,6 +250,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_index: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             custom_views: Vec::new(),
+            real_time_data: Vec::new(),
+            web_publications: Vec::new(),
             function_groups: None,
             tolerance: XlsToleranceReport::default(),
         };
@@ -302,6 +308,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             shared_string_index: Ok(None),
             workbook_view: crate::xls::workbook_view::XlsWorkbookView::default(),
             custom_views: Vec::new(),
+            real_time_data: Vec::new(),
+            web_publications: Vec::new(),
             function_groups: None,
             tolerance: XlsToleranceReport::default(),
         };
@@ -591,6 +599,28 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 crate::xls::custom_view::USER_B_VIEW_RECORD_TYPE => {
                     self.custom_views
                         .push(crate::xls::custom_view::XlsWorkbookCustomView::parse(&record.data)?);
+                },
+                crate::xls::real_time_data::REAL_TIME_DATA_RECORD_TYPE => {
+                    // RTD = RealTimeData *ContinueFrt (MS-XLS 2.1): the
+                    // logical payload is the record body plus any trailing
+                    // ContinueFrt bodies.
+                    let mut payload = record.data.clone();
+                    while records.get(i + 1).is_some_and(|next| {
+                        next.header.record_type
+                            == crate::xls::real_time_data::CONTINUE_FRT_RECORD_TYPE
+                    }) {
+                        i += 1;
+                        payload.extend_from_slice(&records[i].data);
+                    }
+                    let previous_topic =
+                        self.real_time_data.last().map(|topic| topic.topic.as_str());
+                    self.real_time_data.push(
+                        crate::xls::real_time_data::XlsRealTimeData::parse(&payload, previous_topic)?,
+                    );
+                },
+                crate::xls::web_pub::WEB_PUB_RECORD_TYPE => {
+                    self.web_publications
+                        .push(crate::xls::web_pub::XlsWebPub::parse(&record.data)?);
                 },
                 crate::xls::book_ext::BOOK_EXT_RECORD_TYPE => {
                     if self.book_ext.is_some() {
@@ -1006,6 +1036,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                 crate::xls::data_table::TABLE_RECORD_TYPE => { // Table
                     worksheet.add_data_table(crate::xls::data_table::XlsDataTable::parse(&record.data)?);
                 }
+                crate::xls::web_pub::WEB_PUB_RECORD_TYPE => { // WebPub
+                    worksheet
+                        .add_web_publication(crate::xls::web_pub::XlsWebPub::parse(&record.data)?);
+                }
                 crate::xls::custom_view::USER_S_VIEW_BEGIN_RECORD_TYPE => { // UserSViewBegin
                     let begin =
                         crate::xls::custom_view::XlsSheetCustomViewBegin::parse(&record.data)?;
@@ -1262,6 +1296,24 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// performs.
     pub fn custom_views(&self) -> &[crate::xls::custom_view::XlsWorkbookCustomView] {
         &self.custom_views
+    }
+
+    /// Real-time data (RTD) topics declared in the workbook globals, in
+    /// record order.
+    ///
+    /// The topics are inert: this reader never locates, launches, or queries
+    /// an RTD server; each entry only reports the topic, the last cached
+    /// value, and the subscribed cells.
+    pub fn real_time_data(&self) -> &[crate::xls::real_time_data::XlsRealTimeData] {
+        &self.real_time_data
+    }
+
+    /// Web pages published from the workbook globals, in record order.
+    ///
+    /// The records are inert: destination URLs and paths are never opened,
+    /// resolved, or fetched.
+    pub fn web_publications(&self) -> &[crate::xls::web_pub::XlsWebPub] {
+        &self.web_publications
     }
 
     /// Built-in and custom function categories, when the FNGROUPS collection exists.
