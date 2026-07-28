@@ -76,6 +76,8 @@ pub struct DocumentBuilder {
     list_level_label_alignments: Vec<crate::ListStyleLevelLabelAlignment>,
     paragraph_flow_styles: Vec<crate::ParagraphStyleFlow>,
     table_row_property_styles: Vec<crate::TableRowStyleProperties>,
+    table_column_property_styles: Vec<crate::TableColumnStyleProperties>,
+    table_cell_property_styles: Vec<crate::TableCellStyleProperties>,
     table_property_styles: Vec<crate::TableStyleProperties>,
     section_property_styles: Vec<crate::SectionStyleProperties>,
     section_names: std::collections::HashSet<String>,
@@ -135,6 +137,8 @@ impl DocumentBuilder {
             list_level_label_alignments: Vec::new(),
             paragraph_flow_styles: Vec::new(),
             table_row_property_styles: Vec::new(),
+            table_column_property_styles: Vec::new(),
+            table_cell_property_styles: Vec::new(),
             table_property_styles: Vec::new(),
             section_property_styles: Vec::new(),
             section_names: std::collections::HashSet::new(),
@@ -343,6 +347,46 @@ impl DocumentBuilder {
             ));
         }
         self.table_row_property_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a named or default table-column style carrying typed column properties.
+    pub fn add_table_column_property_style(
+        &mut self,
+        style: crate::TableColumnStyleProperties,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.table_column_property_styles.len() >= 4096
+            || self
+                .table_column_property_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive table-column property style".to_string(),
+            ));
+        }
+        self.table_column_property_styles.push(style);
+        Ok(self)
+    }
+
+    /// Add a named or default table-cell style carrying typed cell properties.
+    pub fn add_table_cell_property_style(
+        &mut self,
+        style: crate::TableCellStyleProperties,
+    ) -> Result<&mut Self> {
+        style.validate()?;
+        if self.table_cell_property_styles.len() >= 4096
+            || self
+                .table_cell_property_styles
+                .iter()
+                .any(|x| x.name == style.name && x.is_default_style == style.is_default_style)
+        {
+            return Err(litchi_core::Error::InvalidFormat(
+                "duplicate or excessive table-cell property style".to_string(),
+            ));
+        }
+        self.table_cell_property_styles.push(style);
         Ok(self)
     }
 
@@ -1578,6 +1622,30 @@ impl DocumentBuilder {
                 .table_property_styles
                 .iter()
                 .map(|x| x.to_xml_fragment().expect("validated table property style"))
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.table_column_property_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .table_column_property_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated table-column property style")
+                })
+                .collect::<String>();
+            xml.insert_str(insertion, &fragments);
+        }
+        if !self.table_cell_property_styles.is_empty() {
+            let insertion = xml.find("</office:styles>").expect("static styles root");
+            let fragments = self
+                .table_cell_property_styles
+                .iter()
+                .map(|x| {
+                    x.to_xml_fragment()
+                        .expect("validated table-cell property style")
+                })
                 .collect::<String>();
             xml.insert_str(insertion, &fragments);
         }

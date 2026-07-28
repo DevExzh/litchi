@@ -317,6 +317,8 @@ mod paragraph_flow;
 mod paragraph_line_spacing;
 mod paragraph_tab_stop;
 mod style_columns;
+mod table_cell_properties;
+mod table_column_properties;
 mod table_properties;
 mod table_row_properties;
 pub use elements::bookmark::{
@@ -615,6 +617,17 @@ pub use settings::{
 pub use style_columns::{
     MAX_STYLE_COLUMNS, StyleColumn, StyleColumnLength, StyleColumnSeparator,
     StyleColumnSeparatorAlignment, StyleColumnSeparatorStyle, StyleColumns, parse_style_columns,
+};
+pub use table_cell_properties::{
+    CellBorder, CellBorderWidths, CellDirection, CellGlyphOrientationVertical, CellLength,
+    CellProtect, CellRotationAlign, CellRotationAngle, CellTextAlignSource, CellVerticalAlign,
+    CellWrapOption, TableCellProperties, TableCellStyleProperties, TableCellStylePropertiesSet,
+    parse_table_cell_style_properties, set_table_cell_style_properties_xml,
+};
+pub use table_column_properties::{
+    TableColumnLength, TableColumnProperties, TableColumnRelWidth, TableColumnStyleProperties,
+    TableColumnStylePropertiesSet, parse_table_column_style_properties,
+    set_table_column_style_properties_xml,
 };
 pub use table_properties::{
     TableAlignment, TableBorderModel, TablePageNumber, TableProperties, TableShadow,
