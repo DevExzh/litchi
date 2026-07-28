@@ -139,6 +139,10 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Validated foreground color applied to a whole Numbers table cell.
+pub type NumbersTableCellTextColor = RgbaColor;
+/// Typed underline and strikethrough formatting for a whole Numbers table cell.
+pub type NumbersTableCellTextDecorations = TextDecorations;
 /// Strict PostScript font identity applied to a whole Numbers table cell.
 pub type NumbersTableCellTextFont = TextFont;
 /// Whole-cell point size, bold, and italic formatting.
@@ -2797,6 +2801,96 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the effective foreground text color of one table cell.
+    pub fn table_cell_text_color(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextColor> {
+        cell_paragraph_style::text_color(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell foreground text-color override.
+    pub fn set_table_cell_text_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        color: NumbersTableCellTextColor,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_text_color(&mut staged, table_id, row, column, color)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_color(table_id, row, column)? != color {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text color failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text-color override and restore the inherited color.
+    pub fn reset_table_cell_text_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_text_color(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective whole-cell underline and strikethrough formatting.
+    pub fn table_cell_text_decorations(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextDecorations> {
+        cell_paragraph_style::decorations(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell underline and strikethrough formatting.
+    pub fn set_table_cell_text_decorations(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        decorations: NumbersTableCellTextDecorations,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_decorations(&mut staged, table_id, row, column, decorations)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_decorations(table_id, row, column)? != decorations {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text decorations failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local decorations and restore the inherited cell formatting.
+    pub fn reset_table_cell_text_decorations(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_decorations(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective PostScript font identity of one table cell.
     pub fn table_cell_text_font(
         &self,
@@ -4008,6 +4102,62 @@ pub(crate) fn reset_table_cell_text_alignment_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_paragraph_style::reset_alignment(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_color_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<RgbaColor> {
+    cell_paragraph_style::text_color(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    color: RgbaColor,
+) -> Result<()> {
+    cell_paragraph_style::set_text_color(package, table_id, row, column, color)
+}
+
+pub(crate) fn reset_table_cell_text_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_text_color(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_decorations_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextDecorations> {
+    cell_paragraph_style::decorations(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_decorations_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    decorations: TextDecorations,
+) -> Result<()> {
+    cell_paragraph_style::set_decorations(package, table_id, row, column, decorations)
+}
+
+pub(crate) fn reset_table_cell_text_decorations_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_decorations(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_text_font_in_package(

@@ -59,6 +59,7 @@ pub type KeynoteTableRowInsertion = crate::numbers::TableRowInsertion;
 pub type KeynoteTableColumnInsertion = crate::numbers::TableColumnInsertion;
 /// A validated native merged-cell rectangle.
 pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
+pub use crate::shapes::RgbaColor as KeynoteTableCellTextColor;
 pub use crate::table_cell_border::{
     TableCellBorderSide as KeynoteTableCellBorderSide, TableCellBorders as KeynoteTableCellBorders,
 };
@@ -102,6 +103,7 @@ pub use crate::table_cell_number_format::{
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
+pub use crate::text::TextDecorations as KeynoteTableCellTextDecorations;
 pub use crate::text::TextFont as KeynoteTableCellTextFont;
 pub use crate::text::TextStyle as KeynoteTableCellTextStyle;
 /// A validated non-zero native header or footer count.
@@ -1662,6 +1664,149 @@ impl KeynoteEditor {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_alignment_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective foreground text color of one slide-table cell.
+    pub fn slide_table_cell_text_color(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextColor> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_color_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell foreground text-color override.
+    pub fn set_slide_table_cell_text_color(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        color: KeynoteTableCellTextColor,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_color_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            color,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_color(slide_index, model_object_id, row, column)? != color
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell text color failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text-color override and restore the inherited table color.
+    pub fn reset_slide_table_cell_text_color(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_color_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective underline and strikethrough formatting for one cell.
+    pub fn slide_table_cell_text_decorations(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextDecorations> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_decorations_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell underline and strikethrough formatting.
+    pub fn set_slide_table_cell_text_decorations(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        decorations: KeynoteTableCellTextDecorations,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_decorations_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            decorations,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_decorations(slide_index, model_object_id, row, column)?
+            != decorations
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell text decorations failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local decorations and restore inherited underline and strikethrough.
+    pub fn reset_slide_table_cell_text_decorations(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_decorations_in_package(
             &mut staged,
             model_object_id,
             row,

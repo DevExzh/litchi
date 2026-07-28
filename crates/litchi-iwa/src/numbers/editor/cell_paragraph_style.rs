@@ -31,11 +31,12 @@ pub(super) fn alignment(
         CellParagraphPropertyKind::Alignment,
     )? {
         CellParagraphProperty::Alignment(value) => Ok(value),
-        CellParagraphProperty::Font(_) | CellParagraphProperty::TextStyle(_) => {
-            Err(Error::InvalidFormat(
-                "iWork table-cell alignment resolved as another paragraph property".to_owned(),
-            ))
-        },
+        CellParagraphProperty::Color(_)
+        | CellParagraphProperty::Decorations(_)
+        | CellParagraphProperty::Font(_)
+        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+            "iWork table-cell alignment resolved as another paragraph property".to_owned(),
+        )),
     }
 }
 
@@ -70,6 +71,114 @@ pub(super) fn reset_alignment(
     )
 }
 
+pub(super) fn text_color(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<RgbaColor> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Color,
+    )? {
+        CellParagraphProperty::Color(value) => Ok(value),
+        CellParagraphProperty::Alignment(_)
+        | CellParagraphProperty::Decorations(_)
+        | CellParagraphProperty::Font(_)
+        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+            "iWork table-cell text color resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_text_color(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: RgbaColor,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Color(value),
+    )
+}
+
+pub(super) fn reset_text_color(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Color,
+    )
+}
+
+pub(super) fn decorations(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextDecorations> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Decorations,
+    )? {
+        CellParagraphProperty::Decorations(value) => Ok(value),
+        CellParagraphProperty::Alignment(_)
+        | CellParagraphProperty::Color(_)
+        | CellParagraphProperty::Font(_)
+        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+            "iWork table-cell text decorations resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_decorations(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextDecorations,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Decorations(value),
+    )
+}
+
+pub(super) fn reset_decorations(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Decorations,
+    )
+}
+
 pub(super) fn font(
     package: &IWorkPackage,
     table_id: u64,
@@ -84,11 +193,12 @@ pub(super) fn font(
         CellParagraphPropertyKind::Font,
     )? {
         CellParagraphProperty::Font(value) => Ok(value),
-        CellParagraphProperty::Alignment(_) | CellParagraphProperty::TextStyle(_) => {
-            Err(Error::InvalidFormat(
-                "iWork table-cell font resolved as another paragraph property".to_owned(),
-            ))
-        },
+        CellParagraphProperty::Alignment(_)
+        | CellParagraphProperty::Color(_)
+        | CellParagraphProperty::Decorations(_)
+        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+            "iWork table-cell font resolved as another paragraph property".to_owned(),
+        )),
     }
 }
 
@@ -137,12 +247,13 @@ pub(super) fn text_style(
         CellParagraphPropertyKind::TextStyle,
     )? {
         CellParagraphProperty::TextStyle(value) => Ok(value),
-        CellParagraphProperty::Alignment(_) | CellParagraphProperty::Font(_) => {
-            Err(Error::InvalidFormat(
-                "iWork table-cell character formatting resolved as another paragraph property"
-                    .to_owned(),
-            ))
-        },
+        CellParagraphProperty::Alignment(_)
+        | CellParagraphProperty::Color(_)
+        | CellParagraphProperty::Decorations(_)
+        | CellParagraphProperty::Font(_) => Err(Error::InvalidFormat(
+            "iWork table-cell character formatting resolved as another paragraph property"
+                .to_owned(),
+        )),
     }
 }
 
@@ -803,8 +914,16 @@ mod tests {
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::numbers::{CellValue, NumbersDocumentBuilder};
     use crate::pages::PagesDocumentBuilder;
-    use crate::shapes::{DrawablePoint, DrawableSize};
-    use crate::text::{TextFont, TextPointSize};
+    use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
+    use crate::text::{TextDecorations, TextFont, TextPointSize, TextStrikethrough, TextUnderline};
+
+    fn test_color() -> RgbaColor {
+        const RED: f32 = 0.72;
+        const GREEN: f32 = 0.10;
+        const BLUE: f32 = 0.14;
+        const ALPHA: f32 = 1.0;
+        RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap()
+    }
 
     fn explicit_style_id(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> u64 {
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
@@ -984,12 +1103,20 @@ mod tests {
             .with_bold(true)
             .with_italic(true);
         let font = TextFont::named("CourierNewPSMT").unwrap();
+        let color = test_color();
+        let decorations = TextDecorations::new(TextUnderline::Double, TextStrikethrough::Single);
 
         editor
             .set_table_cell_text_style(table_id, 1, 1, styled)
             .unwrap();
         editor
             .set_table_cell_text_font(table_id, 1, 1, font.clone())
+            .unwrap();
+        editor
+            .set_table_cell_text_color(table_id, 1, 1, color)
+            .unwrap();
+        editor
+            .set_table_cell_text_decorations(table_id, 1, 1, decorations)
             .unwrap();
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
         assert_eq!(
@@ -999,6 +1126,28 @@ mod tests {
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
             TextAlignment::Center
+        );
+        assert_eq!(editor.table_cell_text_font(table_id, 1, 1).unwrap(), font);
+        assert_eq!(editor.table_cell_text_color(table_id, 1, 1).unwrap(), color);
+        assert_eq!(
+            editor.table_cell_text_decorations(table_id, 1, 1).unwrap(),
+            decorations
+        );
+
+        assert!(
+            editor
+                .reset_table_cell_text_decorations(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            editor.table_cell_text_decorations(table_id, 1, 1).unwrap(),
+            TextDecorations::NONE
+        );
+        assert_eq!(editor.table_cell_text_color(table_id, 1, 1).unwrap(), color);
+        assert!(editor.reset_table_cell_text_color(table_id, 1, 1).unwrap());
+        assert_eq!(
+            editor.table_cell_text_color(table_id, 1, 1).unwrap(),
+            RgbaColor::black()
         );
         assert_eq!(editor.table_cell_text_font(table_id, 1, 1).unwrap(), font);
 
@@ -1048,7 +1197,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_font_uses_copy_on_write() {
+    fn shared_character_properties_use_copy_on_write() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(2, 3)
             .build()
@@ -1092,6 +1241,39 @@ mod tests {
         write_text_style_key(&mut editor.package, &target, 1, 2, Some(key)).unwrap();
         let shared_style_id = explicit_style_id(&editor, table_id, 1, 1);
         let font = TextFont::named("CourierNewPSMT").unwrap();
+        let color = test_color();
+        let decorations = TextDecorations::new(TextUnderline::Single, TextStrikethrough::Double);
+
+        editor
+            .set_table_cell_text_decorations(table_id, 1, 1, decorations)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor.table_cell_text_decorations(table_id, 1, 1).unwrap(),
+            decorations
+        );
+        assert_eq!(
+            editor.table_cell_text_decorations(table_id, 1, 2).unwrap(),
+            TextDecorations::NONE
+        );
+        assert!(
+            editor
+                .reset_table_cell_text_decorations(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+
+        editor
+            .set_table_cell_text_color(table_id, 1, 1, color)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(editor.table_cell_text_color(table_id, 1, 1).unwrap(), color);
+        assert_eq!(
+            editor.table_cell_text_color(table_id, 1, 2).unwrap(),
+            RgbaColor::black()
+        );
+        assert!(editor.reset_table_cell_text_color(table_id, 1, 1).unwrap());
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
 
         editor
             .set_table_cell_text_font(table_id, 1, 1, font.clone())
@@ -1185,6 +1367,9 @@ mod tests {
         let pages_style =
             TextStyle::new(TextPointSize::from_points(17.0).unwrap()).with_italic(true);
         let pages_font = TextFont::named("AvenirNext-Regular").unwrap();
+        let pages_color = test_color();
+        let pages_decorations =
+            TextDecorations::new(TextUnderline::Single, TextStrikethrough::None);
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Aligned", 2, 2)
             .build()
@@ -1199,6 +1384,12 @@ mod tests {
         pages
             .set_table_cell_text_font(pages_table, 1, 1, pages_font.clone())
             .unwrap();
+        pages
+            .set_table_cell_text_color(pages_table, 1, 1, pages_color)
+            .unwrap();
+        pages
+            .set_table_cell_text_decorations(pages_table, 1, 1, pages_decorations)
+            .unwrap();
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_text_alignment(pages_table, 1, 1).unwrap(),
@@ -1212,6 +1403,26 @@ mod tests {
             pages.table_cell_text_font(pages_table, 1, 1).unwrap(),
             pages_font
         );
+        assert_eq!(
+            pages.table_cell_text_color(pages_table, 1, 1).unwrap(),
+            pages_color
+        );
+        assert_eq!(
+            pages
+                .table_cell_text_decorations(pages_table, 1, 1)
+                .unwrap(),
+            pages_decorations
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_decorations(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_color(pages_table, 1, 1)
+                .unwrap()
+        );
         assert!(pages.reset_table_cell_text_font(pages_table, 1, 1).unwrap());
         assert!(
             pages
@@ -1222,6 +1433,9 @@ mod tests {
         let keynote_style =
             TextStyle::new(TextPointSize::from_points(19.0).unwrap()).with_bold(true);
         let keynote_font = TextFont::named("Menlo-Regular").unwrap();
+        let keynote_color = test_color();
+        let keynote_decorations =
+            TextDecorations::new(TextUnderline::None, TextStrikethrough::Single);
         let mut keynote = KeynoteDocumentBuilder::new()
             .title("Aligned")
             .build()
@@ -1254,6 +1468,18 @@ mod tests {
         keynote
             .set_slide_table_cell_text_font(0, table.model_object_id, 1, 1, keynote_font.clone())
             .unwrap();
+        keynote
+            .set_slide_table_cell_text_color(0, table.model_object_id, 1, 1, keynote_color)
+            .unwrap();
+        keynote
+            .set_slide_table_cell_text_decorations(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                keynote_decorations,
+            )
+            .unwrap();
         let mut keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1273,6 +1499,28 @@ mod tests {
                 .slide_table_cell_text_font(0, table.model_object_id, 1, 1)
                 .unwrap(),
             keynote_font
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_color(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_color
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_decorations(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_decorations
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_decorations(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_color(0, table.model_object_id, 1, 1)
+                .unwrap()
         );
         assert!(
             keynote
@@ -1311,6 +1559,21 @@ mod tests {
                     1,
                     2,
                     TextFont::named("CourierNewPSMT").unwrap(),
+                )
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_color(table_id, 1, 2, test_color())
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_decorations(
+                    table_id,
+                    1,
+                    2,
+                    TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single),
                 )
                 .is_err()
         );

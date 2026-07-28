@@ -1,15 +1,18 @@
-//! Create Pages, Numbers, and Keynote files with native table-cell text layouts and alignment.
+//! Create Pages, Numbers, and Keynote files with native table-cell text formatting.
 
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa::table_cell_layout::{
     TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
 };
-use litchi_iwa::text::{TextAlignment, TextFont, TextPointSize, TextStyle};
+use litchi_iwa::text::{
+    TextAlignment, TextDecorations, TextFont, TextPointSize, TextStrikethrough, TextStyle,
+    TextUnderline,
+};
 
 const ROW: usize = 1;
 const COLUMN: usize = 1;
@@ -21,6 +24,7 @@ const NUMBERS_FONT_NAME: &str = "CourierNewPSMT";
 const PAGES_FONT_NAME: &str = "AvenirNext-Regular";
 const KEYNOTE_FONT_NAME: &str = "Menlo-Regular";
 const CELL_TEXT: &str = "Wrapped text\nwith an 8 pt inset";
+const OPAQUE: f32 = 1.0;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
@@ -54,6 +58,14 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers.table_cell_text_font(numbers_table.object_id, ROW, COLUMN)?,
         numbers_text_font()?
     );
+    assert_eq!(
+        numbers.table_cell_text_color(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_text_color()?
+    );
+    assert_eq!(
+        numbers.table_cell_text_decorations(numbers_table.object_id, ROW, COLUMN)?,
+        numbers_text_decorations()
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -69,6 +81,14 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         pages.table_cell_text_font(pages_table.model_object_id, ROW, COLUMN)?,
         pages_text_font()?
     );
+    assert_eq!(
+        pages.table_cell_text_color(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_text_color()?
+    );
+    assert_eq!(
+        pages.table_cell_text_decorations(pages_table.model_object_id, ROW, COLUMN)?,
+        pages_text_decorations()
+    );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
     let keynote_table = keynote.slide_tables(0)?.remove(0);
@@ -83,6 +103,14 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         keynote.slide_table_cell_text_font(0, keynote_table.model_object_id, ROW, COLUMN)?,
         keynote_text_font()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_text_color(0, keynote_table.model_object_id, ROW, COLUMN)?,
+        keynote_text_color()?
+    );
+    assert_eq!(
+        keynote.slide_table_cell_text_decorations(0, keynote_table.model_object_id, ROW, COLUMN)?,
+        keynote_text_decorations()
     );
     Ok(())
 }
@@ -124,6 +152,39 @@ fn keynote_text_font() -> Result<TextFont, litchi_iwa::Error> {
     TextFont::named(KEYNOTE_FONT_NAME)
 }
 
+fn numbers_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
+    const RED: f32 = 0.72;
+    const GREEN: f32 = 0.10;
+    const BLUE: f32 = 0.14;
+    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+}
+
+fn pages_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
+    const RED: f32 = 0.10;
+    const GREEN: f32 = 0.32;
+    const BLUE: f32 = 0.78;
+    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+}
+
+fn keynote_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
+    const RED: f32 = 0.08;
+    const GREEN: f32 = 0.55;
+    const BLUE: f32 = 0.28;
+    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+}
+
+const fn numbers_text_decorations() -> TextDecorations {
+    TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single)
+}
+
+const fn pages_text_decorations() -> TextDecorations {
+    TextDecorations::new(TextUnderline::Single, TextStrikethrough::None)
+}
+
+const fn keynote_text_decorations() -> TextDecorations {
+    TextDecorations::new(TextUnderline::None, TextStrikethrough::Single)
+}
+
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Layouts")
@@ -140,6 +201,8 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Center)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, numbers_text_style()?)?;
     editor.set_table_cell_text_font(table_id, ROW, COLUMN, numbers_text_font()?)?;
+    editor.set_table_cell_text_color(table_id, ROW, COLUMN, numbers_text_color()?)?;
+    editor.set_table_cell_text_decorations(table_id, ROW, COLUMN, numbers_text_decorations())?;
     editor.save(output)?;
     Ok(())
 }
@@ -160,6 +223,8 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Right)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, pages_text_style()?)?;
     editor.set_table_cell_text_font(table_id, ROW, COLUMN, pages_text_font()?)?;
+    editor.set_table_cell_text_color(table_id, ROW, COLUMN, pages_text_color()?)?;
+    editor.set_table_cell_text_decorations(table_id, ROW, COLUMN, pages_text_decorations())?;
     editor.save(output)?;
     Ok(())
 }
@@ -213,6 +278,20 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ROW,
         COLUMN,
         keynote_text_font()?,
+    )?;
+    editor.set_slide_table_cell_text_color(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_text_color()?,
+    )?;
+    editor.set_slide_table_cell_text_decorations(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        keynote_text_decorations(),
     )?;
     editor.save(output)?;
     Ok(())

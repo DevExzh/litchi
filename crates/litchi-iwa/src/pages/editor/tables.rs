@@ -61,6 +61,7 @@ pub type PagesTableRowInsertion = crate::numbers::TableRowInsertion;
 pub type PagesTableColumnInsertion = crate::numbers::TableColumnInsertion;
 /// A validated native merged-cell rectangle.
 pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
+pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
 pub use crate::table_cell_border::{
     TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,
 };
@@ -104,6 +105,7 @@ pub use crate::table_cell_number_format::{
     TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
 };
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
+pub use crate::text::TextDecorations as PagesTableCellTextDecorations;
 pub use crate::text::TextFont as PagesTableCellTextFont;
 pub use crate::text::TextStyle as PagesTableCellTextStyle;
 
@@ -1316,6 +1318,140 @@ impl PagesEditor {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_alignment_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective foreground text color of one body-table cell.
+    pub fn table_cell_text_color(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextColor> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_color_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell foreground text-color override.
+    pub fn set_table_cell_text_color(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        color: PagesTableCellTextColor,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_color_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            color,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_color(model_object_id, row, column)? != color {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell text color failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text-color override and restore the inherited color.
+    pub fn reset_table_cell_text_color(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_color_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective whole-cell underline and strikethrough formatting.
+    pub fn table_cell_text_decorations(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextDecorations> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_decorations_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell underline and strikethrough formatting.
+    pub fn set_table_cell_text_decorations(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        decorations: PagesTableCellTextDecorations,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_decorations_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            decorations,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_decorations(model_object_id, row, column)? != decorations {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell text decorations failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local decorations and restore the inherited cell formatting.
+    pub fn reset_table_cell_text_decorations(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_decorations_in_package(
             &mut staged,
             model_object_id,
             row,

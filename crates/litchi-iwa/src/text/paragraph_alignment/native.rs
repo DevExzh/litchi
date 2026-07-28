@@ -93,7 +93,7 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) italic: Option<bool>,
     pub(crate) point_size: Option<TextPointSize>,
     pub(crate) font: Option<TextFont>,
-    pub(super) font_color: Option<RgbaColor>,
+    pub(crate) font_color: Option<RgbaColor>,
     pub(super) capitalization: Option<TextCapitalization>,
     pub(super) script: Option<TextScript>,
     pub(super) baseline_shift: Option<TextBaselineShift>,
@@ -102,8 +102,8 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(super) outline: Option<TextOutline>,
     pub(super) shadow: Option<TextShadow>,
     pub(super) background: Option<TextBackground>,
-    pub(super) underline: Option<TextUnderline>,
-    pub(super) strikethrough: Option<TextStrikethrough>,
+    pub(crate) underline: Option<TextUnderline>,
+    pub(crate) strikethrough: Option<TextStrikethrough>,
     pub(crate) alignment: Option<TextAlignment>,
     pub(super) line_spacing: Option<ParagraphLineSpacing>,
     pub(super) space_before: Option<ParagraphSpacingPoints>,
@@ -223,14 +223,14 @@ pub(crate) fn inherited_text_font(package: &IWorkPackage, first_style_id: u64) -
     inheritance::text_font(package, first_style_id)
 }
 
-pub(super) fn inherited_text_decorations(
+pub(crate) fn inherited_text_decorations(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextDecorations> {
     inheritance::text_decorations(package, first_style_id)
 }
 
-pub(super) fn inherited_text_color(
+pub(crate) fn inherited_text_color(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<RgbaColor> {
