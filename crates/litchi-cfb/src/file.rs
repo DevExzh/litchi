@@ -863,21 +863,20 @@ impl<R: Read + Seek> OleFile<R> {
                     "CFB root entry must have SID 0".to_string(),
                 ));
             },
-            STGTY_STORAGE => {
-                if sid == 0 || !matches!(raw.start_sector.get(), 0 | ENDOFCHAIN) || stream_size != 0
-                {
-                    return Err(OleError::CorruptedFile(format!(
-                        "invalid CFB storage fields at SID {sid}"
-                    )));
-                }
+            STGTY_STORAGE
+                if sid == 0 || !matches!(raw.start_sector.get(), 0 | ENDOFCHAIN) || stream_size != 0 =>
+            {
+                return Err(OleError::CorruptedFile(format!(
+                    "invalid CFB storage fields at SID {sid}"
+                )));
             },
-            STGTY_STREAM => {
-                if sid == 0 || sid_child != NOSTREAM {
-                    return Err(OleError::CorruptedFile(format!(
-                        "invalid CFB stream fields at SID {sid}"
-                    )));
-                }
+            STGTY_STORAGE => {},
+            STGTY_STREAM if sid == 0 || sid_child != NOSTREAM => {
+                return Err(OleError::CorruptedFile(format!(
+                    "invalid CFB stream fields at SID {sid}"
+                )));
             },
+            STGTY_STREAM => {},
             _ => {},
         }
 

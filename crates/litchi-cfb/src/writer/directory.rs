@@ -70,6 +70,7 @@ enum NodeColor {
     Black = 1,
 }
 
+#[allow(clippy::type_complexity)]
 fn directory_name_data(name: &str) -> Result<(SmallVec<[u16; 32]>, SmallVec<[u16; 32]>), OleError> {
     let DirectoryNameData { utf16, comparison } =
         parse_directory_name(name).map_err(|error| OleError::InvalidData(error.to_string()))?;

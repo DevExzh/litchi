@@ -403,7 +403,10 @@ fn validate_section(section:&PropertySet)->Result<(),OleError>{
     if section.properties.len()>MAX_PROPERTY_COUNT{return Err(invalid("Property count exceeds safety limit"))}
     if section.dictionary.values().collect::<Vec<_>>().iter().enumerate().any(|(index,name)|section.dictionary.values().skip(index+1).any(|other|name.eq_ignore_ascii_case(other))){return Err(invalid("Duplicate dictionary property name"))}
     for(identifier,name)in &section.dictionary{validate_property_name(name)?;if !section.properties.contains_key(identifier){return Err(invalid("Dictionary references a missing property"))}}
-    if let Some(codepage)=section.codepage{if codepage==0{return Err(invalid("Codepage must be nonzero"))}if section.properties.get(&PID_CODEPAGE)!=Some(&PropertyValue::I2(codepage as i16)){return Err(invalid("PID 1 does not match section codepage"))}}
+    if let Some(codepage)=section.codepage{
+        if codepage==0{return Err(invalid("Codepage must be nonzero"))}
+        if section.properties.get(&PID_CODEPAGE)!=Some(&PropertyValue::I2(codepage as i16)){return Err(invalid("PID 1 does not match section codepage"))}
+    }
     Ok(())
 }
 

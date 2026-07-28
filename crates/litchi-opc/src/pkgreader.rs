@@ -590,6 +590,7 @@ impl PackageReader {
 
 const MAX_RELATIONSHIPS_PER_PART: usize = 65_536;
 
+#[allow(clippy::too_many_arguments)]
 fn inspect_relationship_element(
     relationships: &mut SmallVec<[SerializedRelationship; 8]>,
     ids: &mut std::collections::HashSet<String>,

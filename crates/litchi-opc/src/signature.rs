@@ -99,7 +99,7 @@ pub enum CanonicalizationMethod {
 
 #[derive(Clone)]
 enum SigningMaterial {
-    Rsa(RsaPrivateKey),
+    Rsa(Box<RsaPrivateKey>),
     Ecdsa(EcdsaSigningKey),
 }
 
@@ -150,7 +150,7 @@ impl PackageSigner {
         key.validate()
             .map_err(|error| DigitalSignatureError::InvalidKey(error.to_string()))?;
         Ok(Self {
-            material: SigningMaterial::Rsa(key),
+            material: SigningMaterial::Rsa(Box::new(key)),
             certificates: Vec::new(),
             signing_time: None,
             canonicalization: CanonicalizationMethod::Inclusive,
@@ -387,7 +387,7 @@ pub fn author_detached_signature(
     let canonical = canonicalize_authored(&signed_info, mode)?;
     let value = match &signer.material {
         SigningMaterial::Rsa(key) => {
-            let signature: RsaSignature = RsaSigningKey::<Sha256>::new(key.clone()).sign(&canonical);
+            let signature: RsaSignature = RsaSigningKey::<Sha256>::new(key.as_ref().clone()).sign(&canonical);
             signature.to_vec()
         },
         SigningMaterial::Ecdsa(key) => {
@@ -1498,7 +1498,7 @@ fn build_signature(package: &OpcPackage, signer: &PackageSigner) -> Result<Vec<u
     let signed_bytes = canonicalize_authored(&signed_info, mode)?;
     let signature_value = match &signer.material {
         SigningMaterial::Rsa(key) => {
-            let signature: RsaSignature = RsaSigningKey::<Sha256>::new(key.clone()).sign(&signed_bytes);
+            let signature: RsaSignature = RsaSigningKey::<Sha256>::new(key.as_ref().clone()).sign(&signed_bytes);
             signature.to_vec()
         },
         SigningMaterial::Ecdsa(key) => {
