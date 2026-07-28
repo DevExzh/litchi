@@ -31,10 +31,7 @@ pub(super) fn alignment(
         CellParagraphPropertyKind::Alignment,
     )? {
         CellParagraphProperty::Alignment(value) => Ok(value),
-        CellParagraphProperty::Color(_)
-        | CellParagraphProperty::Decorations(_)
-        | CellParagraphProperty::Font(_)
-        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+        _ => Err(Error::InvalidFormat(
             "iWork table-cell alignment resolved as another paragraph property".to_owned(),
         )),
     }
@@ -71,6 +68,159 @@ pub(super) fn reset_alignment(
     )
 }
 
+pub(super) fn baseline_shift(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextBaselineShift> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::BaselineShift,
+    )? {
+        CellParagraphProperty::BaselineShift(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell baseline shift resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_baseline_shift(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextBaselineShift,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::BaselineShift(value),
+    )
+}
+
+pub(super) fn reset_baseline_shift(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::BaselineShift,
+    )
+}
+
+pub(super) fn capitalization(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextCapitalization> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Capitalization,
+    )? {
+        CellParagraphProperty::Capitalization(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell capitalization resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_capitalization(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextCapitalization,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Capitalization(value),
+    )
+}
+
+pub(super) fn reset_capitalization(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Capitalization,
+    )
+}
+
+pub(super) fn character_spacing(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextCharacterSpacing> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::CharacterSpacing,
+    )? {
+        CellParagraphProperty::CharacterSpacing(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell character spacing resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_character_spacing(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextCharacterSpacing,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::CharacterSpacing(value),
+    )
+}
+
+pub(super) fn reset_character_spacing(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::CharacterSpacing,
+    )
+}
+
 pub(super) fn text_color(
     package: &IWorkPackage,
     table_id: u64,
@@ -85,10 +235,7 @@ pub(super) fn text_color(
         CellParagraphPropertyKind::Color,
     )? {
         CellParagraphProperty::Color(value) => Ok(value),
-        CellParagraphProperty::Alignment(_)
-        | CellParagraphProperty::Decorations(_)
-        | CellParagraphProperty::Font(_)
-        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+        _ => Err(Error::InvalidFormat(
             "iWork table-cell text color resolved as another paragraph property".to_owned(),
         )),
     }
@@ -139,10 +286,7 @@ pub(super) fn decorations(
         CellParagraphPropertyKind::Decorations,
     )? {
         CellParagraphProperty::Decorations(value) => Ok(value),
-        CellParagraphProperty::Alignment(_)
-        | CellParagraphProperty::Color(_)
-        | CellParagraphProperty::Font(_)
-        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+        _ => Err(Error::InvalidFormat(
             "iWork table-cell text decorations resolved as another paragraph property".to_owned(),
         )),
     }
@@ -193,10 +337,7 @@ pub(super) fn font(
         CellParagraphPropertyKind::Font,
     )? {
         CellParagraphProperty::Font(value) => Ok(value),
-        CellParagraphProperty::Alignment(_)
-        | CellParagraphProperty::Color(_)
-        | CellParagraphProperty::Decorations(_)
-        | CellParagraphProperty::TextStyle(_) => Err(Error::InvalidFormat(
+        _ => Err(Error::InvalidFormat(
             "iWork table-cell font resolved as another paragraph property".to_owned(),
         )),
     }
@@ -233,6 +374,108 @@ pub(super) fn reset_font(
     )
 }
 
+pub(super) fn ligatures(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextLigatures> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Ligatures,
+    )? {
+        CellParagraphProperty::Ligatures(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell ligatures resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_ligatures(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextLigatures,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Ligatures(value),
+    )
+}
+
+pub(super) fn reset_ligatures(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Ligatures,
+    )
+}
+
+pub(super) fn script(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextScript> {
+    match property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Script,
+    )? {
+        CellParagraphProperty::Script(value) => Ok(value),
+        _ => Err(Error::InvalidFormat(
+            "iWork table-cell baseline script resolved as another paragraph property".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn set_script(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: TextScript,
+) -> Result<()> {
+    set_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphProperty::Script(value),
+    )
+}
+
+pub(super) fn reset_script(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    reset_property(
+        package,
+        table_id,
+        row,
+        column,
+        CellParagraphPropertyKind::Script,
+    )
+}
+
 pub(super) fn text_style(
     package: &IWorkPackage,
     table_id: u64,
@@ -247,10 +490,7 @@ pub(super) fn text_style(
         CellParagraphPropertyKind::TextStyle,
     )? {
         CellParagraphProperty::TextStyle(value) => Ok(value),
-        CellParagraphProperty::Alignment(_)
-        | CellParagraphProperty::Color(_)
-        | CellParagraphProperty::Decorations(_)
-        | CellParagraphProperty::Font(_) => Err(Error::InvalidFormat(
+        _ => Err(Error::InvalidFormat(
             "iWork table-cell character formatting resolved as another paragraph property"
                 .to_owned(),
         )),
@@ -915,7 +1155,10 @@ mod tests {
     use crate::numbers::{CellValue, NumbersDocumentBuilder};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-    use crate::text::{TextDecorations, TextFont, TextPointSize, TextStrikethrough, TextUnderline};
+    use crate::text::{
+        TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
+        TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextUnderline,
+    };
 
     fn test_color() -> RgbaColor {
         const RED: f32 = 0.72;
@@ -1105,6 +1348,11 @@ mod tests {
         let font = TextFont::named("CourierNewPSMT").unwrap();
         let color = test_color();
         let decorations = TextDecorations::new(TextUnderline::Double, TextStrikethrough::Single);
+        let baseline_shift = TextBaselineShift::from_points(2.0).unwrap();
+        let capitalization = TextCapitalization::TitleCase;
+        let character_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
+        let ligatures = TextLigatures::RequiredOnly;
+        let script = TextScript::Superscript;
 
         editor
             .set_table_cell_text_style(table_id, 1, 1, styled)
@@ -1117,6 +1365,21 @@ mod tests {
             .unwrap();
         editor
             .set_table_cell_text_decorations(table_id, 1, 1, decorations)
+            .unwrap();
+        editor
+            .set_table_cell_text_baseline_shift(table_id, 1, 1, baseline_shift)
+            .unwrap();
+        editor
+            .set_table_cell_text_capitalization(table_id, 1, 1, capitalization)
+            .unwrap();
+        editor
+            .set_table_cell_text_character_spacing(table_id, 1, 1, character_spacing)
+            .unwrap();
+        editor
+            .set_table_cell_text_ligatures(table_id, 1, 1, ligatures)
+            .unwrap();
+        editor
+            .set_table_cell_text_script(table_id, 1, 1, script)
             .unwrap();
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
         assert_eq!(
@@ -1132,6 +1395,66 @@ mod tests {
         assert_eq!(
             editor.table_cell_text_decorations(table_id, 1, 1).unwrap(),
             decorations
+        );
+        assert_eq!(
+            editor
+                .table_cell_text_baseline_shift(table_id, 1, 1)
+                .unwrap(),
+            baseline_shift
+        );
+        assert_eq!(
+            editor
+                .table_cell_text_capitalization(table_id, 1, 1)
+                .unwrap(),
+            capitalization
+        );
+        assert_eq!(
+            editor
+                .table_cell_text_character_spacing(table_id, 1, 1)
+                .unwrap(),
+            character_spacing
+        );
+        assert_eq!(
+            editor.table_cell_text_ligatures(table_id, 1, 1).unwrap(),
+            ligatures
+        );
+        assert_eq!(
+            editor.table_cell_text_script(table_id, 1, 1).unwrap(),
+            script
+        );
+
+        assert!(
+            editor
+                .reset_table_cell_text_capitalization(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .table_cell_text_capitalization(table_id, 1, 1)
+                .unwrap(),
+            TextCapitalization::None
+        );
+        assert_eq!(
+            editor
+                .table_cell_text_character_spacing(table_id, 1, 1)
+                .unwrap(),
+            character_spacing
+        );
+        assert!(
+            editor
+                .reset_table_cell_text_character_spacing(table_id, 1, 1)
+                .unwrap()
+        );
+        assert!(editor.reset_table_cell_text_script(table_id, 1, 1).unwrap());
+        assert!(
+            editor
+                .reset_table_cell_text_baseline_shift(table_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            editor
+                .reset_table_cell_text_ligatures(table_id, 1, 1)
+                .unwrap()
         );
 
         assert!(
@@ -1243,6 +1566,29 @@ mod tests {
         let font = TextFont::named("CourierNewPSMT").unwrap();
         let color = test_color();
         let decorations = TextDecorations::new(TextUnderline::Single, TextStrikethrough::Double);
+
+        editor
+            .set_table_cell_text_capitalization(table_id, 1, 1, TextCapitalization::TitleCase)
+            .unwrap();
+        assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
+        assert_eq!(
+            editor
+                .table_cell_text_capitalization(table_id, 1, 1)
+                .unwrap(),
+            TextCapitalization::TitleCase
+        );
+        assert_eq!(
+            editor
+                .table_cell_text_capitalization(table_id, 1, 2)
+                .unwrap(),
+            TextCapitalization::None
+        );
+        assert!(
+            editor
+                .reset_table_cell_text_capitalization(table_id, 1, 1)
+                .unwrap()
+        );
+        assert_eq!(explicit_style_id(&editor, table_id, 1, 1), shared_style_id);
 
         editor
             .set_table_cell_text_decorations(table_id, 1, 1, decorations)
@@ -1370,6 +1716,8 @@ mod tests {
         let pages_color = test_color();
         let pages_decorations =
             TextDecorations::new(TextUnderline::Single, TextStrikethrough::None);
+        let pages_baseline_shift = TextBaselineShift::from_points(-1.5).unwrap();
+        let pages_spacing = TextCharacterSpacing::from_percent(8.0).unwrap();
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Aligned", 2, 2)
             .build()
@@ -1389,6 +1737,21 @@ mod tests {
             .unwrap();
         pages
             .set_table_cell_text_decorations(pages_table, 1, 1, pages_decorations)
+            .unwrap();
+        pages
+            .set_table_cell_text_baseline_shift(pages_table, 1, 1, pages_baseline_shift)
+            .unwrap();
+        pages
+            .set_table_cell_text_capitalization(pages_table, 1, 1, TextCapitalization::SmallCaps)
+            .unwrap();
+        pages
+            .set_table_cell_text_character_spacing(pages_table, 1, 1, pages_spacing)
+            .unwrap();
+        pages
+            .set_table_cell_text_ligatures(pages_table, 1, 1, TextLigatures::All)
+            .unwrap();
+        pages
+            .set_table_cell_text_script(pages_table, 1, 1, TextScript::Subscript)
             .unwrap();
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1413,6 +1776,57 @@ mod tests {
                 .unwrap(),
             pages_decorations
         );
+        assert_eq!(
+            pages
+                .table_cell_text_baseline_shift(pages_table, 1, 1)
+                .unwrap(),
+            pages_baseline_shift
+        );
+        assert_eq!(
+            pages
+                .table_cell_text_capitalization(pages_table, 1, 1)
+                .unwrap(),
+            TextCapitalization::SmallCaps
+        );
+        assert_eq!(
+            pages
+                .table_cell_text_character_spacing(pages_table, 1, 1)
+                .unwrap(),
+            pages_spacing
+        );
+        assert_eq!(
+            pages.table_cell_text_ligatures(pages_table, 1, 1).unwrap(),
+            TextLigatures::All
+        );
+        assert_eq!(
+            pages.table_cell_text_script(pages_table, 1, 1).unwrap(),
+            TextScript::Subscript
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_capitalization(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_character_spacing(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_baseline_shift(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_ligatures(pages_table, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            pages
+                .reset_table_cell_text_script(pages_table, 1, 1)
+                .unwrap()
+        );
         assert!(
             pages
                 .reset_table_cell_text_decorations(pages_table, 1, 1)
@@ -1436,6 +1850,8 @@ mod tests {
         let keynote_color = test_color();
         let keynote_decorations =
             TextDecorations::new(TextUnderline::None, TextStrikethrough::Single);
+        let keynote_baseline_shift = TextBaselineShift::from_points(2.0).unwrap();
+        let keynote_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
         let mut keynote = KeynoteDocumentBuilder::new()
             .title("Aligned")
             .build()
@@ -1480,6 +1896,51 @@ mod tests {
                 keynote_decorations,
             )
             .unwrap();
+        keynote
+            .set_slide_table_cell_text_baseline_shift(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                keynote_baseline_shift,
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_text_capitalization(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                TextCapitalization::AllCaps,
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_text_character_spacing(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                keynote_spacing,
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_text_ligatures(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                TextLigatures::RequiredOnly,
+            )
+            .unwrap();
+        keynote
+            .set_slide_table_cell_text_script(
+                0,
+                table.model_object_id,
+                1,
+                1,
+                TextScript::Superscript,
+            )
+            .unwrap();
         let mut keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1511,6 +1972,61 @@ mod tests {
                 .slide_table_cell_text_decorations(0, table.model_object_id, 1, 1)
                 .unwrap(),
             keynote_decorations
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_baseline_shift(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_baseline_shift
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_capitalization(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            TextCapitalization::AllCaps
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_character_spacing(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            keynote_spacing
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_ligatures(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            TextLigatures::RequiredOnly
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_text_script(0, table.model_object_id, 1, 1)
+                .unwrap(),
+            TextScript::Superscript
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_capitalization(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_character_spacing(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_baseline_shift(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_ligatures(0, table.model_object_id, 1, 1)
+                .unwrap()
+        );
+        assert!(
+            keynote
+                .reset_slide_table_cell_text_script(0, table.model_object_id, 1, 1)
+                .unwrap()
         );
         assert!(
             keynote
@@ -1575,6 +2091,36 @@ mod tests {
                     2,
                     TextDecorations::new(TextUnderline::Single, TextStrikethrough::Single),
                 )
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_baseline_shift(table_id, 1, 2, TextBaselineShift::ZERO)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_capitalization(table_id, 1, 2, TextCapitalization::AllCaps,)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_character_spacing(
+                    table_id,
+                    1,
+                    2,
+                    TextCharacterSpacing::NORMAL,
+                )
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_ligatures(table_id, 1, 2, TextLigatures::All)
+                .is_err()
+        );
+        assert!(
+            editor
+                .set_table_cell_text_script(table_id, 1, 2, TextScript::Superscript)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

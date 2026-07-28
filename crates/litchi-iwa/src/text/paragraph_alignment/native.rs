@@ -94,11 +94,11 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) point_size: Option<TextPointSize>,
     pub(crate) font: Option<TextFont>,
     pub(crate) font_color: Option<RgbaColor>,
-    pub(super) capitalization: Option<TextCapitalization>,
-    pub(super) script: Option<TextScript>,
-    pub(super) baseline_shift: Option<TextBaselineShift>,
-    pub(super) character_spacing: Option<TextCharacterSpacing>,
-    pub(super) ligatures: Option<TextLigatures>,
+    pub(crate) capitalization: Option<TextCapitalization>,
+    pub(crate) script: Option<TextScript>,
+    pub(crate) baseline_shift: Option<TextBaselineShift>,
+    pub(crate) character_spacing: Option<TextCharacterSpacing>,
+    pub(crate) ligatures: Option<TextLigatures>,
     pub(super) outline: Option<TextOutline>,
     pub(super) shadow: Option<TextShadow>,
     pub(super) background: Option<TextBackground>,
@@ -237,35 +237,35 @@ pub(crate) fn inherited_text_color(
     inheritance::text_color(package, first_style_id)
 }
 
-pub(super) fn inherited_text_capitalization(
+pub(crate) fn inherited_text_capitalization(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextCapitalization> {
     inheritance::text_capitalization(package, first_style_id)
 }
 
-pub(super) fn inherited_text_script(
+pub(crate) fn inherited_text_script(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextScript> {
     inheritance::text_script(package, first_style_id)
 }
 
-pub(super) fn inherited_text_baseline_shift(
+pub(crate) fn inherited_text_baseline_shift(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextBaselineShift> {
     inheritance::text_baseline_shift(package, first_style_id)
 }
 
-pub(super) fn inherited_text_character_spacing(
+pub(crate) fn inherited_text_character_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextCharacterSpacing> {
     inheritance::text_character_spacing(package, first_style_id)
 }
 
-pub(super) fn inherited_text_ligatures(
+pub(crate) fn inherited_text_ligatures(
     package: &IWorkPackage,
     first_style_id: u64,
 ) -> Result<TextLigatures> {

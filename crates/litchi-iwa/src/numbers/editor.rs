@@ -139,12 +139,22 @@ pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
 pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
 pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Validated custom baseline displacement applied to a whole Numbers cell.
+pub type NumbersTableCellTextBaselineShift = TextBaselineShift;
+/// Typed capitalization applied to a whole Numbers table cell.
+pub type NumbersTableCellTextCapitalization = TextCapitalization;
+/// Validated tracking applied to a whole Numbers table cell.
+pub type NumbersTableCellTextCharacterSpacing = TextCharacterSpacing;
 /// Validated foreground color applied to a whole Numbers table cell.
 pub type NumbersTableCellTextColor = RgbaColor;
 /// Typed underline and strikethrough formatting for a whole Numbers table cell.
 pub type NumbersTableCellTextDecorations = TextDecorations;
 /// Strict PostScript font identity applied to a whole Numbers table cell.
 pub type NumbersTableCellTextFont = TextFont;
+/// Typed ligature policy applied to a whole Numbers table cell.
+pub type NumbersTableCellTextLigatures = TextLigatures;
+/// Typed normal, superscript, or subscript formatting for a whole Numbers cell.
+pub type NumbersTableCellTextScript = TextScript;
 /// Whole-cell point size, bold, and italic formatting.
 pub type NumbersTableCellTextStyle = TextStyle;
 
@@ -2801,6 +2811,150 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read the effective custom baseline displacement of one table cell.
+    pub fn table_cell_text_baseline_shift(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextBaselineShift> {
+        cell_paragraph_style::baseline_shift(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell custom baseline displacement.
+    pub fn set_table_cell_text_baseline_shift(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        shift: NumbersTableCellTextBaselineShift,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_baseline_shift(&mut staged, table_id, row, column, shift)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_baseline_shift(table_id, row, column)? != shift {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell baseline shift failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local baseline displacement and restore the inherited value.
+    pub fn reset_table_cell_text_baseline_shift(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_style::reset_baseline_shift(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective capitalization of one table cell.
+    pub fn table_cell_text_capitalization(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextCapitalization> {
+        cell_paragraph_style::capitalization(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell capitalization.
+    pub fn set_table_cell_text_capitalization(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        capitalization: NumbersTableCellTextCapitalization,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_capitalization(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            capitalization,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_capitalization(table_id, row, column)? != capitalization {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell capitalization failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local capitalization and restore the inherited value.
+    pub fn reset_table_cell_text_capitalization(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_style::reset_capitalization(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective character spacing of one table cell.
+    pub fn table_cell_text_character_spacing(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextCharacterSpacing> {
+        cell_paragraph_style::character_spacing(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell character spacing.
+    pub fn set_table_cell_text_character_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        spacing: NumbersTableCellTextCharacterSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_character_spacing(&mut staged, table_id, row, column, spacing)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_character_spacing(table_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell character spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local character spacing and restore the inherited value.
+    pub fn reset_table_cell_text_character_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_style::reset_character_spacing(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective foreground text color of one table cell.
     pub fn table_cell_text_color(
         &self,
@@ -2930,6 +3084,96 @@ impl NumbersEditor {
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_style::reset_font(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of one table cell.
+    pub fn table_cell_text_ligatures(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextLigatures> {
+        cell_paragraph_style::ligatures(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace the whole-cell ligature policy.
+    pub fn set_table_cell_text_ligatures(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        ligatures: NumbersTableCellTextLigatures,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_ligatures(&mut staged, table_id, row, column, ligatures)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_ligatures(table_id, row, column)? != ligatures {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell ligatures failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local ligature policy and restore the inherited value.
+    pub fn reset_table_cell_text_ligatures(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_ligatures(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective normal, superscript, or subscript formatting.
+    pub fn table_cell_text_script(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextScript> {
+        cell_paragraph_style::script(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell baseline script formatting.
+    pub fn set_table_cell_text_script(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        script: NumbersTableCellTextScript,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_script(&mut staged, table_id, row, column, script)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_script(table_id, row, column)? != script {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell baseline script failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local baseline script formatting and restore the inherited value.
+    pub fn reset_table_cell_text_script(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_script(&mut staged, table_id, row, column)?;
         if changed {
             *self = Self::from_bytes(&staged.to_bytes()?)?;
         }
@@ -4104,6 +4348,90 @@ pub(crate) fn reset_table_cell_text_alignment_in_package(
     cell_paragraph_style::reset_alignment(package, table_id, row, column)
 }
 
+pub(crate) fn table_cell_text_baseline_shift_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextBaselineShift> {
+    cell_paragraph_style::baseline_shift(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_baseline_shift_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    shift: TextBaselineShift,
+) -> Result<()> {
+    cell_paragraph_style::set_baseline_shift(package, table_id, row, column, shift)
+}
+
+pub(crate) fn reset_table_cell_text_baseline_shift_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_baseline_shift(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_capitalization_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextCapitalization> {
+    cell_paragraph_style::capitalization(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_capitalization_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    capitalization: TextCapitalization,
+) -> Result<()> {
+    cell_paragraph_style::set_capitalization(package, table_id, row, column, capitalization)
+}
+
+pub(crate) fn reset_table_cell_text_capitalization_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_capitalization(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_character_spacing_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextCharacterSpacing> {
+    cell_paragraph_style::character_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_character_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    spacing: TextCharacterSpacing,
+) -> Result<()> {
+    cell_paragraph_style::set_character_spacing(package, table_id, row, column, spacing)
+}
+
+pub(crate) fn reset_table_cell_text_character_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_character_spacing(package, table_id, row, column)
+}
+
 pub(crate) fn table_cell_text_color_in_package(
     package: &IWorkPackage,
     table_id: u64,
@@ -4186,6 +4514,62 @@ pub(crate) fn reset_table_cell_text_font_in_package(
     column: usize,
 ) -> Result<bool> {
     cell_paragraph_style::reset_font(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_ligatures_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextLigatures> {
+    cell_paragraph_style::ligatures(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_ligatures_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    ligatures: TextLigatures,
+) -> Result<()> {
+    cell_paragraph_style::set_ligatures(package, table_id, row, column, ligatures)
+}
+
+pub(crate) fn reset_table_cell_text_ligatures_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_ligatures(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_script_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextScript> {
+    cell_paragraph_style::script(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_script_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    script: TextScript,
+) -> Result<()> {
+    cell_paragraph_style::set_script(package, table_id, row, column, script)
+}
+
+pub(crate) fn reset_table_cell_text_script_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_script(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_text_style_in_package(

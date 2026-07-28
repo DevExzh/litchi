@@ -105,8 +105,13 @@ pub use crate::table_cell_number_format::{
     TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
 };
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
+pub use crate::text::TextBaselineShift as PagesTableCellTextBaselineShift;
+pub use crate::text::TextCapitalization as PagesTableCellTextCapitalization;
+pub use crate::text::TextCharacterSpacing as PagesTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as PagesTableCellTextDecorations;
 pub use crate::text::TextFont as PagesTableCellTextFont;
+pub use crate::text::TextLigatures as PagesTableCellTextLigatures;
+pub use crate::text::TextScript as PagesTableCellTextScript;
 pub use crate::text::TextStyle as PagesTableCellTextStyle;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
@@ -1331,6 +1336,208 @@ impl PagesEditor {
         Ok(changed)
     }
 
+    /// Read the effective custom baseline displacement of one body-table cell.
+    pub fn table_cell_text_baseline_shift(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextBaselineShift> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_baseline_shift_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell custom baseline displacement.
+    pub fn set_table_cell_text_baseline_shift(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        shift: PagesTableCellTextBaselineShift,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_baseline_shift_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            shift,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_baseline_shift(model_object_id, row, column)? != shift {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell baseline shift failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local baseline displacement and restore the inherited value.
+    pub fn reset_table_cell_text_baseline_shift(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_baseline_shift_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective capitalization of one body-table cell.
+    pub fn table_cell_text_capitalization(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextCapitalization> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_capitalization_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell capitalization.
+    pub fn set_table_cell_text_capitalization(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        capitalization: PagesTableCellTextCapitalization,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_capitalization_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            capitalization,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_capitalization(model_object_id, row, column)? != capitalization
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell capitalization failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local capitalization and restore the inherited value.
+    pub fn reset_table_cell_text_capitalization(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_capitalization_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective character spacing of one body-table cell.
+    pub fn table_cell_text_character_spacing(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextCharacterSpacing> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_character_spacing_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell character spacing.
+    pub fn set_table_cell_text_character_spacing(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        spacing: PagesTableCellTextCharacterSpacing,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_character_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            spacing,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_character_spacing(model_object_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell character spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local character spacing and restore the inherited value.
+    pub fn reset_table_cell_text_character_spacing(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_character_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective foreground text color of one body-table cell.
     pub fn table_cell_text_color(
         &self,
@@ -1519,6 +1726,140 @@ impl PagesEditor {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_font_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of one body-table cell.
+    pub fn table_cell_text_ligatures(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextLigatures> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_ligatures_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace the whole-cell ligature policy.
+    pub fn set_table_cell_text_ligatures(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        ligatures: PagesTableCellTextLigatures,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_ligatures_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            ligatures,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_ligatures(model_object_id, row, column)? != ligatures {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell ligatures failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local ligature policy and restore the inherited value.
+    pub fn reset_table_cell_text_ligatures(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_ligatures_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective normal, superscript, or subscript formatting.
+    pub fn table_cell_text_script(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<PagesTableCellTextScript> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_text_script_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell baseline script formatting.
+    pub fn set_table_cell_text_script(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        script: PagesTableCellTextScript,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_script_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            script,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_text_script(model_object_id, row, column)? != script {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell baseline script failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local baseline script formatting and restore the inherited value.
+    pub fn reset_table_cell_text_script(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_script_in_package(
             &mut staged,
             model_object_id,
             row,

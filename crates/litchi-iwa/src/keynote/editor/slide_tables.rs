@@ -103,8 +103,13 @@ pub use crate::table_cell_number_format::{
     TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
 };
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
+pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
+pub use crate::text::TextCapitalization as KeynoteTableCellTextCapitalization;
+pub use crate::text::TextCharacterSpacing as KeynoteTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as KeynoteTableCellTextDecorations;
 pub use crate::text::TextFont as KeynoteTableCellTextFont;
+pub use crate::text::TextLigatures as KeynoteTableCellTextLigatures;
+pub use crate::text::TextScript as KeynoteTableCellTextScript;
 pub use crate::text::TextStyle as KeynoteTableCellTextStyle;
 /// A validated non-zero native header or footer count.
 pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
@@ -1677,6 +1682,234 @@ impl KeynoteEditor {
         Ok(changed)
     }
 
+    /// Read the effective custom baseline displacement of one slide-table cell.
+    pub fn slide_table_cell_text_baseline_shift(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextBaselineShift> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_baseline_shift_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace a whole-cell custom baseline displacement.
+    pub fn set_slide_table_cell_text_baseline_shift(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        shift: KeynoteTableCellTextBaselineShift,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_baseline_shift_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            shift,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_baseline_shift(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+        )? != shift
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell baseline shift failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local baseline displacement and restore the inherited value.
+    pub fn reset_slide_table_cell_text_baseline_shift(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_baseline_shift_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective capitalization of one slide-table cell.
+    pub fn slide_table_cell_text_capitalization(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextCapitalization> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_capitalization_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell capitalization.
+    pub fn set_slide_table_cell_text_capitalization(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        capitalization: KeynoteTableCellTextCapitalization,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_capitalization_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            capitalization,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_capitalization(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+        )? != capitalization
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell capitalization failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local capitalization and restore the inherited value.
+    pub fn reset_slide_table_cell_text_capitalization(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_capitalization_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective character spacing of one slide-table cell.
+    pub fn slide_table_cell_text_character_spacing(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextCharacterSpacing> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_character_spacing_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell character spacing.
+    pub fn set_slide_table_cell_text_character_spacing(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        spacing: KeynoteTableCellTextCharacterSpacing,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_character_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            spacing,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_character_spacing(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+        )? != spacing
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell character spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local character spacing and restore the inherited value.
+    pub fn reset_slide_table_cell_text_character_spacing(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_character_spacing_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
     /// Read the effective foreground text color of one slide-table cell.
     pub fn slide_table_cell_text_color(
         &self,
@@ -1877,6 +2110,150 @@ impl KeynoteEditor {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::reset_table_cell_text_font_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of one slide-table cell.
+    pub fn slide_table_cell_text_ligatures(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextLigatures> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_ligatures_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace the whole-cell ligature policy.
+    pub fn set_slide_table_cell_text_ligatures(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        ligatures: KeynoteTableCellTextLigatures,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_ligatures_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            ligatures,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_ligatures(slide_index, model_object_id, row, column)?
+            != ligatures
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell ligatures failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local ligature policy and restore the inherited value.
+    pub fn reset_slide_table_cell_text_ligatures(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_ligatures_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+        )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective normal, superscript, or subscript formatting.
+    pub fn slide_table_cell_text_script(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<KeynoteTableCellTextScript> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_text_script_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+        )
+    }
+
+    /// Create or replace whole-cell baseline script formatting.
+    pub fn set_slide_table_cell_text_script(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        script: KeynoteTableCellTextScript,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_text_script_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            script,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_text_script(slide_index, model_object_id, row, column)?
+            != script
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell baseline script failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local baseline script formatting and restore the inherited value.
+    pub fn reset_slide_table_cell_text_script(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed = crate::numbers::editor::reset_table_cell_text_script_in_package(
             &mut staged,
             model_object_id,
             row,
