@@ -1841,7 +1841,7 @@ fn insert_extension(
         let mut empty_candidate = None;
         match event {
             Event::Start(element) => {
-                let is_core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == core.as_bytes());
+                let is_core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == core.as_bytes());
                 if depth == 1 && is_core && element.local_name().as_ref() == b"extLst" {
                     open_ext = Some(2usize);
                 }
@@ -1851,7 +1851,7 @@ fn insert_extension(
                 }
             },
             Event::Empty(element) => {
-                let is_core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == core.as_bytes());
+                let is_core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == core.as_bytes());
                 if depth == 1 && is_core && element.local_name().as_ref() == b"extLst" {
                     empty_candidate = Some((start, element.name().as_ref().to_vec()));
                 }
@@ -2225,7 +2225,7 @@ fn parse_xsd_datetime(value: &str) -> Result<XsdDateTime> {
         time = stripped;
         Some(0)
     } else {
-        let sign = time.rfind(|c| c == '+' || c == '-');
+        let sign = time.rfind(['+', '-']);
         if let Some(index) = sign {
             let zone = &time[index..];
             time = &time[..index];
@@ -2431,7 +2431,7 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

@@ -741,7 +741,7 @@ pub fn parse_chartsheet(xml: &[u8]) -> Result<(ChartSheetConformance, ChartSheet
     no_attributes(&root, &[])?;
     validate_root_order(&root)?;
     let properties = one_child(&root, conformance.sml(), "sheetPr")?
-        .map(|node| parse_properties(node))
+        .map(parse_properties)
         .transpose()?;
     let views = parse_views(required_child(&root, conformance.sml(), "sheetViews")?)?;
     let protection = one_child(&root, conformance.sml(), "sheetProtection")?
@@ -3312,13 +3312,12 @@ fn insert_workbook_entry(
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                let core = matches!(namespace, ResolveResult::Bound(Namespace(v)) if v.as_ref() == conformance.sml().as_bytes());
+                let core = matches!(namespace, ResolveResult::Bound(Namespace(v)) if v == conformance.sml().as_bytes());
                 depth += 1;
-                if core && element.local_name().as_ref() == b"sheets" {
-                    if sheets_depth.replace(depth).is_some() {
+                if core && element.local_name().as_ref() == b"sheets"
+                    && sheets_depth.replace(depth).is_some() {
                         return Err(invalid("workbook has multiple sheets collections"));
                     }
-                }
             },
             Event::Empty(element) if element.local_name().as_ref() == b"sheets" => {
                 return Err(invalid("cannot insert into empty sheets collection"));
@@ -4149,7 +4148,7 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

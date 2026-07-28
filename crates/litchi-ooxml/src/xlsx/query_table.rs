@@ -411,6 +411,12 @@ pub struct QueryTableRefresh {
     extension_attributes: Vec<QueryTableExtensionAttribute>,
 }
 
+impl Default for QueryTableRefresh {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QueryTableRefresh {
     pub fn new() -> Self {
         Self {
@@ -1970,7 +1976,7 @@ fn validate_query_table_connection(package: &OpcPackage, connection_id: u32) -> 
 
 fn next_query_table_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(&format!("/xl/queryTables/queryTable{suffix}.xml"))
+        let candidate = PackURI::new(format!("/xl/queryTables/queryTable{suffix}.xml"))
             .map_err(invalid)?;
         if package.get_part(&candidate).is_err() {
             return Ok(candidate);

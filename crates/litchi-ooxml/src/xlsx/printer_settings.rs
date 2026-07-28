@@ -385,11 +385,11 @@ fn worksheet_conformance(xml: &[u8]) -> Result<PrinterSettingsConformance> {
                 if element.local_name().as_ref() == b"worksheet" =>
             {
                 return match namespace {
-                    ResolveResult::Bound(Namespace(value)) if value.as_ref() == SML.as_bytes() => {
+                    ResolveResult::Bound(Namespace(value)) if value == SML.as_bytes() => {
                         Ok(PrinterSettingsConformance::Transitional)
                     },
                     ResolveResult::Bound(Namespace(value))
-                        if value.as_ref() == STRICT_SML.as_bytes() =>
+                        if value == STRICT_SML.as_bytes() =>
                     {
                         Ok(PrinterSettingsConformance::Strict)
                     },
@@ -457,7 +457,7 @@ pub(crate) fn is_printer_relationship(value: &str) -> bool {
     matches!(value, PRINTER_REL | STRICT_PRINTER_REL)
 }
 fn exact(namespace: &ResolveResult<'_>, value: &str) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if { let bytes: &[u8] = namespace.as_ref(); bytes == value.as_bytes() })
+    matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if { let bytes: &[u8] = namespace; bytes == value.as_bytes() })
 }
 fn escape(output: &mut Vec<u8>, value: &str) {
     for character in value.chars() {

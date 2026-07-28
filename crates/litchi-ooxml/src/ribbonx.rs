@@ -343,17 +343,15 @@ fn validate_ribbon_xml(
                     return invalid(format!("RibbonX XML depth exceeds {MAX_RIBBONX_XML_DEPTH}"));
                 }
             },
-            Event::Empty(element) => {
-                if depth == 0 {
-                    let root_version =
-                        validate_root(namespace, element.local_name().as_ref(), relationship_kind)?;
-                    if saw_root || closed_root {
-                        return invalid("RibbonX XML has multiple document roots".into());
-                    }
-                    saw_root = true;
-                    closed_root = true;
-                    version = Some(root_version);
+            Event::Empty(element) if depth == 0 => {
+                let root_version =
+                    validate_root(namespace, element.local_name().as_ref(), relationship_kind)?;
+                if saw_root || closed_root {
+                    return invalid("RibbonX XML has multiple document roots".into());
                 }
+                saw_root = true;
+                closed_root = true;
+                version = Some(root_version);
             },
             Event::End(_) => {
                 depth = depth.checked_sub(1).ok_or_else(|| {

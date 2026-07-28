@@ -2293,15 +2293,15 @@ impl DocumentBody {
         let mut current = 0usize;
         for element in &mut self.elements {
             match element {
-                BodyElement::Paragraph(paragraph) => {
-                    if paragraph.properties.section.is_some() {
-                        if current == index {
-                            return paragraph.remove_section_break().ok_or_else(|| {
-                                OoxmlError::InvalidFormat("section break disappeared".to_string())
-                            });
-                        }
-                        current += 1;
+                BodyElement::Paragraph(paragraph)
+                    if paragraph.properties.section.is_some() =>
+                {
+                    if current == index {
+                        return paragraph.remove_section_break().ok_or_else(|| {
+                            OoxmlError::InvalidFormat("section break disappeared".to_string())
+                        });
                     }
+                    current += 1;
                 },
                 BodyElement::PreservedParagraph(raw) => {
                     if let Some((start, end)) = paragraph_section_range(raw)? {
@@ -2686,6 +2686,7 @@ fn push_raw_body_xml(
 
 /// A body element (paragraph, table, or exact preserved XML).
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)] // writer-internal type; variants are moved, not compared
 pub(crate) enum BodyElement {
     Paragraph(MutableParagraph),
     Table(MutableTable),

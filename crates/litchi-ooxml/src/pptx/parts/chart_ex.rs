@@ -2116,12 +2116,12 @@ fn parse_numeric_dimension(node: &MiniNode) -> Result<ChartExDimension> {
     })
 }
 
-fn dimension_children<'a>(
-    node: &'a MiniNode,
+fn dimension_children(
+    node: &MiniNode,
 ) -> Result<(
     Option<ChartExFormula>,
     Option<ChartExFormula>,
-    Vec<&'a MiniNode>,
+    Vec<&MiniNode>,
 )> {
     let mut formula = None;
     let mut name_formula = None;
@@ -4443,7 +4443,7 @@ fn reject_unknown(attributes: &[Attribute], allowed: &[(&str, &str)], element: &
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

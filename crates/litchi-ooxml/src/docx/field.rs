@@ -6895,6 +6895,7 @@ fn parse_field_operand_and_switches(
     Ok(Some((operand, switches)))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_mail_merge_data_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Option<String>, Vec<FieldSwitch>)>> {
@@ -6929,6 +6930,7 @@ fn parse_mail_merge_data_field_parts(
     Ok(Some((data_source, header_source, switches)))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_info_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Option<String>, Vec<FieldSwitch>)>> {
@@ -7003,6 +7005,7 @@ fn parse_go_to_button_operands(instruction: &str) -> Result<Option<(String, Stri
     Ok(Some((target, button_text)))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_user_identity_field_parts(
     instruction: &str,
 ) -> Result<
@@ -7102,12 +7105,14 @@ fn parse_advance_field_adjustments(
     Ok(Some(adjustments))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_link_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(String, String, Option<String>, Vec<FieldSwitch>)>> {
     parse_external_link_operands_and_switches(instruction, "LINK")
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_dde_operands_and_switches(
     instruction: &str,
 ) -> Result<
@@ -7140,6 +7145,7 @@ fn parse_dde_operands_and_switches(
     )
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_external_include_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(IncludeFieldKind, String, Option<String>, Vec<FieldSwitch>)>> {
@@ -7187,6 +7193,7 @@ fn required_external_include_option_argument(
     })
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_external_link_operands_and_switches(
     instruction: &str,
     field_type: &str,
@@ -7307,6 +7314,7 @@ fn parse_formula_field_formula(instruction: &str) -> Result<Option<String>> {
     Ok(Some(formula.to_string()))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_style_reference_field_parts(
     instruction: &str,
 ) -> Result<Option<(String, Vec<StyleReferenceFieldOption>, Vec<FieldSwitch>)>> {
@@ -7381,6 +7389,7 @@ fn parse_auto_text_field_parts(
     Ok(Some((kind, entry_name, unknown_switches)))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_auto_text_list_field_parts(
     instruction: &str,
 ) -> Result<Option<(Option<String>, Vec<AutoTextListOption>, Vec<FieldSwitch>)>> {
@@ -7426,6 +7435,7 @@ fn parse_auto_text_list_field_parts(
     Ok(Some((display_text, options, unknown_switches)))
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_prompt_field_parts(
     instruction: &str,
 ) -> Result<

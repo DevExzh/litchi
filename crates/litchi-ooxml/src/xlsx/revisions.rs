@@ -992,12 +992,12 @@ fn make_node(
         let namespace = match resolved {
             ResolveResult::Unbound => RevisionAttributeNamespace::Unqualified,
             ResolveResult::Bound(Namespace(v))
-                if v.as_ref() == REL_NS.as_bytes() || v.as_ref() == STRICT_REL_NS.as_bytes() =>
+                if v == REL_NS.as_bytes() || v == STRICT_REL_NS.as_bytes() =>
             {
                 RevisionAttributeNamespace::Relationships
             },
             ResolveResult::Bound(Namespace(v))
-                if v.as_ref() == b"http://www.w3.org/XML/1998/namespace" =>
+                if v == b"http://www.w3.org/XML/1998/namespace" =>
             {
                 RevisionAttributeNamespace::Xml
             },
@@ -1322,7 +1322,7 @@ fn bounded(v: &str) -> Result<()> {
 fn ns_text(v: &ResolveResult<'_>) -> Result<String> {
     match v {
         ResolveResult::Bound(Namespace(v)) => {
-            Ok(std::str::from_utf8(v.as_ref()).map_err(xml_error)?.into())
+            Ok(std::str::from_utf8(v).map_err(xml_error)?.into())
         },
         _ => Err(invalid("unbound revision element namespace")),
     }

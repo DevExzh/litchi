@@ -501,11 +501,10 @@ pub(crate) fn read_sheet_views<RS: std::io::Read + std::io::Seek>(
                 views.push(parse_ws_view(buf)?);
                 current = Some(views.len() - 1);
             },
-            record_types::END_WS_VIEW => {
-                if current.take().is_none() {
-                    return Err(malformed(context, "BrtEndWsView without BrtBeginWsView"));
-                }
+            record_types::END_WS_VIEW if current.take().is_none() => {
+                return Err(malformed(context, "BrtEndWsView without BrtBeginWsView"));
             },
+            record_types::END_WS_VIEW => {},
             record_types::PANE => {
                 if let Some(index) = current {
                     let view = &mut views[index];

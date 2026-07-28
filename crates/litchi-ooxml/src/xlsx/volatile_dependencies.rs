@@ -617,7 +617,7 @@ fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
                 decoder,
             )?,
             Event::Empty(e) => empty(
-                &mut stack,
+                &stack,
                 &mut types,
                 &mut extension,
                 &namespace,
@@ -788,8 +788,8 @@ fn start(
 }
 
 fn empty(
-    stack: &mut Vec<Context>,
-    types: &mut Vec<TypeBuilder>,
+    stack: &[Context],
+    types: &mut [TypeBuilder],
     extension: &mut Option<Vec<u8>>,
     ns: &ResolveResult,
     e: BytesStart<'static>,
@@ -863,7 +863,7 @@ fn add_reference(
 fn push_text(types: &mut [TypeBuilder], ctx: Option<Context>, text: &str) -> Result<()> {
     match ctx {
         Some(Context::Value(t, m, p)) => append(
-            &mut types[t].mains[m].topics[p].value.as_mut().unwrap(),
+            types[t].mains[m].topics[p].value.as_mut().unwrap(),
             text,
         ),
         Some(Context::Subtopic(t, m, p)) => append(
@@ -964,7 +964,7 @@ fn validate_document(d: &VolatileDependencies) -> Result<()> {
 fn name(ns: &ResolveResult, e: &BytesStart<'_>, local: &[u8]) -> bool {
     let namespace_matches = match ns {
         ResolveResult::Bound(Namespace(v)) => {
-            let bytes: &[u8] = v.as_ref();
+            let bytes: &[u8] = v;
             bytes == NS || bytes == STRICT_NS
         },
         _ => false,

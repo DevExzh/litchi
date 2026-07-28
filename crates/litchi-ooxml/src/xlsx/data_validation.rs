@@ -598,12 +598,15 @@ pub fn parse_data_validation_collections(
     Ok(values)
 }
 
+/// In-flight capture state for a single `dataValidation` element.
+type CaptureState = Option<(usize, DataValidationSource, Vec<u8>, Writer<Vec<u8>>)>;
+
 fn capture_collections(xml: &[u8]) -> Result<Vec<Captured>> {
     let mut reader = NsReader::from_reader(xml);
     let mut values = Vec::new();
     let mut depth = 0usize;
     let mut extension_depth = None;
-    let mut capture: Option<(usize, DataValidationSource, Vec<u8>, Writer<Vec<u8>>)> = None;
+    let mut capture: CaptureState = None;
     loop {
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
@@ -941,20 +944,20 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     && exact(&namespace, XM)
                     && local.as_ref() == b"f"
                 {
-                    if wrapper.as_ref().is_some_and(|v| v.2) {
+                    let Some(wrapper_state) = wrapper.as_mut() else {
+                        return Err(invalid("data-validation formula outside its wrapper"));
+                    };
+                    if wrapper_state.2 {
                         return Err(invalid("formula wrapper must contain exactly one value"));
                     }
-                    wrapper.as_mut().expect("wrapper").2 = true;
+                    wrapper_state.2 = true;
                     depth += 1;
-                    text = Some((
-                        depth,
-                        if wrapper.expect("wrapper").0 == 1 {
-                            TextTarget::Formula1
-                        } else {
-                            TextTarget::Formula2
-                        },
-                        String::new(),
-                    ));
+                    let target = if wrapper_state.0 == 1 {
+                        TextTarget::Formula1
+                    } else {
+                        TextTarget::Formula2
+                    };
+                    text = Some((depth, target, String::new()));
                 } else if source == DataValidationSource::Office2010
                     && wrapper.is_some()
                     && depth == rule_depth.unwrap_or(0) + 1
@@ -1071,10 +1074,13 @@ fn parse_rule(raw: &[u8], source: DataValidationSource) -> Result<ParsedDataVali
                     && exact(&namespace, X12AC)
                     && local.as_ref() == b"list"
                 {
-                    if wrapper.expect("wrapper").0 != 1 || wrapper.as_ref().is_some_and(|v| v.2) {
+                    let Some(wrapper_state) = wrapper.as_mut() else {
+                        return Err(invalid("data-validation list source outside its wrapper"));
+                    };
+                    if wrapper_state.0 != 1 || wrapper_state.2 {
                         return Err(invalid("invalid quoted-list formula wrapper"));
                     }
-                    wrapper.as_mut().expect("wrapper").2 = true;
+                    wrapper_state.2 = true;
                     if formula1
                         .replace(ValidationListSource::QuotedList(String::new()))
                         .is_some()
@@ -1772,7 +1778,7 @@ pub fn replace_data_validation_collections(
     let parsed_x14 = parsed
         .iter()
         .any(|value| value.source == DataValidationSource::Office2010);
-    if parsed_core != !scan.core_ranges.is_empty() || parsed_x14 != !scan.x14_ranges.is_empty() {
+    if parsed_core == scan.core_ranges.is_empty() || parsed_x14 == scan.x14_ranges.is_empty() {
         return Err(invalid(
             "data validations selected through MCE cannot be mutated byte-exactly",
         ));

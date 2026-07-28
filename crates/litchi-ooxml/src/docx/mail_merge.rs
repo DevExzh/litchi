@@ -1212,6 +1212,9 @@ impl Node {
     }
 }
 
+// The Text/CData arms keep their `?`-bearing whitespace checks out of the
+// match guards on purpose; guards cannot use `?`.
+#[allow(clippy::collapsible_match)]
 fn parse_tree(xml: &[u8]) -> Result<Node> {
     let processed = crate::common::mce::process_ooxml(xml)
         .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;

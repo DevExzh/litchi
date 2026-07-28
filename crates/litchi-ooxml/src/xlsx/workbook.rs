@@ -903,7 +903,7 @@ impl Workbook {
         }
         let mut selected = None;
         for suffix in 1..=4097u32 {
-            let uri = PackURI::new(&format!("/xl/externalLinks/externalLink{suffix}.xml"))?;
+            let uri = PackURI::new(format!("/xl/externalLinks/externalLink{suffix}.xml"))?;
             if self.package.get_part(&uri).is_err() {
                 selected = Some((suffix, uri));
                 break;
@@ -1653,8 +1653,7 @@ impl Workbook {
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
-        parse_worksheet_web_extension_bindings(part.blob()).map_err(Into::into)
-    }
+        parse_worksheet_web_extension_bindings(part.blob())}
 
     /// Atomically replace all Office Add-in range bindings on one worksheet.
     ///
@@ -2133,6 +2132,7 @@ impl Workbook {
         Ok(())
     }
 
+    #[allow(clippy::type_complexity)]
     fn stage_worksheet_mutations(&self) -> SheetResult<Vec<(PackURI, Vec<u8>, Vec<u8>)>> {
         use litchi_opc::constants::content_type as ct;
         let indexes: HashSet<usize> = self

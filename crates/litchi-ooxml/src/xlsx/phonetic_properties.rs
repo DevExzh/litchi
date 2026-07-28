@@ -112,11 +112,10 @@ pub fn parse_worksheet_phonetic_properties(
             Event::Start(element) => parser.start(&namespace, &element, decoder, &resolver)?,
             Event::Empty(element) => parser.empty(&namespace, &element, decoder, &resolver)?,
             Event::End(element) => parser.end(element.local_name().as_ref())?,
-            Event::Text(text) if parser.parent() == Context::PhoneticProperties => {
-                if !text.decode().map_err(xml_error)?.trim().is_empty() {
+            Event::Text(text) if parser.parent() == Context::PhoneticProperties
+                && !text.decode().map_err(xml_error)?.trim().is_empty() => {
                     return Err(invalid("unexpected text in worksheet phoneticPr"));
-                }
-            },
+                },
             Event::CData(_) if parser.parent() == Context::PhoneticProperties => {
                 return Err(invalid("unexpected CDATA in worksheet phoneticPr"));
             },

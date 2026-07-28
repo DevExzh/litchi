@@ -9,6 +9,7 @@ use super::revision::RevisionTextMode;
 
 /// Elements that can appear in a hyperlink.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)] // writer-internal type; boxing would churn all match sites
 pub(crate) enum HyperlinkElement {
     Run(MutableRun),
     Field(MutableField),

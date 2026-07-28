@@ -386,6 +386,7 @@ struct RawShow {
     relationship_ids: Vec<String>,
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(true);

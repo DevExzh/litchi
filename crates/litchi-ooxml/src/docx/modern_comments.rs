@@ -1033,7 +1033,7 @@ fn validate_extension_list(list: &ModernCommentExtensionList) -> Result<()> {
 
 fn normalize_xsd_token(value: &str) -> String {
     value
-        .split(|character| matches!(character, ' ' | '\t' | '\r' | '\n'))
+        .split([' ', '\t', '\r', '\n'])
         .filter(|part| !part.is_empty())
         .collect::<Vec<_>>()
         .join(" ")
@@ -1325,6 +1325,7 @@ fn build_dom(xml: &[u8]) -> Result<XmlDocument> {
     Ok(document)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn push_node(
     reader: &Reader<&[u8]>,
     element: &BytesStart<'_>,
@@ -1388,7 +1389,7 @@ fn push_node(
     let mut attributes = Vec::with_capacity(raw_attributes.len());
     let mut seen = HashSet::new();
     for (name, value) in &raw_attributes {
-        let (prefix, local_name) = split_name(&name);
+        let (prefix, local_name) = split_name(name);
         let namespace = if prefix.is_empty() {
             String::new()
         } else {

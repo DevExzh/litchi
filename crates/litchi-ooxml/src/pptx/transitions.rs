@@ -397,13 +397,11 @@ impl SlideTransition {
                     } else if selected_transition_depth
                         .and_then(|transition_depth| transition_depth.checked_add(1))
                         == Some(depth)
-                    {
-                        if let Some(effect) =
+                        && let Some(effect) =
                             Self::parse_transition_type(&namespace, &element, decoder)?
-                            && let Some(transition) = transition.as_mut()
-                        {
-                            transition.apply_effect(effect);
-                        }
+                        && let Some(transition) = transition.as_mut()
+                    {
+                        transition.apply_effect(effect);
                     }
                     stack.push(is_transition);
                 },
@@ -420,13 +418,11 @@ impl SlideTransition {
                     } else if selected_transition_depth
                         .and_then(|transition_depth| transition_depth.checked_add(1))
                         == Some(depth)
-                    {
-                        if let Some(effect) =
+                        && let Some(effect) =
                             Self::parse_transition_type(&namespace, &element, decoder)?
-                            && let Some(transition) = transition.as_mut()
-                        {
-                            transition.apply_effect(effect);
-                        }
+                        && let Some(transition) = transition.as_mut()
+                    {
+                        transition.apply_effect(effect);
                     }
                 },
                 Event::End(_) => {

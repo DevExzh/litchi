@@ -564,7 +564,7 @@ impl XlsbWorkbook {
             .len()
             .checked_sub(end - start)
             .and_then(|value| value.checked_add(replacement.len()))
-            .ok_or_else(|| crate::xlsb::error::XlsbError::InvalidLength {
+            .ok_or(crate::xlsb::error::XlsbError::InvalidLength {
                 expected: usize::MAX,
                 found: original.len(),
             })?;

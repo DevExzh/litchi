@@ -781,7 +781,7 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

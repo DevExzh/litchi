@@ -312,6 +312,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
 }
 
 /// Resolve and parse an optional definition part (layout, quick style, colors).
+#[allow(clippy::too_many_arguments)]
 fn resolve_definition(
     package: &OpcPackage,
     document: &dyn Part,

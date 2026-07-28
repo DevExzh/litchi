@@ -723,7 +723,7 @@ fn next_relationship_id(part: &dyn Part, prefix: &str) -> Result<String> {
 
 fn next_legacy_comment_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=100_001u32 {
-        let uri = PackURI::new(&format!("/ppt/comments/comment{suffix}.xml")).map_err(OoxmlError::InvalidUri)?;
+        let uri = PackURI::new(format!("/ppt/comments/comment{suffix}.xml")).map_err(OoxmlError::InvalidUri)?;
         if package.get_part(&uri).is_err() { return Ok(uri); }
     }
     Err(invalid("no free legacy comment part name"))
@@ -733,7 +733,7 @@ fn next_legacy_author_part_name(package: &OpcPackage) -> Result<PackURI> {
     let canonical = PackURI::new("/ppt/commentAuthors.xml").map_err(invalid)?;
     if package.get_part(&canonical).is_err() { return Ok(canonical); }
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(&format!("/ppt/commentAuthors{suffix}.xml")).map_err(invalid)?;
+        let candidate = PackURI::new(format!("/ppt/commentAuthors{suffix}.xml")).map_err(invalid)?;
         if package.get_part(&candidate).is_err() { return Ok(candidate); }
     }
     Err(invalid("no free legacy comment-author part name"))

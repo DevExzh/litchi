@@ -68,18 +68,13 @@ impl NotesSize {
 }
 
 /// The effective conformance class for a presentation root.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PresentationConformance {
     /// The standard transitional conformance class.
+    #[default]
     Transitional,
     /// The strict conformance class.
     Strict,
-}
-
-impl Default for PresentationConformance {
-    fn default() -> Self {
-        Self::Transitional
-    }
 }
 
 /// Root-level presentation behavior and document settings with schema defaults applied.

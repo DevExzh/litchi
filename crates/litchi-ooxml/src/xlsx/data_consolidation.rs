@@ -44,6 +44,7 @@ impl WorksheetDataConsolidationConformance {
 
 /// Mathematical aggregator selected by `ST_DataConsolidateFunction`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum WorksheetDataConsolidationFunction {
     Average,
     Count,
@@ -53,6 +54,7 @@ pub enum WorksheetDataConsolidationFunction {
     Product,
     StandardDeviation,
     PopulationStandardDeviation,
+    #[default]
     Sum,
     Variance,
     PopulationVariance,
@@ -95,11 +97,6 @@ impl WorksheetDataConsolidationFunction {
     }
 }
 
-impl Default for WorksheetDataConsolidationFunction {
-    fn default() -> Self {
-        Self::Sum
-    }
-}
 
 /// A validated A1 cell or rectangular range reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -339,24 +336,22 @@ pub fn parse_worksheet_data_consolidation(
                     .ok_or_else(|| invalid("unexpected worksheet end element"))?;
                 end_scope(scope, &mut builder, &mut declared_count, &mut references)?;
             },
-            Event::Text(text) => {
+            Event::Text(text)
                 if matches!(
                     scopes.last(),
                     Some(Scope::Consolidate | Scope::DataRefs | Scope::DataRef)
                 ) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
+                => {
                     return Err(invalid("dataConsolidate family cannot contain text"));
-                }
-            },
-            Event::CData(text) => {
+                },
+            Event::CData(text)
                 if matches!(
                     scopes.last(),
                     Some(Scope::Consolidate | Scope::DataRefs | Scope::DataRef)
                 ) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
+                => {
                     return Err(invalid("dataConsolidate family cannot contain CDATA"));
-                }
-            },
+                },
             Event::DocType(_) => {
                 return Err(invalid("worksheet XML cannot contain a document type"));
             },
@@ -368,7 +363,7 @@ pub fn parse_worksheet_data_consolidation(
     if !scopes.is_empty() {
         return Err(invalid("unterminated worksheet XML"));
     }
-    Ok(builder.map(finish_builder).transpose()?)
+    builder.map(finish_builder).transpose()
 }
 
 #[allow(clippy::too_many_arguments)]

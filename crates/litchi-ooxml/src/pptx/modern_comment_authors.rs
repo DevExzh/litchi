@@ -1041,7 +1041,7 @@ fn modern_author_is_referenced(comments: &[ModernCommentPart], author_id: &str) 
 
 fn next_modern_author_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(&format!("/ppt/authors/author{suffix}.xml")).map_err(invalid)?;
+        let candidate = PackURI::new(format!("/ppt/authors/author{suffix}.xml")).map_err(invalid)?;
         if package.get_part(&candidate).is_err() { return Ok(candidate); }
     }
     Err(invalid("no free modern comment author part name"))

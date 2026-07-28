@@ -90,10 +90,11 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
                     }
                     root_seen = true;
                 }
-                if depth == 2 && is_presentationml_name(&namespace, element.name(), b"extLst") {
-                    if ext_lst_depth.replace(depth).is_some() {
-                        return Err(invalid("slide has multiple extension lists"));
-                    }
+                if depth == 2
+                    && is_presentationml_name(&namespace, element.name(), b"extLst")
+                    && ext_lst_depth.replace(depth).is_some()
+                {
+                    return Err(invalid("slide has multiple extension lists"));
                 }
             },
             Event::Empty(element) => {

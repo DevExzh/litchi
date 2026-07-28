@@ -402,10 +402,8 @@ fn parse_sections(root: &Node) -> Result<SectionList> {
     expect(root, &[P, PS], "presentation")?;
     let mut presentation_ext = None;
     for child in children(root)? {
-        if is(child, &[P, PS], "extLst") {
-            if presentation_ext.replace(child).is_some() {
-                return Err(invalid("duplicate presentation extLst"));
-            }
+        if is(child, &[P, PS], "extLst") && presentation_ext.replace(child).is_some() {
+            return Err(invalid("duplicate presentation extLst"));
         }
     }
     let Some(extension_list) = presentation_ext else {
@@ -631,10 +629,11 @@ fn is(node: &Node, namespaces: &[&str], local: &str) -> bool {
 fn optional_attr(node: &Node, local: &str) -> Result<Option<String>> {
     let mut value = None;
     for attribute in &node.attributes {
-        if attribute.namespace.is_empty() && attribute.local == local {
-            if value.replace(attribute.value.clone()).is_some() {
-                return Err(invalid(format!("duplicate attribute '{local}'")));
-            }
+        if attribute.namespace.is_empty()
+            && attribute.local == local
+            && value.replace(attribute.value.clone()).is_some()
+        {
+            return Err(invalid(format!("duplicate attribute '{local}'")));
         }
     }
     Ok(value)

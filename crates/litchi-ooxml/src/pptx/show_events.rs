@@ -276,19 +276,17 @@ fn scan_slide_show_events(
                     closed_root = true;
                 }
             },
-            Event::Text(text) => {
+            Event::Text(text)
                 if stack.last().copied().is_some_and(ElementKind::is_known)
-                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
-                    return Err(invalid("slide-show event markup cannot contain text"));
-                }
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("slide-show event markup cannot contain text"));
             },
-            Event::CData(text) => {
+            Event::CData(text)
                 if stack.last().copied().is_some_and(ElementKind::is_known)
-                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
-                    return Err(invalid("slide-show event markup cannot contain text"));
-                }
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("slide-show event markup cannot contain text"));
             },
             Event::GeneralRef(_) if stack.last().copied().is_some_and(ElementKind::is_known) => {
                 return Err(invalid(
@@ -377,7 +375,7 @@ fn classify_element(
         let event = parse_show_event(slide_index, events.len(), element, decoder)?;
         limits.add_event()?;
         events.push(event);
-        return Ok(empty.then_some(ElementKind::Other).unwrap_or(kind));
+        return Ok(if empty { ElementKind::Other } else { kind });
     }
 
     if parent.is_known() {

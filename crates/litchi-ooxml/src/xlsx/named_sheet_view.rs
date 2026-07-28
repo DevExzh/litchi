@@ -843,9 +843,11 @@ pub fn parse_named_sheet_views(xml: &[u8]) -> Result<NamedSheetViews> {
     for ns in [NSV, X14, RICH] {
         caps.understand_namespace(String::from_utf8_lossy(ns).into_owned());
     }
-    let mut limits = MceLimits::default();
-    limits.max_input_bytes = MAX_PART_BYTES;
-    limits.max_output_bytes = MAX_PART_BYTES * 2;
+    let limits = MceLimits {
+        max_input_bytes: MAX_PART_BYTES,
+        max_output_bytes: MAX_PART_BYTES * 2,
+        ..MceLimits::default()
+    };
     let processed = process_markup_compatibility(xml, &caps, &limits)?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
@@ -2371,18 +2373,17 @@ fn validate_fragment_content(content_xml: &[u8]) -> Result<usize> {
                     .checked_sub(1)
                     .ok_or_else(|| invalid("invalid extension XML nesting"))?;
             },
-            Event::Text(text) if depth == 1 => {
-                if !text
+            Event::Text(text) if depth == 1
+                && !text
                     .decode()
                     .map_err(xml_error)?
                     .chars()
                     .all(char::is_whitespace)
-                {
+                => {
                     return Err(invalid(
                         "authored XML fragment must contain XML markup, not text",
                     ));
-                }
-            },
+                },
             Event::CData(_) if depth == 1 => {
                 return Err(invalid("authored XML fragment must not contain root CDATA"));
             },

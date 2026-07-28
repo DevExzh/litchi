@@ -291,29 +291,27 @@ impl DocumentVariables {
                         )
                     })?;
                 },
-                Event::Text(text) => {
+                Event::Text(text)
                     if (open_doc_var_depth.is_some() || doc_vars_depth == Some(depth))
                         && text
                             .as_ref()
                             .iter()
-                            .any(|byte| !byte.is_ascii_whitespace())
-                    {
-                        return Err(OoxmlError::InvalidFormat(
-                            "document-variable elements cannot contain text".into(),
-                        ));
-                    }
+                            .any(|byte| !byte.is_ascii_whitespace()) =>
+                {
+                    return Err(OoxmlError::InvalidFormat(
+                        "document-variable elements cannot contain text".into(),
+                    ));
                 },
-                Event::CData(text) => {
+                Event::CData(text)
                     if (open_doc_var_depth.is_some() || doc_vars_depth == Some(depth))
                         && text
                             .as_ref()
                             .iter()
-                            .any(|byte| !byte.is_ascii_whitespace())
-                    {
-                        return Err(OoxmlError::InvalidFormat(
-                            "document-variable elements cannot contain text".into(),
-                        ));
-                    }
+                            .any(|byte| !byte.is_ascii_whitespace()) =>
+                {
+                    return Err(OoxmlError::InvalidFormat(
+                        "document-variable elements cannot contain text".into(),
+                    ));
                 },
                 Event::Eof if depth != 0 => {
                     return Err(OoxmlError::InvalidFormat(

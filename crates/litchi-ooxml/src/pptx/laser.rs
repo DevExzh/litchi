@@ -280,19 +280,17 @@ fn scan_slide_laser_traces(
                     closed_root = true;
                 }
             },
-            Event::Text(text) => {
+            Event::Text(text)
                 if stack.last().copied().is_some_and(ElementKind::is_known)
-                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
-                    return Err(invalid("laser-trace markup cannot contain text"));
-                }
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("laser-trace markup cannot contain text"));
             },
-            Event::CData(text) => {
+            Event::CData(text)
                 if stack.last().copied().is_some_and(ElementKind::is_known)
-                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
-                    return Err(invalid("laser-trace markup cannot contain text"));
-                }
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("laser-trace markup cannot contain text"));
             },
             Event::GeneralRef(_) if stack.last().copied().is_some_and(ElementKind::is_known) => {
                 return Err(invalid(
@@ -396,9 +394,7 @@ fn classify_element(
             .as_mut()
             .ok_or_else(|| invalid("laser trace point has no active trace"))?
             .push(point);
-        return Ok(empty
-            .then_some(ElementKind::Other)
-            .unwrap_or(ElementKind::LaserPoint));
+        return Ok(if empty { ElementKind::Other } else { ElementKind::LaserPoint });
     }
 
     if parent.is_known() {

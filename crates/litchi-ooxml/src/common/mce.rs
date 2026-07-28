@@ -188,7 +188,7 @@ pub fn process_markup_compatibility<'a>(
             Ok(Event::End(_)) => {
                 let f: Frame = stack.pop().ok_or_else(|| bad("unexpected end"))?;
                 match f.mode {
-                    Mode::Alt { choices, .. } if choices == 0 => {
+                    Mode::Alt { choices: 0, .. } => {
                         return Err(bad("AlternateContent requires Choice"));
                     },
                     Mode::Emit(q) if f.active => {
@@ -259,6 +259,7 @@ pub fn process_markup_compatibility<'a>(
         report: rep,
     })
 }
+#[allow(clippy::too_many_arguments)]
 fn start(
     e: &BytesStart<'_>,
     d: Decoder,
@@ -819,6 +820,7 @@ fn valid_ncname(value: &str) -> bool {
     (first == '_' || first.is_alphabetic())
         && chars.all(|ch| ch == '_' || ch == '-' || ch == '.' || ch.is_alphanumeric())
 }
+#[allow(clippy::too_many_arguments)]
 fn write_start(
     o: &mut Vec<u8>,
     q: &str,

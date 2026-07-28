@@ -71,6 +71,7 @@ pub(crate) enum GeometryElement {
 
 /// A point-consuming path command under construction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)] // variants mirror DrawingML path command names (moveTo/lnTo/...)
 enum PendingCommandKind {
     MoveTo,
     LineTo,

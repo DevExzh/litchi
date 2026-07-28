@@ -747,6 +747,7 @@ fn empty_element(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_child(
     element: &BytesStart<'_>,
     decoder: Decoder,

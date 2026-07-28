@@ -269,7 +269,7 @@ fn parse_presentation(xml: &[u8]) -> Result<ParsedPresentation> {
                     }
                     reject_unqualified_attributes(
                         &reader,
-                        &element,
+                        element,
                         reader.decoder(),
                         &[],
                         &mut string_bytes,
@@ -282,7 +282,7 @@ fn parse_presentation(xml: &[u8]) -> Result<ParsedPresentation> {
                     }
                     reject_unqualified_attributes(
                         &reader,
-                        &element,
+                        element,
                         reader.decoder(),
                         &[],
                         &mut string_bytes,
@@ -308,7 +308,7 @@ fn parse_presentation(xml: &[u8]) -> Result<ParsedPresentation> {
                         }
                         parse_descriptor(
                             &reader,
-                            &element,
+                            element,
                             reader.decoder(),
                             &mut fonts[index],
                             &mut string_bytes,
@@ -316,7 +316,7 @@ fn parse_presentation(xml: &[u8]) -> Result<ParsedPresentation> {
                         Context::Leaf
                     } else if let Some(style) = EmbeddedFontStyle::parse(&local) {
                         let relationship_id =
-                            parse_face(&reader, &element, reader.decoder(), &mut string_bytes)?;
+                            parse_face(&reader, element, reader.decoder(), &mut string_bytes)?;
                         if fonts[index].faces.iter().any(|face| face.style == style) {
                             return Err(invalid(format!(
                                 "duplicate embedded-font style '{local}'"
@@ -458,7 +458,7 @@ fn parse_face(
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if local.as_ref() != b"id"
-            || !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == REL_NS.as_bytes() || value.as_ref() == STRICT_REL_NS.as_bytes())
+            || !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == REL_NS.as_bytes() || value == STRICT_REL_NS.as_bytes())
         {
             return Err(invalid("embedded-font face has an unexpected attribute"));
         }
@@ -1043,22 +1043,21 @@ fn font_list_ranges(xml: &[u8]) -> Result<Vec<(usize, usize)>> {
         match event {
             Event::Start(element) => {
                 let target = element.local_name().as_ref() == b"embeddedFontLst"
-                    && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == PML.as_bytes() || value.as_ref() == STRICT_PML.as_bytes());
+                    && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == PML.as_bytes() || value == STRICT_PML.as_bytes());
                 starts.push(target.then_some(start));
                 if starts.len() > MAX_DEPTH {
                     return Err(limit("presentation XML depth"));
                 }
             },
-            Event::Empty(element) => {
+            Event::Empty(element)
                 if element.local_name().as_ref() == b"embeddedFontLst"
-                    && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == PML.as_bytes() || value.as_ref() == STRICT_PML.as_bytes())
-                {
-                    ranges.push((
-                        start,
-                        usize::try_from(reader.buffer_position())
-                            .map_err(|_| invalid("presentation XML offset overflow"))?,
-                    ));
-                }
+                    && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == PML.as_bytes() || value == STRICT_PML.as_bytes()) =>
+            {
+                ranges.push((
+                    start,
+                    usize::try_from(reader.buffer_position())
+                        .map_err(|_| invalid("presentation XML offset overflow"))?,
+                ));
             },
             Event::End(_) => {
                 let target = starts
@@ -1115,7 +1114,7 @@ fn insert_font_list(
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                let is_pml = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == conformance.pml().as_bytes());
+                let is_pml = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == conformance.pml().as_bytes());
                 if depth == 0 {
                     if !is_pml || element.local_name().as_ref() != b"presentation" {
                         return Err(invalid(
@@ -1131,7 +1130,7 @@ fn insert_font_list(
                     .ok_or_else(|| limit("presentation XML depth"))?;
             },
             Event::Empty(element) => {
-                let is_pml = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == conformance.pml().as_bytes());
+                let is_pml = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == conformance.pml().as_bytes());
                 if depth == 1 && is_pml && later.contains(&element.local_name().as_ref()) {
                     position.get_or_insert(start);
                 }
@@ -1470,7 +1469,7 @@ fn validate_relationship_id(value: &str) -> Result<()> {
 }
 fn resolved_namespace(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

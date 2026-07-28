@@ -275,10 +275,10 @@ fn parse_transform(
     }))
 }
 
-fn find_office_media<'a>(
-    node: &'a Node,
+fn find_office_media(
+    node: &Node,
     conformance: SlideMediaConformance,
-) -> Result<Option<&'a Node>> {
+) -> Result<Option<&Node>> {
     let mut found = None;
     for list in node
         .children
@@ -332,8 +332,8 @@ fn parse_office_media(
             )));
         }
     }
-    let trim = trim_node.map(|value| parse_trim(value)).transpose()?;
-    let fade = fade_node.map(|value| parse_fade(value)).transpose()?;
+    let trim = trim_node.map(parse_trim).transpose()?;
+    let fade = fade_node.map(parse_fade).transpose()?;
     let mut bookmarks = Vec::new();
     if let Some(list) = bookmarks_node {
         whitespace(list)?;
@@ -721,7 +721,7 @@ fn insert_pictures(
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                let core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == conformance.pml().as_bytes());
+                let core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == conformance.pml().as_bytes());
                 if depth == 0 && (!core || element.local_name().as_ref() != b"sld") {
                     return Err(invalid("slide root does not match conformance"));
                 }
@@ -729,16 +729,15 @@ fn insert_pictures(
                 if depth > MAX_DEPTH {
                     return Err(limit("XML depth"));
                 }
-                if core && element.local_name().as_ref() == b"spTree" {
-                    if sp_tree_depth.replace(depth).is_some() {
-                        return Err(invalid("slide has multiple shape trees"));
-                    }
+                if core
+                    && element.local_name().as_ref() == b"spTree"
+                    && sp_tree_depth.replace(depth).is_some()
+                {
+                    return Err(invalid("slide has multiple shape trees"));
                 }
             },
-            Event::Empty(element) => {
-                if element.local_name().as_ref() == b"spTree" {
-                    return Err(invalid("cannot insert into an empty shape tree"));
-                }
+            Event::Empty(element) if element.local_name().as_ref() == b"spTree" => {
+                return Err(invalid("cannot insert into an empty shape tree"));
             },
             Event::End(element) => {
                 if depth == 0 {
@@ -1273,7 +1272,7 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

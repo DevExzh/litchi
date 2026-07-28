@@ -459,7 +459,7 @@ fn xml_node(
 
 fn append_xml_node(
     node: XmlNode,
-    stack: &mut Vec<XmlNode>,
+    stack: &mut [XmlNode],
     root: &mut Option<XmlNode>,
 ) -> Result<()> {
     if let Some(parent) = stack.last_mut() {
@@ -493,7 +493,7 @@ fn append_xml_text(stack: &mut [XmlNode], text: &str) -> Result<()> {
 
 fn owned_namespace(namespace: ResolveResult<'_>) -> Result<Option<String>> {
     match namespace {
-        ResolveResult::Bound(Namespace(value)) => Ok(Some(utf8_name(value.as_ref())?)),
+        ResolveResult::Bound(Namespace(value)) => Ok(Some(utf8_name(value)?)),
         ResolveResult::Unbound | ResolveResult::Unknown(_) => Ok(None),
     }
 }

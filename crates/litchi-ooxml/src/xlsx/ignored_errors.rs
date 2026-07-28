@@ -151,15 +151,14 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<WorksheetIgno
             Event::Start(element) => parser.start(&namespace, &element, decoder, &resolver)?,
             Event::Empty(element) => parser.empty(&namespace, &element, decoder, &resolver)?,
             Event::End(element) => parser.end(element.local_name().as_ref())?,
-            Event::Text(text) => {
+            Event::Text(text)
                 if matches!(
                     parser.parent(),
                     Context::Collection | Context::IgnoredError | Context::ExtensionList
                 ) && !text.decode().map_err(xml_error)?.trim().is_empty()
-                {
+                => {
                     return Err(invalid("unexpected text in ignoredErrors"));
-                }
-            },
+                },
             Event::CData(_)
                 if matches!(
                     parser.parent(),

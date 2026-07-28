@@ -69,6 +69,8 @@ struct Parser {
 }
 
 /// Parse the worksheet's exact `worksheet/sheetPr/outlinePr` child path.
+// Text/CData arms keep `?`-bearing whitespace checks out of guards; guards cannot use `?`.
+#[allow(clippy::collapsible_match)]
 pub fn parse_worksheet_outline_properties(
     xml: &[u8],
 ) -> Result<Option<WorksheetOutlineProperties>> {

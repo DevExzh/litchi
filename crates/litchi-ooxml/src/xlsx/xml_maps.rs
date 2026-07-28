@@ -624,6 +624,7 @@ fn parse_processed(xml: &[u8]) -> Result<XmlMapInfo> {
     Ok(result)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_start(
     stack: &mut Vec<Context>,
     schemas: &mut Vec<SchemaBuilder>,
@@ -690,7 +691,7 @@ fn handle_start(
 }
 
 fn handle_empty(
-    stack: &mut Vec<Context>,
+    stack: &mut [Context],
     schemas: &mut Vec<SchemaBuilder>,
     maps: &mut Vec<MapBuilder>,
     root_bindings: &[(String, String)],
@@ -926,11 +927,10 @@ fn validate_opaque(xml: &[u8]) -> Result<()> {
                     return Err(invalid("opaque XML depth limit exceeded"));
                 }
             },
-            Ok(Event::Empty(_)) => {
-                if depth == 0 {
+            Ok(Event::Empty(_))
+                if depth == 0 => {
                     roots += 1;
-                }
-            },
+                },
             Ok(Event::End(_)) => {
                 depth = depth
                     .checked_sub(1)
@@ -972,7 +972,7 @@ fn core_name(ns: &ResolveResult, e: &BytesStart<'_>, local: &[u8]) -> bool {
 fn namespace_matches(ns: &ResolveResult) -> bool {
     match ns {
         ResolveResult::Bound(Namespace(v)) => {
-            let bytes: &[u8] = v.as_ref();
+            let bytes: &[u8] = v;
             bytes == NS || bytes == STRICT_NS
         },
         _ => false,

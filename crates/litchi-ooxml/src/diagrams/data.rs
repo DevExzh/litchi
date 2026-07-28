@@ -24,9 +24,10 @@ const MAX_TEXT_BYTES: usize = 1024 * 1024;
 const MAX_TREE_DEPTH: u32 = 64;
 
 /// The type of a diagram data-model point (`dgm:pt@type`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum DiagramPointType {
     /// Content node (`node`, the default when `type` is absent).
+    #[default]
     Node,
     /// Document root point (`doc`).
     Document,
@@ -40,12 +41,6 @@ pub enum DiagramPointType {
     Pres,
     /// Any other point type.
     Other,
-}
-
-impl Default for DiagramPointType {
-    fn default() -> Self {
-        Self::Node
-    }
 }
 
 impl DiagramPointType {

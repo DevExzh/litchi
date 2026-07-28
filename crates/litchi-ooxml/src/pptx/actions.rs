@@ -472,9 +472,7 @@ fn resolve_target(
 
 fn classify_action(action: Option<&str>, has_relationship: bool) -> PptxActionKind {
     let Some(action) = action else {
-        return has_relationship
-            .then_some(PptxActionKind::Hyperlink)
-            .unwrap_or(PptxActionKind::None);
+        return if has_relationship { PptxActionKind::Hyperlink } else { PptxActionKind::None };
     };
     match action {
         "ppaction://hlinkfile" => PptxActionKind::File,

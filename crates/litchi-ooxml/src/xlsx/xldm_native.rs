@@ -686,7 +686,7 @@ pub fn parse_xldm_hash_index(bytes: &[u8]) -> XldmNativeResult<XldmHashIndexFile
     }
     let entry_size = header.entry_size as usize;
     let bin_size = header.bin_size as usize;
-    if entry_size < 8 || entry_size > 64 || !matches!(bin_size, 64 | 128) {
+    if !(8..=64).contains(&entry_size) || !matches!(bin_size, 64 | 128) {
         return Err(XldmNativeError::new(
             "invalid persisted hash entry or bin size",
         ));

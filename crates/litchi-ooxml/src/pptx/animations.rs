@@ -1760,9 +1760,9 @@ impl AnimationSequence {
                 == self.source_graphic_builds.as_deref().unwrap_or_default()
             && self.ole_chart_builds.as_slice()
                 == self.source_ole_chart_builds.as_deref().unwrap_or_default()
-            && self.timing_tree.is_some()
+            && let Some(timing_tree) = &self.timing_tree
         {
-            return self.timing_tree.as_ref().expect("checked above").to_xml();
+            return timing_tree.to_xml();
         }
         if self.is_empty() {
             return String::new();
@@ -2365,6 +2365,7 @@ impl TimingParser {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn start(
         &mut self,
         namespace: &ResolveResult<'_>,
@@ -3521,7 +3522,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                 if depth > MAX_TIMING_DEPTH || count > MAX_TIMING_NODES {
                     return Err(invalid("animation timing tree exceeds safety limit"));
                 }
-                check_attribute_count(&element)?;
+                check_attribute_count(element)?;
                 let empty = matches!(event, Event::Empty(_));
                 if timing_depth.is_none()
                     && is_presentationml_name(&namespace, element.name(), b"timing")
@@ -3538,12 +3539,12 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                             return Err(invalid("animation time container cannot be empty"));
                         }
                         let kind = if local.as_ref() == b"seq" {
-                            let concurrent = attribute(&element, b"concurrent", reader.decoder())?
+                            let concurrent = attribute(element, b"concurrent", reader.decoder())?
                                 .map(|v| parse_xml_bool(&v))
                                 .transpose()?
                                 .unwrap_or(false);
                             let next_action =
-                                match attribute(&element, b"nextAc", reader.decoder())?
+                                match attribute(element, b"nextAc", reader.decoder())?
                                     .as_deref()
                                     .unwrap_or("none")
                                 {
@@ -3552,7 +3553,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                                     _ => return Err(invalid("invalid animation next action")),
                                 };
                             let previous_action =
-                                match attribute(&element, b"prevAc", reader.decoder())?
+                                match attribute(element, b"prevAc", reader.decoder())?
                                     .as_deref()
                                     .unwrap_or("none")
                                 {
@@ -3597,14 +3598,14 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                         let frame = frames
                             .last_mut()
                             .ok_or_else(|| invalid("common time node has no container"))?;
-                        frame.node.common.id = attribute(&element, b"id", reader.decoder())?
+                        frame.node.common.id = attribute(element, b"id", reader.decoder())?
                             .map(|value| {
                                 value
                                     .parse::<u32>()
                                     .map_err(|_| invalid("invalid common time-node ID"))
                             })
                             .transpose()?;
-                        frame.node.common.duration = attribute(&element, b"dur", reader.decoder())?
+                        frame.node.common.duration = attribute(element, b"dur", reader.decoder())?
                             .map(|v| parse_timing_value(&v))
                             .transpose()?
                             .map(|v| match v {
@@ -3612,19 +3613,19 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                                 TimingValue::Milliseconds(ms) => Duration::Finite(ms),
                             });
                         frame.node.common.node_type =
-                            attribute(&element, b"nodeType", reader.decoder())?
+                            attribute(element, b"nodeType", reader.decoder())?
                                 .map(|v| AnimationTimeNodeType::parse(&v))
                                 .transpose()?;
-                        if let Some(value) = attribute(&element, b"presetID", reader.decoder())? {
+                        if let Some(value) = attribute(element, b"presetID", reader.decoder())? {
                             let preset_id = value
                                 .parse::<u32>()
                                 .map_err(|_| invalid("invalid animation preset ID"))?;
                             let class = AnimationPresetClass::parse(
-                                attribute(&element, b"presetClass", reader.decoder())?
+                                attribute(element, b"presetClass", reader.decoder())?
                                     .as_deref()
                                     .unwrap_or("entr"),
                             )?;
-                            let subtype = attribute(&element, b"presetSubtype", reader.decoder())?
+                            let subtype = attribute(element, b"presetSubtype", reader.decoder())?
                                 .map(|v| {
                                     v.parse::<u32>()
                                         .map_err(|_| invalid("invalid animation preset subtype"))
@@ -3651,7 +3652,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                     } else if is_presentationml_name(&namespace, element.name(), b"cond")
                         && !condition_lists.is_empty()
                     {
-                        let delay = attribute(&element, b"delay", reader.decoder())?
+                        let delay = attribute(element, b"delay", reader.decoder())?
                             .map(|v| parse_timing_value(&v))
                             .transpose()?
                             .unwrap_or(TimingValue::Milliseconds(0));
@@ -3660,7 +3661,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                             TimingValue::Milliseconds(ms) => Duration::Finite(ms),
                         };
                         let current = AnimationTimeCondition {
-                            event: attribute(&element, b"evt", reader.decoder())?
+                            event: attribute(element, b"evt", reader.decoder())?
                                 .map(|v| AnimationConditionEvent::parse(&v))
                                 .transpose()?,
                             delay,
@@ -3684,14 +3685,14 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                     } else if let Some((_, _, current)) = condition.as_mut() {
                         if is_presentationml_name(&namespace, element.name(), b"spTgt") {
                             current.target = Some(AnimationConditionTarget::Shape(parse_shape_id(
-                                &attribute(&element, b"spid", reader.decoder())?.ok_or_else(
+                                &attribute(element, b"spid", reader.decoder())?.ok_or_else(
                                     || invalid("condition shape target is missing its ID"),
                                 )?,
                             )?));
                         } else if is_presentationml_name(&namespace, element.name(), b"sldTgt") {
                             current.target = Some(AnimationConditionTarget::Slide);
                         } else if is_presentationml_name(&namespace, element.name(), b"tn") {
-                            let id = attribute(&element, b"val", reader.decoder())?
+                            let id = attribute(element, b"val", reader.decoder())?
                                 .ok_or_else(|| {
                                     invalid("condition time-node target is missing its ID")
                                 })?
@@ -3701,7 +3702,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                         } else if is_presentationml_name(&namespace, element.name(), b"rtn") {
                             current.target = Some(AnimationConditionTarget::Runtime(
                                 AnimationRuntimeTrigger::parse(
-                                    &attribute(&element, b"val", reader.decoder())?.ok_or_else(
+                                    &attribute(element, b"val", reader.decoder())?.ok_or_else(
                                         || invalid("runtime condition target is missing its value"),
                                     )?,
                                 )?,

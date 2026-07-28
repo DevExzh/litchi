@@ -200,6 +200,7 @@ pub struct XldmDimensionInformation {
 pub struct XldmCubeInformation;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::large_enum_variant)] // public API; boxing would break callers
 pub enum XldmOlapDocument {
     Definition(XldmOlapDefinition),
     PartitionInformation(XldmPartitionInformation),
@@ -909,9 +910,7 @@ fn persist_folder(path: &str, definition: &XldmOlapDefinition) -> XldmOlapResult
 }
 
 fn require_storage_reference(paths: &[&str], folder: &str, item: &str) -> XldmOlapResult<()> {
-    let qualified = if item.contains('/') {
-        item.to_owned()
-    } else if folder.is_empty() {
+    let qualified = if item.contains('/') || folder.is_empty() {
         item.to_owned()
     } else {
         format!("{folder}/{item}")

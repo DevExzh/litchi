@@ -344,12 +344,13 @@ pub(crate) fn scan_alt_chunks(xml: &[u8]) -> Result<BTreeMap<u32, AltChunk>> {
                     OoxmlError::InvalidFormat("unexpected altChunk XML end element".into())
                 })?;
             },
-            Event::Text(text) if pending.is_some() => {
-                if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
-                    return Err(OoxmlError::InvalidFormat(
-                        "altChunk contains unexpected text".into(),
-                    ));
-                }
+            Event::Text(text)
+                if pending.is_some()
+                    && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
+            {
+                return Err(OoxmlError::InvalidFormat(
+                    "altChunk contains unexpected text".into(),
+                ));
             },
             Event::CData(_) | Event::GeneralRef(_) if pending.is_some() => {
                 return Err(OoxmlError::InvalidFormat(
@@ -419,8 +420,8 @@ fn relationship_id(
         let valid_namespace = matches!(
             namespace,
             ResolveResult::Bound(Namespace(uri))
-                if uri.as_ref() == TRANSITIONAL_RELATIONSHIP_NAMESPACE
-                    || uri.as_ref() == STRICT_RELATIONSHIP_NAMESPACE
+                if uri == TRANSITIONAL_RELATIONSHIP_NAMESPACE
+                    || uri == STRICT_RELATIONSHIP_NAMESPACE
         );
         if !valid_namespace {
             continue;

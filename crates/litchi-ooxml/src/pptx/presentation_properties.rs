@@ -1289,7 +1289,7 @@ fn write_node(x: &mut String, n: &Node, strict: bool) -> Result<()> {
     x.push('>');
     Ok(())
 }
-fn map_ns<'a>(v: &'a str, s: bool) -> &'a str {
+fn map_ns(v: &str, s: bool) -> &str {
     if s {
         match v {
             P_NS => P_STRICT,

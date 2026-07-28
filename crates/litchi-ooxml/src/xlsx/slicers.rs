@@ -258,14 +258,13 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
                     _ => return Err(invalid("unexpected Slicers closing depth")),
                 }
             },
-            Event::Text(text) => {
-                if extension_start.is_none() {
+            Event::Text(text)
+                if extension_start.is_none() => {
                     let value = text.decode().map_err(xml_error)?;
                     if !value.trim().is_empty() {
                         return Err(invalid("unexpected text in Slicers part"));
                     }
-                }
-            },
+                },
             Event::CData(_) if extension_start.is_none() => {
                 return Err(invalid("unexpected CDATA in Slicers part"));
             },
@@ -565,6 +564,7 @@ fn parse_attributes(
     Ok(attributes)
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_known_attributes(
     element: &BytesStart<'_>,
     known: &[&str],
@@ -834,7 +834,7 @@ fn validate_relationship_id(value: &str) -> Result<()> {
 
 fn exact(namespace: &ResolveResult<'_>, value: &str) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(namespace)) if {
-        let bytes: &[u8] = namespace.as_ref(); bytes == value.as_bytes()
+        let bytes: &[u8] = namespace; bytes == value.as_bytes()
     })
 }
 

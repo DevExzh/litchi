@@ -402,10 +402,13 @@ pub(crate) fn parse_differential_formats(xml: &[u8]) -> Result<Vec<DifferentialF
     Ok(values)
 }
 
+/// In-flight capture state for a single `conditionalFormatting` element.
+type CaptureState = Option<(usize, ConditionalFormattingSource, Vec<u8>, Writer<Vec<u8>>)>;
+
 fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>> {
     let mut reader = NsReader::from_reader(xml);
     let mut values = Vec::new();
-    let mut capture: Option<(usize, ConditionalFormattingSource, Vec<u8>, Writer<Vec<u8>>)> = None;
+    let mut capture: CaptureState = None;
     loop {
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
@@ -889,8 +892,7 @@ impl PayloadBuilder {
         self.active = Some(kind);
         self.seen = Some(kind);
         if kind == PayloadKind::DataBar {
-            let min = optional_u32(element, b"minLength", decoder)?
-                .unwrap_or(if exact_name(element, b"x14") { 10 } else { 10 });
+            let min = optional_u32(element, b"minLength", decoder)?.unwrap_or(10);
             let max = optional_u32(element, b"maxLength", decoder)?.unwrap_or(90);
             if min > max || max > 100 {
                 return Err(invalid("invalid data-bar length bounds"));
@@ -1138,10 +1140,10 @@ fn parse_dxf(raw: &[u8]) -> Result<DifferentialFormat> {
                     && e.local_name().as_ref() == b"numFmt"
                 {
                     value.number_format = Some(DifferentialNumberFormat {
-                        id: required_attr(&e, b"numFmtId", decoder)?
+                        id: required_attr(e, b"numFmtId", decoder)?
                             .parse()
                             .map_err(|_| invalid("invalid dxf numFmtId"))?,
-                        code: required_attr(&e, b"formatCode", decoder)?,
+                        code: required_attr(e, b"formatCode", decoder)?,
                         raw_xml: component.bytes.into_boxed_slice(),
                     });
                     break;
@@ -1254,9 +1256,6 @@ fn spreadsheet(ns: &ResolveResult<'_>) -> bool {
 }
 fn exact(ns: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(ns,ResolveResult::Bound(value)if value.as_ref()==expected)
-}
-fn exact_name(_: &BytesStart<'_>, _: &[u8]) -> bool {
-    false
 }
 fn is_color_element(name: &[u8]) -> bool {
     matches!(

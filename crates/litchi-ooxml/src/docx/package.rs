@@ -1027,7 +1027,7 @@ impl Package {
                 let (uri, target_ref) = (1usize..)
                     .find_map(|number| {
                         let target_ref = format!("afchunk{number}.{}", data.extension());
-                        let uri = PackURI::new(&format!("/word/{target_ref}")).ok()?;
+                        let uri = PackURI::new(format!("/word/{target_ref}")).ok()?;
                         self.opc.get_part(&uri).is_err().then_some((uri, target_ref))
                     })
                     .expect("the alternative-format part-name space is unbounded");

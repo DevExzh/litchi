@@ -187,7 +187,7 @@ pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition
                         }
                     }
                 } else if let Some((pivot_depth, _)) = &open_pivot {
-                    if depth >= *pivot_depth + 1 {
+                    if depth > *pivot_depth {
                         return Err(invalid("pivotTable must be empty"));
                     }
                 } else if depth == 0 {
@@ -333,14 +333,13 @@ pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition
                     return Err(invalid("unexpected Slicer Cache closing depth"));
                 }
             },
-            Event::Text(text) => {
-                if capture.is_none() {
+            Event::Text(text)
+                if capture.is_none() => {
                     let value = text.decode().map_err(xml_error)?;
                     if !value.trim().is_empty() {
                         return Err(invalid("unexpected text in Slicer Cache part"));
                     }
-                }
-            },
+                },
             Event::CData(_) if capture.is_none() => {
                 return Err(invalid("unexpected CDATA in Slicer Cache part"));
             },
@@ -606,18 +605,14 @@ fn validate_cache_collection(values: &[WorkbookSlicerCache]) -> Result<()> {
                 value.definition.name
             )));
         }
-        match &value.definition.uid {
-            Some(uid) => {
-                if !uids.insert(uid.to_ascii_lowercase()) {
-                    return Err(invalid(format!("duplicate Slicer Cache uid '{uid}'")));
-                }
-            },
-            None if any_uid => {
-                return Err(invalid(
-                    "Slicer Cache uid must be present on every cache or none",
-                ));
-            },
-            None => {},
+        if let Some(uid) = &value.definition.uid {
+            if !uids.insert(uid.to_ascii_lowercase()) {
+                return Err(invalid(format!("duplicate Slicer Cache uid '{uid}'")));
+            }
+        } else if any_uid {
+            return Err(invalid(
+                "Slicer Cache uid must be present on every cache or none",
+            ));
         }
     }
     Ok(())
@@ -787,11 +782,10 @@ fn parse_workbook_references(xml: &[u8]) -> Result<Vec<String>> {
                     closed = true;
                 }
             },
-            Event::Text(text) if target_ext_depth.is_some() => {
-                if !text.decode().map_err(xml_error)?.trim().is_empty() {
+            Event::Text(text) if target_ext_depth.is_some()
+                && !text.decode().map_err(xml_error)?.trim().is_empty() => {
                     return Err(invalid("text in workbook Slicer Cache extension"));
-                }
-            },
+                },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
@@ -1380,7 +1374,7 @@ fn set_once<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
 fn namespace_string(namespace: &ResolveResult<'_>) -> Result<String> {
     match namespace {
         ResolveResult::Unbound => Ok(String::new()),
-        ResolveResult::Bound(Namespace(value)) => std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => std::str::from_utf8(value)
             .map(str::to_owned)
             .map_err(xml_error),
         ResolveResult::Unknown(prefix) => Err(invalid(format!(

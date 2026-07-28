@@ -1385,7 +1385,7 @@ pub fn replace_worksheet_protection(
                 .windows(b"sheetProtection".len())
                 .any(|window| window == b"sheetProtection")
         })
-        || parsed_x14 != !scan.x14_ranges.is_empty()
+        || parsed_x14 == scan.x14_ranges.is_empty()
     {
         return Err(invalid(
             "worksheet protection selected through MCE cannot be mutated byte-exactly",

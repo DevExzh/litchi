@@ -608,7 +608,7 @@ fn next_person_part_name(package: &OpcPackage) -> SheetResult<PackURI> {
     let canonical = PackURI::new("/xl/persons/person.xml")?;
     if package.get_part(&canonical).is_err() { return Ok(canonical); }
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(&format!("/xl/persons/person{suffix}.xml"))?;
+        let candidate = PackURI::new(format!("/xl/persons/person{suffix}.xml"))?;
         if package.get_part(&candidate).is_err() { return Ok(candidate); }
     }
     Err("no free persons part name".into())
@@ -616,7 +616,7 @@ fn next_person_part_name(package: &OpcPackage) -> SheetResult<PackURI> {
 
 fn next_threaded_comment_part_name(package: &OpcPackage) -> SheetResult<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(&format!(
+        let candidate = PackURI::new(format!(
             "/xl/threadedComments/threadedComment{suffix}.xml"
         ))?;
         if package.get_part(&candidate).is_err() { return Ok(candidate); }

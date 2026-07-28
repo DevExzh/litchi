@@ -212,11 +212,10 @@ pub fn parse_workbook_calculation_properties(
                 }
                 depth -= 1;
             },
-            Event::Text(text) if leaf_depth.is_some_and(|value| depth >= value) => {
-                if !text.decode().map_err(xml_error)?.trim().is_empty() {
+            Event::Text(text) if leaf_depth.is_some_and(|value| depth >= value)
+                && !text.decode().map_err(xml_error)?.trim().is_empty() => {
                     return Err(invalid("calcPr cannot contain text"));
-                }
-            },
+                },
             Event::CData(_) if leaf_depth.is_some_and(|value| depth >= value) => {
                 return Err(invalid("calcPr cannot contain CDATA"));
             },

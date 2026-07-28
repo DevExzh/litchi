@@ -1648,7 +1648,7 @@ fn modern_id_exists(parts: &[ModernCommentPart], id: &str) -> bool {
 
 fn next_modern_comment_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(&format!("/ppt/comments/modernComment{suffix}.xml"))
+        let candidate = PackURI::new(format!("/ppt/comments/modernComment{suffix}.xml"))
             .map_err(invalid)?;
         if package.get_part(&candidate).is_err() { return Ok(candidate); }
     }

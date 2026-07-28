@@ -864,7 +864,7 @@ fn insert_collection(
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                let core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == conformance.sml().as_bytes());
+                let core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == conformance.sml().as_bytes());
                 if depth == 0 {
                     if !core || element.local_name().as_ref() != b"worksheet" {
                         return Err(invalid("worksheet root does not match conformance"));
@@ -879,7 +879,7 @@ fn insert_collection(
                 }
             },
             Event::Empty(element) => {
-                let core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == conformance.sml().as_bytes());
+                let core = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == conformance.sml().as_bytes());
                 if depth == 1 && core && later.contains(&element.local_name().as_ref()) {
                     position.get_or_insert(start);
                 }
@@ -1232,7 +1232,7 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

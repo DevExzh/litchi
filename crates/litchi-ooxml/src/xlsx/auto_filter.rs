@@ -1529,11 +1529,10 @@ fn push_sort(s: &mut (usize, SortBuilder), e: &BytesStart<'_>, d: Decoder) -> Re
             return Err(invalid("color sort requires dxfId"));
         },
         SortBy::Icon if icon.is_none() => return Err(invalid("icon sort requires iconSet")),
-        SortBy::Icon => {
-            if icon_id.is_some_and(|v| v >= icon.unwrap().cardinality()) {
+        SortBy::Icon
+            if icon_id.is_some_and(|v| v >= icon.unwrap().cardinality()) => {
                 return Err(invalid("sort iconId exceeds icon-set cardinality"));
-            }
-        },
+            },
         _ => {},
     }
     let custom = optional_attr(e, b"customList", d)?;

@@ -747,6 +747,7 @@ fn scan_xml(
     Ok(scan)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn inspect_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -867,7 +868,7 @@ fn checked_add(left: usize, right: usize, label: &str) -> Result<usize> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value.as_ref())
+        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
             .map_err(xml_error)?
             .to_owned()),
         ResolveResult::Unbound => Ok(String::new()),

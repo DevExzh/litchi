@@ -219,7 +219,7 @@ pub struct XldmStorage<'a> {
 
 impl XldmStorage<'_> {
     pub fn bytes(&self) -> &[u8] {
-        &self.bytes
+        self.bytes
     }
 
     /// Return one member's bytes without its CRC marker. The returned bytes

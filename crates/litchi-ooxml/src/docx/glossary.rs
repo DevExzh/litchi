@@ -1129,7 +1129,7 @@ fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
     x.push('>');
     Ok(())
 }
-fn mapns<'a>(v: &'a str, s: bool) -> &'a str {
+fn mapns(v: &str, s: bool) -> &str {
     if s {
         match v {
             W => WS,

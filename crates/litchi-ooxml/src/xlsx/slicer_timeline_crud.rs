@@ -681,13 +681,12 @@ fn rewrite_integration_refs(xml: &[u8], uri: &str, family_ns: &str, list: &str, 
                 depth += 1;
                 if depth > MAX_DEPTH { return Err(invalid("integration XML depth exceeds limit")); }
             },
-            Event::Empty(element) => {
-                if depth == 2 && is_core_namespace(&namespace, core) && element.local_name().as_ref() == b"ext" && attribute_value(&element, "uri", reader.decoder())?.as_deref() == Some(uri) {
+            Event::Empty(element)
+                if depth == 2 && is_core_namespace(&namespace, core) && element.local_name().as_ref() == b"ext" && attribute_value(&element, "uri", reader.decoder())?.as_deref() == Some(uri) => {
                     if target.is_some() || open.is_some() { return Err(invalid("duplicate integration extension")); }
                     let end = usize::try_from(reader.buffer_position()).map_err(|_| invalid("XML offset overflow"))?;
                     target = Some((start, end));
-                }
-            },
+                },
             Event::End(_) => {
                 if depth == 0 { return Err(invalid("unexpected XML close")); }
                 depth -= 1;
@@ -719,8 +718,8 @@ fn root_namespaces(xml: &[u8]) -> Result<(&'static str, &'static str)> {
         let (namespace, event) = reader.read_resolved_event().map_err(|e| invalid(e.to_string()))?;
         match event {
             Event::Start(_) => return match namespace {
-                ResolveResult::Bound(Namespace(value)) if value.as_ref() == SML.as_bytes() => Ok((SML, REL)),
-                ResolveResult::Bound(Namespace(value)) if value.as_ref() == STRICT_SML.as_bytes() => Ok((STRICT_SML, STRICT_REL)),
+                ResolveResult::Bound(Namespace(value)) if value == SML.as_bytes() => Ok((SML, REL)),
+                ResolveResult::Bound(Namespace(value)) if value == STRICT_SML.as_bytes() => Ok((STRICT_SML, STRICT_REL)),
                 _ => Err(invalid("unsupported SpreadsheetML root namespace")),
             },
             Event::DocType(_) | Event::PI(_) => return Err(invalid("DTDs and processing instructions are rejected")),
@@ -753,7 +752,7 @@ fn is_core_namespace(namespace: &ResolveResult<'_>, core: &str) -> bool {
 
 fn next_part_name(package: &OpcPackage, template: &str) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(&template.replace("%d", &suffix.to_string())).map_err(OoxmlError::InvalidUri)?;
+        let candidate = PackURI::new(template.replace("%d", &suffix.to_string())).map_err(OoxmlError::InvalidUri)?;
         if package.get_part(&candidate).is_err() { return Ok(candidate); }
     }
     Err(invalid("no free package part name"))

@@ -285,8 +285,7 @@ impl XlsxTheme {
                         }
                     } else if drawingml && local == b"clrScheme" {
                         slot_index = None;
-                    } else if drawingml && local == b"majorFont" || drawingml && local == b"minorFont"
-                    {
+                    } else if drawingml && (local == b"majorFont" || local == b"minorFont") {
                         font_kind = None;
                     }
                 },

@@ -544,10 +544,10 @@ fn inspect_start(
             set_mode(object, PptxOleObjectMode::Embedded)?;
         } else if is_presentationml_name(namespace, element.name(), b"link") {
             set_mode(object, PptxOleObjectMode::Linked)?;
-        } else if is_presentationml_name(namespace, element.name(), b"pic") {
-            if object.pic_depth.replace(depth).is_some() {
-                return Err(invalid("OLE object has multiple preview pictures"));
-            }
+        } else if is_presentationml_name(namespace, element.name(), b"pic")
+            && object.pic_depth.replace(depth).is_some()
+        {
+            return Err(invalid("OLE object has multiple preview pictures"));
         }
         return Ok(());
     }
