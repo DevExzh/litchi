@@ -81,6 +81,21 @@ mod fbi;
 /// BIFF8 `EntExU2` record: an application-specific cache, preserved opaquely.
 mod ent_ex_u2;
 
+/// BIFF8 chart axis-group records (`AxesUsed`, `AxisParent`).
+mod axes_used;
+
+/// BIFF8 `BopPop` record: bar of pie / pie of pie chart group attributes.
+mod bop_pop;
+
+/// BIFF8 `PlotGrowth` record: plot area font-scaling factors.
+mod plot_growth;
+
+/// BIFF8 `Scl` record: the view zoom fraction.
+mod scl;
+
+/// BIFF8 fieldless chart collection markers (`Begin`, `End`, `PlotArea`).
+mod chart_markers;
+
 /// BIFF8 chart property-stream future records (`ShapePropsStream`,
 /// `TextPropsStream`, `RichTextStream`).
 mod chart_property_stream;
@@ -394,6 +409,11 @@ pub use fbi::{XlsFbi, XlsFontScaleBasis};
 pub use ser_aux_err_bar::{XlsErrorBarDirection, XlsErrorBarSource, XlsSerAuxErrBar};
 pub use ser_aux_trend::{XlsSerAuxTrend, XlsTrendlineKind};
 pub use ser_fmt::XlsSerFmt;
+pub use axes_used::{XlsAxesUsed, XlsAxesUsedCount, XlsAxisGroupPosition, XlsAxisParent};
+pub use bop_pop::{XlsBopPop, XlsBopPopSplit, XlsBopPopSubtype};
+pub use chart_markers::{XlsBegin, XlsEnd, XlsPlotArea};
+pub use plot_growth::{XlsFixedPoint, XlsPlotGrowth};
+pub use scl::XlsScl;
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
 pub use force_full_calculation::XlsForceFullCalculation;
 pub use backup::XlsBackup;
