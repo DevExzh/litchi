@@ -59,8 +59,9 @@ use super::number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
 };
 use super::paragraph_alignment::{
-    create_named_paragraph_style, delete_named_paragraph_style, named_paragraph_styles,
-    paragraph_alignment, paragraph_background, paragraph_borders, paragraph_decimal_tab_character,
+    applied_named_paragraph_style, apply_named_paragraph_style, create_named_paragraph_style,
+    delete_named_paragraph_style, named_paragraph_styles, paragraph_alignment,
+    paragraph_background, paragraph_borders, paragraph_decimal_tab_character,
     paragraph_default_tab_interval, paragraph_flow, paragraph_following_style, paragraph_indents,
     paragraph_line_spacing, paragraph_spacing, paragraph_tab_stops, paragraph_writing_direction,
     rename_named_paragraph_style, reset_paragraph_alignment, reset_paragraph_background,
@@ -105,6 +106,7 @@ use super::paragraph_list::{
     set_paragraph_list_number_scale, set_paragraph_list_number_tiering,
     set_paragraph_list_numbering, set_paragraph_lists,
 };
+use super::paragraph_style_apply::AppliedParagraphStyle;
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
@@ -1709,6 +1711,31 @@ impl IWorkTextEditor {
         named_paragraph_styles(&self.package, object_id)
     }
 
+    /// Read the named paragraph style selected for one uniform text storage.
+    pub fn applied_named_paragraph_style(&self, object_id: u64) -> Result<AppliedParagraphStyle> {
+        applied_named_paragraph_style(&self.package, object_id)
+    }
+
+    /// Apply one selectable paragraph style and clear direct paragraph overrides.
+    pub fn apply_named_paragraph_style(
+        &mut self,
+        object_id: u64,
+        target: ParagraphStyleId,
+    ) -> Result<NamedParagraphStyle> {
+        let mut staged = self.package.clone();
+        let applied = apply_named_paragraph_style(&mut staged, object_id, target)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let selection = applied_named_paragraph_style(&verified, object_id)?;
+        if selection.style() != &applied || selection.has_overrides() {
+            return Err(Error::InvalidFormat(
+                "iWork named paragraph-style application failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(applied)
+    }
+
     /// Clone one theme preset as a new named paragraph style.
     pub fn create_named_paragraph_style(
         &mut self,
@@ -1769,6 +1796,51 @@ impl IWorkTextEditor {
         {
             return Err(Error::InvalidFormat(
                 "iWork named paragraph-style deletion failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(deleted)
+    }
+
+    /// Replace the current named style and delete it as one transaction.
+    ///
+    /// The operation clears current direct overrides, applies `replacement`,
+    /// and removes `target`. References from any other object make the whole
+    /// operation fail without changing the package.
+    pub fn delete_applied_named_paragraph_style_with_replacement(
+        &mut self,
+        object_id: u64,
+        target: ParagraphStyleId,
+        replacement: ParagraphStyleId,
+    ) -> Result<NamedParagraphStyle> {
+        if target == replacement {
+            return Err(Error::InvalidFormat(
+                "a deleted iWork paragraph style requires a different replacement".to_owned(),
+            ));
+        }
+        let current = applied_named_paragraph_style(&self.package, object_id)?;
+        if current.style().id() != target {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text storage {object_id} does not currently use paragraph style {}",
+                target.get()
+            )));
+        }
+
+        let mut staged = self.package.clone();
+        apply_named_paragraph_style(&mut staged, object_id, replacement)?;
+        let deleted = delete_named_paragraph_style(&mut staged, object_id, target)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let selection = applied_named_paragraph_style(&verified, object_id)?;
+        if selection.style().id() != replacement
+            || selection.has_overrides()
+            || named_paragraph_styles(&verified, object_id)?
+                .iter()
+                .any(|style| style.id() == target)
+        {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph-style replacement deletion failed round-trip validation"
+                    .to_owned(),
             ));
         }
         self.package = staged;

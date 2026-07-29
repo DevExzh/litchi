@@ -340,6 +340,196 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
 }
 
 #[test]
+fn named_paragraph_style_application_and_replacement_deletion_are_transactional() {
+    let mut pages = PagesEditor::create_with_text("Pages style application").unwrap();
+    let first = pages
+        .add_text_box(
+            23,
+            "First",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let second = pages
+        .add_text_box(
+            24,
+            "Second",
+            DrawablePoint { x: 20.0, y: 160.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let body = pages
+        .text_box_applied_named_paragraph_style(first.drawable_object_id)
+        .unwrap()
+        .style()
+        .id();
+    assert!(
+        !pages
+            .text_box_applied_named_paragraph_style(first.drawable_object_id)
+            .unwrap()
+            .has_overrides()
+    );
+    let initial_pages = pages.to_bytes().unwrap();
+    let display = pages
+        .create_text_box_named_paragraph_style(
+            first.drawable_object_id,
+            body,
+            ParagraphStyleName::new("Pages Display").unwrap(),
+        )
+        .unwrap();
+    for object_id in [first.drawable_object_id, second.drawable_object_id] {
+        assert_eq!(
+            pages
+                .apply_text_box_named_paragraph_style(object_id, display.id())
+                .unwrap(),
+            display
+        );
+        assert_eq!(
+            pages
+                .text_box_applied_named_paragraph_style(object_id)
+                .unwrap()
+                .style(),
+            &display
+        );
+    }
+
+    let before_shared_delete = pages.to_bytes().unwrap();
+    assert!(
+        pages
+            .delete_applied_text_box_named_paragraph_style_with_replacement(
+                first.drawable_object_id,
+                display.id(),
+                body,
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before_shared_delete);
+    pages
+        .apply_text_box_named_paragraph_style(second.drawable_object_id, body)
+        .unwrap();
+    pages
+        .set_text_box_paragraph_alignment(first.drawable_object_id, TextAlignment::Center)
+        .unwrap();
+    pages
+        .set_text_box_paragraph_default_tab_interval(
+            first.drawable_object_id,
+            ParagraphDefaultTabInterval::from_points(36.0).unwrap(),
+        )
+        .unwrap();
+    assert!(
+        pages
+            .text_box_applied_named_paragraph_style(first.drawable_object_id)
+            .unwrap()
+            .has_overrides()
+    );
+    let before_same_replacement = pages.to_bytes().unwrap();
+    assert!(
+        pages
+            .delete_applied_text_box_named_paragraph_style_with_replacement(
+                first.drawable_object_id,
+                display.id(),
+                display.id(),
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before_same_replacement);
+    assert_eq!(
+        pages
+            .delete_applied_text_box_named_paragraph_style_with_replacement(
+                first.drawable_object_id,
+                display.id(),
+                body,
+            )
+            .unwrap(),
+        display
+    );
+    assert_eq!(pages.to_bytes().unwrap(), initial_pages);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let mut numbers = IWorkTextEditor::from_package(numbers.into_package());
+    assert_application_lifecycle(
+        &mut numbers,
+        numbers_box.storage.object_id,
+        "Numbers Display",
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let mut keynote = IWorkTextEditor::from_package(keynote.into_package());
+    assert_application_lifecycle(
+        &mut keynote,
+        keynote_box.storage.object_id,
+        "Keynote Display",
+    );
+}
+
+fn assert_application_lifecycle(editor: &mut IWorkTextEditor, storage_id: u64, style_name: &str) {
+    let body = editor
+        .applied_named_paragraph_style(storage_id)
+        .unwrap()
+        .style()
+        .id();
+    let initial = editor.package().to_bytes().unwrap();
+    let display = editor
+        .create_named_paragraph_style(
+            storage_id,
+            body,
+            ParagraphStyleName::new(style_name).unwrap(),
+        )
+        .unwrap();
+    editor
+        .apply_named_paragraph_style(storage_id, display.id())
+        .unwrap();
+    editor
+        .set_paragraph_alignment(storage_id, TextAlignment::Right)
+        .unwrap();
+    editor
+        .set_paragraph_default_tab_interval(
+            storage_id,
+            ParagraphDefaultTabInterval::from_points(36.0).unwrap(),
+        )
+        .unwrap();
+    let selected = editor.applied_named_paragraph_style(storage_id).unwrap();
+    assert_eq!(selected.style(), &display);
+    assert!(selected.has_overrides());
+    assert_eq!(
+        editor
+            .delete_applied_named_paragraph_style_with_replacement(storage_id, display.id(), body,)
+            .unwrap(),
+        display
+    );
+    assert_eq!(editor.package().to_bytes().unwrap(), initial);
+}
+
+#[test]
 fn all_native_alignment_values_are_strict_and_reversible() {
     for alignment in [
         TextAlignment::Natural,

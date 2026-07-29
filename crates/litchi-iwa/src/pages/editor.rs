@@ -30,8 +30,8 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, NamedParagraphStyle, ParagraphBackground, ParagraphBorders,
-    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
+    AppliedParagraphStyle, IWorkTextEditor, NamedParagraphStyle, ParagraphBackground,
+    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
     ParagraphDropCapPlacement, ParagraphFlow, ParagraphFollowingStyle, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
@@ -1606,6 +1606,35 @@ impl PagesEditor {
         self.text.named_paragraph_styles(graph.storage_id)
     }
 
+    /// Read the named paragraph style selected for an ordinary text box.
+    pub fn text_box_applied_named_paragraph_style(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<AppliedParagraphStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.applied_named_paragraph_style(graph.storage_id)
+    }
+
+    /// Apply one named paragraph style and clear direct paragraph overrides.
+    pub fn apply_text_box_named_paragraph_style(
+        &mut self,
+        drawable_object_id: u64,
+        target: crate::text::ParagraphStyleId,
+    ) -> Result<NamedParagraphStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let applied = staged.apply_named_paragraph_style(graph.storage_id, target)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        let selection = verified.text_box_applied_named_paragraph_style(drawable_object_id)?;
+        if selection.style() != &applied || selection.has_overrides() {
+            return Err(Error::InvalidFormat(
+                "Pages named paragraph-style application failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(applied)
+    }
+
     /// Clone one selectable preset as a new named style in this text box's theme.
     pub fn create_text_box_named_paragraph_style(
         &mut self,
@@ -1669,6 +1698,40 @@ impl PagesEditor {
         {
             return Err(Error::InvalidFormat(
                 "Pages named paragraph-style deletion failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(deleted)
+    }
+
+    /// Replace the style applied to this text box and delete it atomically.
+    ///
+    /// References from another object reject the deletion without changing the
+    /// document, allowing callers to replace each remaining use explicitly.
+    pub fn delete_applied_text_box_named_paragraph_style_with_replacement(
+        &mut self,
+        drawable_object_id: u64,
+        target: crate::text::ParagraphStyleId,
+        replacement: crate::text::ParagraphStyleId,
+    ) -> Result<NamedParagraphStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let deleted = staged.delete_applied_named_paragraph_style_with_replacement(
+            graph.storage_id,
+            target,
+            replacement,
+        )?;
+        let verified = Self::from_package(staged.package().clone())?;
+        let selection = verified.text_box_applied_named_paragraph_style(drawable_object_id)?;
+        if selection.style().id() != replacement
+            || selection.has_overrides()
+            || verified
+                .text_box_named_paragraph_styles(drawable_object_id)?
+                .iter()
+                .any(|style| style.id() == target)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages paragraph-style replacement deletion failed validation".to_owned(),
             ));
         }
         self.text = staged;

@@ -1782,7 +1782,7 @@ fn is_text_background_field_info(field: &tsp::FieldInfo) -> bool {
         ]
 }
 
-pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+pub(in crate::text) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
     let mut storage_references = 0usize;
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
@@ -1816,6 +1816,39 @@ pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool
         }
     }
     Ok(storage_references == 1)
+}
+
+pub(in crate::text) fn is_unreferenced(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+    for archive_name in package.iwa_entry_names() {
+        for object in package.archive(archive_name)?.objects {
+            for message in &object.messages {
+                if STORAGE_MESSAGE_TYPES.contains(&message.type_)
+                    && let Ok(storage) = tswp::StorageArchive::decode(message.data.as_slice())
+                    && storage.table_para_style.iter().any(|table| {
+                        table.entries.iter().any(|entry| {
+                            entry
+                                .object
+                                .as_ref()
+                                .is_some_and(|reference| reference.identifier == style_id)
+                        })
+                    })
+                {
+                    return Ok(false);
+                }
+                if message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE
+                    && let Ok(style) = tswp::ParagraphStyleArchive::decode(message.data.as_slice())
+                    && style
+                        .super_
+                        .parent
+                        .as_ref()
+                        .is_some_and(|parent| parent.identifier == style_id)
+                {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    Ok(true)
 }
 
 pub(crate) fn parent_style_id(style: &tswp::ParagraphStyleArchive, style_id: u64) -> Result<u64> {

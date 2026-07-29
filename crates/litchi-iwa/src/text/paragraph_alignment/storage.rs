@@ -17,12 +17,15 @@ const ENTRY_CHARACTER_INDEX_FIELD: u32 = 1;
 const ENTRY_OBJECT_FIELD: u32 = 2;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 
-pub(super) struct ParagraphStorageLocation {
-    pub(super) archive_name: String,
-    pub(super) style_id: u64,
+pub(in crate::text) struct ParagraphStorageLocation {
+    pub(in crate::text) archive_name: String,
+    pub(in crate::text) style_id: u64,
 }
 
-pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphStorageLocation> {
+pub(in crate::text) fn locate(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphStorageLocation> {
     let archive_name = object_archive_name(package, storage_id)?;
     let archive = package.archive(&archive_name)?;
     let object = archive.object(storage_id).ok_or_else(|| {
@@ -86,7 +89,7 @@ pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<Paragrap
     })
 }
 
-pub(super) fn patch_style_reference(
+pub(in crate::text) fn patch_style_reference(
     package: &mut IWorkPackage,
     archive_name: &str,
     storage_id: u64,

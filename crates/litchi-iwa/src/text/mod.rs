@@ -35,6 +35,7 @@ mod paragraph_direction;
 mod paragraph_flow;
 mod paragraph_following_style;
 mod paragraph_list;
+mod paragraph_style_apply;
 mod paragraph_style_catalog;
 mod paragraph_style_delete;
 mod paragraph_style_rename;
@@ -116,6 +117,7 @@ pub(crate) use paragraph_list::{
     paragraph_list_numbering as paragraph_list_numbering_in_storage,
     paragraph_lists as paragraph_lists_in_storage, preset_style_id, preset_style_object,
 };
+pub use paragraph_style_apply::AppliedParagraphStyle;
 pub use paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,

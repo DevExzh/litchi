@@ -257,10 +257,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         body.id(),
         ParagraphStyleName::new("Litchi Heading")?,
     )?;
-    editor.rename_text_box_named_paragraph_style(
+    let display = editor.rename_text_box_named_paragraph_style(
         following_style_box.drawable_object_id,
         heading.id(),
         ParagraphStyleName::new("Litchi Display")?,
+    )?;
+    editor.apply_text_box_named_paragraph_style(
+        following_style_box.drawable_object_id,
+        display.id(),
     )?;
     let disposable = editor.create_text_box_named_paragraph_style(
         following_style_box.drawable_object_id,

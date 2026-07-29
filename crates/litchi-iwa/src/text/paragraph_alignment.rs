@@ -1,7 +1,7 @@
 //! Composable native paragraph-style CRUD shared by Pages, Numbers, and Keynote.
 
 pub(crate) mod native;
-mod storage;
+pub(super) mod storage;
 
 use std::borrow::Cow;
 
@@ -16,6 +16,7 @@ use super::font::TextFont;
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_following_style::{NamedParagraphStyle, ParagraphFollowingStyle};
+use super::paragraph_style_apply::{self, AppliedParagraphStyle};
 use super::paragraph_style_catalog;
 use super::paragraph_style_delete;
 use super::paragraph_style_rename;
@@ -622,6 +623,21 @@ pub(super) fn named_paragraph_styles(
 ) -> Result<Vec<NamedParagraphStyle>> {
     let storage = storage::locate(package, storage_id)?;
     native::named_paragraph_styles(package, storage.style_id)
+}
+
+pub(super) fn applied_named_paragraph_style(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<AppliedParagraphStyle> {
+    paragraph_style_apply::applied_named_paragraph_style(package, storage_id)
+}
+
+pub(super) fn apply_named_paragraph_style(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    target: super::paragraph_following_style::ParagraphStyleId,
+) -> Result<NamedParagraphStyle> {
+    paragraph_style_apply::apply_named_paragraph_style(package, storage_id, target)
 }
 
 pub(super) fn create_named_paragraph_style(
