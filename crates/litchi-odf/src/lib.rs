@@ -79,6 +79,7 @@
 //! - ✅ Add headings with levels
 //! - ✅ MutableDocument for modifying existing documents
 //! - ✅ Author, edit, and remove classic form controls and form properties
+//! - ✅ Author, replace, and remove explicit `text:page-sequence` page assignments
 //! - ✅ Set metadata (title, author, description, etc.)
 //! - ✅ Save to file or bytes
 //!
@@ -753,7 +754,7 @@ pub use odt::{
     HeaderFooterColumnRegion, HeaderFooterKind, IllustrationIndexSource, MasterPage, MasterPageChild, MasterPageChildKind,
     MutableDocument, Note, NoteClass, ObjectIndexSource, OdfFrameAnchor, OdfImageFormat, OdfLength,
     OdtSectionBlock,
-    OdtTrackedPosition, OdtTrackedStory,
+    OdtPageSequence, OdtTrackedPosition, OdtTrackedStory,
     PageLayout, PageLayoutAttribute,
     PageLayoutProperties, PageUsage, ReferenceMark, ReferenceMarkFragments, Ruby, SectionDdeSource,
     Section, SectionDisplay, SectionSource, TableIndexSource, TableOfContentsSource,

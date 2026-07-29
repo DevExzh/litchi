@@ -20,6 +20,7 @@ use crate::odt::header_footer::{
     set_region_xml,
 };
 use crate::odt::page_layout::{PageLayout, parse_page_layouts, set_page_layout_xml};
+use crate::odt::page_sequence::{OdtPageSequence, parse_page_sequence, set_page_sequence_xml};
 use crate::{OdfFormProperty, OdfInteractiveControl, OdfSelectionControl, OdfTextControl};
 use crate::{
     OdfVariableDeclarationGroup, OdfVariableDeclarations, OdfVariableKind, OdfVariablePart,
@@ -1626,6 +1627,27 @@ impl MutableDocument {
             .with_content_xml(|xml| crate::odt::remove_dynamic_text_field_xml(xml, field_index))?;
         self.content_xml = Some(updated);
         Ok(old)
+    }
+
+    /// Return the explicit page-sequence master-page assignments, if authored.
+    ///
+    /// The model preserves only the ordered `text:master-page-name` values of
+    /// the document's `text:page-sequence` (ODF 1.3 §5.3); litchi does not
+    /// paginate or resolve the referenced master pages.
+    pub fn page_sequence(&self) -> Result<Option<OdtPageSequence>> {
+        self.with_content_xml(parse_page_sequence)
+    }
+
+    /// Set, replace, or clear the document's `text:page-sequence`.
+    ///
+    /// A new sequence is written as the first child of `office:text`, matching
+    /// the element order of ODF 1.3 §5.1. Passing `None` removes an existing
+    /// sequence and is a no-op when none exists. Master-page names are stored
+    /// lexically and never resolved against `styles.xml`.
+    pub fn set_page_sequence(&mut self, sequence: Option<&OdtPageSequence>) -> Result<()> {
+        let updated = self.with_content_xml(|xml| set_page_sequence_xml(xml, sequence))?;
+        self.content_xml = Some(updated);
+        Ok(())
     }
 
     /// Return validated variable, user-field, sequence, and DDE declarations.

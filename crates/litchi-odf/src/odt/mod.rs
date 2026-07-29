@@ -30,6 +30,7 @@
 //!   checkbox, button, combobox/listbox with options, radio, fixed-text, hidden,
 //!   and number/date/time controls with ids, labels, current state, and inert
 //!   event-listener metadata
+//! - ✅ `page_sequence()` - Parse explicit `text:page-sequence` master-page assignments
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -46,6 +47,7 @@
 //! - ✅ `save()` / `to_bytes()` - Write to file or bytes
 //! - ✅ `MutableDocument` - Modify existing documents
 //! - ✅ Insert, replace, and remove form controls and form properties
+//! - ✅ `set_page_sequence()` - Author, replace, and remove explicit page sequences
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Table of contents generation
@@ -54,7 +56,6 @@
 //! - ⚠️ Advanced drawing objects (complex shapes, connectors)
 //! - ⚠️ Master page editing
 //! - ⚠️ Header and footer manipulation
-//! - ⚠️ Page numbering and sections
 //! - ⚠️ Document protection
 //!
 //! # References
@@ -115,6 +116,7 @@ pub use frame::{OdfFrameAnchor, OdfImageFormat, OdfLength};
 pub use mutable::MutableDocument;
 pub use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
+pub use page_sequence::OdtPageSequence;
 pub use reference_mark::{
     ReferenceMark, ReferenceMarkFragments, insert_reference_mark_xml, remove_reference_mark_xml,
     replace_reference_mark_xml,

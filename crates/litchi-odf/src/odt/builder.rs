@@ -96,6 +96,7 @@ pub struct DocumentBuilder {
     )>,
     notes_configurations: crate::OdfNotesConfigurations,
     line_numbering_configuration: Option<crate::OdfLineNumberingConfiguration>,
+    page_sequence: Option<crate::OdtPageSequence>,
 }
 
 impl Default for DocumentBuilder {
@@ -158,6 +159,7 @@ impl DocumentBuilder {
             page_layout_header_footer_properties: Vec::new(),
             notes_configurations: crate::OdfNotesConfigurations::default(),
             line_numbering_configuration: None,
+            page_sequence: None,
         }
     }
 
@@ -1209,6 +1211,22 @@ impl DocumentBuilder {
         Ok(self)
     }
 
+    /// Set or clear the explicit `text:page-sequence` master-page assignments.
+    ///
+    /// The sequence is written as the first child of `office:text`, matching
+    /// the element order of ODF 1.3 §5.1 and §5.3. Master-page names are
+    /// stored lexically and never resolved against `styles.xml`.
+    pub fn set_page_sequence(
+        &mut self,
+        sequence: Option<crate::OdtPageSequence>,
+    ) -> Result<&mut Self> {
+        if let Some(sequence) = &sequence {
+            sequence.to_xml_fragment()?;
+        }
+        self.page_sequence = sequence;
+        Ok(self)
+    }
+
     /// Add a minimal inert form containing typed custom properties.
     pub fn add_property_form(&mut self, form: &crate::OdfPropertyForm) -> Result<&mut Self> {
         form.to_xml_fragment()?;
@@ -1477,6 +1495,14 @@ impl DocumentBuilder {
             .sum::<usize>();
 
         let mut body = String::with_capacity(estimated);
+
+        if let Some(sequence) = &self.page_sequence {
+            body.push_str(
+                &sequence
+                    .to_xml_fragment()
+                    .expect("validated builder page sequence"),
+            );
+        }
 
         if !self.property_forms.is_empty()
             || !self.control_forms.is_empty()
