@@ -2761,14 +2761,22 @@ impl<'a> Document<'a> {
     //
     // ✅ Mail merge field discovery: merge_fields(), merge_field_names(), typed_merge_fields(),
     //    mail_merge_data_fields(), mail_merge_counters()
-    // TODO: Mail merge mutation (MS-DOCX Section 17.16.5.35)
-    // - execute_mail_merge()
+    // ✅ COMPLETED: Mail merge settings mutation (MS-DOCX Section 17.16.5.35)
+    // - Typed inert `w:mailMerge` model: MailMergeSettings, MailMergeDataSourceObject,
+    //   MailMergeFieldMap, MailMergeRecipients (see mail_merge.rs)
+    // - Package-level create/replace/remove: Package::set_mail_merge(),
+    //   update_mail_merge(), update_mail_merge_recipients(), clear_mail_merge()
+    // - Connection strings, queries, and data sources stay inert typed data;
+    //   executing the merge against a data source is out of scope by design
     //
     // ✅ COMPLETED: Typed run breaks (MS-DOCX Section 17.3.3.1)
     // - Run::breaks() preserves text-wrapping, page, and column breaks plus clear behavior
     // - Rendered pagination hints remain distinguishable from authored breaks
-    // TODO: Section-break insertion and mutation
-    // - insert_section_break()
+    // ✅ COMPLETED: Section-break insertion and mutation
+    // - MutableDocument::insert_section_break() authors paragraph-level w:pPr/w:sectPr;
+    //   section_mut() edits the body-final section
+    // - section_break(), update_section_break(), remove_section_break(),
+    //   move_section_break() cover per-section page setup mutation
     //
     // ✅ Watermarks: typed VML header discovery plus mutable add/remove support
     //
