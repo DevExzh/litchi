@@ -224,6 +224,97 @@ fn rejects_misplaced_or_malformed_math() {
 }
 
 #[test]
+fn parses_matrix_columns_and_argument_properties() {
+    let document = RtfDocument::parse(concat!(
+        r#"{\rtf1{\mmath"#,
+        r#"{\mm{\mmPr{\mcount 2}{\mmcs{\mmc{\mmcPr{\mcount 2}{\mmcJc center}}}{\mmc{\mmcPr{\mcount 1}}}}}"#,
+        r#"{\mmr{\me{\mr a}}{\me{\mr b}}}}"#,
+        r#"{\msSup{\msup{\mr 2}}{\me{\margPr{\margSz 2}}{\mr x}}}"#,
+        r"}}",
+    ))
+    .unwrap();
+    let zones = document.math_zones();
+    assert_eq!(zones.len(), 1);
+
+    let MathObject::Structure(matrix) = &zones[0].content[0] else {
+        panic!("expected matrix structure");
+    };
+    let matrix_pr = matrix.properties.as_ref().unwrap();
+    assert_eq!(matrix_pr.matrix_columns.len(), 2);
+    let first_column = matrix_pr.matrix_columns[0].properties.as_ref().unwrap();
+    assert_eq!(first_column.kind, MathPropertiesKind::MatrixColumn);
+    assert_eq!(first_column.properties[0].name, MathPropertyName::MatrixCellCount);
+    assert_eq!(first_column.properties[0].value, "2");
+    assert_eq!(
+        first_column.properties[1].name,
+        MathPropertyName::MatrixCellJustify
+    );
+    assert_eq!(first_column.properties[1].value, "center");
+    let second_column = matrix_pr.matrix_columns[1].properties.as_ref().unwrap();
+    assert_eq!(second_column.properties.len(), 1);
+
+    let MathObject::Structure(superscript) = &zones[0].content[1] else {
+        panic!("expected superscript structure");
+    };
+    let MathStructureChild::Element(base) = &superscript.children[1] else {
+        panic!("expected base element");
+    };
+    let argument = base.argument_properties.as_ref().unwrap();
+    assert_eq!(argument.kind, MathPropertiesKind::Argument);
+    assert_eq!(argument.properties[0].name, MathPropertyName::ArgumentSize);
+    assert_eq!(argument.properties[0].value, "2");
+
+    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    assert_eq!(reparsed.math_zones(), zones);
+}
+
+#[test]
+fn rejects_misplaced_matrix_columns_and_argument_properties() {
+    let cases = [
+        // Argument properties after argument content.
+        r"{\rtf1{\mmath{\msSup{\msup{\mr 2}}{\me{\mr x}{\margPr{\margSz 1}}}}}}",
+        // Argument size outside an argument-properties destination.
+        r"{\rtf1{\mmath{\mf{\mfPr{\margSz 1}}{\mnum{\mr 1}}{\mden{\mr 2}}}}}",
+        // Non-argument property inside margPr.
+        r"{\rtf1{\mmath{\msSup{\msup{\mr 2}}{\me{\margPr{\mtype bar}}{\mr x}}}}}",
+        // Matrix columns outside matrix properties.
+        r"{\rtf1{\mmath{\mf{\mfPr{\mmcs{\mmc}}}{\mnum{\mr 1}}{\mden{\mr 2}}}}}",
+        // Empty matrix columns destination.
+        r"{\rtf1{\mmath{\mm{\mmPr{\mmcs }}{\mmr{\me{\mr a}}}}}}",
+        // Matrix column with an unsupported group.
+        r"{\rtf1{\mmath{\mm{\mmPr{\mmcs{\mmc{\mf{\mnum{\mr 1}}{\mden{\mr 2}}}}}}{\mmr{\me{\mr a}}}}}}",
+        // Non-column property inside mmcPr.
+        r"{\rtf1{\mmath{\mm{\mmPr{\mmcs{\mmc{\mmcPr{\mtype bar}}}}}{\mmr{\me{\mr a}}}}}}",
+        // Duplicate matrix columns destinations.
+        r"{\rtf1{\mmath{\mm{\mmPr{\mmcs{\mmc}}{\mmcs{\mmc}}}{\mmr{\me{\mr a}}}}}}",
+        // Matrix column destinations at zone level.
+        r"{\rtf1{\mmath{\mmcs{\mmc}}}}",
+    ];
+    for rtf in cases {
+        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+    }
+}
+
+#[test]
+fn typed_constructors_validate_new_property_scopes() {
+    use litchi_rtf::{MathProperties, MathProperty};
+    use std::borrow::Cow;
+    let argument_size = MathProperty::new(MathPropertyName::ArgumentSize, Cow::Borrowed("2")).unwrap();
+    // \margSz is only permitted inside \margPr.
+    assert!(
+        MathProperties::new(
+            MathPropertiesKind::Structure(MathStructureKind::Fraction),
+            vec![argument_size.clone()],
+        )
+        .is_err()
+    );
+    // \margPr accepts nothing but \margSz.
+    let fraction_type = MathProperty::new(MathPropertyName::Type, Cow::Borrowed("bar")).unwrap();
+    assert!(MathProperties::new(MathPropertiesKind::Argument, vec![fraction_type]).is_err());
+    assert!(MathProperties::new(MathPropertiesKind::Argument, vec![argument_size]).is_ok());
+}
+
+#[test]
 fn rejects_excessive_math_nesting_depth() {
     let mut rtf = String::from(r"{\rtf1{\mmath");
     for _ in 0..65 {

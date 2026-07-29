@@ -16011,6 +16011,16 @@ impl<'a> Parser<'a> {
     /// `\xmlopen` may additionally select a namespace with `\xmlnsN` and may
     /// carry nested starred `\xmlattrname`/`\xmlattrvalue` groups.
     fn parse_custom_xml_tag_destination(&mut self) -> RtfResult<()> {
+        if self
+            .states
+            .iter()
+            .any(|state| !matches!(state.destination, Destination::DocumentBody))
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF custom XML markup destinations are supported only in the main body story"
+                    .to_string(),
+            ));
+        }
         let is_open = matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::XmlOpen))
@@ -16175,6 +16185,16 @@ impl<'a> Parser<'a> {
 
     /// Parse a starred sibling `\xmlattrname`/`\xmlattrvalue` destination.
     fn parse_custom_xml_attribute_destination(&mut self) -> RtfResult<()> {
+        if self
+            .states
+            .iter()
+            .any(|state| !matches!(state.destination, Destination::DocumentBody))
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF custom XML markup destinations are supported only in the main body story"
+                    .to_string(),
+            ));
+        }
         let is_name = matches!(
             self.tokens.get(self.pos + 1),
             Some(Token::Control(ControlWord::XmlAttributeName))
@@ -16301,6 +16321,11 @@ impl<'a> Parser<'a> {
                 | C::MathScriptSupProperties
                 | C::MathRunProperties
                 | C::MathControlProperties
+                | C::MathMatrixColumns
+                | C::MathMatrixColumn
+                | C::MathMatrixColumnProperties
+                | C::MathArgumentProperties
+                | C::MathPropertyArgumentSize(_)
                 | C::MathPropertyType(_)
                 | C::MathPropertyGrow(_)
                 | C::MathPropertyChar(_)
@@ -16480,6 +16505,7 @@ impl<'a> Parser<'a> {
             C::MathPropertyRowSpacing(param) => (N::RowSpacing, param),
             C::MathPropertyRowSpacingRule(param) => (N::RowSpacingRule, param),
             C::MathPropertyBreak(param) => (N::Break, param),
+            C::MathPropertyArgumentSize(param) => (N::ArgumentSize, param),
             _ => return None,
         };
         Some((name, *param))
@@ -16672,6 +16698,7 @@ impl<'a> Parser<'a> {
         depth: usize,
     ) -> RtfResult<crate::MathElement<'a>> {
         self.pos += 2; // opening brace and element control
+        let mut argument_properties = None;
         let mut content = Vec::new();
         loop {
             match self.tokens.get(self.pos) {
@@ -16679,13 +16706,26 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                     break;
                 },
-                Some(Token::OpenBrace) => {
-                    if !matches!(self.tokens.get(self.pos + 1), Some(Token::Control(_))) {
+                Some(Token::OpenBrace) => match self.tokens.get(self.pos + 1) {
+                    Some(Token::Control(ControlWord::MathArgumentProperties)) => {
+                        if argument_properties.is_some() || !content.is_empty() {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF math argument properties are misplaced".to_string(),
+                            ));
+                        }
+                        argument_properties = Some(self.parse_math_properties_group(
+                            crate::MathPropertiesKind::Argument,
+                            depth,
+                        )?);
+                    },
+                    Some(Token::Control(_)) => {
+                        content.push(self.parse_math_object(depth + 1)?);
+                    },
+                    _ => {
                         return Err(RtfError::MalformedDocument(
                             "RTF math argument contains unsupported grouped content".to_string(),
                         ));
-                    }
-                    content.push(self.parse_math_object(depth + 1)?);
+                    },
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {
                     self.pos += 1;
@@ -16702,7 +16742,11 @@ impl<'a> Parser<'a> {
                 ));
             }
         }
-        Ok(crate::MathElement { role, content })
+        Ok(crate::MathElement {
+            role,
+            argument_properties,
+            content,
+        })
     }
 
     /// Parse a matrix row group (`\mmr`); `self.pos` is at its opening brace.
@@ -16834,6 +16878,8 @@ impl<'a> Parser<'a> {
         }
         self.pos += 2; // opening brace and property-destination control
         let mut properties = Vec::new();
+        let mut matrix_columns = Vec::new();
+        let mut saw_matrix_columns = false;
         let mut control = None;
         loop {
             match self.tokens.get(self.pos) {
@@ -16853,6 +16899,18 @@ impl<'a> Parser<'a> {
                             crate::MathPropertiesKind::Control,
                             depth + 1,
                         )?));
+                    },
+                    Some(Token::Control(ControlWord::MathMatrixColumns)) => {
+                        if kind != crate::MathPropertiesKind::Structure(
+                            crate::MathStructureKind::Matrix,
+                        ) || saw_matrix_columns
+                        {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF math matrix columns are misplaced".to_string(),
+                            ));
+                        }
+                        saw_matrix_columns = true;
+                        matrix_columns = self.parse_math_matrix_columns(depth)?;
                     },
                     Some(Token::Control(property_control)) => {
                         let Some((name, param)) = Self::math_property_name(property_control)
@@ -16889,10 +16947,107 @@ impl<'a> Parser<'a> {
         let destination = crate::MathProperties {
             kind,
             properties,
+            matrix_columns,
             control,
         };
         destination.validate()?;
         Ok(destination)
+    }
+
+    /// Parse the matrix columns destination (`\mmcs`) of a matrix property
+    /// destination; `self.pos` is at its opening brace.
+    fn parse_math_matrix_columns(
+        &mut self,
+        depth: usize,
+    ) -> RtfResult<Vec<crate::MathMatrixColumn<'a>>> {
+        self.pos += 2; // opening brace and mmcs control
+        let mut columns = Vec::new();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    break;
+                },
+                Some(Token::OpenBrace) => {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::MathMatrixColumn))
+                    ) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF math matrix columns may contain only mmc destinations"
+                                .to_string(),
+                        ));
+                    }
+                    columns.push(self.parse_math_matrix_column(depth)?);
+                    if columns.len() > crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF math matrix column count exceeds the safety limit".to_string(),
+                        ));
+                    }
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                _ => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF math matrix columns contain ungrouped, binary, or active data"
+                            .to_string(),
+                    ));
+                },
+            }
+        }
+        if columns.is_empty() {
+            return Err(RtfError::MalformedDocument(
+                "RTF math matrix columns must contain at least one mmc destination".to_string(),
+            ));
+        }
+        Ok(columns)
+    }
+
+    /// Parse one matrix column destination (`\mmc`); `self.pos` is at its
+    /// opening brace.
+    fn parse_math_matrix_column(
+        &mut self,
+        depth: usize,
+    ) -> RtfResult<crate::MathMatrixColumn<'a>> {
+        self.pos += 2; // opening brace and mmc control
+        let mut properties = None;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    break;
+                },
+                Some(Token::OpenBrace) => {
+                    if properties.is_some()
+                        || !matches!(
+                            self.tokens.get(self.pos + 1),
+                            Some(Token::Control(ControlWord::MathMatrixColumnProperties))
+                        )
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF math matrix column contains an unsupported group".to_string(),
+                        ));
+                    }
+                    properties = Some(self.parse_math_properties_group(
+                        crate::MathPropertiesKind::MatrixColumn,
+                        depth,
+                    )?);
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                _ => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF math matrix column contains ungrouped, binary, or active data"
+                            .to_string(),
+                    ));
+                },
+            }
+        }
+        let column = crate::MathMatrixColumn { properties };
+        column.validate()?;
+        Ok(column)
     }
 
     /// Parse one math property group; `self.pos` is at its opening brace and
@@ -16949,6 +17104,39 @@ impl<'a> Parser<'a> {
             ));
         }
         crate::MathProperty::new(name, Cow::Owned(value))
+    }
+
+    /// Whether the group starting at `self.pos` is a custom XML markup
+    /// destination (`\xmlopen`, `\xmlclose`, or starred
+    /// `\xmlattrname`/`\xmlattrvalue`).
+    fn is_custom_xml_markup_group(&self) -> bool {
+        match self.tokens.get(self.pos + 1) {
+            Some(Token::Control(ControlWord::XmlOpen | ControlWord::XmlClose)) => true,
+            Some(Token::Control(ControlWord::IgnorableDestination)) => matches!(
+                self.tokens.get(self.pos + 2),
+                Some(Token::Control(
+                    ControlWord::XmlAttributeName | ControlWord::XmlAttributeValue
+                ))
+            ),
+            _ => false,
+        }
+    }
+
+    /// Reject custom XML markup destinations in non-body stories.
+    ///
+    /// Custom XML markup is modeled only for the main body story; inside
+    /// every other text story (notes, headers/footers, shape text, field
+    /// stories) the destinations are rejected rather than silently dropped.
+    ///
+    /// Expects `self.pos` at the group's opening brace.
+    fn reject_non_body_custom_xml_markup_group(&self) -> RtfResult<()> {
+        if self.is_custom_xml_markup_group() {
+            return Err(RtfError::MalformedDocument(
+                "RTF custom XML markup destinations are supported only in the main body story"
+                    .to_string(),
+            ));
+        }
+        Ok(())
     }
 
     fn parse_ignorable_text_destination(&mut self) -> RtfResult<String> {
@@ -19385,6 +19573,12 @@ impl<'a> Parser<'a> {
                             .copied()
                             .map(crate::StoryEvent::Drawing),
                     );
+                },
+                Some(Token::OpenBrace) if self.is_custom_xml_markup_group() => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF custom XML markup destinations are supported only in the main body story"
+                            .to_string(),
+                    ));
                 },
                 Some(Token::OpenBrace)
                     if matches!(
@@ -22411,6 +22605,7 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::OpenBrace => {
+                    self.reject_non_body_custom_xml_markup_group()?;
                     let is_status_control = |token: Option<&Token>| {
                         matches!(
                             token,
@@ -22539,6 +22734,12 @@ impl<'a> Parser<'a> {
                                         result.extend_from_slice(decoded.as_bytes());
                                     }
                                     self.pos += 1;
+                                },
+                                Token::OpenBrace if self.is_custom_xml_markup_group() => {
+                                    return Err(RtfError::MalformedDocument(
+                                        "RTF custom XML markup destinations are supported only in the main body story"
+                                            .to_string(),
+                                    ));
                                 },
                                 Token::OpenBrace if in_result && self.is_root_drawing_group() => {
                                     self.field_drawing_captures.last_mut().unwrap().story_offset =
@@ -23326,6 +23527,7 @@ impl<'a> Parser<'a> {
         text_buffer: &mut SmallVec<[u8; 256]>,
         pending_paragraph_break: &mut bool,
     ) -> RtfResult<()> {
+        self.reject_non_body_custom_xml_markup_group()?;
         if self.is_root_drawing_group() {
             if *pending_paragraph_break {
                 self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
@@ -23622,6 +23824,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_note_group(&mut self) -> RtfResult<()> {
+        self.reject_non_body_custom_xml_markup_group()?;
         if self.is_root_drawing_group() {
             return self.parse_group();
         }

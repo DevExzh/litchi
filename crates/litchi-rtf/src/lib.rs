@@ -246,9 +246,9 @@ pub use mail_merge::{
     MailMergeDataSourceObject, MailMergeDataSourceType, MailMergeFieldMapping,
 };
 pub use math::{
-    MathElement, MathElementRole, MathMatrixRow, MathObject, MathProperties, MathPropertiesKind,
-    MathProperty, MathPropertyName, MathRun, MathStructure, MathStructureChild, MathStructureKind,
-    MathZone, MathZoneKind,
+    MathElement, MathElementRole, MathMatrixColumn, MathMatrixRow, MathObject, MathProperties,
+    MathPropertiesKind, MathProperty, MathPropertyName, MathRun, MathStructure, MathStructureChild,
+    MathStructureKind, MathZone, MathZoneKind,
 };
 pub use math_properties::{
     DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,

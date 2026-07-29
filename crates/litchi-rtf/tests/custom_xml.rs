@@ -171,6 +171,33 @@ fn rejects_excessive_nesting_depth() {
 }
 
 #[test]
+fn rejects_custom_xml_markup_in_non_body_stories() {
+    let cases = [
+        // Footnote story.
+        r"{\rtf1 body{\footnote{\xmlopen t}note{\xmlclose t}}}",
+        r"{\rtf1 body{\footnote{\*\xmlattrname a}note}}",
+        // Endnote story.
+        r"{\rtf1 body{\endnote{\xmlopen t}note{\xmlclose t}}}",
+        // Header and footer stories.
+        r"{\rtf1{\header{\xmlopen t}h{\xmlclose t}}body}",
+        r"{\rtf1{\footer{\*\xmlattrvalue v}f}body}",
+        // Shape text story.
+        r#"{\rtf1 body{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt{\xmlopen t}s{\xmlclose t}}}}}"#,
+        r#"{\rtf1 body{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt{\*\xmlattrname a}s}}}}"#,
+        // Field instruction and result stories.
+        r"{\rtf1 body{\field{\*\fldinst X}{\fldrslt{\xmlopen t}r{\xmlclose t}}}}",
+        r"{\rtf1 body{\field{\*\fldinst{\xmlopen t}X{\xmlclose t}}{\fldrslt r}}}",
+        r"{\rtf1 body{\field{\*\fldinst X}{\*\xmlattrname a}{\fldrslt r}}}",
+    ];
+    for rtf in cases {
+        assert!(
+            RtfDocument::parse(rtf).is_err(),
+            "accepted non-body custom XML markup {rtf}"
+        );
+    }
+}
+
+#[test]
 fn coexists_with_bookmarks_and_body_markup() {
     let document = RtfDocument::parse(concat!(
         r#"{\rtf1\ansi{\*\bkmkstart bm}pre{\*\bkmkend bm}"#,

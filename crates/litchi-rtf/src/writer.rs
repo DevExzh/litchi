@@ -3805,6 +3805,7 @@ impl<W: Write> RtfWriter<W> {
             N::RowSpacing => "mrSp",
             N::RowSpacingRule => "mrSpRule",
             N::Break => "mbrk",
+            N::ArgumentSize => "margSz",
         }
     }
 
@@ -3866,6 +3867,9 @@ impl<W: Write> RtfWriter<W> {
     fn write_math_element(&mut self, element: &crate::MathElement<'_>) -> io::Result<()> {
         self.write_str("{")?;
         self.write_control_word(Self::math_element_control(element.role), None)?;
+        if let Some(properties) = &element.argument_properties {
+            self.write_math_properties_group("margPr", properties)?;
+        }
         self.write_str(" ")?;
         for object in &element.content {
             self.write_math_object(object)?;
@@ -3903,6 +3907,19 @@ impl<W: Write> RtfWriter<W> {
             if !property.value.is_empty() {
                 self.write_str(" ")?;
                 self.write_destination_text(property.value.as_ref())?;
+            }
+            self.write_str("}")?;
+        }
+        if !properties.matrix_columns.is_empty() {
+            self.write_str("{")?;
+            self.write_control_word("mmcs", None)?;
+            for column in &properties.matrix_columns {
+                self.write_str("{")?;
+                self.write_control_word("mmc", None)?;
+                if let Some(column_properties) = &column.properties {
+                    self.write_math_properties_group("mmcPr", column_properties)?;
+                }
+                self.write_str("}")?;
             }
             self.write_str("}")?;
         }

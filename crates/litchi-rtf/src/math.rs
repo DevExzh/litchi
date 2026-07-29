@@ -196,6 +196,8 @@ pub enum MathPropertyName {
     RowSpacingRule,
     /// Break (`\mbrk`).
     Break,
+    /// Argument size (`\margSz`).
+    ArgumentSize,
 }
 
 /// One inert math property: a name with its verbatim decoded value text.
@@ -250,6 +252,39 @@ pub enum MathPropertiesKind {
     Paragraph,
     /// Control properties (`\mctrlPr`).
     Control,
+    /// Argument properties (`\margPr`).
+    Argument,
+    /// Matrix column properties (`\mmcPr`).
+    MatrixColumn,
+}
+
+/// One inert matrix column description (`\mmc`) from the `\mmcs` destination
+/// of a matrix property destination.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MathMatrixColumn<'a> {
+    /// Column properties (`\mmcPr`): cell count (`\mcount`) and cell
+    /// justification (`\mmcJc`).
+    pub properties: Option<MathProperties<'a>>,
+}
+
+impl<'a> MathMatrixColumn<'a> {
+    pub(crate) fn validate(&self) -> RtfResult<()> {
+        if let Some(properties) = &self.properties {
+            if properties.kind != MathPropertiesKind::MatrixColumn {
+                return Err(malformed(
+                    "RTF math matrix column properties must use the mmcPr destination",
+                ));
+            }
+            properties.validate()?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> MathMatrixColumn<'static> {
+        MathMatrixColumn {
+            properties: self.properties.map(MathProperties::into_owned),
+        }
+    }
 }
 
 /// An inert math property destination.
@@ -259,6 +294,9 @@ pub struct MathProperties<'a> {
     pub kind: MathPropertiesKind,
     /// Ordered properties declared in the destination.
     pub properties: Vec<MathProperty<'a>>,
+    /// Matrix column descriptions (`\mmcs`); only meaningful for
+    /// [`MathPropertiesKind::Structure`]`(`[`MathStructureKind::Matrix`]`)`.
+    pub matrix_columns: Vec<MathMatrixColumn<'a>>,
     /// Nested control properties (`\mctrlPr`).
     pub control: Option<Box<MathProperties<'a>>>,
 }
@@ -269,6 +307,7 @@ impl<'a> MathProperties<'a> {
         let destination = Self {
             kind,
             properties,
+            matrix_columns: Vec::new(),
             control: None,
         };
         destination.validate()?;
@@ -291,6 +330,34 @@ impl<'a> MathProperties<'a> {
                     "RTF math property names must be unique within a destination",
                 ));
             }
+            let permitted = match self.kind {
+                MathPropertiesKind::Argument => property.name == MathPropertyName::ArgumentSize,
+                MathPropertiesKind::MatrixColumn => matches!(
+                    property.name,
+                    MathPropertyName::MatrixCellCount | MathPropertyName::MatrixCellJustify
+                ),
+                _ => property.name != MathPropertyName::ArgumentSize,
+            };
+            if !permitted {
+                return Err(malformed(
+                    "RTF math property is not permitted in this destination",
+                ));
+            }
+        }
+        if !self.matrix_columns.is_empty() {
+            if self.kind != MathPropertiesKind::Structure(MathStructureKind::Matrix) {
+                return Err(malformed(
+                    "RTF math matrix columns may occur only inside matrix properties",
+                ));
+            }
+            if self.matrix_columns.len() > MAX_MATH_OBJECTS_PER_CONTAINER {
+                return Err(malformed(
+                    "RTF math matrix column count exceeds the safety limit",
+                ));
+            }
+            for column in &self.matrix_columns {
+                column.validate()?;
+            }
         }
         if let Some(control) = &self.control {
             if control.kind != MathPropertiesKind::Control {
@@ -311,6 +378,11 @@ impl<'a> MathProperties<'a> {
                 .into_iter()
                 .map(MathProperty::into_owned)
                 .collect(),
+            matrix_columns: self
+                .matrix_columns
+                .into_iter()
+                .map(MathMatrixColumn::into_owned)
+                .collect(),
             control: self
                 .control
                 .map(|control| Box::new(control.into_owned())),
@@ -323,6 +395,8 @@ impl<'a> MathProperties<'a> {
 pub struct MathElement<'a> {
     /// Argument role.
     pub role: MathElementRole,
+    /// Argument properties (`\margPr` with `\margSz`).
+    pub argument_properties: Option<MathProperties<'a>>,
     /// Ordered objects contained in the argument.
     pub content: Vec<MathObject<'a>>,
 }
@@ -480,6 +554,18 @@ fn validate_objects(objects: &[MathObject<'_>], depth: usize) -> RtfResult<()> {
     Ok(())
 }
 
+pub(crate) fn validate_element(element: &MathElement<'_>, depth: usize) -> RtfResult<()> {
+    if let Some(properties) = &element.argument_properties {
+        if properties.kind != MathPropertiesKind::Argument {
+            return Err(malformed(
+                "RTF math argument properties must use the margPr destination",
+            ));
+        }
+        properties.validate()?;
+    }
+    validate_objects(&element.content, depth)
+}
+
 impl<'a> MathStructure<'a> {
     /// Create a validated math structure.
     pub fn new(
@@ -532,7 +618,7 @@ impl<'a> MathStructure<'a> {
                             "RTF matrix rows may occur only inside a matrix",
                         ));
                     };
-                    validate_objects(&element.content, depth + 1)?;
+                    validate_element(element, depth + 1)?;
                 }
             },
             None if self.kind == MathStructureKind::Matrix => {
@@ -560,7 +646,7 @@ impl<'a> MathStructure<'a> {
                                 "RTF math matrix cells must use the me destination",
                             ));
                         }
-                        validate_objects(&cell.content, depth + 1)?;
+                        validate_element(cell, depth + 1)?;
                     }
                 }
             },
@@ -584,7 +670,7 @@ impl<'a> MathStructure<'a> {
                             "RTF math structure arguments must use the me destination",
                         ));
                     }
-                    validate_objects(&element.content, depth + 1)?;
+                    validate_element(element, depth + 1)?;
                 }
             },
         }
@@ -617,6 +703,7 @@ impl<'a> MathElement<'a> {
     pub(crate) fn into_owned(self) -> MathElement<'static> {
         MathElement {
             role: self.role,
+            argument_properties: self.argument_properties.map(MathProperties::into_owned),
             content: self.content.into_iter().map(MathObject::into_owned).collect(),
         }
     }
