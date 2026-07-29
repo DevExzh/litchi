@@ -558,6 +558,59 @@ impl MutableDocument {
         para
     }
 
+    /// Insert a new empty paragraph before the paragraph at `index`
+    /// (`w:p`, ECMA-376 §17.3.1.22).
+    ///
+    /// Indices follow paragraph order across the whole body: typed and
+    /// preserved paragraphs share one sequence, matching [`Self::paragraph`].
+    /// Passing `index == paragraph_count()` appends at the end of the body
+    /// content, before the body-final `w:sectPr` (ECMA-376 §17.2.2).
+    pub fn insert_paragraph(&mut self, index: usize) -> Result<&mut MutableParagraph> {
+        let (position, paragraph) = self.body.insert_paragraph(index)?;
+        shift_toc_index_on_insert(&mut self.toc_config, position);
+        self.modified = true;
+        Ok(paragraph)
+    }
+
+    /// Insert a new empty table before the table at `index`
+    /// (`w:tbl`, ECMA-376 §17.4.38).
+    ///
+    /// Indices follow table order across the whole body, matching
+    /// [`Self::table`]; `index == table_count()` appends at the end of the
+    /// body content, before the body-final `w:sectPr`.
+    pub fn insert_table(
+        &mut self,
+        index: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Result<&mut MutableTable> {
+        let (position, table) = self.body.insert_table(index, rows, cols)?;
+        shift_toc_index_on_insert(&mut self.toc_config, position);
+        self.modified = true;
+        Ok(table)
+    }
+
+    /// Remove the paragraph at `index` (paragraph order, matching
+    /// [`Self::paragraph`]).
+    ///
+    /// Removing a paragraph whose `w:pPr` holds a `w:sectPr` removes that
+    /// section break as well, merging the section with the following one —
+    /// the same behavior as deleting the paragraph mark in Word.
+    pub fn remove_paragraph(&mut self, index: usize) -> Result<()> {
+        let position = self.body.remove_paragraph(index)?;
+        shift_toc_index_on_remove(&mut self.toc_config, position);
+        self.modified = true;
+        Ok(())
+    }
+
+    /// Remove the table at `index` (table order, matching [`Self::table`]).
+    pub fn remove_table(&mut self, index: usize) -> Result<()> {
+        let position = self.body.remove_table(index)?;
+        shift_toc_index_on_remove(&mut self.toc_config, position);
+        self.modified = true;
+        Ok(())
+    }
+
     /// Get the number of paragraphs in the document.
     pub fn paragraph_count(&self) -> usize {
         self.body.paragraph_count()
@@ -1703,6 +1756,24 @@ pub(crate) struct DocumentBody {
     pub(crate) elements: Vec<BodyElement>,
 }
 
+/// Keep a pending TOC insertion point anchored after an inserted element.
+fn shift_toc_index_on_insert(toc_config: &mut Option<(usize, TableOfContents)>, position: usize) {
+    if let Some((index, _)) = toc_config
+        && position <= *index
+    {
+        *index += 1;
+    }
+}
+
+/// Keep a pending TOC insertion point anchored after a removed element.
+fn shift_toc_index_on_remove(toc_config: &mut Option<(usize, TableOfContents)>, position: usize) {
+    if let Some((index, _)) = toc_config
+        && position < *index
+    {
+        *index -= 1;
+    }
+}
+
 struct ParsedDocumentBody {
     body: DocumentBody,
     prefix: String,
@@ -1947,6 +2018,100 @@ impl DocumentBody {
             .iter()
             .position(|element| matches!(element, BodyElement::PreservedSectionProperties(_)))
             .unwrap_or(self.elements.len())
+    }
+
+    /// Element positions of all paragraphs, typed and preserved, in body order.
+    fn paragraph_positions(&self) -> Vec<usize> {
+        self.elements
+            .iter()
+            .enumerate()
+            .filter_map(|(index, element)| {
+                matches!(
+                    element,
+                    BodyElement::Paragraph(_) | BodyElement::PreservedParagraph(_)
+                )
+                .then_some(index)
+            })
+            .collect()
+    }
+
+    /// Element positions of all tables, typed and preserved, in body order.
+    fn table_positions(&self) -> Vec<usize> {
+        self.elements
+            .iter()
+            .enumerate()
+            .filter_map(|(index, element)| {
+                matches!(element, BodyElement::Table(_) | BodyElement::PreservedTable(_))
+                    .then_some(index)
+            })
+            .collect()
+    }
+
+    /// Insert an empty paragraph before the paragraph at paragraph-relative
+    /// `index`; returns the element position and the new paragraph.
+    fn insert_paragraph(&mut self, index: usize) -> Result<(usize, &mut MutableParagraph)> {
+        let positions = self.paragraph_positions();
+        if index > positions.len() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "paragraph insertion index {index} is out of range"
+            )));
+        }
+        let position = positions
+            .get(index)
+            .copied()
+            .unwrap_or_else(|| self.content_insertion_index());
+        self.elements
+            .insert(position, BodyElement::Paragraph(MutableParagraph::new()));
+        match self.elements.get_mut(position) {
+            Some(BodyElement::Paragraph(paragraph)) => Ok((position, paragraph)),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Insert an empty table before the table at table-relative `index`;
+    /// returns the element position and the new table.
+    fn insert_table(
+        &mut self,
+        index: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(usize, &mut MutableTable)> {
+        let positions = self.table_positions();
+        if index > positions.len() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "table insertion index {index} is out of range"
+            )));
+        }
+        let position = positions
+            .get(index)
+            .copied()
+            .unwrap_or_else(|| self.content_insertion_index());
+        self.elements
+            .insert(position, BodyElement::Table(MutableTable::new(rows, cols)));
+        match self.elements.get_mut(position) {
+            Some(BodyElement::Table(table)) => Ok((position, table)),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Remove the paragraph at paragraph-relative `index`; returns the
+    /// vacated element position.
+    fn remove_paragraph(&mut self, index: usize) -> Result<usize> {
+        let position = self.paragraph_positions().get(index).copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("paragraph index {index} is out of range"))
+        })?;
+        self.elements.remove(position);
+        Ok(position)
+    }
+
+    /// Remove the table at table-relative `index`; returns the vacated
+    /// element position.
+    fn remove_table(&mut self, index: usize) -> Result<usize> {
+        let position = self.table_positions().get(index).copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("table index {index} is out of range"))
+        })?;
+        self.elements.remove(position);
+        Ok(position)
     }
 
     fn alt_chunk_positions(&self) -> Vec<usize> {

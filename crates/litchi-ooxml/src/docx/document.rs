@@ -2738,11 +2738,12 @@ impl<'a> Document<'a> {
     // Note: Write operations are primarily handled by the MutableDocument API
     // in the writer module. See src/ooxml/docx/writer/doc.rs for full API.
     //
-    // TODO: Modification operations
-    // - Add/remove paragraphs: add_paragraph(), remove_paragraph()
-    // - Add/remove tables: add_table(), remove_table()
-    // - Modify runs: set_bold(), set_italic(), set_font(), set_color()
-    // - Insert elements: insert_paragraph(), insert_table()
+    // ✅ COMPLETED: Modification operations (ECMA-376 Section 17.2.2)
+    // - Add/insert/remove paragraphs: add_paragraph(), insert_paragraph(),
+    //   remove_paragraph() on MutableDocument
+    // - Add/insert/remove tables: add_table(), insert_table(), remove_table()
+    // - Modify runs: MutableRun::bold(), italic(), font_name(), color()
+    //   reached through the paragraph()/table() accessors
     //
     // ✅ COMPLETED: Track changes reading (November 2024)
     // - See revision.rs module and Paragraph::revisions() method
