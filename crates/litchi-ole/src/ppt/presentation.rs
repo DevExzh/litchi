@@ -208,6 +208,37 @@ impl Presentation {
             .collect()
     }
 
+    /// Return the typed slide-level programmable tags (MS-PPT 2.5.19) of every
+    /// main master slide that carries a `SlideProgTagsContainer`, in
+    /// main-master stream order.
+    ///
+    /// Tag payloads are inert: they are parsed and preserved, never executed,
+    /// loaded, or resolved. Use
+    /// [`crate::ppt::PowerPointProgTags::slide_extensions`] to decode the
+    /// versioned binary-tag payloads into typed extension structs.
+    pub fn main_master_programmable_tags(
+        &self,
+    ) -> Result<Vec<crate::ppt::PowerPointProgTags>> {
+        self.main_master_programmable_tags_with_limits(
+            crate::ppt::PowerPointProgTagLimits::default(),
+        )
+    }
+
+    /// Return main-master programmable tags with caller-supplied resource limits.
+    pub fn main_master_programmable_tags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointProgTagLimits,
+    ) -> Result<Vec<crate::ppt::PowerPointProgTags>> {
+        self.parser
+            .find_records_ref()
+            .into_iter()
+            .filter(|record| record.record_type == PptRecordType::MainMaster)
+            .filter_map(|record| {
+                crate::ppt::PowerPointProgTags::parse_slide(record, limits).transpose()
+            })
+            .collect()
+    }
+
     /// All header/footer metacharacter placeholders found in the document
     /// stream, in stream order.
     ///

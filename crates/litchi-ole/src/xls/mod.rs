@@ -34,6 +34,10 @@ mod chart;
 /// `StartBlock`, and `EndBlock`.
 mod chart_frt;
 
+/// BIFF8 chart `CrtMlFrt`/`CrtMlFrtContinue` records: additional chart-element
+/// properties as an opaque `XmlTkChain` byte chain.
+mod crt_ml_frt;
+
 /// BIFF8 worksheet scenario manager records.
 mod scenario;
 
@@ -306,6 +310,7 @@ pub use page_setup::{
 };
 pub use palette::{XlsColor, XlsPalette};
 pub use print_flags::{XlsGridSet, XlsPrintRowCol};
+pub use crt_ml_frt::XlsCrtMlFrt;
 pub use sxview_link::XlsSXViewLink;
 pub use query_table::{
     XlsHtmlFormatting, XlsOleDbConnection, XlsQueryParameter, XlsQueryParameterType,
