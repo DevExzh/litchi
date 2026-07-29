@@ -93,6 +93,54 @@ pub(crate) fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
     Ok(fields)
 }
 
+/// Overlay singular protobuf fields while retaining every untouched byte.
+///
+/// Each field present in `overlay` replaces the field with the same number in
+/// `base`, or is appended when the base does not contain it. Duplicate fields
+/// and wire-type changes are rejected because this helper is only suitable for
+/// singular schema fields.
+pub(crate) fn overlay_singular_wire_fields(base: &[u8], overlay: &[u8]) -> Result<Vec<u8>> {
+    let overlay_fields = parse_wire_fields(overlay)?;
+    let mut seen = Vec::with_capacity(overlay_fields.len());
+    for field in &overlay_fields {
+        if seen.contains(&field.number) {
+            return Err(Error::InvalidFormat(format!(
+                "singular protobuf overlay field {} occurs multiple times",
+                field.number
+            )));
+        }
+        seen.push(field.number);
+    }
+
+    let mut output = base.to_vec();
+    for overlay_field in overlay_fields {
+        let fields = parse_wire_fields(&output)?;
+        let matches = fields
+            .iter()
+            .filter(|field| field.number == overlay_field.number)
+            .collect::<Vec<_>>();
+        if matches.len() > 1 {
+            return Err(Error::InvalidFormat(format!(
+                "singular protobuf base field {} occurs multiple times",
+                overlay_field.number
+            )));
+        }
+        let replacement = &overlay[overlay_field.start..overlay_field.end];
+        if let Some(existing) = matches.first() {
+            if existing.wire_type != overlay_field.wire_type {
+                return Err(Error::InvalidFormat(format!(
+                    "protobuf field {} changes wire type during overlay",
+                    overlay_field.number
+                )));
+            }
+            output.splice(existing.start..existing.end, replacement.iter().copied());
+        } else {
+            output.extend_from_slice(replacement);
+        }
+    }
+    Ok(output)
+}
+
 pub(crate) fn patch_nested_length_delimited_field(
     data: &[u8],
     path: &[u32],
@@ -829,6 +877,25 @@ mod tests {
         let mut field = crate::varint::encode_varint(u64::from(number) << 3);
         field.extend(crate::varint::encode_varint(value));
         field
+    }
+
+    #[test]
+    fn singular_wire_overlay_replaces_and_appends_without_touching_siblings() {
+        let mut base = varint_field(1, 10);
+        base.extend(varint_field(2, 20));
+        let mut overlay = varint_field(2, 21);
+        overlay.extend(varint_field(3, 30));
+        let mut expected = varint_field(1, 10);
+        expected.extend(varint_field(2, 21));
+        expected.extend(varint_field(3, 30));
+        assert_eq!(
+            overlay_singular_wire_fields(&base, &overlay).unwrap(),
+            expected
+        );
+
+        let mut duplicate = varint_field(2, 21);
+        duplicate.extend(varint_field(2, 22));
+        assert!(overlay_singular_wire_fields(&base, &duplicate).is_err());
     }
 
     #[test]

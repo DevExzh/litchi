@@ -11,7 +11,10 @@ use crate::shapes::{
     RgbaColor, StrokeCap, StrokeJoin, color_from_native, color_to_native, shadow_from_native,
     shadow_to_native, stroke_from_native, stroke_to_native,
 };
-use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
+use crate::wire::{
+    overlay_singular_wire_fields, parse_wire_fields, patch_length_delimited_field,
+    patch_varint_field, repeated_length_delimited_payloads,
+};
 use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
 
 use super::super::font::{TextFont, TextFontName};
@@ -1341,6 +1344,268 @@ pub(crate) fn replace_variation(
         }
         Ok(())
     })
+}
+
+pub(crate) fn redefine_named_style(
+    package: &mut IWorkPackage,
+    style_id: u64,
+    variation_ids: &[u64],
+) -> Result<()> {
+    let location = locate_style(package, style_id)?;
+    if location.style.super_.is_variation == Some(true) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} is not a named style"
+        )));
+    }
+    let archive = package.archive(&location.archive_name)?;
+    let source = archive.object(style_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork paragraph style {style_id} is missing"))
+    })?;
+    let mut replacement = ArchiveObject::new(style_id, source.messages.clone())?;
+    replacement.archive_info.message_infos = source.archive_info.message_infos.clone();
+    replacement.archive_info.should_merge = source.archive_info.should_merge;
+    let indexes = replacement
+        .messages
+        .iter()
+        .enumerate()
+        .filter_map(|(index, message)| {
+            (message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE).then_some(index)
+        })
+        .collect::<Vec<_>>();
+    let [message_index] = indexes.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {style_id} must have exactly one payload"
+        )));
+    };
+    let message_index = *message_index;
+    let old_following = location
+        .style
+        .para_properties
+        .as_ref()
+        .and_then(|properties| properties.following_style)
+        .map(|reference| reference.identifier);
+    let old_known_count = known_property_count(&replacement.messages[message_index].data)?;
+    let old_override_count = location.style.override_count.unwrap_or(old_known_count);
+    let mut data = replacement.messages[message_index].data.clone();
+    for variation_id in variation_ids.iter().rev() {
+        let variation = locate_style(package, *variation_id)?;
+        if direct_overrides(&variation.style, &variation.message.data)?.is_none() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style {variation_id} is not a supported variation"
+            )));
+        }
+        data = overlay_style_properties(&data, &variation.message.data)?;
+    }
+    let new_known_count = known_property_count(&data)?;
+    let new_override_count = old_override_count
+        .saturating_sub(old_known_count)
+        .checked_add(new_known_count)
+        .ok_or_else(|| {
+            Error::InvalidFormat("paragraph-style override count overflow".to_owned())
+        })?;
+    data = patch_varint_field(
+        &data,
+        STYLE_OVERRIDE_COUNT_FIELD,
+        location.style.override_count.is_some(),
+        Some(u64::from(new_override_count)),
+    )?;
+    let decoded = tswp::ParagraphStyleArchive::decode(data.as_slice())?;
+    let info = &mut replacement.archive_info.message_infos[message_index];
+    if let Some(old_following) = old_following {
+        info.object_references
+            .retain(|identifier| *identifier != old_following);
+    }
+    if let Some(new_following) = decoded
+        .para_properties
+        .as_ref()
+        .and_then(|properties| properties.following_style)
+        .map(|reference| reference.identifier)
+        && !info.object_references.contains(&new_following)
+    {
+        info.object_references.push(new_following);
+    }
+    info.field_infos.retain(|field| {
+        !is_text_fill_field_info(field)
+            && !is_text_stroke_field_info(field)
+            && !is_text_shadow_field_info(field)
+            && !is_text_background_field_info(field)
+    });
+    if decoded
+        .char_properties
+        .as_ref()
+        .is_some_and(|properties| properties.tsd_fill.is_some())
+    {
+        info.field_infos.push(text_fill_field_info());
+    }
+    if decoded
+        .char_properties
+        .as_ref()
+        .is_some_and(|properties| properties.tsd_stroke.is_some())
+    {
+        info.field_infos.push(text_stroke_field_info());
+    }
+    if decoded
+        .char_properties
+        .as_ref()
+        .is_some_and(|properties| properties.shadow.is_some())
+    {
+        info.field_infos.push(text_shadow_field_info());
+    }
+    if decoded
+        .char_properties
+        .as_ref()
+        .is_some_and(|properties| properties.background_color.is_some())
+    {
+        info.field_infos.push(text_background_field_info());
+    }
+    replacement.replace_message(
+        message_index,
+        RawMessage {
+            type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
+            data,
+        },
+    )?;
+    replace_variation(package, &location.archive_name, style_id, replacement)
+}
+
+fn known_property_count(data: &[u8]) -> Result<u32> {
+    let character = repeated_length_delimited_payloads(data, STYLE_CHARACTER_PROPERTIES_FIELD)?;
+    let paragraph = repeated_length_delimited_payloads(data, STYLE_PARAGRAPH_PROPERTIES_FIELD)?;
+    let character_fields = character
+        .first()
+        .map(|payload| parse_wire_fields(payload))
+        .transpose()?
+        .unwrap_or_default();
+    let paragraph_fields = paragraph
+        .first()
+        .map(|payload| parse_wire_fields(payload))
+        .transpose()?
+        .unwrap_or_default();
+    let has_character = |numbers: &[u32]| {
+        character_fields
+            .iter()
+            .any(|field| numbers.contains(&field.number))
+    };
+    let has_paragraph = |numbers: &[u32]| {
+        paragraph_fields
+            .iter()
+            .any(|field| numbers.contains(&field.number))
+    };
+    let character_groups: &[&[u32]] = &[
+        &[CHARACTER_BOLD_FIELD],
+        &[CHARACTER_ITALIC_FIELD],
+        &[CHARACTER_FONT_SIZE_FIELD],
+        &[CHARACTER_FONT_NAME_NULL_FIELD, CHARACTER_FONT_NAME_FIELD],
+        &[CHARACTER_FONT_COLOR_FIELD, CHARACTER_DRAWING_FILL_FIELD],
+        &[CHARACTER_CAPITALIZATION_FIELD],
+        &[CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD],
+        &[CHARACTER_SCRIPT_FIELD],
+        &[CHARACTER_BASELINE_SHIFT_FIELD],
+        &[CHARACTER_TRACKING_FIELD],
+        &[CHARACTER_LIGATURES_FIELD],
+        &[
+            CHARACTER_DRAWING_STROKE_NULL_FIELD,
+            CHARACTER_DRAWING_STROKE_FIELD,
+        ],
+        &[CHARACTER_SHADOW_NULL_FIELD, CHARACTER_SHADOW_FIELD],
+        &[
+            CHARACTER_BACKGROUND_COLOR_NULL_FIELD,
+            CHARACTER_BACKGROUND_COLOR_FIELD,
+        ],
+        &[CHARACTER_UNDERLINE_FIELD],
+        &[CHARACTER_STRIKETHROUGH_FIELD],
+        &[CHARACTER_WRITING_DIRECTION_FIELD],
+    ];
+    let paragraph_groups: &[&[u32]] = &[
+        &[PARAGRAPH_ALIGNMENT_FIELD],
+        &[PARAGRAPH_FILL_NULL_FIELD, PARAGRAPH_FILL_FIELD],
+        &[PARAGRAPH_HYPHENATE_FIELD],
+        &[PARAGRAPH_KEEP_LINES_TOGETHER_FIELD],
+        &[PARAGRAPH_KEEP_WITH_NEXT_FIELD],
+        &[PARAGRAPH_PAGE_BREAK_BEFORE_FIELD],
+        &[PARAGRAPH_WIDOW_CONTROL_FIELD],
+        &[
+            PARAGRAPH_FOLLOWING_STYLE_NULL_FIELD,
+            PARAGRAPH_FOLLOWING_STYLE_FIELD,
+        ],
+        &[PARAGRAPH_LINE_SPACING_FIELD],
+        &[PARAGRAPH_SPACE_BEFORE_FIELD],
+        &[PARAGRAPH_SPACE_AFTER_FIELD],
+        &[PARAGRAPH_FIRST_LINE_INDENT_FIELD],
+        &[PARAGRAPH_LEFT_INDENT_FIELD],
+        &[PARAGRAPH_RIGHT_INDENT_FIELD],
+        &[
+            PARAGRAPH_DECIMAL_TAB_NULL_FIELD,
+            PARAGRAPH_DECIMAL_TAB_FIELD,
+        ],
+        &[PARAGRAPH_DEFAULT_TAB_INTERVAL_FIELD],
+        &[PARAGRAPH_TABS_FIELD],
+    ];
+    let border_count = if has_paragraph(&[
+        PARAGRAPH_DEPRECATED_BORDERS_FIELD,
+        PARAGRAPH_BORDER_OFFSET_NULL_FIELD,
+        PARAGRAPH_BORDER_OFFSET_FIELD,
+        PARAGRAPH_LEGACY_RULE_WIDTH_FIELD,
+        PARAGRAPH_BORDER_STROKE_NULL_FIELD,
+        PARAGRAPH_BORDER_STROKE_FIELD,
+        PARAGRAPH_BORDER_POSITIONS_FIELD,
+        PARAGRAPH_BORDER_ROUNDED_CORNERS_FIELD,
+    ]) {
+        ParagraphBorders::None.native_override_count()
+    } else {
+        0
+    };
+    let character_count = u32::try_from(
+        character_groups
+            .iter()
+            .filter(|group| has_character(group))
+            .count(),
+    )
+    .map_err(|_| Error::InvalidFormat("character override count exceeds u32".to_owned()))?;
+    let paragraph_count = u32::try_from(
+        paragraph_groups
+            .iter()
+            .filter(|group| has_paragraph(group))
+            .count(),
+    )
+    .map_err(|_| Error::InvalidFormat("paragraph override count exceeds u32".to_owned()))?;
+    character_count
+        .checked_add(paragraph_count)
+        .and_then(|count| count.checked_add(border_count))
+        .ok_or_else(|| Error::InvalidFormat("paragraph-style override count overflow".to_owned()))
+}
+
+fn overlay_style_properties(base: &[u8], overlay: &[u8]) -> Result<Vec<u8>> {
+    let mut output = base.to_vec();
+    for field_number in [
+        STYLE_CHARACTER_PROPERTIES_FIELD,
+        STYLE_PARAGRAPH_PROPERTIES_FIELD,
+    ] {
+        let overlay_payloads = repeated_length_delimited_payloads(overlay, field_number)?;
+        let [overlay_payload] = overlay_payloads.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "paragraph-style variation must have exactly one field {field_number}"
+            )));
+        };
+        let base_payloads = repeated_length_delimited_payloads(&output, field_number)?;
+        if base_payloads.len() > 1 {
+            return Err(Error::InvalidFormat(format!(
+                "named paragraph style has multiple fields {field_number}"
+            )));
+        }
+        let merged = if let Some(base_payload) = base_payloads.first() {
+            overlay_singular_wire_fields(base_payload, overlay_payload)?
+        } else {
+            overlay_payload.to_vec()
+        };
+        output = patch_length_delimited_field(
+            &output,
+            field_number,
+            !base_payloads.is_empty(),
+            Some(&merged),
+        )?;
+    }
+    Ok(output)
 }
 
 pub(super) fn text_color_from_character(

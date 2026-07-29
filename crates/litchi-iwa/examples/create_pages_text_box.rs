@@ -279,6 +279,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         following_style_box.drawable_object_id,
         ParagraphFollowingStyle::Named(body.id()),
     )?;
+    editor.set_text_box_paragraph_alignment(
+        following_style_box.drawable_object_id,
+        TextAlignment::Center,
+    )?;
+    editor
+        .redefine_applied_text_box_named_paragraph_style(following_style_box.drawable_object_id)?;
     editor.save(output)?;
     println!(
         "created two-column Pages text box {} with storage {}",

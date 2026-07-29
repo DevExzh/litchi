@@ -38,6 +38,7 @@ mod paragraph_list;
 mod paragraph_style_apply;
 mod paragraph_style_catalog;
 mod paragraph_style_delete;
+mod paragraph_style_redefine;
 mod paragraph_style_rename;
 mod paragraph_tabs;
 mod position;

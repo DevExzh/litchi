@@ -29,6 +29,27 @@ impl NumbersEditor {
         applied_named_paragraph_style_in_storage(&self.package, graph.storage_id)
     }
 
+    /// Redefine the selected named style from this text box's direct overrides.
+    pub fn redefine_applied_sheet_text_box_named_paragraph_style(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<NamedParagraphStyle> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let redefined = text.redefine_applied_named_paragraph_style(graph.storage_id)?;
+        let verified = Self::from_package(text.into_package())?;
+        let selection =
+            verified.sheet_text_box_applied_named_paragraph_style(sheet_id, drawable_object_id)?;
+        if selection.style() != &redefined || selection.has_overrides() {
+            return Err(Error::InvalidFormat(
+                "Numbers named paragraph-style redefinition failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(redefined)
+    }
+
     /// Create a named paragraph style by cloning one selectable preset.
     pub fn create_sheet_text_box_named_paragraph_style(
         &mut self,

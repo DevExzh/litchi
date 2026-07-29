@@ -321,6 +321,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         named_style_box.drawable_object_id,
         display.id(),
     )?;
+    editor.set_sheet_text_box_paragraph_alignment(
+        sheet_id,
+        named_style_box.drawable_object_id,
+        TextAlignment::Center,
+    )?;
+    editor.redefine_applied_sheet_text_box_named_paragraph_style(
+        sheet_id,
+        named_style_box.drawable_object_id,
+    )?;
     let disposable = editor.create_sheet_text_box_named_paragraph_style(
         sheet_id,
         named_style_box.drawable_object_id,

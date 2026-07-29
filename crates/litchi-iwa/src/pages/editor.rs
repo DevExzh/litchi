@@ -1615,6 +1615,25 @@ impl PagesEditor {
         self.text.applied_named_paragraph_style(graph.storage_id)
     }
 
+    /// Redefine the selected named style from this text box's direct overrides.
+    pub fn redefine_applied_text_box_named_paragraph_style(
+        &mut self,
+        drawable_object_id: u64,
+    ) -> Result<NamedParagraphStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let redefined = staged.redefine_applied_named_paragraph_style(graph.storage_id)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        let selection = verified.text_box_applied_named_paragraph_style(drawable_object_id)?;
+        if selection.style() != &redefined || selection.has_overrides() {
+            return Err(Error::InvalidFormat(
+                "Pages named paragraph-style redefinition failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(redefined)
+    }
+
     /// Apply one named paragraph style and clear direct paragraph overrides.
     pub fn apply_text_box_named_paragraph_style(
         &mut self,

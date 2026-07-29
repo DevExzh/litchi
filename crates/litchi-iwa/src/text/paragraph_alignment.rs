@@ -19,6 +19,7 @@ use super::paragraph_following_style::{NamedParagraphStyle, ParagraphFollowingSt
 use super::paragraph_style_apply::{self, AppliedParagraphStyle};
 use super::paragraph_style_catalog;
 use super::paragraph_style_delete;
+use super::paragraph_style_redefine;
 use super::paragraph_style_rename;
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
@@ -110,6 +111,8 @@ pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<Text
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_style(package, storage.style_id)
 }
+
+pub(super) use paragraph_style_redefine::redefine_applied_named_paragraph_style;
 
 pub(super) fn set_text_style(
     package: &mut IWorkPackage,

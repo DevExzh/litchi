@@ -622,6 +622,202 @@ fn assert_keynote_style_lifecycle(editor: &mut KeynoteEditor, drawable_object_id
 }
 
 #[test]
+fn named_paragraph_style_redefinition_propagates_across_suites() {
+    let mut pages = PagesEditor::create_with_text("Pages redefine").unwrap();
+    let first = pages
+        .add_text_box(
+            0,
+            "First",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let second = pages
+        .add_text_box(
+            0,
+            "Second",
+            DrawablePoint { x: 20.0, y: 160.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let body = pages
+        .text_box_applied_named_paragraph_style(first.drawable_object_id)
+        .unwrap()
+        .style()
+        .id();
+    let display = pages
+        .create_text_box_named_paragraph_style(
+            first.drawable_object_id,
+            body,
+            ParagraphStyleName::new("Pages Redefined").unwrap(),
+        )
+        .unwrap();
+    for object_id in [first.drawable_object_id, second.drawable_object_id] {
+        pages
+            .apply_text_box_named_paragraph_style(object_id, display.id())
+            .unwrap();
+    }
+    let unchanged = pages.to_bytes().unwrap();
+    assert!(
+        pages
+            .redefine_applied_text_box_named_paragraph_style(first.drawable_object_id)
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), unchanged);
+    pages
+        .set_text_box_paragraph_alignment(first.drawable_object_id, TextAlignment::Center)
+        .unwrap();
+    assert_eq!(
+        pages
+            .redefine_applied_text_box_named_paragraph_style(first.drawable_object_id)
+            .unwrap(),
+        display
+    );
+    let pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    for object_id in [first.drawable_object_id, second.drawable_object_id] {
+        assert_eq!(
+            pages.text_box_paragraph_alignment(object_id).unwrap(),
+            TextAlignment::Center
+        );
+        assert!(
+            !pages
+                .text_box_applied_named_paragraph_style(object_id)
+                .unwrap()
+                .has_overrides()
+        );
+    }
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let first = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "First",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let second = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Second",
+            DrawablePoint { x: 20.0, y: 160.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let body = numbers
+        .sheet_text_box_applied_named_paragraph_style(sheet_id, first.drawable_object_id)
+        .unwrap()
+        .style()
+        .id();
+    let display = numbers
+        .create_sheet_text_box_named_paragraph_style(
+            sheet_id,
+            first.drawable_object_id,
+            body,
+            ParagraphStyleName::new("Numbers Redefined").unwrap(),
+        )
+        .unwrap();
+    for object_id in [first.drawable_object_id, second.drawable_object_id] {
+        numbers
+            .apply_sheet_text_box_named_paragraph_style(sheet_id, object_id, display.id())
+            .unwrap();
+    }
+    numbers
+        .set_sheet_text_box_paragraph_alignment(
+            sheet_id,
+            first.drawable_object_id,
+            TextAlignment::Right,
+        )
+        .unwrap();
+    numbers
+        .redefine_applied_sheet_text_box_named_paragraph_style(sheet_id, first.drawable_object_id)
+        .unwrap();
+    let numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    for object_id in [first.drawable_object_id, second.drawable_object_id] {
+        assert_eq!(
+            numbers
+                .sheet_text_box_paragraph_alignment(sheet_id, object_id)
+                .unwrap(),
+            TextAlignment::Right
+        );
+    }
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let first = keynote
+        .add_slide_text_box(
+            0,
+            "First",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let second = keynote
+        .add_slide_text_box(
+            0,
+            "Second",
+            DrawablePoint { x: 20.0, y: 160.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let body = keynote
+        .slide_text_box_applied_named_paragraph_style(0, first.drawable_object_id)
+        .unwrap()
+        .style()
+        .id();
+    let display = keynote
+        .create_slide_text_box_named_paragraph_style(
+            0,
+            first.drawable_object_id,
+            body,
+            ParagraphStyleName::new("Keynote Redefined").unwrap(),
+        )
+        .unwrap();
+    for object_id in [first.drawable_object_id, second.drawable_object_id] {
+        keynote
+            .apply_slide_text_box_named_paragraph_style(0, object_id, display.id())
+            .unwrap();
+    }
+    keynote
+        .set_slide_text_box_paragraph_alignment(
+            0,
+            first.drawable_object_id,
+            TextAlignment::Justified,
+        )
+        .unwrap();
+    keynote
+        .redefine_applied_slide_text_box_named_paragraph_style(0, first.drawable_object_id)
+        .unwrap();
+    let keynote = KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    for object_id in [first.drawable_object_id, second.drawable_object_id] {
+        assert_eq!(
+            keynote
+                .slide_text_box_paragraph_alignment(0, object_id)
+                .unwrap(),
+            TextAlignment::Justified
+        );
+    }
+}
+
+#[test]
 fn all_native_alignment_values_are_strict_and_reversible() {
     for alignment in [
         TextAlignment::Natural,

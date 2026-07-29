@@ -317,6 +317,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         named_style_box.drawable_object_id,
         display.id(),
     )?;
+    editor.set_slide_text_box_paragraph_alignment(
+        0,
+        named_style_box.drawable_object_id,
+        TextAlignment::Center,
+    )?;
+    editor.redefine_applied_slide_text_box_named_paragraph_style(
+        0,
+        named_style_box.drawable_object_id,
+    )?;
     let disposable = editor.create_slide_text_box_named_paragraph_style(
         0,
         named_style_box.drawable_object_id,
