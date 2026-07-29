@@ -85,6 +85,8 @@ enum BodyEventKind<'b, 'a> {
     NavigationEntry(&'b crate::NavigationEntry<'a>),
     BookmarkStart(&'b Bookmark<'a>),
     BookmarkEnd(&'b Bookmark<'a>),
+    CustomXmlOpen(&'b crate::CustomXmlTag<'a>),
+    CustomXmlClose(&'b crate::CustomXmlTag<'a>),
     AnnotationStart(&'b Annotation<'a>),
     AnnotationEnd(&'b Annotation<'a>),
     Note(&'b Note<'a>),
@@ -324,6 +326,7 @@ impl<W: Write> RtfWriter<W> {
         self.write_blocks_with_markup(
             doc.blocks(),
             doc.bookmarks(),
+            doc.custom_xml_tags(),
             doc.annotations(),
             doc.notes(),
             doc.revisions(),
@@ -3645,6 +3648,47 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
+    /// Write a custom XML tag open destination and its inert attributes.
+    pub fn write_custom_xml_open(&mut self, tag: &crate::CustomXmlTag<'_>) -> io::Result<()> {
+        tag.validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{")?;
+        self.write_control_word("xmlopen", None)?;
+        if let Some(namespace) = tag.namespace {
+            self.write_control_word("xmlns", Some(namespace as i32))?;
+        }
+        self.write_str(" ")?;
+        self.write_destination_text(tag.name.as_ref())?;
+        self.write_str("}")?;
+        for attribute in &tag.attributes {
+            self.write_str("{\\*")?;
+            self.write_control_word("xmlattrname", None)?;
+            self.write_str(" ")?;
+            self.write_destination_text(attribute.name.as_ref())?;
+            self.write_str("}{\\*")?;
+            self.write_control_word("xmlattrvalue", None)?;
+            self.write_str(" ")?;
+            self.write_destination_text(attribute.value.as_ref())?;
+            self.write_str("}")?;
+        }
+        Ok(())
+    }
+
+    /// Write a custom XML tag close destination.
+    pub fn write_custom_xml_close(&mut self, tag: &crate::CustomXmlTag<'_>) -> io::Result<()> {
+        if tag.name.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF custom XML tag name cannot be empty",
+            ));
+        }
+        self.write_str("{")?;
+        self.write_control_word("xmlclose", None)?;
+        self.write_str(" ")?;
+        self.write_destination_text(tag.name.as_ref())?;
+        self.write_str("}")
+    }
+
     /// Write an annotation range-start destination.
     pub fn write_annotation_start(&mut self, annotation: &Annotation<'_>) -> io::Result<()> {
         if !annotation.has_reference {
@@ -3717,6 +3761,7 @@ impl<W: Write> RtfWriter<W> {
         &mut self,
         blocks: &[StyleBlock<'_>],
         bookmarks: &BookmarkTable<'_>,
+        custom_xml_tags: &[crate::CustomXmlTag<'_>],
         annotations: &[Annotation<'_>],
         notes: &[Note<'_>],
         revisions: &[Revision<'_>],
@@ -3736,6 +3781,7 @@ impl<W: Write> RtfWriter<W> {
         body_story_events: &[crate::BodyStoryEvent],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
+            && custom_xml_tags.is_empty()
             && annotations.is_empty()
             && notes.is_empty()
             && revisions.is_empty()
@@ -3768,6 +3814,7 @@ impl<W: Write> RtfWriter<W> {
             .saturating_add(revisions.len())
             .saturating_mul(2);
         let event_count = event_count.saturating_add(navigation_entries.len());
+        let event_count = event_count.saturating_add(custom_xml_tags.len().saturating_mul(2));
         let event_count = event_count.saturating_add(shapes.len());
         let event_count = event_count.saturating_add(shape_groups.len());
         let event_count = event_count.saturating_add(picture_compatibility_records.len());
@@ -4186,6 +4233,63 @@ impl<W: Write> RtfWriter<W> {
                 kind: BodyEventKind::BookmarkEnd(bookmark),
             });
         }
+        if custom_xml_tags.len() > crate::custom_xml::MAX_CUSTOM_XML_TAGS {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF custom XML tag count exceeds the safety limit",
+            ));
+        }
+        for tag in custom_xml_tags {
+            tag.validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            let end = tag.position.checked_add(tag.content.len()).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "RTF custom XML tag range overflow")
+            })?;
+            let content = body.get(tag.position..end).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF custom XML tag range is outside body text or splits a character",
+                )
+            })?;
+            if content != tag.content {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF custom XML tag content does not match its body range",
+                ));
+            }
+        }
+        {
+            let mut xml_stack: Vec<usize> = Vec::new();
+            for event in body_story_events {
+                match *event {
+                    crate::BodyStoryEvent::CustomXmlOpen(index) => {
+                        if index >= custom_xml_tags.len() {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF custom XML story event references a missing tag",
+                            ));
+                        }
+                        xml_stack.push(index);
+                    },
+                    crate::BodyStoryEvent::CustomXmlClose(index) => {
+                        let expected = xml_stack.pop();
+                        if expected != Some(index) {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF custom XML tags are not properly nested",
+                            ));
+                        }
+                    },
+                    _ => {},
+                }
+            }
+            if !xml_stack.is_empty() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF custom XML tags are not properly nested",
+                ));
+            }
+        }
         for annotation in annotations {
             annotation
                 .validate()
@@ -4276,6 +4380,8 @@ impl<W: Write> RtfWriter<W> {
         let mut saw_fields = vec![false; fields.len()];
         let mut saw_bookmark_starts = vec![false; bookmark_items.len()];
         let mut saw_bookmark_ends = vec![false; bookmark_items.len()];
+        let mut saw_custom_xml_opens = vec![false; custom_xml_tags.len()];
+        let mut saw_custom_xml_closes = vec![false; custom_xml_tags.len()];
         let mut saw_annotation_starts = vec![false; annotations.len()];
         let mut saw_annotation_ends = vec![false; annotations.len()];
         let mut saw_notes = vec![false; notes.len()];
@@ -4385,6 +4491,30 @@ impl<W: Write> RtfWriter<W> {
                                 )
                             })?,
                         BodyEventKind::BookmarkEnd(bookmark),
+                    )
+                },
+                crate::BodyStoryEvent::CustomXmlOpen(index)
+                    if index < custom_xml_tags.len() && !saw_custom_xml_opens[index] =>
+                {
+                    saw_custom_xml_opens[index] = true;
+                    (
+                        custom_xml_tags[index].position,
+                        BodyEventKind::CustomXmlOpen(&custom_xml_tags[index]),
+                    )
+                },
+                crate::BodyStoryEvent::CustomXmlClose(index)
+                    if index < custom_xml_tags.len() && !saw_custom_xml_closes[index] =>
+                {
+                    saw_custom_xml_closes[index] = true;
+                    let tag = &custom_xml_tags[index];
+                    (
+                        tag.position.checked_add(tag.content.len()).ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF custom XML tag range overflow",
+                            )
+                        })?,
+                        BodyEventKind::CustomXmlClose(tag),
                     )
                 },
                 crate::BodyStoryEvent::AnnotationStart(index)
@@ -4546,6 +4676,8 @@ impl<W: Write> RtfWriter<W> {
             })
             && saw_bookmark_starts.iter().all(|seen| *seen)
             && saw_bookmark_ends.iter().all(|seen| *seen)
+            && saw_custom_xml_opens.iter().all(|seen| *seen)
+            && saw_custom_xml_closes.iter().all(|seen| *seen)
             && saw_annotation_starts.iter().all(|seen| *seen)
             && saw_annotation_ends.iter().all(|seen| *seen)
             && saw_notes.iter().all(|seen| *seen)
@@ -4645,6 +4777,8 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::NavigationEntry(entry) => self.write_navigation_entry(entry),
             BodyEventKind::BookmarkStart(bookmark) => self.write_bookmark_start(bookmark),
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
+            BodyEventKind::CustomXmlOpen(tag) => self.write_custom_xml_open(tag),
+            BodyEventKind::CustomXmlClose(tag) => self.write_custom_xml_close(tag),
             BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
             BodyEventKind::AnnotationEnd(annotation) => self.write_annotation_end(annotation),
             BodyEventKind::Note(note) => self.write_note_with_fields(note, fields),

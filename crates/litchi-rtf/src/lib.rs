@@ -31,6 +31,7 @@ mod bookmark;
 mod border;
 mod character_positioning;
 mod compressed;
+mod custom_xml;
 mod data_store;
 mod document;
 mod document_asian_grid_compatibility;
@@ -118,6 +119,7 @@ pub use character_positioning::{
     MAX_CHARACTER_SCALE_PERCENT,
 };
 pub use compressed::{compress, decompress, is_compressed_rtf};
+pub use custom_xml::{CustomXmlAttribute, CustomXmlTag};
 pub use data_store::DocumentDataStore;
 pub use document::RtfDocument;
 pub use document_asian_grid_compatibility::DocumentAsianGridCompatibility;

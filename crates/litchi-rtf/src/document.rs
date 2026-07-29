@@ -97,6 +97,8 @@ pub struct RtfDocument<'a> {
     revision_save: Option<crate::RevisionSaveMetadata>,
     /// Ordered inert XML namespace table; `Some([])` preserves an empty table.
     xml_namespaces: Option<Vec<crate::XmlNamespace<'a>>>,
+    /// Ordered inert custom XML markup tags spanning body text.
+    custom_xml_tags: Vec<crate::CustomXmlTag<'a>>,
     /// Ordered inert usernames used by range-level protection.
     protection_user_table: Option<crate::ProtectionUserTable<'a>>,
     /// Explicit passive document hyphenation properties.
@@ -415,6 +417,11 @@ impl<'a> RtfDocument<'a> {
                     .map(crate::XmlNamespace::into_owned)
                     .collect()
             }),
+            custom_xml_tags: parsed
+                .custom_xml_tags
+                .into_iter()
+                .map(crate::CustomXmlTag::into_owned)
+                .collect(),
             protection_user_table: parsed
                 .protection_user_table
                 .map(crate::ProtectionUserTable::into_owned),
@@ -1998,6 +2005,15 @@ impl<'a> RtfDocument<'a> {
     /// Return the ordered inert XML namespace table, preserving empty-table presence.
     pub fn xml_namespaces(&self) -> Option<&[crate::XmlNamespace<'_>]> {
         self.xml_namespaces.as_deref()
+    }
+
+    /// Return the custom XML markup tags in body source order.
+    ///
+    /// The tags are inert `\xmlopen`/`\xmlclose` markup metadata (RTF 1.9.1
+    /// custom XML markup): names and attributes are stored verbatim and are
+    /// never resolved against a schema.
+    pub fn custom_xml_tags(&self) -> &[crate::CustomXmlTag<'_>] {
+        &self.custom_xml_tags
     }
 
     /// Replace the XML namespace table after full validation.
@@ -3912,6 +3928,13 @@ impl<'a> RtfDocument<'a> {
             },
             crate::BodyStoryEvent::NavigationEntry(index) => {
                 self.navigation_entries.get(index)?.position()
+            },
+            crate::BodyStoryEvent::CustomXmlOpen(index) => {
+                self.custom_xml_tags.get(index)?.position
+            },
+            crate::BodyStoryEvent::CustomXmlClose(index) => {
+                let tag = self.custom_xml_tags.get(index)?;
+                tag.position.checked_add(tag.content.len())?
             },
         })
     }

@@ -217,11 +217,11 @@ fn typed_story_apis_enforce_local_and_main_utf8_boundaries() {
 #[test]
 fn rejects_starred_story_drawings_and_recursive_text_story_abuse() {
     for source in [
-        format!(r"{{\rtf1{{\footnote{{\*\shp x}}}}}}"),
-        format!(r"{{\rtf1\chatn{{\*\annotation{{\*\shp x}}}}}}"),
-        format!(r"{{\rtf1{{\shp{{\*\shpinst{{\shptxt{{\*\shp x}}}}}}}}}}"),
-        format!(r"{{\rtf1{{\endnote{{\*\shpgrp x}}}}}}"),
-        format!(r"{{\rtf1{{\*\do\dptxbx{{\dptxbxtext{{\*\shp x}}}}}}}}"),
+        r"{\rtf1{\footnote{\*\shp x}}}".to_string(),
+        r"{\rtf1\chatn{\*\annotation{\*\shp x}}}".to_string(),
+        r"{\rtf1{\shp{\*\shpinst{\shptxt{\*\shp x}}}}}".to_string(),
+        r"{\rtf1{\endnote{\*\shpgrp x}}}".to_string(),
+        r"{\rtf1{\*\do\dptxbx{\dptxbxtext{\*\shp x}}}}".to_string(),
     ] {
         assert!(RtfDocument::parse(&source).is_err(), "accepted {source}");
     }

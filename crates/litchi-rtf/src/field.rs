@@ -167,6 +167,8 @@ pub enum BodyStoryEvent {
     LegacyTextBox(usize),
     LegacyDrawing(usize),
     NavigationEntry(usize),
+    CustomXmlOpen(usize),
+    CustomXmlClose(usize),
 }
 
 /// A generic field reference embedded in a non-body text story.
