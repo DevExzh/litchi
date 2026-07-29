@@ -349,6 +349,30 @@ impl IconSetType {
     }
 }
 
+/// One inert `calcext:custom-iconset` icon replacement of an icon set.
+///
+/// LibreOffice writes these ahead of the threshold entries when an icon set
+/// mixes icons from different families (`calcext:custom="true"`). Litchi
+/// stores the assignment as typed data and never renders it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ConditionalCustomIcon {
+    /// The icon family the replacement icon comes from
+    /// (`calcext:custom-iconset-name`).
+    pub icon_set_type: IconSetType,
+    /// The replaced icon position (`calcext:custom-iconset-index`).
+    pub index: u32,
+}
+
+impl ConditionalCustomIcon {
+    /// Create an inert custom icon assignment.
+    pub fn new(icon_set_type: IconSetType, index: u32) -> Self {
+        Self {
+            icon_set_type,
+            index,
+        }
+    }
+}
+
 /// An inert `calcext:icon-set` rule.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConditionalIconSet {
@@ -357,10 +381,10 @@ pub struct ConditionalIconSet {
     /// Whether the cell value is shown next to the icon (`calcext:show-value`).
     pub show_value: Option<bool>,
     /// Whether the icon set uses custom icons (`calcext:custom`).
-    ///
-    /// The `calcext:custom-iconset` child declarations themselves are not
-    /// modeled and are skipped on read.
     pub custom: Option<bool>,
+    /// Inert custom icon assignments (`calcext:custom-iconset` children) in
+    /// document order.
+    pub custom_icons: Vec<ConditionalCustomIcon>,
     /// Threshold entries in document order.
     pub entries: Vec<ConditionalIconSetEntry>,
 }
@@ -586,6 +610,7 @@ impl ConditionalIconSet {
             icon_set_type,
             show_value: None,
             custom: None,
+            custom_icons: Vec::new(),
             entries,
         }
     }
@@ -599,6 +624,12 @@ impl ConditionalIconSet {
     /// Set whether the icon set uses custom icons.
     pub fn with_custom(mut self, custom: bool) -> Self {
         self.custom = Some(custom);
+        self
+    }
+
+    /// Set the inert custom icon assignments.
+    pub fn with_custom_icons(mut self, custom_icons: Vec<ConditionalCustomIcon>) -> Self {
+        self.custom_icons = custom_icons;
         self
     }
 }
@@ -746,6 +777,11 @@ pub(crate) fn validate_icon_set(icon_set: &ConditionalIconSet) -> Result<()> {
         ));
     }
     validate_entry_count(icon_set.entries.len(), "calcext:icon-set")?;
+    if icon_set.custom_icons.len() > MAX_ENTRIES_PER_RULE {
+        return Err(Error::InvalidFormat(format!(
+            "calcext:icon-set exceeds the {MAX_ENTRIES_PER_RULE} custom icon safety limit"
+        )));
+    }
     for entry in &icon_set.entries {
         validate_icon_set_entry(entry)?;
     }
@@ -922,6 +958,13 @@ fn write_icon_set(out: &mut String, icon_set: &ConditionalIconSet) {
     write_optional_bool_attribute(out, "calcext:custom", icon_set.custom);
     write_optional_bool_attribute(out, "calcext:show-value", icon_set.show_value);
     out.push('>');
+    for custom_icon in &icon_set.custom_icons {
+        out.push_str("<calcext:custom-iconset calcext:custom-iconset-name=\"");
+        out.push_str(custom_icon.icon_set_type.as_str());
+        out.push_str("\" calcext:custom-iconset-index=\"");
+        out.push_str(&custom_icon.index.to_string());
+        out.push_str("\"/>");
+    }
     for entry in &icon_set.entries {
         out.push_str("<calcext:formatting-entry calcext:value=\"");
         out.push_str(&escape_xml(&entry.value));
@@ -1008,6 +1051,8 @@ mod tests {
             ],
         )
         .with_show_value(false)
+        .with_custom(true)
+        .with_custom_icons(vec![ConditionalCustomIcon::new(IconSetType::ThreeStars, 0)])
     }
 
     fn sample_date_is() -> ConditionalDateIs {
@@ -1046,7 +1091,10 @@ mod tests {
             r#"<calcext:formatting-entry calcext:value="0" calcext:type="auto-minimum"/>"#
         ));
         assert!(xml.contains(
-            r#"<calcext:icon-set calcext:icon-set-type="3TrafficLights1" calcext:show-value="false">"#
+            r#"<calcext:icon-set calcext:icon-set-type="3TrafficLights1" calcext:custom="true" calcext:show-value="false">"#
+        ));
+        assert!(xml.contains(
+            r#"<calcext:custom-iconset calcext:custom-iconset-name="3Stars" calcext:custom-iconset-index="0"/>"#
         ));
         assert!(xml.contains(
             r#"<calcext:formatting-entry calcext:value="33" calcext:greater-equal="false" calcext:type="percent"/>"#

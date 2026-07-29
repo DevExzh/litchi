@@ -6,7 +6,7 @@ use super::{
     ConditionalColorScaleEntry,
     ConditionalDataBar, ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType,
     ConditionalFormat, ConditionalFormatCondition, ConditionalFormatEntryType,
-    ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry, DataBarAxisPosition,
+    ConditionalFormatRule, ConditionalIconSet, ConditionalCustomIcon, ConditionalIconSetEntry, DataBarAxisPosition,
     DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
     IconSetType, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
@@ -299,9 +299,23 @@ impl OdsParser {
                                 )?);
                                 calcext_leaf_open_depth = Some(element_depth);
                             },
+                            PendingCalcextRule::IconSet { icon_set, .. }
+                                if is_calcext("custom-iconset") =>
+                            {
+                                if icon_set.custom_icons.len() >= MAX_ENTRIES_PER_RULE {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:icon-set exceeds the {MAX_ENTRIES_PER_RULE} custom icon safety limit"
+                                    )));
+                                }
+                                icon_set.custom_icons.push(Self::parse_custom_icon(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                                calcext_leaf_open_depth = Some(element_depth);
+                            },
                             _ => {
-                                // Unmodeled content such as
-                                // `calcext:custom-iconset` is skipped.
+                                // Unmodeled content is skipped.
                                 calcext_skip_depth = Some(element_depth);
                             },
                         }
@@ -895,6 +909,20 @@ impl OdsParser {
                                     )));
                                 }
                                 icon_set.entries.push(Self::parse_icon_set_entry(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                            },
+                            PendingCalcextRule::IconSet { icon_set, .. }
+                                if is_calcext("custom-iconset") =>
+                            {
+                                if icon_set.custom_icons.len() >= MAX_ENTRIES_PER_RULE {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:icon-set exceeds the {MAX_ENTRIES_PER_RULE} custom icon safety limit"
+                                    )));
+                                }
+                                icon_set.custom_icons.push(Self::parse_custom_icon(
                                     e,
                                     reader.decoder(),
                                     &document_namespaces,
@@ -3432,6 +3460,58 @@ impl OdsParser {
         Ok(data_bar)
     }
 
+    /// Parse one inert `calcext:custom-iconset` assignment from its attributes.
+    fn parse_custom_icon(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalCustomIcon> {
+        let mut icon_set_type = None;
+        let mut index = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("custom-iconset-name") {
+                icon_set_type = Some(IconSetType::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:custom-iconset-name",
+                )?)?);
+            } else if is_calcext("custom-iconset-index") {
+                let lexical = Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:custom-iconset-index",
+                )?;
+                index = Some(lexical.parse::<u32>().map_err(|_| {
+                    Error::InvalidFormat(format!(
+                        "calcext:custom-iconset-index requires a non-negative integer, found '{lexical}'"
+                    ))
+                })?);
+            }
+        }
+        Ok(ConditionalCustomIcon {
+            icon_set_type: icon_set_type.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:custom-iconset requires calcext:custom-iconset-name".to_string(),
+                )
+            })?,
+            index: index.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:custom-iconset requires calcext:custom-iconset-index".to_string(),
+                )
+            })?,
+        })
+    }
+
     /// Parse the attributes of an inert `calcext:icon-set` element.
     fn parse_icon_set_attributes(
         element: &BytesStart<'_>,
@@ -3472,6 +3552,7 @@ impl OdsParser {
             })?,
             show_value,
             custom,
+            custom_icons: Vec::new(),
             entries: Vec::new(),
         };
         Ok(icon_set)

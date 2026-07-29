@@ -118,10 +118,10 @@ pub use calculation::{
 };
 pub use cell::{Cell, CellMatrixSpan, CellMerge, CellValue};
 pub use conditional_format::{
-    ConditionalColorScale, ConditionalColorScaleEntry, ConditionalDataBar, ConditionalDataBarEntry,
-    ConditionalDateIs, ConditionalDateType, ConditionalFormat, ConditionalFormatCondition,
-    ConditionalFormatEntryType, ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry,
-    DataBarAxisPosition, IconSetType,
+    ConditionalColorScale, ConditionalColorScaleEntry, ConditionalCustomIcon, ConditionalDataBar,
+    ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType, ConditionalFormat,
+    ConditionalFormatCondition, ConditionalFormatEntryType, ConditionalFormatRule,
+    ConditionalIconSet, ConditionalIconSetEntry, DataBarAxisPosition, IconSetType,
 };
 pub use consolidation::{Consolidation, ConsolidationUseLabels};
 pub use data_pilot::{

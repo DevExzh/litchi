@@ -6,11 +6,11 @@
 //! mutable APIs author, edit, remove, and round-trip them.
 
 use litchi_odf::{
-    ConditionalColorScale, ConditionalColorScaleEntry, ConditionalDataBar, ConditionalDataBarEntry,
-    ConditionalDateIs, ConditionalDateType, ConditionalFormat, ConditionalFormatCondition,
-    ConditionalFormatEntryType, ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry,
-    DataBarAxisPosition, FlatSpreadsheet, IconSetType, MutableSpreadsheet, Spreadsheet,
-    SpreadsheetBuilder,
+    ConditionalColorScale, ConditionalColorScaleEntry, ConditionalCustomIcon, ConditionalDataBar,
+    ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType, ConditionalFormat,
+    ConditionalFormatCondition, ConditionalFormatEntryType, ConditionalFormatRule,
+    ConditionalIconSet, ConditionalIconSetEntry, DataBarAxisPosition, FlatSpreadsheet, IconSetType,
+    MutableSpreadsheet, Spreadsheet, SpreadsheetBuilder,
 };
 
 /// Flat spreadsheet written in the shape LibreOffice Calc produces.
@@ -75,6 +75,11 @@ fn icon_set() -> ConditionalIconSet {
         ],
     )
     .with_show_value(false)
+    .with_custom(true)
+    .with_custom_icons(vec![
+        ConditionalCustomIcon::new(IconSetType::ThreeStars, 0),
+        ConditionalCustomIcon::new(IconSetType::FiveBoxes, 2),
+    ])
 }
 
 fn format_c() -> ConditionalFormat {
@@ -141,7 +146,13 @@ fn builder_authored_conditional_formats_round_trip_the_package() {
         r##"<calcext:data-bar calcext:gradient="false" calcext:show-value="false" calcext:min-length="10" calcext:max-length="90" calcext:negative-color="#ff8080" calcext:axis-position="middle" calcext:positive-color="#638ec6" calcext:axis-color="#000000">"##
     ));
     assert!(xml.contains(
-        r#"<calcext:icon-set calcext:icon-set-type="3TrafficLights1" calcext:show-value="false">"#
+        r#"<calcext:icon-set calcext:icon-set-type="3TrafficLights1" calcext:custom="true" calcext:show-value="false">"#
+    ));
+    assert!(xml.contains(
+        r#"<calcext:custom-iconset calcext:custom-iconset-name="3Stars" calcext:custom-iconset-index="0"/>"#
+    ));
+    assert!(xml.contains(
+        r#"<calcext:custom-iconset calcext:custom-iconset-name="5Boxes" calcext:custom-iconset-index="2"/>"#
     ));
     assert!(xml.contains(
         r#"<calcext:formatting-entry calcext:value="33" calcext:greater-equal="false" calcext:type="percent"/>"#
@@ -346,15 +357,28 @@ fn parser_rejects_malformed_calcext_content() {
     assert!(rejects(&format(
         r#"<calcext:icon-set calcext:icon-set-type="5Boxes"><calcext:formatting-entry calcext:value="many" calcext:type="percent"/></calcext:icon-set>"#,
     )));
+    // Custom icons require a known family and a non-negative integer index.
+    assert!(rejects(&format(
+        r#"<calcext:icon-set calcext:icon-set-type="5Boxes" calcext:custom="true"><calcext:custom-iconset calcext:custom-iconset-name="9Wonders" calcext:custom-iconset-index="0"/><calcext:formatting-entry calcext:value="0" calcext:type="percent"/></calcext:icon-set>"#,
+    )));
+    assert!(rejects(&format(
+        r#"<calcext:icon-set calcext:icon-set-type="5Boxes" calcext:custom="true"><calcext:custom-iconset calcext:custom-iconset-name="3Stars" calcext:custom-iconset-index="-1"/><calcext:formatting-entry calcext:value="0" calcext:type="percent"/></calcext:icon-set>"#,
+    )));
+    assert!(rejects(&format(
+        r#"<calcext:icon-set calcext:icon-set-type="5Boxes" calcext:custom="true"><calcext:custom-iconset calcext:custom-iconset-name="3Stars"/><calcext:formatting-entry calcext:value="0" calcext:type="percent"/></calcext:icon-set>"#,
+    )));
+    // calcext:custom-iconset must not have child elements.
+    assert!(rejects(&format(
+        r#"<calcext:icon-set calcext:icon-set-type="5Boxes" calcext:custom="true"><calcext:custom-iconset calcext:custom-iconset-name="3Stars" calcext:custom-iconset-index="0"><calcext:custom-iconset calcext:custom-iconset-name="3Stars" calcext:custom-iconset-index="1"/></calcext:custom-iconset><calcext:formatting-entry calcext:value="0" calcext:type="percent"/></calcext:icon-set>"#,
+    )));
 }
 
 #[test]
-fn legacy_data_bar_entry_and_custom_iconset_children_are_tolerated() {
+fn legacy_data_bar_entry_and_custom_iconset_children_parse() {
     // The legacy `calcext:data-bar-entry` alias reads like a formatting entry,
-    // and unmodeled `calcext:custom-iconset` children are skipped while the
-    // thresholds around them still parse.
+    // and `calcext:custom-iconset` assignments parse as typed inert data.
     let document = r##"<?xml version="1.0" encoding="UTF-8"?>
-<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" office:mimetype="application/vnd.oasis.opendocument.spreadsheet" office:version="1.3"><office:body><office:spreadsheet><table:table table:name="S"><calcext:conditional-formats><calcext:conditional-format calcext:target-range-address="S.A1:S.A2"><calcext:data-bar calcext:positive-color="#638ec6"><calcext:data-bar-entry calcext:value="0" calcext:type="auto-minimum"/><calcext:data-bar-entry calcext:value="0" calcext:type="auto-maximum"/></calcext:data-bar><calcext:icon-set calcext:icon-set-type="3Arrows" calcext:custom="true"><calcext:custom-iconset calcext:custom-iconset-name="3Arrows" calcext:custom-iconset-index="0"/><calcext:formatting-entry calcext:value="0" calcext:type="percent"/></calcext:icon-set></calcext:conditional-format></calcext:conditional-formats></table:table></office:spreadsheet></office:body></office:document>"##;
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0" office:mimetype="application/vnd.oasis.opendocument.spreadsheet" office:version="1.3"><office:body><office:spreadsheet><table:table table:name="S"><calcext:conditional-formats><calcext:conditional-format calcext:target-range-address="S.A1:S.A2"><calcext:data-bar calcext:positive-color="#638ec6"><calcext:data-bar-entry calcext:value="0" calcext:type="auto-minimum"/><calcext:data-bar-entry calcext:value="0" calcext:type="auto-maximum"/></calcext:data-bar><calcext:icon-set calcext:icon-set-type="3Arrows" calcext:custom="true"><calcext:custom-iconset calcext:custom-iconset-name="3Stars" calcext:custom-iconset-index="0"/><calcext:formatting-entry calcext:value="0" calcext:type="percent"/></calcext:icon-set></calcext:conditional-format></calcext:conditional-formats></table:table></office:spreadsheet></office:body></office:document>"##;
     let mut flat = FlatSpreadsheet::from_bytes(document.as_bytes().to_vec()).unwrap();
     let sheets = flat.spreadsheet_mut().sheets().unwrap();
     let expected_data_bar = ConditionalDataBar::new(vec![
@@ -369,7 +393,8 @@ fn legacy_data_bar_entry_and_custom_iconset_children_are_tolerated() {
             "0",
         )],
     )
-    .with_custom(true);
+    .with_custom(true)
+    .with_custom_icons(vec![ConditionalCustomIcon::new(IconSetType::ThreeStars, 0)]);
     assert_eq!(
         sheets[0].conditional_formats(),
         [ConditionalFormat::new(

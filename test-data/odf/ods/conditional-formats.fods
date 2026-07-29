@@ -10,7 +10,8 @@
       `calcext:icon-set`, and a `calcext:date-is` rule.
     * The referenced cell styles "Good"/"Bad" are ordinary common styles.
       Litchi stores the rules as typed inert data and never evaluates the
-      conditions, resolves the style references, or renders the thresholds.
+      conditions, resolves the style references, renders the thresholds, or
+      resolves the custom icon replacements.
 -->
 <office:document
     xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -62,7 +63,9 @@
               <calcext:formatting-entry calcext:value="0" calcext:type="auto-minimum"/>
               <calcext:formatting-entry calcext:value="0" calcext:type="auto-maximum"/>
             </calcext:data-bar>
-            <calcext:icon-set calcext:icon-set-type="3TrafficLights1" calcext:show-value="false">
+            <calcext:icon-set calcext:icon-set-type="3TrafficLights1" calcext:show-value="false" calcext:custom="true">
+              <calcext:custom-iconset calcext:custom-iconset-name="3Stars" calcext:custom-iconset-index="0"/>
+              <calcext:custom-iconset calcext:custom-iconset-name="5Boxes" calcext:custom-iconset-index="2"/>
               <calcext:formatting-entry calcext:value="0" calcext:type="percent"/>
               <calcext:formatting-entry calcext:value="33" calcext:greater-equal="false" calcext:type="percent"/>
               <calcext:formatting-entry calcext:value="67" calcext:type="percent"/>
