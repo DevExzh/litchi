@@ -51,6 +51,21 @@ mod chart_3d_bar_shape;
 /// BIFF8 chart `CrtLine` and `CrtLink` records.
 mod crt_line_link;
 
+/// BIFF8 `MarkerFormat` record: data-marker color, size, and shape.
+mod marker_format;
+
+/// BIFF8 `PieFormat` record: pie data-point explosion distance.
+mod pie_format;
+
+/// BIFF8 `ObjectLink` record: the chart object a text is linked to.
+mod object_link;
+
+/// BIFF8 `SerParent` record: the series of a trendline or error bar.
+mod ser_parent;
+
+/// BIFF8 `UsesELFs` record: the natural language formula flag.
+mod uses_elfs;
+
 /// BIFF8 chart property-stream future records (`ShapePropsStream`,
 /// `TextPropsStream`, `RichTextStream`).
 mod chart_property_stream;
@@ -354,6 +369,11 @@ pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
 pub use chart_3d_bar_shape::{XlsChart3DBarShape, XlsChart3DRiserShape, XlsChart3DTaper};
 pub use chart_frt_wrapper::{XlsEndObject, XlsFrtObjectKind, XlsFrtWrapper, XlsStartObject};
 pub use crt_line_link::{XlsCrtLine, XlsCrtLineKind, XlsCrtLink};
+pub use marker_format::{XlsChartRgb, XlsDataMarkerKind, XlsMarkerFormat};
+pub use object_link::{XlsObjectLink, XlsObjectLinkTarget};
+pub use pie_format::XlsPieFormat;
+pub use ser_parent::XlsSerParent;
+pub use uses_elfs::XlsUsesElfs;
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
 pub use force_full_calculation::XlsForceFullCalculation;
 pub use backup::XlsBackup;
