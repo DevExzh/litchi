@@ -66,6 +66,21 @@ mod ser_parent;
 /// BIFF8 `UsesELFs` record: the natural language formula flag.
 mod uses_elfs;
 
+/// BIFF8 `SerAuxErrBar` record: error bar properties.
+mod ser_aux_err_bar;
+
+/// BIFF8 `SerAuxTrend` record: a trendline.
+mod ser_aux_trend;
+
+/// BIFF8 `SerFmt` record: series line/marker properties.
+mod ser_fmt;
+
+/// BIFF8 `Fbi` record: scalable chart font information.
+mod fbi;
+
+/// BIFF8 `EntExU2` record: an application-specific cache, preserved opaquely.
+mod ent_ex_u2;
+
 /// BIFF8 chart property-stream future records (`ShapePropsStream`,
 /// `TextPropsStream`, `RichTextStream`).
 mod chart_property_stream;
@@ -374,6 +389,11 @@ pub use object_link::{XlsObjectLink, XlsObjectLinkTarget};
 pub use pie_format::XlsPieFormat;
 pub use ser_parent::XlsSerParent;
 pub use uses_elfs::XlsUsesElfs;
+pub use ent_ex_u2::XlsEntExU2;
+pub use fbi::{XlsFbi, XlsFontScaleBasis};
+pub use ser_aux_err_bar::{XlsErrorBarDirection, XlsErrorBarSource, XlsSerAuxErrBar};
+pub use ser_aux_trend::{XlsSerAuxTrend, XlsTrendlineKind};
+pub use ser_fmt::XlsSerFmt;
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
 pub use force_full_calculation::XlsForceFullCalculation;
 pub use backup::XlsBackup;
