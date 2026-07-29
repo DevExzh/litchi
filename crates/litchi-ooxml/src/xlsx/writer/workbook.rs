@@ -424,6 +424,39 @@ impl MutableWorkbookData {
         self.worksheets.last_mut().unwrap()
     }
 
+    /// Insert a new worksheet at the requested workbook-order position
+    /// (`sheet` inside `sheets`, ECMA-376 §18.2.19 and §18.2.20).
+    ///
+    /// `index` counts worksheets and chartsheets together in workbook
+    /// order, matching the order emitted on save; passing the current
+    /// sheet count appends like [`Self::add_worksheet`]. The new sheet
+    /// receives a fresh `sheetId`; relationship IDs and part names are
+    /// derived from the final sheet order when the workbook is saved.
+    ///
+    /// # Arguments
+    /// * `index` - Zero-based workbook-order position
+    /// * `name` - Worksheet name
+    pub fn insert_worksheet(
+        &mut self,
+        index: usize,
+        name: String,
+    ) -> SheetResult<&mut MutableWorksheet> {
+        if index > self.sheet_order.len() {
+            return Err(format!(
+                "worksheet insertion index {index} out of bounds (max: {})",
+                self.sheet_order.len()
+            )
+            .into());
+        }
+        let sheet_id = (self.worksheets.len() + self.chart_sheets.len() + 1) as u32;
+        let worksheet = MutableWorksheet::new(name, sheet_id);
+        self.worksheets.push(worksheet);
+        self.sheet_order
+            .insert(index, SheetSlot::Worksheet(self.worksheets.len() - 1));
+        self.modified = true;
+        Ok(self.worksheets.last_mut().unwrap())
+    }
+
     /// Add a new chartsheet hosting the given chart.
     ///
     /// The name must be a valid Excel sheet name and unique (case-insensitive)

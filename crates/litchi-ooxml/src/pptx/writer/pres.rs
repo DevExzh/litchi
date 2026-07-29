@@ -11,6 +11,10 @@ use std::fmt::Write as FmtWrite;
 use super::super::format::ImageFormat;
 use super::slide::MutableSlide;
 
+/// First slide ID assigned to a new slide. PowerPoint starts `p:sldId@id`
+/// values at 256; IDs are allocated as one above the current maximum.
+const FIRST_SLIDE_ID: u32 = 256;
+
 // ============================================================================
 // Chart and SmartArt Parts Storage
 // ============================================================================
@@ -127,19 +131,62 @@ impl MutablePresentation {
 
     /// Add a new slide to the presentation.
     pub fn add_slide(&mut self) -> Result<&mut MutableSlide> {
-        let slide_id = self
-            .slides
-            .iter()
-            .map(MutableSlide::slide_id)
-            .max()
-            .map_or(Ok(256), |id| {
-                id.checked_add(1)
-                    .ok_or_else(|| OoxmlError::InvalidFormat("presentation slide ID overflow".into()))
-            })?;
+        let slide_id = self.allocate_slide_id()?;
         let slide = MutableSlide::new(slide_id);
         self.slides.push(slide);
         self.modified = true;
         Ok(self.slides.last_mut().unwrap())
+    }
+
+    /// Insert a new slide at the requested position.
+    ///
+    /// The slide is placed at `index` in the slide ID list (`p:sldIdLst`,
+    /// ECMA-376 §19.2.1.34), shifting the slides after it one position
+    /// down; passing `index == slide_count()` appends like
+    /// [`Self::add_slide`]. The new slide receives a freshly allocated
+    /// slide ID and belongs to no section or custom show. Relationship
+    /// IDs, slide part names, and content-type registrations are all
+    /// derived from the final slide order when the presentation is saved,
+    /// so inserting requires no further bookkeeping.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use litchi_ooxml::pptx::MutablePresentation;
+    ///
+    /// let mut pres = MutablePresentation::new();
+    /// pres.add_slide().unwrap().set_title("First");
+    /// pres.add_slide().unwrap().set_title("Third");
+    /// pres.insert_slide(1).unwrap().set_title("Second");
+    /// assert_eq!(pres.slide_mut(1).unwrap().title(), Some("Second"));
+    /// assert_eq!(pres.slide_count(), 3);
+    /// ```
+    pub fn insert_slide(&mut self, index: usize) -> Result<&mut MutableSlide> {
+        if index > self.slides.len() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "Slide insertion index {} out of bounds (max: {})",
+                index,
+                self.slides.len()
+            )));
+        }
+        let slide_id = self.allocate_slide_id()?;
+        self.slides.insert(index, MutableSlide::new(slide_id));
+        self.modified = true;
+        Ok(self.slides.get_mut(index).unwrap())
+    }
+
+    /// Allocate the next slide ID (`p:sldId@id`), starting at
+    /// [`FIRST_SLIDE_ID`] and always one above the current maximum.
+    fn allocate_slide_id(&self) -> Result<u32> {
+        self.slides
+            .iter()
+            .map(MutableSlide::slide_id)
+            .max()
+            .map_or(Ok(FIRST_SLIDE_ID), |id| {
+                id.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("presentation slide ID overflow".into())
+                })
+            })
     }
 
     /// Get the number of slides.
@@ -261,13 +308,7 @@ impl MutablePresentation {
         let mut new_slide = slide_to_duplicate.clone();
 
         // Assign a new slide ID
-        let new_slide_id = self
-            .slides
-            .iter()
-            .map(MutableSlide::slide_id)
-            .max()
-            .and_then(|id| id.checked_add(1))
-            .ok_or_else(|| OoxmlError::InvalidFormat("presentation slide ID overflow".into()))?;
+        let new_slide_id = self.allocate_slide_id()?;
         new_slide.set_slide_id(new_slide_id);
 
         self.slides.push(new_slide);

@@ -1809,6 +1809,39 @@ impl Workbook {
             .add_worksheet(name.to_string())
     }
 
+    /// Insert a new worksheet at the requested workbook-order position
+    /// (`sheet` inside `sheets`, ECMA-376 §18.2.19 and §18.2.20).
+    ///
+    /// `index` counts worksheets and chartsheets together in workbook
+    /// order; passing the current sheet count appends like
+    /// [`Self::add_worksheet`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi_ooxml::xlsx::Workbook;
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// wb.add_worksheet("Sheet2");
+    /// wb.insert_worksheet(1, "Summary")?;
+    /// wb.save("output.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+    /// ```
+    pub fn insert_worksheet(
+        &mut self,
+        index: usize,
+        name: &str,
+    ) -> SheetResult<&mut MutableWorksheet> {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .insert_worksheet(index, name.to_string())
+    }
+
     /// Add a chartsheet hosting the given chart.
     ///
     /// The chartsheet is appended to the workbook's sheet list in insertion
