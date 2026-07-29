@@ -148,13 +148,13 @@ conversion, fonts, and image conversion are optional.
 | Open/create/save | ✅ | ✅ | ✅ | Path and in-memory workflows |
 | Multiple worksheets | ✅ | ✅ | ✅ | Add, access, update, and serialize sheets |
 | Cell values and ranges | ✅ | ✅ | ✅ | String, rich text, number, boolean, error, date/time, and range access |
-| Formula cells | ✅ | ✅ | ✅ | Formula strings, cached values, shared formulas, and array formulas |
+| Formula cells | ✅ | ✅ | ✅ | Formula strings, cached values, shared formulas, and array formulas with typed row-major array-formula discovery (anchor, verbatim `ref` range, text) |
 | Formula evaluation | 🟡 | ✅ | N/A | Shared evaluator with many math, lookup, text, date, financial, and statistical functions |
 | Shared strings and rich text | ✅ | ✅ | ✅ | Plain and formatted shared/inline strings |
 | Named ranges/defined names | ✅ | ✅ | ✅ | Workbook and sheet scopes, built-ins, comments, and print names |
 | Cell and table styles | ✅ | ✅ | ✅ | Fonts, fills, borders, alignment, protection, and number formats |
 | Merged cells | ✅ | ✅ | ✅ | Read/write merge ranges |
-| Row and column properties | ✅ | ✅ | ✅ | Sizes, visibility, outline, spans, and defaults |
+| Row and column properties | ✅ | ✅ | ✅ | Sizes, visibility, outline, spans, and defaults, plus character-count column auto-sizing (Excel 255-character clamp, rich-text measurement, cached-formula results) |
 | Freeze/split panes and selections | ✅ | ✅ | ✅ | Worksheet views, panes, selections, and active cells |
 | Metadata and properties | ✅ | ✅ | ✅ | Core, extended, custom, and workbook metadata |
 
@@ -324,7 +324,7 @@ conversion, fonts, and image conversion are optional.
 | Hyperlinks | ✅ | ✅ | ✅ | URL, file, and internal monikers |
 | Comments/notes | ✅ | ✅ | ✅ | NOTE/OBJ/TXO text and object records |
 | Images and primitive drawing shapes | 🟡 | ✅ | ✅ | OfficeArt extraction plus bounded primitive shape CRUD; `add_shape_group`/`remove_shape_group` author `SpgrContainer` groups with an explicit child coordinate space, per-child child anchors, collision-free OBJ identifiers, and the spec-required ftGmo group record, and groups reparse through the existing group-aware reader |
-| Charts and chart sheets | 🟡 | ✅ | ✅ | Typed embedded/chart-sheet substreams and transactional CRUD; no renderer |
+| Charts and chart sheets | 🟡 | ✅ | ✅ | Typed embedded/chart-sheet substreams and transactional CRUD plus the `CrtMlFrt`/`CrtMlFrtContinue` multilevel-properties future-record pair (FRT header validation, continuation reassembly, verbatim `XmlTkChain` bytes, and 8224-byte re-chunking); no renderer |
 | Pivot tables and caches | ✅ | ✅ | ✅ | Cache values, grouping, fields, filters, and view/editor support |
 | Structured tables/ListObjects | ✅ | ✅ | ✅ | ListObject, AutoFilter12, web/XML, and external-source metadata |
 | Auto-filter and sort | ✅ | ✅ | ✅ | Filter conditions, filter modes, and sort records |
@@ -572,12 +572,12 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Mail-merge metadata | ✅ | ✅ | ✅ | Data sources, field mappings, and recipients as inert metadata; no merge execution |
 | Document variables and user properties | ✅ | ✅ | ✅ | Typed values, lexical forms, links, Unicode, and mutation |
 | Embedded OLE objects | ✅ | ✅ | ✅ | OLE1 header decoding, object data/results, positions, and mutation; payloads remain inert |
-| Equations/math | 🟡 | ✅ | 🟡 | Typed inert `EQ` field discovery and caller-authored `EQ` field serialization, a typed syntactic model of the ECMA-376 `EQ` instruction switches (fractions, radicals, scripts, integrals/sums/products, arrays, brackets, boxes, overstrikes, lists, and displacements), native `\mmath`/`\mmathPara` zone parsing and writer round trips covering the 19 OMML-mirroring structure kinds, argument/property destinations, and matrix rows with `\mmathPict` fallback renderings skipped, plus embedded equation objects and math-property metadata; equations are never calculated, formatted, or rendered |
+| Equations/math | 🟡 | ✅ | 🟡 | Typed inert `EQ` field discovery and caller-authored `EQ` field serialization, a typed syntactic model of the ECMA-376 `EQ` instruction switches (fractions, radicals, scripts, integrals/sums/products, arrays, brackets, boxes, overstrikes, lists, and displacements), native `\mmath`/`\mmathPara` zone parsing and writer round trips covering the 19 OMML-mirroring structure kinds, argument/property destinations (including `\margPr`/`\margSz` argument properties and `\mmcs`/`\mmc`/`\mmcPr` matrix-column descriptions), and matrix rows with `\mmathPict` fallback renderings skipped, plus embedded equation objects and math-property metadata; equations are never calculated, formatted, or rendered |
 | Embedded fonts | ✅ | ✅ | ✅ | `fontemb`/`fontfile` destinations and inline data |
 | Themes and data stores | ✅ | ✅ | ✅ | Inert theme/data-store bytes and typed mutation |
 | File table and external references | ✅ | ✅ | ✅ | Bounded inert external-file metadata; targets are never resolved |
 | XML namespaces and XSL transform metadata | ✅ | ✅ | ✅ | Namespace table, transform location/usage, and XML policies; no transform execution |
-| Custom XML markup destinations | ✅ | ✅ | ✅ | Typed inert `\xmlopen`/`\xmlclose`/`\xmlattrname`/`\xmlattrvalue` body-story markup (RTF 1.9.1): tag names, optional `\xmlnsN` namespace references validated against the parsed namespace table, ordered starred attribute pairs, content body-text ranges, proper-nesting/mismatch rejection, and writer round trips; tag names are never schema-validated or resolved |
+| Custom XML markup destinations | ✅ | ✅ | ✅ | Typed inert `\xmlopen`/`\xmlclose`/`\xmlattrname`/`\xmlattrvalue` body-story markup (RTF 1.9.1): tag names, optional `\xmlnsN` namespace references validated against the parsed namespace table, ordered starred attribute pairs, content body-text ranges, proper-nesting/mismatch rejection, and writer round trips; tag names are never schema-validated or resolved, and the markup destinations are rejected with a clear error in non-body stories (notes, headers/footers, shape text, field stories) rather than leaking into story text |
 | Document protection and write reservations | ✅ | ✅ | ✅ | Protection controls, users, hashes, reservations, and save preferences; no policy enforcement |
 | Document/view/print/compatibility policies | ✅ | ✅ | ✅ | Typed RTF 1.9.1 settings across layout, rendering, privacy, revision, save, style, and compatibility groups |
 | Document info and generator/origin metadata | ✅ | ✅ | ✅ | Title/author/timestamps, generator, origin, caption, and revision-save metadata, with standard `\info` values bridged into the unified metadata facade |
