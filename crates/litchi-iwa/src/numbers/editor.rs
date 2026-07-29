@@ -5772,51 +5772,6 @@ impl NumbersEditor {
         Ok(created)
     }
 
-    /// Remove a sheet from the workbook, retaining unreachable drawable data.
-    ///
-    /// The final sheet cannot be removed. Retaining detached drawable objects is
-    /// deliberate: styles and calculation objects can be shared across sheets.
-    pub fn remove_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
-        let sheets = self.sheets()?;
-        if sheets.len() <= 1 {
-            return Err(Error::ParseError(
-                "Cannot remove the final Numbers sheet".to_owned(),
-            ));
-        }
-        let removed = sheets
-            .iter()
-            .find(|sheet| sheet.object_id == sheet_id)
-            .cloned()
-            .ok_or_else(|| Error::ParseError(format!("Numbers sheet {sheet_id} not found")))?;
-        let locations = object_locations(&self.package)?;
-        let mut staged = self.package.clone();
-        update_numbers_document(&mut staged, |document| {
-            let old_len = document.sheets.len();
-            document
-                .sheets
-                .retain(|reference| reference.identifier != sheet_id);
-            if document.sheets.len() + 1 != old_len {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers root does not reference sheet {sheet_id} exactly once"
-                )));
-            }
-            Ok(())
-        })?;
-        remove_object_or_empty_entry(&mut staged, &locations, sheet_id)?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
-        if verified
-            .sheets()?
-            .iter()
-            .any(|sheet| sheet.object_id == sheet_id)
-        {
-            return Err(Error::InvalidFormat(
-                "Numbers sheet deletion failed validation".to_owned(),
-            ));
-        }
-        self.package = staged;
-        Ok(removed)
-    }
-
     pub fn package(&self) -> &IWorkPackage {
         &self.package
     }
@@ -7473,6 +7428,7 @@ mod named_paragraph_styles;
 mod row_insert;
 mod sheet_audio;
 mod sheet_charts;
+mod sheet_delete;
 mod sheet_duplicate;
 mod sheet_images;
 mod sheet_movies;
