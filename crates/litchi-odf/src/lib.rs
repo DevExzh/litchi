@@ -65,6 +65,9 @@
 //! - ✅ Point/range cross-reference targets with exact positions and text
 //! - ✅ Header/footer left/center/right column region (`style:region-*`) attribution
 //! - ✅ Inert `text:alphabetical-index-auto-mark-file` concordance references
+//! - ✅ Inert classic form controls (`office:forms`): text, textarea, checkbox,
+//!   button, combobox/listbox with options, radio, fixed-text, hidden, and
+//!   number/date/time controls, with inert event-listener metadata
 //!
 //! ### Writing (`odt/builder.rs`, `odt/mutable.rs`)
 //! - ✅ DocumentBuilder for creating new ODT files
@@ -75,6 +78,7 @@
 //! - ✅ Add lists (ordered/unordered)
 //! - ✅ Add headings with levels
 //! - ✅ MutableDocument for modifying existing documents
+//! - ✅ Author, edit, and remove classic form controls and form properties
 //! - ✅ Set metadata (title, author, description, etc.)
 //! - ✅ Save to file or bytes
 //!
@@ -83,7 +87,6 @@
 //! - ⚠️ Index generation
 //! - ⚠️ Mail merge and field insertion
 //! - ⚠️ Drawing object support (beyond basic shapes)
-//! - ⚠️ Form controls
 //! - ⚠️ Master page manipulation
 //!
 //! ## ✅ ODS - Spreadsheets (COMPLETE for reading/writing)

@@ -26,6 +26,10 @@
 //! - ✅ `text_index_marks()` - Parse TOC, user, alphabetical, and bibliography marks
 //! - ✅ `reference_marks()` - Parse point/range cross-reference targets
 //! - ✅ `ruby_annotations()` / `rubies()` - Parse structure-preserving and simplified ruby pairs
+//! - ✅ `forms()` - Inert classic form controls (`office:forms`): text, textarea,
+//!   checkbox, button, combobox/listbox with options, radio, fixed-text, hidden,
+//!   and number/date/time controls with ids, labels, current state, and inert
+//!   event-listener metadata
 //! - ✅ Style parsing and resolution with registry
 //!
 //! ## ✅ Writing (`builder.rs`, `mutable.rs`) - COMPLETE
@@ -37,16 +41,17 @@
 //! - ✅ `add_table()` - Add tables with rows/cells
 //! - ✅ `add_list()` - Add lists
 //! - ✅ `add_heading()` - Add headings with levels
+//! - ✅ `add_control_form()` and family APIs - Author typed forms and controls
 //! - ✅ `set_title()` / `set_author()` - Set metadata
 //! - ✅ `save()` / `to_bytes()` - Write to file or bytes
 //! - ✅ `MutableDocument` - Modify existing documents
+//! - ✅ Insert, replace, and remove form controls and form properties
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Table of contents generation
 //! - ⚠️ Index creation (alphabetical, figure, table indexes)
 //! - ⚠️ Mail merge and field replacement
 //! - ⚠️ Advanced drawing objects (complex shapes, connectors)
-//! - ⚠️ Form controls (text fields, checkboxes, dropdowns)
 //! - ⚠️ Master page editing
 //! - ⚠️ Header and footer manipulation
 //! - ⚠️ Page numbering and sections
