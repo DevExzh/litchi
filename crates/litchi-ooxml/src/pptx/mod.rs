@@ -92,6 +92,7 @@ pub mod sections;
 pub mod show_events;
 pub mod shapes;
 pub mod slide;
+pub mod slide_sync;
 pub mod smartart;
 pub mod table_styles;
 pub mod tags;
@@ -257,6 +258,11 @@ pub use show_events::{
     SHOW_EVENT_EXTENSION_URI, store_slide_show_events,
 };
 pub use slide::{Slide, SlideLayout, SlideMaster};
+pub use slide_sync::{
+    SLIDE_SYNC_CONTENT_TYPE, SLIDE_SYNC_RELATIONSHIP_TYPE, SlideSyncDateTime, SlideSyncOffset,
+    SlideSyncProperties, SlideSyncPropertiesPart, load_slide_sync_properties,
+    store_slide_sync_properties,
+};
 pub use smartart::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use table_styles::{TableStyleDefinition, TableStyleList, TableStylePartKind};
 pub use tags::{
