@@ -9,12 +9,17 @@ use crate::core::{
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellHyperlink, CellRangeSource,
     CellValue, Column,
-    ConditionalCellStyle, Consolidation, ContentValidation, DataPilotTable, DatabaseRange, DdeLink, LabelRange,
+    ConditionalCellStyle, ConditionalFormat, Consolidation, ContentValidation, DataPilotTable,
+    DatabaseRange, DdeLink, LabelRange,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
     SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, Spreadsheet,
     SpreadsheetProtection, TableCellProtectionStyle, TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
+    conditional_format::{
+        CALCEXT_NAMESPACE_DECLARATION, MAX_CONDITIONAL_FORMATS_PER_SHEET,
+        validate_conditional_format, validate_conditional_formats, write_conditional_formats,
+    },
     consolidation::write_consolidation,
     data_pilot::write_data_pilot_tables,
     data_validation::{validate_collection, write_content_validations},
@@ -844,6 +849,7 @@ impl MutableSpreadsheet {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
@@ -1741,6 +1747,55 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Replace a sheet's inert `calcext` conditional formats atomically.
+    ///
+    /// Passing an empty collection removes all conditional formats from the
+    /// sheet. Conditions are stored as typed data and are never evaluated.
+    pub fn set_sheet_conditional_formats(
+        &mut self,
+        sheet_index: usize,
+        formats: Vec<ConditionalFormat>,
+    ) -> Result<()> {
+        validate_conditional_formats(&formats)?;
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.conditional_formats = formats;
+        Ok(())
+    }
+
+    /// Append one inert conditional format to a sheet.
+    pub fn add_sheet_conditional_format(
+        &mut self,
+        sheet_index: usize,
+        format: ConditionalFormat,
+    ) -> Result<()> {
+        validate_conditional_format(&format)?;
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        if sheet.conditional_formats.len() >= MAX_CONDITIONAL_FORMATS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "sheet exceeds the {MAX_CONDITIONAL_FORMATS_PER_SHEET} conditional format safety limit"
+            )));
+        }
+        sheet.conditional_formats.push(format);
+        Ok(())
+    }
+
+    /// Remove and return a sheet's conditional format at `index`, if present.
+    pub fn remove_sheet_conditional_format(
+        &mut self,
+        sheet_index: usize,
+        index: usize,
+    ) -> Result<Option<ConditionalFormat>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok((index < sheet.conditional_formats.len())
+            .then(|| sheet.conditional_formats.remove(index)))
+    }
+
     /// Add an inert image to a sheet's `table:shapes` container.
     pub fn add_sheet_image(&mut self, sheet_index: usize, image: crate::OdfImage) -> Result<()> {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
@@ -2263,6 +2318,8 @@ impl MutableSpreadsheet {
                 }),
             );
 
+            write_conditional_formats(&mut body, &sheet.conditional_formats)?;
+
             body.push_str("</table:table>");
         }
 
@@ -2344,10 +2401,20 @@ impl MutableSpreadsheet {
         if has_protection_extensions && !has_annotations {
             out.push_str(r#" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0""#);
         }
+        let has_conditional_formats = self
+            .sheets
+            .iter()
+            .any(|sheet| !sheet.conditional_formats.is_empty());
+        if has_conditional_formats {
+            out.push_str(CALCEXT_NAMESPACE_DECLARATION);
+        }
         if self.automatic_styles.is_some() || self.font_face_decls.is_some() {
             let mut declared = vec!["office", "table", "text"];
             if self.has_formulas() {
                 declared.push("of");
+            }
+            if has_conditional_formats {
+                declared.push("calcext");
             }
             if has_annotations {
                 declared.extend(["dc", "meta", "draw", "svg", "xlink", "fo", "style", "loext"]);

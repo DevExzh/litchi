@@ -125,11 +125,12 @@
 //! - ✅ Calculation settings, row/column label ranges, and inert consolidations
 //! - ✅ Create, edit, remove, and round-trip inert DDE caches
 //! - ✅ Create, edit, remove, and round-trip data-pilot tables
+//! - ✅ `style:map` conditional cell styles and inert `calcext` conditional formats
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing
-//! - ⚠️ Conditional formatting
+//! - ⚠️ `calcext` color-scale, data-bar, and icon-set conditional format rules
 //!
 //! ## ✅ ODP - Presentations (COMPLETE for reading/writing)
 //!
@@ -709,7 +710,8 @@ pub use ods::{
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellHyperlink,
     CellMatrixSpan, CellMerge, CellRangeSource, CellStyleProtection, CellTextContent, CellValue,
     Column as SColumn, ConditionalCellStyle,
-    ConditionalCellStyleRule, Consolidation, ConsolidationUseLabels, ContentValidation,
+    ConditionalCellStyleRule, ConditionalFormat, ConditionalFormatCondition, Consolidation,
+    ConsolidationUseLabels, ContentValidation,
     DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
     DataPilotGrandTotal, DataPilotGrandTotalElement, DataPilotGrandTotalOrientation,
     DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,

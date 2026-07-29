@@ -30,6 +30,8 @@
 //! - ✅ Inert spreadsheet consolidation declarations
 //! - ✅ Inert DDE source declarations and document-stored cached tables
 //! - ✅ Data-pilot (pivot-table) sources, fields, levels, references, and groups
+//! - ✅ Standard `style:map` conditional cell styles and inert LibreOffice
+//!   `calcext` conditional formats
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -59,10 +61,11 @@
 //! - ✅ Create, edit, clear, and round-trip consolidation declarations
 //! - ✅ Create, edit, remove, and round-trip inert DDE caches
 //! - ✅ Create, edit, remove, and round-trip data-pilot tables
+//! - ✅ Create, edit, remove, and round-trip conditional formats
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
-//! - ⚠️ Conditional formatting
+//! - ⚠️ `calcext` color-scale, data-bar, and icon-set conditional format rules
 //! - ⚠️ Sparklines
 //! - ⚠️ External data connections
 //!
@@ -76,6 +79,7 @@ pub(crate) mod annotation;
 mod builder;
 pub(crate) mod calculation;
 mod cell;
+mod conditional_format;
 mod consolidation;
 pub(crate) mod data_pilot;
 mod data_validation;
@@ -110,6 +114,7 @@ pub use calculation::{
     CalculationIteration, CalculationNullDate, CalculationSettings, IterationStatus,
 };
 pub use cell::{Cell, CellMatrixSpan, CellMerge, CellValue};
+pub use conditional_format::{ConditionalFormat, ConditionalFormatCondition};
 pub use consolidation::{Consolidation, ConsolidationUseLabels};
 pub use data_pilot::{
     DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,

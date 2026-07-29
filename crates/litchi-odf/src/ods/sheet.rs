@@ -35,6 +35,8 @@ pub struct Sheet {
     pub dde_source: Option<DdeSource>,
     /// Optional what-if scenario metadata.
     pub scenario: Option<SheetScenario>,
+    /// Inert LibreOffice `calcext` conditional formats attached to the sheet.
+    pub conditional_formats: Vec<super::ConditionalFormat>,
     /// Inert images anchored in the sheet's `table:shapes` container.
     pub images: Vec<crate::OdfImage>,
     /// General drawing shapes anchored in the sheet's `table:shapes` container.
@@ -104,6 +106,11 @@ impl Sheet {
         self.scenario.as_ref()
     }
 
+    /// Get the sheet's inert conditional formats without evaluating them.
+    pub fn conditional_formats(&self) -> &[super::ConditionalFormat] {
+        &self.conditional_formats
+    }
+
     /// Get inert images anchored at sheet level.
     pub fn images(&self) -> &[crate::OdfImage] {
         &self.images
@@ -155,6 +162,7 @@ mod tests {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -179,6 +187,7 @@ mod tests {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -201,6 +210,7 @@ mod tests {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -240,6 +250,7 @@ mod tests {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -370,6 +381,7 @@ mod tests {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -392,6 +404,7 @@ mod tests {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -511,6 +524,7 @@ mod tests {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),

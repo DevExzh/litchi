@@ -2,12 +2,16 @@
 
 use super::{
     Cell, CellDetective, CellHyperlink, CellMatrixSpan, CellMerge, CellRangeSource,
-    CellTextContent, CellValue, Column, DetectiveDirection, DetectiveHighlightedRange,
-    DetectiveOperation, DetectiveOperationKind, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario,
-    SheetStyle, SheetTableSource, TableGroup, TableRange, TableSourceMode, TableStructure,
-    TableVisibility,
+    CellTextContent, CellValue, Column, ConditionalFormat, ConditionalFormatCondition,
+    DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
+    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, TableGroup, TableRange,
+    TableSourceMode, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
+    conditional_format::{
+        CALCEXT_NAMESPACE_URI, MAX_CONDITIONAL_FORMATS_PER_SHEET, MAX_CONDITIONS_PER_FORMAT,
+        validate_condition, validate_conditional_format,
+    },
     dde::parse_source as parse_dde_source,
     rich_text::CellTextContentBuilder,
     scenario::validate_scenario,
@@ -50,6 +54,16 @@ struct PendingHyperlink {
     /// Byte offset into the cell text where the link text begins.
     text_start: usize,
     /// The `text_element_depth` value assigned to the `text:a` element.
+    depth: usize,
+}
+
+/// A `calcext:conditional-format` element whose rules are still being read.
+struct PendingConditionalFormat {
+    /// Target ranges parsed from `calcext:target-range-address`.
+    target_range_addresses: Vec<String>,
+    /// Inert condition rules collected so far, in document order.
+    conditions: Vec<ConditionalFormatCondition>,
+    /// The `element_depth` value assigned to the element.
     depth: usize,
 }
 
@@ -101,6 +115,10 @@ impl OdsParser {
         let mut spreadsheet_depth = None;
         let mut current_sheet_depth = None;
         let mut sheet_dde_source_depth = None;
+        let mut conditional_formats_depth = None;
+        let mut pending_conditional_format: Option<PendingConditionalFormat> = None;
+        let mut calcext_condition_open_depth = None;
+        let mut calcext_skip_depth = None;
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -140,6 +158,73 @@ impl OdsParser {
                         let source = parse_dde_source(e, reader.decoder(), &document_namespaces)?;
                         sheet.set_dde_source(source)?;
                         sheet_dde_source_depth = Some(element_depth);
+                    } else if calcext_skip_depth.is_some() {
+                        // Unknown extension content inside
+                        // `calcext:conditional-formats` is skipped entirely.
+                    } else if calcext_condition_open_depth.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "calcext:condition must not contain child elements".to_string(),
+                        ));
+                    } else if let Some(pending) = pending_conditional_format.as_mut() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "condition",
+                        ) {
+                            if pending.conditions.len() >= MAX_CONDITIONS_PER_FORMAT {
+                                return Err(Error::InvalidFormat(format!(
+                                    "conditional format exceeds the {MAX_CONDITIONS_PER_FORMAT} condition safety limit"
+                                )));
+                            }
+                            let condition = Self::parse_calcext_condition(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending.conditions.push(condition);
+                            calcext_condition_open_depth = Some(element_depth);
+                        } else {
+                            // `calcext:color-scale`, `calcext:data-bar`, and
+                            // other unmodeled rule types are skipped.
+                            calcext_skip_depth = Some(element_depth);
+                        }
+                    } else if conditional_formats_depth.is_some() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "conditional-format",
+                        ) {
+                            let target_range_addresses = Self::parse_conditional_format_ranges(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending_conditional_format = Some(PendingConditionalFormat {
+                                target_range_addresses,
+                                conditions: Vec::new(),
+                                depth: element_depth,
+                            });
+                        } else {
+                            calcext_skip_depth = Some(element_depth);
+                        }
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && current_sheet_depth.is_some_and(|depth| element_depth == depth + 1)
+                        && e.local_name().as_ref() == b"conditional-formats"
+                    {
+                        if !Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "conditional-formats",
+                        ) {
+                            return Err(Error::InvalidFormat(
+                                "spoofed calcext:conditional-formats namespace".to_string(),
+                            ));
+                        }
+                        conditional_formats_depth = Some(element_depth);
                     } else if let Some(builder) = detective_builder.as_mut() {
                         if detective_child_open {
                             return Err(Error::InvalidFormat(
@@ -456,6 +541,83 @@ impl OdsParser {
                         }
                         let source = parse_dde_source(e, reader.decoder(), &document_namespaces)?;
                         sheet.set_dde_source(source)?;
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if calcext_skip_depth.is_some() {
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if calcext_condition_open_depth.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "calcext:condition must not contain child elements".to_string(),
+                        ));
+                    }
+                    if let Some(pending) = pending_conditional_format.as_mut() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "condition",
+                        ) {
+                            if pending.conditions.len() >= MAX_CONDITIONS_PER_FORMAT {
+                                return Err(Error::InvalidFormat(format!(
+                                    "conditional format exceeds the {MAX_CONDITIONS_PER_FORMAT} condition safety limit"
+                                )));
+                            }
+                            let condition = Self::parse_calcext_condition(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending.conditions.push(condition);
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if conditional_formats_depth.is_some() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "conditional-format",
+                        ) {
+                            let format = ConditionalFormat {
+                                target_range_addresses: Self::parse_conditional_format_ranges(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?,
+                                conditions: Vec::new(),
+                            };
+                            validate_conditional_format(&format)?;
+                            if let Some(sheet) = current_sheet.as_mut() {
+                                sheet.add_conditional_format(format)?;
+                            }
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if current_sheet.is_some()
+                        && current_row.is_none()
+                        && current_sheet_depth.is_some_and(|depth| element_depth == depth)
+                        && e.local_name().as_ref() == b"conditional-formats"
+                    {
+                        if !Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "conditional-formats",
+                        ) {
+                            return Err(Error::InvalidFormat(
+                                "spoofed calcext:conditional-formats namespace".to_string(),
+                            ));
+                        }
+                        // An empty container declares no conditional formats.
                         Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
                         buf.clear();
                         continue;
@@ -832,9 +994,61 @@ impl OdsParser {
                             OFFICE_NAMESPACE,
                             "spreadsheet",
                         );
+                    let closes_calcext_skip = calcext_skip_depth == Some(element_depth);
+                    let closes_calcext_condition = calcext_condition_open_depth == Some(element_depth);
+                    let closes_conditional_format = pending_conditional_format
+                        .as_ref()
+                        .is_some_and(|pending| pending.depth == element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "conditional-format",
+                        );
+                    let closes_conditional_formats = conditional_formats_depth == Some(element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "conditional-formats",
+                        );
                     element_depth = element_depth.saturating_sub(1);
                     if closes_sheet_dde_source {
                         sheet_dde_source_depth = None;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_calcext_skip {
+                        calcext_skip_depth = None;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_calcext_condition {
+                        calcext_condition_open_depth = None;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_conditional_format {
+                        let pending = pending_conditional_format
+                            .take()
+                            .expect("pending conditional format was checked");
+                        let format = ConditionalFormat {
+                            target_range_addresses: pending.target_range_addresses,
+                            conditions: pending.conditions,
+                        };
+                        validate_conditional_format(&format)?;
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.add_conditional_format(format)?;
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_conditional_formats {
+                        conditional_formats_depth = None;
                         Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                         buf.clear();
                         continue;
@@ -1029,6 +1243,11 @@ impl OdsParser {
         if sheet_dde_source_depth.is_some() {
             return Err(Error::InvalidFormat(
                 "unterminated office:dde-source".to_string(),
+            ));
+        }
+        if conditional_formats_depth.is_some() {
+            return Err(Error::InvalidFormat(
+                "unterminated calcext:conditional-formats".to_string(),
             ));
         }
 
@@ -2301,6 +2520,104 @@ impl OdsParser {
         }
     }
 
+    /// Parse the `calcext:target-range-address` of a `calcext:conditional-format`.
+    fn parse_conditional_format_ranges(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<Vec<String>> {
+        let mut ranges = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                CALCEXT_NAMESPACE_URI,
+                "target-range-address",
+            ) {
+                if ranges.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "duplicate calcext:target-range-address attribute".to_string(),
+                    ));
+                }
+                ranges = Some(split_cell_range_addresses(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:target-range-address",
+                )?)?);
+            }
+        }
+        let ranges = ranges.ok_or_else(|| {
+            Error::InvalidFormat(
+                "calcext:conditional-format requires calcext:target-range-address".to_string(),
+            )
+        })?;
+        if ranges.is_empty() {
+            return Err(Error::InvalidFormat(
+                "calcext:target-range-address requires at least one range".to_string(),
+            ));
+        }
+        Ok(ranges)
+    }
+
+    /// Parse one inert `calcext:condition` rule from its attributes.
+    fn parse_calcext_condition(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalFormatCondition> {
+        let mut condition = None;
+        let mut apply_style_name = None;
+        let mut base_cell_address = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("value") {
+                condition = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:value",
+                )?);
+            } else if is_calcext("apply-style-name") {
+                apply_style_name = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:apply-style-name",
+                )?);
+            } else if is_calcext("base-cell-address") {
+                base_cell_address = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:base-cell-address",
+                )?);
+            }
+        }
+        let rule = ConditionalFormatCondition {
+            condition: condition.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:condition requires calcext:value".to_string(),
+                )
+            })?,
+            apply_style_name: apply_style_name.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:condition requires calcext:apply-style-name".to_string(),
+                )
+            })?,
+            base_cell_address,
+        };
+        validate_condition(&rule)?;
+        Ok(rule)
+    }
+
     fn decode_attribute(
         attribute: &quick_xml::events::attributes::Attribute<'_>,
         decoder: Decoder,
@@ -2468,6 +2785,7 @@ pub(crate) struct SheetBuilder {
     table_source: Option<SheetTableSource>,
     dde_source: Option<super::DdeSource>,
     scenario: Option<SheetScenario>,
+    conditional_formats: Vec<ConditionalFormat>,
     images: Vec<crate::OdfImage>,
     cell_count: usize,
     /// Runs of empty rows read but not yet materialised, in document order.
@@ -2500,6 +2818,7 @@ impl SheetBuilder {
             table_source: None,
             dde_source: None,
             scenario: None,
+            conditional_formats: Vec::new(),
             images: Vec::new(),
             cell_count: 0,
             deferred_rows: Vec::new(),
@@ -2513,6 +2832,16 @@ impl SheetBuilder {
                 "a table must not contain more than one scenario".to_string(),
             ));
         }
+        Ok(())
+    }
+
+    fn add_conditional_format(&mut self, format: ConditionalFormat) -> Result<()> {
+        if self.conditional_formats.len() >= MAX_CONDITIONAL_FORMATS_PER_SHEET {
+            return Err(Error::InvalidFormat(format!(
+                "sheet exceeds the {MAX_CONDITIONAL_FORMATS_PER_SHEET} conditional format safety limit"
+            )));
+        }
+        self.conditional_formats.push(format);
         Ok(())
     }
 
@@ -2712,6 +3041,7 @@ impl SheetBuilder {
             table_source: self.table_source,
             dde_source: self.dde_source,
             scenario: self.scenario,
+            conditional_formats: self.conditional_formats,
             images: self.images,
             shapes: Vec::new(),
             protection: super::SheetProtection::default(),
