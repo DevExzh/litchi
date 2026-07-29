@@ -3357,6 +3357,28 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("cshade", Some(i32::from(theme.shade)))?;
             self.write_str("}")?;
         }
+        if let Some(hyperlink) = &property.hyperlink {
+            hyperlink
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            self.write_str("{\\hl")?;
+            if let Some(location) = &hyperlink.location {
+                self.write_str("{\\hlloc ")?;
+                self.write_destination_text(location.as_ref())?;
+                self.write_str("}")?;
+            }
+            if let Some(source) = &hyperlink.source {
+                self.write_str("{\\hlsrc ")?;
+                self.write_destination_text(source.as_ref())?;
+                self.write_str("}")?;
+            }
+            if let Some(friendly_name) = &hyperlink.friendly_name {
+                self.write_str("{\\hlfr ")?;
+                self.write_destination_text(friendly_name.as_ref())?;
+                self.write_str("}")?;
+            }
+            self.write_str("}")?;
+        }
         self.write_str("}")
     }
 

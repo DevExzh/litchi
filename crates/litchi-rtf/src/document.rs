@@ -4329,6 +4329,9 @@ impl<'a> RtfDocument<'a> {
                 .binary_value
                 .map(|value| Cow::Owned(value.into_owned())),
             theme_value: property.theme_value,
+            hyperlink: property
+                .hyperlink
+                .map(crate::ShapeHyperlink::into_owned),
         }
     }
 

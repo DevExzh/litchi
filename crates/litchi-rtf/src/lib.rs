@@ -303,7 +303,8 @@ pub use section::{SectionFootnotePlacement, SectionNoteOptions};
 pub use shape::{
     Fill, FillType, GradientDirection, MAX_SHAPE_PROPERTY_BINARY_BYTES, OfficeArtColor,
     OfficeArtOpacity, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
-    ShapeHorizontalAnchor, ShapeLine, ShapeProperty, ShapeResult, ShapeRotationDegrees,
+    ShapeHorizontalAnchor, ShapeHyperlink, ShapeLine, ShapeProperty, ShapeResult,
+    ShapeRotationDegrees,
     ShapeThemeColor, ShapeThemeValue, ShapeTwips, ShapeType, ShapeVerticalAnchor, ShapeWrapSide,
     ShapeWrapStyle, ShapeZOrder, StoryDrawing, WrapMode,
 };

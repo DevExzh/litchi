@@ -19706,13 +19706,14 @@ impl<'a> Parser<'a> {
                             "RTF shape property count exceeds the safety limit".to_string(),
                         ));
                     }
-                    let (name, value, binary_value, theme_value) =
+                    let (name, value, binary_value, theme_value, hyperlink) =
                         self.parse_shape_property_group()?;
                     shape.properties.push(super::shape::ShapeProperty {
                         name: Cow::Owned(name),
                         value: Cow::Owned(value),
                         binary_value: binary_value.map(Cow::Owned),
                         theme_value,
+                        hyperlink,
                     });
                 },
                 Token::OpenBrace
@@ -20399,6 +20400,7 @@ impl<'a> Parser<'a> {
         String,
         Option<Vec<u8>>,
         Option<crate::ShapeThemeValue>,
+        Option<crate::ShapeHyperlink<'a>>,
     )> {
         #[derive(Clone, Copy, PartialEq, Eq)]
         enum PropertyPart {
@@ -20410,6 +20412,7 @@ impl<'a> Parser<'a> {
         let mut value = String::new();
         let mut binary_value = None;
         let mut theme_value = None;
+        let mut hyperlink = None;
         let mut seen_name = false;
         let mut seen_value = false;
         let mut part = None;
@@ -20418,6 +20421,53 @@ impl<'a> Parser<'a> {
         self.pos += 1; // consume the opening brace
         while self.pos < self.tokens.len() {
             match &self.tokens[self.pos] {
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::ShapeHyperlink))
+                    ) =>
+                {
+                    if depth != 0
+                        || part.is_some()
+                        || !seen_name
+                        || hyperlink.is_some()
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF hl must be the single direct hyperlink group after sn in sp"
+                                .to_string(),
+                        ));
+                    }
+                    hyperlink = Some(self.parse_shape_hyperlink_destination()?);
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos..self.pos + 3),
+                        Some([
+                            Token::OpenBrace,
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::ShapeHyperlink),
+                        ])
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF hl destination must not be starred".to_string(),
+                    ));
+                },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(
+                            ControlWord::ShapeHyperlinkLocation
+                                | ControlWord::ShapeHyperlinkSource
+                                | ControlWord::ShapeHyperlinkFriendlyName
+                        ))
+                    ) =>
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape-hyperlink string destinations may occur only inside hl"
+                            .to_string(),
+                    ));
+                },
                 Token::OpenBrace
                     if matches!(
                         self.tokens.get(self.pos + 1),
@@ -20500,6 +20550,7 @@ impl<'a> Parser<'a> {
                         value.trim().to_string(),
                         binary_value,
                         theme_value,
+                        hyperlink,
                     ));
                 },
                 Token::CloseBrace => {
@@ -20535,6 +20586,16 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ShapeBinaryValue(_)) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF svb destination must be grouped and starred".to_string(),
+                    ));
+                },
+                Token::Control(
+                    ControlWord::ShapeHyperlink
+                    | ControlWord::ShapeHyperlinkLocation
+                    | ControlWord::ShapeHyperlinkSource
+                    | ControlWord::ShapeHyperlinkFriendlyName,
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape-hyperlink destinations must be grouped".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::ShapeThemeValue(_)) => {
@@ -20945,7 +21006,7 @@ impl<'a> Parser<'a> {
                             "RTF shape group property count exceeds the safety limit".to_string(),
                         ));
                     }
-                    let (name, value, binary_value, theme_value) =
+                    let (name, value, binary_value, theme_value, hyperlink) =
                         self.parse_shape_property_group()?;
                     if name == "wzName" {
                         group.name = Cow::Owned(value.clone());
@@ -20955,6 +21016,7 @@ impl<'a> Parser<'a> {
                         value: Cow::Owned(value),
                         binary_value: binary_value.map(Cow::Owned),
                         theme_value,
+                        hyperlink,
                     });
                 },
                 Token::OpenBrace
@@ -22847,6 +22909,7 @@ impl<'a> Parser<'a> {
             value: Cow::Borrowed(self.arena.alloc_str(&value) as &str),
             binary_value: binary_value.map(Cow::Owned),
             theme_value,
+            hyperlink: None,
         })
     }
 
@@ -22917,6 +22980,98 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
         }
+    }
+
+    /// Parse the `\hl` shape-hyperlink group inside a shape property.
+    ///
+    /// Expects `self.pos` at the group's opening brace and consumes tokens
+    /// through its closing brace. The `\hlloc`, `\hlsrc`, and `\hlfr` string
+    /// groups may appear in any order (RTF "Hyperlink Property for Shapes").
+    fn parse_shape_hyperlink_destination(&mut self) -> RtfResult<crate::ShapeHyperlink<'a>> {
+        self.pos += 2; // opening brace and hl control
+        let mut hyperlink = crate::ShapeHyperlink::default();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    break;
+                },
+                Some(Token::OpenBrace) => {
+                    let slot = match self.tokens.get(self.pos + 1) {
+                        Some(Token::Control(ControlWord::ShapeHyperlinkLocation)) => {
+                            &mut hyperlink.location
+                        },
+                        Some(Token::Control(ControlWord::ShapeHyperlinkSource)) => {
+                            &mut hyperlink.source
+                        },
+                        Some(Token::Control(ControlWord::ShapeHyperlinkFriendlyName)) => {
+                            &mut hyperlink.friendly_name
+                        },
+                        _ => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF hl may contain only hlloc, hlsrc, and hlfr destinations"
+                                    .to_string(),
+                            ));
+                        },
+                    };
+                    if slot.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF shape-hyperlink string destination".to_string(),
+                        ));
+                    }
+                    *slot = Some(self.parse_shape_hyperlink_string()?);
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {
+                    self.pos += 1;
+                },
+                _ => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF hl contains ungrouped, binary, or active data".to_string(),
+                    ));
+                },
+            }
+        }
+        hyperlink.validate()?;
+        Ok(hyperlink)
+    }
+
+    /// Parse one `\hlloc`/`\hlsrc`/`\hlfr` string destination group;
+    /// `self.pos` is at its opening brace.
+    fn parse_shape_hyperlink_string(&mut self) -> RtfResult<Cow<'a, str>> {
+        self.pos += 2; // opening brace and destination control
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut fallback_skip = 0usize;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    break;
+                },
+                None => return Err(RtfError::UnexpectedEof),
+                _ => {
+                    if !self.consume_destination_text_token(
+                        &mut value,
+                        &mut unicode_skip,
+                        &mut fallback_skip,
+                        "shape-hyperlink string",
+                    )? {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-hyperlink string destination contains grouped, binary, or active data"
+                                .to_string(),
+                        ));
+                    }
+                    if value.len() > crate::shape::MAX_SHAPE_HYPERLINK_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF shape-hyperlink string exceeds the safety limit".to_string(),
+                        ));
+                    }
+                },
+            }
+        }
+        Ok(Cow::Owned(
+            value.trim_end_matches(['\r', '\n']).to_string(),
+        ))
     }
 
     fn skip_picture_property_whitespace(&mut self) {

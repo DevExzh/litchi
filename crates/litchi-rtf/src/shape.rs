@@ -347,6 +347,74 @@ impl ShapeResult<'_> {
     }
 }
 
+/// Upper bound for one inert shape-hyperlink string, in bytes.
+pub const MAX_SHAPE_HYPERLINK_BYTES: usize = 65_536;
+
+/// Inert hyperlink metadata from the `\hl` group of a shape property.
+///
+/// The RTF specification ("Hyperlink Property for Shapes") defines the
+/// `{\hl {\hlloc …} {\hlsrc …} {\hlfr …}}` group, which may occur inside a
+/// shape property (`\sp`) destination: `\hlloc` is the location string,
+/// `\hlsrc` the source string, and `\hlfr` the friendly name; the three
+/// groups may appear in any order.
+///
+/// The strings are passive metadata only: they are never resolved, opened,
+/// fetched, validated as references, or activated.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShapeHyperlink<'a> {
+    /// Location string (`\hlloc`).
+    pub location: Option<Cow<'a, str>>,
+    /// Source string (`\hlsrc`).
+    pub source: Option<Cow<'a, str>>,
+    /// Friendly name (`\hlfr`).
+    pub friendly_name: Option<Cow<'a, str>>,
+}
+
+impl<'a> ShapeHyperlink<'a> {
+    fn validate_string(kind: &str, value: &str) -> crate::RtfResult<()> {
+        if value.len() > MAX_SHAPE_HYPERLINK_BYTES {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF shape-hyperlink {kind} string exceeds the safety limit"
+            )));
+        }
+        if value.contains(['\0', '\r', '\n']) {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF shape-hyperlink {kind} string contains a forbidden control character"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Validate presence and resource constraints.
+    pub fn validate(&self) -> crate::RtfResult<()> {
+        if self.location.is_none() && self.source.is_none() && self.friendly_name.is_none() {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF shape hyperlink must carry at least one string".to_string(),
+            ));
+        }
+        if let Some(location) = &self.location {
+            Self::validate_string("location", location)?;
+        }
+        if let Some(source) = &self.source {
+            Self::validate_string("source", source)?;
+        }
+        if let Some(friendly_name) = &self.friendly_name {
+            Self::validate_string("friendly name", friendly_name)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> ShapeHyperlink<'static> {
+        ShapeHyperlink {
+            location: self.location.map(|value| Cow::Owned(value.into_owned())),
+            source: self.source.map(|value| Cow::Owned(value.into_owned())),
+            friendly_name: self
+                .friendly_name
+                .map(|value| Cow::Owned(value.into_owned())),
+        }
+    }
+}
+
 /// A scalar or binary OfficeArt property retained from an RTF `sp` destination.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeProperty<'a> {
@@ -358,6 +426,8 @@ pub struct ShapeProperty<'a> {
     pub binary_value: Option<Cow<'a, [u8]>>,
     /// Optional inert theme metadata from the starred `hsv` destination after `sv`
     pub theme_value: Option<ShapeThemeValue>,
+    /// Optional inert hyperlink metadata from the `hl` group
+    pub hyperlink: Option<ShapeHyperlink<'a>>,
 }
 
 impl<'a> ShapeProperty<'a> {
@@ -369,6 +439,7 @@ impl<'a> ShapeProperty<'a> {
             value,
             binary_value: None,
             theme_value: None,
+            hyperlink: None,
         }
     }
 
@@ -384,6 +455,7 @@ impl<'a> ShapeProperty<'a> {
             value,
             binary_value: None,
             theme_value: Some(theme_value),
+            hyperlink: None,
         }
     }
 
@@ -395,6 +467,7 @@ impl<'a> ShapeProperty<'a> {
             value: Cow::Borrowed(""),
             binary_value: Some(value),
             theme_value: None,
+            hyperlink: None,
         }
     }
 
@@ -424,6 +497,9 @@ impl<'a> ShapeProperty<'a> {
                 ));
             }
             theme_value.validate()?;
+        }
+        if let Some(hyperlink) = &self.hyperlink {
+            hyperlink.validate()?;
         }
         Ok(())
     }
@@ -934,6 +1010,7 @@ impl<'a> Shape<'a> {
                         .binary_value
                         .map(|value| Cow::Owned(value.into_owned())),
                     theme_value: property.theme_value,
+                    hyperlink: property.hyperlink.map(ShapeHyperlink::into_owned),
                 })
                 .collect(),
             result: self.result.map(ShapeResult::into_owned),
@@ -1166,6 +1243,7 @@ impl<'a> ShapeGroup<'a> {
                         .binary_value
                         .map(|value| Cow::Owned(value.into_owned())),
                     theme_value: property.theme_value,
+                    hyperlink: property.hyperlink.map(ShapeHyperlink::into_owned),
                 })
                 .collect(),
             result: self.result.map(ShapeResult::into_owned),
