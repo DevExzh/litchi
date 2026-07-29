@@ -38,6 +38,16 @@ mod chart_frt;
 /// properties as an opaque `XmlTkChain` byte chain.
 mod crt_ml_frt;
 
+/// BIFF8 chart layout future records (`CrtLayout12`, `CrtLayout12A`).
+mod chart_layout;
+
+/// BIFF8 chart property-stream future records (`ShapePropsStream`,
+/// `TextPropsStream`, `RichTextStream`).
+mod chart_property_stream;
+
+/// BIFF8 `ForceFullCalculation` record: the forced calculation mode.
+mod force_full_calculation;
+
 /// BIFF8 `Backup` record: the workbook save-backup flag.
 mod backup;
 
@@ -330,6 +340,9 @@ pub use page_setup::{
 pub use palette::{XlsColor, XlsPalette};
 pub use print_flags::{XlsGridSet, XlsPrintRowCol};
 pub use crt_ml_frt::XlsCrtMlFrt;
+pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
+pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
+pub use force_full_calculation::XlsForceFullCalculation;
 pub use backup::XlsBackup;
 pub use background_picture::{XlsBackgroundImage, XlsBackgroundImageFormat};
 pub use cell_watch::XlsCellWatch;

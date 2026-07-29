@@ -14,13 +14,13 @@
 
 use super::{XlsError, XlsResult};
 
-/// Record type of the `CrtMlFrt` record (MS-XLS 2.4.70).
-pub(crate) const CRT_ML_FRT_RECORD_TYPE: u16 = 0x089D;
+/// Record type of the `CrtMlFrt` record (MS-XLS 2.4.70); also the required
+/// `frtHeader.rt` value. (The neighboring 0x089D is `CrtLayout12`,
+/// MS-XLS 2.4.66.)
+pub(crate) const CRT_ML_FRT_RECORD_TYPE: u16 = 0x089E;
 /// Record type of the `CrtMlFrtContinue` record (MS-XLS 2.4.71).
 pub(crate) const CRT_ML_FRT_CONTINUE_RECORD_TYPE: u16 = 0x089F;
 
-/// `frtHeader.rt` value inside a `CrtMlFrt` record (MS-XLS 2.4.70).
-const CRT_ML_FRT_HEADER_RT: u16 = 0x089E;
 /// Size in bytes of an `FrtHeader` (MS-XLS 2.5.135).
 const FRT_HEADER_LEN: usize = 12;
 /// `FrtFlags` bits that MUST be zero in a `CrtMlFrt`/`CrtMlFrtContinue`
@@ -91,7 +91,7 @@ impl XlsCrtMlFrt {
                 found: data.len(),
             });
         }
-        validate_frt_header(data, CRT_ML_FRT_HEADER_RT, "CrtMlFrt")?;
+        validate_frt_header(data, CRT_ML_FRT_RECORD_TYPE, "CrtMlFrt")?;
         let declared = u64::from(u32::from_le_bytes(
             data[FRT_HEADER_LEN..FRT_HEADER_LEN + FIELD_LEN]
                 .try_into()
@@ -129,7 +129,7 @@ impl XlsCrtMlFrt {
     /// one record.
     pub fn to_record_payloads(&self) -> Vec<Vec<u8>> {
         let mut first = Vec::new();
-        first.extend_from_slice(&CRT_ML_FRT_HEADER_RT.to_le_bytes());
+        first.extend_from_slice(&CRT_ML_FRT_RECORD_TYPE.to_le_bytes());
         first.extend_from_slice(&self.flags.to_le_bytes());
         first.extend_from_slice(&self.reserved);
         first.extend_from_slice(&(self.chain.len() as u32).to_le_bytes());
@@ -171,7 +171,7 @@ mod tests {
 
     fn crt_ml_frt_record(chain: &[u8], unused: [u8; 4]) -> Vec<u8> {
         let mut data = Vec::new();
-        data.extend_from_slice(&CRT_ML_FRT_HEADER_RT.to_le_bytes());
+        data.extend_from_slice(&CRT_ML_FRT_RECORD_TYPE.to_le_bytes());
         data.extend_from_slice(&[0; FRT_HEADER_LEN - 2]);
         data.extend_from_slice(&(chain.len() as u32).to_le_bytes());
         data.extend_from_slice(chain);
@@ -239,9 +239,9 @@ mod tests {
         let record = crt_ml_frt_record(b"chain", [0; 4]);
         // Truncated.
         assert!(XlsCrtMlFrt::parse(&record[..10], &[]).is_err());
-        // Wrong FrtHeader.rt.
+        // Wrong FrtHeader.rt (0x089D is the neighboring CrtLayout12).
         let mut wrong_rt = record.clone();
-        wrong_rt[0..2].copy_from_slice(&CRT_ML_FRT_RECORD_TYPE.to_le_bytes());
+        wrong_rt[0..2].copy_from_slice(&0x089Du16.to_le_bytes());
         assert!(XlsCrtMlFrt::parse(&wrong_rt, &[]).is_err());
         // fFrtRef / fFrtAlert set.
         for flags in [0x0001u16, 0x0002] {
