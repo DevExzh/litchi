@@ -112,6 +112,7 @@ pub use crate::text::ParagraphListLabelColor as KeynoteTableCellParagraphListLab
 pub use crate::text::ParagraphListLevel as KeynoteTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as KeynoteTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListNumberFormat as KeynoteTableCellParagraphListNumberFormat;
+pub use crate::text::ParagraphListNumberScale as KeynoteTableCellParagraphListNumberScale;
 pub use crate::text::ParagraphListNumberTiering as KeynoteTableCellParagraphListNumberTiering;
 pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlacement;
@@ -2273,6 +2274,91 @@ impl KeynoteEditor {
         let mut staged = self.package().clone();
         let changed =
             crate::numbers::editor::reset_table_cell_paragraph_list_number_tiering_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read one numbered slide-table paragraph's number-label size.
+    pub fn slide_table_cell_paragraph_list_number_scale(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<KeynoteTableCellParagraphListNumberScale> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_number_scale_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one numbered slide-table paragraph's number-label size.
+    pub fn set_slide_table_cell_paragraph_list_number_scale(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        scale: KeynoteTableCellParagraphListNumberScale,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_number_scale_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            scale,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_list_number_scale(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != scale
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph list-number scale failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the standard 100% number-label size.
+    pub fn reset_slide_table_cell_paragraph_list_number_scale(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_number_scale_in_package(
                 &mut staged,
                 model_object_id,
                 row,

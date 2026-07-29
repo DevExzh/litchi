@@ -194,6 +194,18 @@ pub(super) fn effective_bullet_geometries(
             "iWork list style {style_id} is not a text-bullet list"
         )));
     }
+    effective_label_geometries(package, style_id)
+}
+
+pub(super) fn effective_label_geometries(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<Vec<LabelGeometry>> {
+    if resolved_paragraph_list(package, style_id)? == ParagraphList::None {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} has no labels"
+        )));
+    }
     let mut current_id = style_id;
     let mut visited = HashSet::new();
     loop {

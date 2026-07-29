@@ -45,12 +45,12 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
-    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
-    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
+    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing,
+    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
     TextShadow, TextStorageInfo, TextStyle,
 };
@@ -161,6 +161,8 @@ pub type NumbersTableCellParagraphListLabelColor = ParagraphListLabelColor;
 pub type NumbersTableCellParagraphListNumberFormat = ParagraphListNumberFormat;
 /// Flat or hierarchical numbered-list labels in a Numbers table cell.
 pub type NumbersTableCellParagraphListNumberTiering = ParagraphListNumberTiering;
+/// Number-label size for a numbered paragraph in a Numbers table cell.
+pub type NumbersTableCellParagraphListNumberScale = ParagraphListNumberScale;
 /// A validated zero-based list nesting level in a Numbers table cell.
 pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
@@ -1244,6 +1246,49 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_number_tiering(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one numbered sheet text-box paragraph's number-label size.
+    pub fn sheet_text_box_paragraph_list_number_scale(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberScale> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_number_scale(graph.storage_id, paragraph)
+    }
+
+    /// Set one numbered sheet text-box paragraph's number-label size.
+    pub fn set_sheet_text_box_paragraph_list_number_scale(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        scale: ParagraphListNumberScale,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_number_scale(graph.storage_id, paragraph, scale)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the standard 100% number-label size.
+    pub fn reset_sheet_text_box_paragraph_list_number_scale(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list_number_scale(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
@@ -3560,6 +3605,76 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read one numbered table-cell paragraph's number-label size.
+    pub fn table_cell_paragraph_list_number_scale(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumberScale> {
+        cell_paragraph_list::paragraph_list_number_scale(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one numbered table-cell paragraph's number-label size.
+    pub fn set_table_cell_paragraph_list_number_scale(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        scale: NumbersTableCellParagraphListNumberScale,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_number_scale(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            scale,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_number_scale(table_id, row, column, paragraph)?
+            != scale
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-number scale failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the standard 100% number-label size.
+    pub fn reset_table_cell_paragraph_list_number_scale(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_number_scale(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read one table-cell paragraph's effective text-bullet marker.
     pub fn table_cell_paragraph_list_bullet(
         &self,
@@ -5814,6 +5929,41 @@ pub(crate) fn reset_table_cell_paragraph_list_number_tiering_in_package(
     paragraph: ParagraphStart,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_tiering(
+        package, table_id, row, column, paragraph,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_number_scale_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumberScale> {
+    cell_paragraph_list::paragraph_list_number_scale(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_number_scale_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    scale: ParagraphListNumberScale,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_number_scale(
+        package, table_id, row, column, paragraph, scale,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_number_scale_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_number_scale(
         package, table_id, row, column, paragraph,
     )
 }

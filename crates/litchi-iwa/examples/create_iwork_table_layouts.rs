@@ -15,13 +15,13 @@ use litchi_iwa::text::{
     ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLabelIndent,
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberPunctuation, ParagraphListNumberSequence, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphListNumberPunctuation, ParagraphListNumberScale, ParagraphListNumberSequence,
+    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart,
+    ParagraphListTextGap, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
+    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -158,6 +158,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             numbered_paragraph_start()?,
         )?,
         ParagraphListNumberTiering::Tiered
+    );
+    assert_eq!(
+        numbers.table_cell_paragraph_list_number_scale(
+            numbers_table.object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        custom_number_scale()?
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_bullet(
@@ -300,6 +309,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             numbered_paragraph_start()?,
         )?,
         ParagraphListNumberTiering::Tiered
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list_number_scale(
+            pages_table.model_object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        custom_number_scale()?
     );
     assert_eq!(
         pages.table_cell_paragraph_list_bullet(
@@ -487,6 +505,16 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ParagraphListNumberTiering::Tiered
     );
     assert_eq!(
+        keynote.slide_table_cell_paragraph_list_number_scale(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        custom_number_scale()?
+    );
+    assert_eq!(
         keynote.slide_table_cell_paragraph_list_bullet(
             0,
             keynote_table.model_object_id,
@@ -608,6 +636,10 @@ fn custom_number_format() -> ParagraphListNumberFormat {
         ParagraphListNumberSequence::RomanLowercase,
         ParagraphListNumberPunctuation::Parentheses,
     )
+}
+
+fn custom_number_scale() -> Result<ParagraphListNumberScale, litchi_iwa::Error> {
+    ParagraphListNumberScale::from_percent(135.0)
 }
 
 fn numbers_text_style() -> Result<TextStyle, litchi_iwa::Error> {
@@ -945,6 +977,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbered_paragraph_start()?,
         ParagraphListNumberTiering::Tiered,
     )?;
+    editor.set_table_cell_paragraph_list_number_scale(
+        table_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        custom_number_scale()?,
+    )?;
     editor.set_table_cell_paragraph_list_bullet(
         table_id,
         ROW,
@@ -1055,6 +1094,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbered_paragraph_start()?,
         ParagraphListNumberTiering::Tiered,
+    )?;
+    editor.set_table_cell_paragraph_list_number_scale(
+        table_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        custom_number_scale()?,
     )?;
     editor.set_table_cell_paragraph_list_bullet(
         table_id,
@@ -1274,6 +1320,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbered_paragraph_start()?,
         ParagraphListNumberTiering::Tiered,
+    )?;
+    editor.set_slide_table_cell_paragraph_list_number_scale(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        custom_number_scale()?,
     )?;
     editor.set_slide_table_cell_paragraph_list_bullet(
         0,

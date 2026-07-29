@@ -88,8 +88,8 @@ pub use paragraph_list::{
     ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
     ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
-    ParagraphListNumberSequence, ParagraphListNumberTiering, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
 };
 pub(crate) use paragraph_list::{
     paragraph_list as paragraph_list_in_storage,
@@ -100,6 +100,7 @@ pub(crate) use paragraph_list::{
     paragraph_list_level as paragraph_list_level_in_storage,
     paragraph_list_levels as paragraph_list_levels_in_storage,
     paragraph_list_number_format as paragraph_list_number_format_in_storage,
+    paragraph_list_number_scale as paragraph_list_number_scale_in_storage,
     paragraph_list_number_tiering as paragraph_list_number_tiering_in_storage,
     paragraph_list_numbering as paragraph_list_numbering_in_storage,
     paragraph_lists as paragraph_lists_in_storage, preset_style_id, preset_style_object,

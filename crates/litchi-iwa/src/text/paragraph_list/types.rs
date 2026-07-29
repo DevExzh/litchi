@@ -8,6 +8,8 @@ use crate::{Error, Result};
 const MAX_PARAGRAPH_LIST_LEVEL: u8 = 8;
 const MAX_PARAGRAPH_LIST_BULLET_CHARACTERS: usize = 32;
 const PERCENT_PER_SCALE_UNIT: f32 = 100.0;
+const MIN_NUMBER_SCALE_PERCENT: f32 = 1.0;
+const MAX_NUMBER_SCALE_PERCENT: f32 = 999.0;
 const STANDARD_TOP_LEVEL_BULLET_BASELINE_POINTS: f32 = 0.0;
 const STANDARD_NESTED_BULLET_BASELINE_POINTS: f32 = -1.0;
 const STANDARD_FONT_EM_POINTS: f32 = 11.0;
@@ -257,6 +259,54 @@ impl ParagraphListBulletScale {
 }
 
 impl Default for ParagraphListBulletScale {
+    fn default() -> Self {
+        Self::ONE
+    }
+}
+
+/// A numbered-list label size relative to its paragraph text.
+///
+/// The range matches the 1%–999% limits enforced by the iWork inspector.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct ParagraphListNumberScale(f32);
+
+impl ParagraphListNumberScale {
+    /// The standard 100% number-label size.
+    pub const ONE: Self = Self(1.0);
+    /// Smallest size accepted by iWork's inspector.
+    pub const MIN_PERCENT: f32 = MIN_NUMBER_SCALE_PERCENT;
+    /// Largest size accepted by iWork's inspector.
+    pub const MAX_PERCENT: f32 = MAX_NUMBER_SCALE_PERCENT;
+
+    /// Construct a scale from the percentage displayed by iWork.
+    pub fn from_percent(percent: f32) -> Result<Self> {
+        if !percent.is_finite()
+            || !(MIN_NUMBER_SCALE_PERCENT..=MAX_NUMBER_SCALE_PERCENT).contains(&percent)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "paragraph list number scale must be between {MIN_NUMBER_SCALE_PERCENT}% and {MAX_NUMBER_SCALE_PERCENT}%"
+            )));
+        }
+        Ok(Self(percent / PERCENT_PER_SCALE_UNIT))
+    }
+
+    /// Construct a scale from its native text-relative ratio.
+    pub fn from_ratio(ratio: f32) -> Result<Self> {
+        Self::from_percent(ratio * PERCENT_PER_SCALE_UNIT)
+    }
+
+    /// Return the percentage displayed by iWork.
+    pub fn percent(self) -> f32 {
+        self.0 * PERCENT_PER_SCALE_UNIT
+    }
+
+    /// Return the native text-relative scale ratio.
+    pub const fn ratio(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for ParagraphListNumberScale {
     fn default() -> Self {
         Self::ONE
     }
@@ -612,6 +662,25 @@ mod tests {
         assert_eq!(top.baseline_offset.points(), 0.0);
         let nested = ParagraphListBulletGeometry::standard(ParagraphListLevel::ONE);
         assert_eq!(nested.baseline_offset.points(), -1.0);
+    }
+
+    #[test]
+    fn number_scale_matches_native_inspector_bounds() {
+        assert_eq!(
+            ParagraphListNumberScale::from_percent(1.0)
+                .unwrap()
+                .percent(),
+            1.0
+        );
+        assert_eq!(
+            ParagraphListNumberScale::from_percent(999.0)
+                .unwrap()
+                .ratio(),
+            9.99
+        );
+        assert!(ParagraphListNumberScale::from_percent(0.0).is_err());
+        assert!(ParagraphListNumberScale::from_percent(1_000.0).is_err());
+        assert!(ParagraphListNumberScale::from_ratio(f32::NAN).is_err());
     }
 
     #[test]

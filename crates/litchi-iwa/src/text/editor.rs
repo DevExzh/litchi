@@ -76,17 +76,20 @@ use super::paragraph_alignment::{
 use super::paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumberFormat, ParagraphListNumberTiering, ParagraphListNumbering,
-    ParagraphListPlacement, paragraph_list, paragraph_list_bullet, paragraph_list_bullet_geometry,
-    paragraph_list_indentation, paragraph_list_label_color, paragraph_list_level,
-    paragraph_list_levels, paragraph_list_number_format, paragraph_list_number_tiering,
-    paragraph_list_numbering, paragraph_lists, reset_paragraph_list, reset_paragraph_list_bullet,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphListPlacement, paragraph_list, paragraph_list_bullet,
+    paragraph_list_bullet_geometry, paragraph_list_indentation, paragraph_list_label_color,
+    paragraph_list_level, paragraph_list_levels, paragraph_list_number_format,
+    paragraph_list_number_scale, paragraph_list_number_tiering, paragraph_list_numbering,
+    paragraph_lists, reset_paragraph_list, reset_paragraph_list_bullet,
     reset_paragraph_list_bullet_geometry, reset_paragraph_list_indentation,
     reset_paragraph_list_label_color, reset_paragraph_list_level,
-    reset_paragraph_list_number_format, reset_paragraph_list_number_tiering, set_paragraph_list,
-    set_paragraph_list_bullet, set_paragraph_list_bullet_geometry, set_paragraph_list_indentation,
+    reset_paragraph_list_number_format, reset_paragraph_list_number_scale,
+    reset_paragraph_list_number_tiering, set_paragraph_list, set_paragraph_list_bullet,
+    set_paragraph_list_bullet_geometry, set_paragraph_list_indentation,
     set_paragraph_list_label_color, set_paragraph_list_level, set_paragraph_list_number_format,
-    set_paragraph_list_number_tiering, set_paragraph_list_numbering, set_paragraph_lists,
+    set_paragraph_list_number_scale, set_paragraph_list_number_tiering,
+    set_paragraph_list_numbering, set_paragraph_lists,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::position::{TextPosition, TextRange};
@@ -886,6 +889,59 @@ impl IWorkTextEditor {
             {
                 return Err(Error::InvalidFormat(
                     "iWork paragraph list-number tiering reset failed round-trip validation"
+                        .to_owned(),
+                ));
+            }
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read one numbered paragraph's effective number-label size.
+    pub fn paragraph_list_number_scale(
+        &self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberScale> {
+        paragraph_list_number_scale(&self.package, object_id, paragraph)
+    }
+
+    /// Atomically set one numbered paragraph's number-label size.
+    pub fn set_paragraph_list_number_scale(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+        scale: ParagraphListNumberScale,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list_number_scale(&mut staged, object_id, paragraph, scale)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list_number_scale(&verified, object_id, paragraph)? != scale {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph list-number scale update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore the standard 100% number-label size.
+    pub fn reset_paragraph_list_number_scale(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_list_number_scale(&mut staged, object_id, paragraph)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if paragraph_list_number_scale(&verified, object_id, paragraph)?
+                != ParagraphListNumberScale::ONE
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork paragraph list-number scale reset failed round-trip validation"
                         .to_owned(),
                 ));
             }
