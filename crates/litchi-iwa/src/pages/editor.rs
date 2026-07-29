@@ -30,18 +30,19 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
-    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
-    ParagraphStart, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
-    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
-    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
-    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
-    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    IWorkTextEditor, NamedParagraphStyle, ParagraphBackground, ParagraphBorders,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
+    ParagraphDropCapPlacement, ParagraphFlow, ParagraphFollowingStyle, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
+    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
+    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing, ParagraphStart,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -1590,6 +1591,57 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_writing_direction(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// List the named paragraph styles available to a reachable ordinary text box.
+    pub fn text_box_named_paragraph_styles(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<Vec<NamedParagraphStyle>> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.named_paragraph_styles(graph.storage_id)
+    }
+
+    /// Read the style selected for the paragraph created after this text box's current paragraph.
+    pub fn text_box_paragraph_following_style(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphFollowingStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_following_style(graph.storage_id)
+    }
+
+    /// Select the named or same style used for the following paragraph.
+    pub fn set_text_box_paragraph_following_style(
+        &mut self,
+        drawable_object_id: u64,
+        following_style: ParagraphFollowingStyle,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_following_style(graph.storage_id, following_style)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_following_style(drawable_object_id)? != following_style {
+            return Err(Error::InvalidFormat(
+                "Pages following paragraph-style update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited following paragraph style.
+    pub fn reset_text_box_paragraph_following_style(
+        &mut self,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_following_style(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

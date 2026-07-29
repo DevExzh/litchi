@@ -11,11 +11,11 @@ use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
     ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
-    ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphFlow, ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList,
+    ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
     TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
     TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
@@ -237,6 +237,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_text_box_paragraph_default_tab_interval(
         tab_defaults_box.drawable_object_id,
         ParagraphDefaultTabInterval::from_points(54.0)?,
+    )?;
+    let following_style_box = editor.add_text_box(
+        anchor,
+        "Press Return for Body style",
+        DrawablePoint { x: 360.0, y: 540.0 },
+        DrawableSize {
+            width: 220.0,
+            height: 72.0,
+        },
+    )?;
+    let body = editor
+        .text_box_named_paragraph_styles(following_style_box.drawable_object_id)?
+        .into_iter()
+        .find(|style| style.name() == "Body")
+        .ok_or("source-built Pages theme has no Body paragraph style")?;
+    editor.set_text_box_paragraph_following_style(
+        following_style_box.drawable_object_id,
+        ParagraphFollowingStyle::Named(body.id()),
     )?;
     editor.save(output)?;
     println!(

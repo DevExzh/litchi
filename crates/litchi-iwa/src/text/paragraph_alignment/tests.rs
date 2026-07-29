@@ -13,8 +13,8 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphHyphenation,
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFollowingStyle,
+    ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
     ParagraphWritingDirection, TextBackground, TextBaselineShift, TextCapitalization,
@@ -24,6 +24,49 @@ use crate::text::{
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+
+#[test]
+fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
+    let mut pages = PagesEditor::create_with_text("Following style").unwrap();
+    let text_box = pages
+        .add_text_box(
+            15,
+            "Press Return",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let styles = pages
+        .text_box_named_paragraph_styles(text_box.drawable_object_id)
+        .unwrap();
+    assert_eq!(
+        styles.iter().map(|style| style.name()).collect::<Vec<_>>(),
+        ["Body", "Object Title"]
+    );
+    let body = styles.iter().find(|style| style.name() == "Body").unwrap();
+    let expected = ParagraphFollowingStyle::Named(body.id());
+    let before = pages.to_bytes().unwrap();
+
+    pages
+        .set_text_box_paragraph_following_style(text_box.drawable_object_id, expected)
+        .unwrap();
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_following_style(text_box.drawable_object_id)
+            .unwrap(),
+        expected
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_following_style(text_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before);
+}
 
 #[test]
 fn all_native_alignment_values_are_strict_and_reversible() {

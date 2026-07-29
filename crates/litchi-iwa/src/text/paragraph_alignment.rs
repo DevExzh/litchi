@@ -15,6 +15,7 @@ use self::native::ParagraphStyleOverrides;
 use super::font::TextFont;
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
+use super::paragraph_following_style::{NamedParagraphStyle, ParagraphFollowingStyle};
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
@@ -46,6 +47,7 @@ enum ParagraphProperty<'a> {
     Borders(ParagraphBorders),
     Flow(ParagraphFlow),
     WritingDirection(ParagraphWritingDirection),
+    FollowingStyle(ParagraphFollowingStyle),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -73,6 +75,7 @@ enum ParagraphPropertyKind {
     Borders,
     Flow,
     WritingDirection,
+    FollowingStyle,
     Alignment,
     LineSpacing,
     Spacing,
@@ -610,6 +613,48 @@ pub(super) fn paragraph_decimal_tab_character(
     native::inherited_decimal_tab_character(package, storage.style_id)
 }
 
+pub(super) fn named_paragraph_styles(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<Vec<NamedParagraphStyle>> {
+    let storage = storage::locate(package, storage_id)?;
+    native::named_paragraph_styles(package, storage.style_id)
+}
+
+pub(super) fn paragraph_following_style(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphFollowingStyle> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_following_style(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_following_style(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    following_style: ParagraphFollowingStyle,
+) -> Result<()> {
+    if paragraph_following_style(package, storage_id)? == following_style {
+        return Ok(());
+    }
+    if let ParagraphFollowingStyle::Named(target) = following_style {
+        let storage = storage::locate(package, storage_id)?;
+        native::validate_named_paragraph_style(package, storage.style_id, target)?;
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::FollowingStyle(following_style),
+    )
+}
+
+pub(super) fn reset_paragraph_following_style(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::FollowingStyle)
+}
+
 pub(super) fn set_paragraph_decimal_tab_character(
     package: &mut IWorkPackage,
     storage_id: u64,
@@ -1025,6 +1070,9 @@ fn apply_property(
         ParagraphProperty::WritingDirection(direction) => {
             overrides.writing_direction = Some(*direction);
         },
+        ParagraphProperty::FollowingStyle(following_style) => {
+            overrides.following_style = Some(*following_style);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -1077,6 +1125,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
                 || overrides.prevent_widow_orphan_lines.is_some()
         },
         ParagraphPropertyKind::WritingDirection => overrides.writing_direction.is_some(),
+        ParagraphPropertyKind::FollowingStyle => overrides.following_style.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -1124,6 +1173,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.prevent_widow_orphan_lines = None;
         },
         ParagraphPropertyKind::WritingDirection => overrides.writing_direction = None,
+        ParagraphPropertyKind::FollowingStyle => overrides.following_style = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -1194,6 +1244,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::WritingDirection => Ok(ParagraphProperty::WritingDirection(
             native::inherited_paragraph_writing_direction(package, style_id)?,
+        )),
+        ParagraphPropertyKind::FollowingStyle => Ok(ParagraphProperty::FollowingStyle(
+            native::inherited_following_style(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -1266,6 +1319,9 @@ fn validate_expected_property(
         ParagraphProperty::Flow(flow) => paragraph_flow(package, storage_id)? == flow,
         ParagraphProperty::WritingDirection(direction) => {
             paragraph_writing_direction(package, storage_id)? == direction
+        },
+        ParagraphProperty::FollowingStyle(following_style) => {
+            paragraph_following_style(package, storage_id)? == following_style
         },
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment

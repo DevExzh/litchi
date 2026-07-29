@@ -33,6 +33,7 @@ mod number_attachment_types;
 pub(crate) mod paragraph_alignment;
 mod paragraph_direction;
 mod paragraph_flow;
+mod paragraph_following_style;
 mod paragraph_list;
 mod paragraph_tabs;
 mod position;
@@ -87,6 +88,9 @@ pub use number_attachment_types::{
 };
 pub use paragraph_direction::ParagraphWritingDirection;
 pub use paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
+pub use paragraph_following_style::{
+    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
+};
 pub use paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
     ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,

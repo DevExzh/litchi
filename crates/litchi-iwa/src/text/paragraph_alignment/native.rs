@@ -17,6 +17,9 @@ use crate::{Error, IWorkPackage, Result};
 use super::super::font::{TextFont, TextFontName};
 use super::super::paragraph_direction::ParagraphWritingDirection;
 use super::super::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
+use super::super::paragraph_following_style::{
+    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
+};
 use super::super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
@@ -31,6 +34,7 @@ use super::super::style::{
 use super::super::style_registry::object_archive_name;
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 
@@ -94,6 +98,8 @@ const PARAGRAPH_TABS_FIELD: u32 = 25;
 const PARAGRAPH_WIDOW_CONTROL_FIELD: u32 = 26;
 const PARAGRAPH_BORDER_STROKE_NULL_FIELD: u32 = 31;
 const PARAGRAPH_BORDER_STROKE_FIELD: u32 = 32;
+const PARAGRAPH_FOLLOWING_STYLE_NULL_FIELD: u32 = 41;
+const PARAGRAPH_FOLLOWING_STYLE_FIELD: u32 = 42;
 const PARAGRAPH_BORDER_POSITIONS_FIELD: u32 = 45;
 const PARAGRAPH_BORDER_ROUNDED_CORNERS_FIELD: u32 = 46;
 const LINE_SPACING_MODE_FIELD: u32 = 1;
@@ -141,6 +147,7 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) start_on_new_page: Option<bool>,
     pub(crate) prevent_widow_orphan_lines: Option<bool>,
     pub(crate) writing_direction: Option<ParagraphWritingDirection>,
+    pub(crate) following_style: Option<ParagraphFollowingStyle>,
     pub(crate) underline: Option<TextUnderline>,
     pub(crate) strikethrough: Option<TextStrikethrough>,
     pub(crate) alignment: Option<TextAlignment>,
@@ -192,6 +199,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.start_on_new_page.is_some())
             + u32::from(self.prevent_widow_orphan_lines.is_some())
             + u32::from(self.writing_direction.is_some())
+            + u32::from(self.following_style.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -239,6 +247,7 @@ impl ParagraphStyleOverrides {
             && self.start_on_new_page.is_none()
             && self.prevent_widow_orphan_lines.is_none()
             && self.writing_direction.is_none()
+            && self.following_style.is_none()
             && self.underline.is_none()
             && self.strikethrough.is_none()
             && self.alignment.is_none()
@@ -443,6 +452,85 @@ pub(crate) fn inherited_default_tab_interval(
     inheritance::default_tab_interval(package, first_style_id)
 }
 
+pub(crate) fn inherited_following_style(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphFollowingStyle> {
+    inheritance::following_style(package, first_style_id)
+}
+
+pub(crate) fn named_paragraph_styles(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<Vec<NamedParagraphStyle>> {
+    let first = locate_style(package, first_style_id)?;
+    let stylesheet_id = stylesheet_id(&first.style, first_style_id)?;
+    let archive_name = object_archive_name(package, stylesheet_id)?;
+    let archive = package.archive(&archive_name)?;
+    let stylesheet_object = archive.object(stylesheet_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("iWork stylesheet {stylesheet_id} is missing"))
+    })?;
+    let payloads = stylesheet_object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == STYLESHEET_MESSAGE_TYPE)
+        .filter_map(|message| tss::StylesheetArchive::decode(message.data.as_slice()).ok())
+        .collect::<Vec<_>>();
+    let [stylesheet] = payloads.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork stylesheet {stylesheet_id} must have exactly one stylesheet payload"
+        )));
+    };
+    let mut styles = Vec::new();
+    for reference in &stylesheet.styles {
+        let Some(object) = archive.object(reference.identifier) else {
+            continue;
+        };
+        let mut paragraph_styles = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
+            .filter_map(|message| {
+                tswp::ParagraphStyleArchive::decode(message.data.as_slice()).ok()
+            });
+        let Some(style) = paragraph_styles.next() else {
+            continue;
+        };
+        if paragraph_styles.next().is_some()
+            || style.super_.is_variation == Some(true)
+            || style.super_.stylesheet.map(|value| value.identifier) != Some(stylesheet_id)
+        {
+            continue;
+        }
+        let Some(name) = style.super_.name else {
+            continue;
+        };
+        styles.push(NamedParagraphStyle::new(
+            ParagraphStyleId::new(reference.identifier)?,
+            name,
+        )?);
+    }
+    Ok(styles)
+}
+
+pub(crate) fn validate_named_paragraph_style(
+    package: &IWorkPackage,
+    first_style_id: u64,
+    target: ParagraphStyleId,
+) -> Result<()> {
+    if named_paragraph_styles(package, first_style_id)?
+        .iter()
+        .any(|style| style.id() == target)
+    {
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(format!(
+            "iWork paragraph style {} is not a named style in this text stylesheet",
+            target.get()
+        )))
+    }
+}
+
 pub(crate) fn direct_overrides(
     style: &tswp::ParagraphStyleArchive,
     raw: &[u8],
@@ -499,6 +587,21 @@ pub(crate) fn direct_overrides(
         .writing_direction
         .map(ParagraphWritingDirection::from_native_value)
         .transpose()?;
+    let following_style = if properties.following_style_null == Some(true) {
+        if properties.following_style.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork following paragraph style is both null and populated".to_owned(),
+            ));
+        }
+        Some(ParagraphFollowingStyle::Same)
+    } else {
+        properties
+            .following_style
+            .map(|reference| {
+                ParagraphStyleId::new(reference.identifier).map(ParagraphFollowingStyle::Named)
+            })
+            .transpose()?
+    };
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -581,6 +684,7 @@ pub(crate) fn direct_overrides(
         start_on_new_page,
         prevent_widow_orphan_lines,
         writing_direction,
+        following_style,
         underline,
         strikethrough,
         alignment,
@@ -615,6 +719,10 @@ pub(crate) fn direct_overrides(
     remaining.keep_with_next = None;
     remaining.page_break_before = None;
     remaining.widow_control = None;
+    if following_style.is_some() {
+        remaining.following_style_null = None;
+        remaining.following_style = None;
+    }
     remaining.line_spacing = None;
     remaining.space_before = None;
     remaining.space_after = None;
@@ -865,6 +973,27 @@ pub(crate) fn direct_overrides(
     if right_indent.is_some() {
         paragraph_fields.push(PARAGRAPH_RIGHT_INDENT_FIELD);
     }
+    if let Some(following_style) = following_style {
+        match following_style {
+            ParagraphFollowingStyle::Same => {
+                paragraph_fields.push(PARAGRAPH_FOLLOWING_STYLE_NULL_FIELD);
+                if !has_canonical_bool_field(paragraph_raw, PARAGRAPH_FOLLOWING_STYLE_NULL_FIELD)? {
+                    return Ok(None);
+                }
+            },
+            ParagraphFollowingStyle::Named(_) => {
+                paragraph_fields.push(PARAGRAPH_FOLLOWING_STYLE_FIELD);
+                let reference_raw = required_payload(
+                    paragraph_raw,
+                    PARAGRAPH_FOLLOWING_STYLE_FIELD,
+                    "following paragraph style",
+                )?;
+                if !has_exact_fields(reference_raw, &[1])? {
+                    return Ok(None);
+                }
+            },
+        }
+    }
     if decimal_tab_character.is_some() {
         if properties.decimal_tab_null == Some(true) {
             paragraph_fields.push(PARAGRAPH_DECIMAL_TAB_NULL_FIELD);
@@ -1008,6 +1137,17 @@ pub(crate) fn variation_object(
             keep_with_next: overrides.keep_with_next,
             page_break_before: overrides.start_on_new_page,
             widow_control: overrides.prevent_widow_orphan_lines,
+            following_style_null: matches!(
+                overrides.following_style,
+                Some(ParagraphFollowingStyle::Same)
+            )
+            .then_some(true),
+            following_style: overrides
+                .following_style
+                .and_then(|following| match following {
+                    ParagraphFollowingStyle::Same => None,
+                    ParagraphFollowingStyle::Named(identifier) => Some(reference(identifier.get())),
+                }),
             line_spacing: overrides.line_spacing.map(line_spacing_archive),
             space_before: overrides.space_before.map(ParagraphSpacingPoints::points),
             space_after: overrides.space_after.map(ParagraphSpacingPoints::points),
@@ -1039,6 +1179,11 @@ pub(crate) fn variation_object(
     object.archive_info.message_infos[0]
         .object_references
         .push(parent_style_id);
+    if let Some(ParagraphFollowingStyle::Named(identifier)) = overrides.following_style {
+        object.archive_info.message_infos[0]
+            .object_references
+            .push(identifier.get());
+    }
     if overrides.font_color.is_some() {
         object.archive_info.message_infos[0]
             .field_infos

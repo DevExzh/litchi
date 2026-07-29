@@ -7,6 +7,7 @@ use crate::shapes::RgbaColor;
 use crate::text::font::TextFont;
 use crate::text::paragraph_direction::ParagraphWritingDirection;
 use crate::text::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
+use crate::text::paragraph_following_style::{ParagraphFollowingStyle, ParagraphStyleId};
 use crate::text::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
@@ -535,6 +536,34 @@ pub(super) fn default_tab_interval(
             return Ok(InheritanceControl::Continue);
         };
         *value = Some(ParagraphDefaultTabInterval::from_points(points)?);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn following_style(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphFollowingStyle> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(properties) = style.para_properties.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        if properties.following_style_null == Some(true) {
+            if properties.following_style.is_some() {
+                return Err(Error::InvalidFormat(
+                    "native iWork following paragraph style is both null and populated".to_owned(),
+                ));
+            }
+            *value = Some(ParagraphFollowingStyle::Same);
+            return Ok(InheritanceControl::Complete);
+        }
+        let Some(reference) = properties.following_style else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(ParagraphFollowingStyle::Named(ParagraphStyleId::new(
+            reference.identifier,
+        )?));
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())
