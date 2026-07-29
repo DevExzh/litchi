@@ -17,6 +17,11 @@ impl Note {
         }
     }
 
+    /// Get the note ID (`w:footnote@w:id` / `w:endnote@w:id`).
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
     /// Add a paragraph to this note.
     pub fn add_paragraph(&mut self) -> &mut MutableParagraph {
         let para = MutableParagraph::new();

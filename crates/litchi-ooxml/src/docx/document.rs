@@ -2744,6 +2744,11 @@ impl<'a> Document<'a> {
     // - Add/insert/remove tables: add_table(), insert_table(), remove_table()
     // - Modify runs: MutableRun::bold(), italic(), font_name(), color()
     //   reached through the paragraph()/table() accessors
+    // ✅ COMPLETED: Note and comment removal
+    // - remove_footnote()/remove_endnote() strip typed w:footnoteReference /
+    //   w:endnoteReference runs (ECMA-376 Sections 17.11.10, 17.11.2)
+    // - remove_comment() drops authored w:comment entries (ECMA-376
+    //   Section 17.13.4.2); note/comment IDs stay unique after removals
     //
     // ✅ COMPLETED: Track changes reading (November 2024)
     // - See revision.rs module and Paragraph::revisions() method

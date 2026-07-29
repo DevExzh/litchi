@@ -190,6 +190,17 @@ impl MutableRun {
         self
     }
 
+    /// Whether this run is a reference to the note `id` of the requested
+    /// kind (`w:footnoteReference`, ECMA-376 §17.11.14;
+    /// `w:endnoteReference`, ECMA-376 §17.11.7).
+    pub(crate) fn is_note_reference(&self, footnote: bool, id: u32) -> bool {
+        match &self.content {
+            RunContent::FootnoteReference(ref_id) => footnote && *ref_id == id,
+            RunContent::EndnoteReference(ref_id) => !footnote && *ref_id == id,
+            _ => false,
+        }
+    }
+
     /// Record the run properties that existed before this formatting revision.
     pub fn set_property_change(
         &mut self,

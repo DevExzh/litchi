@@ -152,6 +152,13 @@ fn is_stale_sheet_part(
     if let Some(id) = numeric_part_stem(name, "/xl/drawings/vmlDrawing", ".vml") {
         return !worksheet_ids.contains(&id);
     }
+    // /xl/comments{id}.xml and its threaded counterpart — per worksheet.
+    if let Some(id) = numeric_part_stem(name, "/xl/comments", ".xml") {
+        return !worksheet_ids.contains(&id);
+    }
+    if let Some(id) = numeric_part_stem(name, "/xl/threadedComments/threadedComment", ".xml") {
+        return !worksheet_ids.contains(&id);
+    }
     // /xl/media/image{id}_{m}.{ext} — per worksheet.
     if let Some(rest) = name.strip_prefix("/xl/media/image") {
         let digits = rest.bytes().take_while(u8::is_ascii_digit).count();

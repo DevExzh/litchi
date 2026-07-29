@@ -95,7 +95,7 @@ impl MutableComment {
 
         write!(
             &mut xml,
-            r#"<w:comment w:id="{}" w:author="{}"#,
+            r#"<w:comment w:id="{}" w:author="{}""#,
             self.id,
             escape_xml(&self.author)
         )?;
@@ -144,9 +144,7 @@ mod tests {
 
         let xml = comment.to_xml().unwrap();
         assert!(xml.contains(r#"w:id="1""#));
-        // Author name is XML-escaped, so we check for the presence without quotes
-        assert!(xml.contains("w:author="));
-        assert!(xml.contains("Jane Smith"));
+        assert!(xml.contains(r#"w:author="Jane Smith""#));
         assert!(xml.contains(r#"w:initials="JS""#));
         assert!(xml.contains("Review this"));
     }

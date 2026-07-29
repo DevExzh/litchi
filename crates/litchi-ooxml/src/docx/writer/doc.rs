@@ -10,7 +10,7 @@ pub use super::super::format::ImageFormat;
 use super::comment::MutableComment;
 use super::note::Note;
 use super::ole_object::MutableOleObject;
-use super::paragraph::MutableParagraph;
+use super::paragraph::{MutableParagraph, ParagraphElement};
 use super::section::SectionProperties;
 use super::smartart::{MAX_SMART_ARTS, MutableSmartArt};
 use super::vml_shape::MutableVmlShape;
@@ -90,8 +90,6 @@ pub struct DocumentProtection {
     pub salt: Option<String>,
 }
 
-#[cfg(feature = "fonts")]
-use super::paragraph::ParagraphElement;
 #[cfg(feature = "fonts")]
 use super::smart_tag::MutableSmartTag;
 #[cfg(feature = "fonts")]
@@ -680,7 +678,7 @@ impl MutableDocument {
 
     /// Add a footnote and return its ID and mutable reference.
     pub fn add_footnote(&mut self) -> (u32, &mut Note) {
-        let id = self.footnotes.len() as u32 + 1;
+        let id = Self::next_note_id(self.footnotes.iter().map(|note| note.id));
         let note = Note::new(id);
         self.footnotes.push(note);
         self.modified = true;
@@ -688,14 +686,92 @@ impl MutableDocument {
         (id, self.footnotes.last_mut().unwrap())
     }
 
+    /// Remove a footnote by ID and return it (`w:footnote`,
+    /// ECMA-376 §17.11.10).
+    ///
+    /// Runs referencing the removed footnote (`w:footnoteReference`,
+    /// ECMA-376 §17.11.14) are stripped from typed body, table, header,
+    /// and footer paragraphs so the saved document never dangles a
+    /// reference into the footnotes part.
+    pub fn remove_footnote(&mut self, id: u32) -> Result<Note> {
+        let index = self
+            .footnotes
+            .iter()
+            .position(|note| note.id == id)
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("footnote ID {id} does not exist"))
+            })?;
+        let removed = self.footnotes.remove(index);
+        self.strip_note_references(true, id);
+        self.modified = true;
+        self.section_dirty = true;
+        Ok(removed)
+    }
+
     /// Add an endnote and return its ID and mutable reference.
     pub fn add_endnote(&mut self) -> (u32, &mut Note) {
-        let id = self.endnotes.len() as u32 + 1;
+        let id = Self::next_note_id(self.endnotes.iter().map(|note| note.id));
         let note = Note::new(id);
         self.endnotes.push(note);
         self.modified = true;
         self.section_dirty = true;
         (id, self.endnotes.last_mut().unwrap())
+    }
+
+    /// Remove an endnote by ID and return it (`w:endnote`,
+    /// ECMA-376 §17.11.2).
+    ///
+    /// Runs referencing the removed endnote (`w:endnoteReference`,
+    /// ECMA-376 §17.11.7) are stripped like in [`Self::remove_footnote`].
+    pub fn remove_endnote(&mut self, id: u32) -> Result<Note> {
+        let index = self
+            .endnotes
+            .iter()
+            .position(|note| note.id == id)
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("endnote ID {id} does not exist"))
+            })?;
+        let removed = self.endnotes.remove(index);
+        self.strip_note_references(false, id);
+        self.modified = true;
+        self.section_dirty = true;
+        Ok(removed)
+    }
+
+    /// Next note ID: one above the current maximum, so IDs stay unique
+    /// even after removals.
+    fn next_note_id(ids: impl Iterator<Item = u32>) -> u32 {
+        ids.max().map_or(1, |id| id.saturating_add(1))
+    }
+
+    /// Strip every typed run referencing the note `id` from body, table,
+    /// header, and footer paragraphs.
+    fn strip_note_references(&mut self, footnote: bool, id: u32) {
+        fn strip(elements: &mut Vec<ParagraphElement>, footnote: bool, id: u32) {
+            elements.retain(|element| {
+                !matches!(element, ParagraphElement::Run(run) if run.is_note_reference(footnote, id))
+            });
+        }
+        for element in &mut self.body.elements {
+            match element {
+                BodyElement::Paragraph(paragraph) => strip(&mut paragraph.elements, footnote, id),
+                BodyElement::Table(table) => {
+                    for row in &mut table.rows {
+                        for cell in &mut row.cells {
+                            for paragraph in &mut cell.paragraphs {
+                                strip(&mut paragraph.elements, footnote, id);
+                            }
+                        }
+                    }
+                },
+                _ => {},
+            }
+        }
+        for paragraphs in [&mut self.header, &mut self.footer].into_iter().flatten() {
+            for paragraph in paragraphs {
+                strip(&mut paragraph.elements, footnote, id);
+            }
+        }
     }
 
     /// Check if the document has footnotes.
@@ -722,11 +798,29 @@ impl MutableDocument {
     /// comment.set_initials(Some("JD".to_string()));
     /// ```
     pub fn add_comment(&mut self, author: &str, text: &str) -> (u32, &mut MutableComment) {
-        let id = self.comments.len() as u32 + 1;
+        let id = Self::next_note_id(self.comments.iter().map(|comment| comment.id()));
         let comment = MutableComment::new(id, author.to_string(), text.to_string());
         self.comments.push(comment);
         self.modified = true;
         (id, self.comments.last_mut().unwrap())
+    }
+
+    /// Remove a comment by ID and return it (`w:comment`,
+    /// ECMA-376 §17.13.4.2).
+    ///
+    /// Authored comments carry no range markers or reference runs in this
+    /// writer model, so removal only affects the comments part emitted on
+    /// save.
+    pub fn remove_comment(&mut self, id: u32) -> Result<MutableComment> {
+        let index = self
+            .comments
+            .iter()
+            .position(|comment| comment.id() == id)
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("comment ID {id} does not exist"))
+            })?;
+        self.modified = true;
+        Ok(self.comments.remove(index))
     }
 
     /// Check if the document has comments.

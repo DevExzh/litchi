@@ -40,8 +40,7 @@ fn second_save_after_worksheet_removal_drops_the_stale_part() {
 }
 
 #[test]
-fn second_save_after_chartsheet_removal_drops_stale_parts() {
-    let directory = tempfile::tempdir().unwrap();
+fn second_save_after_chartsheet_removal_drops_stale_parts() {    let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("double-save-chartsheet.xlsx");
 
     let mut workbook = Workbook::create().unwrap();
@@ -76,4 +75,38 @@ fn second_save_after_chartsheet_removal_drops_stale_parts() {
             .get_part(&PackURI::new("/xl/charts/chart3_1.xml").unwrap())
             .is_ok()
     );
+}
+
+#[test]
+fn second_save_drops_comment_parts_of_removed_sheets() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("double-save-comments.xlsx");
+
+    let mut workbook = Workbook::create().unwrap();
+    workbook.add_worksheet("Sheet2");
+    workbook
+        .worksheet_mut(1)
+        .unwrap()
+        .set_cell_comment(1, 1, "review this", "tester");
+    workbook.save(&path).unwrap();
+
+    // Sheet2 has sheet_id 2, so the first save emitted its comment part.
+    let package = OpcPackage::open(&path).unwrap();
+    assert!(
+        package
+            .get_part(&PackURI::new("/xl/comments2.xml").unwrap())
+            .is_ok()
+    );
+    drop(package);
+
+    workbook.remove_worksheet(1).unwrap();
+    workbook.save(&path).unwrap();
+
+    let package = OpcPackage::open(&path).unwrap();
+    for uri in ["/xl/comments2.xml", "/xl/worksheets/sheet2.xml"] {
+        assert!(
+            package.get_part(&PackURI::new(uri).unwrap()).is_err(),
+            "stale part {uri} survived the second save"
+        );
+    }
 }
