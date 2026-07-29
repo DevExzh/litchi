@@ -76,7 +76,9 @@ use litchi_opc::{OpcPackage, PackURI};
 use std::collections::{HashMap, HashSet};
 
 use super::parsers::workbook_parser;
-use super::worksheet::{Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator};
+use super::worksheet::{
+    ArrayFormula, Worksheet, WorksheetInfo, WorksheetIterator as XlsxWorksheetIterator,
+};
 
 fn next_active_x_relationship_id(
     occupied: &mut HashSet<String>,
@@ -1604,6 +1606,12 @@ impl Workbook {
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
         parse_data_validation_collections(part.blob()).map_err(Into::into)
+    }
+
+    /// Return all array formulas on one worksheet (`f` with `t="array"`,
+    /// ECMA-376 §18.3.1.40), sorted in row-major order.
+    pub fn worksheet_array_formulas(&self, index: usize) -> SheetResult<Vec<ArrayFormula>> {
+        Ok(self.get_worksheet(index)?.get_array_formulas())
     }
 
     /// Atomically replace all data-validation collections on one existing worksheet.

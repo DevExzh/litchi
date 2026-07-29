@@ -438,6 +438,41 @@ pub struct MutableWorksheet {
     modified: bool,
 }
 
+/// Padding in character-width units added by [`MutableWorksheet::auto_size_column`]
+/// to account for cell padding and borders, matching Excel's "best fit".
+const AUTO_SIZE_PADDING_CHARS: f64 = 2.0;
+
+/// Maximum column width in character-width units accepted by Excel
+/// (`col@width` is clamped to 255, ECMA-376 §18.3.1.13).
+const MAX_COLUMN_WIDTH_CHARS: f64 = 255.0;
+
+/// Approximate display width of a cell value in character-width units.
+///
+/// This is a character-count heuristic for auto-sizing; it does not resolve
+/// number formats against the styles table.
+fn cell_display_width(value: &CellValue) -> usize {
+    match value {
+        CellValue::Empty => 0,
+        // Excel renders booleans as TRUE/FALSE.
+        CellValue::Bool(value) => ["FALSE", "TRUE"][usize::from(*value)].len(),
+        CellValue::Int(value) => value.to_string().len(),
+        CellValue::Float(value) => value.to_string().len(),
+        CellValue::String(value) => value.chars().count(),
+        // Serial dates are measured as their numeric representation; the
+        // number-format-aware width is resolved by Excel on open.
+        CellValue::DateTime(serial) => serial.to_string().len(),
+        CellValue::Error(message) => message.chars().count(),
+        CellValue::Formula {
+            cached_value,
+            formula,
+            ..
+        } => match cached_value.as_deref() {
+            Some(cached) => cell_display_width(cached),
+            None => formula.chars().count(),
+        },
+    }
+}
+
 impl MutableWorksheet {
     /// Create a new empty worksheet.
     pub fn new(name: String, sheet_id: u32) -> Self {
@@ -874,6 +909,44 @@ impl MutableWorksheet {
         // Convert from 1-based (API) to 0-based (internal storage)
         self.column_widths.insert(col - 1, width);
         self.modified = true;
+    }
+
+    /// Auto-size a column to fit its widest cell content.
+    ///
+    /// Column widths are character-width units of the workbook's normal font
+    /// (`col@width`, ECMA-376 §18.3.1.13). Without font metrics this uses
+    /// the same character-count heuristic as Excel's "best fit": the longest
+    /// display text in the column plus [`AUTO_SIZE_PADDING_CHARS`], clamped
+    /// to [`MAX_COLUMN_WIDTH_CHARS`]. Rich-text cells are measured as the
+    /// sum of their run texts (ECMA-376 §18.4.4); formula cells are measured
+    /// by their cached result when present, otherwise by the formula text.
+    ///
+    /// # Arguments
+    /// * `col` - 1-based column number (1 = column A)
+    ///
+    /// # Returns
+    /// * `Some(width)` - the applied width, or `None` when the column has no
+    ///   measurable content (the column is then left unchanged)
+    pub fn auto_size_column(&mut self, col: u32) -> Option<f64> {
+        let col_idx = col.checked_sub(1)?;
+        let mut max_chars = 0usize;
+        for (&(_, cell_col), value) in &self.cells {
+            if cell_col == col_idx {
+                max_chars = max_chars.max(cell_display_width(value));
+            }
+        }
+        for (&(_, cell_col), runs) in &self.rich_text_cells {
+            if cell_col == col_idx {
+                let width: usize = runs.iter().map(|run| run.text.chars().count()).sum();
+                max_chars = max_chars.max(width);
+            }
+        }
+        if max_chars == 0 {
+            return None;
+        }
+        let width = (max_chars as f64 + AUTO_SIZE_PADDING_CHARS).min(MAX_COLUMN_WIDTH_CHARS);
+        self.set_column_width(col, width);
+        Some(width)
     }
 
     /// Hide a column.
@@ -4025,6 +4098,54 @@ mod tests {
         assert!(xml.contains("<is>"));
         assert!(xml.contains("Hello "));
         assert!(xml.contains("World"));
+    }
+
+    #[test]
+    fn auto_size_column_uses_widest_content_and_excel_limits() {
+        let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
+
+        // Empty and invalid columns are left unchanged.
+        assert_eq!(ws.auto_size_column(3), None);
+        assert_eq!(ws.auto_size_column(0), None);
+        assert!(!ws.column_widths.contains_key(&2));
+
+        ws.set_cell_value(1, 1, "abc");
+        ws.set_cell_value(2, 1, "a much longer string");
+        // 20 characters + 2.0 padding.
+        assert_eq!(ws.auto_size_column(1), Some(22.0));
+        assert_eq!(ws.column_widths.get(&0), Some(&22.0));
+
+        // Rich text is measured as the sum of its run texts.
+        ws.set_rich_text_cell(
+            1,
+            2,
+            vec![
+                RichTextRun {
+                    text: "Hello ".to_string(),
+                    font_name: None,
+                    font_size: None,
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                    color: None,
+                },
+                RichTextRun {
+                    text: "World".to_string(),
+                    font_name: None,
+                    font_size: None,
+                    bold: true,
+                    italic: false,
+                    underline: false,
+                    color: None,
+                },
+            ],
+        );
+        // "Hello World" is 11 characters + 2.0 padding.
+        assert_eq!(ws.auto_size_column(2), Some(13.0));
+
+        // Width is clamped to Excel's 255 character-unit limit.
+        ws.set_cell_value(1, 3, "x".repeat(300));
+        assert_eq!(ws.auto_size_column(3), Some(255.0));
     }
 
     #[test]

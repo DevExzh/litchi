@@ -322,8 +322,8 @@ pub use workbook_protection::{
 };
 pub use vba_project::VbaProject;
 pub use worksheet::{
-    AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule, Hyperlink,
-    PageBreak, PageSetup, RowInfo, Worksheet, WorksheetInfo,
+    ArrayFormula, AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule,
+    Hyperlink, PageBreak, PageSetup, RowInfo, Worksheet, WorksheetInfo,
 };
 // Re-export pivot types
 pub use pivot::{

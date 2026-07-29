@@ -131,6 +131,21 @@ pub struct PageBreak {
     pub pivot: bool,
 }
 
+/// One array-formula cell (`c/f` with `t="array"`, ECMA-376 §18.3.1.40),
+/// reported at its anchor cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrayFormula {
+    /// Row number of the anchor cell (1-based).
+    pub row: u32,
+    /// Column number of the anchor cell (1-based).
+    pub column: u32,
+    /// Formula expression without the leading '='.
+    pub formula: String,
+    /// Covered range in A1 notation (e.g. "A1:C3") when the formula
+    /// records one (`f@ref`); single-cell array formulas have no range.
+    pub range: Option<String>,
+}
+
 /// Hyperlink information
 #[derive(Debug, Clone)]
 pub struct Hyperlink {
@@ -2364,6 +2379,48 @@ impl<'a> Worksheet<'a> {
         None
     }
 
+    /// List all array formulas in the worksheet (`f` with `t="array"`,
+    /// ECMA-376 §18.3.1.40), sorted in row-major order.
+    ///
+    /// Both single-cell and multi-cell (CSE) array formulas are reported at
+    /// their anchor cell; the covered range is preserved verbatim as A1
+    /// notation when the formula records it.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use litchi_ooxml::xlsx::Workbook;
+    ///
+    /// let wb = Workbook::open("workbook.xlsx")?;
+    /// for formula in wb.worksheet_array_formulas(0)? {
+    ///     println!("{} at row {} col {}", formula.formula, formula.row, formula.column);
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+    /// ```
+    pub fn get_array_formulas(&self) -> Vec<ArrayFormula> {
+        let mut formulas = Vec::new();
+        for (&row, columns) in &self.cells {
+            for (&column, value) in columns {
+                if let CellValue::Formula {
+                    formula,
+                    is_array: true,
+                    array_range,
+                    ..
+                } = value
+                {
+                    formulas.push(ArrayFormula {
+                        row,
+                        column,
+                        formula: formula.clone(),
+                        range: array_range.clone(),
+                    });
+                }
+            }
+        }
+        formulas.sort_by_key(|formula| (formula.row, formula.column));
+        formulas
+    }
+
     // Previously TODO: Apache POI worksheet-level features - NOW IMPLEMENTED:
     // ✅ Cell formatting (reading): get_cell_style(), get_cell_format()
     // ✅ Cell types (advanced): get_cell_type() via CellValue enum
@@ -2377,17 +2434,20 @@ impl<'a> Worksheet<'a> {
     // ✅ Data validation: get_data_validations()
     // ✅ Conditional formatting: get_conditional_formatting()
     // ✅ Page setup: get_page_setup()
+    // ✅ Array formulas: get_array_formulas() (read), set_array_formula() (write)
+    // ✅ Rich text cells: get_rich_text_cell() (read), set_rich_text_cell() (write)
+    // ✅ Cell set operations: set_hyperlink(), remove_hyperlink(),
+    //    set_cell_comment(), remove_comment()
+    // ✅ Column/row mutations: auto_size_column(), hide/show_column(),
+    //    hide/show_row(), set_row_height()
+    // ✅ Sheet protection: protect_sheet(), sheet_protection()
+    // ✅ Set operations: set_auto_filter(), add_data_validation(),
+    //    set_fit_to_page(), set_header_footer()
+    // ✅ Repeating rows/columns: set_repeating_rows(), set_repeating_columns()
     //
-    // Still TODO (writing operations and advanced features):
+    // Still TODO (advanced features):
     // - Formula evaluation: evaluate_formula(), get_formula_evaluator()
-    // - Array formulas: set_array_formula(), get_array_formulas()
-    // - Rich text cells: get_rich_string_cell_value(), set_rich_text_string()
-    // - Set operations: set_hyperlink(), remove_hyperlink(), set_cell_comment(), remove_cell_comment()
-    // - Column/row mutations: auto_size_column(), set_column_hidden(), set_row_hidden(), set_row_height()
-    // - Sheet protection: protect_sheet(), is_protected(), get_protection_info()
-    // - Set operations: set_auto_filter(), add_validation_data()
-    // - Set operations: set_fit_to_page(), set_header(), set_footer()
-    // - Repeating rows/columns: set_repeating_rows(), set_repeating_columns()
+    //   (formula engines live in the litchi-eval crate)
 }
 
 impl<'a> WorksheetTrait for Worksheet<'a> {
