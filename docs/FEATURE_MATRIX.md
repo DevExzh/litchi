@@ -146,7 +146,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | Path and in-memory workflows |
-| Multiple worksheets | ✅ | ✅ | ✅ | Add, insert at position, remove (with defined-name scope remapping and pivot-target rejection), access, update, and serialize sheets |
+| Multiple worksheets | ✅ | ✅ | ✅ | Add (with optional uniform name validation), insert at position, remove worksheets and chart sheets (with defined-name scope remapping and pivot-target rejection), access, update, and serialize sheets |
 | Cell values and ranges | ✅ | ✅ | ✅ | String, rich text, number, boolean, error, date/time, and range access |
 | Formula cells | ✅ | ✅ | ✅ | Formula strings, cached values, shared formulas, and array formulas with typed row-major array-formula discovery (anchor, verbatim `ref` range, text) |
 | Formula evaluation | 🟡 | ✅ | N/A | Shared evaluator with many math, lookup, text, date, financial, and statistical functions |
@@ -334,7 +334,7 @@ conversion, fonts, and image conversion are optional.
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
 | Page setup, headers/footers, and breaks | ✅ | ✅ | ✅ | Print/page records, page-break authoring, and typed `HeaderFooter` even/first-page text with scale/align flags |
 | Workbook extension flags | ✅ | ✅ | ✅ | Typed `BookExt` AutoRecover/privacy/smart-tag/recovery flags plus conditional ink and publish-state extensions |
-| Miscellaneous workbook records | ✅ | ✅ | ✅ | Typed inert `Backup` save-backup flag, `BkHim` background-image blobs with typed format, `CellWatch` watch ranges, `InterfaceHdr`/`InterfaceEnd` codepage brackets, `HFPicture` header/footer OfficeArt payloads, `Pls` printer-driver DEVMODE chains reassembled across `Continue` records, `CrtLayout12`/`CrtLayout12A` chart layout corners with strict mode enums, `ShapePropsStream`/`TextPropsStream`/`RichTextStream` chart XML property streams with verbatim checksums, and `ForceFullCalculation` dependency flags; all preserve reserved bytes and round-trip byte-exactly |
+| Miscellaneous workbook records | ✅ | ✅ | ✅ | Typed inert `Backup` save-backup flag, `BkHim` background-image blobs with typed format, `CellWatch` watch ranges, `InterfaceHdr`/`InterfaceEnd` codepage brackets, `HFPicture` header/footer OfficeArt payloads, `Pls` printer-driver DEVMODE chains reassembled across `Continue` records, `CrtLayout12`/`CrtLayout12A` chart layout corners with strict mode enums, `ShapePropsStream`/`TextPropsStream`/`RichTextStream` chart XML property streams with verbatim checksums, `ForceFullCalculation` dependency flags, `StartObject`/`EndObject`/`FrtWrapper` chart FRT wrappers with kind/instance validation and verbatim wrapped records, `Chart3DBarShape` riser/taper enums, and `CrtLine`/`CrtLink` line records; all preserve reserved bytes and round-trip byte-exactly |
 | Document theme | ✅ | ✅ | ✅ | Inert `Theme` record with custom/default versions and verbatim contents spanning `ContinueFrt12` records |
 | Protection | ✅ | ✅ | ✅ | Sheet, object, scenario, workbook, and password records |
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
@@ -465,7 +465,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Styles and full cell formatting | ✅ | ✅ | ✅ | Text, alignment, borders, backgrounds, number/data styles, protection styles, and read-only named fill-image/gradient/hatch/marker/opacity/stroke-dash inspection; no link following, style-use resolution, or rendering |
 | Conditional cell styles | ✅ | ✅ | ✅ | ODF style-map conditions and ordered mutation; not the full Excel rule family |
 | Sheet conditional formatting | ✅ | ✅ | ✅ | LibreOffice `calcext:conditional-formats` extension parsing and authoring: typed inert condition expressions, color-scale entries, data bars (colors, axis, lengths), icon sets (22 named sets), and date-is buckets with apply-style references, base-cell addresses, and multi-range targets, spoof-rejecting namespace verification, and builder/mutable create/replace/remove round trips; `calcext:custom-iconset` child declarations are skipped on read while the `custom` flag is preserved |
-| Sparklines | ✅ | ✅ | ✅ | LibreOffice `calcext:sparkline-groups` parsing and authoring: typed line/column/stacked groups with date axes, empty-cell handling, direction markers, per-element colors, and multi-range data references, with builder/mutable create/replace/remove round trips; `calcext:sparkline-*-complex-color` theme-color children are skipped on read |
+| Sparklines | ✅ | ✅ | ✅ | LibreOffice `calcext:sparkline-groups` parsing and authoring: typed line/column/stacked groups with date axes, empty-cell handling, direction markers, per-element colors, `loext` complex theme colors (12 theme families, tint/shade/lum transformations), and multi-range data references, with builder/mutable create/replace/remove round trips |
 | Content validation | ✅ | ✅ | ✅ | Conditions, prompts, error messages, events, definitions, and cell bindings |
 | Comments/annotations | ✅ | ✅ | ✅ | Rich text/lists, creator/date, geometry, extensions, and CRUD |
 | Hyperlinks | ✅ | ✅ | ✅ | Typed inert `text:a` anchors preserve and author non-overlapping UTF-8 ranges across namespace-aware mixed paragraph trees, retaining spans, fields, whitespace, extension nodes, and XLink/office/text metadata; links are never followed |
@@ -541,7 +541,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Lists and numbering | ✅ | ✅ | ✅ | Modern list tables/overrides with per-level tentative/legal/no-restart/legacy/previous-level metadata, plus legacy section and paragraph numbering |
 | Languages and bidirectional text | ✅ | ✅ | ✅ | Document defaults, character languages, LTR/RTL, and East Asian controls |
 | Pictures and alternatives | ✅ | ✅ | ✅ | Common raster/metafile types, crop/layout metadata, identities, and compatibility alternatives |
-| Shapes, groups, and text frames | ✅ | ✅ | ✅ | Geometry, anchors, wrapping, fills, gradients, themes, binary properties, stories, and mutation |
+| Shapes, groups, and text frames | ✅ | ✅ | ✅ | Geometry, anchors, wrapping, fills, gradients, themes, binary properties, stories, mutation, and inert `\hl` shape hyperlink properties (location/source/friendly-name strings, never resolved or activated) |
 | Legacy drawings and text boxes | ✅ | ✅ | ✅ | Primitive/callout models and canonical round trips |
 
 ### Fields, review, metadata, and advanced destinations
