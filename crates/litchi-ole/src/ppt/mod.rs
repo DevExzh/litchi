@@ -111,6 +111,7 @@ pub mod picture_bullets;
 pub mod placeholder_atom;
 pub mod print_options;
 pub mod privacy;
+pub mod prog_tags;
 pub mod recolor;
 pub mod routing_slip;
 pub mod shape_flags;
@@ -271,6 +272,10 @@ pub use placeholder_atom::{
 };
 pub use print_options::{PowerPointPrintColorMode, PowerPointPrintOptions, PowerPointPrintTarget};
 pub use privacy::PowerPointPrivacySettings;
+pub use prog_tags::{
+    PowerPointProgBinaryTag, PowerPointProgBinaryTagVersion, PowerPointProgStringTag,
+    PowerPointProgTag, PowerPointProgTagLimits, PowerPointProgTagScope, PowerPointProgTags,
+};
 pub use recolor::{
     PowerPointRecolorBitmapType, PowerPointRecolorBrush, PowerPointRecolorEntry,
     PowerPointRecolorHatch, PowerPointRecolorInfo, PowerPointRecolorLimits,
