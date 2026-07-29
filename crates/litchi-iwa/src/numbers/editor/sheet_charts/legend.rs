@@ -1,15 +1,19 @@
 //! Native legend visibility CRUD for Numbers sheet charts.
 
 use super::*;
-use crate::charts::ChartLegendFill;
 use crate::charts::legend_fill::{
     chart_legend_fill as read_native_chart_legend_fill,
     set_chart_legend_fill as set_native_chart_legend_fill,
+};
+use crate::charts::legend_stroke::{
+    chart_legend_stroke as read_native_chart_legend_stroke,
+    set_chart_legend_stroke as set_native_chart_legend_stroke,
 };
 use crate::charts::options::{
     chart_legend_visible as read_native_chart_legend_visible,
     set_chart_legend_visible as set_native_chart_legend_visible,
 };
+use crate::charts::{ChartLegendFill, ChartLegendStroke};
 
 impl NumbersEditor {
     /// Read whether Numbers shows the native legend for one sheet chart.
@@ -69,6 +73,50 @@ impl NumbersEditor {
         if verified.sheet_chart_legend_fill(sheet_id, drawable_object_id)? != *fill {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend-fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read the exact inherited, empty, or direct native legend stroke.
+    pub fn sheet_chart_legend_stroke(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ChartLegendStroke> {
+        let graph = chart_graph(self, sheet_id, drawable_object_id)?;
+        read_native_chart_legend_stroke(
+            &self.package,
+            &graph.archive_name,
+            drawable_object_id,
+            "Numbers",
+        )
+    }
+
+    /// Set or remove the direct native legend-stroke override.
+    pub fn set_sheet_chart_legend_stroke(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        stroke: ChartLegendStroke,
+    ) -> Result<()> {
+        if self.sheet_chart_legend_stroke(sheet_id, drawable_object_id)? == stroke {
+            return Ok(());
+        }
+        let graph = chart_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_native_chart_legend_stroke(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            "Numbers",
+            stroke,
+        )?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.sheet_chart_legend_stroke(sheet_id, drawable_object_id)? != stroke {
+            return Err(Error::InvalidFormat(
+                "Numbers chart legend-stroke update failed validation".to_owned(),
             ));
         }
         *self = verified;

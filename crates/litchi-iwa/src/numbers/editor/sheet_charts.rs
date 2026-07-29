@@ -638,10 +638,10 @@ mod tests {
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
         ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue,
-        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartPieLabelDistance,
-        ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
-        ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendStroke,
+        ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
+        ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
+        ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
         ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
         ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
         ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
@@ -2300,6 +2300,49 @@ mod tests {
         );
         reopened
             .set_sheet_chart_legend_fill(sheet_id, object_id, &ChartLegendFill::Inherited)
+            .unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_exact_chart_legend_stroke_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let chart = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let object_id = chart.drawable_object_id;
+        let baseline = editor.to_bytes().unwrap();
+
+        assert_eq!(
+            editor
+                .sheet_chart_legend_stroke(sheet_id, object_id)
+                .unwrap(),
+            ChartLegendStroke::Inherited
+        );
+        let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+            RgbaColor::new(0.15, 0.7, 0.35, 1.0, RgbColorSpace::Srgb).unwrap(),
+            StrokeWidth::new(3.0).unwrap(),
+            StrokePattern::Solid,
+        ));
+        editor
+            .set_sheet_chart_legend_stroke(sheet_id, object_id, stroke)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_legend_stroke(sheet_id, object_id)
+                .unwrap(),
+            stroke
+        );
+        assert!(
+            editor
+                .sheet_chart_legend_visible(sheet_id, object_id)
+                .unwrap()
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        reopened
+            .set_sheet_chart_legend_stroke(sheet_id, object_id, ChartLegendStroke::Inherited)
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }

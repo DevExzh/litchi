@@ -34,6 +34,7 @@ pub(crate) mod gaps;
 pub(crate) mod hidden_data;
 mod kind;
 pub(crate) mod legend_fill;
+pub(crate) mod legend_stroke;
 pub(crate) mod legend_style;
 pub mod metadata_extractor;
 pub(crate) mod non_style;
@@ -85,6 +86,7 @@ pub use font::{ChartFont, ChartFontSize};
 pub use gaps::{ChartGapPercentage, ChartGapSpacing};
 pub use kind::ChartKind;
 pub use legend_fill::ChartLegendFill;
+pub use legend_stroke::ChartLegendStroke;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use number_format::{
     ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartLabelAffixes, ChartNegativeStyle,

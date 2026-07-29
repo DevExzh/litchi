@@ -8,10 +8,10 @@ use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
-    ChartLegendFill, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
-    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartLegendFill, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
+    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
+    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
     ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
@@ -1754,6 +1754,47 @@ fn scratch_document_supports_exact_chart_legend_fill_crud() {
     assert_eq!(reopened.body_chart_legend_fill(object_id).unwrap(), solid);
     reopened
         .set_body_chart_legend_fill(object_id, &ChartLegendFill::Inherited)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn scratch_document_supports_exact_chart_legend_stroke_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart legend stroke").unwrap();
+    let chart = editor
+        .add_body_chart(
+            "Chart legend stroke".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let object_id = chart.drawable_object_id;
+    let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.body_chart_legend_stroke(object_id).unwrap(),
+        ChartLegendStroke::Inherited
+    );
+    let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+        RgbaColor::new(0.8, 0.2, 0.15, 1.0, RgbColorSpace::Srgb).unwrap(),
+        StrokeWidth::new(1.5).unwrap(),
+        StrokePattern::RoundedDash,
+    ));
+    editor
+        .set_body_chart_legend_stroke(object_id, stroke)
+        .unwrap();
+    assert_eq!(editor.body_chart_legend_stroke(object_id).unwrap(), stroke);
+    assert!(editor.body_chart_legend_visible(object_id).unwrap());
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.body_chart_legend_stroke(object_id).unwrap(),
+        stroke
+    );
+    reopened
+        .set_body_chart_legend_stroke(object_id, ChartLegendStroke::Inherited)
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), baseline);
 }
