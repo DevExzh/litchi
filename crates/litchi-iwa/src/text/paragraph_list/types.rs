@@ -397,6 +397,114 @@ pub enum ParagraphListLabelColor {
     Explicit(RgbaColor),
 }
 
+/// Numbering sequence used by an iWork numbered-list label.
+///
+/// These cover every affix-capable native sequence, including the locale-aware
+/// formats that are only shown when the corresponding input language is active.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ParagraphListNumberSequence {
+    #[default]
+    Decimal,
+    RomanUppercase,
+    RomanLowercase,
+    LatinUppercase,
+    LatinLowercase,
+    JapaneseIdeographic,
+    JapaneseHiragana,
+    JapaneseKatakana,
+    JapaneseHiraganaIroha,
+    JapaneseKatakanaIroha,
+    SimplifiedChineseIdeographic,
+    TraditionalChineseIdeographic,
+    FormalJapaneseIdeographic,
+    FormalSimplifiedChineseIdeographic,
+    FormalTraditionalChineseIdeographic,
+    KoreanAlphabet,
+    ArabicIndic,
+    ArabicAlphabet,
+    ArabicAbjad,
+    HebrewAlphabet,
+    HebrewBiblical,
+}
+
+impl ParagraphListNumberSequence {
+    pub const ALL: [Self; 21] = [
+        Self::Decimal,
+        Self::RomanUppercase,
+        Self::RomanLowercase,
+        Self::LatinUppercase,
+        Self::LatinLowercase,
+        Self::JapaneseIdeographic,
+        Self::JapaneseHiragana,
+        Self::JapaneseKatakana,
+        Self::JapaneseHiraganaIroha,
+        Self::JapaneseKatakanaIroha,
+        Self::SimplifiedChineseIdeographic,
+        Self::TraditionalChineseIdeographic,
+        Self::FormalJapaneseIdeographic,
+        Self::FormalSimplifiedChineseIdeographic,
+        Self::FormalTraditionalChineseIdeographic,
+        Self::KoreanAlphabet,
+        Self::ArabicIndic,
+        Self::ArabicAlphabet,
+        Self::ArabicAbjad,
+        Self::HebrewAlphabet,
+        Self::HebrewBiblical,
+    ];
+}
+
+/// Punctuation placed around or after an iWork list number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ParagraphListNumberPunctuation {
+    #[default]
+    Period,
+    Parentheses,
+    RightParenthesis,
+}
+
+impl ParagraphListNumberPunctuation {
+    pub const ALL: [Self; 3] = [Self::Period, Self::Parentheses, Self::RightParenthesis];
+}
+
+/// Complete native number format for a numbered-list label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ParagraphListNumberFormat {
+    /// A number sequence with one of iWork's three standard affix styles.
+    Affixed {
+        sequence: ParagraphListNumberSequence,
+        punctuation: ParagraphListNumberPunctuation,
+    },
+    /// Circled numbers such as ①, ②, and ③.
+    Circled,
+    /// Hebrew biblical numbering without additional punctuation.
+    HebrewBiblicalStandard,
+}
+
+impl Default for ParagraphListNumberFormat {
+    fn default() -> Self {
+        Self::DECIMAL
+    }
+}
+
+impl ParagraphListNumberFormat {
+    /// Apple's default `1.`, `2.`, `3.` format.
+    pub const DECIMAL: Self = Self::Affixed {
+        sequence: ParagraphListNumberSequence::Decimal,
+        punctuation: ParagraphListNumberPunctuation::Period,
+    };
+
+    /// Construct an affixed locale-aware number format.
+    pub const fn affixed(
+        sequence: ParagraphListNumberSequence,
+        punctuation: ParagraphListNumberPunctuation,
+    ) -> Self {
+        Self::Affixed {
+            sequence,
+            punctuation,
+        }
+    }
+}
+
 impl ParagraphListIndentation {
     /// Construct list indentation from validated components.
     pub const fn new(

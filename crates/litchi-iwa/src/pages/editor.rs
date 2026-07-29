@@ -33,13 +33,13 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
-    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
-    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumbering,
+    ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
+    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
+    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
+    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
+    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -788,6 +788,46 @@ impl PagesEditor {
         staged.set_paragraph_list_numbering(graph.storage_id, paragraph, numbering)?;
         *self = Self::from_package(staged.into_package())?;
         Ok(())
+    }
+
+    /// Read one numbered text-box paragraph's effective label format.
+    pub fn text_box_paragraph_list_number_format(
+        &self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberFormat> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text
+            .paragraph_list_number_format(graph.storage_id, paragraph)
+    }
+
+    /// Set one numbered text-box paragraph's locale-aware label format.
+    pub fn set_text_box_paragraph_list_number_format(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        format: ParagraphListNumberFormat,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_number_format(graph.storage_id, paragraph, format)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the standard decimal-period label format.
+    pub fn reset_text_box_paragraph_list_number_format(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_number_format(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
     }
 
     /// Read one text-box paragraph's effective text-bullet marker.
@@ -4123,9 +4163,9 @@ pub use tables::{
     PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
     PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
     PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
-    PagesTableCellParagraphListNumbering, PagesTableCellParagraphListPlacement,
-    PagesTableCellParagraphSpacing, PagesTableCellParagraphTabStops,
-    PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
+    PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumbering,
+    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
+    PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
     PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
     PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat, PagesTableCellSliderFormat,
     PagesTableCellSliderRange, PagesTableCellStarRatingFormat, PagesTableCellStepperDisplayFormat,

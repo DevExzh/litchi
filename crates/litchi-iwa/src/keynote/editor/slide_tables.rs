@@ -111,6 +111,7 @@ pub use crate::text::ParagraphListIndentation as KeynoteTableCellParagraphListIn
 pub use crate::text::ParagraphListLabelColor as KeynoteTableCellParagraphListLabelColor;
 pub use crate::text::ParagraphListLevel as KeynoteTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as KeynoteTableCellParagraphListLevelPlacement;
+pub use crate::text::ParagraphListNumberFormat as KeynoteTableCellParagraphListNumberFormat;
 pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
@@ -2113,6 +2114,91 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read one numbered slide-table paragraph's effective label format.
+    pub fn slide_table_cell_paragraph_list_number_format(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<KeynoteTableCellParagraphListNumberFormat> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_number_format_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one numbered slide-table paragraph's locale-aware label format.
+    pub fn set_slide_table_cell_paragraph_list_number_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        format: KeynoteTableCellParagraphListNumberFormat,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_number_format_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            format,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_list_number_format(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != format
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph list-number format failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the standard decimal-period label format.
+    pub fn reset_slide_table_cell_paragraph_list_number_format(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_number_format_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
     }
 
     /// Read one slide-table paragraph's effective text-bullet marker.

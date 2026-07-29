@@ -10,11 +10,14 @@ use crate::protobuf::tswp::list_style_archive::{LabelGeometry, LabelType, Number
 use crate::protobuf::{tsp, tss, tswp};
 use crate::wire::{
     patch_length_delimited_field, patch_varint_field, rewrite_repeated_fixed32_fields,
-    rewrite_repeated_length_delimited_fields,
+    rewrite_repeated_length_delimited_fields, rewrite_repeated_varint_fields,
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::types::{ParagraphList, ParagraphListLabelColor};
+use super::types::{
+    ParagraphList, ParagraphListLabelColor, ParagraphListNumberFormat,
+    ParagraphListNumberPunctuation, ParagraphListNumberSequence,
+};
 
 const LIST_STYLE_MESSAGE_TYPE: u32 = 2_023;
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -24,6 +27,7 @@ const OVERRIDE_COUNT_FIELD: u32 = 10;
 const TEXT_INDENTS_FIELD: u32 = 12;
 const INDENTS_FIELD: u32 = 13;
 const GEOMETRIES_FIELD: u32 = 14;
+const NUMBER_TYPES_FIELD: u32 = 15;
 const STRINGS_FIELD: u32 = 16;
 const FONT_COLOR_NULL_FIELD: u32 = 20;
 const FONT_COLOR_FIELD: u32 = 21;
@@ -33,6 +37,8 @@ const BULLET_INDENT_STEP_POINTS: f32 = 9.0;
 const NUMBER_INDENT_STEP_POINTS: f32 = 18.0;
 const BULLET_BASELINE_OFFSET_POINTS: f32 = -1.0;
 const DEFAULT_LABEL_SCALE: f32 = 1.0;
+const DOUBLE_PAREN_NUMBER_TYPE_OFFSET: i32 = 1;
+const RIGHT_PAREN_NUMBER_TYPE_OFFSET: i32 = 2;
 const BULLET_GLYPH: &str = "•";
 const NONE_OVERRIDE_COUNT: u32 = 4;
 const BULLET_OVERRIDE_COUNT: u32 = 5;
@@ -259,6 +265,29 @@ pub(super) fn effective_label_color(
     }
 }
 
+pub(super) fn effective_number_types(package: &IWorkPackage, style_id: u64) -> Result<Vec<i32>> {
+    if resolved_paragraph_list(package, style_id)? != ParagraphList::Numbered {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} is not a numbered list"
+        )));
+    }
+    let mut current_id = style_id;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(current_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list-style inheritance contains a cycle at {current_id}"
+            )));
+        }
+        let style = locate_style(package, current_id)?.style;
+        if !style.number_types.is_empty() {
+            validate_number_types(current_id, &style.number_types)?;
+            return Ok(style.number_types);
+        }
+        current_id = parent_style_id(&style, current_id)?;
+    }
+}
+
 #[derive(Clone, Copy)]
 enum ListFloatArray {
     LabelIndents,
@@ -447,6 +476,178 @@ pub(super) fn label_color_variation_object(
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
     info.object_references.push(parent_style_id);
     Ok(object)
+}
+
+pub(super) fn number_format_variation_object(
+    identifier: u64,
+    parent_style_id: u64,
+    stylesheet_id: u64,
+    number_types: Vec<i32>,
+) -> Result<ArchiveObject> {
+    validate_number_types(identifier, &number_types)?;
+    let style = tswp::ListStyleArchive {
+        super_: tss::StyleArchive {
+            parent: Some(reference(parent_style_id)),
+            is_variation: Some(true),
+            stylesheet: Some(reference(stylesheet_id)),
+            ..Default::default()
+        },
+        override_count: Some(1),
+        number_types,
+        ..Default::default()
+    };
+    let data = style.encode_to_vec();
+    tswp::ListStyleArchive::decode(data.as_slice())?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: LIST_STYLE_MESSAGE_TYPE,
+            data,
+        }],
+    )?;
+    let info = &mut object.archive_info.message_infos[0];
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.object_references.push(parent_style_id);
+    Ok(object)
+}
+
+pub(super) fn replace_direct_number_types(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+    number_types: &[i32],
+) -> Result<()> {
+    validate_number_types(style_id, number_types)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let data = patch_direct_number_types(&original.data, style_id, number_types)?;
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(super) fn remove_direct_number_types(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+        if style.number_types.is_empty() {
+            return Ok(());
+        }
+        validate_number_types(style_id, &style.number_types)?;
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_sub(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} has number formats without an override count"
+                ))
+            })?;
+        let data = rewrite_repeated_varint_fields(&original.data, NUMBER_TYPES_FIELD, &[])?;
+        let data = patch_varint_field(
+            &data,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+        let decoded = tswp::ListStyleArchive::decode(data.as_slice())?;
+        if !decoded.number_types.is_empty() || decoded.override_count != Some(override_count) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} number-format removal failed validation"
+            )));
+        }
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn patch_direct_number_types(data: &[u8], style_id: u64, number_types: &[i32]) -> Result<Vec<u8>> {
+    validate_number_types(style_id, number_types)?;
+    let style = tswp::ListStyleArchive::decode(data)?;
+    let had_direct_number_types = !style.number_types.is_empty();
+    if had_direct_number_types {
+        validate_number_types(style_id, &style.number_types)?;
+    }
+    let encoded = number_types
+        .iter()
+        .map(|value| u64::try_from(*value))
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|_| {
+            Error::InvalidFormat(format!(
+                "iWork list style {style_id} contains a negative number format"
+            ))
+        })?;
+    let mut patched = rewrite_repeated_varint_fields(data, NUMBER_TYPES_FIELD, &encoded)?;
+    if !had_direct_number_types {
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} override count overflowed"
+                ))
+            })?;
+        patched = patch_varint_field(
+            &patched,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+    }
+    let decoded = tswp::ListStyleArchive::decode(patched.as_slice())?;
+    if decoded.number_types != number_types {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} number-format update failed validation"
+        )));
+    }
+    Ok(patched)
 }
 
 pub(super) fn replace_direct_label_color(
@@ -1082,6 +1283,106 @@ fn validate_list_float_array(style_id: u64, values: &[f32], array: ListFloatArra
     Ok(())
 }
 
+fn validate_number_types(style_id: u64, values: &[i32]) -> Result<()> {
+    if values.len() != LIST_LEVEL_COUNT {
+        return Err(Error::InvalidFormat(format!(
+            "iWork numbered list style {style_id} must define {LIST_LEVEL_COUNT} number formats, found {}",
+            values.len()
+        )));
+    }
+    for value in values {
+        number_format_from_native(*value)?;
+    }
+    Ok(())
+}
+
+pub(super) fn number_format_to_native(format: ParagraphListNumberFormat) -> i32 {
+    match format {
+        ParagraphListNumberFormat::Circled => NumberType::KCircledNumberKind as i32,
+        ParagraphListNumberFormat::HebrewBiblicalStandard => {
+            NumberType::KHebrewBiblicalStandardKind as i32
+        },
+        ParagraphListNumberFormat::Affixed {
+            sequence,
+            punctuation,
+        } => {
+            let base = match sequence {
+                ParagraphListNumberSequence::Decimal => NumberType::KNumericDecimal,
+                ParagraphListNumberSequence::RomanUppercase => NumberType::KRomanUpperDecimal,
+                ParagraphListNumberSequence::RomanLowercase => NumberType::KRomanLowerDecimal,
+                ParagraphListNumberSequence::LatinUppercase => NumberType::KAlphaUpperDecimal,
+                ParagraphListNumberSequence::LatinLowercase => NumberType::KAlphaLowerDecimal,
+                ParagraphListNumberSequence::JapaneseIdeographic => {
+                    NumberType::KIdeographicJapaneseDecimalKind
+                },
+                ParagraphListNumberSequence::JapaneseHiragana => NumberType::KHiraganaDecimalKind,
+                ParagraphListNumberSequence::JapaneseKatakana => NumberType::KKatakanaDecimalKind,
+                ParagraphListNumberSequence::JapaneseHiraganaIroha => {
+                    NumberType::KHiraganaIrohaDecimalKind
+                },
+                ParagraphListNumberSequence::JapaneseKatakanaIroha => {
+                    NumberType::KKatakanaIrohaDecimalKind
+                },
+                ParagraphListNumberSequence::SimplifiedChineseIdeographic => {
+                    NumberType::KIdeographicSimplifiedChineseDecimalKind
+                },
+                ParagraphListNumberSequence::TraditionalChineseIdeographic => {
+                    NumberType::KIdeographicTraditionalChineseDecimalKind
+                },
+                ParagraphListNumberSequence::FormalJapaneseIdeographic => {
+                    NumberType::KIdeographicFormalJapaneseDecimalKind
+                },
+                ParagraphListNumberSequence::FormalSimplifiedChineseIdeographic => {
+                    NumberType::KIdeographicFormalSimplifiedChineseDecimalKind
+                },
+                ParagraphListNumberSequence::FormalTraditionalChineseIdeographic => {
+                    NumberType::KIdeographicFormalTraditionalChineseDecimalKind
+                },
+                ParagraphListNumberSequence::KoreanAlphabet => {
+                    NumberType::KKoreanAlphabetDecimalKind
+                },
+                ParagraphListNumberSequence::ArabicIndic => NumberType::KArabianNumericDecimalKind,
+                ParagraphListNumberSequence::ArabicAlphabet => NumberType::KArabianAlphaDecimalKind,
+                ParagraphListNumberSequence::ArabicAbjad => NumberType::KArabianAbjadDecimalKind,
+                ParagraphListNumberSequence::HebrewAlphabet => NumberType::KHebrewAlphaDecimalKind,
+                ParagraphListNumberSequence::HebrewBiblical => {
+                    NumberType::KHebrewBiblicalDecimalKind
+                },
+            } as i32;
+            base + match punctuation {
+                ParagraphListNumberPunctuation::Period => 0,
+                ParagraphListNumberPunctuation::Parentheses => DOUBLE_PAREN_NUMBER_TYPE_OFFSET,
+                ParagraphListNumberPunctuation::RightParenthesis => RIGHT_PAREN_NUMBER_TYPE_OFFSET,
+            }
+        },
+    }
+}
+
+pub(super) fn number_format_from_native(value: i32) -> Result<ParagraphListNumberFormat> {
+    NumberType::try_from(value).map_err(|_| {
+        Error::InvalidFormat(format!(
+            "native iWork numbered-list format {value} is unknown"
+        ))
+    })?;
+    if value == NumberType::KCircledNumberKind as i32 {
+        return Ok(ParagraphListNumberFormat::Circled);
+    }
+    if value == NumberType::KHebrewBiblicalStandardKind as i32 {
+        return Ok(ParagraphListNumberFormat::HebrewBiblicalStandard);
+    }
+    for sequence in ParagraphListNumberSequence::ALL {
+        for punctuation in ParagraphListNumberPunctuation::ALL {
+            let format = ParagraphListNumberFormat::affixed(sequence, punctuation);
+            if number_format_to_native(format) == value {
+                return Ok(format);
+            }
+        }
+    }
+    Err(Error::InvalidFormat(format!(
+        "native iWork numbered-list format {value} has no public representation"
+    )))
+}
+
 pub(super) fn find_preset_style(
     package: &IWorkPackage,
     archive_name: &str,
@@ -1440,5 +1741,73 @@ mod tests {
         assert_eq!(decoded.override_count, Some(5));
         assert_eq!(decoded.font_color_null, Some(true));
         assert!(decoded.font_color.is_none());
+    }
+
+    #[test]
+    fn every_native_number_format_has_one_strict_public_representation() {
+        let mut formats = Vec::new();
+        for sequence in ParagraphListNumberSequence::ALL {
+            for punctuation in ParagraphListNumberPunctuation::ALL {
+                formats.push(ParagraphListNumberFormat::affixed(sequence, punctuation));
+            }
+        }
+        formats.extend([
+            ParagraphListNumberFormat::Circled,
+            ParagraphListNumberFormat::HebrewBiblicalStandard,
+        ]);
+        assert_eq!(formats.len(), 65);
+        let native = formats
+            .iter()
+            .copied()
+            .map(number_format_to_native)
+            .collect::<HashSet<_>>();
+        assert_eq!(native.len(), formats.len());
+        for format in formats {
+            assert_eq!(
+                number_format_from_native(number_format_to_native(format)).unwrap(),
+                format
+            );
+        }
+        assert!(number_format_from_native(65).is_err());
+        assert!(number_format_from_native(-1).is_err());
+    }
+
+    #[test]
+    fn number_format_updates_compose_losslessly_and_preserve_unknown_fields() {
+        let mut style = tswp::ListStyleArchive {
+            super_: tss::StyleArchive {
+                parent: Some(reference(8)),
+                is_variation: Some(true),
+                stylesheet: Some(reference(3)),
+                ..Default::default()
+            },
+            override_count: Some(2),
+            font_color: Some(crate::shapes::color_to_native(
+                crate::shapes::RgbaColor::black(),
+            )),
+            tiered_numbers: vec![false; LIST_LEVEL_COUNT],
+            ..Default::default()
+        };
+        style.tiered_numbers[1] = true;
+        let mut encoded = style.encode_to_vec();
+        let unknown = [0xb8, 0x06, 0x0d];
+        encoded.extend_from_slice(&unknown);
+        let mut formats = repeated_enum(NumberType::KNumericDecimal);
+        formats[1] = number_format_to_native(ParagraphListNumberFormat::affixed(
+            ParagraphListNumberSequence::RomanLowercase,
+            ParagraphListNumberPunctuation::Parentheses,
+        ));
+
+        let patched = patch_direct_number_types(&encoded, 10, &formats).unwrap();
+        assert!(
+            patched
+                .windows(unknown.len())
+                .any(|window| window == unknown)
+        );
+        let decoded = tswp::ListStyleArchive::decode(patched.as_slice()).unwrap();
+        assert_eq!(decoded.override_count, Some(3));
+        assert_eq!(decoded.number_types, formats);
+        assert_eq!(decoded.tiered_numbers, style.tiered_numbers);
+        assert_eq!(decoded.font_color, style.font_color);
     }
 }

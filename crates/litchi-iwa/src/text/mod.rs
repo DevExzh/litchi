@@ -87,7 +87,8 @@ pub use paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
     ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement,
+    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+    ParagraphListNumberSequence, ParagraphListNumbering, ParagraphListPlacement,
     ParagraphListStart, ParagraphListTextGap,
 };
 pub(crate) use paragraph_list::{
@@ -98,6 +99,7 @@ pub(crate) use paragraph_list::{
     paragraph_list_label_color as paragraph_list_label_color_in_storage,
     paragraph_list_level as paragraph_list_level_in_storage,
     paragraph_list_levels as paragraph_list_levels_in_storage,
+    paragraph_list_number_format as paragraph_list_number_format_in_storage,
     paragraph_list_numbering as paragraph_list_numbering_in_storage,
     paragraph_lists as paragraph_lists_in_storage, preset_style_id, preset_style_object,
 };

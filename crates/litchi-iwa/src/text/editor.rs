@@ -76,13 +76,15 @@ use super::paragraph_alignment::{
 use super::paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphListPlacement, paragraph_list, paragraph_list_bullet,
-    paragraph_list_bullet_geometry, paragraph_list_indentation, paragraph_list_label_color,
-    paragraph_list_level, paragraph_list_levels, paragraph_list_numbering, paragraph_lists,
-    reset_paragraph_list, reset_paragraph_list_bullet, reset_paragraph_list_bullet_geometry,
+    ParagraphListNumberFormat, ParagraphListNumbering, ParagraphListPlacement, paragraph_list,
+    paragraph_list_bullet, paragraph_list_bullet_geometry, paragraph_list_indentation,
+    paragraph_list_label_color, paragraph_list_level, paragraph_list_levels,
+    paragraph_list_number_format, paragraph_list_numbering, paragraph_lists, reset_paragraph_list,
+    reset_paragraph_list_bullet, reset_paragraph_list_bullet_geometry,
     reset_paragraph_list_indentation, reset_paragraph_list_label_color, reset_paragraph_list_level,
-    set_paragraph_list, set_paragraph_list_bullet, set_paragraph_list_bullet_geometry,
-    set_paragraph_list_indentation, set_paragraph_list_label_color, set_paragraph_list_level,
+    reset_paragraph_list_number_format, set_paragraph_list, set_paragraph_list_bullet,
+    set_paragraph_list_bullet_geometry, set_paragraph_list_indentation,
+    set_paragraph_list_label_color, set_paragraph_list_level, set_paragraph_list_number_format,
     set_paragraph_list_numbering, set_paragraph_lists,
 };
 use super::paragraph_tabs::ParagraphTabStops;
@@ -782,6 +784,59 @@ impl IWorkTextEditor {
         }
         self.package = staged;
         Ok(())
+    }
+
+    /// Read one numbered paragraph's effective locale-aware label format.
+    pub fn paragraph_list_number_format(
+        &self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberFormat> {
+        paragraph_list_number_format(&self.package, object_id, paragraph)
+    }
+
+    /// Atomically set one numbered paragraph's locale-aware label format.
+    pub fn set_paragraph_list_number_format(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+        format: ParagraphListNumberFormat,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list_number_format(&mut staged, object_id, paragraph, format)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list_number_format(&verified, object_id, paragraph)? != format {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph list-number format update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore Apple's standard decimal-period format (`1.`, `2.`, `3.`).
+    pub fn reset_paragraph_list_number_format(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_list_number_format(&mut staged, object_id, paragraph)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            if paragraph_list_number_format(&verified, object_id, paragraph)?
+                != ParagraphListNumberFormat::DECIMAL
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork paragraph list-number format reset failed round-trip validation"
+                        .to_owned(),
+                ));
+            }
+            self.package = staged;
+        }
+        Ok(changed)
     }
 
     /// Read the effective text-bullet marker at one paragraph's list level.

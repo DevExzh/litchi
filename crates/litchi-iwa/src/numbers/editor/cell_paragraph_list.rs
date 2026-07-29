@@ -223,6 +223,65 @@ pub(super) fn set_paragraph_list_numbering(
     Ok(())
 }
 
+pub(super) fn paragraph_list_number_format(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<crate::text::ParagraphListNumberFormat> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Err(Error::InvalidFormat(
+            "plain iWork table cells are not numbered lists".to_owned(),
+        ));
+    };
+    crate::text::paragraph_list_number_format_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_number_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    format: crate::text::ParagraphListNumberFormat,
+) -> Result<()> {
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_number_format(storage_id, paragraph, format)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_number_format_in_storage(&staged, storage_id, paragraph)?
+        != format
+    {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph list-number format update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list_number_format(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(false);
+    };
+    let mut text = IWorkTextEditor::from_package(package.clone());
+    let changed = text.reset_paragraph_list_number_format(storage_id, paragraph)?;
+    if changed {
+        *package = text.into_package();
+    }
+    Ok(changed)
+}
+
 pub(super) fn paragraph_list_bullet(
     package: &IWorkPackage,
     table_id: u64,
@@ -930,7 +989,9 @@ mod tests {
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::text::{
         ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
-        ParagraphListIndentation, ParagraphListLabelIndent, ParagraphListTextGap, TextPointSize,
+        ParagraphListIndentation, ParagraphListLabelIndent, ParagraphListNumberFormat,
+        ParagraphListNumberPunctuation, ParagraphListNumberSequence, ParagraphListTextGap,
+        TextPointSize,
     };
 
     const ROW: usize = 1;
@@ -1926,6 +1987,10 @@ mod tests {
         let paragraph = ParagraphStart::from_utf16_index(16).unwrap();
         let restart =
             ParagraphListNumbering::StartAt(crate::text::ParagraphListStart::new(7).unwrap());
+        let format = ParagraphListNumberFormat::affixed(
+            ParagraphListNumberSequence::RomanUppercase,
+            ParagraphListNumberPunctuation::RightParenthesis,
+        );
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(3, 3)
             .build()
@@ -1941,6 +2006,9 @@ mod tests {
         editor
             .set_table_cell_paragraph_list_numbering(duplicate, ROW, COLUMN, paragraph, restart)
             .unwrap();
+        editor
+            .set_table_cell_paragraph_list_number_format(duplicate, ROW, COLUMN, paragraph, format)
+            .unwrap();
         assert_eq!(
             editor
                 .table_cell_paragraph_list_numbering(source, ROW, COLUMN, paragraph)
@@ -1952,6 +2020,18 @@ mod tests {
                 .table_cell_paragraph_list_numbering(duplicate, ROW, COLUMN, paragraph)
                 .unwrap(),
             restart
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_number_format(source, ROW, COLUMN, paragraph)
+                .unwrap(),
+            ParagraphListNumberFormat::DECIMAL
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_number_format(duplicate, ROW, COLUMN, paragraph)
+                .unwrap(),
+            format
         );
         assert_eq!(
             editor

@@ -45,13 +45,13 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing,
-    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumbering,
+    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -156,6 +156,8 @@ pub type NumbersTableCellParagraphListBulletGeometry = ParagraphListBulletGeomet
 /// Typed native list-label and text-gap indentation in a Numbers table cell.
 pub type NumbersTableCellParagraphListIndentation = ParagraphListIndentation;
 pub type NumbersTableCellParagraphListLabelColor = ParagraphListLabelColor;
+/// Locale-aware numbered-list label format in a Numbers table cell.
+pub type NumbersTableCellParagraphListNumberFormat = ParagraphListNumberFormat;
 /// A validated zero-based list nesting level in a Numbers table cell.
 pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
@@ -1157,6 +1159,49 @@ impl NumbersEditor {
         text.set_paragraph_list_numbering(graph.storage_id, paragraph, numbering)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
+    }
+
+    /// Read one numbered sheet text-box paragraph's effective label format.
+    pub fn sheet_text_box_paragraph_list_number_format(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberFormat> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_number_format(graph.storage_id, paragraph)
+    }
+
+    /// Set one numbered sheet text-box paragraph's locale-aware label format.
+    pub fn set_sheet_text_box_paragraph_list_number_format(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        format: ParagraphListNumberFormat,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_number_format(graph.storage_id, paragraph, format)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the standard decimal-period label format.
+    pub fn reset_sheet_text_box_paragraph_list_number_format(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list_number_format(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
     }
 
     /// Read one sheet text-box paragraph's effective text-bullet marker.
@@ -3327,6 +3372,76 @@ impl NumbersEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read one numbered table-cell paragraph's effective label format.
+    pub fn table_cell_paragraph_list_number_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumberFormat> {
+        cell_paragraph_list::paragraph_list_number_format(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one numbered table-cell paragraph's locale-aware label format.
+    pub fn set_table_cell_paragraph_list_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        format: NumbersTableCellParagraphListNumberFormat,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_number_format(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            format,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_number_format(table_id, row, column, paragraph)?
+            != format
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-number format failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the standard decimal-period label format.
+    pub fn reset_table_cell_paragraph_list_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_number_format(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
     }
 
     /// Read one table-cell paragraph's effective text-bullet marker.
@@ -5514,6 +5629,41 @@ pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_numbering(
         package, table_id, row, column, paragraph, numbering,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_number_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumberFormat> {
+    cell_paragraph_list::paragraph_list_number_format(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    format: ParagraphListNumberFormat,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_number_format(
+        package, table_id, row, column, paragraph, format,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_number_format(
+        package, table_id, row, column, paragraph,
     )
 }
 
