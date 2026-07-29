@@ -172,6 +172,8 @@ pub enum BodyStoryEvent {
     MathZone(usize),
     ProtectionRangeStart(usize),
     ProtectionRangeEnd(usize),
+    EditableRegionStart(usize),
+    EditableRegionEnd(usize),
 }
 
 /// A generic field reference embedded in a non-body text story.

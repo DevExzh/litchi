@@ -199,3 +199,51 @@ fn rejects_misplaced_object_alias_and_section_destinations() {
         );
     }
 }
+
+#[test]
+fn round_trips_object_time_metadata() {
+    let source = r#"{\rtf1\ansi A{\object\objlink\objh40\objw50
+        {\*\objclass Package}{\*\objname Visible Name}
+        {\*\objsect Section1}{\*\objtime \yr1994\mo6\dy16\hr12\min30}
+        {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
+        {\*\objdata 0102a0ff}
+        {\result fallback}}B}"#;
+    let document = RtfDocument::parse(source).unwrap();
+    let object = &document.objects()[0];
+    let time = object.time.unwrap();
+    assert_eq!(time.year, Some(1994));
+    assert_eq!(time.month, Some(6));
+    assert_eq!(time.day, Some(16));
+    assert_eq!(time.hour, Some(12));
+    assert_eq!(time.minute, Some(30));
+    assert_eq!(time.second, None);
+
+    let output = write(&document);
+    let serialized = String::from_utf8(output.clone()).unwrap();
+    assert!(serialized.contains("{\\*\\objtime \\yr1994\\mo6\\dy16\\hr12\\min30}"));
+
+    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    assert_eq!(reparsed.objects()[0].time, object.time);
+    assert_eq!(reparsed.objects()[0].section, object.section);
+}
+
+#[test]
+fn rejects_misplaced_object_time_destinations() {
+    for source in [
+        // Unstarred destination.
+        r#"{\rtf1{\object\objemb{\objtime \yr1994}{\*\objdata 00}}}"#,
+        // Duplicate destination.
+        r#"{\rtf1{\object\objemb{\*\objtime \yr1994}{\*\objtime \yr1995}{\*\objdata 00}}}"#,
+        // Destination after objdata.
+        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\objtime \yr1994}}}"#,
+        // Text payload in the destination.
+        r#"{\rtf1{\object\objemb{\*\objtime noon}{\*\objdata 00}}}"#,
+        // Active non-time control in the destination.
+        r#"{\rtf1{\object\objemb{\*\objtime \b\yr1994}{\*\objdata 00}}}"#,
+    ] {
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed {source}"
+        );
+    }
+}

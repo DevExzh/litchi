@@ -90,6 +90,8 @@ enum BodyEventKind<'b, 'a> {
     MathZone(&'b crate::MathZone<'a>),
     ProtectionRangeStart(&'b crate::ProtectionRange<'a>),
     ProtectionRangeEnd(&'b crate::ProtectionRange<'a>),
+    EditableRegionStart(&'b crate::EditableRegion<'a>),
+    EditableRegionEnd(&'b crate::EditableRegion<'a>),
     AnnotationStart(&'b Annotation<'a>),
     AnnotationEnd(&'b Annotation<'a>),
     Note(&'b Note<'a>),
@@ -238,6 +240,8 @@ impl<W: Write> RtfWriter<W> {
 
         self.write_window_caption(doc.window_caption())?;
 
+        self.write_kinsoku(doc.kinsoku())?;
+
         self.write_document_auto_format_type(doc.origin_metadata().auto_format_type)?;
 
         self.write_xsl_transform(doc.xsl_transform())?;
@@ -332,6 +336,7 @@ impl<W: Write> RtfWriter<W> {
             doc.custom_xml_tags(),
             doc.math_zones(),
             doc.protection_ranges(),
+            doc.editable_regions(),
             doc.annotations(),
             doc.notes(),
             doc.revisions(),
@@ -1423,6 +1428,27 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("{\\*\\windowcaption ")?;
         self.write_destination_text(caption.text.as_ref())?;
         self.write_str("}")
+    }
+
+    /// Write the inert custom kinsoku character sets and their language.
+    pub fn write_kinsoku(&mut self, kinsoku: &crate::DocumentKinsoku<'_>) -> io::Result<()> {
+        kinsoku
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if let Some(following) = &kinsoku.following {
+            self.write_str("{\\*\\fchars ")?;
+            self.write_destination_text(following.as_ref())?;
+            self.write_str("}")?;
+        }
+        if let Some(leading) = &kinsoku.leading {
+            self.write_str("{\\*\\lchars ")?;
+            self.write_destination_text(leading.as_ref())?;
+            self.write_str("}")?;
+        }
+        if let Some(language) = kinsoku.language {
+            self.write_control_word("ksulang", Some(language as i32))?;
+        }
+        Ok(())
     }
 
     /// Write an inert custom XSL transform location as its required starred destination.
@@ -4023,6 +4049,7 @@ impl<W: Write> RtfWriter<W> {
         custom_xml_tags: &[crate::CustomXmlTag<'_>],
         math_zones: &[crate::MathZone<'_>],
         protection_ranges: &[crate::ProtectionRange<'_>],
+        editable_regions: &[crate::EditableRegion<'_>],
         annotations: &[Annotation<'_>],
         notes: &[Note<'_>],
         revisions: &[Revision<'_>],
@@ -4045,6 +4072,7 @@ impl<W: Write> RtfWriter<W> {
             && custom_xml_tags.is_empty()
             && math_zones.is_empty()
             && protection_ranges.is_empty()
+            && editable_regions.is_empty()
             && annotations.is_empty()
             && notes.is_empty()
             && revisions.is_empty()
@@ -4080,6 +4108,7 @@ impl<W: Write> RtfWriter<W> {
         let event_count = event_count.saturating_add(custom_xml_tags.len().saturating_mul(2));
         let event_count = event_count.saturating_add(math_zones.len());
         let event_count = event_count.saturating_add(protection_ranges.len().saturating_mul(2));
+        let event_count = event_count.saturating_add(editable_regions.len().saturating_mul(2));
         let event_count = event_count.saturating_add(shapes.len());
         let event_count = event_count.saturating_add(shape_groups.len());
         let event_count = event_count.saturating_add(picture_compatibility_records.len());
@@ -4600,6 +4629,67 @@ impl<W: Write> RtfWriter<W> {
                 ));
             }
         }
+        if editable_regions.len() > crate::editable_region::MAX_EDITABLE_REGIONS {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF editable-region count exceeds the safety limit",
+            ));
+        }
+        for region in editable_regions {
+            region
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            let end = region.position.checked_add(region.content.len()).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF editable-region range overflow",
+                )
+            })?;
+            let content = body.get(region.position..end).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF editable region is outside body text or splits a character",
+                )
+            })?;
+            if content != region.content {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF editable-region content does not match its body range",
+                ));
+            }
+        }
+        {
+            let mut region_stack: Vec<usize> = Vec::new();
+            for event in body_story_events {
+                match *event {
+                    crate::BodyStoryEvent::EditableRegionStart(index) => {
+                        if index >= editable_regions.len() {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF editable-region story event references a missing region",
+                            ));
+                        }
+                        region_stack.push(index);
+                    },
+                    crate::BodyStoryEvent::EditableRegionEnd(index) => {
+                        let expected = region_stack.pop();
+                        if expected != Some(index) {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF editable regions are not properly nested",
+                            ));
+                        }
+                    },
+                    _ => {},
+                }
+            }
+            if !region_stack.is_empty() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF editable regions are not properly nested",
+                ));
+            }
+        }
         for annotation in annotations {
             annotation
                 .validate()
@@ -4695,6 +4785,8 @@ impl<W: Write> RtfWriter<W> {
         let mut saw_math_zones = vec![false; math_zones.len()];
         let mut saw_protection_starts = vec![false; protection_ranges.len()];
         let mut saw_protection_ends = vec![false; protection_ranges.len()];
+        let mut saw_editable_starts = vec![false; editable_regions.len()];
+        let mut saw_editable_ends = vec![false; editable_regions.len()];
         let mut saw_annotation_starts = vec![false; annotations.len()];
         let mut saw_annotation_ends = vec![false; annotations.len()];
         let mut saw_notes = vec![false; notes.len()];
@@ -4863,6 +4955,30 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::ProtectionRangeEnd(range),
                     )
                 },
+                crate::BodyStoryEvent::EditableRegionStart(index)
+                    if index < editable_regions.len() && !saw_editable_starts[index] =>
+                {
+                    saw_editable_starts[index] = true;
+                    (
+                        editable_regions[index].position,
+                        BodyEventKind::EditableRegionStart(&editable_regions[index]),
+                    )
+                },
+                crate::BodyStoryEvent::EditableRegionEnd(index)
+                    if index < editable_regions.len() && !saw_editable_ends[index] =>
+                {
+                    saw_editable_ends[index] = true;
+                    let region = &editable_regions[index];
+                    (
+                        region.position.checked_add(region.content.len()).ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF editable-region range overflow",
+                            )
+                        })?,
+                        BodyEventKind::EditableRegionEnd(region),
+                    )
+                },
                 crate::BodyStoryEvent::AnnotationStart(index)
                     if index < annotations.len() && !saw_annotation_starts[index] =>
                 {
@@ -5027,6 +5143,8 @@ impl<W: Write> RtfWriter<W> {
             && saw_math_zones.iter().all(|seen| *seen)
             && saw_protection_starts.iter().all(|seen| *seen)
             && saw_protection_ends.iter().all(|seen| *seen)
+            && saw_editable_starts.iter().all(|seen| *seen)
+            && saw_editable_ends.iter().all(|seen| *seen)
             && saw_annotation_starts.iter().all(|seen| *seen)
             && saw_annotation_ends.iter().all(|seen| *seen)
             && saw_notes.iter().all(|seen| *seen)
@@ -5134,6 +5252,18 @@ impl<W: Write> RtfWriter<W> {
             },
             BodyEventKind::ProtectionRangeEnd(range) => {
                 self.write_protection_range_marker("protend", range)
+            },
+            BodyEventKind::EditableRegionStart(region) => {
+                region
+                    .validate()
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+                self.write_str("\\ebcstart ")
+            },
+            BodyEventKind::EditableRegionEnd(region) => {
+                region
+                    .validate()
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+                self.write_str("\\ebcend ")
             },
             BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
             BodyEventKind::AnnotationEnd(annotation) => self.write_annotation_end(annotation),
@@ -5330,6 +5460,22 @@ impl<W: Write> RtfWriter<W> {
         if let Some(section) = &object.section {
             self.write_str("{\\*\\objsect ")?;
             self.write_destination_text(section.as_ref())?;
+            self.write_str("}")?;
+        }
+        if let Some(time) = object.time {
+            self.write_str("{\\*\\objtime ")?;
+            for (name, value) in [
+                ("yr", time.year),
+                ("mo", time.month),
+                ("dy", time.day),
+                ("hr", time.hour),
+                ("min", time.minute),
+                ("sec", time.second),
+            ] {
+                if let Some(value) = value {
+                    self.write_control_word(name, Some(value))?;
+                }
+            }
             self.write_str("}")?;
         }
         if object.set_size {

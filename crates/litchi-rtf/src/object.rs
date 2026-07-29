@@ -94,6 +94,8 @@ pub struct EmbeddedObject<'a> {
     pub alias: Option<Cow<'a, str>>,
     /// Optional name of the linked document section (`objsect`)
     pub section: Option<Cow<'a, str>>,
+    /// Optional time the object was last updated (`objtime`)
+    pub time: Option<crate::RtfTimestamp>,
     /// Optional original CLSID from the `oleclsid` destination
     pub class_id: Cow<'a, str>,
     /// Object width in twips
@@ -146,6 +148,7 @@ impl<'a> EmbeddedObject<'a> {
             name: Cow::Borrowed(""),
             alias: None,
             section: None,
+            time: None,
             class_id: Cow::Borrowed(""),
             width: 0,
             height: 0,

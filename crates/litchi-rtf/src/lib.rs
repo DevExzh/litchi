@@ -60,6 +60,7 @@ mod document_variable;
 mod document_view;
 mod document_word_2003_compatibility;
 mod document_xml_policies;
+mod editable_region;
 mod equation;
 mod error;
 mod external_reference;
@@ -70,6 +71,7 @@ mod generated_list_marker;
 mod generator;
 mod hyphenation;
 mod info;
+mod kinsoku;
 mod language;
 mod latent_style;
 mod legacy_drawing;
@@ -165,6 +167,7 @@ pub use document_view::{
 };
 pub use document_word_2003_compatibility::DocumentWord2003Compatibility;
 pub use document_xml_policies::DocumentXmlPolicies;
+pub use editable_region::EditableRegion;
 pub use equation::{
     EquationAlignment, EquationArray, EquationBox, EquationBracket, EquationDisplace,
     EquationGroup, EquationIntegral, EquationIntegralSymbol, EquationModel, EquationOverstrike,
@@ -213,6 +216,7 @@ pub use hyphenation::{
     DocumentHyphenation, MAX_HYPHENATION_CONSECUTIVE_LINES, MAX_HYPHENATION_HOT_ZONE_TWIPS,
 };
 pub use info::{DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp};
+pub use kinsoku::DocumentKinsoku;
 pub use language::{DocumentLanguageDefaults, LanguageId};
 pub use latent_style::{LatentStyleException, LatentStyles};
 pub use legacy_drawing::{

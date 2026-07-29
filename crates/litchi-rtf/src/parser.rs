@@ -335,6 +335,17 @@ struct ProtectionRangeSpan {
     end: usize,
 }
 
+struct OpenEditableRegion {
+    position: usize,
+    order: usize,
+}
+
+struct EditableRegionSpan {
+    position: usize,
+    order: usize,
+    end: usize,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum ParsedBodyStoryEvent {
     Resolved(crate::BodyStoryEvent),
@@ -1235,6 +1246,10 @@ pub struct Parser<'a> {
     open_protection_ranges: HashMap<String, Vec<OpenProtectionRange>>,
     protection_range_spans: Vec<ProtectionRangeSpan>,
     next_protection_range_order: usize,
+    editable_regions: Vec<crate::EditableRegion<'a>>,
+    open_editable_regions: Vec<OpenEditableRegion>,
+    editable_region_spans: Vec<EditableRegionSpan>,
+    next_editable_region_order: usize,
     protection_users: Vec<crate::ProtectionUser<'a>>,
     saw_protection_user_table: bool,
     protection_user_text_bytes: usize,
@@ -1246,6 +1261,7 @@ pub struct Parser<'a> {
     review_display: crate::DocumentReviewDisplay,
     review_display_seen: u8,
     window_caption: Option<crate::DocumentWindowCaption<'a>>,
+    kinsoku: crate::DocumentKinsoku<'a>,
     xsl_transform: Option<crate::DocumentXslTransform<'a>>,
     xsl_transform_usage: crate::DocumentXslTransformUsage,
     use_xsl_transform_seen: bool,
@@ -1806,6 +1822,10 @@ impl<'a> Parser<'a> {
             open_protection_ranges: HashMap::new(),
             protection_range_spans: Vec::new(),
             next_protection_range_order: 0,
+            editable_regions: Vec::new(),
+            open_editable_regions: Vec::new(),
+            editable_region_spans: Vec::new(),
+            next_editable_region_order: 0,
             protection_users: Vec::new(),
             saw_protection_user_table: false,
             protection_user_text_bytes: 0,
@@ -1817,6 +1837,7 @@ impl<'a> Parser<'a> {
             review_display: crate::DocumentReviewDisplay::default(),
             review_display_seen: 0,
             window_caption: None,
+            kinsoku: crate::DocumentKinsoku::default(),
             xsl_transform: None,
             xsl_transform_usage: crate::DocumentXslTransformUsage::default(),
             use_xsl_transform_seen: false,
@@ -2183,6 +2204,7 @@ impl<'a> Parser<'a> {
         self.finalize_bookmarks()?;
         self.finalize_custom_xml_tags()?;
         self.finalize_protection_ranges()?;
+        self.finalize_editable_regions()?;
         self.finalize_annotations()?;
         let body_story_events = self.finalize_body_story_events()?;
 
@@ -2236,12 +2258,14 @@ impl<'a> Parser<'a> {
             custom_xml_tags: self.custom_xml_tags,
             math_zones: self.math_zones,
             protection_ranges: self.protection_ranges,
+            editable_regions: self.editable_regions,
             protection_user_table,
             hyphenation: self.hyphenation,
             external_references: self.external_references,
             document_view: self.document_view,
             review_display: self.review_display,
             window_caption: self.window_caption,
+            kinsoku: self.kinsoku,
             xsl_transform: self.xsl_transform,
             xsl_transform_usage: self.xsl_transform_usage,
             style_list_filter: self.style_list_filter,
@@ -2430,6 +2454,11 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF protection-range destinations must be starred".to_string(),
+                    ));
+                },
+                Token::Control(ControlWord::KinsokuFollowing | ControlWord::KinsokuLeading) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF kinsoku destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(ControlWord::MathZoneInline) => {
@@ -2750,6 +2779,42 @@ impl<'a> Parser<'a> {
                             return Err(RtfError::MalformedDocument(
                                 "RTF document-property flag must not be starred".to_string(),
                             ));
+                        },
+                        Some(Token::Control(
+                            control @ (ControlWord::KinsokuFollowing | ControlWord::KinsokuLeading),
+                        )) => {
+                            // Word wraps the header-level kinsoku destinations
+                            // of codepage documents in \upr/\ud pairs; the ANSI
+                            // branch is skipped, so the Unicode branch is the
+                            // single parsed representation.
+                            let in_unicode_alternate = self.unicode_alternate_depth > 0;
+                            if !in_unicode_alternate
+                                && (self.states.len() != 3 || self.section_note_options_closed)
+                            {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF kinsoku destinations must precede visible text at document root"
+                                        .to_string(),
+                                ));
+                            }
+                            let following = matches!(control, ControlWord::KinsokuFollowing);
+                            let duplicate = if following {
+                                self.kinsoku.following.is_some()
+                            } else {
+                                self.kinsoku.leading.is_some()
+                            };
+                            if duplicate {
+                                return Err(RtfError::MalformedDocument(
+                                    "duplicate RTF kinsoku destination".to_string(),
+                                ));
+                            }
+                            let value = self.parse_kinsoku_destination(following)?;
+                            if following {
+                                self.kinsoku.following = Some(value);
+                            } else {
+                                self.kinsoku.leading = Some(value);
+                            }
+                            self.states.pop();
+                            return Ok(true);
                         },
                         Some(Token::Control(ControlWord::WindowCaption)) => {
                             if self.states.len() != 3 || self.section_note_options_closed {
@@ -5091,6 +5156,22 @@ impl<'a> Parser<'a> {
                 self.record_body_column_break()?;
                 self.pos += 1;
             },
+            ControlWord::EditableRegionStart(param) => {
+                require_parameterless(*param, "ebcstart")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_editable_region_boundary(true)?;
+                self.pos += 1;
+            },
+            ControlWord::EditableRegionEnd(param) => {
+                require_parameterless(*param, "ebcend")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_editable_region_boundary(false)?;
+                self.pos += 1;
+            },
             ControlWord::Section => {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
@@ -5675,6 +5756,18 @@ impl<'a> Parser<'a> {
                 "RTF page is not permitted in this destination".to_string(),
             ));
         }
+        if let ControlWord::EditableRegionStart(parameter) = control {
+            require_parameterless(*parameter, "ebcstart")?;
+            return Err(RtfError::MalformedDocument(
+                "RTF editable-region marks are supported only in the main body story".to_string(),
+            ));
+        }
+        if let ControlWord::EditableRegionEnd(parameter) = control {
+            require_parameterless(*parameter, "ebcend")?;
+            return Err(RtfError::MalformedDocument(
+                "RTF editable-region marks are supported only in the main body story".to_string(),
+            ));
+        }
         if matches!(
             control,
             ControlWord::DefaultFont(_)
@@ -5756,6 +5849,29 @@ impl<'a> Parser<'a> {
                 ));
             }
             self.default_tab_width_twips = Some(value);
+            return Ok(());
+        }
+        if let ControlWord::KinsokuLanguage(parameter) = control {
+            if self.states.len() != 2 || self.section_note_options_closed {
+                return Err(RtfError::MalformedDocument(
+                    "RTF ksulang must precede visible text at document root".to_string(),
+                ));
+            }
+            if self.kinsoku.language.is_some() {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF ksulang document property".to_string(),
+                ));
+            }
+            let value = parameter.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF ksulang requires a nonnegative numeric parameter".to_string(),
+                )
+            })?;
+            self.kinsoku.language = Some(u32::try_from(value).map_err(|_| {
+                RtfError::MalformedDocument(
+                    "RTF ksulang requires a nonnegative numeric parameter".to_string(),
+                )
+            })?);
             return Ok(());
         }
         if matches!(
@@ -17292,6 +17408,158 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Record an `\ebcstart`/`\ebcend` editable-region boundary mark.
+    ///
+    /// The marks carry no identifier and therefore pair positionally: each
+    /// `\ebcend` closes the innermost open `\ebcstart`.
+    fn record_editable_region_boundary(&mut self, is_start: bool) -> RtfResult<()> {
+        let state = self.current_state()?;
+        if state.destination != Destination::DocumentBody {
+            return Err(RtfError::MalformedDocument(
+                "RTF editable-region marks are supported only in the main body story".to_string(),
+            ));
+        }
+        if is_start {
+            if self.next_editable_region_order >= crate::editable_region::MAX_EDITABLE_REGIONS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF editable-region count exceeds the safety limit".to_string(),
+                ));
+            }
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::EditableRegionStart(self.next_editable_region_order),
+            ));
+            self.open_editable_regions.push(OpenEditableRegion {
+                position: self.body_text_len,
+                order: self.next_editable_region_order,
+            });
+            self.next_editable_region_order += 1;
+            return Ok(());
+        }
+        let Some(open) = self.open_editable_regions.pop() else {
+            return Err(RtfError::MalformedDocument(
+                "RTF ebcend has no matching ebcstart".to_string(),
+            ));
+        };
+        self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+            crate::BodyStoryEvent::EditableRegionEnd(open.order),
+        ));
+        self.editable_region_spans.push(EditableRegionSpan {
+            position: open.position,
+            order: open.order,
+            end: self.body_text_len,
+        });
+        Ok(())
+    }
+
+    fn finalize_editable_regions(&mut self) -> RtfResult<()> {
+        if !self.open_editable_regions.is_empty() {
+            return Err(RtfError::MalformedDocument(
+                "RTF ebcstart has no matching ebcend".to_string(),
+            ));
+        }
+        self.editable_region_spans
+            .sort_unstable_by_key(|span| span.order);
+        if self.editable_region_spans.is_empty() {
+            return Ok(());
+        }
+
+        let mut body = String::with_capacity(self.body_text_len);
+        for block in &self.blocks {
+            body.push_str(block.text.as_ref());
+        }
+        for span in self.editable_region_spans.drain(..) {
+            let content = body.get(span.position..span.end).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "editable region does not align to body text".to_string(),
+                )
+            })?;
+            self.editable_regions.push(crate::EditableRegion::new(
+                span.position,
+                Cow::Owned(content.to_string()),
+            )?);
+        }
+        Ok(())
+    }
+
+    /// Parse a starred `\*\fchars`/`\*\lchars` kinsoku destination group.
+    ///
+    /// Expects `self.pos` at the ignorable-destination marker and consumes
+    /// tokens through the group's closing brace.
+    fn parse_kinsoku_destination(&mut self, following: bool) -> RtfResult<Cow<'a, str>> {
+        self.pos += 2; // ignorable marker and destination control word
+        let mut value = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut fallback_skip = 0usize;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    break;
+                },
+                Some(Token::OpenBrace) => {
+                    // Word writes {\ucN\uN } encoding-switch groups inside the
+                    // kinsoku destinations of CJK documents.
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::UnicodeSkip(_)))
+                    ) {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF kinsoku destination contains an unsupported group".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                    loop {
+                        match self.tokens.get(self.pos) {
+                            Some(Token::CloseBrace) => {
+                                self.pos += 1;
+                                break;
+                            },
+                            None => return Err(RtfError::UnexpectedEof),
+                            _ => {
+                                if !self.consume_destination_text_token(
+                                    &mut value,
+                                    &mut unicode_skip,
+                                    &mut fallback_skip,
+                                    "kinsoku character set",
+                                )? {
+                                    return Err(RtfError::MalformedDocument(
+                                        "RTF kinsoku encoding-switch group contains grouped, binary, or active data"
+                                            .to_string(),
+                                    ));
+                                }
+                            },
+                        }
+                    }
+                },
+                None => return Err(RtfError::UnexpectedEof),
+                _ => {
+                    if !self.consume_destination_text_token(
+                        &mut value,
+                        &mut unicode_skip,
+                        &mut fallback_skip,
+                        "kinsoku character set",
+                    )? {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF kinsoku destination contains grouped, binary, or active data"
+                                .to_string(),
+                        ));
+                    }
+                    if value.len() > crate::kinsoku::MAX_KINSOKU_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF kinsoku character set exceeds the safety limit".to_string(),
+                        ));
+                    }
+                },
+            }
+        }
+        let value: String = value.chars().filter(|c| !matches!(c, '\r' | '\n')).collect();
+        crate::DocumentKinsoku::validate_characters(
+            if following { "following" } else { "leading" },
+            &value,
+        )?;
+        Ok(Cow::Owned(value))
+    }
+
     fn parse_ignorable_text_destination(&mut self) -> RtfResult<String> {
         self.pos += 2; // ignorable marker and destination control word
         let mut value = String::new();
@@ -18676,6 +18944,23 @@ impl<'a> Parser<'a> {
                     object.section = Some(Cow::Owned(self.parse_object_text_destination()?));
                 },
                 Token::OpenBrace
+                    if self.nested_control_word() == Some(ControlWord::ObjectTime) =>
+                {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || object.time.is_some()
+                        || saw_class_id
+                        || saw_data
+                        || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object time destination placement".to_string(),
+                        ));
+                    }
+                    object.time = Some(self.parse_object_time_destination()?);
+                },
+                Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::OleClassId(None)) =>
                 {
                     if !matches!(
@@ -19155,6 +19440,49 @@ impl<'a> Parser<'a> {
             }
         }
         Err(RtfError::UnexpectedEof)
+    }
+
+    fn parse_object_time_destination(&mut self) -> RtfResult<crate::RtfTimestamp> {
+        self.pos += 2; // opening brace and ignorable marker
+        if !matches!(
+            self.tokens.get(self.pos),
+            Some(Token::Control(ControlWord::ObjectTime))
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF object time destination".to_string(),
+            ));
+        }
+        self.pos += 1;
+        let mut timestamp = crate::RtfTimestamp::default();
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(timestamp);
+                },
+                Some(Token::Control(control)) => match control {
+                    ControlWord::Year(value) => timestamp.year = Some(*value),
+                    ControlWord::Month(value) => timestamp.month = Some(*value),
+                    ControlWord::Day(value) => timestamp.day = Some(*value),
+                    ControlWord::Hour(value) => timestamp.hour = Some(*value),
+                    ControlWord::Minute(value) => timestamp.minute = Some(*value),
+                    ControlWord::Second(value) => timestamp.second = Some(*value),
+                    _ => {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF object time destination contains an active control".to_string(),
+                        ));
+                    },
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => {},
+                _ => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF object time destination contains grouped, binary, or text data"
+                            .to_string(),
+                    ));
+                },
+            }
+            self.pos += 1;
+        }
     }
 
     fn parse_object_hex_destination(&mut self) -> RtfResult<Vec<u8>> {
@@ -24147,12 +24475,16 @@ pub struct ParsedDocument<'a> {
     pub math_zones: Vec<crate::MathZone<'a>>,
     /// Ordered inert protection-exception ranges spanning body text.
     pub protection_ranges: Vec<crate::ProtectionRange<'a>>,
+    /// Ordered inert editable regions spanning body text.
+    pub editable_regions: Vec<crate::EditableRegion<'a>>,
     pub protection_user_table: Option<crate::ProtectionUserTable<'a>>,
     pub hyphenation: crate::DocumentHyphenation,
     pub external_references: crate::DocumentExternalReferences<'a>,
     pub document_view: crate::DocumentView,
     pub review_display: crate::DocumentReviewDisplay,
     pub window_caption: Option<crate::DocumentWindowCaption<'a>>,
+    /// Inert custom kinsoku character sets.
+    pub kinsoku: crate::DocumentKinsoku<'a>,
     pub xsl_transform: Option<crate::DocumentXslTransform<'a>>,
     pub xsl_transform_usage: crate::DocumentXslTransformUsage,
     pub style_list_filter: Option<crate::DocumentStyleListFilter>,

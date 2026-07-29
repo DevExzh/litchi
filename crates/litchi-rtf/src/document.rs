@@ -103,6 +103,8 @@ pub struct RtfDocument<'a> {
     math_zones: Vec<crate::MathZone<'a>>,
     /// Ordered inert protection-exception ranges spanning body text.
     protection_ranges: Vec<crate::ProtectionRange<'a>>,
+    /// Ordered inert editable regions spanning body text.
+    editable_regions: Vec<crate::EditableRegion<'a>>,
     /// Ordered inert usernames used by range-level protection.
     protection_user_table: Option<crate::ProtectionUserTable<'a>>,
     /// Explicit passive document hyphenation properties.
@@ -115,6 +117,8 @@ pub struct RtfDocument<'a> {
     review_display: crate::DocumentReviewDisplay,
     /// Inert document-window caption text.
     window_caption: Option<crate::DocumentWindowCaption<'a>>,
+    /// Inert custom kinsoku character sets and their language.
+    kinsoku: crate::DocumentKinsoku<'a>,
     /// Inert custom XSL transform location metadata.
     xsl_transform: Option<crate::DocumentXslTransform<'a>>,
     /// Passive requested intent from the `usexform` flag.
@@ -377,6 +381,7 @@ impl<'a> RtfDocument<'a> {
                 name: Cow::Owned(object.name.into_owned()),
                 alias: object.alias.map(|alias| Cow::Owned(alias.into_owned())),
                 section: object.section.map(|section| Cow::Owned(section.into_owned())),
+                time: object.time,
                 class_id: Cow::Owned(object.class_id.into_owned()),
                 width: object.width,
                 height: object.height,
@@ -438,6 +443,11 @@ impl<'a> RtfDocument<'a> {
                 .into_iter()
                 .map(crate::ProtectionRange::into_owned)
                 .collect(),
+            editable_regions: parsed
+                .editable_regions
+                .into_iter()
+                .map(crate::EditableRegion::into_owned)
+                .collect(),
             protection_user_table: parsed
                 .protection_user_table
                 .map(crate::ProtectionUserTable::into_owned),
@@ -448,6 +458,7 @@ impl<'a> RtfDocument<'a> {
             window_caption: parsed
                 .window_caption
                 .map(crate::DocumentWindowCaption::into_owned),
+            kinsoku: parsed.kinsoku.into_owned(),
             xsl_transform: parsed
                 .xsl_transform
                 .map(crate::DocumentXslTransform::into_owned),
@@ -2051,6 +2062,14 @@ impl<'a> RtfDocument<'a> {
         &self.protection_ranges
     }
 
+    /// Return the editable regions in `\ebcstart` source order.
+    ///
+    /// The regions are inert boundary marks from protected documents: no
+    /// editing restriction is ever evaluated or enforced.
+    pub fn editable_regions(&self) -> &[crate::EditableRegion<'_>] {
+        &self.editable_regions
+    }
+
     /// Replace the XML namespace table after full validation.
     pub fn set_xml_namespaces(
         &mut self,
@@ -2173,6 +2192,14 @@ impl<'a> RtfDocument<'a> {
     /// Return passive document-window caption metadata.
     pub fn window_caption(&self) -> Option<&crate::DocumentWindowCaption<'a>> {
         self.window_caption.as_ref()
+    }
+
+    /// Return the custom kinsoku (East Asian line-breaking) character sets.
+    ///
+    /// The sets are inert typography metadata: no line-breaking rule is ever
+    /// evaluated or applied.
+    pub fn kinsoku(&self) -> &crate::DocumentKinsoku<'_> {
+        &self.kinsoku
     }
 
     /// Replace passive document-window caption metadata.
@@ -3978,6 +4005,13 @@ impl<'a> RtfDocument<'a> {
             crate::BodyStoryEvent::ProtectionRangeEnd(index) => {
                 let range = self.protection_ranges.get(index)?;
                 range.position.checked_add(range.content.len())?
+            },
+            crate::BodyStoryEvent::EditableRegionStart(index) => {
+                self.editable_regions.get(index)?.position
+            },
+            crate::BodyStoryEvent::EditableRegionEnd(index) => {
+                let region = self.editable_regions.get(index)?;
+                region.position.checked_add(region.content.len())?
             },
         })
     }
