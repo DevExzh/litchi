@@ -1630,8 +1630,10 @@ mod tests {
     #[test]
     fn rejects_duplicate_and_invalid_section_properties() {
         assert!(SectionProperties::from_xml("<w:sectPr><w:type w:val=\"nextPage\"/><w:type w:val=\"continuous\"/></w:sectPr>").is_err());
-        let mut section = SectionProperties::default();
-        section.columns = Some(SectionColumns { count: 0, ..SectionColumns::default() });
+        let section = SectionProperties {
+            columns: Some(SectionColumns { count: 0, ..SectionColumns::default() }),
+            ..SectionProperties::default()
+        };
         assert!(section.validate().is_err());
     }
 
@@ -1779,8 +1781,10 @@ mod tests {
         assert!(SectionProperties::from_xml("<w:sectPr><w:pgNumType w:fmt=\"decimal\"/><w:lnNumType w:countBy=\"5\"/></w:sectPr>").is_err());
         assert!(SectionProperties::from_xml("<w:sectPr><w:printerSettings r:id=\"rId1\"/><w:docGrid/></w:sectPr>").is_err());
         // Empty relationship ID rejected through validation.
-        let mut section = SectionProperties::default();
-        section.printer_settings_relationship_id = Some(String::new());
+        let section = SectionProperties {
+            printer_settings_relationship_id: Some(String::new()),
+            ..SectionProperties::default()
+        };
         assert!(section.validate().is_err());
     }
 }

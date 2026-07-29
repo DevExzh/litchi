@@ -783,7 +783,7 @@ mod tests {
                 r#"serverSldId="a" serverSldModifiedTime="009-04-14T16:20:41" clientInsertedTime="2009-04-14T16:20:41""#,
             ),
             format!(r#"<p:wrong xmlns:p="{P}"/>"#),
-            format!(r#"<f:sldSyncPr xmlns:f="urn:foreign"/>"#),
+            r#"<f:sldSyncPr xmlns:f="urn:foreign"/>"#.to_string(),
             format!(
                 r#"<p:sldSyncPr xmlns:p="{P}" serverSldId="a" serverSldModifiedTime="2009-04-14T16:20:41" clientInsertedTime="2009-04-14T16:20:41">text</p:sldSyncPr>"#
             ),
@@ -803,7 +803,7 @@ mod tests {
                 r#"<p:sldSyncPr xmlns:p="{P}" serverSldId="a" serverSldModifiedTime="2009-04-14T16:20:41" clientInsertedTime="2009-04-14T16:20:41" serverSldId="b"/>"#
             ),
             format!(r#"<p:sldSyncPr xmlns:p="{P}" serverSldId="a""#),
-            format!(r#"<?xml version="1.0"?>"#),
+            r#"<?xml version="1.0"?>"#.to_string(),
         ];
         for xml in cases {
             assert!(
@@ -824,7 +824,7 @@ mod tests {
         let mut package = package();
         store_slide_sync_properties(&mut package, &expected).unwrap();
         let loaded = load_slide_sync_properties(&package).unwrap();
-        assert_eq!(loaded, [expected.clone()]);
+        assert_eq!(loaded, std::slice::from_ref(&expected));
         assert!(
             store_slide_sync_properties(&mut package, &expected).is_err(),
             "storing a second synchronization part for one slide must fail"

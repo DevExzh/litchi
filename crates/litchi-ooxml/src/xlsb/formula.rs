@@ -5939,7 +5939,7 @@ mod tests {
 
         let token =
             resident_table_reference(FormulaTableRowType::Data, FormulaTableColumns::One(3));
-        assert!(FormulaConverter::try_tokens_to_string(&[token.clone()]).is_err());
+        assert!(FormulaConverter::try_tokens_to_string(std::slice::from_ref(&token)).is_err());
         assert!(
             FormulaConverter::try_tokens_to_string_with_context(&[token], &table_context())
                 .is_err()

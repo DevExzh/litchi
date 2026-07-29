@@ -1430,8 +1430,10 @@ mod tests {
                 "accepted {bad}"
             );
         }
-        let mut v = GlossaryDocument::default();
-        v.background_xml = Some(b"<?bad?><w:background/>".to_vec());
+        let v = GlossaryDocument {
+            background_xml: Some(b"<?bad?><w:background/>".to_vec()),
+            ..GlossaryDocument::default()
+        };
         assert!(v.to_xml(false).is_err());
     }
 }

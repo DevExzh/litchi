@@ -960,7 +960,7 @@ mod tests {
                 false,
             );
         for index in 1..=2 {
-            let uri = PackURI::new(&format!("/ppt/slides/slide{index}.xml")).unwrap();
+            let uri = PackURI::new(format!("/ppt/slides/slide{index}.xml")).unwrap();
             opc.add_part(Box::new(BlobPart::new(
                 uri,
                 "application/vnd.openxmlformats-officedocument.presentationml.slide+xml".into(),

@@ -1657,7 +1657,7 @@ mod tests {
         for (index, relationship_id) in
             (1..=6).zip(["rId4", "rId5", "rId6", "rId7", "rId8", "rId9"])
         {
-            let uri = PackURI::new(&format!("/ppt/fonts/font{index}.fntdata")).unwrap();
+            let uri = PackURI::new(format!("/ppt/fonts/font{index}.fntdata")).unwrap();
             let data = physical.blob_for(&uri).unwrap();
             poi.add_part(Box::new(BlobPart::new(uri, FONT_DATA_CT.into(), data)));
             poi.get_part_mut(&presentation_uri)

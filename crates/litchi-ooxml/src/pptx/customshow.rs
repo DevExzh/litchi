@@ -230,7 +230,7 @@ impl CustomShowList {
     ///
     /// This is a convenience wrapper that emits a best-effort mapping by treating
     /// numeric slide IDs as their corresponding `rId` values (e.g. slide 5 → `rId5`).
-    /// For full fidelity, prefer [`to_xml_with_rel_map`] and pass the workbook's
+    /// For full fidelity, prefer [`Self::to_xml_with_rel_map`] and pass the workbook's
     /// actual slide relationship map.
     pub fn to_xml(&self) -> String {
         if self.is_empty() {

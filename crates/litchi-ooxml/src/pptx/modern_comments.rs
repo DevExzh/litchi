@@ -1778,7 +1778,7 @@ mod tests {
     fn rejects_hostile_or_schema_invalid_comment_xml() {
         let cases = [
             format!(r#"<!DOCTYPE x><p188:cmLst xmlns:p188="{P188}"/>"#),
-            format!(r#"<x:cmLst xmlns:x="urn:wrong"/>"#),
+            r#"<x:cmLst xmlns:x="urn:wrong"/>"#.to_string(),
             format!(
                 r#"<p188:cmLst xmlns:p188="{P188}"><p188:cm id="bad" authorId="{AUTHOR}" created="2024-12-30T20:26:06.503"/></p188:cmLst>"#
             ),

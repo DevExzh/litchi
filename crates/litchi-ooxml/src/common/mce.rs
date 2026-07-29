@@ -701,8 +701,10 @@ mod preservation_tests {
         let source = format!(
             r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveAttributes="x:one x:two"/>"#
         );
-        let mut limits = MceLimits::default();
-        limits.max_directive_tokens = 2;
+        let limits = MceLimits {
+            max_directive_tokens: 2,
+            ..MceLimits::default()
+        };
         assert!(matches!(
             run_with(&source, &MceCapabilities::new(), &limits),
             Err(MceError::LimitExceeded(_))
@@ -958,8 +960,10 @@ mod tests {
             run(x, &MceCapabilities::new()),
             Err(MceError::MustUnderstand(_))
         ));
-        let mut l = MceLimits::default();
-        l.max_depth = 1;
+        let l = MceLimits {
+            max_depth: 1,
+            ..MceLimits::default()
+        };
         assert!(process_markup_compatibility(b"<r xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><x/></r>",&MceCapabilities::new(),&l).is_err())
     }
 }

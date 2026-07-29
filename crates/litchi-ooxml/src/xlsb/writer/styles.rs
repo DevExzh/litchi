@@ -90,7 +90,8 @@ impl StylesWriter {
     /// Add a differential formatting style (DXF) with a solid fill color and
     /// return its 0-based index.
     ///
-    /// The returned index is used as `dxf_id` in [`ConditionalFormattingRule`].
+    /// The returned index is used as `dxf_id` in
+    /// [`ConditionalFormattingRule`](crate::xlsb::conditional_formatting::ConditionalFormattingRule).
     ///
     /// # Arguments
     ///

@@ -1111,7 +1111,7 @@ mod tests {
         let transition = SlideTransition::from_xml(STANDARD_COVER).unwrap().unwrap();
 
         assert_eq!(transition.speed, TransitionSpeed::Fast);
-        assert_eq!(transition.advance_on_click, false);
+        assert!(!transition.advance_on_click);
         assert_eq!(transition.advance_after_ms, Some(750));
         assert_eq!(
             transition.transition_type,

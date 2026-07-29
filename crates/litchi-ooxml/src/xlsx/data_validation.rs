@@ -1975,7 +1975,7 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
             .unwrap_or_else(|e| panic!("open {relative}: {e}"));
-        let uri = PackURI::new(&format!("/xl/worksheets/sheet{index}.xml")).unwrap();
+        let uri = PackURI::new(format!("/xl/worksheets/sheet{index}.xml")).unwrap();
         let bytes = package
             .blob_for(&uri)
             .unwrap_or_else(|e| panic!("sheet {relative}: {e}"));

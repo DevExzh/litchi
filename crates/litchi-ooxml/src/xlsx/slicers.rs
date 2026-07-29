@@ -956,9 +956,8 @@ mod tests {
             format!(
                 r#"<!DOCTYPE x><slicers xmlns="{SLICERS_NS}"><slicer name="a" cache="b" rowHeight="1"/></slicers>"#
             ),
-            format!(
-                r#"<slicers xmlns="urn:wrong"><slicer name="a" cache="b" rowHeight="1"/></slicers>"#
-            ),
+            r#"<slicers xmlns="urn:wrong"><slicer name="a" cache="b" rowHeight="1"/></slicers>"#
+                .to_string(),
             format!(r#"<slicers xmlns="{SLICERS_NS}"/>"#),
             format!(r#"<slicers xmlns="{SLICERS_NS}"><slicer name="a" cache="b"/></slicers>"#),
             format!(

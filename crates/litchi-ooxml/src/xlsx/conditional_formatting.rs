@@ -1457,7 +1457,7 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("failed to parse styles in {relative}: {error}"));
         let sheet_uri =
-            PackURI::new(&format!("/xl/worksheets/sheet{sheet}.xml")).expect("valid sheet URI");
+            PackURI::new(format!("/xl/worksheets/sheet{sheet}.xml")).expect("valid sheet URI");
         let sheet_bytes = package
             .blob_for(&sheet_uri)
             .unwrap_or_else(|error| panic!("failed to read sheet1 in {relative}: {error}"));

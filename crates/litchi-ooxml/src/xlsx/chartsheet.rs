@@ -4569,7 +4569,7 @@ mod tests {
             )
         };
         for body in [
-            format!("<a:graphicData uri=\"urn:wrong\"><cx:chart r:id=\"rId1\"/></a:graphicData>"),
+            "<a:graphicData uri=\"urn:wrong\"><cx:chart r:id=\"rId1\"/></a:graphicData>".to_string(),
             format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart/></a:graphicData>"),
             format!(
                 "<a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rId1\"/><cx:chart r:id=\"rId2\"/></a:graphicData>"

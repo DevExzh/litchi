@@ -4870,10 +4870,6 @@ mod tests {
                 .replace("</cx:f>", "</cx:nf>"),
             base.replace("</cx:strDim>", "<cx:f>late</cx:f></cx:strDim>"),
             base.replace(
-                "ptCount=\"1\" name=\"Category\"",
-                "ptCount=\"1\" name=\"Category\"",
-            )
-            .replace(
                 "</cx:lvl></cx:strDim>",
                 "<cx:pt idx=\"0\">B</cx:pt></cx:lvl></cx:strDim>",
             ),
@@ -4915,7 +4911,7 @@ mod tests {
             base.replace("majorUnit=\"2\"", "majorUnit=\"0\""),
             base.replace("gapWidth=\"0.5\"", "gapWidth=\"-1\""),
             base.replace("<cx:catScaling gapWidth=\"0.5\"/>", "<cx:catScaling gapWidth=\"0.5\"/><cx:valScaling/>"),
-            base.replace(r#"<cx:plotSurface><cx:spPr><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></cx:spPr><cx:extLst/></cx:plotSurface>"#, "").replace("<cx:series layoutId", "<cx:series layoutId").replace("</cx:series><cx:extLst/></cx:plotAreaRegion>", r#"</cx:series><cx:plotSurface><cx:spPr><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></cx:spPr><cx:extLst/></cx:plotSurface></cx:plotAreaRegion>"#),
+            base.replace(r#"<cx:plotSurface><cx:spPr><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></cx:spPr><cx:extLst/></cx:plotSurface>"#, "").replace("</cx:series><cx:extLst/></cx:plotAreaRegion>", r#"</cx:series><cx:plotSurface><cx:spPr><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></cx:spPr><cx:extLst/></cx:plotSurface></cx:plotAreaRegion>"#),
             base.replace(r#"<cx:plotSurface><cx:spPr><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></cx:spPr><cx:extLst/></cx:plotSurface>"#, r#"<cx:plotSurface><cx:spPr><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></cx:spPr><cx:extLst/></cx:plotSurface><cx:plotSurface><cx:spPr><a:solidFill><a:schemeClr val="accent2"/></a:solidFill></cx:spPr><cx:extLst/></cx:plotSurface>"#),
             base.replace("<cx:parentLabelLayout val=\"banner\"/>", "").replace("<cx:regionLabelLayout val=\"bestFitOnly\"/>", "<cx:regionLabelLayout val=\"bestFitOnly\"/><cx:parentLabelLayout val=\"banner\"/>"),
         ];
@@ -5038,7 +5034,7 @@ mod tests {
                     .is_err()
             );
         }
-        let oversized = "A".repeat(((MAX_GEO_BINARY_BYTES + 1 + 2) / 3) * 4);
+        let oversized = "A".repeat((MAX_GEO_BINARY_BYTES + 1).div_ceil(3) * 4);
         assert!(
             ChartExPart::from_part(&chart_part(base.replace("AQID", &oversized)))
                 .unwrap()

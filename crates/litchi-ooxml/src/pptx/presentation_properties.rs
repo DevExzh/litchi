@@ -1642,15 +1642,17 @@ mod tests {
                 "accepted {xml}"
             );
         }
-        let mut value = PresentationProperties::default();
-        value.extensions = (0..=MAX_EXTENSIONS)
-            .map(|i| {
-                PresentationPropertyExtension::Unknown(OpaquePresentationExtension {
-                    uri: format!("urn:vendor:{i}"),
-                    xml: format!(r#"<p:ext xmlns:p="{P_NS}" uri="urn:vendor:{i}"/>"#).into_bytes(),
+        let value = PresentationProperties {
+            extensions: (0..=MAX_EXTENSIONS)
+                .map(|i| {
+                    PresentationPropertyExtension::Unknown(OpaquePresentationExtension {
+                        uri: format!("urn:vendor:{i}"),
+                        xml: format!(r#"<p:ext xmlns:p="{P_NS}" uri="urn:vendor:{i}"/>"#).into_bytes(),
+                    })
                 })
-            })
-            .collect();
+                .collect(),
+            ..PresentationProperties::default()
+        };
         assert!(value.to_xml(false).is_err());
     }
     #[test]

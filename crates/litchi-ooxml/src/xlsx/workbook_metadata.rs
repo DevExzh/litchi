@@ -1093,7 +1093,7 @@ mod tests {
         let body = body
             .replace(
                 "<metadataTypes",
-                &format!("<mc:AlternateContent><mc:Choice Requires=\"xda\"><metadataTypes"),
+                "<mc:AlternateContent><mc:Choice Requires=\"xda\"><metadataTypes",
             )
             .replace(
                 "</metadataTypes>",

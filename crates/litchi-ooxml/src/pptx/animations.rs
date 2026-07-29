@@ -5065,10 +5065,8 @@ mod tests {
             r#"<p:tmpl/>"#.to_string(),
             format!(r#"<p:tmpl><p:tnLst>{par}{par}</p:tnLst></p:tmpl>"#),
             r#"<p:tmpl><p:tnLst><p:par><p:cTn/><p:cTn/></p:par></p:tnLst></p:tmpl>"#.to_string(),
-            format!(r#"<p:tmpl><p:tnLst><p:seq><p:cTn/></p:seq></p:tnLst></p:tmpl>"#),
-            format!(
-                r#"<p:tmpl><p:tnLst><x:par xmlns:x="urn:foreign"><x:cTn/></x:par></p:tnLst></p:tmpl>"#
-            ),
+            r#"<p:tmpl><p:tnLst><p:seq><p:cTn/></p:seq></p:tnLst></p:tmpl>"#.to_string(),
+            r#"<p:tmpl><p:tnLst><x:par xmlns:x="urn:foreign"><x:cTn/></x:par></p:tnLst></p:tmpl>"#.to_string(),
             format!(r#"<p:tmpl><p:tnLst>{par}</p:tnLst><p:tnLst>{par}</p:tnLst></p:tmpl>"#),
             format!(r#"<p:tmpl lvl="10"><p:tnLst>{par}</p:tnLst></p:tmpl>"#),
             format!(r#"<p:tmpl lvl="nope"><p:tnLst>{par}</p:tnLst></p:tmpl>"#),

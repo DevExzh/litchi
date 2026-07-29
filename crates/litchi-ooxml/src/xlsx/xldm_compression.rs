@@ -1035,9 +1035,10 @@ mod tests {
         for field_bits in 0..=64u8 {
             for bit_offset in 0..64u8 {
                 let expected =
-                    if field_bits == 0 || u16::from(field_bits) + u16::from(bit_offset) > 64 {
-                        0
-                    } else if field_bits == 64 {
+                    if field_bits == 0
+                        || field_bits == 64
+                        || u16::from(field_bits) + u16::from(bit_offset) > 64
+                    {
                         0
                     } else {
                         !(((1u64 << field_bits) - 1) << bit_offset)

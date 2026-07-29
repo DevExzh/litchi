@@ -1958,7 +1958,7 @@ mod tests {
                 level_offsets: vec![],
             }],
         };
-        validate_hierarchies(&model, &[], &[generated.clone()]).unwrap();
+        validate_hierarchies(&model, &[], std::slice::from_ref(&generated)).unwrap();
         assert!(validate_hierarchies(&model, &[], &[]).is_err());
         let mut forbidden = model.clone();
         forbidden.hierarchies[0].position_to_id = false;
