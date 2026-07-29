@@ -8,12 +8,12 @@ use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
-    ChartLegendFill, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
-    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
-    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartLegendFill, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
+    ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -1723,6 +1723,77 @@ fn scratch_presentation_supports_exact_chart_legend_stroke_crud() {
     );
     reopened
         .set_slide_chart_legend_stroke(0, object_id, ChartLegendStroke::Inherited)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let object_id = chart.drawable_object_id;
+    let fill = ChartLegendFill::Fill(ShapeFill::Solid(
+        RgbaColor::new(0.9, 0.95, 1.0, 1.0, RgbColorSpace::Srgb).unwrap(),
+    ));
+    let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+        RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+        StrokeWidth::new(2.5).unwrap(),
+        StrokePattern::MediumDash,
+    ));
+    editor
+        .set_slide_chart_legend_fill(0, object_id, &fill)
+        .unwrap();
+    editor
+        .set_slide_chart_legend_stroke(0, object_id, stroke)
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.slide_chart_legend_shadow(0, object_id).unwrap(),
+        ChartLegendShadow::Inherited
+    );
+    let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
+        ShapeShadowAppearance::new(
+            RgbaColor::black(),
+            ShapeShadowBlurRadius::from_points(12).unwrap(),
+            ShapeShadowOffset::from_points(8.0).unwrap(),
+            ShapeShadowOpacity::new(0.6).unwrap(),
+        ),
+        ShapeShadowAngle::from_degrees(30.0).unwrap(),
+    ));
+    editor
+        .set_slide_chart_legend_shadow(0, object_id, shadow)
+        .unwrap();
+    assert_eq!(
+        editor.slide_chart_legend_shadow(0, object_id).unwrap(),
+        shadow
+    );
+    assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), fill);
+    assert_eq!(
+        editor.slide_chart_legend_stroke(0, object_id).unwrap(),
+        stroke
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    reopened
+        .set_slide_chart_legend_shadow(0, object_id, ChartLegendShadow::NoShadow)
+        .unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_shadow(0, object_id).unwrap(),
+        ChartLegendShadow::NoShadow
+    );
+    assert_eq!(
+        reopened.slide_chart_legend_fill(0, object_id).unwrap(),
+        fill
+    );
+    assert_eq!(
+        reopened.slide_chart_legend_stroke(0, object_id).unwrap(),
+        stroke
+    );
+    reopened
+        .set_slide_chart_legend_shadow(0, object_id, ChartLegendShadow::Inherited)
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), baseline);
 }

@@ -638,7 +638,7 @@ mod tests {
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
         ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue,
-        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendStroke,
+        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendShadow, ChartLegendStroke,
         ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
         ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
         ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
@@ -2343,6 +2343,53 @@ mod tests {
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         reopened
             .set_sheet_chart_legend_stroke(sheet_id, object_id, ChartLegendStroke::Inherited)
+            .unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_exact_chart_legend_shadow_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let chart = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let object_id = chart.drawable_object_id;
+        let baseline = editor.to_bytes().unwrap();
+
+        assert_eq!(
+            editor
+                .sheet_chart_legend_shadow(sheet_id, object_id)
+                .unwrap(),
+            ChartLegendShadow::Inherited
+        );
+        let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(9).unwrap(),
+                ShapeShadowOffset::from_points(5.0).unwrap(),
+                ShapeShadowOpacity::new(0.5).unwrap(),
+            ),
+            ShapeShadowAngle::from_degrees(60.0).unwrap(),
+        ));
+        editor
+            .set_sheet_chart_legend_shadow(sheet_id, object_id, shadow)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_legend_shadow(sheet_id, object_id)
+                .unwrap(),
+            shadow
+        );
+        assert!(
+            editor
+                .sheet_chart_legend_visible(sheet_id, object_id)
+                .unwrap()
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        reopened
+            .set_sheet_chart_legend_shadow(sheet_id, object_id, ChartLegendShadow::Inherited)
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }

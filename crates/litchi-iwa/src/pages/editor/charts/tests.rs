@@ -8,12 +8,12 @@ use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
-    ChartLegendFill, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
-    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
-    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartLegendFill, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
+    ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -1795,6 +1795,51 @@ fn scratch_document_supports_exact_chart_legend_stroke_crud() {
     );
     reopened
         .set_body_chart_legend_stroke(object_id, ChartLegendStroke::Inherited)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn scratch_document_supports_exact_chart_legend_shadow_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart legend shadow").unwrap();
+    let chart = editor
+        .add_body_chart(
+            "Chart legend shadow".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let object_id = chart.drawable_object_id;
+    let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.body_chart_legend_shadow(object_id).unwrap(),
+        ChartLegendShadow::Inherited
+    );
+    let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
+        ShapeShadowAppearance::new(
+            RgbaColor::black(),
+            ShapeShadowBlurRadius::from_points(11).unwrap(),
+            ShapeShadowOffset::from_points(7.0).unwrap(),
+            ShapeShadowOpacity::new(0.55).unwrap(),
+        ),
+        ShapeShadowAngle::from_degrees(25.0).unwrap(),
+    ));
+    editor
+        .set_body_chart_legend_shadow(object_id, shadow)
+        .unwrap();
+    assert_eq!(editor.body_chart_legend_shadow(object_id).unwrap(), shadow);
+    assert!(editor.body_chart_legend_visible(object_id).unwrap());
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.body_chart_legend_shadow(object_id).unwrap(),
+        shadow
+    );
+    reopened
+        .set_body_chart_legend_shadow(object_id, ChartLegendShadow::Inherited)
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), baseline);
 }

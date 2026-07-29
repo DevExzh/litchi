@@ -6,10 +6,10 @@ use litchi_iwa::charts::{
     ChartAxis, ChartAxisBound, ChartAxisGridline, ChartAxisGridlineStroke, ChartAxisMajorStepCount,
     ChartAxisMinorStepCount, ChartAxisTickMarkLocation, ChartCornerRadius, ChartData,
     ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage,
-    ChartGapSpacing, ChartKind, ChartLegendFill, ChartLegendStroke, ChartRoundedCorners,
-    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartGapSpacing, ChartKind, ChartLegendFill, ChartLegendShadow, ChartLegendStroke,
+    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
+    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -233,6 +233,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             StrokePattern::MediumDash,
         )),
     )?;
+    editor.set_sheet_chart_legend_shadow(
+        sheet_id,
+        chart.drawable_object_id,
+        ChartLegendShadow::Shadow(ShapeDropShadow::new(
+            ShapeShadowAppearance::new(
+                RgbaColor::black(),
+                ShapeShadowBlurRadius::from_points(12)?,
+                ShapeShadowOffset::from_points(8.0)?,
+                ShapeShadowOpacity::new(0.6)?,
+            ),
+            ShapeShadowAngle::from_degrees(30.0)?,
+        )),
+    )?;
     editor.set_sheet_chart_series_value_label_visibilities(
         sheet_id,
         chart.drawable_object_id,
@@ -312,7 +325,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_chart_caption(sheet_id, chart.drawable_object_id, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Numbers {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label and line, a visible pale-blue legend with a blue 2.5 pt medium-dash stroke, visible category-axis series names, explicitly number-formatted currency-affixed data value labels placed outside with per-series Auto-Fit, linear and moving-average series trendlines, fixed and percentage series error bars with per-series Auto-Fit, hidden value-axis major gridlines, visible value-axis minor gridlines, excluded hidden source rows and columns, and a caption on sheet {}",
+        "created Numbers {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label and line, a visible pale-blue legend with a blue 2.5 pt medium-dash stroke and black 12 pt shadow, visible category-axis series names, explicitly number-formatted currency-affixed data value labels placed outside with per-series Auto-Fit, linear and moving-average series trendlines, fixed and percentage series error bars with per-series Auto-Fit, hidden value-axis major gridlines, visible value-axis minor gridlines, excluded hidden source rows and columns, and a caption on sheet {}",
         chart.kind, chart.drawable_object_id, sheet_id
     );
     Ok(())
