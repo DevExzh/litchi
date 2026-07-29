@@ -41,6 +41,16 @@ mod crt_ml_frt;
 /// BIFF8 chart layout future records (`CrtLayout12`, `CrtLayout12A`).
 mod chart_layout;
 
+/// BIFF8 chart future-record wrappers (`StartObject`, `EndObject`,
+/// `FrtWrapper`).
+mod chart_frt_wrapper;
+
+/// BIFF8 `Chart3DBarShape` record: bar/column data-point shapes.
+mod chart_3d_bar_shape;
+
+/// BIFF8 chart `CrtLine` and `CrtLink` records.
+mod crt_line_link;
+
 /// BIFF8 chart property-stream future records (`ShapePropsStream`,
 /// `TextPropsStream`, `RichTextStream`).
 mod chart_property_stream;
@@ -341,6 +351,9 @@ pub use palette::{XlsColor, XlsPalette};
 pub use print_flags::{XlsGridSet, XlsPrintRowCol};
 pub use crt_ml_frt::XlsCrtMlFrt;
 pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
+pub use chart_3d_bar_shape::{XlsChart3DBarShape, XlsChart3DRiserShape, XlsChart3DTaper};
+pub use chart_frt_wrapper::{XlsEndObject, XlsFrtObjectKind, XlsFrtWrapper, XlsStartObject};
+pub use crt_line_link::{XlsCrtLine, XlsCrtLineKind, XlsCrtLink};
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
 pub use force_full_calculation::XlsForceFullCalculation;
 pub use backup::XlsBackup;
