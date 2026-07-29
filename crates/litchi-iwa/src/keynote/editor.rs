@@ -4527,121 +4527,6 @@ impl KeynoteEditor {
         Ok(created)
     }
 
-    /// Remove a slide and its slide-tree node.
-    ///
-    /// A dedicated `Index/Slide-<id>.iwa` component is removed in one operation;
-    /// otherwise only the slide object is removed so unrelated colocated objects
-    /// are preserved. Removing the final slide is rejected.
-    pub fn remove_slide(&mut self, slide_index: usize) -> Result<KeynoteSlideInfo> {
-        let slides = self.slides()?;
-        if slides.len() <= 1 {
-            return Err(Error::ParseError(
-                "Cannot remove the final Keynote slide".to_owned(),
-            ));
-        }
-        let removed = slides.get(slide_index).cloned().ok_or_else(|| {
-            Error::ParseError(format!(
-                "Keynote slide index {slide_index} is out of range for {} slides",
-                slides.len()
-            ))
-        })?;
-
-        let graph = ObjectGraph::read(self.text.package())?;
-        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
-        let show_id = document.show.identifier;
-        let show_archive = graph.archive_name(show_id)?.to_owned();
-        let node_archive = graph.archive_name(removed.node_id)?.to_owned();
-        let slide_archive = graph.archive_name(removed.slide_id)?.to_owned();
-        let removed_slide_object_ids = self
-            .package()
-            .archive(&slide_archive)?
-            .objects
-            .iter()
-            .filter_map(|object| object.archive_info.identifier)
-            .collect::<Vec<_>>();
-        let mut staged = self.text.package().clone();
-
-        staged.update_archive(&show_archive, |archive| {
-            let object = archive.object_mut(show_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Keynote show object {show_id} is missing"))
-            })?;
-            let message_index = object
-                .messages
-                .iter()
-                .position(|message| kn::ShowArchive::decode(message.data.as_slice()).is_ok())
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote show object {show_id} has no ShowArchive payload"
-                    ))
-                })?;
-            let show = kn::ShowArchive::decode(object.messages[message_index].data.as_slice())?;
-            let desired = show
-                .slide_tree
-                .slides
-                .iter()
-                .filter(|reference| reference.identifier != removed.node_id)
-                .map(|reference| reference.identifier)
-                .collect::<Vec<_>>();
-            if desired.len() + 1 != show.slide_tree.slides.len() {
-                return Err(Error::InvalidFormat(format!(
-                    "Keynote show does not contain slide node {} exactly once",
-                    removed.node_id
-                )));
-            }
-            let message_type = object.messages[message_index].type_;
-            let data = rewrite_show_slide_references(
-                object.messages[message_index].data.as_slice(),
-                &show.slide_tree.slides,
-                &desired,
-            )?;
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            object.archive_info.message_infos[message_index]
-                .object_references
-                .retain(|&identifier| identifier != removed.node_id);
-            for field in &mut object.archive_info.message_infos[message_index].field_infos {
-                field
-                    .object_references
-                    .retain(|&identifier| identifier != removed.node_id);
-            }
-            Ok(())
-        })?;
-
-        remove_object(&mut staged, &node_archive, removed.node_id)?;
-        if let Some(document_component) = component_identifier_for_entry(&staged, &node_archive)? {
-            remove_component_object_uuids(&mut staged, document_component, &[removed.node_id])?;
-        }
-        let dedicated_slide_archive = format!("Index/Slide-{}.iwa", removed.slide_id);
-        if slide_archive == dedicated_slide_archive {
-            staged.remove_entry(&slide_archive).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote slide component {slide_archive} is missing"
-                ))
-            })?;
-            remove_component_registration(&mut staged, removed.slide_id)?;
-        } else {
-            remove_object(&mut staged, &slide_archive, removed.slide_id)?;
-        }
-        let mut removed_object_ids = removed_slide_object_ids;
-        removed_object_ids.push(removed.node_id);
-        release_package_identifier_suffix(&mut staged, &removed_object_ids)?;
-
-        let bytes = staged.to_bytes()?;
-        let verified = KeynoteEditor::from_bytes(&bytes)?;
-        if verified.slides()?.len() + 1 != slides.len() {
-            return Err(Error::InvalidFormat(
-                "Keynote slide deletion failed validation".to_owned(),
-            ));
-        }
-        self.text = IWorkTextEditor::from_package(staged);
-        Ok(removed)
-    }
-
     pub fn package(&self) -> &IWorkPackage {
         self.text.package()
     }
@@ -5037,6 +4922,7 @@ mod slide_background_reset;
 mod slide_background_wire;
 mod slide_charts;
 mod slide_create;
+mod slide_delete;
 mod slide_graph;
 mod slide_images;
 mod slide_layout_media;

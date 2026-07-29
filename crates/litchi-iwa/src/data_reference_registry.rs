@@ -123,6 +123,30 @@ pub(crate) fn remove_component_data_references_for_objects(
     Ok(affected)
 }
 
+/// Return every embedded-data identifier registered to one package component.
+///
+/// Components may retain a data reference without any object owners, so this
+/// deliberately reads the component-level registry rather than flattening only
+/// object-reference records.
+pub(crate) fn component_data_identifiers(
+    package: &IWorkPackage,
+    component_identifier: u64,
+) -> Result<Vec<u64>> {
+    let component = component_info(package, component_identifier)?;
+    let mut identifiers = HashSet::with_capacity(component.data_references.len());
+    for reference in component.data_references {
+        if reference.data_identifier == 0 || !identifiers.insert(reference.data_identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "Component {component_identifier} has an invalid or repeated data reference {}",
+                reference.data_identifier
+            )));
+        }
+    }
+    let mut identifiers = identifiers.into_iter().collect::<Vec<_>>();
+    identifiers.sort_unstable();
+    Ok(identifiers)
+}
+
 fn adjust_component_data_reference(
     package: &mut IWorkPackage,
     component_identifier: u64,
@@ -392,31 +416,7 @@ fn component_object_data_references(
     package: &IWorkPackage,
     component_identifier: u64,
 ) -> Result<Vec<(u64, u64, u32)>> {
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let messages = archive
-        .objects
-        .iter()
-        .flat_map(|object| &object.messages)
-        .filter(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    let [message] = messages.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "Package must contain exactly one PackageMetadata payload, found {}",
-            messages.len()
-        )));
-    };
-    let metadata = PackageMetadata::decode(message.data.as_slice())?;
-    let components = metadata
-        .components
-        .iter()
-        .chain(&metadata.versioned_components)
-        .filter(|component| component.identifier == component_identifier)
-        .collect::<Vec<_>>();
-    let [component] = components.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "PackageMetadata must contain exactly one component {component_identifier}"
-        )));
-    };
+    let component = component_info(package, component_identifier)?;
     let capacity = component
         .data_references
         .iter()
@@ -450,6 +450,39 @@ fn component_object_data_references(
         }
     }
     Ok(references)
+}
+
+fn component_info(package: &IWorkPackage, component_identifier: u64) -> Result<ComponentInfo> {
+    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
+    let messages = archive
+        .objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    let [message] = messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Package must contain exactly one PackageMetadata payload, found {}",
+            messages.len()
+        )));
+    };
+    let metadata = PackageMetadata::decode(message.data.as_slice())?;
+    let mut components = metadata
+        .components
+        .into_iter()
+        .chain(metadata.versioned_components)
+        .filter(|component| component.identifier == component_identifier);
+    let Some(component) = components.next() else {
+        return Err(Error::InvalidFormat(format!(
+            "PackageMetadata must contain exactly one component {component_identifier}"
+        )));
+    };
+    if components.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "PackageMetadata must contain exactly one component {component_identifier}"
+        )));
+    }
+    Ok(component)
 }
 
 fn validate_data_reference_identifier(data: &[u8], expected: u64) -> Result<bool> {
