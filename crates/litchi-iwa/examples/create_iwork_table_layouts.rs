@@ -13,8 +13,9 @@ use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphList, ParagraphListBullet,
     ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphListStart, ParagraphSpacing, ParagraphSpacingPoints,
+    ParagraphListIndentation, ParagraphListLabelIndent, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement,
+    ParagraphListStart, ParagraphListTextGap, ParagraphSpacing, ParagraphSpacingPoints,
     ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
     ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
@@ -157,6 +158,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         )?,
         custom_bullet_geometry()?
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_list_indentation(
+            numbers_table.object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_list_indentation()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -262,6 +272,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             bullet_paragraph_start()?,
         )?,
         custom_bullet_geometry()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list_indentation(
+            pages_table.model_object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_list_indentation()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -412,6 +431,16 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         )?,
         custom_bullet_geometry()?
     );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_list_indentation(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_list_indentation()?
+    );
     Ok(())
 }
 
@@ -465,6 +494,13 @@ fn custom_bullet_geometry() -> Result<ParagraphListBulletGeometry, litchi_iwa::E
     Ok(ParagraphListBulletGeometry::new(
         ParagraphListBulletScale::from_percent(150.0)?,
         ParagraphListBulletBaselineOffset::from_points(2.0)?,
+    ))
+}
+
+fn custom_list_indentation() -> Result<ParagraphListIndentation, litchi_iwa::Error> {
+    Ok(ParagraphListIndentation::new(
+        ParagraphListLabelIndent::from_points(20.0)?,
+        ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE)?,
     ))
 }
 
@@ -807,6 +843,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         bullet_paragraph_start()?,
         custom_bullet_geometry()?,
     )?;
+    editor.set_table_cell_paragraph_list_indentation(
+        table_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        custom_list_indentation()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -889,6 +932,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         bullet_paragraph_start()?,
         custom_bullet_geometry()?,
+    )?;
+    editor.set_table_cell_paragraph_list_indentation(
+        table_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        custom_list_indentation()?,
     )?;
     editor.save(output)?;
     Ok(())
@@ -1080,6 +1130,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         bullet_paragraph_start()?,
         custom_bullet_geometry()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_list_indentation(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        custom_list_indentation()?,
     )?;
     editor.save(output)?;
     Ok(())

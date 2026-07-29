@@ -339,6 +339,65 @@ pub(super) fn reset_paragraph_list_bullet_geometry(
     Ok(changed)
 }
 
+pub(super) fn paragraph_list_indentation(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<crate::text::ParagraphListIndentation> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Err(Error::InvalidFormat(
+            "plain iWork table cells do not have list indentation".to_owned(),
+        ));
+    };
+    crate::text::paragraph_list_indentation_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_indentation(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    indentation: crate::text::ParagraphListIndentation,
+) -> Result<()> {
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_indentation(storage_id, paragraph, indentation)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_indentation_in_storage(&staged, storage_id, paragraph)?
+        != indentation
+    {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph list-indentation update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list_indentation(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(false);
+    };
+    let mut text = IWorkTextEditor::from_package(package.clone());
+    let changed = text.reset_paragraph_list_indentation(storage_id, paragraph)?;
+    if changed {
+        *package = text.into_package();
+    }
+    Ok(changed)
+}
+
 fn existing_storage_id(
     package: &IWorkPackage,
     table_id: u64,
@@ -813,6 +872,7 @@ mod tests {
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::text::{
         ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
+        ParagraphListIndentation, ParagraphListLabelIndent, ParagraphListTextGap, TextPointSize,
     };
 
     const ROW: usize = 1;
@@ -1073,6 +1133,10 @@ mod tests {
             ParagraphListBulletScale::from_percent(175.0).unwrap(),
             ParagraphListBulletBaselineOffset::from_points(4.0).unwrap(),
         );
+        let indentation = ParagraphListIndentation::new(
+            ParagraphListLabelIndent::from_points(20.0).unwrap(),
+            ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE).unwrap(),
+        );
 
         let mut numbers = NumbersDocumentBuilder::new()
             .table_dimensions(3, 3)
@@ -1102,12 +1166,38 @@ mod tests {
                 geometry,
             )
             .unwrap();
+        numbers
+            .set_table_cell_paragraph_list_indentation(
+                numbers_table,
+                ROW,
+                COLUMN,
+                paragraph,
+                indentation,
+            )
+            .unwrap();
         let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph)
                 .unwrap(),
             arrow
+        );
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list_bullet_geometry(numbers_table, ROW, COLUMN, paragraph,)
+                .unwrap(),
+            geometry
+        );
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list_indentation(numbers_table, ROW, COLUMN, paragraph,)
+                .unwrap(),
+            indentation
+        );
+        assert!(
+            numbers
+                .reset_table_cell_paragraph_list_indentation(numbers_table, ROW, COLUMN, paragraph,)
+                .unwrap()
         );
         assert_eq!(
             numbers
@@ -1186,6 +1276,15 @@ mod tests {
                 geometry,
             )
             .unwrap();
+        pages
+            .set_table_cell_paragraph_list_indentation(
+                pages_table,
+                ROW,
+                COLUMN,
+                paragraph,
+                indentation,
+            )
+            .unwrap();
         let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
@@ -1198,6 +1297,12 @@ mod tests {
                 .table_cell_paragraph_list_bullet_geometry(pages_table, ROW, COLUMN, paragraph,)
                 .unwrap(),
             geometry
+        );
+        assert_eq!(
+            pages
+                .table_cell_paragraph_list_indentation(pages_table, ROW, COLUMN, paragraph,)
+                .unwrap(),
+            indentation
         );
 
         let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
@@ -1252,6 +1357,16 @@ mod tests {
                 geometry,
             )
             .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_list_indentation(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                paragraph,
+                indentation,
+            )
+            .unwrap();
         let keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1278,14 +1393,34 @@ mod tests {
                 .unwrap(),
             geometry
         );
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_list_indentation(
+                    0,
+                    table.model_object_id,
+                    ROW,
+                    COLUMN,
+                    paragraph,
+                )
+                .unwrap(),
+            indentation
+        );
     }
 
     #[test]
     #[allow(deprecated)]
-    fn duplicated_rich_text_cells_are_custom_bullet_copy_on_write() {
+    fn duplicated_rich_text_cells_are_custom_list_style_copy_on_write() {
         let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
         let arrow = ParagraphListBullet::new("➡").unwrap();
         let diamond = ParagraphListBullet::new("◆").unwrap();
+        let source_indentation = ParagraphListIndentation::new(
+            ParagraphListLabelIndent::from_points(20.0).unwrap(),
+            ParagraphListTextGap::from_em(1.5).unwrap(),
+        );
+        let duplicate_indentation = ParagraphListIndentation::new(
+            ParagraphListLabelIndent::from_points(24.0).unwrap(),
+            ParagraphListTextGap::from_em(2.0).unwrap(),
+        );
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(3, 3)
             .build()
@@ -1300,9 +1435,27 @@ mod tests {
         editor
             .set_table_cell_paragraph_list_bullet(source, ROW, COLUMN, paragraph, &arrow)
             .unwrap();
+        editor
+            .set_table_cell_paragraph_list_indentation(
+                source,
+                ROW,
+                COLUMN,
+                paragraph,
+                source_indentation,
+            )
+            .unwrap();
         let duplicate = editor.duplicate_table(source).unwrap().object_id;
         editor
             .set_table_cell_paragraph_list_bullet(duplicate, ROW, COLUMN, paragraph, &diamond)
+            .unwrap();
+        editor
+            .set_table_cell_paragraph_list_indentation(
+                duplicate,
+                ROW,
+                COLUMN,
+                paragraph,
+                duplicate_indentation,
+            )
             .unwrap();
         assert_eq!(
             editor
@@ -1315,6 +1468,18 @@ mod tests {
                 .table_cell_paragraph_list_bullet(duplicate, ROW, COLUMN, paragraph)
                 .unwrap(),
             diamond
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_indentation(source, ROW, COLUMN, paragraph)
+                .unwrap(),
+            source_indentation
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_indentation(duplicate, ROW, COLUMN, paragraph)
+                .unwrap(),
+            duplicate_indentation
         );
     }
 

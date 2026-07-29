@@ -85,14 +85,15 @@ pub use number_attachment_types::{
 };
 pub use paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
-    ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement,
-    ParagraphListStart,
+    ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+    ParagraphListLabelIndent, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
 };
 pub(crate) use paragraph_list::{
     paragraph_list as paragraph_list_in_storage,
     paragraph_list_bullet as paragraph_list_bullet_in_storage,
     paragraph_list_bullet_geometry as paragraph_list_bullet_geometry_in_storage,
+    paragraph_list_indentation as paragraph_list_indentation_in_storage,
     paragraph_list_level as paragraph_list_level_in_storage,
     paragraph_list_levels as paragraph_list_levels_in_storage,
     paragraph_list_numbering as paragraph_list_numbering_in_storage,

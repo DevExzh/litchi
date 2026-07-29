@@ -74,13 +74,15 @@ use super::paragraph_alignment::{
     text_script, text_shadow, text_style,
 };
 use super::paragraph_list::{
-    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement, paragraph_list,
-    paragraph_list_bullet, paragraph_list_bullet_geometry, paragraph_list_level,
-    paragraph_list_levels, paragraph_list_numbering, paragraph_lists, reset_paragraph_list,
-    reset_paragraph_list_bullet, reset_paragraph_list_bullet_geometry, reset_paragraph_list_level,
-    set_paragraph_list, set_paragraph_list_bullet, set_paragraph_list_bullet_geometry,
-    set_paragraph_list_level, set_paragraph_list_numbering, set_paragraph_lists,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
+    ParagraphListPlacement, paragraph_list, paragraph_list_bullet, paragraph_list_bullet_geometry,
+    paragraph_list_indentation, paragraph_list_level, paragraph_list_levels,
+    paragraph_list_numbering, paragraph_lists, reset_paragraph_list, reset_paragraph_list_bullet,
+    reset_paragraph_list_bullet_geometry, reset_paragraph_list_indentation,
+    reset_paragraph_list_level, set_paragraph_list, set_paragraph_list_bullet,
+    set_paragraph_list_bullet_geometry, set_paragraph_list_indentation, set_paragraph_list_level,
+    set_paragraph_list_numbering, set_paragraph_lists,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::position::{TextPosition, TextRange};
@@ -880,6 +882,70 @@ impl IWorkTextEditor {
             {
                 return Err(Error::InvalidFormat(
                     "iWork paragraph text-bullet geometry reset failed round-trip validation"
+                        .to_owned(),
+                ));
+            }
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read one list paragraph's effective label and text-gap indentation.
+    pub fn paragraph_list_indentation(
+        &self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListIndentation> {
+        paragraph_list_indentation(&self.package, object_id, paragraph)
+    }
+
+    /// Atomically set one list paragraph's label and text-gap indentation.
+    pub fn set_paragraph_list_indentation(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+        indentation: ParagraphListIndentation,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list_indentation(&mut staged, object_id, paragraph, indentation)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list_indentation(&verified, object_id, paragraph)? != indentation {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph list-indentation update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore Apple's standard indentation for this list preset and level.
+    pub fn reset_paragraph_list_indentation(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_list_indentation(&mut staged, object_id, paragraph)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let list = paragraph_lists(&verified, object_id)?
+                .into_iter()
+                .take_while(|placement| placement.paragraph <= paragraph)
+                .last()
+                .map(|placement| placement.list)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "iWork paragraph list-indentation reset lost its list preset".to_owned(),
+                    )
+                })?;
+            let level = paragraph_list_level(&verified, object_id, paragraph)?;
+            if paragraph_list_indentation(&verified, object_id, paragraph)?
+                != ParagraphListIndentation::standard(list, level)?
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork paragraph list-indentation reset failed round-trip validation"
                         .to_owned(),
                 ));
             }

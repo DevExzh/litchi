@@ -32,13 +32,13 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphSpacing,
-    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListIndentation, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -862,6 +862,46 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_list_bullet_geometry(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one text-box list paragraph's label and text-gap indentation.
+    pub fn text_box_paragraph_list_indentation(
+        &self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListIndentation> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text
+            .paragraph_list_indentation(graph.storage_id, paragraph)
+    }
+
+    /// Set one text-box list paragraph's label and text-gap indentation.
+    pub fn set_text_box_paragraph_list_indentation(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        indentation: ParagraphListIndentation,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_indentation(graph.storage_id, paragraph, indentation)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore Apple's standard indentation for this list preset and level.
+    pub fn reset_text_box_paragraph_list_indentation(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_indentation(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }
@@ -4040,10 +4080,10 @@ pub use tables::{
     PagesTableCellNumeralSystemFormat, PagesTableCellParagraphIndents,
     PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
     PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
-    PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
-    PagesTableCellParagraphListNumbering, PagesTableCellParagraphListPlacement,
-    PagesTableCellParagraphSpacing, PagesTableCellParagraphTabStops,
-    PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
+    PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLevel,
+    PagesTableCellParagraphListLevelPlacement, PagesTableCellParagraphListNumbering,
+    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
+    PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
     PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
     PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat, PagesTableCellSliderFormat,
     PagesTableCellSliderRange, PagesTableCellStarRatingFormat, PagesTableCellStepperDisplayFormat,

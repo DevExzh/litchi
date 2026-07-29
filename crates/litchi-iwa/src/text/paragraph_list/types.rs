@@ -1,6 +1,7 @@
 //! Strict list presets and nesting levels shared by Pages, Numbers, and Keynote.
 
 use super::super::drop_cap::ParagraphStart;
+use super::super::style::TextPointSize;
 use crate::{Error, Result};
 
 const MAX_PARAGRAPH_LIST_LEVEL: u8 = 8;
@@ -8,6 +9,9 @@ const MAX_PARAGRAPH_LIST_BULLET_CHARACTERS: usize = 32;
 const PERCENT_PER_SCALE_UNIT: f32 = 100.0;
 const STANDARD_TOP_LEVEL_BULLET_BASELINE_POINTS: f32 = 0.0;
 const STANDARD_NESTED_BULLET_BASELINE_POINTS: f32 = -1.0;
+const STANDARD_FONT_EM_POINTS: f32 = 11.0;
+const STANDARD_BULLET_INDENT_STEP_POINTS: f32 = 9.0;
+const STANDARD_NUMBER_INDENT_STEP_POINTS: f32 = 18.0;
 
 /// A canonical paragraph-list presentation understood by all three iWork apps.
 ///
@@ -314,6 +318,103 @@ impl ParagraphListBulletGeometry {
     }
 }
 
+/// A finite, nonnegative list-label offset from the paragraph's left margin.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+pub struct ParagraphListLabelIndent(f32);
+
+impl ParagraphListLabelIndent {
+    /// No offset from the left margin.
+    pub const ZERO: Self = Self(0.0);
+
+    /// Construct an absolute label indent in typographic points.
+    pub fn from_points(points: f32) -> Result<Self> {
+        if !points.is_finite() || points < 0.0 {
+            return Err(Error::InvalidFormat(
+                "paragraph list label indent must be finite and nonnegative".to_owned(),
+            ));
+        }
+        Ok(Self(points))
+    }
+
+    /// Return the absolute label indent in typographic points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+/// A finite, nonnegative gap between a list label and its paragraph text.
+///
+/// iWork stores this gap in em units so it scales with the paragraph's font.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+pub struct ParagraphListTextGap(f32);
+
+impl ParagraphListTextGap {
+    /// No space between the label and text.
+    pub const ZERO: Self = Self(0.0);
+
+    /// Construct a font-relative gap in em units.
+    pub fn from_em(em: f32) -> Result<Self> {
+        if !em.is_finite() || em < 0.0 {
+            return Err(Error::InvalidFormat(
+                "paragraph list text gap must be finite and nonnegative".to_owned(),
+            ));
+        }
+        Ok(Self(em))
+    }
+
+    /// Construct a gap from its displayed point size and paragraph font size.
+    pub fn from_points(points: f32, font_size: TextPointSize) -> Result<Self> {
+        Self::from_em(points / font_size.points())
+    }
+
+    /// Return the native font-relative gap in em units.
+    pub const fn em(self) -> f32 {
+        self.0
+    }
+
+    /// Return the point size iWork displays for the supplied paragraph font.
+    pub fn points_at(self, font_size: TextPointSize) -> f32 {
+        self.0 * font_size.points()
+    }
+}
+
+/// Per-level native list indentation shared by bullets and numbering.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParagraphListIndentation {
+    pub label_from_margin: ParagraphListLabelIndent,
+    pub text_from_label: ParagraphListTextGap,
+}
+
+impl ParagraphListIndentation {
+    /// Construct list indentation from validated components.
+    pub const fn new(
+        label_from_margin: ParagraphListLabelIndent,
+        text_from_label: ParagraphListTextGap,
+    ) -> Self {
+        Self {
+            label_from_margin,
+            text_from_label,
+        }
+    }
+
+    /// Apple's standard indentation for a list preset and nesting level.
+    pub fn standard(list: ParagraphList, level: ParagraphListLevel) -> Result<Self> {
+        let step = match list {
+            ParagraphList::Bullet => STANDARD_BULLET_INDENT_STEP_POINTS,
+            ParagraphList::Numbered => STANDARD_NUMBER_INDENT_STEP_POINTS,
+            ParagraphList::None => {
+                return Err(Error::InvalidFormat(
+                    "ordinary paragraphs do not have list indentation".to_owned(),
+                ));
+            },
+        };
+        Ok(Self::new(
+            ParagraphListLabelIndent(step * f32::from(level.get())),
+            ParagraphListTextGap(step / STANDARD_FONT_EM_POINTS),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,5 +471,31 @@ mod tests {
         assert_eq!(top.baseline_offset.points(), 0.0);
         let nested = ParagraphListBulletGeometry::standard(ParagraphListLevel::ONE);
         assert_eq!(nested.baseline_offset.points(), -1.0);
+    }
+
+    #[test]
+    fn list_indentation_distinguishes_points_from_font_relative_em() {
+        let label = ParagraphListLabelIndent::from_points(20.0).unwrap();
+        let gap = ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE).unwrap();
+        assert_eq!(label.points(), 20.0);
+        assert_eq!(gap.em(), 1.5);
+        assert_eq!(gap.points_at(TextPointSize::TWELVE), 18.0);
+        assert!(ParagraphListLabelIndent::from_points(-1.0).is_err());
+        assert!(ParagraphListTextGap::from_em(f32::NAN).is_err());
+
+        let bullet =
+            ParagraphListIndentation::standard(ParagraphList::Bullet, ParagraphListLevel::ONE)
+                .unwrap();
+        assert_eq!(bullet.label_from_margin.points(), 9.0);
+        assert_eq!(bullet.text_from_label.em(), 9.0 / 11.0);
+        let numbered =
+            ParagraphListIndentation::standard(ParagraphList::Numbered, ParagraphListLevel::ONE)
+                .unwrap();
+        assert_eq!(numbered.label_from_margin.points(), 18.0);
+        assert_eq!(numbered.text_from_label.em(), 18.0 / 11.0);
+        assert!(
+            ParagraphListIndentation::standard(ParagraphList::None, ParagraphListLevel::ZERO)
+                .is_err()
+        );
     }
 }

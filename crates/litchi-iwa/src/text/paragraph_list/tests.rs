@@ -8,7 +8,7 @@ use crate::pages::PagesEditor;
 use crate::protobuf::tsp;
 use crate::protobuf::tswp::{self, object_attribute_table::ObjectAttribute};
 use crate::shapes::{DrawablePoint, DrawableSize};
-use crate::text::{IWorkTextEditor, ParagraphStart};
+use crate::text::{IWorkTextEditor, ParagraphStart, TextPointSize};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -293,8 +293,109 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
 }
 
 #[test]
-fn custom_bullet_updates_reject_nonbullet_and_invalid_paragraphs_transactionally() {
+fn text_boxes_round_trip_list_indentation_in_every_suite() {
+    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let indentation = ParagraphListIndentation::new(
+        ParagraphListLabelIndent::from_points(20.0).unwrap(),
+        ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE).unwrap(),
+    );
+
+    let mut pages = PagesEditor::create_with_text("List Indentation").unwrap();
+    let pages_box = pages
+        .add_text_box(5, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    pages
+        .set_text_box_paragraph_list(pages_box.drawable_object_id, ParagraphList::Bullet)
+        .unwrap();
+    let pages_before_indentation = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_list_indentation(
+            pages_box.drawable_object_id,
+            paragraph,
+            indentation,
+        )
+        .unwrap();
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_list_indentation(pages_box.drawable_object_id, paragraph)
+            .unwrap(),
+        indentation
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_list_indentation(pages_box.drawable_object_id, paragraph,)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before_indentation);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            ParagraphList::Numbered,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list_indentation(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            paragraph,
+            indentation,
+        )
+        .unwrap();
+    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_list_indentation(
+                sheet_id,
+                numbers_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        indentation
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list_indentation(
+            0,
+            keynote_box.drawable_object_id,
+            paragraph,
+            indentation,
+        )
+        .unwrap();
+    let keynote = crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_list_indentation(
+                0,
+                keynote_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        indentation
+    );
+}
+
+#[test]
+fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
     let arrow = ParagraphListBullet::new("➡").unwrap();
+    let indentation = ParagraphListIndentation::new(
+        ParagraphListLabelIndent::from_points(20.0).unwrap(),
+        ParagraphListTextGap::from_em(1.5).unwrap(),
+    );
     let mut pages = PagesEditor::create_with_text("Bullets").unwrap();
     let text_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
@@ -310,6 +411,16 @@ fn custom_bullet_updates_reject_nonbullet_and_invalid_paragraphs_transactionally
             .is_err()
     );
     assert_eq!(pages.to_bytes().unwrap(), before);
+    assert!(
+        pages
+            .set_text_box_paragraph_list_indentation(
+                text_box.drawable_object_id,
+                ParagraphStart::ZERO,
+                indentation,
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before);
 
     pages
         .set_text_box_paragraph_list(text_box.drawable_object_id, ParagraphList::Bullet)
@@ -321,6 +432,16 @@ fn custom_bullet_updates_reject_nonbullet_and_invalid_paragraphs_transactionally
                 text_box.drawable_object_id,
                 ParagraphStart::from_utf16_index(1).unwrap(),
                 &arrow,
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before);
+    assert!(
+        pages
+            .set_text_box_paragraph_list_indentation(
+                text_box.drawable_object_id,
+                ParagraphStart::from_utf16_index(1).unwrap(),
+                indentation,
             )
             .is_err()
     );

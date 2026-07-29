@@ -8,7 +8,9 @@ use prost::Message;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::tswp::list_style_archive::{LabelGeometry, LabelType, NumberType};
 use crate::protobuf::{tsp, tss, tswp};
-use crate::wire::{patch_varint_field, rewrite_repeated_length_delimited_fields};
+use crate::wire::{
+    patch_varint_field, rewrite_repeated_fixed32_fields, rewrite_repeated_length_delimited_fields,
+};
 use crate::{Error, IWorkPackage, Result};
 
 use super::types::ParagraphList;
@@ -18,6 +20,8 @@ const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const LIST_LEVEL_COUNT: usize = 9;
 const OVERRIDE_COUNT_FIELD: u32 = 10;
+const TEXT_INDENTS_FIELD: u32 = 12;
+const INDENTS_FIELD: u32 = 13;
 const GEOMETRIES_FIELD: u32 = 14;
 const STRINGS_FIELD: u32 = 16;
 const FONT_EM_POINTS: f32 = 11.0;
@@ -197,6 +201,57 @@ pub(super) fn effective_bullet_geometries(
     }
 }
 
+pub(super) fn effective_list_indents(package: &IWorkPackage, style_id: u64) -> Result<Vec<f32>> {
+    effective_list_float_array(package, style_id, ListFloatArray::LabelIndents)
+}
+
+pub(super) fn effective_list_text_indents(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<Vec<f32>> {
+    effective_list_float_array(package, style_id, ListFloatArray::TextGaps)
+}
+
+#[derive(Clone, Copy)]
+enum ListFloatArray {
+    LabelIndents,
+    TextGaps,
+}
+
+fn effective_list_float_array(
+    package: &IWorkPackage,
+    style_id: u64,
+    array: ListFloatArray,
+) -> Result<Vec<f32>> {
+    if resolved_paragraph_list(package, style_id)? == ParagraphList::None {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} does not have labels"
+        )));
+    }
+    let mut current_id = style_id;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(current_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list-style inheritance contains a cycle at {current_id}"
+            )));
+        }
+        let style = locate_style(package, current_id)?.style;
+        let values = match array {
+            ListFloatArray::LabelIndents => &style.indents,
+            ListFloatArray::TextGaps => &style.text_indents,
+        };
+        if !values.is_empty() {
+            validate_list_float_array(current_id, values, array)?;
+            return Ok(match array {
+                ListFloatArray::LabelIndents => style.indents,
+                ListFloatArray::TextGaps => style.text_indents,
+            });
+        }
+        current_id = parent_style_id(&style, current_id)?;
+    }
+}
+
 pub(super) fn parent_style_id(style: &tswp::ListStyleArchive, style_id: u64) -> Result<u64> {
     style
         .super_
@@ -260,6 +315,42 @@ pub(super) fn geometry_variation_object(
         },
         override_count: Some(1),
         geometries,
+        ..Default::default()
+    };
+    let data = style.encode_to_vec();
+    tswp::ListStyleArchive::decode(data.as_slice())?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: LIST_STYLE_MESSAGE_TYPE,
+            data,
+        }],
+    )?;
+    let info = &mut object.archive_info.message_infos[0];
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.object_references.push(parent_style_id);
+    Ok(object)
+}
+
+pub(super) fn indentation_variation_object(
+    identifier: u64,
+    parent_style_id: u64,
+    stylesheet_id: u64,
+    indents: Vec<f32>,
+    text_indents: Vec<f32>,
+) -> Result<ArchiveObject> {
+    validate_list_float_array(identifier, &indents, ListFloatArray::LabelIndents)?;
+    validate_list_float_array(identifier, &text_indents, ListFloatArray::TextGaps)?;
+    let style = tswp::ListStyleArchive {
+        super_: tss::StyleArchive {
+            parent: Some(reference(parent_style_id)),
+            is_variation: Some(true),
+            stylesheet: Some(reference(stylesheet_id)),
+            ..Default::default()
+        },
+        override_count: Some(2),
+        text_indents,
+        indents,
         ..Default::default()
     };
     let data = style.encode_to_vec();
@@ -450,6 +541,162 @@ fn patch_direct_bullet_geometries(
     Ok(patched)
 }
 
+pub(super) fn replace_direct_list_indentation(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+    indents: &[f32],
+    text_indents: &[f32],
+) -> Result<()> {
+    validate_list_float_array(style_id, indents, ListFloatArray::LabelIndents)?;
+    validate_list_float_array(style_id, text_indents, ListFloatArray::TextGaps)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let data = patch_direct_list_indentation(&original.data, style_id, indents, text_indents)?;
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn patch_direct_list_indentation(
+    data: &[u8],
+    style_id: u64,
+    indents: &[f32],
+    text_indents: &[f32],
+) -> Result<Vec<u8>> {
+    validate_list_float_array(style_id, indents, ListFloatArray::LabelIndents)?;
+    validate_list_float_array(style_id, text_indents, ListFloatArray::TextGaps)?;
+    let style = tswp::ListStyleArchive::decode(data)?;
+    if !style.indents.is_empty() {
+        validate_list_float_array(style_id, &style.indents, ListFloatArray::LabelIndents)?;
+    }
+    if !style.text_indents.is_empty() {
+        validate_list_float_array(style_id, &style.text_indents, ListFloatArray::TextGaps)?;
+    }
+    let missing_overrides =
+        u32::from(style.indents.is_empty()) + u32::from(style.text_indents.is_empty());
+    let indent_bits = indents
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>();
+    let text_indent_bits = text_indents
+        .iter()
+        .map(|value| value.to_bits())
+        .collect::<Vec<_>>();
+    let data = rewrite_repeated_fixed32_fields(data, INDENTS_FIELD, &indent_bits)?;
+    let mut data = rewrite_repeated_fixed32_fields(&data, TEXT_INDENTS_FIELD, &text_indent_bits)?;
+    if missing_overrides != 0 {
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_add(missing_overrides)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} override count overflowed"
+                ))
+            })?;
+        data = patch_varint_field(
+            &data,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+    }
+    let decoded = tswp::ListStyleArchive::decode(data.as_slice())?;
+    if decoded.indents != indents || decoded.text_indents != text_indents {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} indentation update failed validation"
+        )));
+    }
+    Ok(data)
+}
+
+pub(super) fn remove_direct_list_indentation(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+        let removed_overrides =
+            u32::from(!style.indents.is_empty()) + u32::from(!style.text_indents.is_empty());
+        if removed_overrides == 0 {
+            return Ok(());
+        }
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_sub(removed_overrides)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} has indentation without enough overrides"
+                ))
+            })?;
+        let data = rewrite_repeated_fixed32_fields(&original.data, INDENTS_FIELD, &[])?;
+        let data = rewrite_repeated_fixed32_fields(&data, TEXT_INDENTS_FIELD, &[])?;
+        let data = patch_varint_field(
+            &data,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+        let decoded = tswp::ListStyleArchive::decode(data.as_slice())?;
+        if !decoded.indents.is_empty()
+            || !decoded.text_indents.is_empty()
+            || decoded.override_count != Some(override_count)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} indentation removal failed validation"
+            )));
+        }
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
 fn patch_direct_bullet_strings(data: &[u8], style_id: u64, strings: &[String]) -> Result<Vec<u8>> {
     validate_bullet_strings(style_id, strings)?;
     let style = tswp::ListStyleArchive::decode(data)?;
@@ -559,6 +806,32 @@ fn validate_bullet_geometries(style_id: u64, geometries: &[LabelGeometry]) -> Re
                 "iWork text-bullet list style {style_id} contains an absolute-size geometry"
             )));
         }
+    }
+    Ok(())
+}
+
+fn validate_list_float_array(style_id: u64, values: &[f32], array: ListFloatArray) -> Result<()> {
+    if values.len() != LIST_LEVEL_COUNT {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} must define {LIST_LEVEL_COUNT} {} values, found {}",
+            match array {
+                ListFloatArray::LabelIndents => "label-indent",
+                ListFloatArray::TextGaps => "text-gap",
+            },
+            values.len()
+        )));
+    }
+    if values
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} contains an invalid {} value",
+            match array {
+                ListFloatArray::LabelIndents => "label-indent",
+                ListFloatArray::TextGaps => "text-gap",
+            }
+        )));
     }
     Ok(())
 }
@@ -818,5 +1091,50 @@ mod tests {
         assert_eq!(decoded.override_count, Some(2));
         assert_eq!(decoded.strings[1], "➡");
         assert_eq!(decoded.geometries, geometries);
+    }
+
+    #[test]
+    fn indentation_updates_compose_with_glyph_and_geometry_losslessly() {
+        let mut style = tswp::ListStyleArchive {
+            super_: tss::StyleArchive {
+                parent: Some(reference(8)),
+                is_variation: Some(true),
+                stylesheet: Some(reference(3)),
+                ..Default::default()
+            },
+            override_count: Some(2),
+            geometries: repeated_geometry(|level| {
+                if level == 0 {
+                    0.0
+                } else {
+                    BULLET_BASELINE_OFFSET_POINTS
+                }
+            }),
+            strings: vec![BULLET_GLYPH.to_owned(); LIST_LEVEL_COUNT],
+            ..Default::default()
+        };
+        style.strings[1] = "➡".to_owned();
+        style.geometries[1].scale = Some(1.5);
+        style.geometries[1].baseline_offset = Some(2.0);
+        let mut encoded = style.encode_to_vec();
+        let unknown = [0xa8, 0x06, 0x09];
+        encoded.extend_from_slice(&unknown);
+        let mut indents = level_indents(BULLET_INDENT_STEP_POINTS);
+        let mut text_indents = vec![BULLET_INDENT_STEP_POINTS / FONT_EM_POINTS; LIST_LEVEL_COUNT];
+        indents[1] = 10.0;
+        text_indents[1] = 10.0 / 12.0;
+
+        let patched = patch_direct_list_indentation(&encoded, 10, &indents, &text_indents).unwrap();
+        assert!(
+            patched
+                .windows(unknown.len())
+                .any(|window| window == unknown)
+        );
+        let decoded = tswp::ListStyleArchive::decode(patched.as_slice()).unwrap();
+        assert_eq!(decoded.override_count, Some(4));
+        assert_eq!(decoded.strings[1], "➡");
+        assert_eq!(decoded.geometries[1].scale, Some(1.5));
+        assert_eq!(decoded.indents, indents);
+        assert_eq!(decoded.text_indents, text_indents);
     }
 }

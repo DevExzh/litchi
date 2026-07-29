@@ -109,6 +109,7 @@ pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as PagesTableCellParagraphListBullet;
 pub use crate::text::ParagraphListBulletGeometry as PagesTableCellParagraphListBulletGeometry;
+pub use crate::text::ParagraphListIndentation as PagesTableCellParagraphListIndentation;
 pub use crate::text::ParagraphListLevel as PagesTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as PagesTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
@@ -1869,6 +1870,86 @@ impl PagesEditor {
         let mut staged = self.package().clone();
         let changed =
             crate::numbers::editor::reset_table_cell_paragraph_list_bullet_geometry_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read one body-table list paragraph's label and text-gap indentation.
+    pub fn table_cell_paragraph_list_indentation(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<PagesTableCellParagraphListIndentation> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_indentation_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one body-table list paragraph's label and text-gap indentation.
+    pub fn set_table_cell_paragraph_list_indentation(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        indentation: PagesTableCellParagraphListIndentation,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_indentation_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            indentation,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_indentation(
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != indentation
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph list indentation failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard indentation for this list preset and level.
+    pub fn reset_table_cell_paragraph_list_indentation(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_indentation_in_package(
                 &mut staged,
                 model_object_id,
                 row,
