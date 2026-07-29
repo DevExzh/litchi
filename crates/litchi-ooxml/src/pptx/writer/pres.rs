@@ -316,6 +316,59 @@ impl MutablePresentation {
         Ok(self.slides.len() - 1)
     }
 
+    /// Duplicate a slide and place the copy at the requested position.
+    ///
+    /// Combines [`Self::duplicate_slide`] and [`Self::move_slide`]: the
+    /// copy takes `position` in the slide ID list (`p:sldIdLst`,
+    /// ECMA-376 §19.2.1.34) instead of being appended. Both indices are
+    /// validated before anything is duplicated; `position ==
+    /// slide_count()` is equivalent to [`Self::duplicate_slide`].
+    ///
+    /// # Arguments
+    /// * `index` - Zero-based index of the slide to duplicate
+    /// * `position` - Zero-based target position for the copy
+    ///
+    /// # Returns
+    /// * `Ok(usize)` - Final position of the duplicated slide
+    /// * `Err` if either index is out of bounds
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use litchi_ooxml::pptx::MutablePresentation;
+    ///
+    /// let mut pres = MutablePresentation::new();
+    /// pres.add_slide().unwrap().set_title("Intro");
+    /// pres.add_slide().unwrap().set_title("Body");
+    ///
+    /// let pos = pres.insert_duplicate_slide(0, 2).unwrap();
+    /// assert_eq!(pos, 2);
+    /// assert_eq!(pres.slide_mut(2).unwrap().title(), Some("Intro"));
+    /// assert_eq!(pres.slide_count(), 3);
+    /// ```
+    pub fn insert_duplicate_slide(&mut self, index: usize, position: usize) -> Result<usize> {
+        if index >= self.slides.len() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "Slide index {} out of bounds (max: {})",
+                index,
+                self.slides.len().saturating_sub(1)
+            )));
+        }
+        if position > self.slides.len() {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "Target position {} out of bounds (max: {})",
+                position,
+                self.slides.len()
+            )));
+        }
+
+        let appended = self.duplicate_slide(index)?;
+        if position != appended {
+            self.move_slide(appended, position)?;
+        }
+        Ok(position)
+    }
+
     /// Move a slide from one position to another.
     ///
     /// # Arguments

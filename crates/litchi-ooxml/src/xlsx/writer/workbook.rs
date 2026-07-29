@@ -457,6 +457,77 @@ impl MutableWorkbookData {
         Ok(self.worksheets.last_mut().unwrap())
     }
 
+    /// Remove a worksheet by its worksheets-relative `index` (matching
+    /// [`Self::worksheet_mut`]) and return it.
+    ///
+    /// The sheet disappears from the `sheets` sequence (ECMA-376 §18.2.20),
+    /// so its part, workbook relationship, and content-type override are
+    /// simply not emitted on the next save. Sheet-scoped defined names
+    /// (`definedName@localSheetId` is the zero-based workbook-order sheet
+    /// index, ECMA-376 §18.2.5) are remapped the way LibreOffice resolves
+    /// sheet deletion: names scoped to the removed sheet are dropped and
+    /// names scoped to later sheets shift one position up. Pivot-table
+    /// destination indices shift likewise; removing a sheet that a pivot
+    /// table targets is rejected so a report is never silently relocated.
+    pub fn remove_worksheet(&mut self, index: usize) -> SheetResult<MutableWorksheet> {
+        if index >= self.worksheets.len() {
+            return Err(format!(
+                "worksheet index {index} out of bounds (max: {})",
+                self.worksheets.len().saturating_sub(1)
+            )
+            .into());
+        }
+        if self
+            .pivot_tables
+            .iter()
+            .any(|pivot| pivot.dest_sheet_index == index)
+        {
+            return Err(format!(
+                "cannot remove worksheet {index}: a pivot table targets it"
+            )
+            .into());
+        }
+        let position = self.workbook_position(index).ok_or_else(|| {
+            format!("worksheet {index} is missing from the workbook sheet order")
+        })?;
+
+        let removed = self.worksheets.remove(index);
+        self.sheet_order.remove(position);
+        for slot in &mut self.sheet_order {
+            if let SheetSlot::Worksheet(ws_index) = slot
+                && *ws_index > index
+            {
+                *ws_index -= 1;
+            }
+        }
+
+        let position = position as u32;
+        self.named_ranges.retain_mut(|range| match range.local_sheet_id {
+            Some(local) if local == position => false,
+            Some(local) if local > position => {
+                range.local_sheet_id = Some(local - 1);
+                true
+            },
+            _ => true,
+        });
+        for pivot in &mut self.pivot_tables {
+            if pivot.dest_sheet_index > index {
+                pivot.dest_sheet_index -= 1;
+            }
+        }
+
+        self.modified = true;
+        Ok(removed)
+    }
+
+    /// Workbook-order position of a worksheet in the `sheets` sequence
+    /// (ECMA-376 §18.2.20), counting chartsheets as well.
+    fn workbook_position(&self, worksheet_index: usize) -> Option<usize> {
+        self.sheet_order
+            .iter()
+            .position(|slot| *slot == SheetSlot::Worksheet(worksheet_index))
+    }
+
     /// Add a new chartsheet hosting the given chart.
     ///
     /// The name must be a valid Excel sheet name and unique (case-insensitive)
@@ -640,9 +711,14 @@ impl MutableWorkbookData {
         }
 
         // Rebuild per-sheet print area and print titles based on the
-        // MutableWorksheet settings.
-        for ws in &self.worksheets {
-            let sheet_id = ws.sheet_id();
+        // MutableWorksheet settings. localSheetId is the zero-based
+        // workbook-order sheet index (ECMA-376 §18.2.5), which counts
+        // chartsheets and shifts when sheets are inserted or removed.
+        for (ws_index, ws) in self.worksheets.iter().enumerate() {
+            let Some(position) = self.workbook_position(ws_index) else {
+                continue;
+            };
+            let position = position as u32;
             let sheet_name = ws.name();
             let escaped_sheet_name = escape_sheet_name(sheet_name);
 
@@ -652,7 +728,7 @@ impl MutableWorkbookData {
                 new_ranges.push(NamedRange {
                     name: "_xlnm.Print_Area".to_string(),
                     reference,
-                    local_sheet_id: Some(sheet_id - 1),
+                    local_sheet_id: Some(position),
                     ..NamedRange::default()
                 });
             }
@@ -675,7 +751,7 @@ impl MutableWorkbookData {
                 new_ranges.push(NamedRange {
                     name: "_xlnm.Print_Titles".to_string(),
                     reference,
-                    local_sheet_id: Some(sheet_id - 1),
+                    local_sheet_id: Some(position),
                     ..NamedRange::default()
                 });
             }
@@ -1978,5 +2054,54 @@ mod tests {
     fn test_parse_a1_range_invalid() {
         assert!(parse_a1_range("invalid").is_err());
         assert!(parse_a1_range("").is_err());
+    }
+
+    #[test]
+    fn remove_worksheet_shifts_slots_names_and_pivots() {
+        let mut wb = MutableWorkbookData::new();
+        wb.add_worksheet("Sheet2".to_string());
+        wb.add_worksheet("Sheet3".to_string());
+        wb.define_name_local("Scoped1", "Sheet1!$A$1", 0);
+        wb.define_name_local("Scoped2", "Sheet2!$A$1", 1);
+        wb.define_name_local("Scoped3", "Sheet3!$A$1", 2);
+        wb.define_name("Global", "Sheet1!$A$1");
+        wb.pivot_tables.push(WritablePivotTable {
+            name: "Pivot1".to_string(),
+            source_sheet: "Sheet1".to_string(),
+            source_ref: "A1:B2".to_string(),
+            dest_sheet_index: 2,
+            location_ref: "A3".to_string(),
+            field_names: vec!["F".to_string()],
+            row_fields: vec!["F".to_string()],
+            column_fields: Vec::new(),
+            filter_fields: Vec::new(),
+            data_fields: Vec::new(),
+        });
+
+        // Removing the pivot target is rejected; nothing changes.
+        assert!(wb.remove_worksheet(2).is_err());
+        assert_eq!(wb.worksheets.len(), 3);
+        // Out-of-range removal is rejected.
+        assert!(wb.remove_worksheet(9).is_err());
+
+        let removed = wb.remove_worksheet(1).unwrap();
+        assert_eq!(removed.name(), "Sheet2");
+        assert_eq!(wb.worksheets.len(), 2);
+        assert_eq!(
+            wb.sheet_order,
+            vec![SheetSlot::Worksheet(0), SheetSlot::Worksheet(1)]
+        );
+
+        let scopes: Vec<(&str, Option<u32>)> = wb
+            .named_ranges
+            .iter()
+            .map(|range| (range.name.as_str(), range.local_sheet_id))
+            .collect();
+        assert!(scopes.contains(&("Scoped1", Some(0))));
+        assert!(!scopes.iter().any(|(name, _)| *name == "Scoped2"));
+        assert!(scopes.contains(&("Scoped3", Some(1))));
+        assert!(scopes.contains(&("Global", None)));
+
+        assert_eq!(wb.pivot_tables[0].dest_sheet_index, 1);
     }
 }

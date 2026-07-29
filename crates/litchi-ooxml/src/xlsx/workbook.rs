@@ -96,6 +96,18 @@ fn next_active_x_relationship_id(
     }
 }
 
+/// Rekey an index-keyed per-worksheet mutation map after a worksheet
+/// removal: the entry for the removed index is dropped and later entries
+/// shift one index down.
+fn shift_index_keyed_mutations<V>(map: &mut HashMap<usize, V>, removed: usize) {
+    map.remove(&removed);
+    let shifted = map
+        .drain()
+        .map(|(index, value)| (if index > removed { index - 1 } else { index }, value))
+        .collect::<Vec<_>>();
+    map.extend(shifted);
+}
+
 fn next_active_x_part_uri(
     package: &OpcPackage,
     directory: &str,
@@ -1840,6 +1852,45 @@ impl Workbook {
             .as_mut()
             .unwrap()
             .insert_worksheet(index, name.to_string())
+    }
+
+    /// Remove a worksheet by its worksheets-relative `index` and return it.
+    ///
+    /// The sheet leaves the `sheets` sequence (ECMA-376 §18.2.20); its
+    /// part, workbook relationship, and content-type override are not
+    /// emitted on the next save. Defined names scoped to the removed sheet
+    /// (`definedName@localSheetId`, ECMA-376 §18.2.5) are dropped and
+    /// later scopes shift up, and queued per-worksheet mutations
+    /// (protection metadata, data validations, web-extension bindings)
+    /// shift with it. Removing a sheet that a pivot table targets is
+    /// rejected.
+    ///
+    /// Removal requires the writer data model: it fails for a workbook
+    /// that was only opened for reading, because those sheets are not
+    /// tracked as mutable worksheets.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi_ooxml::xlsx::Workbook;
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// wb.add_worksheet("Scratch");
+    /// let removed = wb.remove_worksheet(1)?;
+    /// assert_eq!(removed.name(), "Scratch");
+    /// wb.save("output.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+    /// ```
+    pub fn remove_worksheet(&mut self, index: usize) -> SheetResult<MutableWorksheet> {
+        let data = self.mutable_data.as_mut().ok_or(
+            "cannot remove a worksheet from a workbook opened read-only; \
+             worksheet removal requires the writer data model",
+        )?;
+        let removed = data.remove_worksheet(index)?;
+        shift_index_keyed_mutations(&mut self.worksheet_protection_mutations, index);
+        shift_index_keyed_mutations(&mut self.worksheet_data_validation_mutations, index);
+        shift_index_keyed_mutations(&mut self.worksheet_web_extension_binding_mutations, index);
+        Ok(removed)
     }
 
     /// Add a chartsheet hosting the given chart.
