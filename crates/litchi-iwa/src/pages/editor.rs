@@ -1629,6 +1629,52 @@ impl PagesEditor {
         Ok(created)
     }
 
+    /// Rename one selectable paragraph style without changing its identifier.
+    pub fn rename_text_box_named_paragraph_style(
+        &mut self,
+        drawable_object_id: u64,
+        target: crate::text::ParagraphStyleId,
+        name: crate::text::ParagraphStyleName,
+    ) -> Result<NamedParagraphStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let renamed = staged.rename_named_paragraph_style(graph.storage_id, target, name)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if !verified
+            .text_box_named_paragraph_styles(drawable_object_id)?
+            .contains(&renamed)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages named paragraph-style rename failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(renamed)
+    }
+
+    /// Delete one unused selectable paragraph style.
+    pub fn delete_text_box_named_paragraph_style(
+        &mut self,
+        drawable_object_id: u64,
+        target: crate::text::ParagraphStyleId,
+    ) -> Result<NamedParagraphStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let deleted = staged.delete_named_paragraph_style(graph.storage_id, target)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified
+            .text_box_named_paragraph_styles(drawable_object_id)?
+            .iter()
+            .any(|style| style.id() == target)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages named paragraph-style deletion failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(deleted)
+    }
+
     /// Read the style selected for the paragraph created after this text box's current paragraph.
     pub fn text_box_paragraph_following_style(
         &self,

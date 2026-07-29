@@ -36,6 +36,8 @@ mod paragraph_flow;
 mod paragraph_following_style;
 mod paragraph_list;
 mod paragraph_style_catalog;
+mod paragraph_style_delete;
+mod paragraph_style_rename;
 mod paragraph_tabs;
 mod position;
 mod smart_field_object;

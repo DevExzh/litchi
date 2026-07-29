@@ -59,27 +59,28 @@ use super::number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
 };
 use super::paragraph_alignment::{
-    create_named_paragraph_style, named_paragraph_styles, paragraph_alignment,
-    paragraph_background, paragraph_borders, paragraph_decimal_tab_character,
+    create_named_paragraph_style, delete_named_paragraph_style, named_paragraph_styles,
+    paragraph_alignment, paragraph_background, paragraph_borders, paragraph_decimal_tab_character,
     paragraph_default_tab_interval, paragraph_flow, paragraph_following_style, paragraph_indents,
     paragraph_line_spacing, paragraph_spacing, paragraph_tab_stops, paragraph_writing_direction,
-    reset_paragraph_alignment, reset_paragraph_background, reset_paragraph_borders,
-    reset_paragraph_decimal_tab_character, reset_paragraph_default_tab_interval,
-    reset_paragraph_flow, reset_paragraph_following_style, reset_paragraph_indents,
-    reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
-    reset_paragraph_writing_direction, reset_text_background, reset_text_baseline_shift,
-    reset_text_capitalization, reset_text_character_spacing, reset_text_color,
-    reset_text_decorations, reset_text_font, reset_text_ligatures, reset_text_outline,
-    reset_text_script, reset_text_shadow, reset_text_style, set_paragraph_alignment,
-    set_paragraph_background, set_paragraph_borders, set_paragraph_decimal_tab_character,
-    set_paragraph_default_tab_interval, set_paragraph_flow, set_paragraph_following_style,
-    set_paragraph_indents, set_paragraph_line_spacing, set_paragraph_spacing,
-    set_paragraph_tab_stops, set_paragraph_writing_direction, set_text_background,
-    set_text_baseline_shift, set_text_capitalization, set_text_character_spacing, set_text_color,
-    set_text_decorations, set_text_font, set_text_ligatures, set_text_outline, set_text_script,
-    set_text_shadow, set_text_style, text_background, text_baseline_shift, text_capitalization,
-    text_character_spacing, text_color, text_decorations, text_font, text_ligatures, text_outline,
-    text_script, text_shadow, text_style,
+    rename_named_paragraph_style, reset_paragraph_alignment, reset_paragraph_background,
+    reset_paragraph_borders, reset_paragraph_decimal_tab_character,
+    reset_paragraph_default_tab_interval, reset_paragraph_flow, reset_paragraph_following_style,
+    reset_paragraph_indents, reset_paragraph_line_spacing, reset_paragraph_spacing,
+    reset_paragraph_tab_stops, reset_paragraph_writing_direction, reset_text_background,
+    reset_text_baseline_shift, reset_text_capitalization, reset_text_character_spacing,
+    reset_text_color, reset_text_decorations, reset_text_font, reset_text_ligatures,
+    reset_text_outline, reset_text_script, reset_text_shadow, reset_text_style,
+    set_paragraph_alignment, set_paragraph_background, set_paragraph_borders,
+    set_paragraph_decimal_tab_character, set_paragraph_default_tab_interval, set_paragraph_flow,
+    set_paragraph_following_style, set_paragraph_indents, set_paragraph_line_spacing,
+    set_paragraph_spacing, set_paragraph_tab_stops, set_paragraph_writing_direction,
+    set_text_background, set_text_baseline_shift, set_text_capitalization,
+    set_text_character_spacing, set_text_color, set_text_decorations, set_text_font,
+    set_text_ligatures, set_text_outline, set_text_script, set_text_shadow, set_text_style,
+    text_background, text_baseline_shift, text_capitalization, text_character_spacing, text_color,
+    text_decorations, text_font, text_ligatures, text_outline, text_script, text_shadow,
+    text_style,
 };
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
@@ -1726,6 +1727,52 @@ impl IWorkTextEditor {
         }
         self.package = staged;
         Ok(created)
+    }
+
+    /// Rename a selectable paragraph style without changing its stable identifier.
+    pub fn rename_named_paragraph_style(
+        &mut self,
+        object_id: u64,
+        target: ParagraphStyleId,
+        name: ParagraphStyleName,
+    ) -> Result<NamedParagraphStyle> {
+        let mut staged = self.package.clone();
+        let renamed = rename_named_paragraph_style(&mut staged, object_id, target, name)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if !named_paragraph_styles(&verified, object_id)?.contains(&renamed) {
+            return Err(Error::InvalidFormat(
+                "iWork named paragraph-style rename failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(renamed)
+    }
+
+    /// Delete an unused selectable paragraph style.
+    ///
+    /// Styles referenced by text, inheritance, following-style rules, or an
+    /// unknown object are rejected transactionally until the caller replaces
+    /// those references.
+    pub fn delete_named_paragraph_style(
+        &mut self,
+        object_id: u64,
+        target: ParagraphStyleId,
+    ) -> Result<NamedParagraphStyle> {
+        let mut staged = self.package.clone();
+        let deleted = delete_named_paragraph_style(&mut staged, object_id, target)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if named_paragraph_styles(&verified, object_id)?
+            .iter()
+            .any(|style| style.id() == target)
+        {
+            return Err(Error::InvalidFormat(
+                "iWork named paragraph-style deletion failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(deleted)
     }
 
     /// Read the paragraph style selected for the paragraph created by pressing Return.

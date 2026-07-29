@@ -132,7 +132,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
 }
 
 #[test]
-fn named_paragraph_style_creation_is_transactional_across_all_suites() {
+fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut pages = PagesEditor::create_with_text("Pages style catalog").unwrap();
     let pages_box = pages
         .add_text_box(
@@ -149,6 +149,7 @@ fn named_paragraph_style_creation_is_transactional_across_all_suites() {
         .text_box_named_paragraph_styles(pages_box.drawable_object_id)
         .unwrap()[0]
         .id();
+    let initial_pages = pages.to_bytes().unwrap();
     let created = pages
         .create_text_box_named_paragraph_style(
             pages_box.drawable_object_id,
@@ -168,7 +169,27 @@ fn named_paragraph_style_creation_is_transactional_across_all_suites() {
             .is_err()
     );
     assert_eq!(pages.to_bytes().unwrap(), before_duplicate);
-    let pages = PagesEditor::from_bytes(&before_duplicate).unwrap();
+    let renamed = pages
+        .rename_text_box_named_paragraph_style(
+            pages_box.drawable_object_id,
+            created.id(),
+            ParagraphStyleName::new("Litchi Display").unwrap(),
+        )
+        .unwrap();
+    assert_eq!(renamed.id(), created.id());
+    assert_eq!(renamed.name(), "Litchi Display");
+    let before_duplicate_rename = pages.to_bytes().unwrap();
+    assert!(
+        pages
+            .rename_text_box_named_paragraph_style(
+                pages_box.drawable_object_id,
+                created.id(),
+                ParagraphStyleName::new("Body").unwrap(),
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before_duplicate_rename);
+    let pages = PagesEditor::from_bytes(&before_duplicate_rename).unwrap();
     assert_eq!(
         pages
             .text_box_named_paragraph_styles(pages_box.drawable_object_id)
@@ -176,8 +197,39 @@ fn named_paragraph_style_creation_is_transactional_across_all_suites() {
             .iter()
             .map(|style| style.name())
             .collect::<Vec<_>>(),
-        ["Body", "Litchi Heading"]
+        ["Body", "Litchi Display"]
     );
+    let mut pages = pages;
+    pages
+        .set_text_box_paragraph_following_style(
+            pages_box.drawable_object_id,
+            ParagraphFollowingStyle::Named(created.id()),
+        )
+        .unwrap();
+    let before_used_delete = pages.to_bytes().unwrap();
+    assert!(
+        pages
+            .delete_text_box_named_paragraph_style(pages_box.drawable_object_id, created.id(),)
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before_used_delete);
+    assert!(
+        pages
+            .reset_text_box_paragraph_following_style(pages_box.drawable_object_id,)
+            .unwrap()
+    );
+    let deleted = pages
+        .delete_text_box_named_paragraph_style(pages_box.drawable_object_id, created.id())
+        .unwrap();
+    assert_eq!(deleted, renamed);
+    assert_eq!(pages.to_bytes().unwrap(), initial_pages);
+    let before_last_delete = pages.to_bytes().unwrap();
+    assert!(
+        pages
+            .delete_text_box_named_paragraph_style(pages_box.drawable_object_id, body,)
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before_last_delete);
 
     let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
@@ -193,15 +245,23 @@ fn named_paragraph_style_creation_is_transactional_across_all_suites() {
         )
         .unwrap();
     let mut numbers_text = IWorkTextEditor::from_package(numbers.into_package());
+    let initial_numbers = numbers_text.package().to_bytes().unwrap();
     let body = numbers_text
         .named_paragraph_styles(numbers_box.storage.object_id)
         .unwrap()[0]
         .id();
-    numbers_text
+    let numbers_created = numbers_text
         .create_named_paragraph_style(
             numbers_box.storage.object_id,
             body,
             ParagraphStyleName::new("Numbers Detail").unwrap(),
+        )
+        .unwrap();
+    let numbers_renamed = numbers_text
+        .rename_named_paragraph_style(
+            numbers_box.storage.object_id,
+            numbers_created.id(),
+            ParagraphStyleName::new("Numbers Summary").unwrap(),
         )
         .unwrap();
     let numbers_bytes = numbers_text.package().to_bytes().unwrap();
@@ -214,8 +274,16 @@ fn named_paragraph_style_creation_is_transactional_across_all_suites() {
             .last()
             .unwrap()
             .name(),
-        "Numbers Detail"
+        "Numbers Summary"
     );
+    let mut numbers_text = numbers_text;
+    assert_eq!(
+        numbers_text
+            .delete_named_paragraph_style(numbers_box.storage.object_id, numbers_created.id(),)
+            .unwrap(),
+        numbers_renamed
+    );
+    assert_eq!(numbers_text.package().to_bytes().unwrap(), initial_numbers);
 
     let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
     let keynote_box = keynote
@@ -230,15 +298,23 @@ fn named_paragraph_style_creation_is_transactional_across_all_suites() {
         )
         .unwrap();
     let mut keynote_text = IWorkTextEditor::from_package(keynote.into_package());
+    let initial_keynote = keynote_text.package().to_bytes().unwrap();
     let body = keynote_text
         .named_paragraph_styles(keynote_box.storage.object_id)
         .unwrap()[0]
         .id();
-    keynote_text
+    let keynote_created = keynote_text
         .create_named_paragraph_style(
             keynote_box.storage.object_id,
             body,
             ParagraphStyleName::new("Keynote Detail").unwrap(),
+        )
+        .unwrap();
+    let keynote_renamed = keynote_text
+        .rename_named_paragraph_style(
+            keynote_box.storage.object_id,
+            keynote_created.id(),
+            ParagraphStyleName::new("Keynote Summary").unwrap(),
         )
         .unwrap();
     let keynote_bytes = keynote_text.package().to_bytes().unwrap();
@@ -251,8 +327,16 @@ fn named_paragraph_style_creation_is_transactional_across_all_suites() {
             .last()
             .unwrap()
             .name(),
-        "Keynote Detail"
+        "Keynote Summary"
     );
+    let mut keynote_text = keynote_text;
+    assert_eq!(
+        keynote_text
+            .delete_named_paragraph_style(keynote_box.storage.object_id, keynote_created.id(),)
+            .unwrap(),
+        keynote_renamed
+    );
+    assert_eq!(keynote_text.package().to_bytes().unwrap(), initial_keynote);
 }
 
 #[test]

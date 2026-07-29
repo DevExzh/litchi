@@ -252,10 +252,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .find(|style| style.name() == "Body")
         .ok_or("source-built Pages theme has no Body paragraph style")?;
-    editor.create_text_box_named_paragraph_style(
+    let heading = editor.create_text_box_named_paragraph_style(
         following_style_box.drawable_object_id,
         body.id(),
         ParagraphStyleName::new("Litchi Heading")?,
+    )?;
+    editor.rename_text_box_named_paragraph_style(
+        following_style_box.drawable_object_id,
+        heading.id(),
+        ParagraphStyleName::new("Litchi Display")?,
+    )?;
+    let disposable = editor.create_text_box_named_paragraph_style(
+        following_style_box.drawable_object_id,
+        body.id(),
+        ParagraphStyleName::new("Disposable")?,
+    )?;
+    editor.delete_text_box_named_paragraph_style(
+        following_style_box.drawable_object_id,
+        disposable.id(),
     )?;
     editor.set_text_box_paragraph_following_style(
         following_style_box.drawable_object_id,

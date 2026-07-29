@@ -30,10 +30,10 @@ const STYLE_VARIATION_FIELD: u32 = 4;
 const GENERATED_STYLE_IDENTIFIER_PREFIX: &str = "com.litchi.paragraph-style.";
 
 #[derive(Debug)]
-struct ThemeLocation {
-    archive_name: String,
-    object_id: u64,
-    message_type: u32,
+pub(super) struct ThemeLocation {
+    pub(super) archive_name: String,
+    pub(super) object_id: u64,
+    pub(super) message_type: u32,
 }
 
 pub(super) fn create_named_paragraph_style(
@@ -121,7 +121,7 @@ pub(super) fn create_named_paragraph_style(
     Ok(created)
 }
 
-fn locate_themes(
+pub(super) fn locate_themes(
     package: &IWorkPackage,
     stylesheet_id: u64,
     source_style_id: u64,

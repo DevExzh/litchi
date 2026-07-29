@@ -17,6 +17,8 @@ use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_following_style::{NamedParagraphStyle, ParagraphFollowingStyle};
 use super::paragraph_style_catalog;
+use super::paragraph_style_delete;
+use super::paragraph_style_rename;
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
@@ -630,6 +632,25 @@ pub(super) fn create_named_paragraph_style(
 ) -> Result<NamedParagraphStyle> {
     let storage = storage::locate(package, storage_id)?;
     paragraph_style_catalog::create_named_paragraph_style(package, storage.style_id, source, name)
+}
+
+pub(super) fn rename_named_paragraph_style(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    target: super::paragraph_following_style::ParagraphStyleId,
+    name: super::paragraph_following_style::ParagraphStyleName,
+) -> Result<NamedParagraphStyle> {
+    let storage = storage::locate(package, storage_id)?;
+    paragraph_style_rename::rename_named_paragraph_style(package, storage.style_id, target, name)
+}
+
+pub(super) fn delete_named_paragraph_style(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    target: super::paragraph_following_style::ParagraphStyleId,
+) -> Result<NamedParagraphStyle> {
+    let storage = storage::locate(package, storage_id)?;
+    paragraph_style_delete::delete_named_paragraph_style(package, storage.style_id, target)
 }
 
 pub(super) fn paragraph_following_style(
