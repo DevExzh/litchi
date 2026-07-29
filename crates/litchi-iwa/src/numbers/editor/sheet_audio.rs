@@ -58,6 +58,12 @@ pub struct RemovedNumbersSheetAudio {
     pub removed_data_identifiers: Vec<u64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AudioClonePlacement {
+    Offset,
+    Preserve,
+}
+
 impl NumbersEditor {
     /// List independently positioned audio clips owned directly by one reachable sheet.
     pub fn sheet_audio(&self, sheet_id: u64) -> Result<Vec<NumbersSheetAudioInfo>> {
@@ -280,10 +286,46 @@ impl NumbersEditor {
         sheet_id: u64,
         source_drawable_object_id: u64,
     ) -> Result<NumbersSheetAudioInfo> {
-        let source = audio_graph(self, sheet_id, source_drawable_object_id)?;
+        self.clone_sheet_audio(
+            sheet_id,
+            source_drawable_object_id,
+            sheet_id,
+            AudioClonePlacement::Offset,
+        )
+    }
+
+    pub(super) fn duplicate_sheet_audio_to_sheet(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+    ) -> Result<NumbersSheetAudioInfo> {
+        self.clone_sheet_audio(
+            source_sheet_id,
+            source_drawable_object_id,
+            target_sheet_id,
+            AudioClonePlacement::Preserve,
+        )
+    }
+
+    fn clone_sheet_audio(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+        placement: AudioClonePlacement,
+    ) -> Result<NumbersSheetAudioInfo> {
+        let source = audio_graph(self, source_sheet_id, source_drawable_object_id)?;
+        let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
+        if target_archive_name != source.archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers audio source and target sheets must share a component: {} != {target_archive_name}",
+                source.archive_name
+            )));
+        }
         let mut staged = self.package.clone();
         let first_identifier = next_object_identifier(&staged)?;
-        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        let mut remap = HashMap::with_capacity(source.object_ids.len() + 1);
         for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
             let offset = u64::try_from(offset)
                 .map_err(|_| Error::ParseError("Numbers audio graph is too large".to_owned()))?;
@@ -291,6 +333,13 @@ impl NumbersEditor {
                 .checked_add(offset)
                 .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
             remap.insert(identifier, replacement);
+        }
+        if source_sheet_id != target_sheet_id
+            && remap.insert(source_sheet_id, target_sheet_id).is_some()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers audio graph unexpectedly owns source sheet {source_sheet_id}"
+            )));
         }
 
         for identifier in &source.object_ids {
@@ -309,7 +358,12 @@ impl NumbersEditor {
         let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Numbers audio clone has no drawable identifier".to_owned())
         })?;
-        let geometry = offset_drawable_geometry(source.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        let geometry = match placement {
+            AudioClonePlacement::Offset => {
+                offset_drawable_geometry(source.geometry, DRAWABLE_DUPLICATE_OFFSET)?
+            },
+            AudioClonePlacement::Preserve => source.geometry,
+        };
         let expected_position = geometry.position.ok_or_else(|| {
             Error::InvalidFormat("Numbers audio clone has no position".to_owned())
         })?;
@@ -317,7 +371,7 @@ impl NumbersEditor {
         patch_numbers_sheet_drawable_reference(
             &mut staged,
             &source.archive_name,
-            source.sheet_id,
+            target_sheet_id,
             None,
             Some(new_drawable_id),
         )?;
@@ -354,13 +408,13 @@ impl NumbersEditor {
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         let created = verified
-            .sheet_audio(sheet_id)?
+            .sheet_audio(target_sheet_id)?
             .into_iter()
             .find(|audio| audio.drawable_object_id == new_drawable_id)
             .ok_or_else(|| {
                 Error::InvalidFormat("Numbers audio duplication failed validation".to_owned())
             })?;
-        let created_graph = audio_graph(&verified, sheet_id, new_drawable_id)?;
+        let created_graph = audio_graph(&verified, target_sheet_id, new_drawable_id)?;
         let expected_data_references = source
             .data_references
             .iter()
@@ -373,7 +427,7 @@ impl NumbersEditor {
                 Ok((data_identifier, new_object_identifier))
             })
             .collect::<Result<Vec<_>>>()?;
-        if created.sheet_id != source.info.sheet_id
+        if created.sheet_id != target_sheet_id
             || created.audio_data_identifier != source.info.audio_data_identifier
             || created.position != expected_position
             || created.duration != source.info.duration

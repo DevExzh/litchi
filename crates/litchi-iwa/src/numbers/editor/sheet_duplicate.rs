@@ -27,15 +27,19 @@ enum SheetDrawableClone {
     Shape {
         drawable_id: u64,
     },
+    Audio {
+        drawable_id: u64,
+    },
 }
 
 impl NumbersEditor {
     /// Duplicate a populated sheet immediately after its source.
     ///
     /// Sheet settings and unknown wire fields are retained. Populated tables,
-    /// local formula dependency graphs, ordinary text boxes, images, and shapes
+    /// local formula dependency graphs, ordinary text boxes, images, shapes, and audio
     /// receive fresh object identities. Image assets and shape styles remain
-    /// shared, matching Numbers, while writable object storage is independent.
+    /// shared, as do audio assets, matching Numbers, while writable object
+    /// storage is independent.
     /// Unsupported drawable kinds and cross-table formula edges are rejected
     /// transactionally.
     pub fn duplicate_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
@@ -149,6 +153,14 @@ impl NumbersEditor {
                     )?;
                     cloned_drawable_ids.push(cloned.drawable_object_id);
                 },
+                SheetDrawableClone::Audio { drawable_id } => {
+                    let cloned = working.duplicate_sheet_audio_to_sheet(
+                        sheet_id,
+                        drawable_id,
+                        new_sheet_id,
+                    )?;
+                    cloned_drawable_ids.push(cloned.drawable_object_id);
+                },
             }
         }
 
@@ -206,6 +218,11 @@ fn classify_sheet_drawables(
         .into_iter()
         .map(|shape| shape.drawable_object_id)
         .collect::<HashSet<_>>();
+    let audio = editor
+        .sheet_audio(sheet_id)?
+        .into_iter()
+        .map(|audio| audio.drawable_object_id)
+        .collect::<HashSet<_>>();
 
     sheet
         .drawable_infos
@@ -234,8 +251,13 @@ fn classify_sheet_drawables(
                     drawable_id: reference.identifier,
                 });
             }
+            if audio.contains(&reference.identifier) {
+                return Ok(SheetDrawableClone::Audio {
+                    drawable_id: reference.identifier,
+                });
+            }
             Err(Error::ParseError(format!(
-                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table, ordinary text box, image, or shape",
+                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table, ordinary text box, image, shape, or audio",
                 reference.identifier
             )))
         })
@@ -359,12 +381,20 @@ fn restore_table_geometry(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
-    use crate::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
+    use crate::numbers::{
+        NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
+    };
     use crate::shapes::{
         DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill, ShapePreset,
     };
+    use crate::{MediaLoopMode, MediaVolume};
 
+    const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsheet-duplicate-audio";
+    const AUDIO_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
+    const MOVED_AUDIO_POSITION: DrawablePoint = DrawablePoint { x: 510.0, y: 225.0 };
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 84.0, y: 126.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
         width: 320.0,
@@ -379,6 +409,77 @@ mod tests {
     const MOVED_SHAPE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
     const SOURCE_SHAPE_FILL: ShapeFill = ShapeFill::Solid(RgbaColor::black());
     const COPIED_SHAPE_FILL: ShapeFill = ShapeFill::None;
+
+    #[test]
+    fn source_built_audio_sheet_duplicates_with_native_shared_asset_semantics() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Audio")
+            .build()
+            .unwrap();
+        let source_sheet = editor.sheets().unwrap().remove(0);
+        let source = editor
+            .add_sheet_audio(
+                source_sheet.object_id,
+                "probe.aiff",
+                AUDIO,
+                NumbersSheetAudioOptions::new(AUDIO_POSITION, Duration::from_millis(2_200)),
+            )
+            .unwrap();
+
+        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+
+        assert_eq!(duplicate.index, 1);
+        assert_eq!(duplicate.name, "Audio-1");
+        let copied = editor.sheet_audio(duplicate.object_id).unwrap().remove(0);
+        assert_ne!(copied.drawable_object_id, source.drawable_object_id);
+        assert_eq!(copied.sheet_id, duplicate.object_id);
+        assert_eq!(copied.position, source.position);
+        assert_eq!(copied.duration, source.duration);
+        assert_eq!(copied.audio_data_identifier, source.audio_data_identifier);
+        assert_eq!(editor.media_assets().unwrap().len(), 1);
+
+        editor
+            .set_sheet_audio_position(
+                duplicate.object_id,
+                copied.drawable_object_id,
+                MOVED_AUDIO_POSITION,
+            )
+            .unwrap();
+        let copied_playback = copied
+            .playback
+            .with_loop_mode(Some(MediaLoopMode::Repeat))
+            .with_volume(Some(MediaVolume::new(0.4).unwrap()));
+        editor
+            .set_sheet_audio_playback_settings(
+                duplicate.object_id,
+                copied.drawable_object_id,
+                copied_playback,
+            )
+            .unwrap();
+
+        assert_eq!(
+            editor
+                .sheet_audio_position(source_sheet.object_id, source.drawable_object_id)
+                .unwrap(),
+            AUDIO_POSITION
+        );
+        assert_eq!(
+            editor
+                .sheet_audio_playback_settings(source_sheet.object_id, source.drawable_object_id)
+                .unwrap(),
+            source.playback
+        );
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened_copy = reopened.sheet_audio(duplicate.object_id).unwrap().remove(0);
+        assert_eq!(reopened_copy.position, MOVED_AUDIO_POSITION);
+        assert_eq!(reopened_copy.playback, copied_playback);
+        assert_eq!(
+            reopened_copy.audio_data_identifier,
+            source.audio_data_identifier
+        );
+        assert_eq!(reopened.media_assets().unwrap().len(), 1);
+    }
 
     #[test]
     fn source_built_shape_sheet_duplicates_with_native_independent_storage() {
