@@ -1701,7 +1701,7 @@ impl IWorkTextEditor {
         Ok(changed)
     }
 
-    /// List the named paragraph styles reachable from this text storage's stylesheet.
+    /// List the theme paragraph-style presets selectable for this text storage.
     pub fn named_paragraph_styles(&self, object_id: u64) -> Result<Vec<NamedParagraphStyle>> {
         named_paragraph_styles(&self.package, object_id)
     }

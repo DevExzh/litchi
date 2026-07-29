@@ -12,7 +12,7 @@ use crate::shapes::{
     shadow_to_native, stroke_from_native, stroke_to_native,
 };
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
 
 use super::super::font::{TextFont, TextFontName};
 use super::super::paragraph_direction::ParagraphWritingDirection;
@@ -34,6 +34,7 @@ use super::super::style::{
 use super::super::style_registry::object_archive_name;
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+const THEME_MESSAGE_TYPES: &[u32] = &[10, 10_001, 12_009];
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
@@ -481,36 +482,101 @@ pub(crate) fn named_paragraph_styles(
             "iWork stylesheet {stylesheet_id} must have exactly one stylesheet payload"
         )));
     };
-    let mut styles = Vec::new();
-    for reference in &stylesheet.styles {
-        let Some(object) = archive.object(reference.identifier) else {
-            continue;
-        };
-        let mut paragraph_styles = object
+    let preset_ids = paragraph_style_preset_ids(package, stylesheet_id)?;
+    let mut styles = Vec::with_capacity(preset_ids.len());
+    for preset_id in preset_ids {
+        let stylesheet_reference_count = stylesheet
+            .styles
+            .iter()
+            .filter(|reference| reference.identifier == preset_id)
+            .count();
+        if stylesheet_reference_count != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style preset {preset_id} must occur exactly once in stylesheet {stylesheet_id}"
+            )));
+        }
+        let object = archive.object(preset_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork paragraph style preset {preset_id} is missing"
+            ))
+        })?;
+        let payloads = object
             .messages
             .iter()
             .filter(|message| message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
-            .filter_map(|message| {
-                tswp::ParagraphStyleArchive::decode(message.data.as_slice()).ok()
-            });
-        let Some(style) = paragraph_styles.next() else {
-            continue;
-        };
-        if paragraph_styles.next().is_some()
-            || style.super_.is_variation == Some(true)
-            || style.super_.stylesheet.map(|value| value.identifier) != Some(stylesheet_id)
+            .map(|message| tswp::ParagraphStyleArchive::decode(message.data.as_slice()))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let [style] = payloads.try_into().map_err(|_| {
+            Error::InvalidFormat(format!(
+                "iWork paragraph style preset {preset_id} must have exactly one paragraph-style payload"
+            ))
+        })?;
+        if style.super_.is_variation == Some(true)
+            || style
+                .super_
+                .stylesheet
+                .as_ref()
+                .map(|value| value.identifier)
+                != Some(stylesheet_id)
         {
-            continue;
+            return Err(Error::InvalidFormat(format!(
+                "iWork paragraph style preset {preset_id} is not a named style in stylesheet {stylesheet_id}"
+            )));
         }
-        let Some(name) = style.super_.name else {
-            continue;
-        };
+        let name = style.super_.name.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork paragraph style preset {preset_id} has no name"
+            ))
+        })?;
         styles.push(NamedParagraphStyle::new(
-            ParagraphStyleId::new(reference.identifier)?,
+            ParagraphStyleId::new(preset_id)?,
             name,
         )?);
     }
     Ok(styles)
+}
+
+fn paragraph_style_preset_ids(package: &IWorkPackage, stylesheet_id: u64) -> Result<Vec<u64>> {
+    let mut identifiers = Vec::new();
+    for archive_name in package.iwa_entry_names() {
+        let archive = package.archive(archive_name)?;
+        for object in archive.objects {
+            for message in object.messages {
+                if !THEME_MESSAGE_TYPES.contains(&message.type_) {
+                    continue;
+                }
+                let theme = IWorkThemeArchive::decode(&message.data)?;
+                if theme
+                    .base
+                    .document_stylesheet
+                    .as_ref()
+                    .map(|reference| reference.identifier)
+                    != Some(stylesheet_id)
+                {
+                    continue;
+                }
+                let Some(text) = theme.extensions.text else {
+                    continue;
+                };
+                for reference in text.paragraph_style_presets {
+                    if reference.identifier == 0 {
+                        return Err(Error::InvalidFormat(format!(
+                            "iWork stylesheet {stylesheet_id} has a zero paragraph style preset"
+                        )));
+                    }
+                    if !identifiers.contains(&reference.identifier) {
+                        identifiers.push(reference.identifier);
+                    }
+                }
+            }
+        }
+    }
+    if identifiers.is_empty() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork stylesheet {stylesheet_id} has no theme paragraph style presets"
+        )));
+    }
+    Ok(identifiers)
 }
 
 pub(crate) fn validate_named_paragraph_style(

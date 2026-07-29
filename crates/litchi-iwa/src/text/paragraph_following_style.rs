@@ -22,7 +22,7 @@ impl ParagraphStyleId {
     }
 }
 
-/// One named paragraph style available in the current document.
+/// One named paragraph-style preset selectable in the current document.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedParagraphStyle {
     id: ParagraphStyleId,

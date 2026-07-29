@@ -1597,7 +1597,7 @@ impl PagesEditor {
         Ok(changed)
     }
 
-    /// List the named paragraph styles available to a reachable ordinary text box.
+    /// List the theme paragraph-style presets selectable for an ordinary text box.
     pub fn text_box_named_paragraph_styles(
         &self,
         drawable_object_id: u64,

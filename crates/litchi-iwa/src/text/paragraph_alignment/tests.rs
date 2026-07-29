@@ -15,15 +15,16 @@ use crate::text::{
     IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFollowingStyle,
     ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    ParagraphWritingDirection, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations, TextFont, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleId,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, ParagraphWritingDirection, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations,
+    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+const SOURCE_PAGES_OBJECT_TITLE_STYLE_ID: u64 = 121;
 
 #[test]
 fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
@@ -44,11 +45,23 @@ fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
         .unwrap();
     assert_eq!(
         styles.iter().map(|style| style.name()).collect::<Vec<_>>(),
-        ["Body", "Object Title"]
+        ["Body"]
     );
     let body = styles.iter().find(|style| style.name() == "Body").unwrap();
     let expected = ParagraphFollowingStyle::Named(body.id());
     let before = pages.to_bytes().unwrap();
+    let hidden_object_title = ParagraphFollowingStyle::Named(
+        ParagraphStyleId::new(SOURCE_PAGES_OBJECT_TITLE_STYLE_ID).unwrap(),
+    );
+    assert!(
+        pages
+            .set_text_box_paragraph_following_style(
+                text_box.drawable_object_id,
+                hidden_object_title,
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before);
 
     pages
         .set_text_box_paragraph_following_style(text_box.drawable_object_id, expected)
@@ -66,6 +79,56 @@ fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
             .unwrap()
     );
     assert_eq!(pages.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers preset",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let numbers_text = IWorkTextEditor::from_package(numbers.into_package());
+    assert_eq!(
+        numbers_text
+            .named_paragraph_styles(numbers_box.storage.object_id)
+            .unwrap()
+            .iter()
+            .map(|style| style.name())
+            .collect::<Vec<_>>(),
+        ["Body"]
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote preset",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let keynote_text = IWorkTextEditor::from_package(keynote.into_package());
+    assert_eq!(
+        keynote_text
+            .named_paragraph_styles(keynote_box.storage.object_id)
+            .unwrap()
+            .iter()
+            .map(|style| style.name())
+            .collect::<Vec<_>>(),
+        ["Body"]
+    );
 }
 
 #[test]
