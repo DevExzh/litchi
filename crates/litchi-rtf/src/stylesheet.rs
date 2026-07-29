@@ -24,6 +24,62 @@ pub enum StyleType {
     Table,
 }
 
+/// Inert conditional-formatting scope and banding metadata of a table style
+/// definition (`\tsN`).
+///
+/// RTF 1.9.1 table-style definitions may declare which table regions the
+/// conditional formatting targets (`\tscfirstrow`, `\tsclastrow`,
+/// `\tscfirstcol`, `\tsclastcol`), odd/even banding scopes
+/// (`\tscbandhorzodd`, `\tscbandhorzeven`, `\tscbandvertodd`,
+/// `\tscbandverteven`), and band sizes (`\tscbandshN`, `\tscbandsvN`); the
+/// `\tsrowd` marker closes the row-defaults portion of the definition.
+///
+/// The flags are passive metadata only: no conditional formatting is ever
+/// evaluated or applied.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TableStyleConditionalFormatting {
+    /// Whether the definition carries the `\tsrowd` row-defaults marker.
+    pub row_defaults_marker: bool,
+    /// Conditional formatting targets the first row (`\tscfirstrow`).
+    pub first_row: bool,
+    /// Conditional formatting targets the last row (`\tsclastrow`).
+    pub last_row: bool,
+    /// Conditional formatting targets the first column (`\tscfirstcol`).
+    pub first_column: bool,
+    /// Conditional formatting targets the last column (`\tsclastcol`).
+    pub last_column: bool,
+    /// Odd horizontal banding scope (`\tscbandhorzodd`).
+    pub band_horizontal_odd: bool,
+    /// Even horizontal banding scope (`\tscbandhorzeven`).
+    pub band_horizontal_even: bool,
+    /// Odd vertical banding scope (`\tscbandvertodd`).
+    pub band_vertical_odd: bool,
+    /// Even vertical banding scope (`\tscbandverteven`).
+    pub band_vertical_even: bool,
+    /// Horizontal band size in rows (`\tscbandshN`).
+    pub horizontal_band_size: Option<u16>,
+    /// Vertical band size in columns (`\tscbandsvN`).
+    pub vertical_band_size: Option<u16>,
+}
+
+impl TableStyleConditionalFormatting {
+    /// Whether no conditional-formatting metadata is present.
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        !self.row_defaults_marker
+            && !self.first_row
+            && !self.last_row
+            && !self.first_column
+            && !self.last_column
+            && !self.band_horizontal_odd
+            && !self.band_horizontal_even
+            && !self.band_vertical_odd
+            && !self.band_vertical_even
+            && self.horizontal_band_size.is_none()
+            && self.vertical_band_size.is_none()
+    }
+}
+
 /// RTF style definition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Style<'a> {
@@ -43,6 +99,8 @@ pub struct Style<'a> {
     pub formatting: Formatting,
     /// Paragraph properties (for paragraph styles)
     pub paragraph: Option<Paragraph>,
+    /// Table-style conditional formatting metadata (`\tsN` styles only).
+    pub table_conditional: TableStyleConditionalFormatting,
     /// Whether this is a built-in style
     pub builtin: bool,
     /// Whether this style is hidden
@@ -87,6 +145,7 @@ impl<'a> Style<'a> {
             linked_style: None,
             formatting: Formatting::default(),
             paragraph,
+            table_conditional: TableStyleConditionalFormatting::default(),
             builtin: false,
             hidden: false,
             additive: false,

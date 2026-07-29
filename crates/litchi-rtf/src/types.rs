@@ -812,6 +812,50 @@ impl AnimatedTextEffect {
     }
 }
 
+/// Fixed-width text fitting selected by `\fittextN` (RTF 1.9.1 character
+/// properties).
+///
+/// `\fittextN` fits the text of the current group into `N` twips;
+/// `\fittext-1` continues the previous fit-text run, so
+/// `{\fittext1000 Fit this}{\fittext-1 text}` fits "Fit this text" into
+/// 1000 twips.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FitText {
+    /// No fit-text property.
+    #[default]
+    None,
+    /// Fit the group's text into this many twips (`\fittextN` with N ≥ 0).
+    Fixed(u32),
+    /// Continue the previous fit-text run (`\fittext-1`).
+    Continue,
+}
+
+impl FitText {
+    /// Maximum width accepted by the RTF `\fittextN` domain, in twips.
+    pub const MAX_TWIPS: i32 = 1_048_576;
+
+    /// Convert a raw RTF `\fittextN` parameter to a typed value.
+    #[inline]
+    pub fn from_rtf(value: i32) -> Option<Self> {
+        Some(match value {
+            -1 => Self::Continue,
+            0..=Self::MAX_TWIPS => Self::Fixed(value as u32),
+            _ => return None,
+        })
+    }
+
+    /// Return the raw RTF `\fittextN` parameter for this value, or `None`
+    /// when no fit-text property is active.
+    #[inline]
+    pub fn rtf_value(self) -> Option<i32> {
+        match self {
+            Self::None => None,
+            Self::Continue => Some(-1),
+            Self::Fixed(twips) => Some(twips as i32),
+        }
+    }
+}
+
 /// East Asian emphasis mark selected by an `\acc*` character control.
 ///
 /// The marks are mutually exclusive; the last control in a run wins. The
@@ -1090,6 +1134,8 @@ pub struct Formatting {
     pub character_grid: Option<CharacterGrid>,
     /// Animated text effect from `\animtextN`.
     pub animated_text: AnimatedTextEffect,
+    /// Fixed-width text fitting from `\fittextN`.
+    pub fit_text: FitText,
     /// East Asian emphasis mark from an `\acc*` control.
     pub emphasis_mark: EmphasisMark,
     /// Associated complex-script character properties.
@@ -1139,6 +1185,7 @@ impl Default for Formatting {
             complex_script: None,
             character_grid: None,
             animated_text: AnimatedTextEffect::default(),
+            fit_text: FitText::default(),
             emphasis_mark: EmphasisMark::default(),
             associated: AssociatedCharacterFormatting::default(),
         }

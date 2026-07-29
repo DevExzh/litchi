@@ -2853,6 +2853,16 @@ impl<W: Write> RtfWriter<W> {
             self.write_str("\\*")?;
         }
         self.write_control_word(control, Some(i32::from(style.id)))?;
+        if style.style_type == StyleType::Table {
+            if style.table_conditional.row_defaults_marker {
+                self.write_control_word("tsrowd", None)?;
+            }
+        } else if !style.table_conditional.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF table-style conditional metadata requires a table style",
+            ));
+        }
         self.write_formatting(&style.formatting)?;
         if let Some(paragraph) = &style.paragraph {
             self.write_paragraph_properties(paragraph)?;
@@ -2901,6 +2911,29 @@ impl<W: Write> RtfWriter<W> {
         }
         if style.reply {
             self.write_control_word("sreply", None)?;
+        }
+        if style.style_type == StyleType::Table {
+            let conditional = &style.table_conditional;
+            for (flag, word) in [
+                (conditional.first_row, "tscfirstrow"),
+                (conditional.last_row, "tsclastrow"),
+                (conditional.first_column, "tscfirstcol"),
+                (conditional.last_column, "tsclastcol"),
+                (conditional.band_horizontal_odd, "tscbandhorzodd"),
+                (conditional.band_horizontal_even, "tscbandhorzeven"),
+                (conditional.band_vertical_odd, "tscbandvertodd"),
+                (conditional.band_vertical_even, "tscbandverteven"),
+            ] {
+                if flag {
+                    self.write_control_word(word, None)?;
+                }
+            }
+            if let Some(size) = conditional.horizontal_band_size {
+                self.write_control_word("tscbandsh", Some(i32::from(size)))?;
+            }
+            if let Some(size) = conditional.vertical_band_size {
+                self.write_control_word("tscbandsv", Some(i32::from(size)))?;
+            }
         }
         self.write_str(" ")?;
         self.write_text(style.name.as_ref())?;
@@ -6272,6 +6305,9 @@ impl<W: Write> RtfWriter<W> {
         }
         if fmt.animated_text != crate::AnimatedTextEffect::None {
             self.write_control_word("animtext", Some(fmt.animated_text.rtf_value()))?;
+        }
+        if let Some(value) = fmt.fit_text.rtf_value() {
+            self.write_control_word("fittext", Some(value))?;
         }
         if fmt.emphasis_mark != crate::EmphasisMark::None {
             self.write_control_word(fmt.emphasis_mark.control_word(), None)?;

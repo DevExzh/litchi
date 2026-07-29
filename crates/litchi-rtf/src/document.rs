@@ -4350,6 +4350,7 @@ impl<'a> RtfDocument<'a> {
                 linked_style: style.linked_style,
                 formatting: style.formatting,
                 paragraph: style.paragraph,
+                table_conditional: style.table_conditional,
                 builtin: style.builtin,
                 hidden: style.hidden,
                 additive: style.additive,

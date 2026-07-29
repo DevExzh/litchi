@@ -885,6 +885,18 @@ fn animated_text(value: Option<i32>) -> RtfResult<crate::AnimatedTextEffect> {
     })
 }
 
+fn fit_text(value: Option<i32>) -> RtfResult<crate::FitText> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument("RTF fittext control requires a numeric parameter".to_string())
+    })?;
+    crate::FitText::from_rtf(value).ok_or_else(|| {
+        RtfError::MalformedDocument(format!(
+            "RTF fittext value must be -1 or 0..={}",
+            crate::FitText::MAX_TWIPS
+        ))
+    })
+}
+
 fn emphasis_mark(
     mark: crate::EmphasisMark,
     value: Option<i32>,
@@ -7753,6 +7765,9 @@ impl<'a> Parser<'a> {
             ControlWord::AnimatedText(value) => {
                 state.formatting.animated_text = animated_text(*value)?;
             },
+            ControlWord::FitText(value) => {
+                state.formatting.fit_text = fit_text(*value)?;
+            },
             ControlWord::EmphasisMark(mark, value) => {
                 state.formatting.emphasis_mark = emphasis_mark(*mark, *value)?;
             },
@@ -13718,6 +13733,7 @@ impl<'a> Parser<'a> {
         let mut personal = false;
         let mut compose = false;
         let mut reply = false;
+        let mut table_conditional = crate::TableStyleConditionalFormatting::default();
         let mut seen_metadata = std::collections::HashSet::new();
         let mut saw_content_before_selector = false;
         macro_rules! set_style_once {
@@ -13814,6 +13830,71 @@ impl<'a> Parser<'a> {
                         }
                         style_type = Some(super::stylesheet::StyleType::Table);
                         id = Some(table_style_reference(*value)?);
+                    },
+                    control @ (ControlWord::TableStyleRowDefaults(_)
+                    | ControlWord::TableStyleFirstRow(_)
+                    | ControlWord::TableStyleLastRow(_)
+                    | ControlWord::TableStyleFirstColumn(_)
+                    | ControlWord::TableStyleLastColumn(_)
+                    | ControlWord::TableStyleBandHorizontalOdd(_)
+                    | ControlWord::TableStyleBandHorizontalEven(_)
+                    | ControlWord::TableStyleBandVerticalOdd(_)
+                    | ControlWord::TableStyleBandVerticalEven(_)
+                    | ControlWord::TableStyleBandSizeHorizontal(_)
+                    | ControlWord::TableStyleBandSizeVertical(_)) => {
+                        if style_type != Some(super::stylesheet::StyleType::Table) {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF table-style conditional controls may occur only in table style definitions"
+                                    .to_string(),
+                            ));
+                        }
+                        match control {
+                            ControlWord::TableStyleRowDefaults(param) => {
+                                require_parameterless(*param, "tsrowd")?;
+                                set_style_once!("tsrowd", table_conditional.row_defaults_marker, true);
+                            },
+                            ControlWord::TableStyleFirstRow(param) => {
+                                require_parameterless(*param, "tscfirstrow")?;
+                                set_style_once!("tscfirstrow", table_conditional.first_row, true);
+                            },
+                            ControlWord::TableStyleLastRow(param) => {
+                                require_parameterless(*param, "tsclastrow")?;
+                                set_style_once!("tsclastrow", table_conditional.last_row, true);
+                            },
+                            ControlWord::TableStyleFirstColumn(param) => {
+                                require_parameterless(*param, "tscfirstcol")?;
+                                set_style_once!("tscfirstcol", table_conditional.first_column, true);
+                            },
+                            ControlWord::TableStyleLastColumn(param) => {
+                                require_parameterless(*param, "tsclastcol")?;
+                                set_style_once!("tsclastcol", table_conditional.last_column, true);
+                            },
+                            ControlWord::TableStyleBandHorizontalOdd(param) => {
+                                require_parameterless(*param, "tscbandhorzodd")?;
+                                set_style_once!("tscbandhorzodd", table_conditional.band_horizontal_odd, true);
+                            },
+                            ControlWord::TableStyleBandHorizontalEven(param) => {
+                                require_parameterless(*param, "tscbandhorzeven")?;
+                                set_style_once!("tscbandhorzeven", table_conditional.band_horizontal_even, true);
+                            },
+                            ControlWord::TableStyleBandVerticalOdd(param) => {
+                                require_parameterless(*param, "tscbandvertodd")?;
+                                set_style_once!("tscbandvertodd", table_conditional.band_vertical_odd, true);
+                            },
+                            ControlWord::TableStyleBandVerticalEven(param) => {
+                                require_parameterless(*param, "tscbandverteven")?;
+                                set_style_once!("tscbandverteven", table_conditional.band_vertical_even, true);
+                            },
+                            ControlWord::TableStyleBandSizeHorizontal(param) => {
+                                let value = Self::required_character_value(*param, "tscbandsh", u16::MAX)?;
+                                set_style_once!("tscbandsh", table_conditional.horizontal_band_size, Some(value));
+                            },
+                            ControlWord::TableStyleBandSizeVertical(param) => {
+                                let value = Self::required_character_value(*param, "tscbandsv", u16::MAX)?;
+                                set_style_once!("tscbandsv", table_conditional.vertical_band_size, Some(value));
+                            },
+                            _ => unreachable!(),
+                        }
                     },
                     ControlWord::StyleBasedOn(value) => {
                         if !seen_metadata.insert("sbasedon") {
@@ -13950,6 +14031,7 @@ impl<'a> Parser<'a> {
         style.personal = personal;
         style.compose = compose;
         style.reply = reply;
+        style.table_conditional = table_conditional;
         self.stylesheet.add(style);
         Ok(())
     }
@@ -14593,6 +14675,9 @@ impl<'a> Parser<'a> {
             },
             ControlWord::AnimatedText(value) => {
                 state.formatting.animated_text = animated_text(*value)?;
+            },
+            ControlWord::FitText(value) => {
+                state.formatting.fit_text = fit_text(*value)?;
             },
             ControlWord::EmphasisMark(mark, value) => {
                 state.formatting.emphasis_mark = emphasis_mark(*mark, *value)?;
