@@ -143,7 +143,6 @@ const DRAWING_LINE_STYLE_PRESET_COUNT: usize = 1;
 const TOC_ENTRY_STYLE_PRESET_COUNT: usize = 1;
 const TOC_SETTINGS_PRESET_COUNT: usize = 1;
 const CHARACTER_STYLE_PRESET_COUNT: usize = 1;
-const PARAGRAPH_STYLE_PRESET_COUNT: usize = 1;
 const DROP_CAP_STYLE_PRESET_COUNT: usize = 1;
 const CAPTION_STYLE_PRESET_COUNT: usize = 1;
 const SVG_IMPORT_STYLE_PRESET_COUNT: usize = 1;
@@ -186,6 +185,17 @@ enum PagesObjectId {
     AnnotationAuthorStorage = 129,
     BulletListStyle = 130,
     NumberedListStyle = 131,
+    ParagraphStyleTitle = 132,
+    ParagraphStyleSubtitle = 133,
+    ParagraphStyleHeading = 134,
+    ParagraphStyleHeading2 = 135,
+    ParagraphStyleHeading3 = 136,
+    ParagraphStyleHeadingRed = 137,
+    ParagraphStyleCaption = 138,
+    ParagraphStyleHeaderFooter = 139,
+    ParagraphStyleFootnote = 140,
+    ParagraphStyleLabel = 141,
+    ParagraphStyleLabelDark = 142,
 }
 
 impl PagesObjectId {
@@ -194,12 +204,110 @@ impl PagesObjectId {
     }
 }
 
-const STYLESHEET_OBJECTS: [PagesObjectId; 18] = [
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PagesParagraphStylePreset {
+    Title,
+    Subtitle,
+    Heading,
+    Heading2,
+    Heading3,
+    HeadingRed,
+    Body,
+    Caption,
+    HeaderFooter,
+    Footnote,
+    Label,
+    LabelDark,
+}
+
+impl PagesParagraphStylePreset {
+    const ALL: [Self; 12] = [
+        Self::Title,
+        Self::Subtitle,
+        Self::Heading,
+        Self::Heading2,
+        Self::Heading3,
+        Self::HeadingRed,
+        Self::Body,
+        Self::Caption,
+        Self::HeaderFooter,
+        Self::Footnote,
+        Self::Label,
+        Self::LabelDark,
+    ];
+
+    const fn object_id(self) -> PagesObjectId {
+        match self {
+            Self::Title => PagesObjectId::ParagraphStyleTitle,
+            Self::Subtitle => PagesObjectId::ParagraphStyleSubtitle,
+            Self::Heading => PagesObjectId::ParagraphStyleHeading,
+            Self::Heading2 => PagesObjectId::ParagraphStyleHeading2,
+            Self::Heading3 => PagesObjectId::ParagraphStyleHeading3,
+            Self::HeadingRed => PagesObjectId::ParagraphStyleHeadingRed,
+            Self::Body => PagesObjectId::ParagraphStyle,
+            Self::Caption => PagesObjectId::ParagraphStyleCaption,
+            Self::HeaderFooter => PagesObjectId::ParagraphStyleHeaderFooter,
+            Self::Footnote => PagesObjectId::ParagraphStyleFootnote,
+            Self::Label => PagesObjectId::ParagraphStyleLabel,
+            Self::LabelDark => PagesObjectId::ParagraphStyleLabelDark,
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Title => "Title",
+            Self::Subtitle => "Subtitle",
+            Self::Heading => "Heading",
+            Self::Heading2 => "Heading 2",
+            Self::Heading3 => "Heading 3",
+            Self::HeadingRed => "Heading Red",
+            Self::Body => "Body",
+            Self::Caption => "Caption",
+            Self::HeaderFooter => "Header & Footer",
+            Self::Footnote => "Footnote",
+            Self::Label => "Label",
+            Self::LabelDark => "Label Dark",
+        }
+    }
+
+    const fn style_identifier(self) -> &'static str {
+        match self {
+            Self::Title => "text-0-paragraphstyle-Title",
+            Self::Subtitle => "text-6-paragraphstyle-Subtitle",
+            Self::Heading => "text-11-paragraphstyle-Heading 1",
+            Self::Heading2 => "text-12-paragraphstyle-Heading 2",
+            Self::Heading3 => "text-13-paragraphstyle-Heading 3",
+            Self::HeadingRed => "text-14-paragraphstyle-Heading 4",
+            Self::Body => PARAGRAPH_STYLE_IDENTIFIER,
+            Self::Caption => "text-26-paragraphstyle-Caption 3",
+            Self::HeaderFooter => "text-29-paragraphstyle-Header & Footer",
+            Self::Footnote => "text-31-paragraphstyle-Footnote Text",
+            Self::Label => "text-32-paragraphstyle-Label",
+            Self::LabelDark => "text-33-paragraphstyle-Label Dark",
+        }
+    }
+}
+
+const LAST_PARAGRAPH_STYLE_OBJECT_ID: u64 =
+    PagesParagraphStylePreset::LabelDark.object_id().value();
+
+const STYLESHEET_OBJECTS: [PagesObjectId; 29] = [
     PagesObjectId::Stylesheet,
     PagesObjectId::ListStyle,
     PagesObjectId::BulletListStyle,
     PagesObjectId::NumberedListStyle,
+    PagesObjectId::ParagraphStyleTitle,
+    PagesObjectId::ParagraphStyleSubtitle,
+    PagesObjectId::ParagraphStyleHeading,
+    PagesObjectId::ParagraphStyleHeading2,
+    PagesObjectId::ParagraphStyleHeading3,
+    PagesObjectId::ParagraphStyleHeadingRed,
     PagesObjectId::ParagraphStyle,
+    PagesObjectId::ParagraphStyleCaption,
+    PagesObjectId::ParagraphStyleHeaderFooter,
+    PagesObjectId::ParagraphStyleFootnote,
+    PagesObjectId::ParagraphStyleLabel,
+    PagesObjectId::ParagraphStyleLabelDark,
     PagesObjectId::CharacterStyle,
     PagesObjectId::LineStyle,
     PagesObjectId::ShapeStyle,
@@ -231,9 +339,56 @@ const DOCUMENT_OBJECTS: [PagesObjectId; 13] = [
     PagesObjectId::FooterFirst,
 ];
 
-const IDENTIFIED_STYLES: [(PagesObjectId, &str); 14] = [
+const IDENTIFIED_STYLES: [(PagesObjectId, &str); 25] = [
     (PagesObjectId::ListStyle, LIST_STYLE_IDENTIFIER),
-    (PagesObjectId::ParagraphStyle, PARAGRAPH_STYLE_IDENTIFIER),
+    (
+        PagesObjectId::ParagraphStyleTitle,
+        PagesParagraphStylePreset::Title.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleSubtitle,
+        PagesParagraphStylePreset::Subtitle.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleHeading,
+        PagesParagraphStylePreset::Heading.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleHeading2,
+        PagesParagraphStylePreset::Heading2.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleHeading3,
+        PagesParagraphStylePreset::Heading3.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleHeadingRed,
+        PagesParagraphStylePreset::HeadingRed.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyle,
+        PagesParagraphStylePreset::Body.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleCaption,
+        PagesParagraphStylePreset::Caption.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleHeaderFooter,
+        PagesParagraphStylePreset::HeaderFooter.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleFootnote,
+        PagesParagraphStylePreset::Footnote.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleLabel,
+        PagesParagraphStylePreset::Label.style_identifier(),
+    ),
+    (
+        PagesObjectId::ParagraphStyleLabelDark,
+        PagesParagraphStylePreset::LabelDark.style_identifier(),
+    ),
     (PagesObjectId::CharacterStyle, CHARACTER_STYLE_IDENTIFIER),
     (PagesObjectId::LineStyle, LINE_STYLE_IDENTIFIER),
     (PagesObjectId::ShapeStyle, SHAPE_STYLE_IDENTIFIER),
@@ -536,10 +691,11 @@ fn document_archive(
                     CHARACTER_STYLE_PRESET_COUNT,
                     PagesObjectId::CharacterStyle,
                 ),
-                paragraph_style_presets: repeated_reference(
-                    PARAGRAPH_STYLE_PRESET_COUNT,
-                    PagesObjectId::ParagraphStyle,
-                ),
+                paragraph_style_presets: PagesParagraphStylePreset::ALL
+                    .into_iter()
+                    .map(PagesParagraphStylePreset::object_id)
+                    .map(reference)
+                    .collect(),
                 dropcap_style_presets: repeated_reference(
                     DROP_CAP_STYLE_PRESET_COUNT,
                     PagesObjectId::DropCapStyle,
@@ -563,6 +719,33 @@ fn document_archive(
             }),
         },
     );
+    let theme_references = [
+        PagesObjectId::Stylesheet,
+        PagesObjectId::ListStyle,
+        PagesObjectId::BulletListStyle,
+        PagesObjectId::NumberedListStyle,
+    ]
+    .into_iter()
+    .chain(
+        PagesParagraphStylePreset::ALL
+            .into_iter()
+            .map(PagesParagraphStylePreset::object_id),
+    )
+    .chain([
+        PagesObjectId::CharacterStyle,
+        PagesObjectId::LineStyle,
+        PagesObjectId::ShapeStyle,
+        PagesObjectId::TextBoxStyle,
+        PagesObjectId::ImageStyle,
+        PagesObjectId::MovieStyle,
+        PagesObjectId::DrawingLineStyle,
+        PagesObjectId::TocEntryStyle,
+        PagesObjectId::TocSettings,
+        PagesObjectId::DropCapStyle,
+        PagesObjectId::CaptionStyle,
+        PagesObjectId::SvgImportStyle,
+    ])
+    .collect::<Vec<_>>();
 
     let mut objects = vec![
         object(
@@ -581,23 +764,7 @@ fn document_archive(
             PagesObjectId::Theme,
             PagesMessageType::Theme,
             theme.encode()?,
-            &[
-                PagesObjectId::Stylesheet,
-                PagesObjectId::ListStyle,
-                PagesObjectId::ParagraphStyle,
-                PagesObjectId::CharacterStyle,
-                PagesObjectId::LineStyle,
-                PagesObjectId::ShapeStyle,
-                PagesObjectId::TextBoxStyle,
-                PagesObjectId::ImageStyle,
-                PagesObjectId::MovieStyle,
-                PagesObjectId::DrawingLineStyle,
-                PagesObjectId::TocEntryStyle,
-                PagesObjectId::TocSettings,
-                PagesObjectId::DropCapStyle,
-                PagesObjectId::CaptionStyle,
-                PagesObjectId::SvgImportStyle,
-            ],
+            &theme_references,
         )?,
         object(
             PagesObjectId::Body,
@@ -785,16 +952,6 @@ fn stylesheet_archive() -> Result<Archive> {
             &[PagesObjectId::Stylesheet],
         )?,
         object(
-            PagesObjectId::ParagraphStyle,
-            PagesMessageType::ParagraphStyle,
-            tswp::ParagraphStyleArchive {
-                super_: style("Body", PARAGRAPH_STYLE_IDENTIFIER),
-                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
-                ..Default::default()
-            },
-            &[PagesObjectId::Stylesheet],
-        )?,
-        object(
             PagesObjectId::CharacterStyle,
             PagesMessageType::CharacterStyle,
             tswp::CharacterStyleArchive {
@@ -935,6 +1092,18 @@ fn stylesheet_archive() -> Result<Archive> {
             &[PagesObjectId::Stylesheet],
         )?,
     ]);
+    for preset in PagesParagraphStylePreset::ALL {
+        objects.push(object(
+            preset.object_id(),
+            PagesMessageType::ParagraphStyle,
+            tswp::ParagraphStyleArchive {
+                super_: style(preset.name(), preset.style_identifier()),
+                override_count: Some(DEFAULT_STYLE_OVERRIDE_COUNT),
+                ..Default::default()
+            },
+            &[PagesObjectId::Stylesheet],
+        )?);
+    }
     objects.push(preset_style_object(
         PagesObjectId::BulletListStyle.value(),
         PagesObjectId::Stylesheet.value(),
@@ -1038,7 +1207,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity, has_initial_table: bool) -
     components.push(document);
 
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: PagesObjectId::NumberedListStyle.value(),
+        last_object_identifier: LAST_PARAGRAPH_STYLE_OBJECT_ID,
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(INITIAL_REVISION_SEQUENCE),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -1504,7 +1673,82 @@ mod tests {
         );
         assert_eq!(
             crate::package_metadata::package_last_object_identifier(&package).unwrap(),
-            Some(PagesObjectId::NumberedListStyle.value())
+            Some(LAST_PARAGRAPH_STYLE_OBJECT_ID)
+        );
+    }
+
+    #[test]
+    fn generated_theme_exposes_unique_native_paragraph_style_catalog() {
+        let package = PagesDocumentBuilder::new().build_package().unwrap();
+        let styles = crate::text::paragraph_alignment::native::named_paragraph_styles(
+            &package,
+            PagesObjectId::ParagraphStyle.value(),
+        )
+        .unwrap();
+        assert_eq!(
+            styles
+                .iter()
+                .map(crate::text::NamedParagraphStyle::name)
+                .collect::<Vec<_>>(),
+            [
+                "Title",
+                "Subtitle",
+                "Heading",
+                "Heading 2",
+                "Heading 3",
+                "Heading Red",
+                "Body",
+                "Caption",
+                "Header & Footer",
+                "Footnote",
+                "Label",
+                "Label Dark",
+            ]
+        );
+        assert_eq!(
+            styles
+                .iter()
+                .map(|style| style.id().get())
+                .collect::<Vec<_>>(),
+            PagesParagraphStylePreset::ALL
+                .into_iter()
+                .map(PagesParagraphStylePreset::object_id)
+                .map(PagesObjectId::value)
+                .collect::<Vec<_>>()
+        );
+
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        let stylesheet = tss::StylesheetArchive::decode(
+            stylesheet
+                .object(PagesObjectId::Stylesheet.value())
+                .unwrap()
+                .messages
+                .first()
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert!(PagesParagraphStylePreset::ALL.into_iter().all(|preset| {
+            stylesheet.identifier_to_style_map.iter().any(|entry| {
+                entry.identifier == preset.style_identifier()
+                    && entry.style.identifier == preset.object_id().value()
+            })
+        }));
+
+        let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
+        let theme_references = &document
+            .object(PagesObjectId::Theme.value())
+            .unwrap()
+            .archive_info
+            .message_infos[0]
+            .object_references;
+        assert!(
+            PagesParagraphStylePreset::ALL
+                .into_iter()
+                .map(PagesParagraphStylePreset::object_id)
+                .map(PagesObjectId::value)
+                .all(|identifier| theme_references.contains(&identifier))
         );
     }
 

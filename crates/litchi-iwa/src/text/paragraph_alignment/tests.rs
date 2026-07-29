@@ -45,7 +45,20 @@ fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
         .unwrap();
     assert_eq!(
         styles.iter().map(|style| style.name()).collect::<Vec<_>>(),
-        ["Body"]
+        [
+            "Title",
+            "Subtitle",
+            "Heading",
+            "Heading 2",
+            "Heading 3",
+            "Heading Red",
+            "Body",
+            "Caption",
+            "Header & Footer",
+            "Footnote",
+            "Label",
+            "Label Dark",
+        ]
     );
     let body = styles.iter().find(|style| style.name() == "Body").unwrap();
     let expected = ParagraphFollowingStyle::Named(body.id());
@@ -168,7 +181,10 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
         .unwrap();
     let body = pages
         .text_box_named_paragraph_styles(pages_box.drawable_object_id)
-        .unwrap()[0]
+        .unwrap()
+        .into_iter()
+        .find(|style| style.name() == "Body")
+        .unwrap()
         .id();
     let initial_pages = pages.to_bytes().unwrap();
     let created = pages
@@ -218,7 +234,21 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
             .iter()
             .map(|style| style.name())
             .collect::<Vec<_>>(),
-        ["Body", "Litchi Display"]
+        [
+            "Title",
+            "Subtitle",
+            "Heading",
+            "Heading 2",
+            "Heading 3",
+            "Heading Red",
+            "Body",
+            "Caption",
+            "Header & Footer",
+            "Footnote",
+            "Label",
+            "Label Dark",
+            "Litchi Display",
+        ]
     );
     let mut pages = pages;
     pages
