@@ -30,16 +30,19 @@ enum SheetDrawableClone {
     Audio {
         drawable_id: u64,
     },
+    Movie {
+        drawable_id: u64,
+    },
 }
 
 impl NumbersEditor {
     /// Duplicate a populated sheet immediately after its source.
     ///
     /// Sheet settings and unknown wire fields are retained. Populated tables,
-    /// local formula dependency graphs, ordinary text boxes, images, shapes, and audio
-    /// receive fresh object identities. Image assets and shape styles remain
-    /// shared, as do audio assets, matching Numbers, while writable object
-    /// storage is independent.
+    /// local formula dependency graphs, ordinary text boxes, images, shapes,
+    /// audio, and movies receive fresh object identities. Image, audio, and
+    /// movie assets and shape styles remain shared, matching Numbers, while
+    /// writable object storage is independent.
     /// Unsupported drawable kinds and cross-table formula edges are rejected
     /// transactionally.
     pub fn duplicate_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
@@ -161,6 +164,14 @@ impl NumbersEditor {
                     )?;
                     cloned_drawable_ids.push(cloned.drawable_object_id);
                 },
+                SheetDrawableClone::Movie { drawable_id } => {
+                    let cloned = working.duplicate_sheet_movie_to_sheet(
+                        sheet_id,
+                        drawable_id,
+                        new_sheet_id,
+                    )?;
+                    cloned_drawable_ids.push(cloned.drawable_object_id);
+                },
             }
         }
 
@@ -223,6 +234,11 @@ fn classify_sheet_drawables(
         .into_iter()
         .map(|audio| audio.drawable_object_id)
         .collect::<HashSet<_>>();
+    let movies = editor
+        .sheet_movies(sheet_id)?
+        .into_iter()
+        .map(|movie| movie.drawable_object_id)
+        .collect::<HashSet<_>>();
 
     sheet
         .drawable_infos
@@ -256,8 +272,13 @@ fn classify_sheet_drawables(
                     drawable_id: reference.identifier,
                 });
             }
+            if movies.contains(&reference.identifier) {
+                return Ok(SheetDrawableClone::Movie {
+                    drawable_id: reference.identifier,
+                });
+            }
             Err(Error::ParseError(format!(
-                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table, ordinary text box, image, shape, or audio",
+                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table, ordinary text box, image, shape, audio, or movie",
                 reference.identifier
             )))
         })
@@ -386,6 +407,7 @@ mod tests {
     use super::*;
     use crate::numbers::{
         NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
+        NumbersSheetMovieOptions,
     };
     use crate::shapes::{
         DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill, ShapePreset,
@@ -393,8 +415,20 @@ mod tests {
     use crate::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsheet-duplicate-audio";
+    const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  sheet-duplicate-movie";
+    const MOVIE_POSTER: &[u8] = b"\x89PNG\r\n\x1a\nsheet-duplicate-movie-poster";
     const AUDIO_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
     const MOVED_AUDIO_POSITION: DrawablePoint = DrawablePoint { x: 510.0, y: 225.0 };
+    const MOVIE_POSITION: DrawablePoint = DrawablePoint { x: 320.0, y: 210.0 };
+    const MOVIE_SIZE: DrawableSize = DrawableSize {
+        width: 320.0,
+        height: 180.0,
+    };
+    const MOVIE_NATURAL_SIZE: DrawableSize = DrawableSize {
+        width: 640.0,
+        height: 360.0,
+    };
+    const MOVED_MOVIE_POSITION: DrawablePoint = DrawablePoint { x: 480.0, y: 290.0 };
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 84.0, y: 126.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
         width: 320.0,
@@ -409,6 +443,131 @@ mod tests {
     const MOVED_SHAPE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
     const SOURCE_SHAPE_FILL: ShapeFill = ShapeFill::Solid(RgbaColor::black());
     const COPIED_SHAPE_FILL: ShapeFill = ShapeFill::None;
+
+    #[test]
+    fn source_built_movie_sheet_duplicates_with_native_shared_asset_semantics() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Movie")
+            .build()
+            .unwrap();
+        let source_sheet = editor.sheets().unwrap().remove(0);
+        let source = editor
+            .add_sheet_movie(
+                source_sheet.object_id,
+                "probe.mov",
+                MOVIE,
+                "probe.png",
+                MOVIE_POSTER,
+                NumbersSheetMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, Duration::from_secs(8))
+                    .with_natural_size(MOVIE_NATURAL_SIZE),
+            )
+            .unwrap();
+        editor
+            .set_sheet_movie_title(
+                source_sheet.object_id,
+                source.drawable_object_id,
+                "Native movie title",
+            )
+            .unwrap();
+        editor
+            .set_sheet_movie_caption(
+                source_sheet.object_id,
+                source.drawable_object_id,
+                "Native movie caption",
+            )
+            .unwrap();
+
+        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+
+        assert_eq!(duplicate.index, 1);
+        assert_eq!(duplicate.name, "Movie-1");
+        let copied = editor.sheet_movies(duplicate.object_id).unwrap().remove(0);
+        assert_ne!(copied.drawable_object_id, source.drawable_object_id);
+        assert_eq!(copied.sheet_id, duplicate.object_id);
+        assert_eq!(copied.geometry, source.geometry);
+        assert_eq!(copied.original_size, source.original_size);
+        assert_eq!(copied.natural_size, source.natural_size);
+        assert_eq!(copied.duration, source.duration);
+        assert_eq!(copied.movie_data_identifier, source.movie_data_identifier);
+        assert_eq!(
+            copied.poster_image_data_identifier,
+            source.poster_image_data_identifier
+        );
+        assert_eq!(
+            editor
+                .sheet_movie_title_caption(duplicate.object_id, copied.drawable_object_id)
+                .unwrap(),
+            crate::DrawableTitleCaption {
+                title: Some("Native movie title".to_owned()),
+                caption: Some("Native movie caption".to_owned()),
+            }
+        );
+        assert_eq!(editor.media_assets().unwrap().len(), 2);
+
+        let moved = DrawableGeometry {
+            position: Some(MOVED_MOVIE_POSITION),
+            ..copied.geometry
+        };
+        editor
+            .set_sheet_movie_geometry(duplicate.object_id, copied.drawable_object_id, moved)
+            .unwrap();
+        let copied_playback = copied
+            .playback
+            .with_loop_mode(Some(MediaLoopMode::BackAndForth))
+            .with_volume(Some(MediaVolume::new(0.4).unwrap()));
+        editor
+            .set_sheet_movie_playback_settings(
+                duplicate.object_id,
+                copied.drawable_object_id,
+                copied_playback,
+            )
+            .unwrap();
+        editor
+            .set_sheet_movie_title(
+                duplicate.object_id,
+                copied.drawable_object_id,
+                "Independent copy",
+            )
+            .unwrap();
+
+        assert_eq!(
+            editor
+                .sheet_movie_geometry(source_sheet.object_id, source.drawable_object_id)
+                .unwrap(),
+            source.geometry
+        );
+        assert_eq!(
+            editor
+                .sheet_movie_playback_settings(source_sheet.object_id, source.drawable_object_id)
+                .unwrap(),
+            source.playback
+        );
+        assert_eq!(
+            editor
+                .sheet_movie_title_caption(source_sheet.object_id, source.drawable_object_id)
+                .unwrap()
+                .title
+                .as_deref(),
+            Some("Native movie title")
+        );
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened_copy = reopened
+            .sheet_movies(duplicate.object_id)
+            .unwrap()
+            .remove(0);
+        assert_eq!(reopened_copy.geometry, moved);
+        assert_eq!(reopened_copy.playback, copied_playback);
+        assert_eq!(
+            reopened_copy.movie_data_identifier,
+            source.movie_data_identifier
+        );
+        assert_eq!(
+            reopened_copy.poster_image_data_identifier,
+            source.poster_image_data_identifier
+        );
+        assert_eq!(reopened.media_assets().unwrap().len(), 2);
+    }
 
     #[test]
     fn source_built_audio_sheet_duplicates_with_native_shared_asset_semantics() {

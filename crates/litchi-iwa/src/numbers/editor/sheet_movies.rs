@@ -77,6 +77,12 @@ pub struct RemovedNumbersSheetMovie {
     pub removed_data_identifiers: Vec<u64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MovieClonePlacement {
+    Offset,
+    Preserve,
+}
+
 impl NumbersEditor {
     /// List ordinary file-backed movies owned directly by one reachable sheet.
     pub fn sheet_movies(&self, sheet_id: u64) -> Result<Vec<NumbersSheetMovieInfo>> {
@@ -373,10 +379,46 @@ impl NumbersEditor {
         sheet_id: u64,
         source_drawable_object_id: u64,
     ) -> Result<NumbersSheetMovieInfo> {
-        let source = movie_graph(self, sheet_id, source_drawable_object_id)?;
+        self.clone_sheet_movie(
+            sheet_id,
+            source_drawable_object_id,
+            sheet_id,
+            MovieClonePlacement::Offset,
+        )
+    }
+
+    pub(super) fn duplicate_sheet_movie_to_sheet(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+    ) -> Result<NumbersSheetMovieInfo> {
+        self.clone_sheet_movie(
+            source_sheet_id,
+            source_drawable_object_id,
+            target_sheet_id,
+            MovieClonePlacement::Preserve,
+        )
+    }
+
+    fn clone_sheet_movie(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+        placement: MovieClonePlacement,
+    ) -> Result<NumbersSheetMovieInfo> {
+        let source = movie_graph(self, source_sheet_id, source_drawable_object_id)?;
+        let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
+        if target_archive_name != source.archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers movie source and target sheets must share a component: {} != {target_archive_name}",
+                source.archive_name
+            )));
+        }
         let mut staged = self.package.clone();
         let first_identifier = next_object_identifier(&staged)?;
-        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        let mut remap = HashMap::with_capacity(source.object_ids.len() + 1);
         for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
             let offset = u64::try_from(offset)
                 .map_err(|_| Error::ParseError("Numbers movie graph is too large".to_owned()))?;
@@ -384,6 +426,13 @@ impl NumbersEditor {
                 .checked_add(offset)
                 .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
             remap.insert(identifier, replacement);
+        }
+        if source_sheet_id != target_sheet_id
+            && remap.insert(source_sheet_id, target_sheet_id).is_some()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers movie graph unexpectedly owns source sheet {source_sheet_id}"
+            )));
         }
 
         for identifier in &source.object_ids {
@@ -402,12 +451,17 @@ impl NumbersEditor {
         let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Numbers movie clone has no drawable identifier".to_owned())
         })?;
-        let geometry = offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        let geometry = match placement {
+            MovieClonePlacement::Offset => {
+                offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?
+            },
+            MovieClonePlacement::Preserve => source.info.geometry,
+        };
         set_movie_geometry(&mut staged, &source.archive_name, new_drawable_id, geometry)?;
         patch_numbers_sheet_drawable_reference(
             &mut staged,
             &source.archive_name,
-            source.sheet_id,
+            target_sheet_id,
             None,
             Some(new_drawable_id),
         )?;
@@ -444,13 +498,13 @@ impl NumbersEditor {
 
         let verified = Self::from_package(staged)?;
         let created = verified
-            .sheet_movies(sheet_id)?
+            .sheet_movies(target_sheet_id)?
             .into_iter()
             .find(|movie| movie.drawable_object_id == new_drawable_id)
             .ok_or_else(|| {
                 Error::InvalidFormat("Numbers movie duplication failed validation".to_owned())
             })?;
-        let created_graph = movie_graph(&verified, sheet_id, new_drawable_id)?;
+        let created_graph = movie_graph(&verified, target_sheet_id, new_drawable_id)?;
         let expected_data_references = source
             .data_references
             .iter()
@@ -463,7 +517,7 @@ impl NumbersEditor {
                 Ok((data_identifier, new_object_identifier))
             })
             .collect::<Result<Vec<_>>>()?;
-        if created.sheet_id != source.info.sheet_id
+        if created.sheet_id != target_sheet_id
             || created.movie_data_identifier != source.info.movie_data_identifier
             || created.poster_image_data_identifier != source.info.poster_image_data_identifier
             || created.geometry != geometry
