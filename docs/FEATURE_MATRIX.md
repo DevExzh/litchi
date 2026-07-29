@@ -394,6 +394,7 @@ conversion, fonts, and image conversion are optional.
 | Embedded OLE objects | ✅ | ✅ | ✅ | Add, remove, reorder, and preserve package storages; payloads remain inert |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
 | Smart tags | ✅ | ✅ | ✅ | PowerPoint 11 smart-tag stores use the shared bounded MS-OSHARED property-bag codec; typed authoring writes deduplicated Unicode type/string tables in the document `___PPT11` extension and validated `StyleTextProp9`/`StyleTextProp11` shape-run mappings, including coexistence with other client data; recognizers, download URLs, and schemas remain inert |
+| Programmable tags | ✅ | ✅ | ✅ | Typed inert document- and slide-level `ProgTags`/`ProgBinaryTag` containers (MS-PPT 2.4.23.1–2.4.23.4, 2.5.19–2.5.22): string tags, versioned binary-tag blobs validated as strict record sequences and retained byte-for-byte, scope-aware version classification (`___PPT9`–`___PPT12`, with `___PPT11` unknown at slide scope), duplicate-versioned-tag rejection including after mutation, and byte-exact round trips; unknown tags are preserved without interpretation and tag payloads are never executed |
 | Presentation settings/metadata | ✅ | ✅ | ✅ | Slide-show, print, HTML publish, broadcast, envelope, routing, and privacy metadata |
 | Modify password/protection | ✅ | ✅ | ✅ | Password and protection metadata; policy is not enforced |
 | Password encryption | ✅ | ✅ | ✅ | Supported PPT encryption profiles |
@@ -462,6 +463,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Repeated and merged cells/rows | ✅ | ✅ | ✅ | Semantic expansion and deterministic serialization; the full-width/full-height blank padding every ODF producer emits is deferred rather than materialized, so interior runs still expand where real content follows and trailing runs are dropped up to a bounded number of authored empty rows |
 | Styles and full cell formatting | ✅ | ✅ | ✅ | Text, alignment, borders, backgrounds, number/data styles, protection styles, and read-only named fill-image/gradient/hatch/marker/opacity/stroke-dash inspection; no link following, style-use resolution, or rendering |
 | Conditional cell styles | ✅ | ✅ | ✅ | ODF style-map conditions and ordered mutation; not the full Excel rule family |
+| Sheet conditional formatting | ✅ | ✅ | ✅ | LibreOffice `calcext:conditional-formats` extension parsing and authoring: typed inert condition expressions, apply-style references, base-cell addresses, and multi-range targets with spoof-rejecting namespace verification and builder/mutable create/replace/remove round trips; `calcext:color-scale`/`data-bar`/`icon-set`/`date-is` rule bodies are skipped on read |
 | Content validation | ✅ | ✅ | ✅ | Conditions, prompts, error messages, events, definitions, and cell bindings |
 | Comments/annotations | ✅ | ✅ | ✅ | Rich text/lists, creator/date, geometry, extensions, and CRUD |
 | Hyperlinks | ✅ | ✅ | ✅ | Typed inert `text:a` anchors preserve and author non-overlapping UTF-8 ranges across namespace-aware mixed paragraph trees, retaining spans, fields, whitespace, extension nodes, and XLink/office/text metadata; links are never followed |
@@ -575,6 +577,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Themes and data stores | ✅ | ✅ | ✅ | Inert theme/data-store bytes and typed mutation |
 | File table and external references | ✅ | ✅ | ✅ | Bounded inert external-file metadata; targets are never resolved |
 | XML namespaces and XSL transform metadata | ✅ | ✅ | ✅ | Namespace table, transform location/usage, and XML policies; no transform execution |
+| Custom XML markup destinations | ✅ | ✅ | ✅ | Typed inert `\xmlopen`/`\xmlclose`/`\xmlattrname`/`\xmlattrvalue` body-story markup (RTF 1.9.1): tag names, optional `\xmlnsN` namespace references validated against the parsed namespace table, ordered starred attribute pairs, content body-text ranges, proper-nesting/mismatch rejection, and writer round trips; tag names are never schema-validated or resolved |
 | Document protection and write reservations | ✅ | ✅ | ✅ | Protection controls, users, hashes, reservations, and save preferences; no policy enforcement |
 | Document/view/print/compatibility policies | ✅ | ✅ | ✅ | Typed RTF 1.9.1 settings across layout, rendering, privacy, revision, save, style, and compatibility groups |
 | Document info and generator/origin metadata | ✅ | ✅ | ✅ | Title/author/timestamps, generator, origin, caption, and revision-save metadata, with standard `\info` values bridged into the unified metadata facade |
