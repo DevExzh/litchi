@@ -162,6 +162,8 @@ fn control_symbol_text(control: &ControlWord<'_>) -> Option<&'static str> {
         ControlWord::RightToLeftMark => Some("\u{200F}"),
         ControlWord::ZeroWidthJoiner => Some("\u{200D}"),
         ControlWord::ZeroWidthNonJoiner => Some("\u{200C}"),
+        ControlWord::ZeroWidthBreakOpportunity => Some("\u{200B}"),
+        ControlWord::ZeroWidthNoBreakOpportunity => Some("\u{FEFF}"),
         _ => None,
     }
 }
@@ -346,6 +348,31 @@ struct EditableRegionSpan {
     end: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParagraphBorderSide {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    Bar,
+    Between,
+    Box,
+}
+
+impl ParagraphBorderSide {
+    const fn bit(self) -> u8 {
+        match self {
+            Self::Top => 1,
+            Self::Bottom => 2,
+            Self::Left => 4,
+            Self::Right => 8,
+            Self::Bar => 16,
+            Self::Between => 32,
+            Self::Box => 64,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum ParsedBodyStoryEvent {
     Resolved(crate::BodyStoryEvent),
@@ -367,6 +394,10 @@ struct State {
     character_border_seen: u8,
     /// Current paragraph properties
     paragraph: Paragraph,
+    /// Border segment currently collecting properties (`\brdrt`, `\box`, ...).
+    paragraph_border_side: Option<ParagraphBorderSide>,
+    /// Paragraph border segments already declared in this paragraph.
+    paragraph_border_seen: u8,
     /// Parsed `dropcapt` value retained independently until the pair is complete.
     drop_cap_kind: Option<crate::ParagraphDropCapKind>,
     /// Parsed `dropcapli` value retained independently until the pair is complete.
@@ -1130,6 +1161,8 @@ impl Default for State {
             character_border_active: false,
             character_border_seen: 0,
             paragraph: Paragraph::default(),
+            paragraph_border_side: None,
+            paragraph_border_seen: 0,
             drop_cap_kind: None,
             drop_cap_lines: None,
             pending_tab_alignment: None,
@@ -5187,6 +5220,47 @@ impl<'a> Parser<'a> {
                 self.record_editable_region_boundary(false)?;
                 self.pos += 1;
             },
+            ControlWord::SoftPageBreak(param) => {
+                require_parameterless(*param, "softpage")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_soft_break(crate::SoftBreakKind::Page)?;
+                self.pos += 1;
+            },
+            ControlWord::SoftColumnBreak(param) => {
+                require_parameterless(*param, "softcol")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_soft_break(crate::SoftBreakKind::Column)?;
+                self.pos += 1;
+            },
+            ControlWord::SoftLineBreak(param) => {
+                require_parameterless(*param, "softline")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_soft_break(crate::SoftBreakKind::Line)?;
+                self.pos += 1;
+            },
+            ControlWord::SoftLineHeight(param) => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                let height = param.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF softlheight requires a numeric parameter".to_string(),
+                    )
+                })?;
+                if !(-32768..=32767).contains(&height) {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF softlheight is outside -32768..=32767 twips".to_string(),
+                    ));
+                }
+                self.record_soft_break(crate::SoftBreakKind::LineHeight(height))?;
+                self.pos += 1;
+            },
             ControlWord::Section => {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
@@ -5244,7 +5318,9 @@ impl<'a> Parser<'a> {
             | ControlWord::LeftToRightMark
             | ControlWord::RightToLeftMark
             | ControlWord::ZeroWidthJoiner
-            | ControlWord::ZeroWidthNonJoiner => {
+            | ControlWord::ZeroWidthNonJoiner
+            | ControlWord::ZeroWidthBreakOpportunity
+            | ControlWord::ZeroWidthNoBreakOpportunity => {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
                 }
@@ -5492,6 +5568,23 @@ impl<'a> Parser<'a> {
         ));
         self.current_state_mut()?.paragraph_content_started = true;
         self.append_revision_text(&state, text, start, self.body_text_len)
+    }
+
+    /// Record a nonrequired (soft) break marker in the body story.
+    fn record_soft_break(&mut self, kind: crate::SoftBreakKind) -> RtfResult<()> {
+        let state = self.current_state()?;
+        if state.destination != Destination::DocumentBody || state.in_table {
+            return Err(RtfError::MalformedDocument(
+                "RTF soft-break controls are supported only in the main body story".to_string(),
+            ));
+        }
+        self.note_options_closed = true;
+        self.section_note_options_closed = true;
+        self.root_section_format_run = false;
+        self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+            crate::BodyStoryEvent::SoftBreak(crate::SoftBreak::new(kind, self.body_text_len)),
+        ));
+        Ok(())
     }
 
     fn record_body_page_break(&mut self) -> RtfResult<()> {
@@ -5781,6 +5874,17 @@ impl<'a> Parser<'a> {
             require_parameterless(*parameter, "ebcend")?;
             return Err(RtfError::MalformedDocument(
                 "RTF editable-region marks are supported only in the main body story".to_string(),
+            ));
+        }
+        if matches!(
+            control,
+            ControlWord::SoftPageBreak(_)
+                | ControlWord::SoftColumnBreak(_)
+                | ControlWord::SoftLineBreak(_)
+                | ControlWord::SoftLineHeight(_)
+        ) {
+            return Err(RtfError::MalformedDocument(
+                "RTF soft-break controls are supported only in the main body story".to_string(),
             ));
         }
         if matches!(
@@ -7702,6 +7806,10 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
+        if Self::apply_paragraph_border_control(state, control)? {
+            return Ok(());
+        }
+
         if Self::apply_paragraph_shading_control(state, control)? {
             return Ok(());
         }
@@ -7977,6 +8085,8 @@ impl<'a> Parser<'a> {
             ControlWord::Pard => {
                 // Reset to default paragraph properties
                 state.paragraph = Paragraph::default();
+                state.paragraph_border_side = None;
+                state.paragraph_border_seen = 0;
                 state.drop_cap_kind = None;
                 state.drop_cap_lines = None;
                 state.pending_tab_alignment = None;
@@ -14130,6 +14240,7 @@ impl<'a> Parser<'a> {
         use crate::BorderStyle as Style;
         Some(match control {
             ControlWord::BorderNone => Style::None,
+            ControlWord::BorderHairline => Style::Hairline,
             ControlWord::BorderSingle => Style::Single,
             ControlWord::BorderThick => Style::Thick,
             ControlWord::BorderDotted => Style::Dotted,
@@ -14329,6 +14440,7 @@ impl<'a> Parser<'a> {
         use crate::CharacterBorderStyle as Style;
         Some(match control {
             ControlWord::BorderNone => Style::None,
+            ControlWord::BorderHairline => Style::Hairline,
             ControlWord::BorderSingle => Style::Single,
             ControlWord::BorderThick => Style::Thick,
             ControlWord::BorderDotted => Style::Dotted,
@@ -14464,6 +14576,140 @@ impl<'a> Parser<'a> {
         Ok(true)
     }
 
+    fn apply_paragraph_border_side(
+        state: &mut State,
+        side: ParagraphBorderSide,
+        apply: impl Fn(&mut crate::Border) -> RtfResult<()>,
+    ) -> RtfResult<()> {
+        let borders = &mut state.paragraph.borders;
+        match side {
+            ParagraphBorderSide::Top => apply(&mut borders.top),
+            ParagraphBorderSide::Bottom => apply(&mut borders.bottom),
+            ParagraphBorderSide::Left => apply(&mut borders.left),
+            ParagraphBorderSide::Right => apply(&mut borders.right),
+            ParagraphBorderSide::Bar => apply(&mut borders.bar),
+            ParagraphBorderSide::Between => apply(&mut borders.between),
+            ParagraphBorderSide::Box => {
+                apply(&mut borders.top)?;
+                apply(&mut borders.bottom)?;
+                apply(&mut borders.left)?;
+                apply(&mut borders.right)
+            },
+        }
+    }
+
+    /// Apply a paragraph border segment or component control.
+    ///
+    /// Segment controls (`\brdrt`, `\brdrb`, `\brdrl`, `\brdrr`, `\brdrbar`,
+    /// `\brdrbtw`, `\box`) select the segment that subsequent style, width,
+    /// color, spacing, shadow, and frame controls apply to (RTF 1.9.1
+    /// paragraph borders). `\box` is normalized onto all four sides; the
+    /// `\brdrbar` and `\brdrbtw` segments are retained separately.
+    fn apply_paragraph_border_control(
+        state: &mut State,
+        control: &ControlWord<'_>,
+    ) -> RtfResult<bool> {
+        let segment = match control {
+            ControlWord::BorderTop => Some(ParagraphBorderSide::Top),
+            ControlWord::BorderBottom => Some(ParagraphBorderSide::Bottom),
+            ControlWord::BorderLeft => Some(ParagraphBorderSide::Left),
+            ControlWord::BorderRight => Some(ParagraphBorderSide::Right),
+            ControlWord::BorderBar => Some(ParagraphBorderSide::Bar),
+            ControlWord::BorderBetween => Some(ParagraphBorderSide::Between),
+            ControlWord::BorderBox => Some(ParagraphBorderSide::Box),
+            _ => None,
+        };
+        if let Some(segment) = segment {
+            let bit = segment.bit();
+            if state.paragraph_border_seen & bit != 0 {
+                return Err(RtfError::MalformedDocument(
+                    "duplicate RTF paragraph border segment".to_string(),
+                ));
+            }
+            state.paragraph_border_seen |= bit;
+            state.paragraph_border_side = Some(segment);
+            return Ok(true);
+        }
+
+        let side = state.paragraph_border_side;
+        if let Some(style) = Self::table_border_style(control) {
+            let side = side.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF paragraph border style has no segment".to_string(),
+                )
+            })?;
+            Self::apply_paragraph_border_side(state, side, |border| {
+                if border.style != crate::BorderStyle::None
+                    && style != crate::BorderStyle::None
+                {
+                    return Err(RtfError::MalformedDocument(
+                        "duplicate RTF paragraph border style".to_string(),
+                    ));
+                }
+                border.style = style;
+                Ok(())
+            })?;
+            return Ok(true);
+        }
+        let require_side = |state: &State| {
+            state.paragraph_border_side.ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF paragraph border component has no segment".to_string(),
+                )
+            })
+        };
+        match control {
+            ControlWord::BorderWidth(value) => {
+                let width = value.ok_or_else(|| {
+                    RtfError::MalformedDocument(
+                        "RTF brdrw requires a numeric parameter".to_string(),
+                    )
+                })?;
+                let side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, side, |border| {
+                    border.width = width;
+                    Ok(())
+                })?;
+                Ok(true)
+            },
+            ControlWord::BorderColor(value) => {
+                let color = Self::required_character_value(*value, "brdrcf", u16::MAX)?;
+                let side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, side, |border| {
+                    border.color_ref = color;
+                    Ok(())
+                })?;
+                Ok(true)
+            },
+            ControlWord::BorderSpace(value) => {
+                let space = Self::required_character_value(*value, "brsp", u16::MAX)?;
+                let side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, side, |border| {
+                    border.space = i32::from(space);
+                    Ok(())
+                })?;
+                Ok(true)
+            },
+            ControlWord::BorderShadow => {
+                let side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, side, |border| {
+                    border.shadow = true;
+                    Ok(())
+                })?;
+                Ok(true)
+            },
+            ControlWord::BorderFrame => {
+                let side = require_side(state)?;
+                Self::apply_paragraph_border_side(state, side, |border| {
+                    border.frame = true;
+                    Ok(())
+                })?;
+                Ok(true)
+            },
+            _ => Ok(false),
+        }
+    }
+
     fn apply_paragraph_shading_control(
         state: &mut State,
         control: &ControlWord<'_>,
@@ -14497,7 +14743,13 @@ impl<'a> Parser<'a> {
         if Self::apply_paragraph_tab_control(state, control)? {
             return Ok(());
         }
+        if Self::apply_table_decoration_control(state, control)? {
+            return Ok(());
+        }
         if Self::apply_character_decoration_control(state, control)? {
+            return Ok(());
+        }
+        if Self::apply_paragraph_border_control(state, control)? {
             return Ok(());
         }
         if Self::apply_paragraph_shading_control(state, control)? {
@@ -14742,6 +14994,8 @@ impl<'a> Parser<'a> {
             },
             ControlWord::Pard => {
                 state.paragraph = Paragraph::default();
+                state.paragraph_border_side = None;
+                state.paragraph_border_seen = 0;
                 state.drop_cap_kind = None;
                 state.drop_cap_lines = None;
                 state.pending_tab_alignment = None;

@@ -34,6 +34,8 @@ pub enum CharacterBorderStyle {
     Engraved,
     Outset,
     Inset,
+    /// Hairline border (`\brdrhair`)
+    Hairline,
 }
 
 impl CharacterBorderStyle {
@@ -65,6 +67,7 @@ impl CharacterBorderStyle {
             Self::Engraved => "brdrengrave",
             Self::Outset => "brdroutset",
             Self::Inset => "brdrinset",
+            Self::Hairline => "brdrhair",
         }
     }
 }
@@ -182,6 +185,8 @@ pub enum BorderStyle {
     Outset,
     /// Inset border (3D)
     Inset,
+    /// Hairline border (`\brdrhair`)
+    Hairline,
 }
 
 impl BorderStyle {
@@ -213,6 +218,7 @@ impl BorderStyle {
             Self::Engraved => "brdrengrave",
             Self::Outset => "brdroutset",
             Self::Inset => "brdrinset",
+            Self::Hairline => "brdrhair",
         }
     }
 }
@@ -289,6 +295,10 @@ pub struct Borders {
     pub left: Border,
     /// Right border
     pub right: Border,
+    /// Bar border at the left edge of a bordered paragraph group (`\brdrbar`).
+    pub bar: Border,
+    /// Border between consecutive paragraphs of one border group (`\brdrbtw`).
+    pub between: Border,
 }
 
 impl Borders {
@@ -306,6 +316,8 @@ impl Borders {
             bottom: border,
             left: border,
             right: border,
+            bar: Border::default(),
+            between: Border::default(),
         }
     }
 
@@ -316,6 +328,8 @@ impl Borders {
             || self.bottom.is_visible()
             || self.left.is_visible()
             || self.right.is_visible()
+            || self.bar.is_visible()
+            || self.between.is_visible()
     }
 }
 

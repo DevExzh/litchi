@@ -92,6 +92,7 @@ enum BodyEventKind<'b, 'a> {
     ProtectionRangeEnd(&'b crate::ProtectionRange<'a>),
     EditableRegionStart(&'b crate::EditableRegion<'a>),
     EditableRegionEnd(&'b crate::EditableRegion<'a>),
+    SoftBreak(crate::SoftBreak),
     AnnotationStart(&'b Annotation<'a>),
     AnnotationEnd(&'b Annotation<'a>),
     Note(&'b Note<'a>),
@@ -4905,6 +4906,9 @@ impl<W: Write> RtfWriter<W> {
                 crate::BodyStoryEvent::PageBreak(page_break) => {
                     (page_break.position, BodyEventKind::PageBreak)
                 },
+                crate::BodyStoryEvent::SoftBreak(soft_break) => {
+                    (soft_break.position, BodyEventKind::SoftBreak(soft_break))
+                },
                 crate::BodyStoryEvent::ColumnBreak(column_break) => {
                     (column_break.position, BodyEventKind::ColumnBreak)
                 },
@@ -5330,6 +5334,15 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::FormFieldEnd => self.write_str("}}"),
             BodyEventKind::GenericField(field) => self.write_field_with_fields(field, fields, 0),
             BodyEventKind::PageBreak => self.write_str("\\page "),
+            BodyEventKind::SoftBreak(soft_break) => match soft_break.kind {
+                crate::SoftBreakKind::Page => self.write_str("\\softpage "),
+                crate::SoftBreakKind::Column => self.write_str("\\softcol "),
+                crate::SoftBreakKind::Line => self.write_str("\\softline "),
+                crate::SoftBreakKind::LineHeight(height) => {
+                    self.write_control_word("softlheight", Some(height))?;
+                    self.write_str(" ")
+                },
+            },
             BodyEventKind::ColumnBreak => self.write_str("\\column "),
             BodyEventKind::SectionBreak(section) => {
                 self.write_control_word("sect", None)?;
@@ -7015,6 +7028,16 @@ impl<W: Write> RtfWriter<W> {
             self.write_border("brdrr", &borders.right)?;
         }
 
+        // Bar border
+        if borders.bar.is_visible() {
+            self.write_border("brdrbar", &borders.bar)?;
+        }
+
+        // Between border
+        if borders.between.is_visible() {
+            self.write_border("brdrbtw", &borders.between)?;
+        }
+
         Ok(())
     }
 
@@ -7050,6 +7073,7 @@ impl<W: Write> RtfWriter<W> {
             BorderStyle::Engraved => "brdrengrave",
             BorderStyle::Outset => "brdroutset",
             BorderStyle::Inset => "brdrinset",
+            BorderStyle::Hairline => "brdrhair",
         };
         self.write_control_word(style_word, None)?;
 
@@ -7064,6 +7088,16 @@ impl<W: Write> RtfWriter<W> {
         // Border space
         if border.space != 0 {
             self.write_control_word("brsp", Some(border.space))?;
+        }
+
+        // Border shadow
+        if border.shadow {
+            self.write_control_word("brdrsh", None)?;
+        }
+
+        // Border frame
+        if border.frame {
+            self.write_control_word("brdrframe", None)?;
         }
 
         Ok(())
@@ -8006,6 +8040,8 @@ impl<W: Write> RtfWriter<W> {
                 '\u{200F}' => self.write_str("\\rtlmark ")?,
                 '\u{200D}' => self.write_str("\\zwj ")?,
                 '\u{200C}' => self.write_str("\\zwnj ")?,
+                '\u{200B}' => self.write_str("\\zwbo ")?,
+                '\u{FEFF}' => self.write_str("\\zwnbo ")?,
                 // Readers discard raw carriage returns and other bare control
                 // bytes as line-ending noise, so emit them as hex escapes to keep
                 // them part of the document text.

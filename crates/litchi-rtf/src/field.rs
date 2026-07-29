@@ -124,6 +124,39 @@ impl ColumnBreak {
     }
 }
 
+/// Kind of a nonrequired (soft) break marker.
+///
+/// RTF 1.9.1 defines `\softpage`, `\softcol`, `\softline`, and
+/// `\softlheightN`, which record where the producer's layout broke a page,
+/// column, or line (emitted as they appear in Galley view). The markers are
+/// passive layout metadata only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SoftBreakKind {
+    /// Nonrequired page break (`\softpage`).
+    Page,
+    /// Nonrequired column break (`\softcol`).
+    Column,
+    /// Nonrequired line break (`\softline`).
+    Line,
+    /// Nonrequired line height in twips (`\softlheightN`).
+    LineHeight(i32),
+}
+
+/// A zero-width nonrequired break marker at a UTF-8 story boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SoftBreak {
+    /// Marker kind.
+    pub kind: SoftBreakKind,
+    /// UTF-8 byte offset in the document body text.
+    pub position: usize,
+}
+
+impl SoftBreak {
+    pub const fn new(kind: SoftBreakKind, position: usize) -> Self {
+        Self { kind, position }
+    }
+}
+
 /// A zero-width explicit `\sect` control at a UTF-8 main-story boundary.
 ///
 /// `next_section` identifies the typed section definition that starts after
@@ -174,6 +207,7 @@ pub enum BodyStoryEvent {
     ProtectionRangeEnd(usize),
     EditableRegionStart(usize),
     EditableRegionEnd(usize),
+    SoftBreak(SoftBreak),
 }
 
 /// A generic field reference embedded in a non-body text story.

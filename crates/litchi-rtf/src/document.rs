@@ -3455,6 +3455,17 @@ impl<'a> RtfDocument<'a> {
         })
     }
 
+    /// Nonrequired (soft) break markers in body source order.
+    ///
+    /// The markers are passive Galley-view layout metadata; no pagination is
+    /// computed from them.
+    pub fn soft_breaks(&self) -> impl Iterator<Item = &crate::SoftBreak> {
+        self.body_story_events.iter().filter_map(|event| match event {
+            crate::BodyStoryEvent::SoftBreak(soft_break) => Some(soft_break),
+            _ => None,
+        })
+    }
+
     /// Explicit main-story section boundaries in source order.
     ///
     /// A boundary with `next_section == None` starts an inherited section that
@@ -3999,6 +4010,7 @@ impl<'a> RtfDocument<'a> {
                 tag.position.checked_add(tag.content.len())?
             },
             crate::BodyStoryEvent::MathZone(index) => self.math_zones.get(index)?.position,
+            crate::BodyStoryEvent::SoftBreak(soft_break) => soft_break.position,
             crate::BodyStoryEvent::ProtectionRangeStart(index) => {
                 self.protection_ranges.get(index)?.position
             },
