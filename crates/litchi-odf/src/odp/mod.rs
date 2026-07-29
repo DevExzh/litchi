@@ -36,14 +36,15 @@
 //! - ✅ Modern and legacy animation-tree creation and namespace-preserving round trips
 //! - ✅ Package-contained audio/video embedding and mutable preservation
 //! - ✅ Shape hyperlink/action creation and inert round trips
+//! - ✅ Page-layout and master-page CRUD with slide assignment
+//! - ✅ Embedded chart open/add/replace/remove
+//! - ✅ Unmodeled `draw:*`, `svg:*`, and `dr3d:*` shape attributes preserved
+//!   losslessly (gradients, shadows, and 3D effects survive round trips)
 //!
 //! ## 🚧 TODO - Advanced Features
-//! - ⚠️ Custom slide layouts
-//! - ⚠️ Advanced shape properties (gradients, shadows, 3D effects)
-//! - ⚠️ Slide master editing
-//! - ⚠️ SmartArt/diagrams
-//! - ⚠️ Embedded charts
-//! - ⚠️ Presentation protection
+//!
+//! (None currently tracked. SmartArt is an OOXML-only feature and ODF
+//! presentations have no document-protection mechanism.)
 //!
 //! # References
 //! - ODF Specification: §10 (Presentation Content)

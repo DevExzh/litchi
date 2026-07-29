@@ -165,27 +165,26 @@
 //! - ✅ Modern and legacy animation-tree creation and namespace-preserving round trips
 //! - ✅ Package-contained audio/video embedding and mutable preservation
 //! - ✅ Shape hyperlink/action creation and inert round trips
+//! - ✅ Page-layout and master-page CRUD with slide assignment
+//! - ✅ Embedded chart open/add/replace/remove
 //! - ✅ Save to file or bytes
 //!
-//! ### TODO - Advanced Features
-//! - ⚠️ Custom slide layouts
-//! - ⚠️ Advanced shape properties
-//! - ⚠️ Slide master manipulation
-//!
-//! ## ✅ ODG - Drawings (READ-ONLY SEMANTIC MODEL)
+//! ## ✅ ODG - Drawings (READING AND WRITING)
 //!
 //! - ✅ Open drawings and drawing templates from paths, readers, or bytes
 //! - ✅ Namespace-aware page and standard 2D shape parsing
 //! - ✅ Nested groups, exact geometry attributes, and inert enhanced geometry
 //! - ✅ Text extraction, metadata, and package-contained media access
+//! - ✅ `DrawingBuilder`/`MutableDrawing` page, layer, and shape authoring
 //! - ✅ Lossless unmodified saving with exact original-byte retention
 //!
-//! ## ✅ ODC - Standalone Charts (READ-ONLY SEMANTIC MODEL)
+//! ## ✅ ODC - Standalone Charts (SEMANTIC MODEL AND AUTHORING)
 //!
 //! - ✅ Open charts and chart templates from paths, readers, or bytes
 //! - ✅ Namespace-aware complete chart subtree and expanded attributes
 //! - ✅ Titles, legends, plot areas, axes, series, domains, data points, and analytics nodes
 //! - ✅ Embedded cached tables and vendor extension elements
+//! - ✅ `ChartDefinition`-driven chart creation and axis/series mutation
 //! - ✅ Metadata and lossless exact original-byte saving
 //!
 //! ## ✅ ODF - Formula Documents (SEMANTIC MODEL AND VALIDATED PACKAGE CONSTRUCTION)

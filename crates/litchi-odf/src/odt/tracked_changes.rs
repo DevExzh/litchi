@@ -22,7 +22,7 @@ impl TrackedChanges {
     /// Validate a manually constructed tracked-change declaration table.
     ///
     /// This validates the declaration metadata only. Range markers remain part of
-    /// the surrounding document and are correlated by [`Document::tracked_changes`]
+    /// the surrounding document and are correlated by [`crate::Document::tracked_changes`]
     /// when parsing a complete document.
     pub fn validate(&self) -> Result<()> {
         if self.changes.len() > MAX_CHANGES {
