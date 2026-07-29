@@ -9,17 +9,26 @@
 //! ranges.
 //!
 //! Litchi parses and stores this metadata as typed data only: sparklines are
-//! never rendered, and cell and range addresses are never resolved. The
-//! `calcext:sparkline-*-complex-color` theme-color children (which carry
-//! `loext:*` attributes) are not modeled and are skipped on read.
+//! never rendered, cell and range addresses are never resolved, and the
+//! `loext:*` theme-color families of the `calcext:sparkline-*-complex-color`
+//! children are never resolved against a theme.
 
 use super::structure::validate_cell_range_addresses;
 use litchi_core::{Error, Result, xml::escape_xml};
+
+/// Namespace URI of the LibreOffice `loext` extension used by theme colors.
+pub(crate) const LOEXT_NAMESPACE_URI: &str =
+    "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
+/// Namespace declaration written on each complex-color element.
+const LOEXT_NAMESPACE_DECLARATION: &str =
+    " xmlns:loext=\"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0\"";
 
 /// Most sparkline groups one sheet may declare.
 pub(crate) const MAX_SPARKLINE_GROUPS_PER_SHEET: usize = 16_384;
 /// Most sparklines one group may contain.
 pub(crate) const MAX_SPARKLINES_PER_GROUP: usize = 65_536;
+/// Most `loext:transformation` children one complex color may carry.
+pub(crate) const MAX_COLOR_TRANSFORMATIONS: usize = 64;
 /// Largest accepted length of any single lexical attribute value.
 pub(crate) const MAX_SPARKLINE_ATTRIBUTE_BYTES: usize = 64 * 1024;
 
@@ -138,8 +147,8 @@ pub struct SparklineFlags {
 
 /// Optional `#RRGGBB` color slots of a sparkline group.
 ///
-/// Colors are never rendered by litchi. The `calcext:sparkline-*-complex-color`
-/// theme-based counterparts are not modeled.
+/// Colors are never rendered by litchi. Theme-based colors are modeled
+/// separately by [`SparklineComplexColors`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SparklineColors {
     /// Series color (`calcext:color-series`).
@@ -158,6 +167,216 @@ pub struct SparklineColors {
     pub high: Option<String>,
     /// Lowest-point color (`calcext:color-low`).
     pub low: Option<String>,
+}
+
+/// The theme color family of a complex color (`loext:theme-type`).
+///
+/// The family names follow the OOXML theme slots LibreOffice mirrors; litchi
+/// never resolves them against a theme.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ThemeColorType {
+    Dark1,
+    Light1,
+    Dark2,
+    Light2,
+    Accent1,
+    Accent2,
+    Accent3,
+    Accent4,
+    Accent5,
+    Accent6,
+    Hyperlink,
+    FollowedHyperlink,
+}
+
+impl ThemeColorType {
+    pub(crate) fn parse(value: &str) -> Result<Self> {
+        Ok(match value {
+            "dark1" => Self::Dark1,
+            "light1" => Self::Light1,
+            "dark2" => Self::Dark2,
+            "light2" => Self::Light2,
+            "accent1" => Self::Accent1,
+            "accent2" => Self::Accent2,
+            "accent3" => Self::Accent3,
+            "accent4" => Self::Accent4,
+            "accent5" => Self::Accent5,
+            "accent6" => Self::Accent6,
+            "hyperlink" => Self::Hyperlink,
+            "followed-hyperlink" => Self::FollowedHyperlink,
+            _ => {
+                return Err(Error::InvalidFormat(format!(
+                    "invalid loext:theme-type value '{value}'"
+                )));
+            },
+        })
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Dark1 => "dark1",
+            Self::Light1 => "light1",
+            Self::Dark2 => "dark2",
+            Self::Light2 => "light2",
+            Self::Accent1 => "accent1",
+            Self::Accent2 => "accent2",
+            Self::Accent3 => "accent3",
+            Self::Accent4 => "accent4",
+            Self::Accent5 => "accent5",
+            Self::Accent6 => "accent6",
+            Self::Hyperlink => "hyperlink",
+            Self::FollowedHyperlink => "followed-hyperlink",
+        }
+    }
+}
+
+/// The kind of a color transformation (`loext:type`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ColorTransformationType {
+    Tint,
+    Shade,
+    LumMod,
+    LumOff,
+}
+
+impl ColorTransformationType {
+    pub(crate) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "tint" => Ok(Self::Tint),
+            "shade" => Ok(Self::Shade),
+            "lummod" => Ok(Self::LumMod),
+            "lumoff" => Ok(Self::LumOff),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid loext transformation type '{value}'"
+            ))),
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Tint => "tint",
+            Self::Shade => "shade",
+            Self::LumMod => "lummod",
+            Self::LumOff => "lumoff",
+        }
+    }
+}
+
+/// One inert `loext:transformation` of a complex color.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SparklineColorTransformation {
+    /// The transformation kind (`loext:type`).
+    pub transformation_type: ColorTransformationType,
+    /// The transformation amount (`loext:value`), an integer in the range
+    /// LibreOffice accepts (`i16`).
+    pub value: i16,
+}
+
+impl SparklineColorTransformation {
+    /// Create an inert color transformation.
+    pub fn new(transformation_type: ColorTransformationType, value: i16) -> Self {
+        Self {
+            transformation_type,
+            value,
+        }
+    }
+}
+
+/// An inert theme-based `calcext:sparkline-*-complex-color` color.
+///
+/// The theme family is never resolved against a theme by litchi.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SparklineComplexColor {
+    /// The theme color family (`loext:theme-type`).
+    pub theme_type: ThemeColorType,
+    /// Color transformations in document order.
+    pub transformations: Vec<SparklineColorTransformation>,
+}
+
+impl SparklineComplexColor {
+    /// Create an inert theme-based color without transformations.
+    pub fn new(theme_type: ThemeColorType) -> Self {
+        Self {
+            theme_type,
+            transformations: Vec::new(),
+        }
+    }
+
+    /// Append one color transformation.
+    pub fn with_transformation(mut self, transformation: SparklineColorTransformation) -> Self {
+        self.transformations.push(transformation);
+        self
+    }
+}
+
+/// Optional theme-based color slots of a sparkline group, one per plain
+/// `#RRGGBB` slot of [`SparklineColors`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SparklineComplexColors {
+    /// Series color (`calcext:sparkline-series-complex-color`).
+    pub series: Option<SparklineComplexColor>,
+    /// Negative-points color (`calcext:sparkline-negative-complex-color`).
+    pub negative: Option<SparklineComplexColor>,
+    /// Axis color (`calcext:sparkline-axis-complex-color`).
+    pub axis: Option<SparklineComplexColor>,
+    /// Markers color (`calcext:sparkline-markers-complex-color`).
+    pub markers: Option<SparklineComplexColor>,
+    /// First-point color (`calcext:sparkline-first-complex-color`).
+    pub first: Option<SparklineComplexColor>,
+    /// Last-point color (`calcext:sparkline-last-complex-color`).
+    pub last: Option<SparklineComplexColor>,
+    /// Highest-point color (`calcext:sparkline-high-complex-color`).
+    pub high: Option<SparklineComplexColor>,
+    /// Lowest-point color (`calcext:sparkline-low-complex-color`).
+    pub low: Option<SparklineComplexColor>,
+}
+
+/// The element names of the complex-color slots, in LibreOffice write order.
+pub(crate) const COMPLEX_COLOR_SLOTS: [&str; 8] = [
+    "sparkline-series-complex-color",
+    "sparkline-negative-complex-color",
+    "sparkline-axis-complex-color",
+    "sparkline-markers-complex-color",
+    "sparkline-first-complex-color",
+    "sparkline-last-complex-color",
+    "sparkline-high-complex-color",
+    "sparkline-low-complex-color",
+];
+
+impl SparklineComplexColors {
+    /// The slot for an element name, or `None` when it is not a complex color.
+    pub(crate) fn slot_mut(&mut self, element_name: &str) -> Option<&mut Option<SparklineComplexColor>> {
+        Some(match element_name {
+            "sparkline-series-complex-color" => &mut self.series,
+            "sparkline-negative-complex-color" => &mut self.negative,
+            "sparkline-axis-complex-color" => &mut self.axis,
+            "sparkline-markers-complex-color" => &mut self.markers,
+            "sparkline-first-complex-color" => &mut self.first,
+            "sparkline-last-complex-color" => &mut self.last,
+            "sparkline-high-complex-color" => &mut self.high,
+            "sparkline-low-complex-color" => &mut self.low,
+            _ => return None,
+        })
+    }
+
+    /// Assign a slot, rejecting duplicates. `element_name` must be one of
+    /// [`COMPLEX_COLOR_SLOTS`].
+    pub(crate) fn assign_slot(
+        &mut self,
+        element_name: &str,
+        color: SparklineComplexColor,
+    ) -> Result<()> {
+        let slot = self.slot_mut(element_name).ok_or_else(|| {
+            Error::InvalidFormat(format!("unknown complex color slot '{element_name}'"))
+        })?;
+        if slot.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate calcext:{element_name} element"
+            )));
+        }
+        *slot = Some(color);
+        Ok(())
+    }
 }
 
 /// One inert `calcext:sparkline` cell assignment.
@@ -198,6 +417,9 @@ pub struct SparklineGroup {
     pub manual_max: Option<String>,
     /// Optional `#RRGGBB` color slots.
     pub colors: SparklineColors,
+    /// Optional theme-based color slots. Parsed and stored inertly; theme
+    /// families are never resolved against a theme by litchi.
+    pub complex_colors: SparklineComplexColors,
     /// Sparkline cell assignments in document order.
     pub sparklines: Vec<Sparkline>,
 }
@@ -271,6 +493,12 @@ impl SparklineGroup {
         self.colors = colors;
         self
     }
+
+    /// Set the optional theme-based color slots.
+    pub fn with_complex_colors(mut self, complex_colors: SparklineComplexColors) -> Self {
+        self.complex_colors = complex_colors;
+        self
+    }
 }
 
 pub(crate) fn validate_sparkline_group(group: &SparklineGroup) -> Result<()> {
@@ -319,6 +547,31 @@ pub(crate) fn validate_sparkline_group_attributes(group: &SparklineGroup) -> Res
         if let Some(color) = color {
             validate_color(name, color)?;
         }
+    }
+    let complex_colors = &group.complex_colors;
+    for complex_color in [
+        &complex_colors.series,
+        &complex_colors.negative,
+        &complex_colors.axis,
+        &complex_colors.markers,
+        &complex_colors.first,
+        &complex_colors.last,
+        &complex_colors.high,
+        &complex_colors.low,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        validate_complex_color(complex_color)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_complex_color(complex_color: &SparklineComplexColor) -> Result<()> {
+    if complex_color.transformations.len() > MAX_COLOR_TRANSFORMATIONS {
+        return Err(Error::InvalidFormat(format!(
+            "complex color exceeds the {MAX_COLOR_TRANSFORMATIONS} transformation safety limit"
+        )));
     }
     Ok(())
 }
@@ -473,7 +726,23 @@ pub(crate) fn write_sparkline_groups(out: &mut String, groups: &[SparklineGroup]
         if let Some(color) = &colors.low {
             write_attribute(out, "calcext:color-low", color);
         }
-        out.push_str("><calcext:sparklines>");
+        out.push('>');
+        let complex_colors = &group.complex_colors;
+        for (slot, complex_color) in [
+            ("sparkline-series-complex-color", &complex_colors.series),
+            ("sparkline-negative-complex-color", &complex_colors.negative),
+            ("sparkline-axis-complex-color", &complex_colors.axis),
+            ("sparkline-markers-complex-color", &complex_colors.markers),
+            ("sparkline-first-complex-color", &complex_colors.first),
+            ("sparkline-last-complex-color", &complex_colors.last),
+            ("sparkline-high-complex-color", &complex_colors.high),
+            ("sparkline-low-complex-color", &complex_colors.low),
+        ] {
+            if let Some(complex_color) = complex_color {
+                write_complex_color(out, slot, complex_color);
+            }
+        }
+        out.push_str("<calcext:sparklines>");
         for sparkline in &group.sparklines {
             out.push_str("<calcext:sparkline calcext:cell-address=\"");
             out.push_str(&escape_xml(&sparkline.cell_address));
@@ -485,6 +754,30 @@ pub(crate) fn write_sparkline_groups(out: &mut String, groups: &[SparklineGroup]
     }
     out.push_str("</calcext:sparkline-groups>");
     Ok(())
+}
+
+fn write_complex_color(out: &mut String, slot: &str, complex_color: &SparklineComplexColor) {
+    out.push_str("<calcext:");
+    out.push_str(slot);
+    out.push_str(LOEXT_NAMESPACE_DECLARATION);
+    out.push_str(" loext:theme-type=\"");
+    out.push_str(complex_color.theme_type.as_str());
+    out.push_str("\" loext:color-type=\"theme\"");
+    if complex_color.transformations.is_empty() {
+        out.push_str("/>");
+        return;
+    }
+    out.push('>');
+    for transformation in &complex_color.transformations {
+        out.push_str("<loext:transformation loext:type=\"");
+        out.push_str(transformation.transformation_type.as_str());
+        out.push_str("\" loext:value=\"");
+        out.push_str(&transformation.value.to_string());
+        out.push_str("\"/>");
+    }
+    out.push_str("</calcext:");
+    out.push_str(slot);
+    out.push('>');
 }
 
 fn write_attribute(out: &mut String, name: &str, value: &str) {
@@ -533,6 +826,15 @@ mod tests {
             low: Some("#c9211e".to_string()),
             ..SparklineColors::default()
         })
+        .with_complex_colors(SparklineComplexColors {
+            series: Some(
+                SparklineComplexColor::new(ThemeColorType::Accent3).with_transformation(
+                    SparklineColorTransformation::new(ColorTransformationType::LumMod, 6000),
+                ),
+            ),
+            last: Some(SparklineComplexColor::new(ThemeColorType::Light1)),
+            ..SparklineComplexColors::default()
+        })
     }
 
     #[test]
@@ -545,6 +847,12 @@ mod tests {
         ));
         assert!(xml.contains(
             r#"<calcext:sparkline calcext:cell-address="Sheet1.A2" calcext:data-range="Sheet1.B1:Sheet1.M1"/>"#
+        ));
+        assert!(xml.contains(
+            r#"<calcext:sparkline-series-complex-color xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" loext:theme-type="accent3" loext:color-type="theme"><loext:transformation loext:type="lummod" loext:value="6000"/></calcext:sparkline-series-complex-color>"#
+        ));
+        assert!(xml.contains(
+            r#"<calcext:sparkline-last-complex-color xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" loext:theme-type="light1" loext:color-type="theme"/>"#
         ));
         assert!(xml.ends_with("</calcext:sparkline-groups>"));
     }

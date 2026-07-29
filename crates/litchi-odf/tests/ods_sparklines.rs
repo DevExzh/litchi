@@ -6,9 +6,10 @@
 //! round-trip them.
 
 use litchi_odf::{
-    FlatSpreadsheet, MutableSpreadsheet, Sparkline, SparklineAxisType, SparklineColors,
+    ColorTransformationType, FlatSpreadsheet, MutableSpreadsheet, Sparkline, SparklineAxisType,
+    SparklineColorTransformation, SparklineColors, SparklineComplexColor, SparklineComplexColors,
     SparklineEmptyCells, SparklineFlags, SparklineGroup, SparklineType, Spreadsheet,
-    SpreadsheetBuilder,
+    SpreadsheetBuilder, ThemeColorType,
 };
 
 /// Flat spreadsheet written in the shape LibreOffice Calc produces.
@@ -42,6 +43,14 @@ fn group_a() -> SparklineGroup {
         low: Some("#c9211e".to_string()),
         ..SparklineColors::default()
     })
+    .with_complex_colors(SparklineComplexColors {
+        series: Some(
+            SparklineComplexColor::new(ThemeColorType::Accent3).with_transformation(
+                SparklineColorTransformation::new(ColorTransformationType::LumMod, 6000),
+            ),
+        ),
+        ..SparklineComplexColors::default()
+    })
 }
 
 fn group_b() -> SparklineGroup {
@@ -72,8 +81,8 @@ fn reads_libreoffice_calcext_sparkline_groups() {
     let sheets = flat.spreadsheet_mut().sheets().unwrap();
     assert_eq!(sheets.len(), 1);
 
-    // Both groups parse with full fidelity; the theme-color complex-color
-    // child is skipped without disturbing the typed attributes.
+    // Both groups parse with full fidelity, including the theme-based
+    // complex color and its transformation.
     assert_eq!(
         sheets[0].sparkline_groups(),
         [group_a(), group_b()].as_slice()
@@ -102,6 +111,9 @@ fn builder_authored_sparkline_groups_round_trip_the_package() {
     ));
     assert!(xml.contains(
         r#"<calcext:sparkline calcext:cell-address="Scores.E2" calcext:data-range="Scores.A1:Scores.A2 Scores.C1:Scores.C2"/>"#
+    ));
+    assert!(xml.contains(
+        r#"<calcext:sparkline-series-complex-color xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" loext:theme-type="accent3" loext:color-type="theme"><loext:transformation loext:type="lummod" loext:value="6000"/></calcext:sparkline-series-complex-color>"#
     ));
 
     let mut spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
@@ -260,6 +272,33 @@ fn parser_rejects_malformed_calcext_sparkline_content() {
     // calcext:sparkline must not have child elements.
     assert!(rejects(&group(
         r#"><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"><calcext:sparkline calcext:cell-address="S.B2" calcext:data-range="S.A2"/></calcext:sparkline></calcext:sparklines>"#
+    )));
+    // Complex colors require a known theme type and well-formed transformations.
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color loext:theme-type="accent9" loext:color-type="theme" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"/><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"/></calcext:sparklines>"#
+    )));
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color loext:color-type="theme" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"/><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"/></calcext:sparklines>"#
+    )));
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color loext:theme-type="accent3" loext:color-type="rgb" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"/><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"/></calcext:sparklines>"#
+    )));
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color loext:theme-type="accent3" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"><loext:transformation loext:type="invert" loext:value="50"/></calcext:sparkline-series-complex-color><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"/></calcext:sparklines>"#
+    )));
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color loext:theme-type="accent3" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"><loext:transformation loext:type="tint" loext:value="99999"/></calcext:sparkline-series-complex-color><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"/></calcext:sparklines>"#
+    )));
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color loext:theme-type="accent3" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"><loext:transformation loext:type="tint"/></calcext:sparkline-series-complex-color><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"/></calcext:sparklines>"#
+    )));
+    // Duplicate color slots are rejected.
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color loext:theme-type="accent3" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"/><calcext:sparkline-series-complex-color loext:theme-type="accent4" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"/><calcext:sparklines><calcext:sparkline calcext:cell-address="S.B1" calcext:data-range="S.A1"/></calcext:sparklines>"#
+    )));
+    // A spoofed loext namespace reads as a missing theme type.
+    assert!(rejects(&group(
+        r#"><calcext:sparkline-series-complex-color xmlns:loext="urn:not-loext" loext:theme-type="accent3"/>"#
     )));
     // A spoofed extension namespace is rejected.
     assert!(rejects(

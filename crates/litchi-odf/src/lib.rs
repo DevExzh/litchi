@@ -131,7 +131,7 @@
 //! - ✅ Create, edit, remove, and round-trip data-pilot tables
 //! - ✅ `style:map` conditional cell styles and inert `calcext` conditional
 //!   formats (condition, color-scale, data-bar, icon-set, and date-is rules)
-//! - ✅ Inert `calcext` sparkline groups
+//! - ✅ Inert `calcext` sparkline groups, including theme-based complex colors
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
@@ -714,7 +714,7 @@ pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellHyperlink,
     CellMatrixSpan, CellMerge, CellRangeSource, CellStyleProtection, CellTextContent, CellValue,
-    Column as SColumn, ConditionalCellStyle,
+    Column as SColumn, ColorTransformationType, ConditionalCellStyle,
     ConditionalCellStyleRule, ConditionalColorScale, ConditionalColorScaleEntry,
     ConditionalDataBar, ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType,
     ConditionalFormat, ConditionalFormatCondition, ConditionalFormatEntryType,
@@ -733,8 +733,9 @@ pub use ods::{
     IterationStatus,
     LabelRange, LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, Sparkline,
-    SparklineAxisType, SparklineColors, SparklineEmptyCells, SparklineFlags, SparklineGroup,
-    SparklineType,
+    SparklineAxisType, SparklineColorTransformation, SparklineColors, SparklineComplexColor,
+    SparklineComplexColors, SparklineEmptyCells, SparklineFlags, SparklineGroup, SparklineType,
+    ThemeColorType,
     SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetShape,
     SheetShapeAnchor, SheetStyle,
     SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder, OdsWorkbook,

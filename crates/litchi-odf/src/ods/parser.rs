@@ -2,14 +2,17 @@
 
 use super::{
     Cell, CellDetective, CellHyperlink, CellMatrixSpan, CellMerge, CellRangeSource,
-    CellTextContent, CellValue, Column, ConditionalColorScale, ConditionalColorScaleEntry,
+    CellTextContent, CellValue, Column, ColorTransformationType, ConditionalColorScale,
+    ConditionalColorScaleEntry,
     ConditionalDataBar, ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType,
     ConditionalFormat, ConditionalFormatCondition, ConditionalFormatEntryType,
     ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry, DataBarAxisPosition,
     DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
     IconSetType, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
-    Sparkline, SparklineAxisType, SparklineEmptyCells, SparklineGroup, SparklineType, TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
+    Sparkline, SparklineAxisType, SparklineColorTransformation, SparklineComplexColor,
+    SparklineEmptyCells, SparklineGroup, SparklineType, TableGroup, TableRange, TableSourceMode,
+    TableStructure, TableVisibility, ThemeColorType,
     annotation::{AnnotationBuilder, decode_reference},
     conditional_format::{
         CALCEXT_NAMESPACE_URI, DATA_BAR_ENTRY_COUNT, MAX_CONDITIONAL_FORMATS_PER_SHEET,
@@ -22,6 +25,7 @@ use super::{
     scenario::validate_scenario,
     source::validate_table_source,
     sparkline::{
+        COMPLEX_COLOR_SLOTS, LOEXT_NAMESPACE_URI, MAX_COLOR_TRANSFORMATIONS,
         MAX_SPARKLINE_GROUPS_PER_SHEET, MAX_SPARKLINES_PER_GROUP, validate_sparkline,
         validate_sparkline_group, validate_sparkline_group_attributes,
     },
@@ -125,6 +129,17 @@ struct PendingSparklineGroup {
     depth: usize,
 }
 
+/// A `calcext:sparkline-*-complex-color` element whose `loext:transformation`
+/// children are still being read.
+struct PendingSparklineComplexColor {
+    /// The slot element name (one of `COMPLEX_COLOR_SLOTS`).
+    slot: &'static str,
+    /// The color parsed from the element's attributes (no transformations yet).
+    color: SparklineComplexColor,
+    /// The `element_depth` value assigned to the element.
+    depth: usize,
+}
+
 /// Parser for ODS-specific structures.
 ///
 /// This provides parsing logic specific to spreadsheets,
@@ -180,6 +195,7 @@ impl OdsParser {
         let mut calcext_skip_depth = None;
         let mut sparkline_groups_depth = None;
         let mut pending_sparkline_group: Option<PendingSparklineGroup> = None;
+        let mut pending_sparkline_complex_color: Option<PendingSparklineComplexColor> = None;
         let mut sparkline_list_depth = None;
 
         loop {
@@ -396,6 +412,30 @@ impl OdsParser {
                         } else {
                             calcext_skip_depth = Some(element_depth);
                         }
+                    } else if let Some(pending) = pending_sparkline_complex_color.as_mut() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            LOEXT_NAMESPACE_URI,
+                            "transformation",
+                        ) {
+                            if pending.color.transformations.len() >= MAX_COLOR_TRANSFORMATIONS {
+                                return Err(Error::InvalidFormat(format!(
+                                    "complex color exceeds the {MAX_COLOR_TRANSFORMATIONS} transformation safety limit"
+                                )));
+                            }
+                            pending
+                                .color
+                                .transformations
+                                .push(Self::parse_color_transformation(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                            calcext_leaf_open_depth = Some(element_depth);
+                        } else {
+                            calcext_skip_depth = Some(element_depth);
+                        }
                     } else if pending_sparkline_group.is_some() {
                         if Self::element_name_is(
                             e.name().as_ref(),
@@ -404,9 +444,26 @@ impl OdsParser {
                             "sparklines",
                         ) {
                             sparkline_list_depth = Some(element_depth);
+                        } else if let Some(slot) = COMPLEX_COLOR_SLOTS.iter().find(|slot| {
+                            Self::element_name_is(
+                                e.name().as_ref(),
+                                &document_namespaces,
+                                CALCEXT_NAMESPACE_URI,
+                                slot,
+                            )
+                        }) {
+                            let color = Self::parse_complex_color(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending_sparkline_complex_color = Some(PendingSparklineComplexColor {
+                                slot,
+                                color,
+                                depth: element_depth,
+                            });
                         } else {
-                            // `calcext:sparkline-*-complex-color` theme colors
-                            // and other unmodeled children are skipped.
+                            // Unmodeled children are skipped.
                             calcext_skip_depth = Some(element_depth);
                         }
                     } else if sparkline_groups_depth.is_some() {
@@ -957,9 +1014,50 @@ impl OdsParser {
                         buf.clear();
                         continue;
                     }
-                    if pending_sparkline_group.is_some() {
-                        // Empty `calcext:sparklines` containers and unmodeled
-                        // complex-color children carry no sparklines.
+                    if let Some(pending) = pending_sparkline_complex_color.as_mut() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            LOEXT_NAMESPACE_URI,
+                            "transformation",
+                        ) {
+                            if pending.color.transformations.len() >= MAX_COLOR_TRANSFORMATIONS {
+                                return Err(Error::InvalidFormat(format!(
+                                    "complex color exceeds the {MAX_COLOR_TRANSFORMATIONS} transformation safety limit"
+                                )));
+                            }
+                            pending
+                                .color
+                                .transformations
+                                .push(Self::parse_color_transformation(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if let Some(pending) = pending_sparkline_group.as_mut() {
+                        // An empty complex-color element carries no
+                        // transformations; an empty `calcext:sparklines`
+                        // container and unknown children carry nothing.
+                        if let Some(slot) = COMPLEX_COLOR_SLOTS.iter().find(|slot| {
+                            Self::element_name_is(
+                                e.name().as_ref(),
+                                &document_namespaces,
+                                CALCEXT_NAMESPACE_URI,
+                                slot,
+                            )
+                        }) {
+                            let color = Self::parse_complex_color(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending.group.complex_colors.assign_slot(slot, color)?;
+                        }
                         Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
                         buf.clear();
                         continue;
@@ -1432,6 +1530,17 @@ impl OdsParser {
                             CALCEXT_NAMESPACE_URI,
                             "sparklines",
                         );
+                    let closes_sparkline_complex_color = pending_sparkline_complex_color
+                        .as_ref()
+                        .is_some_and(|pending| {
+                            pending.depth == element_depth
+                                && Self::element_name_is(
+                                    e.name().as_ref(),
+                                    &document_namespaces,
+                                    CALCEXT_NAMESPACE_URI,
+                                    pending.slot,
+                                )
+                        });
                     let closes_sparkline_group = pending_sparkline_group
                         .as_ref()
                         .is_some_and(|pending| pending.depth == element_depth)
@@ -1513,6 +1622,23 @@ impl OdsParser {
                     }
                     if closes_sparkline_list {
                         sparkline_list_depth = None;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_sparkline_complex_color {
+                        let pending = pending_sparkline_complex_color
+                            .take()
+                            .expect("pending complex color was checked");
+                        let group = pending_sparkline_group.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "complex color closed outside calcext:sparkline-group".to_string(),
+                            )
+                        })?;
+                        group
+                            .group
+                            .complex_colors
+                            .assign_slot(pending.slot, pending.color)?;
                         Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                         buf.clear();
                         continue;
@@ -3522,6 +3648,106 @@ impl OdsParser {
         }
         validate_sparkline_group_attributes(&group)?;
         Ok(group)
+    }
+
+    /// Parse one inert `calcext:sparkline-*-complex-color` from its attributes.
+    fn parse_complex_color(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<SparklineComplexColor> {
+        let mut theme_type = None;
+        let mut color_type = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_loext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    LOEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_loext("theme-type") {
+                theme_type = Some(ThemeColorType::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "loext:theme-type",
+                )?)?);
+            } else if is_loext("color-type") {
+                color_type = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "loext:color-type",
+                )?);
+            }
+        }
+        if let Some(color_type) = &color_type
+            && color_type != "theme"
+        {
+            return Err(Error::InvalidFormat(format!(
+                "unsupported loext:color-type value '{color_type}'"
+            )));
+        }
+        Ok(SparklineComplexColor {
+            theme_type: theme_type.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext complex color requires loext:theme-type".to_string(),
+                )
+            })?,
+            transformations: Vec::new(),
+        })
+    }
+
+    /// Parse one inert `loext:transformation` from its attributes.
+    fn parse_color_transformation(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<SparklineColorTransformation> {
+        let mut transformation_type = None;
+        let mut value = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_loext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    LOEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_loext("type") {
+                transformation_type =
+                    Some(ColorTransformationType::parse(&Self::decode_attribute(
+                        &attribute,
+                        decoder,
+                        "loext:type",
+                    )?)?);
+            } else if is_loext("value") {
+                let lexical = Self::decode_attribute(&attribute, decoder, "loext:value")?;
+                let parsed: i32 = lexical.parse().map_err(|_| {
+                    Error::InvalidFormat(format!(
+                        "loext:value requires an integer value, found '{lexical}'"
+                    ))
+                })?;
+                value = Some(i16::try_from(parsed).map_err(|_| {
+                    Error::InvalidFormat(format!(
+                        "loext:value '{lexical}' is outside the supported range"
+                    ))
+                })?);
+            }
+        }
+        Ok(SparklineColorTransformation {
+            transformation_type: transformation_type.ok_or_else(|| {
+                Error::InvalidFormat("loext:transformation requires loext:type".to_string())
+            })?,
+            value: value.ok_or_else(|| {
+                Error::InvalidFormat("loext:transformation requires loext:value".to_string())
+            })?,
+        })
     }
 
     fn decode_attribute(

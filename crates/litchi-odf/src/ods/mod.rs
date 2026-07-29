@@ -33,7 +33,8 @@
 //! - ✅ Standard `style:map` conditional cell styles and inert LibreOffice
 //!   `calcext` conditional formats (condition, color-scale, data-bar,
 //!   icon-set, and date-is rules)
-//! - ✅ Inert LibreOffice `calcext` sparkline groups
+//! - ✅ Inert LibreOffice `calcext` sparkline groups, including theme-based
+//!   complex colors
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -68,7 +69,6 @@
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
-//! - ⚠️ `calcext` sparkline complex (theme) colors
 //! - ⚠️ External data connections
 //!
 //! # References
@@ -166,8 +166,9 @@ pub use shape::{SheetShape, SheetShapeAnchor};
 pub use sheet::Sheet;
 pub use source::{CellRangeSource, SheetTableSource, TableSourceMode};
 pub use sparkline::{
-    Sparkline, SparklineAxisType, SparklineColors, SparklineEmptyCells, SparklineFlags,
-    SparklineGroup, SparklineType,
+    ColorTransformationType, Sparkline, SparklineAxisType, SparklineColorTransformation,
+    SparklineColors, SparklineComplexColor, SparklineComplexColors, SparklineEmptyCells,
+    SparklineFlags, SparklineGroup, SparklineType, ThemeColorType,
 };
 pub use spreadsheet::Spreadsheet;
 pub use structure::{
