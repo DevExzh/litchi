@@ -579,6 +579,100 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
 }
 
 #[test]
+fn text_boxes_round_trip_number_tiering_in_every_suite() {
+    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let tiered = ParagraphListNumberTiering::Tiered;
+
+    let mut pages = PagesEditor::create_with_text("Number Tiering").unwrap();
+    let pages_box = pages
+        .add_text_box(5, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    pages
+        .set_text_box_paragraph_list(pages_box.drawable_object_id, ParagraphList::Numbered)
+        .unwrap();
+    let pages_before_tiering = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_list_number_tiering(pages_box.drawable_object_id, paragraph, tiered)
+        .unwrap();
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_list_number_tiering(pages_box.drawable_object_id, paragraph)
+            .unwrap(),
+        tiered
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_list_number_tiering(pages_box.drawable_object_id, paragraph,)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before_tiering);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            ParagraphList::Numbered,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list_number_tiering(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            paragraph,
+            tiered,
+        )
+        .unwrap();
+    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_list_number_tiering(
+                sheet_id,
+                numbers_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        tiered
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list(
+            0,
+            keynote_box.drawable_object_id,
+            ParagraphList::Numbered,
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list_number_tiering(
+            0,
+            keynote_box.drawable_object_id,
+            paragraph,
+            tiered,
+        )
+        .unwrap();
+    let keynote = crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_list_number_tiering(
+                0,
+                keynote_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        tiered
+    );
+}
+
+#[test]
 fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
     let arrow = ParagraphListBullet::new("➡").unwrap();
     let indentation = ParagraphListIndentation::new(
@@ -620,6 +714,16 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
             .is_err()
     );
     assert_eq!(pages.to_bytes().unwrap(), before);
+    assert!(
+        pages
+            .set_text_box_paragraph_list_number_tiering(
+                text_box.drawable_object_id,
+                ParagraphStart::ZERO,
+                ParagraphListNumberTiering::Tiered,
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before);
 
     pages
         .set_text_box_paragraph_list(text_box.drawable_object_id, ParagraphList::Bullet)
@@ -651,6 +755,16 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
                 text_box.drawable_object_id,
                 ParagraphStart::ZERO,
                 ParagraphListNumberFormat::Circled,
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before);
+    assert!(
+        pages
+            .set_text_box_paragraph_list_number_tiering(
+                text_box.drawable_object_id,
+                ParagraphStart::ZERO,
+                ParagraphListNumberTiering::Tiered,
             )
             .is_err()
     );

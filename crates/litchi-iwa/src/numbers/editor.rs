@@ -45,13 +45,14 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
-    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
-    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
+    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
+    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -158,6 +159,8 @@ pub type NumbersTableCellParagraphListIndentation = ParagraphListIndentation;
 pub type NumbersTableCellParagraphListLabelColor = ParagraphListLabelColor;
 /// Locale-aware numbered-list label format in a Numbers table cell.
 pub type NumbersTableCellParagraphListNumberFormat = ParagraphListNumberFormat;
+/// Flat or hierarchical numbered-list labels in a Numbers table cell.
+pub type NumbersTableCellParagraphListNumberTiering = ParagraphListNumberTiering;
 /// A validated zero-based list nesting level in a Numbers table cell.
 pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
@@ -1198,6 +1201,49 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_number_format(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read whether one numbered sheet text-box paragraph displays hierarchical numbering.
+    pub fn sheet_text_box_paragraph_list_number_tiering(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberTiering> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_number_tiering(graph.storage_id, paragraph)
+    }
+
+    /// Choose flat or hierarchical numbering for one sheet text-box list level.
+    pub fn set_sheet_text_box_paragraph_list_number_tiering(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        tiering: ParagraphListNumberTiering,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_number_tiering(graph.storage_id, paragraph, tiering)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore flat numbering for one sheet text-box list level.
+    pub fn reset_sheet_text_box_paragraph_list_number_tiering(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list_number_tiering(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
@@ -3444,6 +3490,76 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read whether one numbered table-cell paragraph displays hierarchical numbering.
+    pub fn table_cell_paragraph_list_number_tiering(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumberTiering> {
+        cell_paragraph_list::paragraph_list_number_tiering(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Choose flat or hierarchical numbering for one table-cell list level.
+    pub fn set_table_cell_paragraph_list_number_tiering(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        tiering: NumbersTableCellParagraphListNumberTiering,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_number_tiering(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            tiering,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_number_tiering(table_id, row, column, paragraph)?
+            != tiering
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-number tiering failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore flat numbering for one table-cell list level.
+    pub fn reset_table_cell_paragraph_list_number_tiering(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_number_tiering(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read one table-cell paragraph's effective text-bullet marker.
     pub fn table_cell_paragraph_list_bullet(
         &self,
@@ -5663,6 +5779,41 @@ pub(crate) fn reset_table_cell_paragraph_list_number_format_in_package(
     paragraph: ParagraphStart,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_format(
+        package, table_id, row, column, paragraph,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_number_tiering_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumberTiering> {
+    cell_paragraph_list::paragraph_list_number_tiering(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_number_tiering_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    tiering: ParagraphListNumberTiering,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_number_tiering(
+        package, table_id, row, column, paragraph, tiering,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_number_tiering_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_number_tiering(
         package, table_id, row, column, paragraph,
     )
 }

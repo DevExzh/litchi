@@ -282,6 +282,65 @@ pub(super) fn reset_paragraph_list_number_format(
     Ok(changed)
 }
 
+pub(super) fn paragraph_list_number_tiering(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<crate::text::ParagraphListNumberTiering> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Err(Error::InvalidFormat(
+            "plain iWork table cells are not numbered lists".to_owned(),
+        ));
+    };
+    crate::text::paragraph_list_number_tiering_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_number_tiering(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    tiering: crate::text::ParagraphListNumberTiering,
+) -> Result<()> {
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_number_tiering(storage_id, paragraph, tiering)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_number_tiering_in_storage(&staged, storage_id, paragraph)?
+        != tiering
+    {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph list-number tiering update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list_number_tiering(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(false);
+    };
+    let mut text = IWorkTextEditor::from_package(package.clone());
+    let changed = text.reset_paragraph_list_number_tiering(storage_id, paragraph)?;
+    if changed {
+        *package = text.into_package();
+    }
+    Ok(changed)
+}
+
 pub(super) fn paragraph_list_bullet(
     package: &IWorkPackage,
     table_id: u64,
@@ -2009,6 +2068,15 @@ mod tests {
         editor
             .set_table_cell_paragraph_list_number_format(duplicate, ROW, COLUMN, paragraph, format)
             .unwrap();
+        editor
+            .set_table_cell_paragraph_list_number_tiering(
+                duplicate,
+                ROW,
+                COLUMN,
+                paragraph,
+                ParagraphListNumberTiering::Tiered,
+            )
+            .unwrap();
         assert_eq!(
             editor
                 .table_cell_paragraph_list_numbering(source, ROW, COLUMN, paragraph)
@@ -2032,6 +2100,18 @@ mod tests {
                 .table_cell_paragraph_list_number_format(duplicate, ROW, COLUMN, paragraph)
                 .unwrap(),
             format
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_number_tiering(source, ROW, COLUMN, paragraph)
+                .unwrap(),
+            ParagraphListNumberTiering::Flat
+        );
+        assert_eq!(
+            editor
+                .table_cell_paragraph_list_number_tiering(duplicate, ROW, COLUMN, paragraph)
+                .unwrap(),
+            ParagraphListNumberTiering::Tiered
         );
         assert_eq!(
             editor

@@ -33,13 +33,13 @@ use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumbering,
-    ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
-    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
-    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
-    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
-    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -824,6 +824,46 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_list_number_format(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read whether one numbered text-box paragraph displays hierarchical numbering.
+    pub fn text_box_paragraph_list_number_tiering(
+        &self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberTiering> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text
+            .paragraph_list_number_tiering(graph.storage_id, paragraph)
+    }
+
+    /// Choose flat or hierarchical numbering for one text-box list level.
+    pub fn set_text_box_paragraph_list_number_tiering(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        tiering: ParagraphListNumberTiering,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_number_tiering(graph.storage_id, paragraph, tiering)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore flat numbering for one text-box list level.
+    pub fn reset_text_box_paragraph_list_number_tiering(
+        &mut self,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_number_tiering(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }
@@ -4163,9 +4203,10 @@ pub use tables::{
     PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
     PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
     PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
-    PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumbering,
-    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
-    PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
+    PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumberTiering,
+    PagesTableCellParagraphListNumbering, PagesTableCellParagraphListPlacement,
+    PagesTableCellParagraphSpacing, PagesTableCellParagraphTabStops,
+    PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
     PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
     PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat, PagesTableCellSliderFormat,
     PagesTableCellSliderRange, PagesTableCellStarRatingFormat, PagesTableCellStepperDisplayFormat,

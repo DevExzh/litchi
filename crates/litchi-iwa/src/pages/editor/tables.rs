@@ -114,6 +114,7 @@ pub use crate::text::ParagraphListLabelColor as PagesTableCellParagraphListLabel
 pub use crate::text::ParagraphListLevel as PagesTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as PagesTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListNumberFormat as PagesTableCellParagraphListNumberFormat;
+pub use crate::text::ParagraphListNumberTiering as PagesTableCellParagraphListNumberTiering;
 pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
@@ -1798,6 +1799,87 @@ impl PagesEditor {
         let mut staged = self.package().clone();
         let changed =
             crate::numbers::editor::reset_table_cell_paragraph_list_number_format_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read whether one numbered body-table paragraph displays hierarchical numbering.
+    pub fn table_cell_paragraph_list_number_tiering(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<PagesTableCellParagraphListNumberTiering> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_number_tiering_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Choose flat or hierarchical numbering for one body-table list level.
+    pub fn set_table_cell_paragraph_list_number_tiering(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        tiering: PagesTableCellParagraphListNumberTiering,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_number_tiering_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            tiering,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_number_tiering(
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != tiering
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph list-number tiering failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore flat numbering for one body-table list level.
+    pub fn reset_table_cell_paragraph_list_number_tiering(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_number_tiering_in_package(
                 &mut staged,
                 model_object_id,
                 row,

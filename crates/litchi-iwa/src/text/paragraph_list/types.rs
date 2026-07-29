@@ -505,6 +505,27 @@ impl ParagraphListNumberFormat {
     }
 }
 
+/// Whether a numbered-list level displays only its own number or its full hierarchy.
+///
+/// Tiered numbering renders nested labels such as `1.1` and `1.1.1`; flat
+/// numbering renders the current level alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ParagraphListNumberTiering {
+    #[default]
+    Flat,
+    Tiered,
+}
+
+impl ParagraphListNumberTiering {
+    pub(crate) const fn from_native(value: bool) -> Self {
+        if value { Self::Tiered } else { Self::Flat }
+    }
+
+    pub(crate) const fn native_value(self) -> bool {
+        matches!(self, Self::Tiered)
+    }
+}
+
 impl ParagraphListIndentation {
     /// Construct list indentation from validated components.
     pub const fn new(

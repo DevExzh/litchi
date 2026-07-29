@@ -31,6 +31,7 @@ const NUMBER_TYPES_FIELD: u32 = 15;
 const STRINGS_FIELD: u32 = 16;
 const FONT_COLOR_NULL_FIELD: u32 = 20;
 const FONT_COLOR_FIELD: u32 = 21;
+const TIERED_NUMBERS_FIELD: u32 = 25;
 const FONT_EM_POINTS: f32 = 11.0;
 const NONE_INDENT_STEP_POINTS: f32 = 36.0;
 const BULLET_INDENT_STEP_POINTS: f32 = 9.0;
@@ -288,6 +289,29 @@ pub(super) fn effective_number_types(package: &IWorkPackage, style_id: u64) -> R
     }
 }
 
+pub(super) fn effective_tiered_numbers(package: &IWorkPackage, style_id: u64) -> Result<Vec<bool>> {
+    if resolved_paragraph_list(package, style_id)? != ParagraphList::Numbered {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} is not a numbered list"
+        )));
+    }
+    let mut current_id = style_id;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(current_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list-style inheritance contains a cycle at {current_id}"
+            )));
+        }
+        let style = locate_style(package, current_id)?.style;
+        if !style.tiered_numbers.is_empty() {
+            validate_tiered_numbers(current_id, &style.tiered_numbers)?;
+            return Ok(style.tiered_numbers);
+        }
+        current_id = parent_style_id(&style, current_id)?;
+    }
+}
+
 #[derive(Clone, Copy)]
 enum ListFloatArray {
     LabelIndents,
@@ -511,6 +535,39 @@ pub(super) fn number_format_variation_object(
     Ok(object)
 }
 
+pub(super) fn number_tiering_variation_object(
+    identifier: u64,
+    parent_style_id: u64,
+    stylesheet_id: u64,
+    tiered_numbers: Vec<bool>,
+) -> Result<ArchiveObject> {
+    validate_tiered_numbers(identifier, &tiered_numbers)?;
+    let style = tswp::ListStyleArchive {
+        super_: tss::StyleArchive {
+            parent: Some(reference(parent_style_id)),
+            is_variation: Some(true),
+            stylesheet: Some(reference(stylesheet_id)),
+            ..Default::default()
+        },
+        override_count: Some(1),
+        tiered_numbers,
+        ..Default::default()
+    };
+    let data = style.encode_to_vec();
+    tswp::ListStyleArchive::decode(data.as_slice())?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: LIST_STYLE_MESSAGE_TYPE,
+            data,
+        }],
+    )?;
+    let info = &mut object.archive_info.message_infos[0];
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.object_references.push(parent_style_id);
+    Ok(object)
+}
+
 pub(super) fn replace_direct_number_types(
     package: &mut IWorkPackage,
     archive_name: &str,
@@ -645,6 +702,145 @@ fn patch_direct_number_types(data: &[u8], style_id: u64, number_types: &[i32]) -
     if decoded.number_types != number_types {
         return Err(Error::InvalidFormat(format!(
             "iWork list style {style_id} number-format update failed validation"
+        )));
+    }
+    Ok(patched)
+}
+
+pub(super) fn replace_direct_tiered_numbers(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+    tiered_numbers: &[bool],
+) -> Result<()> {
+    validate_tiered_numbers(style_id, tiered_numbers)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let data = patch_direct_tiered_numbers(&original.data, style_id, tiered_numbers)?;
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(super) fn remove_direct_tiered_numbers(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+        if style.tiered_numbers.is_empty() {
+            return Ok(());
+        }
+        validate_tiered_numbers(style_id, &style.tiered_numbers)?;
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_sub(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} has number tiering without an override count"
+                ))
+            })?;
+        let data = rewrite_repeated_varint_fields(&original.data, TIERED_NUMBERS_FIELD, &[])?;
+        let data = patch_varint_field(
+            &data,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+        let decoded = tswp::ListStyleArchive::decode(data.as_slice())?;
+        if !decoded.tiered_numbers.is_empty() || decoded.override_count != Some(override_count) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} number-tiering removal failed validation"
+            )));
+        }
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn patch_direct_tiered_numbers(
+    data: &[u8],
+    style_id: u64,
+    tiered_numbers: &[bool],
+) -> Result<Vec<u8>> {
+    validate_tiered_numbers(style_id, tiered_numbers)?;
+    let style = tswp::ListStyleArchive::decode(data)?;
+    let had_direct_tiering = !style.tiered_numbers.is_empty();
+    if had_direct_tiering {
+        validate_tiered_numbers(style_id, &style.tiered_numbers)?;
+    }
+    let encoded = tiered_numbers
+        .iter()
+        .copied()
+        .map(u64::from)
+        .collect::<Vec<_>>();
+    let mut patched = rewrite_repeated_varint_fields(data, TIERED_NUMBERS_FIELD, &encoded)?;
+    if !had_direct_tiering {
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} override count overflowed"
+                ))
+            })?;
+        patched = patch_varint_field(
+            &patched,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+    }
+    let decoded = tswp::ListStyleArchive::decode(patched.as_slice())?;
+    if decoded.tiered_numbers != tiered_numbers {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} number-tiering update failed validation"
         )));
     }
     Ok(patched)
@@ -1296,6 +1492,16 @@ fn validate_number_types(style_id: u64, values: &[i32]) -> Result<()> {
     Ok(())
 }
 
+fn validate_tiered_numbers(style_id: u64, values: &[bool]) -> Result<()> {
+    if values.len() != LIST_LEVEL_COUNT {
+        return Err(Error::InvalidFormat(format!(
+            "iWork numbered list style {style_id} must define {LIST_LEVEL_COUNT} tiering values, found {}",
+            values.len()
+        )));
+    }
+    Ok(())
+}
+
 pub(super) fn number_format_to_native(format: ParagraphListNumberFormat) -> i32 {
     match format {
         ParagraphListNumberFormat::Circled => NumberType::KCircledNumberKind as i32,
@@ -1809,5 +2015,42 @@ mod tests {
         assert_eq!(decoded.number_types, formats);
         assert_eq!(decoded.tiered_numbers, style.tiered_numbers);
         assert_eq!(decoded.font_color, style.font_color);
+    }
+
+    #[test]
+    fn number_tiering_updates_compose_losslessly_and_preserve_unknown_fields() {
+        let formats = repeated_enum(NumberType::KNumericDecimal);
+        let style = tswp::ListStyleArchive {
+            super_: tss::StyleArchive {
+                parent: Some(reference(8)),
+                is_variation: Some(true),
+                stylesheet: Some(reference(3)),
+                ..Default::default()
+            },
+            override_count: Some(2),
+            font_color: Some(crate::shapes::color_to_native(
+                crate::shapes::RgbaColor::black(),
+            )),
+            number_types: formats.clone(),
+            ..Default::default()
+        };
+        let mut encoded = style.encode_to_vec();
+        let unknown = [0xb8, 0x06, 0x0d];
+        encoded.extend_from_slice(&unknown);
+        let mut tiering = vec![false; LIST_LEVEL_COUNT];
+        tiering[1] = true;
+
+        let patched = patch_direct_tiered_numbers(&encoded, 10, &tiering).unwrap();
+        assert!(
+            patched
+                .windows(unknown.len())
+                .any(|window| window == unknown)
+        );
+        let decoded = tswp::ListStyleArchive::decode(patched.as_slice()).unwrap();
+        assert_eq!(decoded.override_count, Some(3));
+        assert_eq!(decoded.tiered_numbers, tiering);
+        assert_eq!(decoded.number_types, formats);
+        assert_eq!(decoded.font_color, style.font_color);
+        assert!(validate_tiered_numbers(10, &[false; LIST_LEVEL_COUNT - 1]).is_err());
     }
 }

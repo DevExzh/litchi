@@ -15,12 +15,12 @@ use litchi_iwa::text::{
     ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLabelIndent,
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberPunctuation, ParagraphListNumberSequence, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
-    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    ParagraphListNumberPunctuation, ParagraphListNumberSequence, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
     TextStyle, TextUnderline,
 };
 
@@ -149,6 +149,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             numbered_paragraph_start()?,
         )?,
         custom_number_format()
+    );
+    assert_eq!(
+        numbers.table_cell_paragraph_list_number_tiering(
+            numbers_table.object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        ParagraphListNumberTiering::Tiered
     );
     assert_eq!(
         numbers.table_cell_paragraph_list_bullet(
@@ -282,6 +291,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             numbered_paragraph_start()?,
         )?,
         custom_number_format()
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list_number_tiering(
+            pages_table.model_object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        ParagraphListNumberTiering::Tiered
     );
     assert_eq!(
         pages.table_cell_paragraph_list_bullet(
@@ -457,6 +475,16 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             numbered_paragraph_start()?,
         )?,
         custom_number_format()
+    );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_list_number_tiering(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+            numbered_paragraph_start()?,
+        )?,
+        ParagraphListNumberTiering::Tiered
     );
     assert_eq!(
         keynote.slide_table_cell_paragraph_list_bullet(
@@ -910,6 +938,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbered_paragraph_start()?,
         custom_number_format(),
     )?;
+    editor.set_table_cell_paragraph_list_number_tiering(
+        table_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        ParagraphListNumberTiering::Tiered,
+    )?;
     editor.set_table_cell_paragraph_list_bullet(
         table_id,
         ROW,
@@ -1013,6 +1048,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbered_paragraph_start()?,
         custom_number_format(),
+    )?;
+    editor.set_table_cell_paragraph_list_number_tiering(
+        table_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        ParagraphListNumberTiering::Tiered,
     )?;
     editor.set_table_cell_paragraph_list_bullet(
         table_id,
@@ -1224,6 +1266,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         numbered_paragraph_start()?,
         custom_number_format(),
+    )?;
+    editor.set_slide_table_cell_paragraph_list_number_tiering(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        numbered_paragraph_start()?,
+        ParagraphListNumberTiering::Tiered,
     )?;
     editor.set_slide_table_cell_paragraph_list_bullet(
         0,

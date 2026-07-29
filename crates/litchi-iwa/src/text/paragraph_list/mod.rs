@@ -7,6 +7,7 @@ mod label_color;
 mod levels;
 mod native;
 mod number_format;
+mod number_tiering;
 mod numbering;
 mod storage;
 mod types;
@@ -24,8 +25,8 @@ pub use types::{
     ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
     ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
-    ParagraphListNumberSequence, ParagraphListNumbering, ParagraphListPlacement,
-    ParagraphListStart, ParagraphListTextGap,
+    ParagraphListNumberSequence, ParagraphListNumberTiering, ParagraphListNumbering,
+    ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
 };
 
 pub(crate) use bullet::paragraph_list_bullet;
@@ -43,6 +44,10 @@ pub(super) use levels::{reset_paragraph_list_level, set_paragraph_list_level};
 pub(crate) use number_format::paragraph_list_number_format;
 pub(super) use number_format::{
     reset_paragraph_list_number_format, set_paragraph_list_number_format,
+};
+pub(crate) use number_tiering::paragraph_list_number_tiering;
+pub(super) use number_tiering::{
+    reset_paragraph_list_number_tiering, set_paragraph_list_number_tiering,
 };
 pub(crate) use numbering::paragraph_list_numbering;
 pub(super) use numbering::set_paragraph_list_numbering;
