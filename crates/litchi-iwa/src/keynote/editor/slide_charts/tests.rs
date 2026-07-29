@@ -7,11 +7,11 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
-    ChartLegendFill, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-    ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
-    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFontSize, ChartGapPercentage,
+    ChartGapSpacing, ChartLegendFill, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
+    ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
+    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
+    ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
     ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
     ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
@@ -1674,6 +1674,82 @@ fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
         .set_slide_chart_legend_fill(0, object_id, &ChartLegendFill::Inherited)
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn scratch_presentation_supports_exact_chart_legend_font_size_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let object_id = chart.drawable_object_id;
+    let fill = ChartLegendFill::Fill(ShapeFill::Solid(
+        RgbaColor::new(0.9, 0.95, 1.0, 1.0, RgbColorSpace::Srgb).unwrap(),
+    ));
+    editor
+        .set_slide_chart_legend_fill(0, object_id, &fill)
+        .unwrap();
+    let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.slide_chart_legend_font_size(0, object_id).unwrap(),
+        ChartLegendFontSize::Inherited
+    );
+    let eighteen = ChartLegendFontSize::Size(ChartFontSize::from_points(18.0).unwrap());
+    editor
+        .set_slide_chart_legend_font_size(0, object_id, eighteen)
+        .unwrap();
+    assert_eq!(
+        editor.slide_chart_legend_font_size(0, object_id).unwrap(),
+        eighteen
+    );
+    assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), fill);
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let sixteen = ChartLegendFontSize::Size(ChartFontSize::from_points(16.0).unwrap());
+    reopened
+        .set_slide_chart_legend_font_size(0, object_id, sixteen)
+        .unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_font_size(0, object_id).unwrap(),
+        sixteen
+    );
+    reopened
+        .set_slide_chart_legend_font_size(0, object_id, ChartLegendFontSize::Inherited)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn duplicated_legend_font_size_is_copy_on_write() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let eighteen = ChartLegendFontSize::Size(ChartFontSize::from_points(18.0).unwrap());
+    editor
+        .set_slide_chart_legend_font_size(0, chart.drawable_object_id, eighteen)
+        .unwrap();
+    let duplicate = editor
+        .duplicate_slide_chart(0, chart.drawable_object_id)
+        .unwrap();
+    let sixteen = ChartLegendFontSize::Size(ChartFontSize::from_points(16.0).unwrap());
+    editor
+        .set_slide_chart_legend_font_size(0, chart.drawable_object_id, sixteen)
+        .unwrap();
+
+    assert_eq!(
+        editor
+            .slide_chart_legend_font_size(0, chart.drawable_object_id)
+            .unwrap(),
+        sixteen
+    );
+    assert_eq!(
+        editor
+            .slide_chart_legend_font_size(0, duplicate.drawable_object_id)
+            .unwrap(),
+        eighteen
+    );
 }
 
 #[test]

@@ -5,6 +5,10 @@ use crate::charts::legend_fill::{
     chart_legend_fill as read_native_chart_legend_fill,
     set_chart_legend_fill as set_native_chart_legend_fill,
 };
+use crate::charts::legend_font_size::{
+    chart_legend_font_size as read_native_chart_legend_font_size,
+    set_chart_legend_font_size as set_native_chart_legend_font_size,
+};
 use crate::charts::legend_shadow::{
     chart_legend_shadow as read_native_chart_legend_shadow,
     set_chart_legend_shadow as set_native_chart_legend_shadow,
@@ -17,7 +21,7 @@ use crate::charts::options::{
     chart_legend_visible as read_native_chart_legend_visible,
     set_chart_legend_visible as set_native_chart_legend_visible,
 };
-use crate::charts::{ChartLegendFill, ChartLegendShadow, ChartLegendStroke};
+use crate::charts::{ChartLegendFill, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke};
 
 impl NumbersEditor {
     /// Read whether Numbers shows the native legend for one sheet chart.
@@ -77,6 +81,50 @@ impl NumbersEditor {
         if verified.sheet_chart_legend_fill(sheet_id, drawable_object_id)? != *fill {
             return Err(Error::InvalidFormat(
                 "Numbers chart legend-fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read the exact inherited or direct native legend font size.
+    pub fn sheet_chart_legend_font_size(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ChartLegendFontSize> {
+        let graph = chart_graph(self, sheet_id, drawable_object_id)?;
+        read_native_chart_legend_font_size(
+            &self.package,
+            &graph.archive_name,
+            drawable_object_id,
+            "Numbers",
+        )
+    }
+
+    /// Set or remove the direct native legend font-size override.
+    pub fn set_sheet_chart_legend_font_size(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        size: ChartLegendFontSize,
+    ) -> Result<()> {
+        if self.sheet_chart_legend_font_size(sheet_id, drawable_object_id)? == size {
+            return Ok(());
+        }
+        let graph = chart_graph(self, sheet_id, drawable_object_id)?;
+        let mut staged = self.package.clone();
+        set_native_chart_legend_font_size(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            "Numbers",
+            size,
+        )?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.sheet_chart_legend_font_size(sheet_id, drawable_object_id)? != size {
+            return Err(Error::InvalidFormat(
+                "Numbers chart legend font-size update failed validation".to_owned(),
             ));
         }
         *self = verified;

@@ -16,8 +16,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let editor = KeynoteEditor::open(input)?;
     for slide in editor.slides()? {
         for chart in editor.slide_charts(slide.index)? {
+            let legend_font_size =
+                editor.slide_chart_legend_font_size(slide.index, chart.drawable_object_id)?;
             println!(
-                "slide={} object={} kind={:?} direction={:?} rows={} columns={}",
+                "slide={} object={} kind={:?} direction={:?} rows={} columns={} legend_font_size={legend_font_size:?}",
                 chart.slide_index,
                 chart.drawable_object_id,
                 chart.kind,

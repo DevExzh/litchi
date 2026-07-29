@@ -177,7 +177,7 @@ struct NativeParagraphBorderFields {
 }
 
 impl ParagraphStyleOverrides {
-    pub(super) fn count(&self) -> u32 {
+    pub(crate) fn count(&self) -> u32 {
         u32::from(self.bold.is_some())
             + u32::from(self.italic.is_some())
             + u32::from(self.point_size.is_some())
