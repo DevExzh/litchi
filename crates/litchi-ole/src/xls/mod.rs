@@ -38,6 +38,25 @@ mod chart_frt;
 /// properties as an opaque `XmlTkChain` byte chain.
 mod crt_ml_frt;
 
+/// BIFF8 `Backup` record: the workbook save-backup flag.
+mod backup;
+
+/// BIFF8 `BkHim` record: sheet background image data.
+mod background_picture;
+
+/// BIFF8 `CellWatch` record: a watched-cell reference.
+mod cell_watch;
+
+/// BIFF8 user-interface collection markers (`InterfaceHdr`, `InterfaceEnd`).
+mod interface_records;
+
+/// BIFF8 `HFPicture` record: a sheet header/footer picture.
+mod header_footer_picture;
+
+/// BIFF8 `Pls` record: printer driver `DEVMODE` data spanning `Continue`
+/// records.
+mod printer_driver;
+
 /// BIFF8 worksheet scenario manager records.
 mod scenario;
 
@@ -311,6 +330,12 @@ pub use page_setup::{
 pub use palette::{XlsColor, XlsPalette};
 pub use print_flags::{XlsGridSet, XlsPrintRowCol};
 pub use crt_ml_frt::XlsCrtMlFrt;
+pub use backup::XlsBackup;
+pub use background_picture::{XlsBackgroundImage, XlsBackgroundImageFormat};
+pub use cell_watch::XlsCellWatch;
+pub use header_footer_picture::XlsHeaderFooterPicture;
+pub use interface_records::{XlsInterfaceEnd, XlsInterfaceHdr};
+pub use printer_driver::XlsPrinterDriverData;
 pub use sxview_link::XlsSXViewLink;
 pub use query_table::{
     XlsHtmlFormatting, XlsOleDbConnection, XlsQueryParameter, XlsQueryParameterType,
