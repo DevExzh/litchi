@@ -88,7 +88,10 @@ pub(crate) fn validate_chart_sheet_chart(chart: &WorksheetChart) -> SheetResult<
     Ok(())
 }
 
-/// Validate an Excel sheet name: 1-31 characters, none of `: \ / ? * [ ]`.
+/// Validate an Excel sheet name: 1-31 characters, none of `: \ / ? * [ ]`,
+/// not the reserved name `History` (any letter case), and not starting or
+/// ending with an apostrophe (Excel quotes sheet names in references with
+/// `'` and forbids it at the edges of the name itself).
 pub(crate) fn validate_sheet_name(name: &str) -> SheetResult<()> {
     let length = name.chars().count();
     if length == 0 || length > MAX_SHEET_NAME_CHARS {
@@ -101,6 +104,14 @@ pub(crate) fn validate_sheet_name(name: &str) -> SheetResult<()> {
         .find(|c| matches!(c, ':' | '\\' | '/' | '?' | '*' | '[' | ']'))
     {
         return Err(format!("sheet name '{name}' contains forbidden character '{bad}'").into());
+    }
+    if name.eq_ignore_ascii_case("history") {
+        return Err("sheet name 'History' is reserved by Excel".into());
+    }
+    if name.starts_with('\'') || name.ends_with('\'') {
+        return Err(
+            format!("sheet name '{name}' must not start or end with an apostrophe").into(),
+        );
     }
     Ok(())
 }
@@ -155,6 +166,8 @@ mod tests {
     #[test]
     fn validates_sheet_names() {
         assert!(validate_sheet_name("Chart 1").is_ok());
+        // Interior apostrophes are legal in Excel sheet names.
+        assert!(validate_sheet_name("Sheet'1").is_ok());
         for name in [
             "",
             "This chartsheet name is way too long to be valid",
@@ -165,6 +178,10 @@ mod tests {
             "a*b",
             "a[b",
             "a]b",
+            "History",
+            "HISTORY",
+            "'Quoted",
+            "Quoted'",
         ] {
             assert!(validate_sheet_name(name).is_err(), "accepted '{name}'");
         }

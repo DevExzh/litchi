@@ -108,6 +108,63 @@ fn shift_index_keyed_mutations<V>(map: &mut HashMap<usize, V>, removed: usize) {
     map.extend(shifted);
 }
 
+/// Extract a numeric stem from a part name (`prefix{digits}suffix`).
+fn numeric_part_stem(name: &str, prefix: &str, suffix: &str) -> Option<u32> {
+    name.strip_prefix(prefix)?
+        .strip_suffix(suffix)?
+        .parse::<u32>()
+        .ok()
+}
+
+/// Whether a package part name belongs to a writer-owned sheet part
+/// family but has no live backing sheet in the writer data. Names that
+/// do not parse cleanly are conservatively kept.
+fn is_stale_sheet_part(
+    name: &str,
+    worksheet_ids: &HashSet<u32>,
+    all_sheet_ids: &HashSet<u32>,
+    chartsheet_count: usize,
+) -> bool {
+    // /xl/worksheets/sheet{id}.xml — regenerated once per worksheet.
+    if let Some(id) = numeric_part_stem(name, "/xl/worksheets/sheet", ".xml") {
+        return !worksheet_ids.contains(&id);
+    }
+    // /xl/chartsheets/sheet{n}.xml and its drawing — regenerated per slot.
+    if let Some(n) = numeric_part_stem(name, "/xl/chartsheets/sheet", ".xml") {
+        return n as usize > chartsheet_count;
+    }
+    if let Some(n) = numeric_part_stem(name, "/xl/drawings/drawingChartsheet", ".xml") {
+        return n as usize > chartsheet_count;
+    }
+    // /xl/charts/chart{id}_{m}.xml — hosted by a worksheet or chartsheet.
+    if let Some(rest) = name
+        .strip_prefix("/xl/charts/chart")
+        .and_then(|rest| rest.strip_suffix(".xml"))
+        && let Some((id, _)) = rest.split_once('_')
+        && let Ok(id) = id.parse::<u32>()
+    {
+        return !all_sheet_ids.contains(&id);
+    }
+    // /xl/drawings/drawing{id}.xml and vmlDrawing{id}.vml — per worksheet.
+    if let Some(id) = numeric_part_stem(name, "/xl/drawings/drawing", ".xml") {
+        return !worksheet_ids.contains(&id);
+    }
+    if let Some(id) = numeric_part_stem(name, "/xl/drawings/vmlDrawing", ".vml") {
+        return !worksheet_ids.contains(&id);
+    }
+    // /xl/media/image{id}_{m}.{ext} — per worksheet.
+    if let Some(rest) = name.strip_prefix("/xl/media/image") {
+        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+        if digits > 0
+            && rest[digits..].starts_with('_')
+            && let Ok(id) = rest[..digits].parse::<u32>()
+        {
+            return !worksheet_ids.contains(&id);
+        }
+    }
+    false
+}
+
 fn next_active_x_part_uri(
     package: &OpcPackage,
     directory: &str,
@@ -1425,6 +1482,29 @@ impl Workbook {
         Ok(relationship.target_partname()?)
     }
 
+    /// Whether the sheet at `index` is a worksheet rather than a
+    /// chartsheet or dialogsheet, judged by its workbook relationship
+    /// type (`sheet`, ECMA-376 §18.2.19; `chartsheet`, ECMA-376 §18.3.1.12).
+    /// Sheet-scoped companion parts (ActiveX, web extensions) only exist
+    /// on worksheets, so save-time detachment skips the rest.
+    fn is_spreadsheetml_worksheet(&self, index: usize) -> bool {
+        use litchi_opc::constants::relationship_type as rt;
+
+        let (Ok(workbook_part), Some(info)) = (
+            self.package.get_part(&self.workbook_uri),
+            self.worksheets.get(index),
+        ) else {
+            return false;
+        };
+        workbook_part
+            .rels()
+            .get(&info.relationship_id)
+            .is_some_and(|relationship| {
+                relationship.reltype() == rt::WORKSHEET
+                    || relationship.reltype() == rt::STRICT_WORKSHEET
+            })
+    }
+
     /// Get the shared strings table (for internal use by worksheet)
     pub(crate) fn shared_strings(&self) -> &SharedStrings {
         &self.shared_strings
@@ -2147,6 +2227,7 @@ impl Workbook {
             // Take mutable_data temporarily to avoid borrow issues
             if let Some(mut mutable_data) = self.mutable_data.take() {
                 let worksheet_web_extension_bindings = (0..self.worksheets.len())
+                    .filter(|index| self.is_spreadsheetml_worksheet(*index))
                     .map(|index| {
                         let bindings = self.worksheet_web_extension_bindings(index)?;
                         Ok((!bindings.is_empty()
@@ -2164,6 +2245,7 @@ impl Workbook {
                 // do not become orphaned, then restore them after materialization.
                 let named_sheet_views = self.detach_named_sheet_views_before_materialization()?;
                 let active_x_controls = (0..self.worksheets.len())
+                    .filter(|index| self.is_spreadsheetml_worksheet(*index))
                     .map(|index| {
                         let info = self
                             .worksheets
@@ -2249,6 +2331,14 @@ impl Workbook {
                     &worksheet_web_extension_bindings,
                 )?;
                 self.mutable_data = Some(mutable_data);
+
+                // Re-sync the read-side model (worksheet relationship IDs,
+                // defined names, shared strings, styles) with the parts
+                // just written, so a second save resolves the same state
+                // as a reopened workbook.
+                self.load_workbook_info()?;
+                self.load_shared_strings()?;
+                self.load_styles()?;
             }
         }
 
@@ -2380,11 +2470,14 @@ impl Workbook {
     fn detach_named_sheet_views_before_materialization(
         &mut self,
     ) -> SheetResult<Vec<(u32, NamedSheetViews)>> {
-        let worksheets = self
-            .worksheets
-            .iter()
-            .map(|info| Ok((info.sheet_id, self.worksheet_part_uri(info)?)))
-            .collect::<SheetResult<Vec<_>>>()?;
+        // Named sheet views only exist on worksheets; chartsheets share the
+        // sheets sequence but have no worksheet part to detach from.
+        let mut worksheets = Vec::new();
+        for (index, info) in self.worksheets.iter().enumerate() {
+            if self.is_spreadsheetml_worksheet(index) {
+                worksheets.push((info.sheet_id, self.worksheet_part_uri(info)?));
+            }
+        }
         let mut retained = Vec::new();
         for (sheet_id, worksheet_part) in worksheets {
             if let Some(value) = load_worksheet_named_sheet_views(&self.package, &worksheet_part)? {
@@ -2516,12 +2609,42 @@ impl Workbook {
         Ok(Some(normalized))
     }
 
+    /// Remove writer-owned sheet parts left over from a previous
+    /// materialization (for example a sheet removed between two saves),
+    /// so saving twice never emits orphaned parts. Live parts are derived
+    /// from the writer data (`sheet`, ECMA-376 §18.2.19; `chartsheet`,
+    /// ECMA-376 §18.3.1.12); anything under the writer-owned naming
+    /// schemes without live backing is dropped.
+    fn remove_stale_sheet_parts(&mut self, data: &MutableWorkbookData) {
+        let worksheet_ids: HashSet<u32> =
+            data.worksheets.iter().map(|ws| ws.sheet_id()).collect();
+        let all_sheet_ids: HashSet<u32> = worksheet_ids
+            .iter()
+            .copied()
+            .chain(data.chart_sheets.iter().map(|sheet| sheet.sheet_id()))
+            .collect();
+        let chartsheet_count = data.chart_sheets.len();
+
+        let stale: Vec<PackURI> = self
+            .package
+            .iter_parts()
+            .map(|part| part.partname().clone())
+            .filter(|uri| {
+                is_stale_sheet_part(uri.as_str(), &worksheet_ids, &all_sheet_ids, chartsheet_count)
+            })
+            .collect();
+        for uri in stale {
+            self.package.remove_part(&uri);
+        }
+    }
+
     fn update_workbook_parts(&mut self, data: &mut MutableWorkbookData) -> SheetResult<()> {
         use litchi_opc::constants::content_type as ct;
         use litchi_opc::constants::relationship_type as rt;
         use litchi_opc::part::{BlobPart, Part};
 
         validate_workbook_tables(data)?;
+        self.remove_stale_sheet_parts(data);
 
         let (
             preserved_main_content_type,
