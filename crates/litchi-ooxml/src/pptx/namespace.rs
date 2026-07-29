@@ -91,6 +91,12 @@ pub(crate) fn presentation_name(xml_bytes: &[u8]) -> Result<String> {
     }
 }
 
+/// Maximum capture nesting depth accepted by the shared PresentationML
+/// element scanner, matching the hardened presentation part parser.
+const MAX_SCAN_DEPTH: usize = 128;
+/// Maximum number of elements scanned in one slide part.
+const MAX_SCAN_NODES: usize = 1_000_000;
+
 pub(crate) fn scan_presentationml_element_ranges(
     xml_bytes: &[u8],
     targets: &[&[u8]],
@@ -107,6 +113,8 @@ pub(crate) fn scan_presentationml_element_ranges(
 
     let mut reader = NsReader::from_reader(xml_bytes);
     let mut capture: Option<(usize, usize, usize)> = None;
+    let mut nodes = 0usize;
+    let mut total_depth = 0usize;
     loop {
         let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
             OoxmlError::InvalidFormat("PresentationML offset does not fit usize".to_string())
@@ -115,6 +123,36 @@ pub(crate) fn scan_presentationml_element_ranges(
             let (namespace, event) = reader
                 .read_resolved_event()
                 .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            if matches!(event, Event::Start(_) | Event::Empty(_)) {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat(
+                        "PresentationML element counter overflow".to_string(),
+                    )
+                })?;
+                if nodes > MAX_SCAN_NODES {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "PresentationML XML exceeds {MAX_SCAN_NODES} elements"
+                    )));
+                }
+            }
+            // Total nesting is tracked separately from capture depth so
+            // deeply nested non-target content is rejected before
+            // quick-xml's own namespace resolver overflows (u16).
+            if matches!(event, Event::Start(_)) {
+                total_depth = total_depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("PresentationML nesting is too deep".to_string())
+                })?;
+                if total_depth > MAX_SCAN_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "PresentationML nesting exceeds the {MAX_SCAN_DEPTH} depth limit"
+                    )));
+                }
+            }
+            if matches!(event, Event::End(_)) {
+                total_depth = total_depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid PresentationML nesting".to_string())
+                })?;
+            }
             match event {
                 Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
                 Event::Start(element) => targets
@@ -145,6 +183,11 @@ pub(crate) fn scan_presentationml_element_ranges(
                 *depth = depth.checked_add(1).ok_or_else(|| {
                     OoxmlError::InvalidFormat("PresentationML nesting is too deep".to_string())
                 })?;
+                if *depth > MAX_SCAN_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "PresentationML nesting exceeds the {MAX_SCAN_DEPTH} depth limit"
+                    )));
+                }
             },
             ScanEvent::Empty(target) => {
                 emit_range(target, event_start, event_end, &mut emit)?;

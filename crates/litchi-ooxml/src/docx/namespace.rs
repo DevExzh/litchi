@@ -73,6 +73,12 @@ fn is_fragment_word_namespace(
     }
 }
 
+/// Maximum capture nesting depth accepted by the shared WordprocessingML
+/// element scanner, matching the hardened settings and mail-merge parsers.
+const MAX_SCAN_DEPTH: usize = 128;
+/// Maximum number of elements scanned in one document part.
+const MAX_SCAN_NODES: usize = 1_000_000;
+
 pub(crate) fn scan_word_element_ranges(
     xml_bytes: &[u8],
     targets: &[&[u8]],
@@ -90,6 +96,8 @@ pub(crate) fn scan_word_element_ranges(
     let mut reader = NsReader::from_reader(xml_bytes);
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut capture: Option<(usize, usize, usize)> = None;
+    let mut nodes = 0usize;
+    let mut total_depth = 0usize;
 
     loop {
         let event_start = usize::try_from(reader.buffer_position()).map_err(|_| {
@@ -99,6 +107,35 @@ pub(crate) fn scan_word_element_ranges(
             let (namespace, event) = reader
                 .read_resolved_event()
                 .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+
+            if matches!(event, Event::Start(_) | Event::Empty(_)) {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word XML element counter overflow".to_string())
+                })?;
+                if nodes > MAX_SCAN_NODES {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "Word XML exceeds {MAX_SCAN_NODES} elements"
+                    )));
+                }
+            }
+            // Total nesting is tracked separately from capture depth so
+            // deeply nested non-target content is rejected before
+            // quick-xml's own namespace resolver overflows (u16).
+            if matches!(event, Event::Start(_)) {
+                total_depth = total_depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
+                })?;
+                if total_depth > MAX_SCAN_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "Word XML nesting exceeds the {MAX_SCAN_DEPTH} depth limit"
+                    )));
+                }
+            }
+            if matches!(event, Event::End(_)) {
+                total_depth = total_depth.checked_sub(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("invalid Word XML nesting".to_string())
+                })?;
+            }
 
             if fragment_prefix.is_none()
                 && let Event::Start(element) = &event
@@ -151,6 +188,11 @@ pub(crate) fn scan_word_element_ranges(
                 *depth = depth.checked_add(1).ok_or_else(|| {
                     OoxmlError::InvalidFormat("Word element nesting is too deep".to_string())
                 })?;
+                if *depth > MAX_SCAN_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "Word element nesting exceeds the {MAX_SCAN_DEPTH} depth limit"
+                    )));
+                }
             },
             ScanEvent::Empty(target) => {
                 emit_word_element_range(target, event_start, event_end, &mut emit)?;

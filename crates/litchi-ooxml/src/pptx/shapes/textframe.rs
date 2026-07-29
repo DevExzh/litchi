@@ -8,6 +8,12 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+/// Maximum nesting depth accepted when extracting DrawingML text, matching
+/// the hardened slide element scanner.
+const MAX_TEXT_SCAN_DEPTH: usize = 128;
+/// Maximum number of elements scanned while extracting DrawingML text.
+const MAX_TEXT_SCAN_NODES: usize = 1_000_000;
+
 fn is_drawingml_name(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
@@ -40,6 +46,7 @@ pub(crate) fn extract_drawingml_text(
     let mut result = String::with_capacity(xml_bytes.len() / 8);
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut depth = 0usize;
+    let mut nodes = 0usize;
     let mut text_depth = None;
     let mut seen_paragraph = false;
 
@@ -61,9 +68,22 @@ pub(crate) fn extract_drawingml_text(
 
         match event {
             Event::Start(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("DrawingML element counter overflow".to_string())
+                })?;
+                if nodes > MAX_TEXT_SCAN_NODES {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "DrawingML XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                    )));
+                }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     OoxmlError::InvalidFormat("DrawingML nesting is too deep".to_string())
                 })?;
+                if depth > MAX_TEXT_SCAN_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "DrawingML nesting exceeds the {MAX_TEXT_SCAN_DEPTH} depth limit"
+                    )));
+                }
                 if is_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
                     if seen_paragraph
                         && !result.is_empty()
@@ -84,6 +104,14 @@ pub(crate) fn extract_drawingml_text(
                 }
             },
             Event::Empty(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("DrawingML element counter overflow".to_string())
+                })?;
+                if nodes > MAX_TEXT_SCAN_NODES {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "DrawingML XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                    )));
+                }
                 if is_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
                     if seen_paragraph
                         && !result.is_empty()

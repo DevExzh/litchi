@@ -15,6 +15,13 @@ use quick_xml::reader::NsReader;
 
 const P14_NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 const P14_NAMESPACE_BYTES: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+
+/// Maximum nesting depth accepted in a slide transition element
+/// (`p:transition`, ECMA-376 §19.3.1.50), matching the other hardened
+/// PresentationML parsers.
+const MAX_TRANSITION_DEPTH: usize = 128;
+/// Maximum number of elements accepted while scanning for a transition.
+const MAX_TRANSITION_NODES: usize = 1_000_000;
 const MARKUP_COMPATIBILITY_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
@@ -370,6 +377,7 @@ impl SlideTransition {
         let xml = process_markup_compatibility(xml, &capabilities, &MceLimits::default())?.xml;
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut stack = Vec::new();
+        let mut nodes = 0usize;
         let mut transition: Option<SlideTransition> = None;
         let mut selected_transition_depth = None;
 
@@ -384,6 +392,19 @@ impl SlideTransition {
 
             match event {
                 Event::Start(element) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("transition XML element counter overflow".into())
+                    })?;
+                    if nodes > MAX_TRANSITION_NODES {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "transition XML exceeds {MAX_TRANSITION_NODES} elements"
+                        )));
+                    }
+                    if stack.len() >= MAX_TRANSITION_DEPTH {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "transition XML exceeds the {MAX_TRANSITION_DEPTH} nesting depth limit"
+                        )));
+                    }
                     let depth = stack.len().checked_add(1).ok_or_else(|| {
                         OoxmlError::InvalidFormat("transition XML nesting is too deep".to_string())
                     })?;
@@ -406,6 +427,14 @@ impl SlideTransition {
                     stack.push(is_transition);
                 },
                 Event::Empty(element) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat("transition XML element counter overflow".into())
+                    })?;
+                    if nodes > MAX_TRANSITION_NODES {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "transition XML exceeds {MAX_TRANSITION_NODES} elements"
+                        )));
+                    }
                     let depth = stack.len().checked_add(1).ok_or_else(|| {
                         OoxmlError::InvalidFormat("transition XML nesting is too deep".to_string())
                     })?;

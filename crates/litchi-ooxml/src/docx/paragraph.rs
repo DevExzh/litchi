@@ -26,6 +26,12 @@ use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::sync::Arc;
 
+/// Maximum nesting depth accepted when extracting paragraph text, matching
+/// the hardened document element scanner.
+const MAX_TEXT_SCAN_DEPTH: usize = 128;
+/// Maximum number of elements scanned while extracting paragraph text.
+const MAX_TEXT_SCAN_NODES: usize = 1_000_000;
+
 fn is_fragment_word_name(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
@@ -267,6 +273,7 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
     let mut result = String::with_capacity(xml_bytes.len() / 8);
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut depth = 0usize;
+    let mut nodes = 0usize;
     let mut text_depth = None;
 
     loop {
@@ -288,9 +295,22 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
 
         match event {
             Event::Start(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word XML element counter overflow".to_string())
+                })?;
+                if nodes > MAX_TEXT_SCAN_NODES {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                    )));
+                }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     OoxmlError::InvalidFormat("Word XML nesting is too deep".to_string())
                 })?;
+                if depth > MAX_TEXT_SCAN_DEPTH {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "Word XML nesting exceeds the {MAX_TEXT_SCAN_DEPTH} depth limit"
+                    )));
+                }
                 if text_depth.is_none()
                     && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
                 {
@@ -302,6 +322,14 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
                 }
             },
             Event::Empty(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Word XML element counter overflow".to_string())
+                })?;
+                if nodes > MAX_TEXT_SCAN_NODES {
+                    return Err(OoxmlError::InvalidFormat(format!(
+                        "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                    )));
+                }
                 if let Some(character) =
                     word_special_character(&namespace, element.name(), &fragment_prefix)
                 {

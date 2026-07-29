@@ -170,3 +170,64 @@ fn slide_part_parsers_reject_malformed_xml_without_panics() {
         let _ = slide.animations();
     }
 }
+
+/// Corrupt the slide part in an otherwise valid one-slide package and run
+/// the slide-level accessor battery over the given blob.
+fn exercise_slide(
+    blob: &[u8],
+) -> (
+    litchi_ooxml::error::Result<String>,
+    litchi_ooxml::error::Result<Vec<litchi_ooxml::pptx::shapes::base::BaseShape>>,
+    litchi_ooxml::error::Result<Option<litchi_ooxml::pptx::transitions::SlideTransition>>,
+) {
+    let output = NamedTempFile::with_suffix(".pptx").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .presentation_mut()
+        .unwrap()
+        .add_slide()
+        .unwrap()
+        .set_title("seed");
+    package.save(output.path()).unwrap();
+
+    let mut package = Package::open(output.path()).unwrap();
+    let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    package
+        .opc_package_mut()
+        .get_part_mut(&slide_uri)
+        .unwrap()
+        .set_blob(blob.to_vec());
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let slide = &slides[0];
+    (slide.text(), slide.shapes(), slide.transition())
+}
+
+#[test]
+fn slide_part_excessive_nesting_depth_is_rejected() {
+    let mut blob = format!(r#"<p:sld xmlns:p="{PML}"><p:cSld><p:spTree>"#).into_bytes();
+    blob.extend_from_slice(b"<p:grpSp>".repeat(100_000).as_slice());
+    blob.extend_from_slice(b"</p:grpSp>".repeat(100_000).as_slice());
+    blob.extend_from_slice(b"</p:spTree></p:cSld></p:sld>");
+    let (_, shapes, _) = exercise_slide(&blob);
+    assert!(shapes.is_err(), "deeply nested slide XML was accepted");
+}
+
+#[test]
+fn slide_part_excessive_element_count_is_rejected() {
+    let mut blob = format!(r#"<p:sld xmlns:p="{PML}"><p:cSld><p:spTree>"#).into_bytes();
+    blob.extend_from_slice(b"<p:sp/>".repeat(2_000_000).as_slice());
+    blob.extend_from_slice(b"</p:spTree></p:cSld></p:sld>");
+    let (_, shapes, _) = exercise_slide(&blob);
+    assert!(shapes.is_err(), "oversized slide XML was accepted");
+}
+
+#[test]
+fn transition_excessive_nesting_depth_is_rejected() {
+    let mut blob = format!(r#"<p:sld xmlns:p="{PML}"><p:transition>"#).into_bytes();
+    blob.extend_from_slice(b"<p:ext>".repeat(100_000).as_slice());
+    blob.extend_from_slice(b"</p:ext>".repeat(100_000).as_slice());
+    blob.extend_from_slice(b"</p:transition></p:sld>");
+    let (_, _, transition) = exercise_slide(&blob);
+    assert!(transition.is_err(), "deeply nested transition XML was accepted");
+}
