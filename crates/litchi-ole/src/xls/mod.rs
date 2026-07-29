@@ -137,6 +137,12 @@ mod view;
 /// BIFF8 worksheet print and page setup.
 mod page_setup;
 
+/// BIFF8 worksheet print display flags (`PrintRowCol`, `GridSet`).
+mod print_flags;
+
+/// BIFF8 `SXViewLink` record: the PivotTable view linked to a Pivot Chart.
+mod sxview_link;
+
 /// Legacy BIFF8 conditional formatting.
 mod conditional_format;
 
@@ -299,6 +305,8 @@ pub use page_setup::{
     XlsPrintOrientation, XlsPrintSetup,
 };
 pub use palette::{XlsColor, XlsPalette};
+pub use print_flags::{XlsGridSet, XlsPrintRowCol};
+pub use sxview_link::XlsSXViewLink;
 pub use query_table::{
     XlsHtmlFormatting, XlsOleDbConnection, XlsQueryParameter, XlsQueryParameterType,
     XlsQuerySource, XlsQueryTable, XlsTextCodePage, XlsTextDelimiter, XlsTextField,
