@@ -112,6 +112,7 @@ pub mod placeholder_atom;
 pub mod print_options;
 pub mod privacy;
 pub mod prog_tags;
+pub mod prog_tag_extensions;
 pub mod recolor;
 pub mod routing_slip;
 pub mod shape_flags;
@@ -275,6 +276,14 @@ pub use privacy::PowerPointPrivacySettings;
 pub use prog_tags::{
     PowerPointProgBinaryTag, PowerPointProgBinaryTagVersion, PowerPointProgStringTag,
     PowerPointProgTag, PowerPointProgTagLimits, PowerPointProgTagScope, PowerPointProgTags,
+};
+pub use prog_tag_extensions::{
+    PowerPoint9DocBinaryTagExtension, PowerPoint9SlideBinaryTagExtension,
+    PowerPoint10DocBinaryTagExtension, PowerPoint10SlideBinaryTagExtension,
+    PowerPoint11DocBinaryTagExtension, PowerPoint12DocBinaryTagExtension,
+    PowerPoint12SlideBinaryTagExtension, PowerPointDocBinaryTagExtension,
+    PowerPointDocumentTagExtensions, PowerPointSlideBinaryTagExtension,
+    PowerPointSlideTagExtensions,
 };
 pub use recolor::{
     PowerPointRecolorBitmapType, PowerPointRecolorBrush, PowerPointRecolorEntry,

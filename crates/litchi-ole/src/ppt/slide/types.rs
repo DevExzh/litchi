@@ -240,6 +240,25 @@ impl<'doc> Slide<'doc> {
         Ok(result)
     }
 
+    /// Return this slide's typed slide-level programmable tags (MS-PPT 2.5.19),
+    /// when the slide carries a `SlideProgTagsContainer`.
+    ///
+    /// Tag payloads are inert: they are parsed and preserved, never executed,
+    /// loaded, or resolved. Use
+    /// [`crate::ppt::PowerPointProgTags::slide_extensions`] to decode the
+    /// versioned binary-tag payloads into typed extension structs.
+    pub fn programmable_tags(&self) -> Result<Option<crate::ppt::PowerPointProgTags>> {
+        self.programmable_tags_with_limits(crate::ppt::PowerPointProgTagLimits::default())
+    }
+
+    /// Return slide-level programmable tags with caller-supplied resource limits.
+    pub fn programmable_tags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointProgTagLimits,
+    ) -> Result<Option<crate::ppt::PowerPointProgTags>> {
+        crate::ppt::PowerPointProgTags::parse_slide(&self.record, limits)
+    }
+
     /// Return every typed shape-flag projection on this slide.
     pub fn shape_flags(&self) -> Result<Vec<crate::ppt::PowerPointShapeFlagEntry>> {
         self.shape_flags_with_limits(crate::ppt::PowerPointShapeFlagLimits::default())

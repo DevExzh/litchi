@@ -1165,6 +1165,25 @@ impl Presentation {
         crate::ppt::PowerPointSmartTagStore::parse(&document)
     }
 
+    /// Return the typed document-level programmable tags (MS-PPT 2.4.23), when
+    /// the document carries a `DocProgTagsContainer`.
+    ///
+    /// Tag payloads are inert: they are parsed and preserved, never executed,
+    /// loaded, or resolved. Use
+    /// [`crate::ppt::PowerPointProgTags::document_extensions`] to decode the
+    /// versioned binary-tag payloads into typed extension structs.
+    pub fn programmable_tags(&self) -> Result<Option<crate::ppt::PowerPointProgTags>> {
+        self.programmable_tags_with_limits(crate::ppt::PowerPointProgTagLimits::default())
+    }
+
+    /// Return document-level programmable tags with caller-supplied resource limits.
+    pub fn programmable_tags_with_limits(
+        &self,
+        limits: crate::ppt::PowerPointProgTagLimits,
+    ) -> Result<Option<crate::ppt::PowerPointProgTags>> {
+        crate::ppt::PowerPointProgTags::parse_document(&self.live_document_record()?, limits)
+    }
+
     /// Return all shape programmable tags with caller-supplied resource limits.
     pub fn shape_programmable_tags_with_limits(
         &self,
