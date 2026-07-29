@@ -118,7 +118,8 @@ pub use text_comment_types::{
 pub use extractor::TextExtractor;
 pub use storage::{TextFragment, TextRun, TextStorage};
 pub use style::{
-    ParagraphBackground, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
+    ParagraphBorders, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
     ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
     ParagraphSpacingPoints, ParagraphStyle, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline,

@@ -15,9 +15,10 @@ use self::native::ParagraphStyleOverrides;
 use super::font::TextFont;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
-    ParagraphBackground, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextLigatures, TextOutline, TextScript, TextShadow, TextStyle,
+    ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextScript, TextShadow,
+    TextStyle,
 };
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
@@ -38,6 +39,7 @@ enum ParagraphProperty<'a> {
     TextShadow(TextShadow),
     TextBackground(TextBackground),
     Background(ParagraphBackground),
+    Borders(ParagraphBorders),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -60,6 +62,7 @@ enum ParagraphPropertyKind {
     TextShadow,
     TextBackground,
     Background,
+    Borders,
     Alignment,
     LineSpacing,
     Spacing,
@@ -406,6 +409,29 @@ pub(super) fn reset_paragraph_background(
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Background)
+}
+
+pub(super) fn paragraph_borders(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphBorders> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_paragraph_borders(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_borders(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    borders: ParagraphBorders,
+) -> Result<()> {
+    if paragraph_borders(package, storage_id)? == borders {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::Borders(borders))
+}
+
+pub(super) fn reset_paragraph_borders(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::Borders)
 }
 
 pub(super) fn paragraph_alignment(
@@ -850,6 +876,7 @@ fn apply_property(
         ParagraphProperty::Background(background) => {
             overrides.paragraph_background = Some(*background);
         },
+        ParagraphProperty::Borders(borders) => overrides.paragraph_borders = Some(*borders),
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -887,6 +914,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextShadow => overrides.shadow.is_some(),
         ParagraphPropertyKind::TextBackground => overrides.background.is_some(),
         ParagraphPropertyKind::Background => overrides.paragraph_background.is_some(),
+        ParagraphPropertyKind::Borders => overrides.paragraph_borders.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -923,6 +951,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
         ParagraphPropertyKind::TextShadow => overrides.shadow = None,
         ParagraphPropertyKind::TextBackground => overrides.background = None,
         ParagraphPropertyKind::Background => overrides.paragraph_background = None,
+        ParagraphPropertyKind::Borders => overrides.paragraph_borders = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -982,6 +1011,9 @@ fn inherited_property(
         )),
         ParagraphPropertyKind::Background => Ok(ParagraphProperty::Background(
             native::inherited_paragraph_background(package, style_id)?,
+        )),
+        ParagraphPropertyKind::Borders => Ok(ParagraphProperty::Borders(
+            native::inherited_paragraph_borders(package, style_id)?,
         )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
@@ -1044,6 +1076,7 @@ fn validate_expected_property(
         ParagraphProperty::Background(background) => {
             paragraph_background(package, storage_id)? == background
         },
+        ParagraphProperty::Borders(borders) => paragraph_borders(package, storage_id)? == borders,
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

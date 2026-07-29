@@ -7,18 +7,19 @@ use crate::shapes::RgbaColor;
 use crate::text::font::TextFont;
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
-    ParagraphBackground, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline,
-    TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphBackground, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
 
 use super::{
     capitalization_from_character, line_spacing_from_archive, locate_style,
-    paragraph_background_from_properties, tabs, text_background_from_character,
-    text_color_from_character, text_font_from_character, text_outline_from_character,
-    text_shadow_from_character,
+    paragraph_background_from_properties, paragraph_borders_from_properties, tabs,
+    text_background_from_character, text_color_from_character, text_font_from_character,
+    text_outline_from_character, text_shadow_from_character,
 };
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
@@ -267,6 +268,23 @@ pub(super) fn paragraph_background(
             return Ok(InheritanceControl::Continue);
         };
         *value = Some(background);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn paragraph_borders(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphBorders> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(properties) = style.para_properties.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        let Some(borders) = paragraph_borders_from_properties(properties)? else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(borders);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())

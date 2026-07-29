@@ -5,11 +5,12 @@ use std::env;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeTextAutoSize, ShapeTextInset,
-    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment,
+    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
 };
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    DropCapWrap, ParagraphBackground, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents,
+    DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
+    ParagraphBorders, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents,
     ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
     ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
@@ -126,6 +127,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             0.552_926_2,
             1.0,
             RgbColorSpace::Srgb,
+        )?),
+    )?;
+    editor.set_slide_text_box_paragraph_borders(
+        0,
+        created.drawable_object_id,
+        ParagraphBorders::Bordered(ParagraphBorder::new(
+            RgbaColor::black(),
+            StrokeWidth::new(3.0)?,
+            StrokePattern::Solid,
+            ParagraphBorderSides::ALL,
+            ParagraphBorderOffset::from_points(9.0)?,
+            true,
         )?),
     )?;
     editor.set_slide_text_box_paragraph_alignment(

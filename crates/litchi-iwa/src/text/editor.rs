@@ -59,20 +59,21 @@ use super::number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
 };
 use super::paragraph_alignment::{
-    paragraph_alignment, paragraph_background, paragraph_indents, paragraph_line_spacing,
-    paragraph_spacing, paragraph_tab_stops, reset_paragraph_alignment, reset_paragraph_background,
-    reset_paragraph_indents, reset_paragraph_line_spacing, reset_paragraph_spacing,
-    reset_paragraph_tab_stops, reset_text_background, reset_text_baseline_shift,
-    reset_text_capitalization, reset_text_character_spacing, reset_text_color,
-    reset_text_decorations, reset_text_font, reset_text_ligatures, reset_text_outline,
-    reset_text_script, reset_text_shadow, reset_text_style, set_paragraph_alignment,
-    set_paragraph_background, set_paragraph_indents, set_paragraph_line_spacing,
-    set_paragraph_spacing, set_paragraph_tab_stops, set_text_background, set_text_baseline_shift,
-    set_text_capitalization, set_text_character_spacing, set_text_color, set_text_decorations,
-    set_text_font, set_text_ligatures, set_text_outline, set_text_script, set_text_shadow,
-    set_text_style, text_background, text_baseline_shift, text_capitalization,
-    text_character_spacing, text_color, text_decorations, text_font, text_ligatures, text_outline,
-    text_script, text_shadow, text_style,
+    paragraph_alignment, paragraph_background, paragraph_borders, paragraph_indents,
+    paragraph_line_spacing, paragraph_spacing, paragraph_tab_stops, reset_paragraph_alignment,
+    reset_paragraph_background, reset_paragraph_borders, reset_paragraph_indents,
+    reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
+    reset_text_background, reset_text_baseline_shift, reset_text_capitalization,
+    reset_text_character_spacing, reset_text_color, reset_text_decorations, reset_text_font,
+    reset_text_ligatures, reset_text_outline, reset_text_script, reset_text_shadow,
+    reset_text_style, set_paragraph_alignment, set_paragraph_background, set_paragraph_borders,
+    set_paragraph_indents, set_paragraph_line_spacing, set_paragraph_spacing,
+    set_paragraph_tab_stops, set_text_background, set_text_baseline_shift, set_text_capitalization,
+    set_text_character_spacing, set_text_color, set_text_decorations, set_text_font,
+    set_text_ligatures, set_text_outline, set_text_script, set_text_shadow, set_text_style,
+    text_background, text_baseline_shift, text_capitalization, text_character_spacing, text_color,
+    text_decorations, text_font, text_ligatures, text_outline, text_script, text_shadow,
+    text_style,
 };
 use super::paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
@@ -95,9 +96,10 @@ use super::paragraph_list::{
 use super::paragraph_tabs::ParagraphTabStops;
 use super::position::{TextPosition, TextRange};
 use super::style::{
-    ParagraphBackground, ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextLigatures, TextOutline, TextScript, TextShadow, TextStyle,
+    ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextScript, TextShadow,
+    TextStyle,
 };
 use super::text_comment::{
     add_text_comment, add_text_comment_reply, remove_text_comment, remove_text_comment_reply,
@@ -1576,6 +1578,42 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_background(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_background(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph borders across a uniform paragraph layout box.
+    pub fn paragraph_borders(&self, object_id: u64) -> Result<ParagraphBorders> {
+        paragraph_borders(&self.package, object_id)
+    }
+
+    /// Atomically set the Text → Layout paragraph borders.
+    pub fn set_paragraph_borders(
+        &mut self,
+        object_id: u64,
+        borders: ParagraphBorders,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_borders(&mut staged, object_id, borders)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_borders(&verified, object_id)? != borders {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph border update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph borders while preserving sibling overrides.
+    pub fn reset_paragraph_borders(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_borders(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

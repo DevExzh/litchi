@@ -9,10 +9,11 @@ use crate::protobuf::tswp;
 use crate::shapes::{
     DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeDropShadow,
     ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-    ShapeShadowOpacity, ShapeShadowPerspective,
+    ShapeShadowOpacity, ShapeShadowPerspective, StrokePattern, StrokeWidth,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
+    IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
@@ -507,6 +508,104 @@ fn native_paragraph_background_overrides_match_app_authored_wire() {
         ..Default::default()
     };
     assert!(native::paragraph_background_from_properties(&false_without_color).is_err());
+}
+
+#[test]
+fn native_paragraph_border_overrides_match_app_authored_wire() {
+    let border = ParagraphBorder::new(
+        RgbaColor::black(),
+        StrokeWidth::new(3.0).unwrap(),
+        StrokePattern::Solid,
+        ParagraphBorderSides::ALL,
+        ParagraphBorderOffset::from_points(9.0).unwrap(),
+        true,
+    )
+    .unwrap();
+    let overrides = ParagraphStyleOverrides {
+        paragraph_borders: Some(ParagraphBorders::Bordered(border)),
+        ..Default::default()
+    };
+    let object = native::variation_object(64, 65, 66, overrides.clone()).unwrap();
+    let message = &object.messages[0];
+    let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+    let properties = archive.para_properties.as_ref().unwrap();
+    assert_eq!(archive.override_count, Some(4));
+    assert_eq!(properties.deprecated_borders, Some(4));
+    assert_eq!(properties.border_positions, Some(15));
+    assert_eq!(properties.rounded_corners, Some(true));
+    let offset = properties.historical_rule_offset.as_ref().unwrap();
+    assert_eq!((offset.x, offset.y), (3.0, 3.0));
+    assert!(properties.stroke.is_some());
+    assert_eq!(
+        native::direct_overrides(&archive, &message.data).unwrap(),
+        Some(overrides)
+    );
+
+    let none = ParagraphStyleOverrides {
+        paragraph_borders: Some(ParagraphBorders::None),
+        ..Default::default()
+    };
+    let object = native::variation_object(67, 68, 69, none.clone()).unwrap();
+    let message = &object.messages[0];
+    let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+    let properties = archive.para_properties.as_ref().unwrap();
+    assert_eq!(archive.override_count, Some(4));
+    assert_eq!(properties.deprecated_borders, Some(0));
+    assert_eq!(properties.stroke_null, Some(true));
+    assert_eq!(properties.border_positions, Some(0));
+    assert_eq!(properties.rounded_corners, Some(false));
+    assert_eq!(
+        native::direct_overrides(&archive, &message.data).unwrap(),
+        Some(none)
+    );
+}
+
+#[test]
+fn native_paragraph_border_parser_rejects_conflicting_wire() {
+    let mismatched_sides = tswp::ParagraphStylePropertiesArchive {
+        deprecated_borders: Some(1),
+        border_positions: Some(2),
+        ..Default::default()
+    };
+    assert!(native::paragraph_borders_from_properties(&mismatched_sides).is_err());
+
+    let mismatched_offset = tswp::ParagraphStylePropertiesArchive {
+        historical_rule_offset: Some(crate::protobuf::tsp::Point { x: 1.0, y: 2.0 }),
+        deprecated_borders: Some(1),
+        border_positions: Some(1),
+        stroke: Some(crate::shapes::stroke_to_native(
+            ParagraphBorder::new(
+                RgbaColor::black(),
+                StrokeWidth::new(1.0).unwrap(),
+                StrokePattern::Solid,
+                ParagraphBorderSides::TOP,
+                ParagraphBorderOffset::DEFAULT,
+                false,
+            )
+            .unwrap()
+            .native_stroke(),
+        )),
+        ..Default::default()
+    };
+    assert!(native::paragraph_borders_from_properties(&mismatched_offset).is_err());
+
+    let null_and_stroke = tswp::ParagraphStylePropertiesArchive {
+        stroke_null: Some(true),
+        stroke: Some(crate::shapes::stroke_to_native(
+            ParagraphBorder::new(
+                RgbaColor::black(),
+                StrokeWidth::new(1.0).unwrap(),
+                StrokePattern::Solid,
+                ParagraphBorderSides::TOP,
+                ParagraphBorderOffset::DEFAULT,
+                false,
+            )
+            .unwrap()
+            .native_stroke(),
+        )),
+        ..Default::default()
+    };
+    assert!(native::paragraph_borders_from_properties(&null_and_stroke).is_err());
 }
 
 #[test]
@@ -1685,6 +1784,131 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         background
     );
+}
+
+#[test]
+fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
+    let borders = ParagraphBorders::Bordered(
+        ParagraphBorder::new(
+            RgbaColor::black(),
+            StrokeWidth::new(3.0).unwrap(),
+            StrokePattern::Solid,
+            ParagraphBorderSides::ALL,
+            ParagraphBorderOffset::from_points(9.0).unwrap(),
+            true,
+        )
+        .unwrap(),
+    );
+
+    let mut pages = PagesEditor::create_with_text("Paragraph borders").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            7,
+            "Pages paragraph border",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            7,
+            "Plain Pages paragraph",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_before = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_borders(pages_box.drawable_object_id, borders)
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_borders(pages_sibling.drawable_object_id)
+            .unwrap(),
+        ParagraphBorders::None
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_borders(pages_box.drawable_object_id)
+            .unwrap(),
+        borders
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_borders(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers paragraph border",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let numbers_before = numbers.to_bytes().unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_borders(sheet_id, numbers_box.drawable_object_id, borders)
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_borders(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        borders
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_paragraph_borders(sheet_id, numbers_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote paragraph border",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let keynote_before = keynote.to_bytes().unwrap();
+    keynote
+        .set_slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id, borders)
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        borders
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(keynote.to_bytes().unwrap(), keynote_before);
 }
 
 #[test]
