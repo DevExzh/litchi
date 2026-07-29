@@ -9,12 +9,12 @@ use litchi_iwa::shapes::{
 };
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
-    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap,
-    TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
+    ParagraphBackground, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount,
+    TextColumnGap, TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
     TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition,
     TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
@@ -121,6 +121,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         created.drawable_object_id,
         TextBackground::Color(RgbaColor::new(0.74, 0.95, 0.78, 1.0, RgbColorSpace::Srgb)?),
+    )?;
+    editor.set_sheet_text_box_paragraph_background(
+        sheet_id,
+        created.drawable_object_id,
+        ParagraphBackground::Color(RgbaColor::new(
+            1.0,
+            0.588_738_74,
+            0.552_926_2,
+            1.0,
+            RgbColorSpace::Srgb,
+        )?),
     )?;
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,

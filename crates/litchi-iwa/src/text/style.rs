@@ -483,9 +483,24 @@ pub enum TextBackground {
     Color(RgbaColor),
 }
 
+/// Effective solid fill painted across a paragraph's layout box.
+///
+/// This is the “Paragraph Background” control in the iWork Text → Layout
+/// inspector. It is independent from character-level [`TextBackground`].
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ParagraphBackground {
+    /// Leave the paragraph layout box unfilled.
+    #[default]
+    None,
+    /// Paint the paragraph layout box with a solid native color.
+    Color(RgbaColor),
+}
+
 /// Uniform paragraph properties currently supported by the shared text editor.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ParagraphStyle {
+    /// Solid fill painted across the paragraph's layout box.
+    pub background: ParagraphBackground,
     /// Native paragraph alignment.
     pub alignment: TextAlignment,
     /// Native line-spacing mode and amount.
@@ -502,6 +517,7 @@ impl ParagraphStyle {
     /// Create a new default paragraph style
     pub fn new() -> Self {
         Self {
+            background: ParagraphBackground::None,
             alignment: TextAlignment::Natural,
             line_spacing: ParagraphLineSpacing::default(),
             spacing: ParagraphSpacing::default(),
@@ -781,6 +797,7 @@ mod tests {
     #[test]
     fn test_paragraph_style() {
         let para = ParagraphStyle::new();
+        assert_eq!(para.background, ParagraphBackground::None);
         assert_eq!(para.alignment, TextAlignment::Natural);
         assert_eq!(
             para.line_spacing,

@@ -9,14 +9,14 @@ use litchi_iwa::shapes::{
 };
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
-    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
-    TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
-    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    DropCapWrap, ParagraphBackground, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount,
+    TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
+    TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition,
+    TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -116,6 +116,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         created.drawable_object_id,
         TextBackground::Color(RgbaColor::new(0.72, 0.84, 1.0, 1.0, RgbColorSpace::Srgb)?),
+    )?;
+    editor.set_slide_text_box_paragraph_background(
+        0,
+        created.drawable_object_id,
+        ParagraphBackground::Color(RgbaColor::new(
+            1.0,
+            0.588_738_74,
+            0.552_926_2,
+            1.0,
+            RgbColorSpace::Srgb,
+        )?),
     )?;
     editor.set_slide_text_box_paragraph_alignment(
         0,

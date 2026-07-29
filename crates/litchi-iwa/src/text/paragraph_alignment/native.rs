@@ -17,11 +17,11 @@ use crate::{Error, IWorkPackage, Result};
 use super::super::font::{TextFont, TextFontName};
 use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphBackground, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
+    ParagraphSpacingPoints, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript,
+    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive_name;
 
@@ -65,6 +65,8 @@ const COLOR_BLUE_FIELD: u32 = 5;
 const COLOR_ALPHA_FIELD: u32 = 6;
 const COLOR_RGB_SPACE_FIELD: u32 = 12;
 const PARAGRAPH_ALIGNMENT_FIELD: u32 = 1;
+const PARAGRAPH_FILL_NULL_FIELD: u32 = 5;
+const PARAGRAPH_FILL_FIELD: u32 = 6;
 const PARAGRAPH_FIRST_LINE_INDENT_FIELD: u32 = 7;
 const PARAGRAPH_LEFT_INDENT_FIELD: u32 = 11;
 const PARAGRAPH_LINE_SPACING_FIELD: u32 = 13;
@@ -102,6 +104,7 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) outline: Option<TextOutline>,
     pub(crate) shadow: Option<TextShadow>,
     pub(crate) background: Option<TextBackground>,
+    pub(crate) paragraph_background: Option<ParagraphBackground>,
     pub(crate) underline: Option<TextUnderline>,
     pub(crate) strikethrough: Option<TextStrikethrough>,
     pub(crate) alignment: Option<TextAlignment>,
@@ -131,6 +134,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.outline.is_some())
             + u32::from(self.shadow.is_some())
             + u32::from(self.background.is_some())
+            + u32::from(self.paragraph_background.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -161,6 +165,7 @@ impl ParagraphStyleOverrides {
             && self.outline.is_none()
             && self.shadow.is_none()
             && self.background.is_none()
+            && self.paragraph_background.is_none()
             && self.underline.is_none()
             && self.strikethrough.is_none()
             && self.alignment.is_none()
@@ -293,6 +298,13 @@ pub(crate) fn inherited_text_background(
     inheritance::text_background(package, first_style_id)
 }
 
+pub(crate) fn inherited_paragraph_background(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphBackground> {
+    inheritance::paragraph_background(package, first_style_id)
+}
+
 pub(crate) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -364,6 +376,7 @@ pub(crate) fn direct_overrides(
     let outline = text_outline_from_character(character_properties)?;
     let shadow = text_shadow_from_character(character_properties)?;
     let background = text_background_from_character(character_properties)?;
+    let paragraph_background = paragraph_background_from_properties(properties)?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -420,6 +433,7 @@ pub(crate) fn direct_overrides(
         outline,
         shadow,
         background,
+        paragraph_background,
         underline,
         strikethrough,
         alignment,
@@ -433,6 +447,10 @@ pub(crate) fn direct_overrides(
     };
     let mut remaining = properties.clone();
     remaining.alignment = None;
+    if paragraph_background.is_some() {
+        remaining.fill_null = None;
+        remaining.fill = None;
+    }
     remaining.line_spacing = None;
     remaining.space_before = None;
     remaining.space_after = None;
@@ -583,9 +601,22 @@ pub(crate) fn direct_overrides(
     if strikethrough.is_some() {
         character_fields.push(CHARACTER_STRIKETHROUGH_FIELD);
     }
-    let mut paragraph_fields = Vec::with_capacity(8);
+    let mut paragraph_fields = Vec::with_capacity(9);
     if alignment.is_some() {
         paragraph_fields.push(PARAGRAPH_ALIGNMENT_FIELD);
+    }
+    if let Some(background) = paragraph_background {
+        let field = match background {
+            ParagraphBackground::None => PARAGRAPH_FILL_NULL_FIELD,
+            ParagraphBackground::Color(_) => PARAGRAPH_FILL_FIELD,
+        };
+        paragraph_fields.push(field);
+        if matches!(background, ParagraphBackground::Color(_)) {
+            let color_raw = required_payload(paragraph_raw, field, "paragraph background")?;
+            if !has_canonical_color_wire(color_raw)? {
+                return Ok(None);
+            }
+        }
     }
     if line_spacing.is_some() {
         paragraph_fields.push(PARAGRAPH_LINE_SPACING_FIELD);
@@ -720,6 +751,17 @@ pub(crate) fn variation_object(
         }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {
             alignment: overrides.alignment.map(TextAlignment::native_value),
+            fill_null: matches!(
+                overrides.paragraph_background,
+                Some(ParagraphBackground::None)
+            )
+            .then_some(true),
+            fill: overrides
+                .paragraph_background
+                .and_then(|background| match background {
+                    ParagraphBackground::None => None,
+                    ParagraphBackground::Color(color) => Some(color_to_native(color)),
+                }),
             line_spacing: overrides.line_spacing.map(line_spacing_archive),
             space_before: overrides.space_before.map(ParagraphSpacingPoints::points),
             space_after: overrides.space_after.map(ParagraphSpacingPoints::points),
@@ -970,6 +1012,29 @@ pub(super) fn text_background_from_character(
         .background_color
         .as_ref()
         .map(|color| color_from_native(color).map(TextBackground::Color))
+        .transpose()
+}
+
+pub(super) fn paragraph_background_from_properties(
+    properties: &tswp::ParagraphStylePropertiesArchive,
+) -> Result<Option<ParagraphBackground>> {
+    if properties.fill_null == Some(true) {
+        if properties.fill.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork paragraph background is both null and populated".to_owned(),
+            ));
+        }
+        return Ok(Some(ParagraphBackground::None));
+    }
+    if properties.fill_null == Some(false) && properties.fill.is_none() {
+        return Err(Error::InvalidFormat(
+            "native iWork paragraph background has a false null marker without a color".to_owned(),
+        ));
+    }
+    properties
+        .fill
+        .as_ref()
+        .map(|color| color_from_native(color).map(ParagraphBackground::Color))
         .transpose()
 }
 

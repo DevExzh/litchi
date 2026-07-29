@@ -30,15 +30,15 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
-    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
-    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
-    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
-    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    IWorkTextEditor, ParagraphBackground, ParagraphDropCap, ParagraphDropCapPlacement,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
+    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
     TextShadow, TextStorageInfo, TextStyle,
 };
@@ -1436,6 +1436,45 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_text_background(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective Text → Layout paragraph background.
+    pub fn text_box_paragraph_background(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphBackground> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_background(graph.storage_id)
+    }
+
+    /// Atomically set the paragraph background across an ordinary text box.
+    pub fn set_text_box_paragraph_background(
+        &mut self,
+        drawable_object_id: u64,
+        background: ParagraphBackground,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_background(graph.storage_id, background)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_background(drawable_object_id)? != background {
+            return Err(Error::InvalidFormat(
+                "Pages text-box paragraph background update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph background.
+    pub fn reset_text_box_paragraph_background(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_background(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

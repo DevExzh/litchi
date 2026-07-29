@@ -9,12 +9,12 @@ use litchi_iwa::shapes::{
 };
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    DropCapWrap, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingMultiple, ParagraphList, ParagraphListLevel, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
-    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap,
-    TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
+    DropCapWrap, ParagraphBackground, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList, ParagraphListLevel,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount,
+    TextColumnGap, TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
     TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition,
     TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
@@ -89,6 +89,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_text_box_text_background(
         created.drawable_object_id,
         TextBackground::Color(RgbaColor::new(1.0, 0.82, 0.72, 1.0, RgbColorSpace::Srgb)?),
+    )?;
+    editor.set_text_box_paragraph_background(
+        created.drawable_object_id,
+        ParagraphBackground::Color(RgbaColor::new(
+            1.0,
+            0.588_738_74,
+            0.552_926_2,
+            1.0,
+            RgbColorSpace::Srgb,
+        )?),
     )?;
     editor.set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)?;
     editor.set_text_box_paragraph_line_spacing(

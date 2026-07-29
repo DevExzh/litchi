@@ -466,6 +466,50 @@ fn native_text_background_overrides_are_canonical_strict_and_reversible() {
 }
 
 #[test]
+fn native_paragraph_background_overrides_match_app_authored_wire() {
+    let custom = ParagraphBackground::Color(
+        RgbaColor::new(1.0, 0.588_738_74, 0.552_926_2, 1.0, RgbColorSpace::Srgb).unwrap(),
+    );
+    for background in [ParagraphBackground::None, custom] {
+        let overrides = ParagraphStyleOverrides {
+            paragraph_background: Some(background),
+            ..Default::default()
+        };
+        let object = native::variation_object(61, 62, 63, overrides.clone()).unwrap();
+        let message = &object.messages[0];
+        let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+        let properties = archive.para_properties.as_ref().unwrap();
+        assert_eq!(archive.override_count, Some(1));
+        match background {
+            ParagraphBackground::None => {
+                assert_eq!(properties.fill_null, Some(true));
+                assert!(properties.fill.is_none());
+            },
+            ParagraphBackground::Color(_) => {
+                assert!(properties.fill_null.is_none());
+                assert!(properties.fill.is_some());
+            },
+        }
+        assert_eq!(
+            native::direct_overrides(&archive, &message.data).unwrap(),
+            Some(overrides)
+        );
+    }
+
+    let both = tswp::ParagraphStylePropertiesArchive {
+        fill_null: Some(true),
+        fill: Some(crate::shapes::color_to_native(RgbaColor::black())),
+        ..Default::default()
+    };
+    assert!(native::paragraph_background_from_properties(&both).is_err());
+    let false_without_color = tswp::ParagraphStylePropertiesArchive {
+        fill_null: Some(false),
+        ..Default::default()
+    };
+    assert!(native::paragraph_background_from_properties(&false_without_color).is_err());
+}
+
+#[test]
 fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
     let mut pages = PagesEditor::create_with_text("Scripts").unwrap();
     let pages_box = pages
@@ -1535,6 +1579,111 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
             .unwrap(),
         TextCapitalization::TitleCase
+    );
+}
+
+#[test]
+fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
+    let background = ParagraphBackground::Color(
+        RgbaColor::new(1.0, 0.588_738_74, 0.552_926_2, 1.0, RgbColorSpace::Srgb).unwrap(),
+    );
+
+    let mut pages = PagesEditor::create_with_text("Paragraph backgrounds").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            7,
+            "Pages paragraph background",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            7,
+            "Plain Pages paragraph",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_before = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_background(pages_box.drawable_object_id, background)
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_background(pages_sibling.drawable_object_id)
+            .unwrap(),
+        ParagraphBackground::None
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_background(pages_box.drawable_object_id)
+            .unwrap(),
+        background
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_background(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers paragraph background",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_background(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            background,
+        )
+        .unwrap();
+    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_background(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        background
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote paragraph background",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_background(0, keynote_box.drawable_object_id, background)
+        .unwrap();
+    let keynote = crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_background(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        background
     );
 }
 

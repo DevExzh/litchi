@@ -42,17 +42,17 @@ use crate::table_appearance::TableAppearance;
 use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
 use crate::table_lock::TableLockState;
 use crate::text::{
-    IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
-    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
-    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing,
-    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    IWorkTextEditor, ParagraphBackground, ParagraphDropCap, ParagraphDropCapPlacement,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
+    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -1914,6 +1914,52 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_text_background(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective Text → Layout paragraph background.
+    pub fn sheet_text_box_paragraph_background(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphBackground> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_background(graph.storage_id)
+    }
+
+    /// Atomically set the paragraph background across a sheet-owned text box.
+    pub fn set_sheet_text_box_paragraph_background(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        background: ParagraphBackground,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_background(graph.storage_id, background)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_background(sheet_id, drawable_object_id)? != background
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box paragraph background update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph background.
+    pub fn reset_sheet_text_box_paragraph_background(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_background(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
