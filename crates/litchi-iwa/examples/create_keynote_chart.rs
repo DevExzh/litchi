@@ -3,11 +3,11 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartData, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
-    ChartKind, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartAxis, ChartAxisBound, ChartAxisGridline, ChartAxisGridlineStroke, ChartAxisMajorStepCount,
+    ChartAxisMinorStepCount, ChartAxisTickMarkLocation, ChartCornerRadius, ChartData,
+    ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage,
+    ChartGapSpacing, ChartKind, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
     ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAffixes,
     ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
@@ -185,6 +185,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chart.drawable_object_id,
         ChartAxis::Value,
         true,
+    )?;
+    editor.set_slide_chart_axis_gridline_stroke(
+        0,
+        chart.drawable_object_id,
+        ChartAxis::Value,
+        ChartAxisGridline::Minor,
+        ChartAxisGridlineStroke::Stroke(ShapeStroke::new(
+            RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
+            StrokeWidth::new(2.0)?,
+            StrokePattern::MediumDash,
+        )),
     )?;
     editor.set_slide_chart_legend_visible(0, chart.drawable_object_id, false)?;
     editor.set_slide_chart_series_value_label_visibilities(
