@@ -676,6 +676,11 @@ pub struct Paragraph {
     pub page_break_before: bool,
     /// Widow/orphan control
     pub widow_control: bool,
+    /// Whether line numbering is suppressed for this paragraph (`\noline`).
+    pub no_line_numbering: bool,
+    /// Whether the automatic hanging-indent tab stop is suppressed
+    /// (`\notabind`).
+    pub no_auto_tab_indent: bool,
     /// Complete drop-cap settings from `\\dropcapliN` and `\\dropcaptN`.
     pub drop_cap: Option<ParagraphDropCap>,
     /// Line-breaking and automatic-spacing policy.

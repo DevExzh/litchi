@@ -6936,6 +6936,12 @@ impl<W: Write> RtfWriter<W> {
         if para.widow_control {
             self.write_control_word("widctlpar", None)?;
         }
+        if para.no_line_numbering {
+            self.write_control_word("noline", None)?;
+        }
+        if para.no_auto_tab_indent {
+            self.write_control_word("notabind", None)?;
+        }
 
         let breaking = para.line_breaking;
         if breaking.automatic_hyphenation {
@@ -8501,12 +8507,24 @@ impl<W: Write> RtfWriter<W> {
         if section.properties.orientation == PageOrientation::Landscape {
             self.write_control_word("lndscpsxn", None)?;
         }
+        if let Some(rendering) = section.properties.rendering {
+            self.write_control_word(
+                match rendering {
+                    crate::SectionRendering::Horizontal => "horzsect",
+                    crate::SectionRendering::Vertical => "vertsect",
+                },
+                None,
+            )?;
+        }
         section
             .properties
             .columns
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_control_word("cols", Some(i32::from(section.properties.columns.count)))?;
+        if !section.properties.balance_columns {
+            self.write_control_word("nocolbal", None)?;
+        }
         if section.properties.columns.separator {
             self.write_control_word("linebetcol", None)?;
         }

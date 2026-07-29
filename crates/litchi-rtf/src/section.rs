@@ -563,6 +563,18 @@ impl SectionPaperSource {
     }
 }
 
+/// Section rendering direction from `\vertsect` and `\horzsect`.
+///
+/// Vertical rendering is used for East Asian vertical-writing sections. The
+/// value is passive layout metadata; no rendering is performed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionRendering {
+    /// Horizontal rendering (`\horzsect`, the default).
+    Horizontal,
+    /// Vertical rendering (`\vertsect`).
+    Vertical,
+}
+
 /// Section properties
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SectionProperties {
@@ -575,6 +587,9 @@ pub struct SectionProperties {
     pub title_page: bool,
     /// Explicit direction used to thread section columns.
     pub direction: Option<TextDirection>,
+    /// Section rendering direction (`\vertsect` / `\horzsect`); `None`
+    /// preserves the horizontal default.
+    pub rendering: Option<SectionRendering>,
     /// Section break type
     pub break_type: SectionBreakType,
     /// Page width (in twips)
@@ -599,6 +614,9 @@ pub struct SectionProperties {
     pub orientation: PageOrientation,
     /// Equal- or variable-width section column layout.
     pub columns: SectionColumns,
+    /// Whether column text is balanced across the section's columns;
+    /// `false` comes from `\nocolbal`.
+    pub balance_columns: bool,
     /// Page number start
     pub page_number_start: i32,
     /// Page number format
@@ -636,6 +654,7 @@ impl Default for SectionProperties {
             section_rsid: None,
             title_page: false,
             direction: None,
+            rendering: None,
             break_type: SectionBreakType::default(),
             page_width: 12240,  // 8.5 inches at 1440 twips/inch
             page_height: 15840, // 11 inches
@@ -648,6 +667,7 @@ impl Default for SectionProperties {
             footer_distance: 720,
             orientation: PageOrientation::default(),
             columns: SectionColumns::default(),
+            balance_columns: true,
             page_number_start: 1,
             page_number_format: PageNumberFormat::default(),
             page_number_restart: None,

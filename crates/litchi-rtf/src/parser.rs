@@ -503,6 +503,9 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::LineNumberContinuous
             | ControlWord::LeftToRightSection
             | ControlWord::RightToLeftSection
+            | ControlWord::SectionVerticalRendering(_)
+            | ControlWord::SectionHorizontalRendering(_)
+            | ControlWord::SectionNoColumnBalance(_)
             | ControlWord::SectionFootnotePlacement(_)
             | ControlWord::SectionEndnoteHere
             | ControlWord::SectionFootnoteStart(_)
@@ -8048,6 +8051,14 @@ impl<'a> Parser<'a> {
             ControlWord::SideBySide(value) => state.paragraph.side_by_side = *value,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
+            ControlWord::ParagraphNoLineNumbering(param) => {
+                require_parameterless(*param, "noline")?;
+                state.paragraph.no_line_numbering = true;
+            },
+            ControlWord::ParagraphNoAutoTabIndent(param) => {
+                require_parameterless(*param, "notabind")?;
+                state.paragraph.no_auto_tab_indent = true;
+            },
             ControlWord::DropCapLines(_) | ControlWord::DropCapType(_) => {
                 Self::apply_drop_cap_control(state, control)?;
             },
@@ -9464,6 +9475,18 @@ impl<'a> Parser<'a> {
                 }
             },
             ControlWord::PageNumberStart(value) => properties.page_number_start = *value,
+            ControlWord::SectionVerticalRendering(param) => {
+                require_parameterless(*param, "vertsect")?;
+                properties.rendering = Some(crate::SectionRendering::Vertical);
+            },
+            ControlWord::SectionHorizontalRendering(param) => {
+                require_parameterless(*param, "horzsect")?;
+                properties.rendering = Some(crate::SectionRendering::Horizontal);
+            },
+            ControlWord::SectionNoColumnBalance(param) => {
+                require_parameterless(*param, "nocolbal")?;
+                properties.balance_columns = false;
+            },
             ControlWord::PageNumberFormat(format) => {
                 properties.page_number_format = *format;
             },
@@ -14788,6 +14811,14 @@ impl<'a> Parser<'a> {
             ControlWord::SideBySide(value) => state.paragraph.side_by_side = *value,
             ControlWord::PageBreakBefore => state.paragraph.page_break_before = true,
             ControlWord::WidowControl => state.paragraph.widow_control = true,
+            ControlWord::ParagraphNoLineNumbering(param) => {
+                require_parameterless(*param, "noline")?;
+                state.paragraph.no_line_numbering = true;
+            },
+            ControlWord::ParagraphNoAutoTabIndent(param) => {
+                require_parameterless(*param, "notabind")?;
+                state.paragraph.no_auto_tab_indent = true;
+            },
             ControlWord::ParagraphHyphenation(value) => {
                 state.paragraph.line_breaking.automatic_hyphenation =
                     strict_paragraph_toggle(*value, "hyphpar")?

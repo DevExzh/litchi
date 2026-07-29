@@ -297,7 +297,7 @@ pub use section::{
     PageNumberFormat, PageNumberHeadingSeparator, PageNumberRestart, PageOrientation, Section,
     SectionBreakType, SectionColumn, SectionColumns, SectionDocumentGrid, SectionDocumentGridType,
     SectionLineNumberRestart, SectionLineNumbering, SectionPageNumberHeading, SectionProperties,
-    VerticalAlignment,
+    SectionRendering, VerticalAlignment,
 };
 pub use section::{SectionFootnotePlacement, SectionNoteOptions};
 pub use shape::{
