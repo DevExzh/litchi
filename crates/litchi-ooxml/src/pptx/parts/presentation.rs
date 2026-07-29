@@ -15,6 +15,12 @@ use std::sync::Arc;
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
+/// Maximum element nesting depth accepted in a presentation part, matching
+/// the hardened DOCX settings and mail-merge parsers.
+const MAX_DEPTH: usize = 128;
+/// Maximum number of elements accepted in a presentation part.
+const MAX_NODES: usize = 1_000_000;
+
 /// The presentation slide surface dimensions and declared size type.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SlideSize {
@@ -913,6 +919,7 @@ impl PresentationInfo {
         let mut info = Self::default();
         let mut stack = Vec::new();
         let mut closed_root = false;
+        let mut nodes = 0usize;
 
         loop {
             let decoder = reader.decoder();
@@ -924,6 +931,16 @@ impl PresentationInfo {
             let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "presentation XML element count overflow".to_string(),
+                        )
+                    })?;
+                    if nodes > MAX_NODES {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "presentation XML exceeds {MAX_NODES} elements"
+                        )));
+                    }
                     if stack.is_empty() {
                         if closed_root
                             || !is_presentationml_name(&namespace, element.name(), b"presentation")
@@ -936,6 +953,11 @@ impl PresentationInfo {
                         info.metadata = PresentationMetadata::from_root_element(&element, decoder)?;
                         stack.push(PresentationContext::Presentation);
                         continue;
+                    }
+                    if stack.len() >= MAX_DEPTH {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "presentation XML exceeds the {MAX_DEPTH} nesting depth limit"
+                        )));
                     }
                     info.process_element(
                         *stack.last().ok_or_else(|| {
@@ -959,6 +981,16 @@ impl PresentationInfo {
                     )?);
                 },
                 Event::Empty(element) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "presentation XML element count overflow".to_string(),
+                        )
+                    })?;
+                    if nodes > MAX_NODES {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "presentation XML exceeds {MAX_NODES} elements"
+                        )));
+                    }
                     let parent = *stack.last().ok_or_else(|| {
                         OoxmlError::InvalidFormat(
                             "presentation XML has an empty or missing root".to_string(),
