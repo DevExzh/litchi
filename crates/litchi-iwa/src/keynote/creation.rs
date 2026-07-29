@@ -84,6 +84,83 @@ const DEFAULT_LIVE_VIDEO_SOURCE: u64 = 136;
 const STYLESHEET: u64 = 137;
 const BULLET_LIST_STYLE: u64 = 138;
 const NUMBERED_LIST_STYLE: u64 = 139;
+const LAST_PARAGRAPH_STYLE: u64 = KeynoteParagraphStylePreset::Fact.object_id();
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u64)]
+enum KeynoteParagraphStylePreset {
+    Body = PARAGRAPH_STYLE,
+    Title = 140,
+    TitleSmall = 141,
+    Subtitle = 142,
+    SubtitleAlt = 143,
+    Caption = 144,
+    Quote = 145,
+    Attribution = 146,
+    Heading = 147,
+    Agenda = 148,
+    Statement = 149,
+    Section = 150,
+    Fact = 151,
+}
+
+impl KeynoteParagraphStylePreset {
+    const ALL: [Self; 13] = [
+        Self::Title,
+        Self::TitleSmall,
+        Self::Subtitle,
+        Self::SubtitleAlt,
+        Self::Body,
+        Self::Caption,
+        Self::Quote,
+        Self::Attribution,
+        Self::Heading,
+        Self::Agenda,
+        Self::Statement,
+        Self::Section,
+        Self::Fact,
+    ];
+
+    const fn object_id(self) -> u64 {
+        self as u64
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Title => "Title",
+            Self::TitleSmall => "Title Small",
+            Self::Subtitle => "Subtitle",
+            Self::SubtitleAlt => "Subtitle Alt",
+            Self::Body => "Body",
+            Self::Caption => "Caption",
+            Self::Quote => "Quote",
+            Self::Attribution => "Attribution",
+            Self::Heading => "Heading",
+            Self::Agenda => "Agenda",
+            Self::Statement => "Statement",
+            Self::Section => "Section",
+            Self::Fact => "Fact",
+        }
+    }
+
+    const fn style_identifier(self) -> &'static str {
+        match self {
+            Self::Title => "litchi-paragraph-title",
+            Self::TitleSmall => "litchi-paragraph-title-small",
+            Self::Subtitle => "litchi-paragraph-subtitle",
+            Self::SubtitleAlt => "litchi-paragraph-subtitle-alt",
+            Self::Body => "litchi-paragraph-body",
+            Self::Caption => "litchi-paragraph-caption",
+            Self::Quote => "litchi-paragraph-quote",
+            Self::Attribution => "litchi-paragraph-attribution",
+            Self::Heading => "litchi-paragraph-heading",
+            Self::Agenda => "litchi-paragraph-agenda",
+            Self::Statement => "litchi-paragraph-statement",
+            Self::Section => "litchi-paragraph-section",
+            Self::Fact => "litchi-paragraph-fact",
+        }
+    }
+}
 
 const TABLE_INFO_TEMPLATE: u64 = 9;
 const TABLE_MODEL_TEMPLATE: u64 = 10;
@@ -103,7 +180,51 @@ const TABLE_TEMPLATE_DOCUMENT_OBJECTS: &[u64] = &[
     30,
     32,
 ];
-const TABLE_TEMPLATE_STYLE_OBJECTS: &[u64] = &[11, 12, 13, 14, 15, 16, 17, 18, 19, 40];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u64)]
+enum TableTemplateParagraphStyle {
+    Body = 12,
+    Title = 43,
+    Subtitle = 44,
+    Heading = 45,
+    HeadingRed = 46,
+    Caption = 47,
+}
+
+impl TableTemplateParagraphStyle {
+    #[cfg(test)]
+    const ALL: [Self; 6] = [
+        Self::Body,
+        Self::Title,
+        Self::Subtitle,
+        Self::Heading,
+        Self::HeadingRed,
+        Self::Caption,
+    ];
+
+    const fn object_id(self) -> u64 {
+        self as u64
+    }
+}
+
+const TABLE_TEMPLATE_STYLE_OBJECTS: &[u64] = &[
+    11,
+    TableTemplateParagraphStyle::Body.object_id(),
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    40,
+    TableTemplateParagraphStyle::Title.object_id(),
+    TableTemplateParagraphStyle::Subtitle.object_id(),
+    TableTemplateParagraphStyle::Heading.object_id(),
+    TableTemplateParagraphStyle::HeadingRed.object_id(),
+    TableTemplateParagraphStyle::Caption.object_id(),
+];
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 
 const STYLESHEET_OBJECTS: &[u64] = &[
@@ -112,7 +233,19 @@ const STYLESHEET_OBJECTS: &[u64] = &[
     LIST_STYLE,
     BULLET_LIST_STYLE,
     NUMBERED_LIST_STYLE,
-    PARAGRAPH_STYLE,
+    KeynoteParagraphStylePreset::Title.object_id(),
+    KeynoteParagraphStylePreset::TitleSmall.object_id(),
+    KeynoteParagraphStylePreset::Subtitle.object_id(),
+    KeynoteParagraphStylePreset::SubtitleAlt.object_id(),
+    KeynoteParagraphStylePreset::Body.object_id(),
+    KeynoteParagraphStylePreset::Caption.object_id(),
+    KeynoteParagraphStylePreset::Quote.object_id(),
+    KeynoteParagraphStylePreset::Attribution.object_id(),
+    KeynoteParagraphStylePreset::Heading.object_id(),
+    KeynoteParagraphStylePreset::Agenda.object_id(),
+    KeynoteParagraphStylePreset::Statement.object_id(),
+    KeynoteParagraphStylePreset::Section.object_id(),
+    KeynoteParagraphStylePreset::Fact.object_id(),
     CHARACTER_STYLE,
     SHAPE_STYLE,
     MEDIA_STYLE,
@@ -524,14 +657,20 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
                     .map(reference)
                     .collect(),
                 character_style_presets: repeated_reference(6, CHARACTER_STYLE),
-                paragraph_style_presets: repeated_reference(13, PARAGRAPH_STYLE),
+                paragraph_style_presets: KeynoteParagraphStylePreset::ALL
+                    .into_iter()
+                    .map(|preset| reference(preset.object_id()))
+                    .collect(),
                 dropcap_style_presets: repeated_reference(6, DROP_CAP_STYLE),
                 ..Default::default()
             }),
             chart: None,
             table: None,
             application: Some(tsa::ThemePresetsArchive {
-                caption_style_presets: repeated_reference(2, PARAGRAPH_STYLE),
+                caption_style_presets: repeated_reference(
+                    2,
+                    KeynoteParagraphStylePreset::Caption.object_id(),
+                ),
                 svg_import_style_presets: repeated_reference(1, SHAPE_STYLE),
             }),
         },
@@ -554,6 +693,27 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
     };
     let theme =
         patch_length_delimited_field(&theme.encode_to_vec(), 1, true, Some(common_payload))?;
+    let theme_references = [
+        STYLESHEET,
+        TEMPLATE_NODE,
+        LIST_STYLE,
+        BULLET_LIST_STYLE,
+        NUMBERED_LIST_STYLE,
+    ]
+    .into_iter()
+    .chain(
+        KeynoteParagraphStylePreset::ALL
+            .into_iter()
+            .map(KeynoteParagraphStylePreset::object_id),
+    )
+    .chain([
+        CHARACTER_STYLE,
+        SHAPE_STYLE,
+        MEDIA_STYLE,
+        DROP_CAP_STYLE,
+        LIVE_VIDEO_COLLECTION,
+    ])
+    .collect::<Vec<_>>();
 
     Ok(Archive {
         objects: vec![
@@ -570,22 +730,7 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
                     ANNOTATION_AUTHOR_STORAGE,
                 ],
             )?,
-            raw_object(
-                THEME,
-                KeynoteMessageType::Theme,
-                theme,
-                &[
-                    STYLESHEET,
-                    TEMPLATE_NODE,
-                    LIST_STYLE,
-                    PARAGRAPH_STYLE,
-                    CHARACTER_STYLE,
-                    SHAPE_STYLE,
-                    MEDIA_STYLE,
-                    DROP_CAP_STYLE,
-                    LIVE_VIDEO_COLLECTION,
-                ],
-            )?,
+            raw_object(THEME, KeynoteMessageType::Theme, theme, &theme_references)?,
             object(
                 SHOW,
                 KeynoteMessageType::Show,
@@ -1064,6 +1209,13 @@ fn stylesheet_archive() -> Result<Archive> {
                 KeynoteMessageType::Stylesheet,
                 tss::StylesheetArchive {
                     styles: styles.iter().copied().map(reference).collect(),
+                    identifier_to_style_map: KeynoteParagraphStylePreset::ALL
+                        .into_iter()
+                        .map(|preset| tss::stylesheet_archive::IdentifiedStyleEntry {
+                            identifier: preset.style_identifier().to_owned(),
+                            style: reference(preset.object_id()),
+                        })
+                        .collect(),
                     is_locked: Some(false),
                     can_cull_styles: Some(true),
                     ..Default::default()
@@ -1093,16 +1245,6 @@ fn stylesheet_archive() -> Result<Archive> {
                 KeynoteMessageType::ListStyle,
                 tswp::ListStyleArchive {
                     super_: style("None", "litchi-list-none"),
-                    override_count: Some(0),
-                    ..Default::default()
-                },
-                &[STYLESHEET],
-            )?,
-            object(
-                PARAGRAPH_STYLE,
-                KeynoteMessageType::ParagraphStyle,
-                tswp::ParagraphStyleArchive {
-                    super_: style("Body", "litchi-body"),
                     override_count: Some(0),
                     ..Default::default()
                 },
@@ -1164,6 +1306,18 @@ fn stylesheet_archive() -> Result<Archive> {
         STYLESHEET,
         ParagraphList::Numbered,
     )?);
+    for preset in KeynoteParagraphStylePreset::ALL {
+        archive.objects.push(object(
+            preset.object_id(),
+            KeynoteMessageType::ParagraphStyle,
+            tswp::ParagraphStyleArchive {
+                super_: style(preset.name(), preset.style_identifier()),
+                override_count: Some(0),
+                ..Default::default()
+            },
+            &[STYLESHEET],
+        )?);
+    }
     Ok(archive)
 }
 
@@ -1281,7 +1435,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
         )
         .collect();
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: NUMBERED_LIST_STYLE,
+        last_object_identifier: LAST_PARAGRAPH_STYLE,
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(0),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -1704,7 +1858,90 @@ mod tests {
         );
         assert_eq!(
             crate::package_metadata::package_last_object_identifier(&package).unwrap(),
-            Some(NUMBERED_LIST_STYLE)
+            Some(LAST_PARAGRAPH_STYLE)
+        );
+    }
+
+    #[test]
+    fn generated_theme_exposes_unique_native_paragraph_style_catalog() {
+        let package = KeynoteDocumentBuilder::new().build_package().unwrap();
+        let styles = crate::text::paragraph_alignment::native::named_paragraph_styles(
+            &package,
+            PARAGRAPH_STYLE,
+        )
+        .unwrap();
+        assert_eq!(
+            styles
+                .iter()
+                .map(crate::text::NamedParagraphStyle::name)
+                .collect::<Vec<_>>(),
+            [
+                "Title",
+                "Title Small",
+                "Subtitle",
+                "Subtitle Alt",
+                "Body",
+                "Caption",
+                "Quote",
+                "Attribution",
+                "Heading",
+                "Agenda",
+                "Statement",
+                "Section",
+                "Fact",
+            ]
+        );
+        assert_eq!(
+            styles
+                .iter()
+                .map(|style| style.id().get())
+                .collect::<Vec<_>>(),
+            KeynoteParagraphStylePreset::ALL
+                .into_iter()
+                .map(KeynoteParagraphStylePreset::object_id)
+                .collect::<Vec<_>>()
+        );
+
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        let stylesheet = tss::StylesheetArchive::decode(
+            stylesheet
+                .object(STYLESHEET)
+                .unwrap()
+                .messages
+                .first()
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert_eq!(
+            stylesheet.identifier_to_style_map.len(),
+            KeynoteParagraphStylePreset::ALL.len()
+        );
+        let document = package.archive(DOCUMENT_ARCHIVE_ENTRY).unwrap();
+        let theme_references =
+            &document.object(THEME).unwrap().archive_info.message_infos[0].object_references;
+        assert!(
+            KeynoteParagraphStylePreset::ALL
+                .into_iter()
+                .map(KeynoteParagraphStylePreset::object_id)
+                .all(|identifier| theme_references.contains(&identifier))
+        );
+        assert_eq!(
+            crate::package_metadata::package_last_object_identifier(&package).unwrap(),
+            Some(LAST_PARAGRAPH_STYLE)
+        );
+    }
+
+    #[test]
+    fn generated_table_template_keeps_numbers_paragraph_style_dependencies() {
+        let package = KeynoteDocumentBuilder::new().build_package().unwrap();
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        assert!(
+            TableTemplateParagraphStyle::ALL
+                .into_iter()
+                .map(TableTemplateParagraphStyle::object_id)
+                .all(|identifier| stylesheet.object(identifier).is_some())
         );
     }
 

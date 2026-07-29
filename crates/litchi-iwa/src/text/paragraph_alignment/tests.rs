@@ -134,7 +134,21 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
             .iter()
             .map(|style| style.name())
             .collect::<Vec<_>>(),
-        ["Body"]
+        [
+            "Title",
+            "Title Small",
+            "Subtitle",
+            "Subtitle Alt",
+            "Body",
+            "Caption",
+            "Quote",
+            "Attribution",
+            "Heading",
+            "Agenda",
+            "Statement",
+            "Section",
+            "Fact",
+        ]
     );
 }
 
