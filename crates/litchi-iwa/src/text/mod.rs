@@ -90,6 +90,10 @@ pub use number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentFormat, TextNumberAttachmentId,
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
 };
+pub(crate) use paragraph_alignment::{
+    applied_named_paragraph_style as applied_named_paragraph_style_in_storage,
+    named_paragraph_styles as named_paragraph_styles_in_storage,
+};
 pub use paragraph_direction::ParagraphWritingDirection;
 pub use paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
 pub use paragraph_following_style::{

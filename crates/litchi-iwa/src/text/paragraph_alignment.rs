@@ -617,7 +617,7 @@ pub(super) fn paragraph_decimal_tab_character(
     native::inherited_decimal_tab_character(package, storage.style_id)
 }
 
-pub(super) fn named_paragraph_styles(
+pub(crate) fn named_paragraph_styles(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<Vec<NamedParagraphStyle>> {
@@ -625,7 +625,7 @@ pub(super) fn named_paragraph_styles(
     native::named_paragraph_styles(package, storage.style_id)
 }
 
-pub(super) fn applied_named_paragraph_style(
+pub(crate) fn applied_named_paragraph_style(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<AppliedParagraphStyle> {

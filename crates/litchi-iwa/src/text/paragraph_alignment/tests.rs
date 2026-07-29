@@ -2,8 +2,8 @@ use prost::Message;
 
 use super::*;
 use crate::archive::RawMessage;
-use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::NumbersDocumentBuilder;
+use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use crate::pages::PagesEditor;
 use crate::protobuf::tswp;
 use crate::shapes::{
@@ -464,12 +464,7 @@ fn named_paragraph_style_application_and_replacement_deletion_are_transactional(
             },
         )
         .unwrap();
-    let mut numbers = IWorkTextEditor::from_package(numbers.into_package());
-    assert_application_lifecycle(
-        &mut numbers,
-        numbers_box.storage.object_id,
-        "Numbers Display",
-    );
+    assert_numbers_style_lifecycle(&mut numbers, sheet_id, numbers_box.drawable_object_id);
 
     let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
     let keynote_box = keynote
@@ -483,46 +478,143 @@ fn named_paragraph_style_application_and_replacement_deletion_are_transactional(
             },
         )
         .unwrap();
-    let mut keynote = IWorkTextEditor::from_package(keynote.into_package());
-    assert_application_lifecycle(
-        &mut keynote,
-        keynote_box.storage.object_id,
-        "Keynote Display",
-    );
+    assert_keynote_style_lifecycle(&mut keynote, keynote_box.drawable_object_id);
 }
 
-fn assert_application_lifecycle(editor: &mut IWorkTextEditor, storage_id: u64, style_name: &str) {
+fn assert_numbers_style_lifecycle(
+    editor: &mut NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+) {
     let body = editor
-        .applied_named_paragraph_style(storage_id)
+        .sheet_text_box_applied_named_paragraph_style(sheet_id, drawable_object_id)
         .unwrap()
         .style()
         .id();
     let initial = editor.package().to_bytes().unwrap();
     let display = editor
-        .create_named_paragraph_style(
-            storage_id,
+        .create_sheet_text_box_named_paragraph_style(
+            sheet_id,
+            drawable_object_id,
             body,
-            ParagraphStyleName::new(style_name).unwrap(),
+            ParagraphStyleName::new("Numbers Draft").unwrap(),
+        )
+        .unwrap();
+    let display = editor
+        .rename_sheet_text_box_named_paragraph_style(
+            sheet_id,
+            drawable_object_id,
+            display.id(),
+            ParagraphStyleName::new("Numbers Display").unwrap(),
+        )
+        .unwrap();
+    let before_disposable = editor.to_bytes().unwrap();
+    let disposable = editor
+        .create_sheet_text_box_named_paragraph_style(
+            sheet_id,
+            drawable_object_id,
+            body,
+            ParagraphStyleName::new("Numbers Disposable").unwrap(),
         )
         .unwrap();
     editor
-        .apply_named_paragraph_style(storage_id, display.id())
+        .delete_sheet_text_box_named_paragraph_style(sheet_id, drawable_object_id, disposable.id())
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before_disposable);
+    editor
+        .apply_sheet_text_box_named_paragraph_style(sheet_id, drawable_object_id, display.id())
         .unwrap();
     editor
-        .set_paragraph_alignment(storage_id, TextAlignment::Right)
+        .set_sheet_text_box_paragraph_alignment(sheet_id, drawable_object_id, TextAlignment::Right)
         .unwrap();
     editor
-        .set_paragraph_default_tab_interval(
-            storage_id,
+        .set_sheet_text_box_paragraph_default_tab_interval(
+            sheet_id,
+            drawable_object_id,
             ParagraphDefaultTabInterval::from_points(36.0).unwrap(),
         )
         .unwrap();
-    let selected = editor.applied_named_paragraph_style(storage_id).unwrap();
+    let selected = editor
+        .sheet_text_box_applied_named_paragraph_style(sheet_id, drawable_object_id)
+        .unwrap();
     assert_eq!(selected.style(), &display);
     assert!(selected.has_overrides());
     assert_eq!(
         editor
-            .delete_applied_named_paragraph_style_with_replacement(storage_id, display.id(), body,)
+            .delete_applied_sheet_text_box_named_paragraph_style_with_replacement(
+                sheet_id,
+                drawable_object_id,
+                display.id(),
+                body,
+            )
+            .unwrap(),
+        display
+    );
+    assert_eq!(editor.package().to_bytes().unwrap(), initial);
+}
+
+fn assert_keynote_style_lifecycle(editor: &mut KeynoteEditor, drawable_object_id: u64) {
+    let body = editor
+        .slide_text_box_applied_named_paragraph_style(0, drawable_object_id)
+        .unwrap()
+        .style()
+        .id();
+    let initial = editor.package().to_bytes().unwrap();
+    let display = editor
+        .create_slide_text_box_named_paragraph_style(
+            0,
+            drawable_object_id,
+            body,
+            ParagraphStyleName::new("Keynote Draft").unwrap(),
+        )
+        .unwrap();
+    let display = editor
+        .rename_slide_text_box_named_paragraph_style(
+            0,
+            drawable_object_id,
+            display.id(),
+            ParagraphStyleName::new("Keynote Display").unwrap(),
+        )
+        .unwrap();
+    let before_disposable = editor.to_bytes().unwrap();
+    let disposable = editor
+        .create_slide_text_box_named_paragraph_style(
+            0,
+            drawable_object_id,
+            body,
+            ParagraphStyleName::new("Keynote Disposable").unwrap(),
+        )
+        .unwrap();
+    editor
+        .delete_slide_text_box_named_paragraph_style(0, drawable_object_id, disposable.id())
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), before_disposable);
+    editor
+        .apply_slide_text_box_named_paragraph_style(0, drawable_object_id, display.id())
+        .unwrap();
+    editor
+        .set_slide_text_box_paragraph_alignment(0, drawable_object_id, TextAlignment::Right)
+        .unwrap();
+    editor
+        .set_slide_text_box_paragraph_default_tab_interval(
+            0,
+            drawable_object_id,
+            ParagraphDefaultTabInterval::from_points(36.0).unwrap(),
+        )
+        .unwrap();
+    let selected = editor
+        .slide_text_box_applied_named_paragraph_style(0, drawable_object_id)
+        .unwrap();
+    assert_eq!(selected.style(), &display);
+    assert!(selected.has_overrides());
+    assert_eq!(
+        editor
+            .delete_applied_slide_text_box_named_paragraph_style_with_replacement(
+                0,
+                drawable_object_id,
+                display.id(),
+                body,
+            )
             .unwrap(),
         display
     );

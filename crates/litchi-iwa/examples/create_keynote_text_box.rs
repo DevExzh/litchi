@@ -13,9 +13,9 @@ use litchi_iwa::text::{
     ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
     ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
     ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns, TextCommentBody,
     TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
     TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
@@ -285,6 +285,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         tab_defaults_box.drawable_object_id,
         ParagraphDefaultTabInterval::from_points(48.0)?,
+    )?;
+    let named_style_box = editor.add_slide_text_box(
+        0,
+        "Keynote named paragraph style",
+        DrawablePoint { x: 760.0, y: 880.0 },
+        DrawableSize {
+            width: 560.0,
+            height: 96.0,
+        },
+    )?;
+    let body = editor
+        .slide_text_box_named_paragraph_styles(0, named_style_box.drawable_object_id)?
+        .into_iter()
+        .find(|style| style.name() == "Body")
+        .ok_or("source-built Keynote theme has no Body paragraph style")?;
+    let draft = editor.create_slide_text_box_named_paragraph_style(
+        0,
+        named_style_box.drawable_object_id,
+        body.id(),
+        ParagraphStyleName::new("Keynote Draft")?,
+    )?;
+    let display = editor.rename_slide_text_box_named_paragraph_style(
+        0,
+        named_style_box.drawable_object_id,
+        draft.id(),
+        ParagraphStyleName::new("Keynote Display")?,
+    )?;
+    editor.apply_slide_text_box_named_paragraph_style(
+        0,
+        named_style_box.drawable_object_id,
+        display.id(),
+    )?;
+    let disposable = editor.create_slide_text_box_named_paragraph_style(
+        0,
+        named_style_box.drawable_object_id,
+        body.id(),
+        ParagraphStyleName::new("Keynote Disposable")?,
+    )?;
+    editor.delete_slide_text_box_named_paragraph_style(
+        0,
+        named_style_box.drawable_object_id,
+        disposable.id(),
     )?;
     editor.save(output)?;
     println!(

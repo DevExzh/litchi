@@ -7469,6 +7469,7 @@ mod formula_cache;
 mod formula_clone;
 mod formula_dependency_shift;
 mod model;
+mod named_paragraph_styles;
 mod row_insert;
 mod sheet_audio;
 mod sheet_charts;

@@ -13,9 +13,9 @@ use litchi_iwa::text::{
     ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
     ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
     ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
     TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
     TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
@@ -289,6 +289,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sheet_id,
         tab_defaults_box.drawable_object_id,
         ParagraphDefaultTabInterval::from_points(42.0)?,
+    )?;
+    let named_style_box = editor.add_sheet_text_box(
+        sheet_id,
+        "Numbers named paragraph style",
+        DrawablePoint { x: 340.0, y: 560.0 },
+        DrawableSize {
+            width: 280.0,
+            height: 72.0,
+        },
+    )?;
+    let body = editor
+        .sheet_text_box_named_paragraph_styles(sheet_id, named_style_box.drawable_object_id)?
+        .into_iter()
+        .find(|style| style.name() == "Body")
+        .ok_or("source-built Numbers theme has no Body paragraph style")?;
+    let draft = editor.create_sheet_text_box_named_paragraph_style(
+        sheet_id,
+        named_style_box.drawable_object_id,
+        body.id(),
+        ParagraphStyleName::new("Numbers Draft")?,
+    )?;
+    let display = editor.rename_sheet_text_box_named_paragraph_style(
+        sheet_id,
+        named_style_box.drawable_object_id,
+        draft.id(),
+        ParagraphStyleName::new("Numbers Display")?,
+    )?;
+    editor.apply_sheet_text_box_named_paragraph_style(
+        sheet_id,
+        named_style_box.drawable_object_id,
+        display.id(),
+    )?;
+    let disposable = editor.create_sheet_text_box_named_paragraph_style(
+        sheet_id,
+        named_style_box.drawable_object_id,
+        body.id(),
+        ParagraphStyleName::new("Numbers Disposable")?,
+    )?;
+    editor.delete_sheet_text_box_named_paragraph_style(
+        sheet_id,
+        named_style_box.drawable_object_id,
+        disposable.id(),
     )?;
     editor.save(output)?;
     println!(
