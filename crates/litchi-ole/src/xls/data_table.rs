@@ -231,7 +231,7 @@ impl XlsDataTable {
     }
 
     /// Serialize back to a complete `Table` record payload.
-    pub(crate) fn to_payload(&self) -> Vec<u8> {
+    pub(crate) fn to_payload(self) -> Vec<u8> {
         let mut flags = 0u16;
         if self.always_calc {
             flags |= ALWAYS_CALC;

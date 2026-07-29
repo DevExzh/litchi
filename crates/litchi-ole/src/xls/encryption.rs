@@ -186,7 +186,7 @@ impl FilePassRecord {
 
 enum WorkbookCipher {
     Xor([u8; 16]),
-    BinaryRc4(BinaryRc4Stream),
+    BinaryRc4(Box<BinaryRc4Stream>),
     CryptoApi(CryptoApiContext),
 }
 
@@ -298,7 +298,7 @@ fn prepare_writer_material(encryption: &XlsWriterEncryption) -> XlsResult<Writer
             filepass.extend_from_slice(encrypted.as_ref());
             Ok(WriterEncryptionMaterial {
                 filepass,
-                cipher: WorkbookCipher::BinaryRc4(BinaryRc4Stream::new(secret)),
+                cipher: WorkbookCipher::BinaryRc4(Box::new(BinaryRc4Stream::new(secret))),
             })
         },
         XlsEncryptionProfile::CryptoApiRc4 { key_bits } => {
@@ -371,12 +371,10 @@ fn inspect_clear_workbook(workbook: &[u8]) -> XlsResult<ClearWorkbookPlan> {
         } else if sid == FILEPASS_SID {
             saw_filepass = true;
         }
-        if in_globals && sid == CODEPAGE_SID {
-            if codepage_offset.replace(position).is_some() {
-                return Err(XlsError::InvalidData(
-                    "generated workbook globals contain duplicate CODEPAGE records".to_string(),
-                ));
-            }
+        if in_globals && sid == CODEPAGE_SID && codepage_offset.replace(position).is_some() {
+            return Err(XlsError::InvalidData(
+                "generated workbook globals contain duplicate CODEPAGE records".to_string(),
+            ));
         }
         if in_globals && sid == BOUNDSHEET8_SID {
             if data_len < 4 {
@@ -577,7 +575,7 @@ pub(crate) fn prepare_workbook_stream(
                     let password = password.ok_or(XlsError::PasswordRequired)?;
                     let secret = verify_binary_rc4_password(&filepass, password)?
                         .ok_or(XlsError::InvalidPassword)?;
-                    cipher = Some(WorkbookCipher::BinaryRc4(BinaryRc4Stream::new(secret)));
+                    cipher = Some(WorkbookCipher::BinaryRc4(Box::new(BinaryRc4Stream::new(secret))));
                 },
                 FilePassRecord::CryptoApi(header) => {
                     let password = password.ok_or(XlsError::PasswordRequired)?;
@@ -761,15 +759,13 @@ fn create_xor_key(password: &str) -> u16 {
         return 0;
     }
     let mut key = INITIAL_CODE_ARRAY[bytes.len() - 1];
-    let mut matrix_line = 15 - bytes.len();
-    for mut byte in bytes {
+    for (matrix_line, mut byte) in (15 - bytes.len()..).zip(bytes) {
         for matrix_value in ENCRYPTION_MATRIX[matrix_line] {
             if byte & 1 != 0 {
                 key ^= matrix_value;
             }
             byte >>= 1;
         }
-        matrix_line += 1;
     }
     key
 }
