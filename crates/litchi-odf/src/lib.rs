@@ -208,11 +208,12 @@
 //! - ✅ External references remain inert and are never fetched
 //! - ✅ Metadata and lossless exact original-byte saving
 //!
-//! ## ✅ ODM - Master Documents (READ-ONLY SEMANTIC MODEL)
+//! ## ✅ ODM - Master Documents (READING AND WRITING)
 //!
 //! - ✅ Open master documents and master templates (`.odm`/`.otm`)
 //! - ✅ Reuse the complete text-document semantic reader for cached content
 //! - ✅ Namespace-aware linked sections, display/protection metadata, and XLink behavior
+//! - ✅ `MasterDocumentBuilder`/mutable model for sections, indexes, and subdocuments
 //! - ✅ Linked external documents remain inert and are never refreshed automatically
 //! - ✅ Metadata and lossless exact original-byte saving
 //!
@@ -224,11 +225,12 @@
 //! - ✅ Metadata and lossless exact original-byte saving
 //! - ℹ️ `text-web` is a legacy producer MIME type, not an ODF 1.3/1.4 conformance MIME
 //!
-//! ## ✅ ODB - Database Front Ends (READ-ONLY SEMANTIC MODEL)
+//! ## ✅ ODB - Database Front Ends (READING AND WRITING)
 //!
 //! - ✅ Open database front ends from paths, readers, or bytes
 //! - ✅ Namespace-aware complete database configuration subtree and expanded attributes
 //! - ✅ Connections, driver settings, forms, reports, queries, tables, schemas, keys, and indices
+//! - ✅ Schema, query, and component add/update/remove/move authoring APIs
 //! - ✅ Opaque access to package-contained embedded database engine resources
 //! - ✅ Metadata and lossless exact original-byte saving
 //! - ✅ Connections, SQL commands, embedded engines, and macros always remain inert
