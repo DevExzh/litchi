@@ -90,6 +90,7 @@ mod paragraph_group;
 mod parser;
 mod picture;
 mod picture_compatibility;
+mod protection_range;
 mod protection_user;
 mod review_display;
 mod revision_save;
@@ -278,6 +279,7 @@ pub use picture::{
 pub use picture_compatibility::{
     MAX_PICTURE_COMPATIBILITY_RECORDS, PictureCompatibilityKind, PictureCompatibilityRecord,
 };
+pub use protection_range::ProtectionRange;
 pub use protection_user::{
     MAX_PROTECTION_USER_BYTES, MAX_PROTECTION_USER_TOTAL_BYTES, MAX_PROTECTION_USERS,
     ProtectionUser, ProtectionUserTable,

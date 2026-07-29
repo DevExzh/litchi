@@ -170,6 +170,8 @@ pub enum BodyStoryEvent {
     CustomXmlOpen(usize),
     CustomXmlClose(usize),
     MathZone(usize),
+    ProtectionRangeStart(usize),
+    ProtectionRangeEnd(usize),
 }
 
 /// A generic field reference embedded in a non-body text story.

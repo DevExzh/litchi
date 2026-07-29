@@ -151,3 +151,51 @@ fn rejects_hostile_object_destination_grammar() {
         );
     }
 }
+
+#[test]
+fn round_trips_object_alias_and_section_metadata() {
+    let source = r#"{\rtf1\ansi A{\object\objemb\objh40\objw50
+        {\*\objclass Package}{\*\objname Visible Name}
+        {\*\objalias Alias Name}{\*\objsect Section1}
+        {\*\oleclsid 00112233-4455-6677-8899-AABBCCDDEEFF}
+        {\*\objdata 0102a0ff}
+        {\result fallback}}B}"#;
+    let document = RtfDocument::parse(source).unwrap();
+    let object = &document.objects()[0];
+    assert_eq!(object.alias.as_deref(), Some("Alias Name"));
+    assert_eq!(object.section.as_deref(), Some("Section1"));
+
+    let output = write(&document);
+    let serialized = String::from_utf8(output.clone()).unwrap();
+    assert!(serialized.contains("{\\*\\objalias Alias Name}"));
+    assert!(serialized.contains("{\\*\\objsect Section1}"));
+
+    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed_object = &reparsed.objects()[0];
+    assert_eq!(reparsed_object.alias, object.alias);
+    assert_eq!(reparsed_object.section, object.section);
+    assert_eq!(reparsed_object.class_id, object.class_id);
+    assert_eq!(reparsed_object.data, object.data);
+}
+
+#[test]
+fn rejects_misplaced_object_alias_and_section_destinations() {
+    for source in [
+        // Unstarred destinations.
+        r#"{\rtf1{\object\objemb{\objalias X}{\*\objdata 00}}}"#,
+        r#"{\rtf1{\object\objemb{\objsect X}{\*\objdata 00}}}"#,
+        // Duplicate destinations.
+        r#"{\rtf1{\object\objemb{\*\objalias X}{\*\objalias Y}{\*\objdata 00}}}"#,
+        r#"{\rtf1{\object\objemb{\*\objsect X}{\*\objsect Y}{\*\objdata 00}}}"#,
+        // Metadata after objdata.
+        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\objalias X}}}"#,
+        r#"{\rtf1{\object\objemb{\*\objdata 00}{\*\objsect X}}}"#,
+        // Metadata after the CLSID.
+        r#"{\rtf1{\object\objemb{\*\oleclsid X}{\*\objalias A}{\*\objdata 00}}}"#,
+    ] {
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted malformed {source}"
+        );
+    }
+}

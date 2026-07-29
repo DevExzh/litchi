@@ -324,6 +324,17 @@ struct CustomXmlSpan {
     end: usize,
 }
 
+struct OpenProtectionRange {
+    id: String,
+    position: usize,
+    order: usize,
+}
+
+struct ProtectionRangeSpan {
+    range: OpenProtectionRange,
+    end: usize,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum ParsedBodyStoryEvent {
     Resolved(crate::BodyStoryEvent),
@@ -1220,6 +1231,10 @@ pub struct Parser<'a> {
     custom_xml_text_bytes: usize,
     math_zones: Vec<crate::MathZone<'a>>,
     math_text_bytes: usize,
+    protection_ranges: Vec<crate::ProtectionRange<'a>>,
+    open_protection_ranges: HashMap<String, Vec<OpenProtectionRange>>,
+    protection_range_spans: Vec<ProtectionRangeSpan>,
+    next_protection_range_order: usize,
     protection_users: Vec<crate::ProtectionUser<'a>>,
     saw_protection_user_table: bool,
     protection_user_text_bytes: usize,
@@ -1787,6 +1802,10 @@ impl<'a> Parser<'a> {
             custom_xml_text_bytes: 0,
             math_zones: Vec::new(),
             math_text_bytes: 0,
+            protection_ranges: Vec::new(),
+            open_protection_ranges: HashMap::new(),
+            protection_range_spans: Vec::new(),
+            next_protection_range_order: 0,
             protection_users: Vec::new(),
             saw_protection_user_table: false,
             protection_user_text_bytes: 0,
@@ -2163,6 +2182,7 @@ impl<'a> Parser<'a> {
         self.finalize_table()?;
         self.finalize_bookmarks()?;
         self.finalize_custom_xml_tags()?;
+        self.finalize_protection_ranges()?;
         self.finalize_annotations()?;
         let body_story_events = self.finalize_body_story_events()?;
 
@@ -2215,6 +2235,7 @@ impl<'a> Parser<'a> {
             saw_xml_namespace_table: self.saw_xml_namespace_table,
             custom_xml_tags: self.custom_xml_tags,
             math_zones: self.math_zones,
+            protection_ranges: self.protection_ranges,
             protection_user_table,
             hyphenation: self.hyphenation,
             external_references: self.external_references,
@@ -2406,6 +2427,11 @@ impl<'a> Parser<'a> {
                         "RTF custom XML attribute destinations must be starred".to_string(),
                     ));
                 },
+                Token::Control(ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF protection-range destinations must be starred".to_string(),
+                    ));
+                },
                 Token::Control(ControlWord::MathZoneInline) => {
                     self.parse_math_zone_destination(false)?;
                     self.states.pop();
@@ -2438,6 +2464,13 @@ impl<'a> Parser<'a> {
                             ControlWord::XmlAttributeName | ControlWord::XmlAttributeValue,
                         )) => {
                             self.parse_custom_xml_attribute_destination()?;
+                            self.states.pop();
+                            return Ok(true);
+                        },
+                        Some(Token::Control(
+                            ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd,
+                        )) => {
+                            self.parse_protection_range_destination()?;
                             self.states.pop();
                             return Ok(true);
                         },
@@ -17139,6 +17172,126 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Parse a `\*\protstart`/`\*\protend` destination group.
+    ///
+    /// The destination text is the opaque hexadecimal identifier pairing the
+    /// markers (RTF 1.9.1 Word 2003 document protection); matching open and
+    /// close markers are paired by identifier like bookmarks, and unclosed
+    /// markers extend to the end of the body story.
+    fn parse_protection_range_destination(&mut self) -> RtfResult<()> {
+        self.pos += 1; // ignorable-destination marker
+        let is_start = match self.tokens.get(self.pos) {
+            Some(Token::Control(ControlWord::ProtectionRangeStart)) => true,
+            Some(Token::Control(ControlWord::ProtectionRangeEnd)) => false,
+            _ => {
+                return Err(RtfError::MalformedDocument(
+                    "invalid RTF protection-range destination".to_string(),
+                ));
+            },
+        };
+        self.pos += 1;
+        let mut id = String::new();
+        let mut unicode_skip = self.current_state()?.unicode_skip.max(0) as usize;
+        let mut fallback_skip = 0usize;
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    break;
+                },
+                None => return Err(RtfError::UnexpectedEof),
+                _ => {
+                    if !self.consume_destination_text_token(
+                        &mut id,
+                        &mut unicode_skip,
+                        &mut fallback_skip,
+                        "protection-range identifier",
+                    )? {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF protection-range destination contains grouped, binary, or active data"
+                                .to_string(),
+                        ));
+                    }
+                    if id.len() > crate::protection_range::MAX_PROTECTION_RANGE_ID_BYTES {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF protection-range identifier exceeds the safety limit".to_string(),
+                        ));
+                    }
+                },
+            }
+        }
+        let id = id.trim_end_matches(['\r', '\n']).to_string();
+        crate::ProtectionRange::new(Cow::Borrowed(id.as_str()), 0, Cow::Borrowed(""))?;
+
+        if is_start {
+            if self.next_protection_range_order >= crate::protection_range::MAX_PROTECTION_RANGES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF protection-range count exceeds the safety limit".to_string(),
+                ));
+            }
+            let range = OpenProtectionRange {
+                id: id.clone(),
+                position: self.body_text_len,
+                order: self.next_protection_range_order,
+            };
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::ProtectionRangeStart(self.next_protection_range_order),
+            ));
+            self.next_protection_range_order += 1;
+            self.open_protection_ranges.entry(id).or_default().push(range);
+        } else if let Some(open) = self
+            .open_protection_ranges
+            .get_mut(&id)
+            .and_then(Vec::pop)
+        {
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::ProtectionRangeEnd(open.order),
+            ));
+            self.protection_range_spans.push(ProtectionRangeSpan {
+                range: open,
+                end: self.body_text_len,
+            });
+        }
+        Ok(())
+    }
+
+    fn finalize_protection_ranges(&mut self) -> RtfResult<()> {
+        for ranges in self.open_protection_ranges.values_mut() {
+            for range in ranges.drain(..) {
+                self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                    crate::BodyStoryEvent::ProtectionRangeEnd(range.order),
+                ));
+                self.protection_range_spans.push(ProtectionRangeSpan {
+                    range,
+                    end: self.body_text_len,
+                });
+            }
+        }
+        self.protection_range_spans
+            .sort_unstable_by_key(|span| span.range.order);
+        if self.protection_range_spans.is_empty() {
+            return Ok(());
+        }
+
+        let mut body = String::with_capacity(self.body_text_len);
+        for block in &self.blocks {
+            body.push_str(block.text.as_ref());
+        }
+        for span in self.protection_range_spans.drain(..) {
+            let content = body.get(span.range.position..span.end).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "protection range does not align to body text".to_string(),
+                )
+            })?;
+            self.protection_ranges.push(crate::ProtectionRange::new(
+                Cow::Owned(span.range.id),
+                span.range.position,
+                Cow::Owned(content.to_string()),
+            )?);
+        }
+        Ok(())
+    }
+
     fn parse_ignorable_text_destination(&mut self) -> RtfResult<String> {
         self.pos += 2; // ignorable marker and destination control word
         let mut value = String::new();
@@ -18487,6 +18640,40 @@ impl<'a> Parser<'a> {
                     }
                     object.name = Cow::Owned(self.parse_object_text_destination()?);
                     saw_name = true;
+                },
+                Token::OpenBrace
+                    if self.nested_control_word() == Some(ControlWord::ObjectAlias) =>
+                {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || object.alias.is_some()
+                        || saw_class_id
+                        || saw_data
+                        || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object alias destination placement".to_string(),
+                        ));
+                    }
+                    object.alias = Some(Cow::Owned(self.parse_object_text_destination()?));
+                },
+                Token::OpenBrace
+                    if self.nested_control_word() == Some(ControlWord::ObjectSection) =>
+                {
+                    if !matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    ) || object.section.is_some()
+                        || saw_class_id
+                        || saw_data
+                        || saw_result
+                    {
+                        return Err(RtfError::MalformedDocument(
+                            "invalid RTF object section destination placement".to_string(),
+                        ));
+                    }
+                    object.section = Some(Cow::Owned(self.parse_object_text_destination()?));
                 },
                 Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::OleClassId(None)) =>
@@ -23958,6 +24145,8 @@ pub struct ParsedDocument<'a> {
     pub custom_xml_tags: Vec<crate::CustomXmlTag<'a>>,
     /// Ordered inert math zones anchored in the body story.
     pub math_zones: Vec<crate::MathZone<'a>>,
+    /// Ordered inert protection-exception ranges spanning body text.
+    pub protection_ranges: Vec<crate::ProtectionRange<'a>>,
     pub protection_user_table: Option<crate::ProtectionUserTable<'a>>,
     pub hyphenation: crate::DocumentHyphenation,
     pub external_references: crate::DocumentExternalReferences<'a>,

@@ -101,6 +101,8 @@ pub struct RtfDocument<'a> {
     custom_xml_tags: Vec<crate::CustomXmlTag<'a>>,
     /// Ordered inert math zones anchored in the body story.
     math_zones: Vec<crate::MathZone<'a>>,
+    /// Ordered inert protection-exception ranges spanning body text.
+    protection_ranges: Vec<crate::ProtectionRange<'a>>,
     /// Ordered inert usernames used by range-level protection.
     protection_user_table: Option<crate::ProtectionUserTable<'a>>,
     /// Explicit passive document hyphenation properties.
@@ -373,6 +375,8 @@ impl<'a> RtfDocument<'a> {
                 link_self: object.link_self,
                 class_name: Cow::Owned(object.class_name.into_owned()),
                 name: Cow::Owned(object.name.into_owned()),
+                alias: object.alias.map(|alias| Cow::Owned(alias.into_owned())),
+                section: object.section.map(|section| Cow::Owned(section.into_owned())),
                 class_id: Cow::Owned(object.class_id.into_owned()),
                 width: object.width,
                 height: object.height,
@@ -428,6 +432,11 @@ impl<'a> RtfDocument<'a> {
                 .math_zones
                 .into_iter()
                 .map(crate::MathZone::into_owned)
+                .collect(),
+            protection_ranges: parsed
+                .protection_ranges
+                .into_iter()
+                .map(crate::ProtectionRange::into_owned)
                 .collect(),
             protection_user_table: parsed
                 .protection_user_table
@@ -2031,6 +2040,15 @@ impl<'a> RtfDocument<'a> {
     /// document body text (like field results).
     pub fn math_zones(&self) -> &[crate::MathZone<'_>] {
         &self.math_zones
+    }
+
+    /// Return the protection-exception ranges in `\*\protstart` source order.
+    ///
+    /// The ranges are inert Word 2003 document-protection metadata: their
+    /// identifiers are stored verbatim and no editing restriction is ever
+    /// evaluated or enforced.
+    pub fn protection_ranges(&self) -> &[crate::ProtectionRange<'_>] {
+        &self.protection_ranges
     }
 
     /// Replace the XML namespace table after full validation.
@@ -3954,6 +3972,13 @@ impl<'a> RtfDocument<'a> {
                 tag.position.checked_add(tag.content.len())?
             },
             crate::BodyStoryEvent::MathZone(index) => self.math_zones.get(index)?.position,
+            crate::BodyStoryEvent::ProtectionRangeStart(index) => {
+                self.protection_ranges.get(index)?.position
+            },
+            crate::BodyStoryEvent::ProtectionRangeEnd(index) => {
+                let range = self.protection_ranges.get(index)?;
+                range.position.checked_add(range.content.len())?
+            },
         })
     }
 

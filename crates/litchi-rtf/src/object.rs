@@ -90,6 +90,10 @@ pub struct EmbeddedObject<'a> {
     pub class_name: Cow<'a, str>,
     /// User-visible object name (`objname`)
     pub name: Cow<'a, str>,
+    /// Optional alias for the object (`objalias`)
+    pub alias: Option<Cow<'a, str>>,
+    /// Optional name of the linked document section (`objsect`)
+    pub section: Option<Cow<'a, str>>,
     /// Optional original CLSID from the `oleclsid` destination
     pub class_id: Cow<'a, str>,
     /// Object width in twips
@@ -140,6 +144,8 @@ impl<'a> EmbeddedObject<'a> {
             link_self: false,
             class_name: Cow::Borrowed(""),
             name: Cow::Borrowed(""),
+            alias: None,
+            section: None,
             class_id: Cow::Borrowed(""),
             width: 0,
             height: 0,
@@ -195,6 +201,16 @@ impl<'a> EmbeddedObject<'a> {
             .len()
             .checked_add(self.name.len())
             .and_then(|size| size.checked_add(self.class_id.len()))
+            .and_then(|size| {
+                size.checked_add(
+                    self.alias.as_ref().map_or(0, |alias| alias.len()),
+                )
+            })
+            .and_then(|size| {
+                size.checked_add(
+                    self.section.as_ref().map_or(0, |section| section.len()),
+                )
+            })
             .and_then(|size| size.checked_add(self.result_text.len()))
             .ok_or_else(|| {
                 RtfError::MalformedDocument(

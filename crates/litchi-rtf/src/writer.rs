@@ -88,6 +88,8 @@ enum BodyEventKind<'b, 'a> {
     CustomXmlOpen(&'b crate::CustomXmlTag<'a>),
     CustomXmlClose(&'b crate::CustomXmlTag<'a>),
     MathZone(&'b crate::MathZone<'a>),
+    ProtectionRangeStart(&'b crate::ProtectionRange<'a>),
+    ProtectionRangeEnd(&'b crate::ProtectionRange<'a>),
     AnnotationStart(&'b Annotation<'a>),
     AnnotationEnd(&'b Annotation<'a>),
     Note(&'b Note<'a>),
@@ -329,6 +331,7 @@ impl<W: Write> RtfWriter<W> {
             doc.bookmarks(),
             doc.custom_xml_tags(),
             doc.math_zones(),
+            doc.protection_ranges(),
             doc.annotations(),
             doc.notes(),
             doc.revisions(),
@@ -3691,6 +3694,22 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
+    /// Write a protection-exception range marker destination.
+    pub fn write_protection_range_marker(
+        &mut self,
+        control: &str,
+        range: &crate::ProtectionRange<'_>,
+    ) -> io::Result<()> {
+        range
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{\\*")?;
+        self.write_control_word(control, None)?;
+        self.write_str(" ")?;
+        self.write_destination_text(range.id.as_ref())?;
+        self.write_str("}")
+    }
+
     fn math_structure_control(kind: crate::MathStructureKind) -> &'static str {
         use crate::MathStructureKind as K;
         match kind {
@@ -4003,6 +4022,7 @@ impl<W: Write> RtfWriter<W> {
         bookmarks: &BookmarkTable<'_>,
         custom_xml_tags: &[crate::CustomXmlTag<'_>],
         math_zones: &[crate::MathZone<'_>],
+        protection_ranges: &[crate::ProtectionRange<'_>],
         annotations: &[Annotation<'_>],
         notes: &[Note<'_>],
         revisions: &[Revision<'_>],
@@ -4024,6 +4044,7 @@ impl<W: Write> RtfWriter<W> {
         if bookmarks.bookmarks().is_empty()
             && custom_xml_tags.is_empty()
             && math_zones.is_empty()
+            && protection_ranges.is_empty()
             && annotations.is_empty()
             && notes.is_empty()
             && revisions.is_empty()
@@ -4058,6 +4079,7 @@ impl<W: Write> RtfWriter<W> {
         let event_count = event_count.saturating_add(navigation_entries.len());
         let event_count = event_count.saturating_add(custom_xml_tags.len().saturating_mul(2));
         let event_count = event_count.saturating_add(math_zones.len());
+        let event_count = event_count.saturating_add(protection_ranges.len().saturating_mul(2));
         let event_count = event_count.saturating_add(shapes.len());
         let event_count = event_count.saturating_add(shape_groups.len());
         let event_count = event_count.saturating_add(picture_compatibility_records.len());
@@ -4549,6 +4571,35 @@ impl<W: Write> RtfWriter<W> {
                 ));
             }
         }
+        if protection_ranges.len() > crate::protection_range::MAX_PROTECTION_RANGES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF protection-range count exceeds the safety limit",
+            ));
+        }
+        for range in protection_ranges {
+            range
+                .validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            let end = range.position.checked_add(range.content.len()).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF protection-range range overflow",
+                )
+            })?;
+            let content = body.get(range.position..end).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF protection range is outside body text or splits a character",
+                )
+            })?;
+            if content != range.content {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF protection-range content does not match its body range",
+                ));
+            }
+        }
         for annotation in annotations {
             annotation
                 .validate()
@@ -4642,6 +4693,8 @@ impl<W: Write> RtfWriter<W> {
         let mut saw_custom_xml_opens = vec![false; custom_xml_tags.len()];
         let mut saw_custom_xml_closes = vec![false; custom_xml_tags.len()];
         let mut saw_math_zones = vec![false; math_zones.len()];
+        let mut saw_protection_starts = vec![false; protection_ranges.len()];
+        let mut saw_protection_ends = vec![false; protection_ranges.len()];
         let mut saw_annotation_starts = vec![false; annotations.len()];
         let mut saw_annotation_ends = vec![false; annotations.len()];
         let mut saw_notes = vec![false; notes.len()];
@@ -4784,6 +4837,30 @@ impl<W: Write> RtfWriter<W> {
                     (
                         math_zones[index].position,
                         BodyEventKind::MathZone(&math_zones[index]),
+                    )
+                },
+                crate::BodyStoryEvent::ProtectionRangeStart(index)
+                    if index < protection_ranges.len() && !saw_protection_starts[index] =>
+                {
+                    saw_protection_starts[index] = true;
+                    (
+                        protection_ranges[index].position,
+                        BodyEventKind::ProtectionRangeStart(&protection_ranges[index]),
+                    )
+                },
+                crate::BodyStoryEvent::ProtectionRangeEnd(index)
+                    if index < protection_ranges.len() && !saw_protection_ends[index] =>
+                {
+                    saw_protection_ends[index] = true;
+                    let range = &protection_ranges[index];
+                    (
+                        range.position.checked_add(range.content.len()).ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF protection-range range overflow",
+                            )
+                        })?,
+                        BodyEventKind::ProtectionRangeEnd(range),
                     )
                 },
                 crate::BodyStoryEvent::AnnotationStart(index)
@@ -4948,6 +5025,8 @@ impl<W: Write> RtfWriter<W> {
             && saw_custom_xml_opens.iter().all(|seen| *seen)
             && saw_custom_xml_closes.iter().all(|seen| *seen)
             && saw_math_zones.iter().all(|seen| *seen)
+            && saw_protection_starts.iter().all(|seen| *seen)
+            && saw_protection_ends.iter().all(|seen| *seen)
             && saw_annotation_starts.iter().all(|seen| *seen)
             && saw_annotation_ends.iter().all(|seen| *seen)
             && saw_notes.iter().all(|seen| *seen)
@@ -5050,6 +5129,12 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::CustomXmlOpen(tag) => self.write_custom_xml_open(tag),
             BodyEventKind::CustomXmlClose(tag) => self.write_custom_xml_close(tag),
             BodyEventKind::MathZone(zone) => self.write_math_zone(zone),
+            BodyEventKind::ProtectionRangeStart(range) => {
+                self.write_protection_range_marker("protstart", range)
+            },
+            BodyEventKind::ProtectionRangeEnd(range) => {
+                self.write_protection_range_marker("protend", range)
+            },
             BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
             BodyEventKind::AnnotationEnd(annotation) => self.write_annotation_end(annotation),
             BodyEventKind::Note(note) => self.write_note_with_fields(note, fields),
@@ -5235,6 +5320,16 @@ impl<W: Write> RtfWriter<W> {
         if !object.name.is_empty() {
             self.write_str("{\\*\\objname ")?;
             self.write_destination_text(object.name.as_ref())?;
+            self.write_str("}")?;
+        }
+        if let Some(alias) = &object.alias {
+            self.write_str("{\\*\\objalias ")?;
+            self.write_destination_text(alias.as_ref())?;
+            self.write_str("}")?;
+        }
+        if let Some(section) = &object.section {
+            self.write_str("{\\*\\objsect ")?;
+            self.write_destination_text(section.as_ref())?;
             self.write_str("}")?;
         }
         if object.set_size {
