@@ -69,6 +69,55 @@ const DOCUMENT_METADATA: u64 = 38;
 const FORMULA_OWNER: u64 = 39;
 const BULLET_LIST_STYLE: u64 = 41;
 const NUMBERED_LIST_STYLE: u64 = 42;
+const LAST_PARAGRAPH_STYLE: u64 = NumbersParagraphStylePreset::Caption.object_id();
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u64)]
+enum NumbersParagraphStylePreset {
+    Body = PARAGRAPH_STYLE,
+    Title = 43,
+    Subtitle = 44,
+    Heading = 45,
+    HeadingRed = 46,
+    Caption = 47,
+}
+
+impl NumbersParagraphStylePreset {
+    const ALL: [Self; 6] = [
+        Self::Title,
+        Self::Subtitle,
+        Self::Heading,
+        Self::HeadingRed,
+        Self::Body,
+        Self::Caption,
+    ];
+
+    const fn object_id(self) -> u64 {
+        self as u64
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Title => "Title",
+            Self::Subtitle => "Subtitle",
+            Self::Heading => "Heading",
+            Self::HeadingRed => "Heading Red",
+            Self::Body => "Body",
+            Self::Caption => "Caption",
+        }
+    }
+
+    const fn style_identifier(self) -> &'static str {
+        match self {
+            Self::Title => "litchi-paragraph-title",
+            Self::Subtitle => "litchi-paragraph-subtitle",
+            Self::Heading => "litchi-paragraph-heading",
+            Self::HeadingRed => "litchi-paragraph-heading-red",
+            Self::Body => "litchi-paragraph-body",
+            Self::Caption => "litchi-paragraph-caption",
+        }
+    }
+}
 
 const TABLE_FORMULA_OWNER_INTERNAL_ID: u32 = 6;
 
@@ -120,7 +169,12 @@ const STYLESHEET_OBJECTS: &[u64] = &[
     LIST_STYLE,
     BULLET_LIST_STYLE,
     NUMBERED_LIST_STYLE,
-    PARAGRAPH_STYLE,
+    NumbersParagraphStylePreset::Title.object_id(),
+    NumbersParagraphStylePreset::Subtitle.object_id(),
+    NumbersParagraphStylePreset::Heading.object_id(),
+    NumbersParagraphStylePreset::HeadingRed.object_id(),
+    NumbersParagraphStylePreset::Body.object_id(),
+    NumbersParagraphStylePreset::Caption.object_id(),
     CHARACTER_STYLE,
     SHAPE_STYLE,
     MEDIA_STYLE,
@@ -355,7 +409,10 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
                     .map(reference)
                     .collect(),
                 character_style_presets: repeated_reference(7, CHARACTER_STYLE),
-                paragraph_style_presets: repeated_reference(6, PARAGRAPH_STYLE),
+                paragraph_style_presets: NumbersParagraphStylePreset::ALL
+                    .into_iter()
+                    .map(|preset| reference(preset.object_id()))
+                    .collect(),
                 dropcap_style_presets: repeated_reference(6, DROP_CAP_STYLE),
                 ..Default::default()
             }),
@@ -365,7 +422,10 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
                 ..Default::default()
             }),
             application: Some(tsa::ThemePresetsArchive {
-                caption_style_presets: repeated_reference(2, PARAGRAPH_STYLE),
+                caption_style_presets: repeated_reference(
+                    2,
+                    NumbersParagraphStylePreset::Caption.object_id(),
+                ),
                 svg_import_style_presets: repeated_reference(1, SHAPE_STYLE),
             }),
         },
@@ -483,7 +543,12 @@ fn document_archive(builder: &NumbersDocumentBuilder, table_uuid: &tsp::Uuid) ->
             &[
                 STYLESHEET,
                 LIST_STYLE,
-                PARAGRAPH_STYLE,
+                NumbersParagraphStylePreset::Title.object_id(),
+                NumbersParagraphStylePreset::Subtitle.object_id(),
+                NumbersParagraphStylePreset::Heading.object_id(),
+                NumbersParagraphStylePreset::HeadingRed.object_id(),
+                NumbersParagraphStylePreset::Body.object_id(),
+                NumbersParagraphStylePreset::Caption.object_id(),
                 CHARACTER_STYLE,
                 SHAPE_STYLE,
                 MEDIA_STYLE,
@@ -800,6 +865,13 @@ fn stylesheet_archive() -> Result<Archive> {
                 NumbersMessageType::Stylesheet,
                 tss::StylesheetArchive {
                     styles: styles.iter().copied().map(reference).collect(),
+                    identifier_to_style_map: NumbersParagraphStylePreset::ALL
+                        .into_iter()
+                        .map(|preset| tss::stylesheet_archive::IdentifiedStyleEntry {
+                            identifier: preset.style_identifier().to_owned(),
+                            style: reference(preset.object_id()),
+                        })
+                        .collect(),
                     is_locked: Some(false),
                     can_cull_styles: Some(true),
                     ..Default::default()
@@ -811,16 +883,6 @@ fn stylesheet_archive() -> Result<Archive> {
                 NumbersMessageType::ListStyle,
                 tswp::ListStyleArchive {
                     super_: style("None", "litchi-list-none"),
-                    override_count: Some(0),
-                    ..Default::default()
-                },
-                &[STYLESHEET],
-            )?,
-            object(
-                PARAGRAPH_STYLE,
-                NumbersMessageType::ParagraphStyle,
-                tswp::ParagraphStyleArchive {
-                    super_: style("Body", "litchi-table-body"),
                     override_count: Some(0),
                     ..Default::default()
                 },
@@ -919,6 +981,18 @@ fn stylesheet_archive() -> Result<Archive> {
         STYLESHEET,
         ParagraphList::Numbered,
     )?);
+    for preset in NumbersParagraphStylePreset::ALL {
+        archive.objects.push(object(
+            preset.object_id(),
+            NumbersMessageType::ParagraphStyle,
+            tswp::ParagraphStyleArchive {
+                super_: style(preset.name(), preset.style_identifier()),
+                override_count: Some(0),
+                ..Default::default()
+            },
+            &[STYLESHEET],
+        )?);
+    }
     Ok(archive)
 }
 
@@ -989,7 +1063,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
         },
     ]);
     let metadata = tsp::PackageMetadata {
-        last_object_identifier: NUMBERED_LIST_STYLE,
+        last_object_identifier: LAST_PARAGRAPH_STYLE,
         revision: Some(tsp::DocumentRevision {
             sequence_32: Some(0),
             identifier: Some(identity.version_uuid().to_owned()),
@@ -1293,7 +1367,64 @@ mod tests {
         );
         assert_eq!(
             crate::package_metadata::package_last_object_identifier(&package).unwrap(),
-            Some(NUMBERED_LIST_STYLE)
+            Some(LAST_PARAGRAPH_STYLE)
+        );
+    }
+
+    #[test]
+    fn generated_theme_exposes_unique_native_paragraph_style_catalog() {
+        let package = NumbersDocumentBuilder::new().build_package().unwrap();
+        let styles = crate::text::paragraph_alignment::native::named_paragraph_styles(
+            &package,
+            PARAGRAPH_STYLE,
+        )
+        .unwrap();
+        assert_eq!(
+            styles
+                .iter()
+                .map(crate::text::NamedParagraphStyle::name)
+                .collect::<Vec<_>>(),
+            [
+                "Title",
+                "Subtitle",
+                "Heading",
+                "Heading Red",
+                "Body",
+                "Caption"
+            ]
+        );
+        assert_eq!(
+            styles
+                .iter()
+                .map(|style| style.id().get())
+                .collect::<Vec<_>>(),
+            NumbersParagraphStylePreset::ALL
+                .into_iter()
+                .map(NumbersParagraphStylePreset::object_id)
+                .collect::<Vec<_>>()
+        );
+        let stylesheet = package.archive(STYLESHEET_ARCHIVE_ENTRY).unwrap();
+        let stylesheet = tss::StylesheetArchive::decode(
+            stylesheet
+                .object(STYLESHEET)
+                .unwrap()
+                .messages
+                .first()
+                .unwrap()
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert_eq!(
+            stylesheet
+                .identifier_to_style_map
+                .iter()
+                .map(|entry| (entry.identifier.as_str(), entry.style.identifier))
+                .collect::<Vec<_>>(),
+            NumbersParagraphStylePreset::ALL
+                .into_iter()
+                .map(|preset| (preset.style_identifier(), preset.object_id()))
+                .collect::<Vec<_>>()
         );
     }
 

@@ -104,7 +104,14 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
             .iter()
             .map(|style| style.name())
             .collect::<Vec<_>>(),
-        ["Body"]
+        [
+            "Title",
+            "Subtitle",
+            "Heading",
+            "Heading Red",
+            "Body",
+            "Caption"
+        ]
     );
 
     let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
