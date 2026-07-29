@@ -15,6 +15,7 @@ use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
 
 use super::super::font::{TextFont, TextFontName};
+use super::super::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
 use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
     ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
@@ -69,8 +70,12 @@ const PARAGRAPH_ALIGNMENT_FIELD: u32 = 1;
 const PARAGRAPH_FILL_NULL_FIELD: u32 = 5;
 const PARAGRAPH_FILL_FIELD: u32 = 6;
 const PARAGRAPH_FIRST_LINE_INDENT_FIELD: u32 = 7;
+const PARAGRAPH_HYPHENATE_FIELD: u32 = 8;
+const PARAGRAPH_KEEP_LINES_TOGETHER_FIELD: u32 = 9;
+const PARAGRAPH_KEEP_WITH_NEXT_FIELD: u32 = 10;
 const PARAGRAPH_LEFT_INDENT_FIELD: u32 = 11;
 const PARAGRAPH_LINE_SPACING_FIELD: u32 = 13;
+const PARAGRAPH_PAGE_BREAK_BEFORE_FIELD: u32 = 14;
 const PARAGRAPH_DEPRECATED_BORDERS_FIELD: u32 = 15;
 const PARAGRAPH_BORDER_OFFSET_NULL_FIELD: u32 = 16;
 const PARAGRAPH_BORDER_OFFSET_FIELD: u32 = 17;
@@ -79,6 +84,7 @@ const PARAGRAPH_RIGHT_INDENT_FIELD: u32 = 19;
 const PARAGRAPH_SPACE_AFTER_FIELD: u32 = 20;
 const PARAGRAPH_SPACE_BEFORE_FIELD: u32 = 21;
 const PARAGRAPH_TABS_FIELD: u32 = 25;
+const PARAGRAPH_WIDOW_CONTROL_FIELD: u32 = 26;
 const PARAGRAPH_BORDER_STROKE_NULL_FIELD: u32 = 31;
 const PARAGRAPH_BORDER_STROKE_FIELD: u32 = 32;
 const PARAGRAPH_BORDER_POSITIONS_FIELD: u32 = 45;
@@ -90,6 +96,8 @@ const LEGACY_BORDER_BOTTOM: i32 = 2;
 const LEGACY_BORDER_ALL: i32 = 4;
 const LEGACY_BORDER_LEFT: i32 = 8;
 const LEGACY_BORDER_RIGHT: i32 = 16;
+const PROTOBUF_FALSE_BYTE: u8 = 0;
+const PROTOBUF_TRUE_BYTE: u8 = 1;
 
 const RELATIVE_LINE_SPACING_MODE: i32 = 0;
 const MINIMUM_LINE_SPACING_MODE: i32 = 1;
@@ -120,6 +128,11 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) background: Option<TextBackground>,
     pub(crate) paragraph_background: Option<ParagraphBackground>,
     pub(crate) paragraph_borders: Option<ParagraphBorders>,
+    pub(crate) hyphenation: Option<ParagraphHyphenation>,
+    pub(crate) keep_lines_together: Option<bool>,
+    pub(crate) keep_with_next: Option<bool>,
+    pub(crate) start_on_new_page: Option<bool>,
+    pub(crate) prevent_widow_orphan_lines: Option<bool>,
     pub(crate) underline: Option<TextUnderline>,
     pub(crate) strikethrough: Option<TextStrikethrough>,
     pub(crate) alignment: Option<TextAlignment>,
@@ -163,6 +176,11 @@ impl ParagraphStyleOverrides {
             + self
                 .paragraph_borders
                 .map_or(0, ParagraphBorders::native_override_count)
+            + u32::from(self.hyphenation.is_some())
+            + u32::from(self.keep_lines_together.is_some())
+            + u32::from(self.keep_with_next.is_some())
+            + u32::from(self.start_on_new_page.is_some())
+            + u32::from(self.prevent_widow_orphan_lines.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -195,6 +213,11 @@ impl ParagraphStyleOverrides {
             && self.background.is_none()
             && self.paragraph_background.is_none()
             && self.paragraph_borders.is_none()
+            && self.hyphenation.is_none()
+            && self.keep_lines_together.is_none()
+            && self.keep_with_next.is_none()
+            && self.start_on_new_page.is_none()
+            && self.prevent_widow_orphan_lines.is_none()
             && self.underline.is_none()
             && self.strikethrough.is_none()
             && self.alignment.is_none()
@@ -341,6 +364,13 @@ pub(crate) fn inherited_paragraph_borders(
     inheritance::paragraph_borders(package, first_style_id)
 }
 
+pub(crate) fn inherited_paragraph_flow(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphFlow> {
+    inheritance::paragraph_flow(package, first_style_id)
+}
+
 pub(crate) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -414,6 +444,13 @@ pub(crate) fn direct_overrides(
     let background = text_background_from_character(character_properties)?;
     let paragraph_background = paragraph_background_from_properties(properties)?;
     let paragraph_borders = paragraph_borders_from_properties(properties)?;
+    let hyphenation = properties
+        .hyphenate
+        .map(ParagraphHyphenation::from_native_value);
+    let keep_lines_together = properties.keep_lines_together;
+    let keep_with_next = properties.keep_with_next;
+    let start_on_new_page = properties.page_break_before;
+    let prevent_widow_orphan_lines = properties.widow_control;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -472,6 +509,11 @@ pub(crate) fn direct_overrides(
         background,
         paragraph_background,
         paragraph_borders,
+        hyphenation,
+        keep_lines_together,
+        keep_with_next,
+        start_on_new_page,
+        prevent_widow_orphan_lines,
         underline,
         strikethrough,
         alignment,
@@ -499,6 +541,11 @@ pub(crate) fn direct_overrides(
         remaining.border_positions = None;
         remaining.rounded_corners = None;
     }
+    remaining.hyphenate = None;
+    remaining.keep_lines_together = None;
+    remaining.keep_with_next = None;
+    remaining.page_break_before = None;
+    remaining.widow_control = None;
     remaining.line_spacing = None;
     remaining.space_before = None;
     remaining.space_after = None;
@@ -649,7 +696,7 @@ pub(crate) fn direct_overrides(
     if strikethrough.is_some() {
         character_fields.push(CHARACTER_STRIKETHROUGH_FIELD);
     }
-    let mut paragraph_fields = Vec::with_capacity(17);
+    let mut paragraph_fields = Vec::with_capacity(22);
     if alignment.is_some() {
         paragraph_fields.push(PARAGRAPH_ALIGNMENT_FIELD);
     }
@@ -683,6 +730,29 @@ pub(crate) fn direct_overrides(
         });
         paragraph_fields.push(PARAGRAPH_BORDER_POSITIONS_FIELD);
         paragraph_fields.push(PARAGRAPH_BORDER_ROUNDED_CORNERS_FIELD);
+    }
+    for (field, present) in [
+        (PARAGRAPH_HYPHENATE_FIELD, hyphenation.is_some()),
+        (
+            PARAGRAPH_KEEP_LINES_TOGETHER_FIELD,
+            keep_lines_together.is_some(),
+        ),
+        (PARAGRAPH_KEEP_WITH_NEXT_FIELD, keep_with_next.is_some()),
+        (
+            PARAGRAPH_PAGE_BREAK_BEFORE_FIELD,
+            start_on_new_page.is_some(),
+        ),
+        (
+            PARAGRAPH_WIDOW_CONTROL_FIELD,
+            prevent_widow_orphan_lines.is_some(),
+        ),
+    ] {
+        if present {
+            paragraph_fields.push(field);
+            if !has_canonical_bool_field(paragraph_raw, field)? {
+                return Ok(None);
+            }
+        }
     }
     if line_spacing.is_some() {
         paragraph_fields.push(PARAGRAPH_LINE_SPACING_FIELD);
@@ -835,6 +905,13 @@ pub(crate) fn variation_object(
             stroke: native_borders.stroke,
             border_positions: native_borders.positions,
             rounded_corners: native_borders.rounded_corners,
+            hyphenate: overrides
+                .hyphenation
+                .map(ParagraphHyphenation::native_value),
+            keep_lines_together: overrides.keep_lines_together,
+            keep_with_next: overrides.keep_with_next,
+            page_break_before: overrides.start_on_new_page,
+            widow_control: overrides.prevent_widow_orphan_lines,
             line_spacing: overrides.line_spacing.map(line_spacing_archive),
             space_before: overrides.space_before.map(ParagraphSpacingPoints::points),
             space_after: overrides.space_after.map(ParagraphSpacingPoints::points),
@@ -1514,6 +1591,21 @@ fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
     actual.sort_unstable();
     expected.sort_unstable();
     Ok(actual == expected)
+}
+
+fn has_canonical_bool_field(data: &[u8], number: u32) -> Result<bool> {
+    let fields = parse_wire_fields(data)?
+        .into_iter()
+        .filter(|field| field.number == number)
+        .collect::<Vec<_>>();
+    let [field] = fields.as_slice() else {
+        return Ok(false);
+    };
+    Ok(field.wire_type == 0
+        && matches!(
+            &data[field.key_end..field.end],
+            [PROTOBUF_FALSE_BYTE] | [PROTOBUF_TRUE_BYTE]
+        ))
 }
 
 fn required_payload<'a>(data: &'a [u8], field: u32, context: &str) -> Result<&'a [u8]> {

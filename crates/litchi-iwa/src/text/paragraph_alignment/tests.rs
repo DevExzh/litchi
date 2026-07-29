@@ -13,7 +13,7 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
+    ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextBackground,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
@@ -606,6 +606,65 @@ fn native_paragraph_border_parser_rejects_conflicting_wire() {
         ..Default::default()
     };
     assert!(native::paragraph_borders_from_properties(&null_and_stroke).is_err());
+}
+
+#[test]
+fn native_paragraph_flow_overrides_match_app_authored_wire() {
+    let flow = ParagraphFlow::new()
+        .with_keep_lines_together(true)
+        .with_keep_with_next(true)
+        .with_start_on_new_page(true)
+        .with_prevent_widow_orphan_lines(false)
+        .with_hyphenation(ParagraphHyphenation::Prevented);
+    let overrides = ParagraphStyleOverrides {
+        hyphenation: Some(flow.hyphenation()),
+        keep_lines_together: Some(flow.keeps_lines_together()),
+        keep_with_next: Some(flow.keeps_with_next()),
+        start_on_new_page: Some(flow.starts_on_new_page()),
+        prevent_widow_orphan_lines: Some(flow.prevents_widow_orphan_lines()),
+        ..Default::default()
+    };
+    let object = native::variation_object(70, 71, 72, overrides.clone()).unwrap();
+    let message = &object.messages[0];
+    let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+    let properties = archive.para_properties.as_ref().unwrap();
+    assert_eq!(archive.override_count, Some(5));
+    assert_eq!(properties.hyphenate, Some(false));
+    assert_eq!(properties.keep_lines_together, Some(true));
+    assert_eq!(properties.keep_with_next, Some(true));
+    assert_eq!(properties.page_break_before, Some(true));
+    assert_eq!(properties.widow_control, Some(false));
+    assert_eq!(
+        native::direct_overrides(&archive, &message.data).unwrap(),
+        Some(overrides)
+    );
+}
+
+#[test]
+fn native_paragraph_flow_rejects_noncanonical_boolean_wire() {
+    const PARAGRAPH_PROPERTIES_FIELD: u32 = 12;
+    const HYPHENATE_FIELD: u32 = 8;
+    const NONCANONICAL_TRUE: u8 = 2;
+
+    let overrides = ParagraphStyleOverrides {
+        hyphenation: Some(ParagraphHyphenation::Prevented),
+        ..Default::default()
+    };
+    let object = native::variation_object(73, 74, 75, overrides).unwrap();
+    let mut data = object.messages[0].data.clone();
+    let paragraph = crate::wire::parse_wire_fields(&data)
+        .unwrap()
+        .into_iter()
+        .find(|field| field.number == PARAGRAPH_PROPERTIES_FIELD)
+        .unwrap();
+    let hyphenate = crate::wire::parse_wire_fields(&data[paragraph.payload_start..paragraph.end])
+        .unwrap()
+        .into_iter()
+        .find(|field| field.number == HYPHENATE_FIELD)
+        .unwrap();
+    data[paragraph.payload_start + hyphenate.payload_start] = NONCANONICAL_TRUE;
+    let archive = tswp::ParagraphStyleArchive::decode(data.as_slice()).unwrap();
+    assert!(native::direct_overrides(&archive, &data).unwrap().is_none());
 }
 
 #[test]
@@ -1906,6 +1965,126 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
     assert!(
         keynote
             .reset_slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(keynote.to_bytes().unwrap(), keynote_before);
+}
+
+#[test]
+fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
+    let flow = ParagraphFlow::new()
+        .with_keep_lines_together(true)
+        .with_keep_with_next(true)
+        .with_start_on_new_page(true)
+        .with_prevent_widow_orphan_lines(false)
+        .with_hyphenation(ParagraphHyphenation::Prevented);
+
+    let mut pages = PagesEditor::create_with_text("Paragraph flow").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            7,
+            "Pages paragraph flow",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_sibling = pages
+        .add_text_box(
+            7,
+            "Plain Pages paragraph",
+            DrawablePoint { x: 280.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_before = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_flow(pages_box.drawable_object_id, flow)
+        .unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_flow(pages_sibling.drawable_object_id)
+            .unwrap(),
+        ParagraphFlow::default()
+    );
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_flow(pages_box.drawable_object_id)
+            .unwrap(),
+        flow
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_flow(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers paragraph flow",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let numbers_before = numbers.to_bytes().unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_flow(sheet_id, numbers_box.drawable_object_id, flow)
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_flow(sheet_id, numbers_box.drawable_object_id)
+            .unwrap(),
+        flow
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_paragraph_flow(sheet_id, numbers_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote paragraph flow",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let keynote_before = keynote.to_bytes().unwrap();
+    keynote
+        .set_slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id, flow)
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        flow
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id)
             .unwrap()
     );
     assert_eq!(keynote.to_bytes().unwrap(), keynote_before);

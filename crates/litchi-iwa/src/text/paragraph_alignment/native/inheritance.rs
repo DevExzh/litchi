@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use crate::protobuf::tswp;
 use crate::shapes::RgbaColor;
 use crate::text::font::TextFont;
+use crate::text::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
@@ -288,6 +289,56 @@ pub(super) fn paragraph_borders(
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())
+}
+
+pub(super) fn paragraph_flow(package: &IWorkPackage, first_style_id: u64) -> Result<ParagraphFlow> {
+    let (hyphenation, keep_lines, keep_next, new_page, widow_orphan) = walk(
+        package,
+        first_style_id,
+        (None, None, None, None, None),
+        |(hyphenation, keep_lines, keep_next, new_page, widow_orphan), style| {
+            if let Some(properties) = style.para_properties.as_ref() {
+                if hyphenation.is_none() {
+                    *hyphenation = properties
+                        .hyphenate
+                        .map(ParagraphHyphenation::from_native_value);
+                }
+                if keep_lines.is_none() {
+                    *keep_lines = properties.keep_lines_together;
+                }
+                if keep_next.is_none() {
+                    *keep_next = properties.keep_with_next;
+                }
+                if new_page.is_none() {
+                    *new_page = properties.page_break_before;
+                }
+                if widow_orphan.is_none() {
+                    *widow_orphan = properties.widow_control;
+                }
+            }
+            Ok(
+                if hyphenation.is_some()
+                    && keep_lines.is_some()
+                    && keep_next.is_some()
+                    && new_page.is_some()
+                    && widow_orphan.is_some()
+                {
+                    InheritanceControl::Complete
+                } else {
+                    InheritanceControl::Continue
+                },
+            )
+        },
+    )?;
+    let defaults = ParagraphFlow::default();
+    Ok(ParagraphFlow::new()
+        .with_hyphenation(hyphenation.unwrap_or(defaults.hyphenation()))
+        .with_keep_lines_together(keep_lines.unwrap_or(defaults.keeps_lines_together()))
+        .with_keep_with_next(keep_next.unwrap_or(defaults.keeps_with_next()))
+        .with_start_on_new_page(new_page.unwrap_or(defaults.starts_on_new_page()))
+        .with_prevent_widow_orphan_lines(
+            widow_orphan.unwrap_or(defaults.prevents_widow_orphan_lines()),
+        ))
 }
 
 pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<TextAlignment> {

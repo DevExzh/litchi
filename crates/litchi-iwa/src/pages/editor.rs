@@ -31,8 +31,8 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphIndents, ParagraphLineSpacing, ParagraphList,
-    ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphDropCapPlacement, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
@@ -1511,6 +1511,42 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_borders(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph pagination and hyphenation controls.
+    pub fn text_box_paragraph_flow(&self, drawable_object_id: u64) -> Result<ParagraphFlow> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_flow(graph.storage_id)
+    }
+
+    /// Atomically set paragraph pagination and hyphenation controls.
+    pub fn set_text_box_paragraph_flow(
+        &mut self,
+        drawable_object_id: u64,
+        flow: ParagraphFlow,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_flow(graph.storage_id, flow)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_flow(drawable_object_id)? != flow {
+            return Err(Error::InvalidFormat(
+                "Pages text-box paragraph flow update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph pagination and hyphenation controls.
+    pub fn reset_text_box_paragraph_flow(&mut self, drawable_object_id: u64) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_flow(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

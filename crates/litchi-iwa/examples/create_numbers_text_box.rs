@@ -10,14 +10,15 @@ use litchi_iwa::shapes::{
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDropCap, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount,
-    TextColumnGap, TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
-    TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition,
-    TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphBorders, ParagraphDropCap, ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList,
+    ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextCommentBody,
+    TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
+    TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -145,6 +146,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ParagraphBorderOffset::from_points(9.0)?,
             true,
         )?),
+    )?;
+    editor.set_sheet_text_box_paragraph_flow(
+        sheet_id,
+        created.drawable_object_id,
+        ParagraphFlow::new()
+            .with_keep_lines_together(true)
+            .with_keep_with_next(true)
+            .with_start_on_new_page(true)
+            .with_prevent_widow_orphan_lines(false)
+            .with_hyphenation(ParagraphHyphenation::Prevented),
     )?;
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,

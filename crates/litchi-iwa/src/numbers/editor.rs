@@ -43,8 +43,8 @@ use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
 use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphIndents, ParagraphLineSpacing, ParagraphList,
-    ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphDropCapPlacement, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
@@ -2006,6 +2006,51 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_borders(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph pagination and hyphenation controls.
+    pub fn sheet_text_box_paragraph_flow(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphFlow> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone()).paragraph_flow(graph.storage_id)
+    }
+
+    /// Atomically set paragraph pagination and hyphenation controls.
+    pub fn set_sheet_text_box_paragraph_flow(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        flow: ParagraphFlow,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_flow(graph.storage_id, flow)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_flow(sheet_id, drawable_object_id)? != flow {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box paragraph flow update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph pagination and hyphenation controls.
+    pub fn reset_sheet_text_box_paragraph_flow(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_flow(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

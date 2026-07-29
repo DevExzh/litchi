@@ -13,6 +13,7 @@ use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
 use super::font::TextFont;
+use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
@@ -40,6 +41,7 @@ enum ParagraphProperty<'a> {
     TextBackground(TextBackground),
     Background(ParagraphBackground),
     Borders(ParagraphBorders),
+    Flow(ParagraphFlow),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -63,6 +65,7 @@ enum ParagraphPropertyKind {
     TextBackground,
     Background,
     Borders,
+    Flow,
     Alignment,
     LineSpacing,
     Spacing,
@@ -432,6 +435,26 @@ pub(super) fn set_paragraph_borders(
 
 pub(super) fn reset_paragraph_borders(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Borders)
+}
+
+pub(super) fn paragraph_flow(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphFlow> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_paragraph_flow(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_flow(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    flow: ParagraphFlow,
+) -> Result<()> {
+    if paragraph_flow(package, storage_id)? == flow {
+        return Ok(());
+    }
+    set_property(package, storage_id, ParagraphProperty::Flow(flow))
+}
+
+pub(super) fn reset_paragraph_flow(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::Flow)
 }
 
 pub(super) fn paragraph_alignment(
@@ -877,6 +900,13 @@ fn apply_property(
             overrides.paragraph_background = Some(*background);
         },
         ParagraphProperty::Borders(borders) => overrides.paragraph_borders = Some(*borders),
+        ParagraphProperty::Flow(flow) => {
+            overrides.hyphenation = Some(flow.hyphenation());
+            overrides.keep_lines_together = Some(flow.keeps_lines_together());
+            overrides.keep_with_next = Some(flow.keeps_with_next());
+            overrides.start_on_new_page = Some(flow.starts_on_new_page());
+            overrides.prevent_widow_orphan_lines = Some(flow.prevents_widow_orphan_lines());
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -915,6 +945,13 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
         ParagraphPropertyKind::TextBackground => overrides.background.is_some(),
         ParagraphPropertyKind::Background => overrides.paragraph_background.is_some(),
         ParagraphPropertyKind::Borders => overrides.paragraph_borders.is_some(),
+        ParagraphPropertyKind::Flow => {
+            overrides.hyphenation.is_some()
+                || overrides.keep_lines_together.is_some()
+                || overrides.keep_with_next.is_some()
+                || overrides.start_on_new_page.is_some()
+                || overrides.prevent_widow_orphan_lines.is_some()
+        },
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -952,6 +989,13 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
         ParagraphPropertyKind::TextBackground => overrides.background = None,
         ParagraphPropertyKind::Background => overrides.paragraph_background = None,
         ParagraphPropertyKind::Borders => overrides.paragraph_borders = None,
+        ParagraphPropertyKind::Flow => {
+            overrides.hyphenation = None;
+            overrides.keep_lines_together = None;
+            overrides.keep_with_next = None;
+            overrides.start_on_new_page = None;
+            overrides.prevent_widow_orphan_lines = None;
+        },
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -1015,6 +1059,9 @@ fn inherited_property(
         ParagraphPropertyKind::Borders => Ok(ParagraphProperty::Borders(
             native::inherited_paragraph_borders(package, style_id)?,
         )),
+        ParagraphPropertyKind::Flow => Ok(ParagraphProperty::Flow(
+            native::inherited_paragraph_flow(package, style_id)?,
+        )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
         )),
@@ -1077,6 +1124,7 @@ fn validate_expected_property(
             paragraph_background(package, storage_id)? == background
         },
         ParagraphProperty::Borders(borders) => paragraph_borders(package, storage_id)? == borders,
+        ParagraphProperty::Flow(flow) => paragraph_flow(package, storage_id)? == flow,
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

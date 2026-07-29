@@ -27,8 +27,8 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphIndents, ParagraphLineSpacing, ParagraphList,
-    ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphDropCapPlacement, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
@@ -2719,6 +2719,51 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_borders(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph pagination and hyphenation controls.
+    pub fn slide_text_box_paragraph_flow(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphFlow> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_flow(graph.storage_id)
+    }
+
+    /// Atomically set paragraph pagination and hyphenation controls.
+    pub fn set_slide_text_box_paragraph_flow(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        flow: ParagraphFlow,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_flow(graph.storage_id, flow)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_flow(slide_index, drawable_object_id)? != flow {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph flow update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph pagination and hyphenation controls.
+    pub fn reset_slide_text_box_paragraph_flow(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_flow(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }
