@@ -43,14 +43,14 @@ use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
 use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing,
-    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
+    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -150,6 +150,8 @@ pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
 pub type NumbersTableCellParagraphList = ParagraphList;
 /// A validated custom text-bullet marker in a Numbers table cell.
 pub type NumbersTableCellParagraphListBullet = ParagraphListBullet;
+/// Typed marker size and baseline in a Numbers table cell.
+pub type NumbersTableCellParagraphListBulletGeometry = ParagraphListBulletGeometry;
 /// A validated zero-based list nesting level in a Numbers table cell.
 pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
@@ -1190,6 +1192,49 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_bullet(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one sheet text-box paragraph's effective bullet size and baseline.
+    pub fn sheet_text_box_paragraph_list_bullet_geometry(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListBulletGeometry> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_bullet_geometry(graph.storage_id, paragraph)
+    }
+
+    /// Set one sheet text-box paragraph's bullet size and baseline.
+    pub fn set_sheet_text_box_paragraph_list_bullet_geometry(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        geometry: ParagraphListBulletGeometry,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_bullet_geometry(graph.storage_id, paragraph, geometry)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore Apple's standard bullet size and baseline for this nesting level.
+    pub fn reset_sheet_text_box_paragraph_list_bullet_geometry(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list_bullet_geometry(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
@@ -3255,6 +3300,75 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read one table-cell paragraph's effective bullet size and baseline.
+    pub fn table_cell_paragraph_list_bullet_geometry(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListBulletGeometry> {
+        cell_paragraph_list::paragraph_list_bullet_geometry(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one table-cell paragraph's bullet size and baseline.
+    pub fn set_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        geometry: NumbersTableCellParagraphListBulletGeometry,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_bullet_geometry(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            geometry,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_bullet_geometry(table_id, row, column, paragraph)?
+            != geometry
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph bullet geometry failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard bullet size and baseline for this nesting level.
+    pub fn reset_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_bullet_geometry(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read effective first-line, left, and right paragraph indents.
     pub fn table_cell_paragraph_indents(
         &self,
@@ -5204,6 +5318,41 @@ pub(crate) fn reset_table_cell_paragraph_list_bullet_in_package(
     paragraph: ParagraphStart,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_bullet(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn table_cell_paragraph_list_bullet_geometry_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListBulletGeometry> {
+    cell_paragraph_list::paragraph_list_bullet_geometry(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_bullet_geometry_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    geometry: ParagraphListBulletGeometry,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_bullet_geometry(
+        package, table_id, row, column, paragraph, geometry,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_bullet_geometry_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_bullet_geometry(
+        package, table_id, row, column, paragraph,
+    )
 }
 
 pub(crate) fn table_cell_paragraph_indents_in_package(

@@ -108,6 +108,7 @@ pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as PagesTableCellParagraphListBullet;
+pub use crate::text::ParagraphListBulletGeometry as PagesTableCellParagraphListBulletGeometry;
 pub use crate::text::ParagraphListLevel as PagesTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as PagesTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
@@ -1794,6 +1795,86 @@ impl PagesEditor {
             column,
             paragraph,
         )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read one body-table paragraph's effective bullet size and baseline.
+    pub fn table_cell_paragraph_list_bullet_geometry(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<PagesTableCellParagraphListBulletGeometry> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one body-table paragraph's bullet size and baseline.
+    pub fn set_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        geometry: PagesTableCellParagraphListBulletGeometry,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_bullet_geometry_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            geometry,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_bullet_geometry(
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != geometry
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph bullet geometry failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard bullet size and baseline for this nesting level.
+    pub fn reset_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_bullet_geometry_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             verified.require_body_table(model_object_id)?;

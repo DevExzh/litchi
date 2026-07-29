@@ -74,12 +74,13 @@ use super::paragraph_alignment::{
     text_script, text_shadow, text_style,
 };
 use super::paragraph_list::{
-    ParagraphList, ParagraphListBullet, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphListPlacement, paragraph_list, paragraph_list_bullet,
-    paragraph_list_level, paragraph_list_levels, paragraph_list_numbering, paragraph_lists,
-    reset_paragraph_list, reset_paragraph_list_bullet, reset_paragraph_list_level,
-    set_paragraph_list, set_paragraph_list_bullet, set_paragraph_list_level,
-    set_paragraph_list_numbering, set_paragraph_lists,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement, paragraph_list,
+    paragraph_list_bullet, paragraph_list_bullet_geometry, paragraph_list_level,
+    paragraph_list_levels, paragraph_list_numbering, paragraph_lists, reset_paragraph_list,
+    reset_paragraph_list_bullet, reset_paragraph_list_bullet_geometry, reset_paragraph_list_level,
+    set_paragraph_list, set_paragraph_list_bullet, set_paragraph_list_bullet_geometry,
+    set_paragraph_list_level, set_paragraph_list_numbering, set_paragraph_lists,
 };
 use super::paragraph_tabs::ParagraphTabStops;
 use super::position::{TextPosition, TextRange};
@@ -825,6 +826,61 @@ impl IWorkTextEditor {
             {
                 return Err(Error::InvalidFormat(
                     "iWork paragraph text-bullet reset failed round-trip validation".to_owned(),
+                ));
+            }
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read one bullet-list paragraph's effective marker size and baseline.
+    pub fn paragraph_list_bullet_geometry(
+        &self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListBulletGeometry> {
+        paragraph_list_bullet_geometry(&self.package, object_id, paragraph)
+    }
+
+    /// Atomically set one bullet-list paragraph's marker size and baseline.
+    pub fn set_paragraph_list_bullet_geometry(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+        geometry: ParagraphListBulletGeometry,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_list_bullet_geometry(&mut staged, object_id, paragraph, geometry)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_list_bullet_geometry(&verified, object_id, paragraph)? != geometry {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph text-bullet geometry update failed round-trip validation"
+                    .to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore Apple's standard marker size and baseline for this nesting level.
+    pub fn reset_paragraph_list_bullet_geometry(
+        &mut self,
+        object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_list_bullet_geometry(&mut staged, object_id, paragraph)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let level = paragraph_list_level(&verified, object_id, paragraph)?;
+            if paragraph_list_bullet_geometry(&verified, object_id, paragraph)?
+                != ParagraphListBulletGeometry::standard(level)
+            {
+                return Err(Error::InvalidFormat(
+                    "iWork paragraph text-bullet geometry reset failed round-trip validation"
+                        .to_owned(),
                 ));
             }
             self.package = staged;

@@ -196,6 +196,103 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
 }
 
 #[test]
+fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
+    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let geometry = ParagraphListBulletGeometry::new(
+        ParagraphListBulletScale::from_percent(150.0).unwrap(),
+        ParagraphListBulletBaselineOffset::from_points(2.0).unwrap(),
+    );
+
+    let mut pages = PagesEditor::create_with_text("Bullet Geometry").unwrap();
+    let pages_box = pages
+        .add_text_box(5, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    pages
+        .set_text_box_paragraph_list(pages_box.drawable_object_id, ParagraphList::Bullet)
+        .unwrap();
+    let before_geometry = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_list_bullet_geometry(
+            pages_box.drawable_object_id,
+            paragraph,
+            geometry,
+        )
+        .unwrap();
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_list_bullet_geometry(pages_box.drawable_object_id, paragraph,)
+            .unwrap(),
+        geometry
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_list_bullet_geometry(pages_box.drawable_object_id, paragraph,)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before_geometry);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            ParagraphList::Bullet,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list_bullet_geometry(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            paragraph,
+            geometry,
+        )
+        .unwrap();
+    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_list_bullet_geometry(
+                sheet_id,
+                numbers_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        geometry
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list_bullet_geometry(
+            0,
+            keynote_box.drawable_object_id,
+            paragraph,
+            geometry,
+        )
+        .unwrap();
+    let keynote = crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_list_bullet_geometry(
+                0,
+                keynote_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        geometry
+    );
+}
+
+#[test]
 fn custom_bullet_updates_reject_nonbullet_and_invalid_paragraphs_transactionally() {
     let arrow = ParagraphListBullet::new("➡").unwrap();
     let mut pages = PagesEditor::create_with_text("Bullets").unwrap();

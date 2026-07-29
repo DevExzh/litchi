@@ -1,6 +1,7 @@
 //! Transactional paragraph-list CRUD shared by Pages, Numbers, and Keynote.
 
 mod bullet;
+mod geometry;
 mod levels;
 mod native;
 mod numbering;
@@ -15,12 +16,18 @@ use crate::text::style_registry::{
 use crate::{Error, IWorkPackage, Result};
 
 pub use types::{
-    ParagraphList, ParagraphListBullet, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+    ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement,
+    ParagraphListStart,
 };
 
 pub(crate) use bullet::paragraph_list_bullet;
 pub(super) use bullet::{reset_paragraph_list_bullet, set_paragraph_list_bullet};
+pub(crate) use geometry::paragraph_list_bullet_geometry;
+pub(super) use geometry::{
+    reset_paragraph_list_bullet_geometry, set_paragraph_list_bullet_geometry,
+};
 pub(crate) use levels::{paragraph_list_level, paragraph_list_levels};
 pub(super) use levels::{reset_paragraph_list_level, set_paragraph_list_level};
 pub(crate) use numbering::paragraph_list_numbering;

@@ -5,6 +5,9 @@ use crate::{Error, Result};
 
 const MAX_PARAGRAPH_LIST_LEVEL: u8 = 8;
 const MAX_PARAGRAPH_LIST_BULLET_CHARACTERS: usize = 32;
+const PERCENT_PER_SCALE_UNIT: f32 = 100.0;
+const STANDARD_TOP_LEVEL_BULLET_BASELINE_POINTS: f32 = 0.0;
+const STANDARD_NESTED_BULLET_BASELINE_POINTS: f32 = -1.0;
 
 /// A canonical paragraph-list presentation understood by all three iWork apps.
 ///
@@ -211,6 +214,106 @@ impl AsRef<str> for ParagraphListBullet {
     }
 }
 
+/// A positive, finite bullet size relative to its paragraph text.
+///
+/// iWork's inspector presents this value as a percentage while the native
+/// archive stores a scale ratio.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParagraphListBulletScale(f32);
+
+impl ParagraphListBulletScale {
+    /// The standard 100% bullet size.
+    pub const ONE: Self = Self(1.0);
+
+    /// Construct a scale from the percentage displayed by iWork.
+    pub fn from_percent(percent: f32) -> Result<Self> {
+        Self::from_ratio(percent / PERCENT_PER_SCALE_UNIT)
+    }
+
+    /// Construct a scale from its native text-relative ratio.
+    pub fn from_ratio(ratio: f32) -> Result<Self> {
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return Err(Error::InvalidFormat(
+                "paragraph list bullet scale must be positive and finite".to_owned(),
+            ));
+        }
+        Ok(Self(ratio))
+    }
+
+    /// Return the percentage displayed by iWork.
+    pub fn percent(self) -> f32 {
+        self.0 * PERCENT_PER_SCALE_UNIT
+    }
+
+    /// Return the native text-relative scale ratio.
+    pub const fn ratio(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for ParagraphListBulletScale {
+    fn default() -> Self {
+        Self::ONE
+    }
+}
+
+/// A finite vertical bullet offset measured in typographic points.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ParagraphListBulletBaselineOffset(f32);
+
+impl ParagraphListBulletBaselineOffset {
+    /// No vertical offset.
+    pub const ZERO: Self = Self(0.0);
+
+    /// Construct a validated vertical offset in points.
+    pub fn from_points(points: f32) -> Result<Self> {
+        if !points.is_finite() {
+            return Err(Error::InvalidFormat(
+                "paragraph list bullet baseline offset must be finite".to_owned(),
+            ));
+        }
+        Ok(Self(points))
+    }
+
+    /// Return the vertical offset in points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+/// The editable size and vertical position of one bullet-list marker.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParagraphListBulletGeometry {
+    pub scale: ParagraphListBulletScale,
+    pub baseline_offset: ParagraphListBulletBaselineOffset,
+}
+
+impl ParagraphListBulletGeometry {
+    /// Construct a bullet geometry from validated components.
+    pub const fn new(
+        scale: ParagraphListBulletScale,
+        baseline_offset: ParagraphListBulletBaselineOffset,
+    ) -> Self {
+        Self {
+            scale,
+            baseline_offset,
+        }
+    }
+
+    /// Apple's standard geometry for a particular list nesting level.
+    pub fn standard(level: ParagraphListLevel) -> Self {
+        let baseline_points = if level == ParagraphListLevel::ZERO {
+            STANDARD_TOP_LEVEL_BULLET_BASELINE_POINTS
+        } else {
+            STANDARD_NESTED_BULLET_BASELINE_POINTS
+        };
+        Self::new(
+            ParagraphListBulletScale::ONE,
+            ParagraphListBulletBaselineOffset(baseline_points),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +354,21 @@ mod tests {
         assert!(ParagraphListBullet::new("").is_err());
         assert!(ParagraphListBullet::new("a\nb").is_err());
         assert!(ParagraphListBullet::new("x".repeat(33)).is_err());
+    }
+
+    #[test]
+    fn bullet_geometry_is_typed_finite_and_level_aware() {
+        let scale = ParagraphListBulletScale::from_percent(175.0).unwrap();
+        assert_eq!(scale.ratio(), 1.75);
+        assert_eq!(scale.percent(), 175.0);
+        assert!(ParagraphListBulletScale::from_ratio(0.0).is_err());
+        assert!(ParagraphListBulletScale::from_ratio(f32::NAN).is_err());
+        assert!(ParagraphListBulletBaselineOffset::from_points(f32::INFINITY).is_err());
+
+        let top = ParagraphListBulletGeometry::standard(ParagraphListLevel::ZERO);
+        assert_eq!(top.scale, ParagraphListBulletScale::ONE);
+        assert_eq!(top.baseline_offset.points(), 0.0);
+        let nested = ParagraphListBulletGeometry::standard(ParagraphListLevel::ONE);
+        assert_eq!(nested.baseline_offset.points(), -1.0);
     }
 }

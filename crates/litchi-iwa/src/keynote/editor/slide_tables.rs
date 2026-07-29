@@ -106,6 +106,7 @@ pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as KeynoteTableCellParagraphListBullet;
+pub use crate::text::ParagraphListBulletGeometry as KeynoteTableCellParagraphListBulletGeometry;
 pub use crate::text::ParagraphListLevel as KeynoteTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as KeynoteTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumbering;
@@ -2187,6 +2188,90 @@ impl KeynoteEditor {
             column,
             paragraph,
         )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            require_table_model(&verified, slide_index, model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read one slide-table paragraph's effective bullet size and baseline.
+    pub fn slide_table_cell_paragraph_list_bullet_geometry(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<KeynoteTableCellParagraphListBulletGeometry> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one slide-table paragraph's bullet size and baseline.
+    pub fn set_slide_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        geometry: KeynoteTableCellParagraphListBulletGeometry,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_bullet_geometry_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            geometry,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        require_table_model(&verified, slide_index, model_object_id)?;
+        if verified.slide_table_cell_paragraph_list_bullet_geometry(
+            slide_index,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != geometry
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote table-cell paragraph bullet geometry failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard bullet size and baseline for this nesting level.
+    pub fn reset_slide_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_bullet_geometry_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;

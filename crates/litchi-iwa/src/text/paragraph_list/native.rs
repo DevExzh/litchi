@@ -18,6 +18,7 @@ const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const LIST_LEVEL_COUNT: usize = 9;
 const OVERRIDE_COUNT_FIELD: u32 = 10;
+const GEOMETRIES_FIELD: u32 = 14;
 const STRINGS_FIELD: u32 = 16;
 const FONT_EM_POINTS: f32 = 11.0;
 const NONE_INDENT_STEP_POINTS: f32 = 36.0;
@@ -170,6 +171,32 @@ pub(super) fn effective_bullet_strings(
     }
 }
 
+pub(super) fn effective_bullet_geometries(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<Vec<LabelGeometry>> {
+    if resolved_paragraph_list(package, style_id)? != ParagraphList::Bullet {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} is not a text-bullet list"
+        )));
+    }
+    let mut current_id = style_id;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(current_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list-style inheritance contains a cycle at {current_id}"
+            )));
+        }
+        let style = locate_style(package, current_id)?.style;
+        if !style.geometries.is_empty() {
+            validate_bullet_geometries(current_id, &style.geometries)?;
+            return Ok(style.geometries);
+        }
+        current_id = parent_style_id(&style, current_id)?;
+    }
+}
+
 pub(super) fn parent_style_id(style: &tswp::ListStyleArchive, style_id: u64) -> Result<u64> {
     style
         .super_
@@ -200,6 +227,39 @@ pub(super) fn variation_object(
         },
         override_count: Some(1),
         strings,
+        ..Default::default()
+    };
+    let data = style.encode_to_vec();
+    tswp::ListStyleArchive::decode(data.as_slice())?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: LIST_STYLE_MESSAGE_TYPE,
+            data,
+        }],
+    )?;
+    let info = &mut object.archive_info.message_infos[0];
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.object_references.push(parent_style_id);
+    Ok(object)
+}
+
+pub(super) fn geometry_variation_object(
+    identifier: u64,
+    parent_style_id: u64,
+    stylesheet_id: u64,
+    geometries: Vec<LabelGeometry>,
+) -> Result<ArchiveObject> {
+    validate_bullet_geometries(identifier, &geometries)?;
+    let style = tswp::ListStyleArchive {
+        super_: tss::StyleArchive {
+            parent: Some(reference(parent_style_id)),
+            is_variation: Some(true),
+            stylesheet: Some(reference(stylesheet_id)),
+            ..Default::default()
+        },
+        override_count: Some(1),
+        geometries,
         ..Default::default()
     };
     let data = style.encode_to_vec();
@@ -251,6 +311,143 @@ pub(super) fn replace_direct_bullet_strings(
         )?;
         Ok(())
     })
+}
+
+pub(super) fn replace_direct_bullet_geometries(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+    geometries: &[LabelGeometry],
+) -> Result<()> {
+    validate_bullet_geometries(style_id, geometries)?;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let data = patch_direct_bullet_geometries(&original.data, style_id, geometries)?;
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(super) fn remove_direct_bullet_geometries(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+        if style.geometries.is_empty() {
+            return Ok(());
+        }
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_sub(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} has geometry without an override count"
+                ))
+            })?;
+        let data = rewrite_repeated_length_delimited_fields(&original.data, GEOMETRIES_FIELD, &[])?;
+        let data = patch_varint_field(
+            &data,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+        let decoded = tswp::ListStyleArchive::decode(data.as_slice())?;
+        if !decoded.geometries.is_empty() || decoded.override_count != Some(override_count) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} bullet geometry removal failed validation"
+            )));
+        }
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn patch_direct_bullet_geometries(
+    data: &[u8],
+    style_id: u64,
+    geometries: &[LabelGeometry],
+) -> Result<Vec<u8>> {
+    validate_bullet_geometries(style_id, geometries)?;
+    let style = tswp::ListStyleArchive::decode(data)?;
+    let had_direct_geometries = !style.geometries.is_empty();
+    if had_direct_geometries {
+        validate_bullet_geometries(style_id, &style.geometries)?;
+    }
+    let encoded = geometries
+        .iter()
+        .map(Message::encode_to_vec)
+        .collect::<Vec<_>>();
+    let mut patched = rewrite_repeated_length_delimited_fields(data, GEOMETRIES_FIELD, &encoded)?;
+    if !had_direct_geometries {
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} override count overflowed"
+                ))
+            })?;
+        patched = patch_varint_field(
+            &patched,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+    }
+    let decoded = tswp::ListStyleArchive::decode(patched.as_slice())?;
+    if decoded.geometries != geometries {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} bullet geometry update failed validation"
+        )));
+    }
+    Ok(patched)
 }
 
 fn patch_direct_bullet_strings(data: &[u8], style_id: u64, strings: &[String]) -> Result<Vec<u8>> {
@@ -342,6 +539,30 @@ fn validate_bullet_strings(style_id: u64, strings: &[String]) -> Result<()> {
     Ok(())
 }
 
+fn validate_bullet_geometries(style_id: u64, geometries: &[LabelGeometry]) -> Result<()> {
+    if geometries.len() != LIST_LEVEL_COUNT {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text-bullet list style {style_id} must define {LIST_LEVEL_COUNT} geometries, found {}",
+            geometries.len()
+        )));
+    }
+    for geometry in geometries {
+        let scale = geometry.scale.unwrap_or(DEFAULT_LABEL_SCALE);
+        let baseline = geometry.baseline_offset.unwrap_or(0.0);
+        if !scale.is_finite() || scale <= 0.0 || !baseline.is_finite() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text-bullet list style {style_id} contains invalid geometry"
+            )));
+        }
+        if geometry.scale_with_text == Some(false) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork text-bullet list style {style_id} contains an absolute-size geometry"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn find_preset_style(
     package: &IWorkPackage,
     archive_name: &str,
@@ -401,6 +622,7 @@ pub(super) fn style_object(
 fn matches_preset(style: &tswp::ListStyleArchive, preset: ParagraphList) -> bool {
     let expected = canonical_archive(preset);
     if preset == ParagraphList::None
+        && style.super_.is_variation != Some(true)
         && (style.label_types.is_empty()
             || style
                 .label_types
@@ -545,12 +767,56 @@ mod tests {
         let mut strings = vec![BULLET_GLYPH.to_owned(); LIST_LEVEL_COUNT];
         strings[3] = "◆".to_owned();
         let patched = patch_direct_bullet_strings(&style, 10, &strings).unwrap();
-        assert!(patched.ends_with(&unknown));
+        assert!(
+            patched
+                .windows(unknown.len())
+                .any(|window| window == unknown)
+        );
         assert_eq!(
             tswp::ListStyleArchive::decode(patched.as_slice())
                 .unwrap()
                 .strings,
             strings
         );
+    }
+
+    #[test]
+    fn geometry_updates_compose_with_glyph_overrides_losslessly() {
+        let mut style = tswp::ListStyleArchive {
+            super_: tss::StyleArchive {
+                parent: Some(reference(8)),
+                is_variation: Some(true),
+                stylesheet: Some(reference(3)),
+                ..Default::default()
+            },
+            override_count: Some(1),
+            strings: vec![BULLET_GLYPH.to_owned(); LIST_LEVEL_COUNT],
+            ..Default::default()
+        };
+        style.strings[1] = "➡".to_owned();
+        let mut encoded = style.encode_to_vec();
+        let unknown = [0xa0, 0x06, 0x07];
+        encoded.extend_from_slice(&unknown);
+
+        let mut geometries = repeated_geometry(|level| {
+            if level == 0 {
+                0.0
+            } else {
+                BULLET_BASELINE_OFFSET_POINTS
+            }
+        });
+        geometries[1].scale = Some(1.75);
+        geometries[1].baseline_offset = Some(4.0);
+        let patched = patch_direct_bullet_geometries(&encoded, 10, &geometries).unwrap();
+        assert!(
+            patched
+                .windows(unknown.len())
+                .any(|window| window == unknown)
+        );
+
+        let decoded = tswp::ListStyleArchive::decode(patched.as_slice()).unwrap();
+        assert_eq!(decoded.override_count, Some(2));
+        assert_eq!(decoded.strings[1], "➡");
+        assert_eq!(decoded.geometries, geometries);
     }
 }

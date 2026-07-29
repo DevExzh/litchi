@@ -280,6 +280,65 @@ pub(super) fn reset_paragraph_list_bullet(
     Ok(changed)
 }
 
+pub(super) fn paragraph_list_bullet_geometry(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<crate::text::ParagraphListBulletGeometry> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Err(Error::InvalidFormat(
+            "plain iWork table cells are not text-bullet lists".to_owned(),
+        ));
+    };
+    crate::text::paragraph_list_bullet_geometry_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_bullet_geometry(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    geometry: crate::text::ParagraphListBulletGeometry,
+) -> Result<()> {
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_bullet_geometry(storage_id, paragraph, geometry)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_bullet_geometry_in_storage(&staged, storage_id, paragraph)?
+        != geometry
+    {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph text-bullet geometry update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list_bullet_geometry(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(false);
+    };
+    let mut text = IWorkTextEditor::from_package(package.clone());
+    let changed = text.reset_paragraph_list_bullet_geometry(storage_id, paragraph)?;
+    if changed {
+        *package = text.into_package();
+    }
+    Ok(changed)
+}
+
 fn existing_storage_id(
     package: &IWorkPackage,
     table_id: u64,
@@ -752,6 +811,9 @@ mod tests {
     use crate::numbers::NumbersDocumentBuilder;
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use crate::text::{
+        ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
+    };
 
     const ROW: usize = 1;
     const COLUMN: usize = 1;
@@ -1007,6 +1069,10 @@ mod tests {
     fn scratch_documents_roundtrip_custom_cell_bullets_in_every_suite() {
         let paragraph = ParagraphStart::from_utf16_index(9).unwrap();
         let arrow = ParagraphListBullet::new("➡").unwrap();
+        let geometry = ParagraphListBulletGeometry::new(
+            ParagraphListBulletScale::from_percent(175.0).unwrap(),
+            ParagraphListBulletBaselineOffset::from_points(4.0).unwrap(),
+        );
 
         let mut numbers = NumbersDocumentBuilder::new()
             .table_dimensions(3, 3)
@@ -1027,6 +1093,15 @@ mod tests {
         numbers
             .set_table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph, &arrow)
             .unwrap();
+        numbers
+            .set_table_cell_paragraph_list_bullet_geometry(
+                numbers_table,
+                ROW,
+                COLUMN,
+                paragraph,
+                geometry,
+            )
+            .unwrap();
         let mut numbers = NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
@@ -1036,9 +1111,41 @@ mod tests {
         );
         assert_eq!(
             numbers
+                .table_cell_paragraph_list_bullet_geometry(numbers_table, ROW, COLUMN, paragraph,)
+                .unwrap(),
+            geometry
+        );
+        assert_eq!(
+            numbers
                 .table_cell_paragraph_lists(numbers_table, ROW, COLUMN)
                 .unwrap(),
             mixed_lists()
+        );
+        assert!(
+            numbers
+                .reset_table_cell_paragraph_list_bullet_geometry(
+                    numbers_table,
+                    ROW,
+                    COLUMN,
+                    paragraph,
+                )
+                .unwrap()
+        );
+        assert_eq!(
+            numbers
+                .table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph)
+                .unwrap(),
+            arrow
+        );
+        assert!(
+            !numbers
+                .reset_table_cell_paragraph_list_bullet_geometry(
+                    numbers_table,
+                    ROW,
+                    COLUMN,
+                    paragraph,
+                )
+                .unwrap()
         );
         assert!(
             numbers
@@ -1070,12 +1177,27 @@ mod tests {
         pages
             .set_table_cell_paragraph_list_bullet(pages_table, ROW, COLUMN, paragraph, &arrow)
             .unwrap();
+        pages
+            .set_table_cell_paragraph_list_bullet_geometry(
+                pages_table,
+                ROW,
+                COLUMN,
+                paragraph,
+                geometry,
+            )
+            .unwrap();
         let pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list_bullet(pages_table, ROW, COLUMN, paragraph)
                 .unwrap(),
             arrow
+        );
+        assert_eq!(
+            pages
+                .table_cell_paragraph_list_bullet_geometry(pages_table, ROW, COLUMN, paragraph,)
+                .unwrap(),
+            geometry
         );
 
         let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
@@ -1120,6 +1242,16 @@ mod tests {
                 &arrow,
             )
             .unwrap();
+        keynote
+            .set_slide_table_cell_paragraph_list_bullet_geometry(
+                0,
+                table.model_object_id,
+                ROW,
+                COLUMN,
+                paragraph,
+                geometry,
+            )
+            .unwrap();
         let keynote =
             crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1133,6 +1265,18 @@ mod tests {
                 )
                 .unwrap(),
             arrow
+        );
+        assert_eq!(
+            keynote
+                .slide_table_cell_paragraph_list_bullet_geometry(
+                    0,
+                    table.model_object_id,
+                    ROW,
+                    COLUMN,
+                    paragraph,
+                )
+                .unwrap(),
+            geometry
         );
     }
 

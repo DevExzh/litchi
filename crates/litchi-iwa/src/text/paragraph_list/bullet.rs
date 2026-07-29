@@ -198,7 +198,10 @@ fn collapse_redundant_variation(
     Ok(())
 }
 
-fn effective_style_id(storage: &ListBoundaryStorage, paragraph: ParagraphStart) -> Result<u64> {
+pub(super) fn effective_style_id(
+    storage: &ListBoundaryStorage,
+    paragraph: ParagraphStart,
+) -> Result<u64> {
     let target = paragraph.utf16_index();
     if storage.paragraph_starts.binary_search(&target).is_err() {
         return Err(Error::InvalidFormat(format!(
@@ -216,7 +219,7 @@ fn effective_style_id(storage: &ListBoundaryStorage, paragraph: ParagraphStart) 
         })
 }
 
-fn style_isolated_to_paragraph(
+pub(super) fn style_isolated_to_paragraph(
     storage: &ListBoundaryStorage,
     paragraph: ParagraphStart,
 ) -> Result<bool> {
@@ -242,7 +245,7 @@ fn style_isolated_to_paragraph(
         .is_ok())
 }
 
-fn paragraph_boundaries_with_style(
+pub(super) fn paragraph_boundaries_with_style(
     storage: &ListBoundaryStorage,
     paragraph: ParagraphStart,
     replacement_style_id: u64,
