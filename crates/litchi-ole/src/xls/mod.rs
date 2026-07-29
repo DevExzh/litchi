@@ -96,6 +96,18 @@ mod scl;
 /// BIFF8 fieldless chart collection markers (`Begin`, `End`, `PlotArea`).
 mod chart_markers;
 
+/// BIFF8 `Chart3d` record: 3-D plot area attributes.
+mod chart_3d;
+
+/// BIFF8 `Frame` record: the frame around a chart element.
+mod frame;
+
+/// BIFF8 `BopPopCustom` record: a custom pie split bit sequence.
+mod bop_pop_custom;
+
+/// BIFF8 extended data label records (`DataLabExt`, `DataLabExtContents`).
+mod data_label_ext;
+
 /// BIFF8 chart property-stream future records (`ShapePropsStream`,
 /// `TextPropsStream`, `RichTextStream`).
 mod chart_property_stream;
@@ -412,6 +424,10 @@ pub use ser_fmt::XlsSerFmt;
 pub use axes_used::{XlsAxesUsed, XlsAxesUsedCount, XlsAxisGroupPosition, XlsAxisParent};
 pub use bop_pop::{XlsBopPop, XlsBopPopSplit, XlsBopPopSubtype};
 pub use chart_markers::{XlsBegin, XlsEnd, XlsPlotArea};
+pub use bop_pop_custom::XlsBopPopCustom;
+pub use chart_3d::XlsChart3d;
+pub use data_label_ext::{XlsDataLabExt, XlsDataLabExtContents};
+pub use frame::{XlsFrame, XlsFrameType};
 pub use plot_growth::{XlsFixedPoint, XlsPlotGrowth};
 pub use scl::XlsScl;
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
