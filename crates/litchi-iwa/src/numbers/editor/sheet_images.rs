@@ -71,6 +71,12 @@ pub struct RemovedNumbersSheetImage {
     pub removed_data_identifiers: Vec<u64>,
 }
 
+#[derive(Clone, Copy)]
+enum ImageClonePlacement {
+    Offset,
+    Preserve,
+}
+
 impl NumbersEditor {
     /// List ordinary image drawables owned directly by one reachable sheet.
     pub fn sheet_images(&self, sheet_id: u64) -> Result<Vec<NumbersSheetImageInfo>> {
@@ -428,10 +434,46 @@ impl NumbersEditor {
         sheet_id: u64,
         source_drawable_object_id: u64,
     ) -> Result<NumbersSheetImageInfo> {
-        let source = image_graph(self, sheet_id, source_drawable_object_id)?;
+        self.clone_sheet_image(
+            sheet_id,
+            source_drawable_object_id,
+            sheet_id,
+            ImageClonePlacement::Offset,
+        )
+    }
+
+    pub(super) fn duplicate_sheet_image_to_sheet(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+    ) -> Result<NumbersSheetImageInfo> {
+        self.clone_sheet_image(
+            source_sheet_id,
+            source_drawable_object_id,
+            target_sheet_id,
+            ImageClonePlacement::Preserve,
+        )
+    }
+
+    fn clone_sheet_image(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+        placement: ImageClonePlacement,
+    ) -> Result<NumbersSheetImageInfo> {
+        let source = image_graph(self, source_sheet_id, source_drawable_object_id)?;
+        let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
+        if target_archive_name != source.archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers image source and target sheets must share a component: {} != {target_archive_name}",
+                source.archive_name
+            )));
+        }
         let mut staged = self.package.clone();
         let first_identifier = next_object_identifier(&staged)?;
-        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        let mut remap = HashMap::with_capacity(source.object_ids.len() + 1);
         for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
             let offset = u64::try_from(offset)
                 .map_err(|_| Error::ParseError("Numbers image graph is too large".to_owned()))?;
@@ -439,6 +481,13 @@ impl NumbersEditor {
                 .checked_add(offset)
                 .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
             remap.insert(identifier, replacement);
+        }
+        if source_sheet_id != target_sheet_id
+            && remap.insert(source_sheet_id, target_sheet_id).is_some()
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers image graph unexpectedly owns source sheet {source_sheet_id}"
+            )));
         }
 
         for identifier in &source.object_ids {
@@ -457,12 +506,17 @@ impl NumbersEditor {
         let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Numbers image clone has no drawable identifier".to_owned())
         })?;
-        let geometry = offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?;
+        let geometry = match placement {
+            ImageClonePlacement::Offset => {
+                offset_drawable_geometry(source.info.geometry, DRAWABLE_DUPLICATE_OFFSET)?
+            },
+            ImageClonePlacement::Preserve => source.info.geometry,
+        };
         set_image_geometry(&mut staged, &source.archive_name, new_drawable_id, geometry)?;
         patch_numbers_sheet_drawable_reference(
             &mut staged,
             &source.archive_name,
-            source.sheet_id,
+            target_sheet_id,
             None,
             Some(new_drawable_id),
         )?;
@@ -499,13 +553,13 @@ impl NumbersEditor {
 
         let verified = Self::from_package(staged)?;
         let created = verified
-            .sheet_images(sheet_id)?
+            .sheet_images(target_sheet_id)?
             .into_iter()
             .find(|image| image.drawable_object_id == new_drawable_id)
             .ok_or_else(|| {
                 Error::InvalidFormat("Numbers image duplication failed validation".to_owned())
             })?;
-        let created_graph = image_graph(&verified, sheet_id, new_drawable_id)?;
+        let created_graph = image_graph(&verified, target_sheet_id, new_drawable_id)?;
         let expected_data_references = source
             .data_references
             .iter()
@@ -518,7 +572,7 @@ impl NumbersEditor {
                 Ok((data_identifier, new_object_identifier))
             })
             .collect::<Result<Vec<_>>>()?;
-        if created.sheet_id != source.info.sheet_id
+        if created.sheet_id != target_sheet_id
             || created.image_data_identifier != source.info.image_data_identifier
             || created.thumbnail_data_identifier != source.info.thumbnail_data_identifier
             || created.geometry != geometry

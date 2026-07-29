@@ -21,15 +21,19 @@ enum SheetDrawableClone {
         drawable_id: u64,
         text: String,
     },
+    Image {
+        drawable_id: u64,
+    },
 }
 
 impl NumbersEditor {
     /// Duplicate a populated sheet immediately after its source.
     ///
     /// Sheet settings and unknown wire fields are retained. Populated tables,
-    /// local formula dependency graphs, and ordinary text boxes receive fresh
-    /// object identities and independent writable storage. Unsupported drawable
-    /// kinds and cross-table formula edges are rejected transactionally.
+    /// local formula dependency graphs, ordinary text boxes, and images receive
+    /// fresh object identities. Image assets remain shared, matching Numbers,
+    /// while writable object storage is independent. Unsupported drawable kinds
+    /// and cross-table formula edges are rejected transactionally.
     pub fn duplicate_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
         let sheets = self.sheets()?;
         let source = sheets
@@ -125,6 +129,14 @@ impl NumbersEditor {
                     )?;
                     cloned_drawable_ids.push(cloned.drawable_object_id);
                 },
+                SheetDrawableClone::Image { drawable_id } => {
+                    let cloned = working.duplicate_sheet_image_to_sheet(
+                        sheet_id,
+                        drawable_id,
+                        new_sheet_id,
+                    )?;
+                    cloned_drawable_ids.push(cloned.drawable_object_id);
+                },
             }
         }
 
@@ -172,6 +184,11 @@ fn classify_sheet_drawables(
         .into_iter()
         .map(|text_box| (text_box.drawable_object_id, text_box.storage.text))
         .collect::<HashMap<_, _>>();
+    let images = editor
+        .sheet_images(sheet_id)?
+        .into_iter()
+        .map(|image| image.drawable_object_id)
+        .collect::<HashSet<_>>();
 
     sheet
         .drawable_infos
@@ -190,8 +207,13 @@ fn classify_sheet_drawables(
                     text: text.clone(),
                 });
             }
+            if images.contains(&reference.identifier) {
+                return Ok(SheetDrawableClone::Image {
+                    drawable_id: reference.identifier,
+                });
+            }
             Err(Error::ParseError(format!(
-                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table or ordinary text box",
+                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table, ordinary text box, or image",
                 reference.identifier
             )))
         })
@@ -311,4 +333,78 @@ fn restore_table_geometry(
         }
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
+    use crate::shapes::{DrawablePoint, DrawableSize};
+
+    const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 84.0, y: 126.0 };
+    const IMAGE_SIZE: DrawableSize = DrawableSize {
+        width: 320.0,
+        height: 155.0,
+    };
+    const MOVED_IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 440.0, y: 72.0 };
+
+    #[test]
+    fn source_built_image_sheet_duplicates_with_native_shared_asset_semantics() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Media")
+            .build()
+            .unwrap();
+        let source_sheet = editor.sheets().unwrap().remove(0);
+        let source = editor
+            .add_sheet_image(
+                source_sheet.object_id,
+                "litchi_logo.png",
+                include_bytes!("../../../../../media/litchi_logo.png"),
+                NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+            )
+            .unwrap();
+
+        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+
+        assert_eq!(duplicate.index, 1);
+        assert_eq!(duplicate.name, "Media-1");
+        let copied = editor.sheet_images(duplicate.object_id).unwrap().remove(0);
+        assert_ne!(copied.drawable_object_id, source.drawable_object_id);
+        assert_eq!(copied.sheet_id, duplicate.object_id);
+        assert_eq!(copied.geometry, source.geometry);
+        assert_eq!(copied.image_data_identifier, source.image_data_identifier);
+        assert_eq!(
+            copied.thumbnail_data_identifier,
+            source.thumbnail_data_identifier
+        );
+        assert_eq!(editor.media_assets().unwrap().len(), 1);
+
+        let moved = DrawableGeometry {
+            position: Some(MOVED_IMAGE_POSITION),
+            ..copied.geometry
+        };
+        editor
+            .set_sheet_image_geometry(duplicate.object_id, copied.drawable_object_id, moved)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_image_geometry(source_sheet.object_id, source.drawable_object_id)
+                .unwrap(),
+            source.geometry
+        );
+        assert_eq!(
+            editor
+                .sheet_image_geometry(duplicate.object_id, copied.drawable_object_id)
+                .unwrap(),
+            moved
+        );
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.sheet_images(source_sheet.object_id).unwrap().len(),
+            1
+        );
+        assert_eq!(reopened.sheet_images(duplicate.object_id).unwrap().len(), 1);
+        assert_eq!(reopened.media_assets().unwrap().len(), 1);
+    }
 }
