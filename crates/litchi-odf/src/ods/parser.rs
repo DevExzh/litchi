@@ -122,7 +122,7 @@ impl OdsParser {
                         return Err(Error::InvalidFormat(
                             "office:dde-source must not contain child elements".to_string(),
                         ));
-                    } else if current_sheet.is_some()
+                    } else if let Some(sheet) = current_sheet.as_mut()
                         && current_row.is_none()
                         && current_sheet_depth.is_some_and(|depth| element_depth == depth + 1)
                         && e.local_name().as_ref() == b"dde-source"
@@ -138,10 +138,7 @@ impl OdsParser {
                             ));
                         }
                         let source = parse_dde_source(e, reader.decoder(), &document_namespaces)?;
-                        current_sheet
-                            .as_mut()
-                            .expect("checked current sheet")
-                            .set_dde_source(source)?;
+                        sheet.set_dde_source(source)?;
                         sheet_dde_source_depth = Some(element_depth);
                     } else if let Some(builder) = detective_builder.as_mut() {
                         if detective_child_open {
@@ -442,7 +439,7 @@ impl OdsParser {
                             "office:dde-source must not contain child elements".to_string(),
                         ));
                     }
-                    if current_sheet.is_some()
+                    if let Some(sheet) = current_sheet.as_mut()
                         && current_row.is_none()
                         && current_sheet_depth.is_some_and(|depth| element_depth == depth)
                         && e.local_name().as_ref() == b"dde-source"
@@ -458,10 +455,7 @@ impl OdsParser {
                             ));
                         }
                         let source = parse_dde_source(e, reader.decoder(), &document_namespaces)?;
-                        current_sheet
-                            .as_mut()
-                            .expect("checked current sheet")
-                            .set_dde_source(source)?;
+                        sheet.set_dde_source(source)?;
                         Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
                         buf.clear();
                         continue;

@@ -645,7 +645,7 @@ fn expand_empty(xml: &str, start: usize, end: usize, qname: &str, content: &str)
     )
 }
 fn apply_edits(xml: &str, mut edits: Vec<(Range<usize>, String)>) -> Result<String> {
-    edits.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start));
     let mut output = xml.to_string();
     let mut previous = xml.len();
     for (span, replacement) in edits {

@@ -362,6 +362,7 @@ fn manifest_attributes(
     Ok(values)
 }
 
+#[allow(clippy::type_complexity)]
 fn manifest_and_loext_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

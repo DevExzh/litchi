@@ -443,6 +443,7 @@ fn write_background(xml: &mut String, image: &crate::SectionBackgroundImage) -> 
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 fn attributes(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,
@@ -559,34 +560,35 @@ fn parse_background(
     total: &mut usize,
 ) -> Result<crate::SectionBackgroundImage> {
     let mut a = attributes(reader, version, element, total)?;
-    let mut image = crate::SectionBackgroundImage::default();
-    image.href = take(&mut a, XLINK, b"href");
-    image.position = take(&mut a, STYLE, b"position");
-    image.filter_name = take(&mut a, STYLE, b"filter-name");
-    image.xlink_type = take(&mut a, XLINK, b"type");
-    image.show = take(&mut a, XLINK, b"show");
-    image.actuate = take(&mut a, XLINK, b"actuate");
-    image.repeat = take(&mut a, STYLE, b"repeat")
-        .map(|v| match v.as_str() {
-            "repeat" => Ok(crate::BackgroundRepeat::Repeat),
-            "stretch" => Ok(crate::BackgroundRepeat::Stretch),
-            "no-repeat" => Ok(crate::BackgroundRepeat::NoRepeat),
-            _ => Err(bad("invalid style:repeat")),
-        })
-        .transpose()?;
-    image.opacity_percent = take(&mut a, DRAW, b"opacity")
-        .map(|v| {
-            let n = v
-                .strip_suffix('%')
-                .ok_or_else(|| bad("draw:opacity requires percent"))?
-                .parse::<u8>()
-                .map_err(|_| bad("invalid draw:opacity"))?;
-            if n > 100 {
-                return Err(bad("draw:opacity exceeds 100%"));
-            }
-            Ok(n)
-        })
-        .transpose()?;
+    let image = crate::SectionBackgroundImage {
+        href: take(&mut a, XLINK, b"href"),
+        position: take(&mut a, STYLE, b"position"),
+        filter_name: take(&mut a, STYLE, b"filter-name"),
+        xlink_type: take(&mut a, XLINK, b"type"),
+        show: take(&mut a, XLINK, b"show"),
+        actuate: take(&mut a, XLINK, b"actuate"),
+        repeat: take(&mut a, STYLE, b"repeat")
+            .map(|v| match v.as_str() {
+                "repeat" => Ok(crate::BackgroundRepeat::Repeat),
+                "stretch" => Ok(crate::BackgroundRepeat::Stretch),
+                "no-repeat" => Ok(crate::BackgroundRepeat::NoRepeat),
+                _ => Err(bad("invalid style:repeat")),
+            })
+            .transpose()?,
+        opacity_percent: take(&mut a, DRAW, b"opacity")
+            .map(|v| {
+                let n = v
+                    .strip_suffix('%')
+                    .ok_or_else(|| bad("draw:opacity requires percent"))?
+                    .parse::<u8>()
+                    .map_err(|_| bad("invalid draw:opacity"))?;
+                if n > 100 {
+                    return Err(bad("draw:opacity exceeds 100%"));
+                }
+                Ok(n)
+            })
+            .transpose()?,
+    };
     if !a.is_empty() {
         return Err(bad(
             "unsupported or wrongly namespaced background-image attribute",

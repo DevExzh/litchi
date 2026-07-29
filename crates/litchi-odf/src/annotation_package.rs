@@ -631,13 +631,24 @@ fn validate_new_name(scan: &Scan, name: Option<&str>) -> Result<()> {
 }
 
 fn validate_anchor_host(host: AnnotationHost, anchor: &OdfAnnotationAnchor) -> Result<()> {
-    let valid = |position: &OdfAnnotationPosition| match (host, position) {
-        (_, OdfAnnotationPosition::AnnotationBody { .. }) => true,
-        (AnnotationHost::Text, OdfAnnotationPosition::TextParagraph { .. }) => true,
-        (AnnotationHost::Spreadsheet, OdfAnnotationPosition::SpreadsheetCell { .. }) => true,
-        (AnnotationHost::Presentation, OdfAnnotationPosition::PresentationPage { .. }) => true,
-        (AnnotationHost::Presentation, OdfAnnotationPosition::PresentationShape { .. }) => true,
-        _ => false,
+    let valid = |position: &OdfAnnotationPosition| {
+        matches!(
+            (host, position),
+            (_, OdfAnnotationPosition::AnnotationBody { .. })
+                | (AnnotationHost::Text, OdfAnnotationPosition::TextParagraph { .. })
+                | (
+                    AnnotationHost::Spreadsheet,
+                    OdfAnnotationPosition::SpreadsheetCell { .. }
+                )
+                | (
+                    AnnotationHost::Presentation,
+                    OdfAnnotationPosition::PresentationPage { .. }
+                )
+                | (
+                    AnnotationHost::Presentation,
+                    OdfAnnotationPosition::PresentationShape { .. }
+                )
+        )
     };
     if !valid(&anchor.start) || anchor.end.as_ref().is_some_and(|end| !valid(end)) {
         return invalid("annotation anchor does not belong to this document family");

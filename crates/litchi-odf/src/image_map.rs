@@ -151,6 +151,7 @@ pub struct ImageMap {
     pub xml: String,
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_link_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -317,8 +318,7 @@ pub fn parse_image_maps(xml: &str) -> Result<Vec<ImageMap>> {
                             ));
                         }
                     }
-                } else if active_map.is_some() {
-                    let (areas, _, _) = active_map.as_mut().expect("active map");
+                } else if let Some((areas, _, _)) = active_map.as_mut() {
                     let shape = if draw_element && local == b"area-rectangle" {
                         Some(ImageMapAreaShape::Rectangle {
                             x: required_attr(&reader, &element, SVG, b"x")?,

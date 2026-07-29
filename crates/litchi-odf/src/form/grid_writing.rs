@@ -775,20 +775,24 @@ fn parse_grid_fragment(raw: &str) -> Result<OdfGridControl> {
                 if is_active(namespace.as_deref(), &local) {
                     return invalid("event and macro content is outside the grid mutation API");
                 }
-                if skip_depth.is_some() || capture.is_some() {
-                } else if depth == 1
-                    && namespace.as_deref() == Some(FORM)
-                    && local == b"properties"
-                    && !saw_column
+                if skip_depth.is_some()
+                    || capture.is_some()
+                    || depth == 1
+                        && namespace.as_deref() == Some(FORM)
+                        && local == b"properties"
+                        && !saw_column
                 {
                 } else if depth == 1 && namespace.as_deref() == Some(FORM) && local == b"column" {
                     return invalid("form:column requires at least one column control");
-                } else if depth == 2 && column.is_some() && namespace.as_deref() == Some(FORM) {
+                } else if depth == 2
+                    && namespace.as_deref() == Some(FORM)
+                    && let Some(column) = column.as_mut()
+                {
                     let kind = OdfGridColumnControlKind::from_local(&local).ok_or_else(|| {
                         Error::InvalidFormat("invalid form:column control kind".to_string())
                     })?;
                     let control = OdfGridColumnControl::new(kind, &xml[previous..end])?;
-                    column.as_mut().unwrap().add_control(control)?;
+                    column.add_control(control)?;
                 } else {
                     return invalid("invalid empty element in form:grid");
                 }

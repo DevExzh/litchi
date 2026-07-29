@@ -638,7 +638,7 @@ fn resolved_text_local(
 }
 
 fn apply_edits(xml: &str, mut edits: Vec<(Range<usize>, String)>) -> Result<String> {
-    edits.sort_by(|left, right| right.0.start.cmp(&left.0.start));
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start));
     let mut prior_start = xml.len();
     let mut output = xml.to_string();
     for (span, replacement) in edits {

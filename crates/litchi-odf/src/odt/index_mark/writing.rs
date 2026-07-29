@@ -645,6 +645,7 @@ fn scan_xml(xml: &str) -> Result<Scan> {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
 fn start_mark_element(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

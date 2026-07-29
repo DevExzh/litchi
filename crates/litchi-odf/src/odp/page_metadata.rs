@@ -223,7 +223,7 @@ pub(crate) fn metadata_after_page_insert(
     };
 
     let mut pages = Vec::with_capacity(new_count);
-    for old_index in 0..slide_count {
+    for (old_index, old_name) in old_names.iter().enumerate() {
         let new_index = if old_index >= insert_index {
             old_index
                 .checked_add(1)
@@ -236,7 +236,7 @@ pub(crate) fn metadata_after_page_insert(
             .cloned()
             .unwrap_or_else(|| PresentationPageMetadata::new(new_index));
         page.slide_index = new_index;
-        page.name.get_or_insert_with(|| old_names[old_index].clone());
+        page.name.get_or_insert_with(|| old_name.clone());
         pages.push(page);
     }
     let mut inserted = PresentationPageMetadata::new(insert_index);
@@ -257,7 +257,7 @@ pub(crate) fn metadata_after_page_remove(
     }
     let old_names = effective_page_names(metadata, slide_count)?;
     let mut pages = Vec::with_capacity(slide_count.saturating_sub(1));
-    for old_index in 0..slide_count {
+    for (old_index, old_name) in old_names.iter().enumerate() {
         if old_index == remove_index {
             continue;
         }
@@ -273,7 +273,7 @@ pub(crate) fn metadata_after_page_remove(
             .cloned()
             .unwrap_or_else(|| PresentationPageMetadata::new(new_index));
         page.slide_index = new_index;
-        page.name.get_or_insert_with(|| old_names[old_index].clone());
+        page.name.get_or_insert_with(|| old_name.clone());
         pages.push(page);
     }
     if pages.is_empty() {

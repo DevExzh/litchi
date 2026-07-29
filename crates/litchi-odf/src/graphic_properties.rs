@@ -687,6 +687,7 @@ fn element(reader: &NsReader<&[u8]>, name: QName<'_>) -> (ElementNs, Vec<u8>) {
     let (namespace, local) = reader.resolver().resolve_element(name);
     (ens(namespace), local.as_ref().to_vec())
 }
+#[allow(clippy::type_complexity)]
 fn raw_attrs(
     reader: &NsReader<&[u8]>,
     version: XmlVersion,

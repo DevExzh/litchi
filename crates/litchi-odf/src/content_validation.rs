@@ -939,6 +939,7 @@ fn handle_empty(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn start_validation_child(
     namespace: NamespaceKind,
     local: &str,

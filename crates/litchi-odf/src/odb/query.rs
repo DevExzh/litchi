@@ -131,6 +131,7 @@ impl OdfDatabaseQuery {
 
 /// A recursive member of `db:queries` or `db:query-collection`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)] // public API; boxing would break callers
 pub enum OdfDatabaseQueryItem {
     Query(OdfDatabaseQuery),
     Collection(OdfDatabaseQueryCollection),

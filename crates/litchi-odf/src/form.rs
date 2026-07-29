@@ -209,6 +209,7 @@ pub struct OdfForm {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)] // public API; boxing would break callers
 pub enum OdfFormNode {
     Form(OdfForm),
     Control(OdfFormControl),
@@ -436,6 +437,7 @@ pub struct OdfControlShape {
     pub attributes: Vec<OdfFormAttribute>,
 }
 
+#[allow(clippy::large_enum_variant)] // parse-stack builder; boxing would churn many match sites
 enum Builder {
     Form(usize, OdfForm),
     Control(usize, OdfFormControl),
@@ -919,7 +921,7 @@ fn form_empty(
     namespace: Option<&str>,
     local: &str,
     group: &mut Option<(usize, OdfFormGroup)>,
-    builders: &mut Vec<Builder>,
+    builders: &mut [Builder],
     limits: &mut Limits,
 ) -> Result<()> {
     if namespace != Some(FORM) {

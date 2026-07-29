@@ -561,20 +561,20 @@ fn managed_style_ranges(
                     .as_deref()
                         == Some("table-cell");
                     candidate = Some((event_start, is_cell, false));
-                } else if depth == 2 && candidate.is_some() && is_style_namespace {
-                    if element.local_name().as_ref() == b"map" {
-                        candidate.as_mut().expect("checked candidate").2 = true;
-                    } else if element.local_name().as_ref() == b"table-cell-properties"
-                        && optional_attribute(
-                            reader.resolver(),
-                            reader.decoder(),
-                            &element,
-                            b"cell-protect",
-                        )?
-                        .is_some()
-                    {
-                        candidate.as_mut().expect("checked candidate").2 = true;
-                    }
+                } else if depth == 2
+                    && candidate.is_some()
+                    && is_style_namespace
+                    && (element.local_name().as_ref() == b"map"
+                        || element.local_name().as_ref() == b"table-cell-properties"
+                            && optional_attribute(
+                                reader.resolver(),
+                                reader.decoder(),
+                                &element,
+                                b"cell-protect",
+                            )?
+                            .is_some())
+                {
+                    candidate.as_mut().expect("checked candidate").2 = true;
                 }
                 depth += 1;
             },
@@ -590,20 +590,20 @@ fn managed_style_ranges(
                         Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
                     })?;
                     insertion = Some(AutomaticStylesInsertion::ExpandEmpty { slash, name });
-                } else if depth == 2 && candidate.is_some() && is_style_namespace {
-                    if element.local_name().as_ref() == b"map" {
-                        candidate.as_mut().expect("checked candidate").2 = true;
-                    } else if element.local_name().as_ref() == b"table-cell-properties"
-                        && optional_attribute(
-                            reader.resolver(),
-                            reader.decoder(),
-                            &element,
-                            b"cell-protect",
-                        )?
-                        .is_some()
-                    {
-                        candidate.as_mut().expect("checked candidate").2 = true;
-                    }
+                } else if depth == 2
+                    && candidate.is_some()
+                    && is_style_namespace
+                    && (element.local_name().as_ref() == b"map"
+                        || element.local_name().as_ref() == b"table-cell-properties"
+                            && optional_attribute(
+                                reader.resolver(),
+                                reader.decoder(),
+                                &element,
+                                b"cell-protect",
+                            )?
+                            .is_some())
+                {
+                    candidate.as_mut().expect("checked candidate").2 = true;
                 }
             },
             Event::End(element) => {

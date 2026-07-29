@@ -192,7 +192,7 @@ fn parse(path: &str, xml: &str) -> Result<Parsed> {
                         else if key == "xmlns" { prefixes.push((String::new(), value)); }
                         else if let Some(prefix) = key.strip_prefix("xmlns:") { prefixes.push((prefix.to_string(), value)); }
                     }
-                } else if skip_depth.is_none() && subject.is_none() && depth == root_depth.unwrap() + 1 {
+                } else if skip_depth.is_none() && subject.is_none() && root_depth.is_some_and(|root| depth == root + 1) {
                     if ns.as_deref() == Some(RDF_NS) && element.local_name().as_ref() == b"Description" {
                         subject = Some((depth, parse_subject(&reader, &element)?));
                     } else {

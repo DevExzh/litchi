@@ -285,11 +285,9 @@ impl TableProperties {
                 return Err(bad(format!("{n} length cannot be negative")));
             }
         }
-        if let Some(x) = self.page_number {
-            if let TablePageNumber::Number(n) = x {
-                if n == 0 || n > MAX_PAGE {
-                    return Err(bad("style:page-number out of range"));
-                }
+        if let Some(TablePageNumber::Number(n)) = self.page_number {
+            if n == 0 || n > MAX_PAGE {
+                return Err(bad("style:page-number out of range"));
             }
         }
         if let Some(x) = &self.background_image {

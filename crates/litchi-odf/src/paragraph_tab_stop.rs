@@ -506,6 +506,7 @@ pub fn parse_paragraph_style_tab_stops(xml: &str) -> Result<ParagraphStyleTabSto
     Ok(result)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn start(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

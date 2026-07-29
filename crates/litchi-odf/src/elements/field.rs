@@ -231,7 +231,7 @@ impl OdfDatabaseField {
             },
             OdfDatabaseFieldKind::Name => {},
         }
-        drop(attribute);
+        let _ = attribute;
         if field.source.connection_resource.is_none() && field.display_text.is_empty() {
             xml.push_str("/>");
             return Ok(xml);
@@ -5586,6 +5586,7 @@ fn validate_meta_nodes(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_meta_exact_pair(
     nodes: &[OdfMetaFieldNode],
     depth: usize,
@@ -5623,6 +5624,7 @@ fn validate_meta_exact_pair(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn validate_meta_required_element(
     node: &OdfMetaFieldNode,
     depth: usize,

@@ -81,9 +81,7 @@ impl OdsWorksheetData {
 
         for row in rows {
             let row_index = one_based_coordinate(row.index, "row")?;
-            let row_slot = usize::try_from(row.index).map_err(|_| {
-                Error::InvalidFormat("ODS row index does not fit platform memory".to_string())
-            })?;
+            let row_slot = row.index;
             if stored_rows.len() <= row_slot {
                 stored_rows.resize_with(row_slot.saturating_add(1), Vec::new);
             }
@@ -91,11 +89,7 @@ impl OdsWorksheetData {
             let values = &mut stored_rows[row_slot];
             for cell in row.cells {
                 let column_index = one_based_coordinate(cell.col, "column")?;
-                let column_slot = usize::try_from(cell.col).map_err(|_| {
-                    Error::InvalidFormat(
-                        "ODS column index does not fit platform memory".to_string(),
-                    )
-                })?;
+                let column_slot = cell.col;
                 if values.len() <= column_slot {
                     values.resize_with(column_slot.saturating_add(1), || CellValue::Empty);
                 }

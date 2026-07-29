@@ -151,6 +151,7 @@ impl OdfVariableValue {
 
 /// One variable declaration.
 #[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::large_enum_variant)] // public API; boxing would break callers
 pub enum OdfVariableDeclaration {
     Simple {
         name: String,
@@ -1293,6 +1294,7 @@ fn parse_double(value: &str) -> Result<f64> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn record_use(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

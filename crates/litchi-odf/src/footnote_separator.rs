@@ -335,6 +335,7 @@ pub(crate) fn parse_page_layout_property_footnote_separators(
     parse_style_footnote_separators(&wrapped)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn start(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

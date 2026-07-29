@@ -179,8 +179,6 @@ fn scan_plot(xml: &str) -> Result<PlotScan> {
                     let mut value = axis_from_start(&reader, &element)?; value.span = Span { start, end }; axes.push(value);
                 } else if plot_depth.is_some_and(|value| depth == value + 1) && chart_ns && local.as_ref() == b"series" {
                     axis_tail.get_or_insert(start); let mut value = series_from_start(&reader, &element)?; value.span = Span { start, end }; series.push(value);
-                } else if plot_depth.is_some_and(|value| depth == value + 1) && chart_ns && is_series_tail(local.as_ref()) {
-                    axis_tail.get_or_insert(start); series_tail.get_or_insert(start);
                 } else if plot_depth.is_some_and(|value| depth == value + 1) {
                     axis_tail.get_or_insert(start); series_tail.get_or_insert(start);
                 }
@@ -217,7 +215,11 @@ fn series_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
 }
 fn validate_references(axes: &[AxisEntry], series: &[SeriesEntry]) -> Result<()> {
     let mut names = HashSet::new(); for axis in axes { if let Some(name) = &axis.name && !names.insert(name.as_str()) { return invalid(format!("duplicate chart axis name '{name}'")); } }
-    let mut ids = HashSet::new(); for value in series { if let Some(id) = &value.xml_id && !ids.insert(id.as_str()) { return invalid(format!("duplicate chart series xml:id '{id}'")); } if let Some(axis) = &value.axis && !names.contains(axis.as_str()) { return invalid(format!("series references unknown axis '{axis}'")); } }
+    let mut ids = HashSet::new();
+    for value in series {
+        if let Some(id) = &value.xml_id && !ids.insert(id.as_str()) { return invalid(format!("duplicate chart series xml:id '{id}'")); }
+        if let Some(axis) = &value.axis && !names.contains(axis.as_str()) { return invalid(format!("series references unknown axis '{axis}'")); }
+    }
     Ok(())
 }
 fn is_series_tail(local: &[u8]) -> bool { matches!(local, b"stock-gain-marker" | b"stock-loss-marker" | b"stock-range-line" | b"wall" | b"floor") }
