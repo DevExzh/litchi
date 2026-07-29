@@ -89,21 +89,18 @@ pub(crate) fn validate_chart_sheet_chart(chart: &WorksheetChart) -> SheetResult<
 }
 
 /// Validate an Excel sheet name: 1-31 characters, none of `: \ / ? * [ ]`.
-pub(crate) fn validate_chart_sheet_name(name: &str) -> SheetResult<()> {
+pub(crate) fn validate_sheet_name(name: &str) -> SheetResult<()> {
     let length = name.chars().count();
     if length == 0 || length > MAX_SHEET_NAME_CHARS {
-        return Err(format!(
-            "chartsheet name '{name}' must be 1-{MAX_SHEET_NAME_CHARS} characters"
-        )
-        .into());
+        return Err(
+            format!("sheet name '{name}' must be 1-{MAX_SHEET_NAME_CHARS} characters").into(),
+        );
     }
     if let Some(bad) = name
         .chars()
         .find(|c| matches!(c, ':' | '\\' | '/' | '?' | '*' | '[' | ']'))
     {
-        return Err(
-            format!("chartsheet name '{name}' contains forbidden character '{bad}'").into(),
-        );
+        return Err(format!("sheet name '{name}' contains forbidden character '{bad}'").into());
     }
     Ok(())
 }
@@ -157,7 +154,7 @@ mod tests {
 
     #[test]
     fn validates_sheet_names() {
-        assert!(validate_chart_sheet_name("Chart 1").is_ok());
+        assert!(validate_sheet_name("Chart 1").is_ok());
         for name in [
             "",
             "This chartsheet name is way too long to be valid",
@@ -169,10 +166,7 @@ mod tests {
             "a[b",
             "a]b",
         ] {
-            assert!(
-                validate_chart_sheet_name(name).is_err(),
-                "accepted '{name}'"
-            );
+            assert!(validate_sheet_name(name).is_err(), "accepted '{name}'");
         }
     }
 

@@ -390,6 +390,10 @@ pub(crate) enum SheetSlot {
     ChartSheet(usize),
 }
 
+/// Maximum number of worksheets in one workbook, symmetric with the
+/// chartsheet limit (`MAX_CHART_SHEETS`); Excel's practical limit is lower.
+pub(crate) const MAX_WORKSHEETS: usize = super::chart_sheet::MAX_CHART_SHEETS;
+
 impl MutableWorkbookData {
     /// Create a new workbook with one default worksheet.
     pub fn new() -> Self {
@@ -414,6 +418,10 @@ impl MutableWorkbookData {
     }
 
     /// Add a new worksheet.
+    ///
+    /// The name is not validated: invalid or duplicate names produce
+    /// workbooks Excel rejects. Prefer [`Self::try_add_worksheet`] for
+    /// validated creation.
     pub fn add_worksheet(&mut self, name: String) -> &mut MutableWorksheet {
         let sheet_id = (self.worksheets.len() + self.chart_sheets.len() + 1) as u32;
         let worksheet = MutableWorksheet::new(name, sheet_id);
@@ -424,12 +432,27 @@ impl MutableWorkbookData {
         self.worksheets.last_mut().unwrap()
     }
 
+    /// Add a new worksheet after validating its name.
+    ///
+    /// The name must satisfy Excel's sheet-name rules (1-31 characters,
+    /// none of `: \ / ? * [ ]`) and be unique case-insensitively across
+    /// worksheets and chartsheets — the same rules [`Self::add_chart_sheet`]
+    /// enforces.
+    pub fn try_add_worksheet(&mut self, name: String) -> SheetResult<&mut MutableWorksheet> {
+        self.validate_new_sheet_name(&name)?;
+        if self.worksheets.len() >= MAX_WORKSHEETS {
+            return Err("worksheet count limit exceeded".into());
+        }
+        Ok(self.add_worksheet(name))
+    }
+
     /// Insert a new worksheet at the requested workbook-order position
     /// (`sheet` inside `sheets`, ECMA-376 §18.2.19 and §18.2.20).
     ///
     /// `index` counts worksheets and chartsheets together in workbook
     /// order, matching the order emitted on save; passing the current
-    /// sheet count appends like [`Self::add_worksheet`]. The new sheet
+    /// sheet count appends like [`Self::add_worksheet`]. The name is
+    /// validated like in [`Self::try_add_worksheet`]. The new sheet
     /// receives a fresh `sheetId`; relationship IDs and part names are
     /// derived from the final sheet order when the workbook is saved.
     ///
@@ -448,6 +471,10 @@ impl MutableWorkbookData {
             )
             .into());
         }
+        self.validate_new_sheet_name(&name)?;
+        if self.worksheets.len() >= MAX_WORKSHEETS {
+            return Err("worksheet count limit exceeded".into());
+        }
         let sheet_id = (self.worksheets.len() + self.chart_sheets.len() + 1) as u32;
         let worksheet = MutableWorksheet::new(name, sheet_id);
         self.worksheets.push(worksheet);
@@ -455,6 +482,26 @@ impl MutableWorkbookData {
             .insert(index, SheetSlot::Worksheet(self.worksheets.len() - 1));
         self.modified = true;
         Ok(self.worksheets.last_mut().unwrap())
+    }
+
+    /// Whether a worksheet or chartsheet with `name` already exists
+    /// (case-insensitive, matching Excel's sheet-name uniqueness).
+    fn sheet_name_taken(&self, name: &str) -> bool {
+        self.worksheets
+            .iter()
+            .map(|worksheet| worksheet.name())
+            .chain(self.chart_sheets.iter().map(|sheet| sheet.name()))
+            .any(|existing| existing.eq_ignore_ascii_case(name))
+    }
+
+    /// Validate a candidate sheet name: Excel's name rules plus
+    /// case-insensitive uniqueness across worksheets and chartsheets.
+    fn validate_new_sheet_name(&self, name: &str) -> SheetResult<()> {
+        super::chart_sheet::validate_sheet_name(name)?;
+        if self.sheet_name_taken(name) {
+            return Err(format!("workbook already has a sheet named '{name}'").into());
+        }
+        Ok(())
     }
 
     /// Remove a worksheet by its worksheets-relative `index` (matching
@@ -502,14 +549,7 @@ impl MutableWorkbookData {
         }
 
         let position = position as u32;
-        self.named_ranges.retain_mut(|range| match range.local_sheet_id {
-            Some(local) if local == position => false,
-            Some(local) if local > position => {
-                range.local_sheet_id = Some(local - 1);
-                true
-            },
-            _ => true,
-        });
+        self.remap_sheet_scopes_after_removal(position);
         for pivot in &mut self.pivot_tables {
             if pivot.dest_sheet_index > index {
                 pivot.dest_sheet_index -= 1;
@@ -520,12 +560,74 @@ impl MutableWorkbookData {
         Ok(removed)
     }
 
+    /// Remove a chartsheet by its chartsheets-relative `index` and return it.
+    ///
+    /// Symmetric to [`Self::remove_worksheet`]: the chartsheet leaves the
+    /// `sheets` sequence (ECMA-376 §18.2.20), so its part — and the drawing
+    /// and hosted chart parts wired only from it (`chartsheet`,
+    /// ECMA-376 §18.3.1.12) — are not emitted on the next save. Defined
+    /// names scoped to its workbook position are dropped and later scopes
+    /// shift up (`definedName@localSheetId`, ECMA-376 §18.2.5). Pivot
+    /// tables never target chartsheets, so no pivot handling is needed.
+    pub fn remove_chart_sheet(
+        &mut self,
+        index: usize,
+    ) -> SheetResult<super::chart_sheet::MutableChartSheet> {
+        if index >= self.chart_sheets.len() {
+            return Err(format!(
+                "chartsheet index {index} out of bounds (max: {})",
+                self.chart_sheets.len().saturating_sub(1)
+            )
+            .into());
+        }
+        let position = self
+            .sheet_slot_position(SheetSlot::ChartSheet(index))
+            .ok_or_else(|| {
+                format!("chartsheet {index} is missing from the workbook sheet order")
+            })?;
+
+        let removed = self.chart_sheets.remove(index);
+        self.sheet_order.remove(position);
+        for slot in &mut self.sheet_order {
+            if let SheetSlot::ChartSheet(cs_index) = slot
+                && *cs_index > index
+            {
+                *cs_index -= 1;
+            }
+        }
+
+        self.remap_sheet_scopes_after_removal(position as u32);
+        self.modified = true;
+        Ok(removed)
+    }
+
+    /// Remap sheet-scoped defined names after the sheet at workbook-order
+    /// `position` was removed (`definedName@localSheetId`, ECMA-376 §18.2.5):
+    /// names scoped to the removed sheet are dropped and names scoped to
+    /// later sheets shift one position up.
+    fn remap_sheet_scopes_after_removal(&mut self, position: u32) {
+        self.named_ranges.retain_mut(|range| match range.local_sheet_id {
+            Some(local) if local == position => false,
+            Some(local) if local > position => {
+                range.local_sheet_id = Some(local - 1);
+                true
+            },
+            _ => true,
+        });
+    }
+
+    /// Workbook-order position of a sheet slot in the `sheets` sequence
+    /// (ECMA-376 §18.2.20).
+    fn sheet_slot_position(&self, slot: SheetSlot) -> Option<usize> {
+        self.sheet_order
+            .iter()
+            .position(|candidate| *candidate == slot)
+    }
+
     /// Workbook-order position of a worksheet in the `sheets` sequence
     /// (ECMA-376 §18.2.20), counting chartsheets as well.
     fn workbook_position(&self, worksheet_index: usize) -> Option<usize> {
-        self.sheet_order
-            .iter()
-            .position(|slot| *slot == SheetSlot::Worksheet(worksheet_index))
+        self.sheet_slot_position(SheetSlot::Worksheet(worksheet_index))
     }
 
     /// Add a new chartsheet hosting the given chart.
@@ -540,17 +642,8 @@ impl MutableWorkbookData {
         name: &str,
         chart: super::sheet::WorksheetChart,
     ) -> SheetResult<&mut super::chart_sheet::MutableChartSheet> {
-        super::chart_sheet::validate_chart_sheet_name(name)?;
         super::chart_sheet::validate_chart_sheet_chart(&chart)?;
-        let duplicate = self
-            .worksheets
-            .iter()
-            .map(|worksheet| worksheet.name())
-            .chain(self.chart_sheets.iter().map(|sheet| sheet.name()))
-            .any(|existing| existing.eq_ignore_ascii_case(name));
-        if duplicate {
-            return Err(format!("workbook already has a sheet named '{name}'").into());
-        }
+        self.validate_new_sheet_name(name)?;
         if self.chart_sheets.len() >= super::chart_sheet::MAX_CHART_SHEETS {
             return Err("chartsheet count limit exceeded".into());
         }
@@ -2103,5 +2196,74 @@ mod tests {
         assert!(scopes.contains(&("Global", None)));
 
         assert_eq!(wb.pivot_tables[0].dest_sheet_index, 1);
+    }
+
+    fn bar_chart() -> crate::xlsx::WorksheetChart {
+        crate::xlsx::WorksheetChart::bar_chart(
+            "Sales",
+            "Sheet1!$A$2:$A$3",
+            "Sheet1!$B$2:$B$3",
+            crate::xlsx::ChartAnchor::new(0, 0, 10, 15),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn remove_chart_sheet_shifts_slots_and_scopes() {
+        let mut wb = MutableWorkbookData::new();
+        wb.add_chart_sheet("Chart1", bar_chart()).unwrap();
+        wb.add_worksheet("Sheet2".to_string());
+        wb.add_chart_sheet("Chart2", bar_chart()).unwrap();
+        wb.define_name_local("Scoped1", "Sheet1!$A$1", 0);
+        wb.define_name_local("ScopedChart1", "Sheet1!$A$1", 1);
+        wb.define_name_local("ScopedSheet2", "Sheet2!$A$1", 2);
+        wb.define_name_local("ScopedChart2", "Sheet1!$A$1", 3);
+
+        // Out-of-range removal is rejected; nothing changes.
+        assert!(wb.remove_chart_sheet(2).is_err());
+        assert_eq!(wb.chart_sheets.len(), 2);
+
+        let removed = wb.remove_chart_sheet(0).unwrap();
+        assert_eq!(removed.name(), "Chart1");
+        assert_eq!(wb.chart_sheets.len(), 1);
+        assert_eq!(
+            wb.sheet_order,
+            vec![
+                SheetSlot::Worksheet(0),
+                SheetSlot::Worksheet(1),
+                SheetSlot::ChartSheet(0)
+            ]
+        );
+
+        let scopes: Vec<(&str, Option<u32>)> = wb
+            .named_ranges
+            .iter()
+            .map(|range| (range.name.as_str(), range.local_sheet_id))
+            .collect();
+        assert!(scopes.contains(&("Scoped1", Some(0))));
+        assert!(!scopes.iter().any(|(name, _)| *name == "ScopedChart1"));
+        assert!(scopes.contains(&("ScopedSheet2", Some(1))));
+        assert!(scopes.contains(&("ScopedChart2", Some(2))));
+    }
+
+    #[test]
+    fn worksheet_creation_validates_names_uniformly() {
+        let mut wb = MutableWorkbookData::new();
+        assert!(wb.try_add_worksheet("a/b".to_string()).is_err());
+        assert!(wb.try_add_worksheet(String::new()).is_err());
+        assert!(wb.try_add_worksheet("x".repeat(32)).is_err());
+        assert!(wb.insert_worksheet(0, "a?b".to_string()).is_err());
+        // Duplicate of the default Sheet1, in any letter case.
+        assert!(wb.try_add_worksheet("sheet1".to_string()).is_err());
+        assert!(wb.insert_worksheet(1, "SHEET1".to_string()).is_err());
+        assert_eq!(wb.worksheets.len(), 1, "failed creations must not mutate");
+
+        wb.try_add_worksheet("Summary".to_string()).unwrap();
+        wb.insert_worksheet(0, "First".to_string()).unwrap();
+        assert_eq!(wb.worksheets.len(), 3);
+
+        // The unchecked legacy append path is unchanged.
+        wb.add_worksheet("Anything Goes".to_string());
+        assert_eq!(wb.worksheets.len(), 4);
     }
 }

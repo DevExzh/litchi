@@ -1935,6 +1935,57 @@ impl Workbook {
             .add_chart_sheet(name, chart)
     }
 
+    /// Remove a chartsheet by its chartsheets-relative `index` and return it.
+    ///
+    /// Symmetric to [`Self::remove_worksheet`]: the chartsheet part, its
+    /// drawing part, and the hosted chart part (`chartsheet`,
+    /// ECMA-376 §18.3.1.12) are not emitted on the next save, and defined
+    /// names scoped to its workbook position (`definedName@localSheetId`,
+    /// ECMA-376 §18.2.5) are dropped with later scopes shifted up.
+    ///
+    /// Like [`Self::remove_worksheet`], removal requires the writer data
+    /// model and fails for a workbook that was only opened for reading.
+    pub fn remove_chart_sheet(
+        &mut self,
+        index: usize,
+    ) -> SheetResult<crate::xlsx::writer::MutableChartSheet> {
+        let data = self.mutable_data.as_mut().ok_or(
+            "cannot remove a chartsheet from a workbook opened read-only; \
+             chartsheet removal requires the writer data model",
+        )?;
+        data.remove_chart_sheet(index)
+    }
+
+    /// Add a new worksheet after validating its name.
+    ///
+    /// The name must satisfy Excel's sheet-name rules (1-31 characters,
+    /// none of `: \ / ? * [ ]`) and be unique case-insensitively across
+    /// worksheets and chartsheets — the same rules [`Self::add_chart_sheet`]
+    /// enforces. [`Self::add_worksheet`] skips this validation for
+    /// backward compatibility.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use litchi_ooxml::xlsx::Workbook;
+    ///
+    /// let mut wb = Workbook::create()?;
+    /// wb.try_add_worksheet("Summary")?;
+    /// assert!(wb.try_add_worksheet("summary").is_err()); // duplicate
+    /// wb.save("output.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+    /// ```
+    pub fn try_add_worksheet(&mut self, name: &str) -> SheetResult<&mut MutableWorksheet> {
+        if self.mutable_data.is_none() {
+            self.mutable_data = Some(MutableWorkbookData::new());
+        }
+
+        self.mutable_data
+            .as_mut()
+            .unwrap()
+            .try_add_worksheet(name.to_string())
+    }
+
     /// Define a named range.
     ///
     /// Named ranges allow you to refer to cells or ranges by meaningful names.
