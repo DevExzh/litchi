@@ -978,7 +978,7 @@ mod tests {
         assert_eq!(cell.value, CellValue::Text("Example".to_string()));
         assert_eq!(cell.text, "Example");
         assert!(cell.formula.is_none());
-        assert_eq!(cell.hyperlinks(), &[hyperlink.clone()]);
+        assert_eq!(cell.hyperlinks(), std::slice::from_ref(&hyperlink));
         assert_eq!(cell.hyperlinks()[0].range(), 0.."Example".len());
         assert_eq!(cell.clear_hyperlinks(), vec![hyperlink]);
         assert!(!cell.has_hyperlinks());

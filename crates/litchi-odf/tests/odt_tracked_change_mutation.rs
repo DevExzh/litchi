@@ -13,9 +13,7 @@ fn change(id: &str, kind: ChangeType) -> TrackChange {
         change_type: kind,
         style_name: (kind == ChangeType::FormatChange).then(|| "Changed Style".to_string()),
         merge_last_paragraph: (kind == ChangeType::Deletion).then_some(false),
-        content: (kind == ChangeType::Deletion)
-            .then(|| "deleted 😀 text\nnext".to_string())
-            .unwrap_or_default(),
+        content: if kind == ChangeType::Deletion { "deleted 😀 text\nnext".to_string() } else { Default::default() },
     }
 }
 

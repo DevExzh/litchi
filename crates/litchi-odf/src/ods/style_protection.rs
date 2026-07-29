@@ -1715,7 +1715,7 @@ mod tests {
                 uri: "urn:example:formula".to_string(),
             })
         );
-        assert_eq!(registry.conditional_styles(), [style.clone()]);
+        assert_eq!(registry.conditional_styles(), std::slice::from_ref(style));
 
         let override_content = format!(
             "{content}<o:automatic-styles xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:s=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\"><s:style s:name=\"ce1\" s:family=\"table-cell\"><s:map s:condition=\"cell-content()=2\" s:apply-style-name=\"Blue\"/></s:style></o:automatic-styles>"

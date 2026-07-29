@@ -559,9 +559,7 @@ mod tests {
             let xml = format!("{PREFIX}{body}{SUFFIX}");
             assert!(parse_drawing_hatches(&xml).is_err(), "accepted {body}");
         }
-        let misplaced = format!(
-            r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:automatic-styles><draw:hatch draw:name="x" draw:style="single"/></office:automatic-styles></office:document-styles>"#
-        );
+        let misplaced = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:automatic-styles><draw:hatch draw:name="x" draw:style="single"/></office:automatic-styles></office:document-styles>"#.to_string();
         assert!(parse_drawing_hatches(&misplaced).is_err());
     }
 

@@ -45,7 +45,7 @@ fn complete_round_trip_and_lossless_mutation() {
     )
     .unwrap();
     let updated = set_table_style_properties_xml(&xml, &changed).unwrap();
-    assert!(updated.contains("t:align") == false);
+    assert!(!updated.contains("t:align"));
     assert!(updated.contains("table:display=\"false\""));
 }
 #[test]

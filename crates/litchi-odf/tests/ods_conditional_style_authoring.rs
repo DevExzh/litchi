@@ -25,7 +25,10 @@ fn builder_and_mutable_conditional_styles_have_stable_packaged_roundtrips() {
         .unwrap();
 
     let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
-    assert_eq!(spreadsheet.conditional_cell_styles(), [original.clone()]);
+    assert_eq!(
+        spreadsheet.conditional_cell_styles(),
+        std::slice::from_ref(&original)
+    );
 
     let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
     let replacement =
@@ -37,7 +40,10 @@ fn builder_and_mutable_conditional_styles_have_stable_packaged_roundtrips() {
         original
     );
     let reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
-    assert_eq!(reopened.conditional_cell_styles(), [replacement.clone()]);
+    assert_eq!(
+        reopened.conditional_cell_styles(),
+        std::slice::from_ref(&replacement)
+    );
 
     let mut mutable = MutableSpreadsheet::from_spreadsheet(reopened).unwrap();
     assert_eq!(

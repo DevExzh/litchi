@@ -1553,7 +1553,7 @@ mod tests {
         let updated = replace_typed_value_control_xml(&updated, 0, &replacement).unwrap();
         assert_eq!(
             typed_value_controls(&remove_typed_value_control_xml(&updated, 1).unwrap()).unwrap(),
-            [replacement.clone()]
+            std::slice::from_ref(&replacement)
         );
 
         let mut form = OdfTypedValueForm::new("TypedValues");

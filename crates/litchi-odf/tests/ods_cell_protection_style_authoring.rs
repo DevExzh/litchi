@@ -66,7 +66,10 @@ fn combined_conditional_and_protection_style_survives_replace_and_remove() {
         ))
         .unwrap();
     let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
-    assert_eq!(spreadsheet.conditional_cell_styles(), [conditional.clone()]);
+    assert_eq!(
+        spreadsheet.conditional_cell_styles(),
+        std::slice::from_ref(&conditional)
+    );
     assert_eq!(spreadsheet.table_cell_protection_styles().len(), 1);
 
     let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();

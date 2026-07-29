@@ -1026,7 +1026,7 @@ mod tests {
         let updated = replace_value_range_control_xml(&updated, 0, &replacement).unwrap();
         assert_eq!(
             value_range_controls(&remove_value_range_control_xml(&updated, 1).unwrap()).unwrap(),
-            [replacement.clone()]
+            std::slice::from_ref(&replacement)
         );
 
         let mut form = OdfValueRangeForm::new("Ranges");

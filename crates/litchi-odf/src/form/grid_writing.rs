@@ -1278,7 +1278,7 @@ mod tests {
         let updated = replace_grid_control_xml(&updated, 0, &replacement).unwrap();
         assert_eq!(
             grid_controls(&remove_grid_control_xml(&updated, 1).unwrap()).unwrap(),
-            [replacement.clone()]
+            std::slice::from_ref(&replacement)
         );
 
         let mut form = OdfGridForm::new("Grids");

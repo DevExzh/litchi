@@ -51,7 +51,7 @@ fn complete_linked_round_trip_and_mutation() {
     )
     .unwrap();
     let updated = set_table_row_style_properties_xml(&xml, &changed).unwrap();
-    assert!(updated.contains("f:background-color") == false);
+    assert!(!updated.contains("f:background-color"));
     assert!(updated.contains("keep-together=\"auto\""));
 }
 

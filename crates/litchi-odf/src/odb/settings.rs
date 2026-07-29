@@ -1346,10 +1346,14 @@ mod tests {
 
     #[test]
     fn package_accessors_and_lossless_set_remove_preserve_other_source_content() {
-        let mut driver = OdfDatabaseDriverSettings::default();
-        driver.parameter_name_substitution = Some(false);
-        let mut application = OdfDatabaseApplicationConnectionSettings::default();
-        application.max_row_count = Some(OdfDatabaseInteger::new("25").unwrap());
+        let driver = OdfDatabaseDriverSettings {
+            parameter_name_substitution: Some(false),
+            ..OdfDatabaseDriverSettings::default()
+        };
+        let application = OdfDatabaseApplicationConnectionSettings {
+            max_row_count: Some(OdfDatabaseInteger::new("25").unwrap()),
+            ..OdfDatabaseApplicationConnectionSettings::default()
+        };
         let original = wrap("", "");
         let with_driver = set_database_driver_settings_xml(&original, Some(&driver)).unwrap();
         let both =

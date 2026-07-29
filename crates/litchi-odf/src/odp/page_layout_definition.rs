@@ -915,9 +915,7 @@ mod tests {
                 "accepted {body}"
             );
         }
-        let misplaced = format!(
-            r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:automatic-styles><style:presentation-page-layout style:name="x"/></office:automatic-styles></office:document-styles>"#
-        );
+        let misplaced = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:automatic-styles><style:presentation-page-layout style:name="x"/></office:automatic-styles></office:document-styles>"#.to_string();
         assert!(parse_presentation_page_layouts(&misplaced).is_err());
     }
 

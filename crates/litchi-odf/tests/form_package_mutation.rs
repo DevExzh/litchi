@@ -129,9 +129,7 @@ fn odt_all_typed_controls_nested_forms_and_atomic_uniqueness() {
 
 #[test]
 fn control_reference_and_event_listener_are_inert_and_referentially_checked() {
-    let inner = format!(
-        "<office:forms><form:form form:name=\"Main\"><office:event-listeners><script:event-listener script:event-name=\"dom:click\" script:language=\"ooo:script\" script:macro-name=\"Standard.Module1.Main\" xlink:type=\"simple\" xlink:href=\"vnd.sun.star.script:Standard.Module1.Main\"/></office:event-listeners><form:text form:name=\"Text\" xml:id=\"control_id\"/></form:form></office:forms><draw:control draw:control=\"control_id\"/>"
-    );
+    let inner = "<office:forms><form:form form:name=\"Main\"><office:event-listeners><script:event-listener script:event-name=\"dom:click\" script:language=\"ooo:script\" script:macro-name=\"Standard.Module1.Main\" xlink:type=\"simple\" xlink:href=\"vnd.sun.star.script:Standard.Module1.Main\"/></office:event-listeners><form:text form:name=\"Text\" xml:id=\"control_id\"/></form:form></office:forms><draw:control draw:control=\"control_id\"/>".to_string();
     let mut document = Document::from_bytes(package(constants::ODF_TEXT, "text", &inner, false)).unwrap();
     let forms = document.forms().unwrap();
     assert_eq!(forms.event_listeners.len(), 1);
