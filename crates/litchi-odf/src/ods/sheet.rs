@@ -37,6 +37,8 @@ pub struct Sheet {
     pub scenario: Option<SheetScenario>,
     /// Inert LibreOffice `calcext` conditional formats attached to the sheet.
     pub conditional_formats: Vec<super::ConditionalFormat>,
+    /// Inert LibreOffice `calcext` sparkline groups attached to the sheet.
+    pub sparkline_groups: Vec<super::SparklineGroup>,
     /// Inert images anchored in the sheet's `table:shapes` container.
     pub images: Vec<crate::OdfImage>,
     /// General drawing shapes anchored in the sheet's `table:shapes` container.
@@ -111,6 +113,11 @@ impl Sheet {
         &self.conditional_formats
     }
 
+    /// Get the sheet's inert sparkline groups without rendering them.
+    pub fn sparkline_groups(&self) -> &[super::SparklineGroup] {
+        &self.sparkline_groups
+    }
+
     /// Get inert images anchored at sheet level.
     pub fn images(&self) -> &[crate::OdfImage] {
         &self.images
@@ -163,6 +170,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -188,6 +196,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -211,6 +220,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -251,6 +261,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -382,6 +393,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -405,6 +417,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),
@@ -525,6 +538,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: SheetProtection::default(),

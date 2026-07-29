@@ -9,7 +9,7 @@ use super::{
     DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
     IconSetType, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
     NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
-    TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
+    Sparkline, SparklineAxisType, SparklineEmptyCells, SparklineGroup, SparklineType, TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     conditional_format::{
         CALCEXT_NAMESPACE_URI, DATA_BAR_ENTRY_COUNT, MAX_CONDITIONAL_FORMATS_PER_SHEET,
@@ -21,6 +21,10 @@ use super::{
     rich_text::CellTextContentBuilder,
     scenario::validate_scenario,
     source::validate_table_source,
+    sparkline::{
+        MAX_SPARKLINE_GROUPS_PER_SHEET, MAX_SPARKLINES_PER_GROUP, validate_sparkline,
+        validate_sparkline_group, validate_sparkline_group_attributes,
+    },
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, MAX_TABLE_STRUCTURE_DEPTH,
         split_cell_range_addresses,
@@ -113,6 +117,14 @@ impl PendingCalcextRule {
     }
 }
 
+/// A `calcext:sparkline-group` element whose sparklines are still being read.
+struct PendingSparklineGroup {
+    /// The group parsed from the element's attributes (with no sparklines yet).
+    group: SparklineGroup,
+    /// The `element_depth` value assigned to the element.
+    depth: usize,
+}
+
 /// Parser for ODS-specific structures.
 ///
 /// This provides parsing logic specific to spreadsheets,
@@ -166,6 +178,9 @@ impl OdsParser {
         let mut pending_calcext_rule: Option<PendingCalcextRule> = None;
         let mut calcext_leaf_open_depth = None;
         let mut calcext_skip_depth = None;
+        let mut sparkline_groups_depth = None;
+        let mut pending_sparkline_group: Option<PendingSparklineGroup> = None;
+        let mut sparkline_list_depth = None;
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -356,6 +371,79 @@ impl OdsParser {
                         } else {
                             calcext_skip_depth = Some(element_depth);
                         }
+                    } else if sparkline_list_depth.is_some() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline",
+                        ) {
+                            let sparkline =
+                                Self::parse_sparkline(e, reader.decoder(), &document_namespaces)?;
+                            let pending = pending_sparkline_group.as_mut().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "calcext:sparklines must be inside calcext:sparkline-group"
+                                        .to_string(),
+                                )
+                            })?;
+                            if pending.group.sparklines.len() >= MAX_SPARKLINES_PER_GROUP {
+                                return Err(Error::InvalidFormat(format!(
+                                    "sparkline group exceeds the {MAX_SPARKLINES_PER_GROUP} sparkline safety limit"
+                                )));
+                            }
+                            pending.group.sparklines.push(sparkline);
+                            calcext_leaf_open_depth = Some(element_depth);
+                        } else {
+                            calcext_skip_depth = Some(element_depth);
+                        }
+                    } else if pending_sparkline_group.is_some() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparklines",
+                        ) {
+                            sparkline_list_depth = Some(element_depth);
+                        } else {
+                            // `calcext:sparkline-*-complex-color` theme colors
+                            // and other unmodeled children are skipped.
+                            calcext_skip_depth = Some(element_depth);
+                        }
+                    } else if sparkline_groups_depth.is_some() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline-group",
+                        ) {
+                            let group = Self::parse_sparkline_group_attributes(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending_sparkline_group = Some(PendingSparklineGroup {
+                                group,
+                                depth: element_depth,
+                            });
+                        } else {
+                            calcext_skip_depth = Some(element_depth);
+                        }
+                    } else if current_sheet.is_some()
+                        && current_row.is_none()
+                        && current_sheet_depth.is_some_and(|depth| element_depth == depth + 1)
+                        && e.local_name().as_ref() == b"sparkline-groups"
+                    {
+                        if !Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline-groups",
+                        ) {
+                            return Err(Error::InvalidFormat(
+                                "spoofed calcext:sparkline-groups namespace".to_string(),
+                            ));
+                        }
+                        sparkline_groups_depth = Some(element_depth);
                     } else if current_sheet.is_some()
                         && current_row.is_none()
                         && current_sheet_depth.is_some_and(|depth| element_depth == depth + 1)
@@ -843,6 +931,78 @@ impl OdsParser {
                         buf.clear();
                         continue;
                     }
+                    if sparkline_list_depth.is_some() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline",
+                        ) {
+                            let sparkline =
+                                Self::parse_sparkline(e, reader.decoder(), &document_namespaces)?;
+                            let pending = pending_sparkline_group.as_mut().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "calcext:sparklines must be inside calcext:sparkline-group"
+                                        .to_string(),
+                                )
+                            })?;
+                            if pending.group.sparklines.len() >= MAX_SPARKLINES_PER_GROUP {
+                                return Err(Error::InvalidFormat(format!(
+                                    "sparkline group exceeds the {MAX_SPARKLINES_PER_GROUP} sparkline safety limit"
+                                )));
+                            }
+                            pending.group.sparklines.push(sparkline);
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if pending_sparkline_group.is_some() {
+                        // Empty `calcext:sparklines` containers and unmodeled
+                        // complex-color children carry no sparklines.
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if sparkline_groups_depth.is_some() {
+                        if Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline-group",
+                        ) {
+                            let group = Self::parse_sparkline_group_attributes(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            // An empty group has no sparklines and is invalid.
+                            validate_sparkline_group(&group)?;
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
+                    if current_sheet.is_some()
+                        && current_row.is_none()
+                        && current_sheet_depth.is_some_and(|depth| element_depth == depth)
+                        && e.local_name().as_ref() == b"sparkline-groups"
+                    {
+                        if !Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline-groups",
+                        ) {
+                            return Err(Error::InvalidFormat(
+                                "spoofed calcext:sparkline-groups namespace".to_string(),
+                            ));
+                        }
+                        // An empty container declares no sparkline groups.
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
                     if current_sheet.is_some()
                         && current_row.is_none()
                         && current_sheet_depth.is_some_and(|depth| element_depth == depth)
@@ -1265,6 +1425,29 @@ impl OdsParser {
                             CALCEXT_NAMESPACE_URI,
                             "conditional-formats",
                         );
+                    let closes_sparkline_list = sparkline_list_depth == Some(element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparklines",
+                        );
+                    let closes_sparkline_group = pending_sparkline_group
+                        .as_ref()
+                        .is_some_and(|pending| pending.depth == element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline-group",
+                        );
+                    let closes_sparkline_groups = sparkline_groups_depth == Some(element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            "sparkline-groups",
+                        );
                     element_depth = element_depth.saturating_sub(1);
                     if closes_sheet_dde_source {
                         sheet_dde_source_depth = None;
@@ -1324,6 +1507,30 @@ impl OdsParser {
                     }
                     if closes_conditional_formats {
                         conditional_formats_depth = None;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_sparkline_list {
+                        sparkline_list_depth = None;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_sparkline_group {
+                        let pending = pending_sparkline_group
+                            .take()
+                            .expect("pending sparkline group was checked");
+                        validate_sparkline_group(&pending.group)?;
+                        if let Some(sheet) = current_sheet.as_mut() {
+                            sheet.add_sparkline_group(pending.group)?;
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_sparkline_groups {
+                        sparkline_groups_depth = None;
                         Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                         buf.clear();
                         continue;
@@ -1523,6 +1730,11 @@ impl OdsParser {
         if conditional_formats_depth.is_some() {
             return Err(Error::InvalidFormat(
                 "unterminated calcext:conditional-formats".to_string(),
+            ));
+        }
+        if sparkline_groups_depth.is_some() {
+            return Err(Error::InvalidFormat(
+                "unterminated calcext:sparkline-groups".to_string(),
             ));
         }
 
@@ -3180,6 +3392,138 @@ impl OdsParser {
         Ok(date_is)
     }
 
+    /// Parse one inert `calcext:sparkline` cell assignment from its attributes.
+    fn parse_sparkline(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<Sparkline> {
+        let mut cell_address = None;
+        let mut data_ranges = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("cell-address") {
+                cell_address = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:cell-address",
+                )?);
+            } else if is_calcext("data-range") {
+                data_ranges = Some(split_cell_range_addresses(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:data-range",
+                )?)?);
+            }
+        }
+        let sparkline = Sparkline {
+            cell_address: cell_address.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:sparkline requires calcext:cell-address".to_string(),
+                )
+            })?,
+            data_ranges: data_ranges.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:sparkline requires calcext:data-range".to_string(),
+                )
+            })?,
+        };
+        validate_sparkline(&sparkline)?;
+        Ok(sparkline)
+    }
+
+    /// Parse the attributes of an inert `calcext:sparkline-group` element.
+    fn parse_sparkline_group_attributes(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<SparklineGroup> {
+        let mut group = SparklineGroup::new(Vec::new());
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            let decode = |name| Self::decode_attribute(&attribute, decoder, name);
+            if is_calcext("id") {
+                group.id = Some(decode("calcext:id")?);
+            } else if is_calcext("type") {
+                group.sparkline_type = Some(SparklineType::parse(&decode("calcext:type")?)?);
+            } else if is_calcext("line-width") {
+                group.line_width = Some(decode("calcext:line-width")?);
+            } else if is_calcext("date-axis") {
+                group.flags.date_axis = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("display-empty-cells-as") {
+                group.display_empty_cells_as = Some(SparklineEmptyCells::parse(&decode(
+                    "calcext:display-empty-cells-as",
+                )?)?);
+            } else if is_calcext("markers") {
+                group.flags.markers = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("high") {
+                group.flags.high = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("low") {
+                group.flags.low = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("first") {
+                group.flags.first = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("last") {
+                group.flags.last = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("negative") {
+                group.flags.negative = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("display-x-axis") {
+                group.flags.display_x_axis =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("display-hidden") {
+                group.flags.display_hidden = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("min-axis-type") {
+                group.min_axis_type =
+                    Some(SparklineAxisType::parse(&decode("calcext:min-axis-type")?)?);
+            } else if is_calcext("max-axis-type") {
+                group.max_axis_type =
+                    Some(SparklineAxisType::parse(&decode("calcext:max-axis-type")?)?);
+            } else if is_calcext("right-to-left") {
+                group.flags.right_to_left =
+                    Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("manual-max") {
+                group.manual_max = Some(decode("calcext:manual-max")?);
+            } else if is_calcext("manual-min") {
+                group.manual_min = Some(decode("calcext:manual-min")?);
+            } else if is_calcext("color-series") {
+                group.colors.series = Some(decode("calcext:color-series")?);
+            } else if is_calcext("color-negative") {
+                group.colors.negative = Some(decode("calcext:color-negative")?);
+            } else if is_calcext("color-axis") {
+                group.colors.axis = Some(decode("calcext:color-axis")?);
+            } else if is_calcext("color-markers") {
+                group.colors.markers = Some(decode("calcext:color-markers")?);
+            } else if is_calcext("color-first") {
+                group.colors.first = Some(decode("calcext:color-first")?);
+            } else if is_calcext("color-last") {
+                group.colors.last = Some(decode("calcext:color-last")?);
+            } else if is_calcext("color-high") {
+                group.colors.high = Some(decode("calcext:color-high")?);
+            } else if is_calcext("color-low") {
+                group.colors.low = Some(decode("calcext:color-low")?);
+            }
+        }
+        validate_sparkline_group_attributes(&group)?;
+        Ok(group)
+    }
+
     fn decode_attribute(
         attribute: &quick_xml::events::attributes::Attribute<'_>,
         decoder: Decoder,
@@ -3348,6 +3692,7 @@ pub(crate) struct SheetBuilder {
     dde_source: Option<super::DdeSource>,
     scenario: Option<SheetScenario>,
     conditional_formats: Vec<ConditionalFormat>,
+    sparkline_groups: Vec<super::SparklineGroup>,
     images: Vec<crate::OdfImage>,
     cell_count: usize,
     /// Runs of empty rows read but not yet materialised, in document order.
@@ -3381,6 +3726,7 @@ impl SheetBuilder {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             cell_count: 0,
             deferred_rows: Vec::new(),
@@ -3404,6 +3750,16 @@ impl SheetBuilder {
             )));
         }
         self.conditional_formats.push(format);
+        Ok(())
+    }
+
+    fn add_sparkline_group(&mut self, group: super::SparklineGroup) -> Result<()> {
+        if self.sparkline_groups.len() >= MAX_SPARKLINE_GROUPS_PER_SHEET {
+            return Err(Error::InvalidFormat(format!(
+                "sheet exceeds the {MAX_SPARKLINE_GROUPS_PER_SHEET} sparkline group safety limit"
+            )));
+        }
+        self.sparkline_groups.push(group);
         Ok(())
     }
 
@@ -3604,6 +3960,7 @@ impl SheetBuilder {
             dde_source: self.dde_source,
             scenario: self.scenario,
             conditional_formats: self.conditional_formats,
+            sparkline_groups: self.sparkline_groups,
             images: self.images,
             shapes: Vec::new(),
             protection: super::SheetProtection::default(),

@@ -9,8 +9,8 @@ use crate::ods::{
     ConditionalCellStyle, ConditionalFormat, Consolidation, ContentValidation, DataPilotTable,
     DatabaseRange, DdeLink, LabelRange,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SpreadsheetProtection,
-    TableCellProtectionStyle, TableStructure, TableVisibility,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SparklineGroup,
+    SpreadsheetProtection, TableCellProtectionStyle, TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     conditional_format::{
@@ -34,6 +34,10 @@ use crate::ods::{
         normalize_sheet_image, remove_sheet_image_alternative,
     },
     source::validate_table_source,
+    sparkline::{
+        MAX_SPARKLINE_GROUPS_PER_SHEET, validate_sparkline_group, validate_sparkline_groups,
+        write_sparkline_groups,
+    },
     style_protection::{
         rewrite_managed_cell_styles, validate_conditional_style_collection,
         validate_protection_style_collection, validate_style_name,
@@ -635,6 +639,7 @@ impl SpreadsheetBuilder {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
@@ -1765,6 +1770,41 @@ impl SpreadsheetBuilder {
         Ok(self)
     }
 
+    /// Replace the current sheet's inert `calcext` sparkline groups.
+    ///
+    /// Passing an empty collection removes all sparkline groups from the
+    /// sheet. Sparklines are stored as typed data and are never rendered.
+    pub fn set_sheet_sparkline_groups(
+        &mut self,
+        groups: Vec<SparklineGroup>,
+    ) -> Result<&mut Self> {
+        validate_sparkline_groups(&groups)?;
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        self.sheets
+            .last_mut()
+            .expect("default sheet was added")
+            .sparkline_groups = groups;
+        Ok(self)
+    }
+
+    /// Append one inert sparkline group to the current sheet.
+    pub fn add_sheet_sparkline_group(&mut self, group: SparklineGroup) -> Result<&mut Self> {
+        validate_sparkline_group(&group)?;
+        if self.sheets.is_empty() {
+            self.add_sheet("Sheet1")?;
+        }
+        let sheet = self.sheets.last_mut().expect("default sheet was added");
+        if sheet.sparkline_groups.len() >= MAX_SPARKLINE_GROUPS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "sheet exceeds the {MAX_SPARKLINE_GROUPS_PER_SHEET} sparkline group safety limit"
+            )));
+        }
+        sheet.sparkline_groups.push(group);
+        Ok(self)
+    }
+
     /// Add an inert image to the current sheet's `table:shapes` container.
     pub fn add_sheet_image(&mut self, image: crate::OdfImage) -> Result<&mut Self> {
         if self.sheets.is_empty() {
@@ -2142,6 +2182,7 @@ impl SpreadsheetBuilder {
             );
 
             write_conditional_formats(&mut body, &sheet.conditional_formats)?;
+            write_sparkline_groups(&mut body, &sheet.sparkline_groups)?;
 
             body.push_str("</table:table>");
         }
@@ -2232,7 +2273,11 @@ impl SpreadsheetBuilder {
             .sheets
             .iter()
             .any(|sheet| !sheet.conditional_formats.is_empty());
-        if has_conditional_formats {
+        let has_sparkline_groups = self
+            .sheets
+            .iter()
+            .any(|sheet| !sheet.sparkline_groups.is_empty());
+        if has_conditional_formats || has_sparkline_groups {
             out.push_str(CALCEXT_NAMESPACE_DECLARATION);
         }
         out.push_str(r#" office:version="1.3"><office:font-face-decls/>"#);
@@ -2886,6 +2931,7 @@ mod tests {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: crate::ods::SheetProtection::default(),

@@ -131,6 +131,7 @@
 //! - ✅ Create, edit, remove, and round-trip data-pilot tables
 //! - ✅ `style:map` conditional cell styles and inert `calcext` conditional
 //!   formats (condition, color-scale, data-bar, icon-set, and date-is rules)
+//! - ✅ Inert `calcext` sparkline groups
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
@@ -731,7 +732,9 @@ pub use ods::{
     FilterConditionSource, FilterDataType, FilterExpression, FormulaNamespace, IconSetType,
     IterationStatus,
     LabelRange, LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
+    NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, Sparkline,
+    SparklineAxisType, SparklineColors, SparklineEmptyCells, SparklineFlags, SparklineGroup,
+    SparklineType,
     SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetShape,
     SheetShapeAnchor, SheetStyle,
     SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder, OdsWorkbook,

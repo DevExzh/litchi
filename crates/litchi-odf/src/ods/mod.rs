@@ -33,6 +33,7 @@
 //! - ✅ Standard `style:map` conditional cell styles and inert LibreOffice
 //!   `calcext` conditional formats (condition, color-scale, data-bar,
 //!   icon-set, and date-is rules)
+//! - ✅ Inert LibreOffice `calcext` sparkline groups
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -63,10 +64,11 @@
 //! - ✅ Create, edit, remove, and round-trip inert DDE caches
 //! - ✅ Create, edit, remove, and round-trip data-pilot tables
 //! - ✅ Create, edit, remove, and round-trip conditional formats
+//! - ✅ Create, edit, remove, and round-trip sparkline groups
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
-//! - ⚠️ Sparklines
+//! - ⚠️ `calcext` sparkline complex (theme) colors
 //! - ⚠️ External data connections
 //!
 //! # References
@@ -102,6 +104,7 @@ mod shape;
 mod sheet;
 mod sheet_image;
 mod source;
+mod sparkline;
 mod spreadsheet;
 mod structure;
 mod style_protection;
@@ -162,6 +165,10 @@ pub use scenario::SheetScenario;
 pub use shape::{SheetShape, SheetShapeAnchor};
 pub use sheet::Sheet;
 pub use source::{CellRangeSource, SheetTableSource, TableSourceMode};
+pub use sparkline::{
+    Sparkline, SparklineAxisType, SparklineColors, SparklineEmptyCells, SparklineFlags,
+    SparklineGroup, SparklineType,
+};
 pub use spreadsheet::Spreadsheet;
 pub use structure::{
     Column, SheetPrintSettings, SheetStyle, SheetStyleUsage, TableGroup, TableRange,

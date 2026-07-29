@@ -12,7 +12,7 @@ use crate::ods::{
     ConditionalCellStyle, ConditionalFormat, Consolidation, ContentValidation, DataPilotTable,
     DatabaseRange, DdeLink, LabelRange,
     NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, Spreadsheet,
+    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SparklineGroup, Spreadsheet,
     SpreadsheetProtection, TableCellProtectionStyle, TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
@@ -37,6 +37,10 @@ use crate::ods::{
         normalize_sheet_image, remove_sheet_image_alternative,
     },
     source::validate_table_source,
+    sparkline::{
+        MAX_SPARKLINE_GROUPS_PER_SHEET, validate_sparkline_group, validate_sparkline_groups,
+        write_sparkline_groups,
+    },
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
         validate_sheet_print_settings, validate_table_structure, write_columns,
@@ -850,6 +854,7 @@ impl MutableSpreadsheet {
             dde_source: None,
             scenario: None,
             conditional_formats: Vec::new(),
+            sparkline_groups: Vec::new(),
             images: Vec::new(),
             shapes: Vec::new(),
             protection: crate::ods::SheetProtection::default(),
@@ -1796,6 +1801,55 @@ impl MutableSpreadsheet {
             .then(|| sheet.conditional_formats.remove(index)))
     }
 
+    /// Replace a sheet's inert `calcext` sparkline groups atomically.
+    ///
+    /// Passing an empty collection removes all sparkline groups from the
+    /// sheet. Sparklines are stored as typed data and are never rendered.
+    pub fn set_sheet_sparkline_groups(
+        &mut self,
+        sheet_index: usize,
+        groups: Vec<SparklineGroup>,
+    ) -> Result<()> {
+        validate_sparkline_groups(&groups)?;
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        sheet.sparkline_groups = groups;
+        Ok(())
+    }
+
+    /// Append one inert sparkline group to a sheet.
+    pub fn add_sheet_sparkline_group(
+        &mut self,
+        sheet_index: usize,
+        group: SparklineGroup,
+    ) -> Result<()> {
+        validate_sparkline_group(&group)?;
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        if sheet.sparkline_groups.len() >= MAX_SPARKLINE_GROUPS_PER_SHEET {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "sheet exceeds the {MAX_SPARKLINE_GROUPS_PER_SHEET} sparkline group safety limit"
+            )));
+        }
+        sheet.sparkline_groups.push(group);
+        Ok(())
+    }
+
+    /// Remove and return a sheet's sparkline group at `index`, if present.
+    pub fn remove_sheet_sparkline_group(
+        &mut self,
+        sheet_index: usize,
+        index: usize,
+    ) -> Result<Option<SparklineGroup>> {
+        let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
+        })?;
+        Ok((index < sheet.sparkline_groups.len())
+            .then(|| sheet.sparkline_groups.remove(index)))
+    }
+
     /// Add an inert image to a sheet's `table:shapes` container.
     pub fn add_sheet_image(&mut self, sheet_index: usize, image: crate::OdfImage) -> Result<()> {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
@@ -2319,6 +2373,7 @@ impl MutableSpreadsheet {
             );
 
             write_conditional_formats(&mut body, &sheet.conditional_formats)?;
+            write_sparkline_groups(&mut body, &sheet.sparkline_groups)?;
 
             body.push_str("</table:table>");
         }
@@ -2405,7 +2460,11 @@ impl MutableSpreadsheet {
             .sheets
             .iter()
             .any(|sheet| !sheet.conditional_formats.is_empty());
-        if has_conditional_formats {
+        let has_sparkline_groups = self
+            .sheets
+            .iter()
+            .any(|sheet| !sheet.sparkline_groups.is_empty());
+        if has_conditional_formats || has_sparkline_groups {
             out.push_str(CALCEXT_NAMESPACE_DECLARATION);
         }
         if self.automatic_styles.is_some() || self.font_face_decls.is_some() {
@@ -2413,7 +2472,7 @@ impl MutableSpreadsheet {
             if self.has_formulas() {
                 declared.push("of");
             }
-            if has_conditional_formats {
+            if has_conditional_formats || has_sparkline_groups {
                 declared.push("calcext");
             }
             if has_annotations {
