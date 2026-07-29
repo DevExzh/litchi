@@ -16,6 +16,7 @@ use super::font::TextFont;
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_following_style::{NamedParagraphStyle, ParagraphFollowingStyle};
+use super::paragraph_style_catalog;
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
@@ -619,6 +620,16 @@ pub(super) fn named_paragraph_styles(
 ) -> Result<Vec<NamedParagraphStyle>> {
     let storage = storage::locate(package, storage_id)?;
     native::named_paragraph_styles(package, storage.style_id)
+}
+
+pub(super) fn create_named_paragraph_style(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    source: super::paragraph_following_style::ParagraphStyleId,
+    name: super::paragraph_following_style::ParagraphStyleName,
+) -> Result<NamedParagraphStyle> {
+    let storage = storage::locate(package, storage_id)?;
+    paragraph_style_catalog::create_named_paragraph_style(package, storage.style_id, source, name)
 }
 
 pub(super) fn paragraph_following_style(

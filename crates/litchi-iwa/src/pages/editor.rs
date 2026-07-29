@@ -1606,6 +1606,29 @@ impl PagesEditor {
         self.text.named_paragraph_styles(graph.storage_id)
     }
 
+    /// Clone one selectable preset as a new named style in this text box's theme.
+    pub fn create_text_box_named_paragraph_style(
+        &mut self,
+        drawable_object_id: u64,
+        source: crate::text::ParagraphStyleId,
+        name: crate::text::ParagraphStyleName,
+    ) -> Result<NamedParagraphStyle> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let created = staged.create_named_paragraph_style(graph.storage_id, source, name)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if !verified
+            .text_box_named_paragraph_styles(drawable_object_id)?
+            .contains(&created)
+        {
+            return Err(Error::InvalidFormat(
+                "Pages named paragraph-style creation failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(created)
+    }
+
     /// Read the style selected for the paragraph created after this text box's current paragraph.
     pub fn text_box_paragraph_following_style(
         &self,

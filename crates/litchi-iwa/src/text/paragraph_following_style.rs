@@ -2,6 +2,32 @@
 
 use std::num::NonZeroU64;
 
+/// Validated user-visible name for a named paragraph style.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ParagraphStyleName(Box<str>);
+
+impl ParagraphStyleName {
+    /// Construct a nonempty printable name without surrounding whitespace.
+    pub fn new(name: impl Into<String>) -> crate::Result<Self> {
+        let name = name.into();
+        if name.is_empty()
+            || name.trim() != name
+            || name.chars().any(|character| character.is_control())
+        {
+            return Err(crate::Error::InvalidFormat(
+                "named iWork paragraph styles require a nonempty printable name without surrounding whitespace"
+                    .to_owned(),
+            ));
+        }
+        Ok(Self(name.into_boxed_str()))
+    }
+
+    /// Return the validated user-visible name.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Package-local identifier of a named iWork paragraph style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ParagraphStyleId(NonZeroU64);
@@ -70,6 +96,13 @@ mod tests {
     #[test]
     fn paragraph_style_identifiers_and_names_are_strict() {
         assert!(ParagraphStyleId::new(0).is_err());
+        assert!(ParagraphStyleName::new("").is_err());
+        assert!(ParagraphStyleName::new(" Heading").is_err());
+        assert!(ParagraphStyleName::new("Bad\nName").is_err());
+        assert_eq!(
+            ParagraphStyleName::new("Heading").unwrap().as_str(),
+            "Heading"
+        );
         let identifier = ParagraphStyleId::new(42).unwrap();
         assert_eq!(identifier.get(), 42);
         assert_eq!(

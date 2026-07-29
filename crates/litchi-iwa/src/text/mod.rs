@@ -35,6 +35,7 @@ mod paragraph_direction;
 mod paragraph_flow;
 mod paragraph_following_style;
 mod paragraph_list;
+mod paragraph_style_catalog;
 mod paragraph_tabs;
 mod position;
 mod smart_field_object;
@@ -89,7 +90,7 @@ pub use number_attachment_types::{
 pub use paragraph_direction::ParagraphWritingDirection;
 pub use paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
 pub use paragraph_following_style::{
-    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
+    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId, ParagraphStyleName,
 };
 pub use paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,

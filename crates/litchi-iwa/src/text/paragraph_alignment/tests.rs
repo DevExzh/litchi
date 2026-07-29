@@ -16,11 +16,11 @@ use crate::text::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFollowingStyle,
     ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleId,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations,
-    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
-    TextStyle, TextUnderline,
+    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
+    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
+    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -128,6 +128,130 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
             .map(|style| style.name())
             .collect::<Vec<_>>(),
         ["Body"]
+    );
+}
+
+#[test]
+fn named_paragraph_style_creation_is_transactional_across_all_suites() {
+    let mut pages = PagesEditor::create_with_text("Pages style catalog").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            19,
+            "Pages",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let body = pages
+        .text_box_named_paragraph_styles(pages_box.drawable_object_id)
+        .unwrap()[0]
+        .id();
+    let created = pages
+        .create_text_box_named_paragraph_style(
+            pages_box.drawable_object_id,
+            body,
+            ParagraphStyleName::new("Litchi Heading").unwrap(),
+        )
+        .unwrap();
+    assert_eq!(created.name(), "Litchi Heading");
+    let before_duplicate = pages.to_bytes().unwrap();
+    assert!(
+        pages
+            .create_text_box_named_paragraph_style(
+                pages_box.drawable_object_id,
+                body,
+                ParagraphStyleName::new("Litchi Heading").unwrap(),
+            )
+            .is_err()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), before_duplicate);
+    let pages = PagesEditor::from_bytes(&before_duplicate).unwrap();
+    assert_eq!(
+        pages
+            .text_box_named_paragraph_styles(pages_box.drawable_object_id)
+            .unwrap()
+            .iter()
+            .map(|style| style.name())
+            .collect::<Vec<_>>(),
+        ["Body", "Litchi Heading"]
+    );
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "Numbers",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let mut numbers_text = IWorkTextEditor::from_package(numbers.into_package());
+    let body = numbers_text
+        .named_paragraph_styles(numbers_box.storage.object_id)
+        .unwrap()[0]
+        .id();
+    numbers_text
+        .create_named_paragraph_style(
+            numbers_box.storage.object_id,
+            body,
+            ParagraphStyleName::new("Numbers Detail").unwrap(),
+        )
+        .unwrap();
+    let numbers_bytes = numbers_text.package().to_bytes().unwrap();
+    let numbers_text =
+        IWorkTextEditor::from_package(IWorkPackage::from_bytes(&numbers_bytes).unwrap());
+    assert_eq!(
+        numbers_text
+            .named_paragraph_styles(numbers_box.storage.object_id)
+            .unwrap()
+            .last()
+            .unwrap()
+            .name(),
+        "Numbers Detail"
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "Keynote",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let mut keynote_text = IWorkTextEditor::from_package(keynote.into_package());
+    let body = keynote_text
+        .named_paragraph_styles(keynote_box.storage.object_id)
+        .unwrap()[0]
+        .id();
+    keynote_text
+        .create_named_paragraph_style(
+            keynote_box.storage.object_id,
+            body,
+            ParagraphStyleName::new("Keynote Detail").unwrap(),
+        )
+        .unwrap();
+    let keynote_bytes = keynote_text.package().to_bytes().unwrap();
+    let keynote_text =
+        IWorkTextEditor::from_package(IWorkPackage::from_bytes(&keynote_bytes).unwrap());
+    assert_eq!(
+        keynote_text
+            .named_paragraph_styles(keynote_box.storage.object_id)
+            .unwrap()
+            .last()
+            .unwrap()
+            .name(),
+        "Keynote Detail"
     );
 }
 

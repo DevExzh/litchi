@@ -14,12 +14,12 @@ use litchi_iwa::text::{
     ParagraphFlow, ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints,
     ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList,
     ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
-    TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
-    TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
-    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
+    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap,
+    TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
+    TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition,
+    TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -252,6 +252,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .find(|style| style.name() == "Body")
         .ok_or("source-built Pages theme has no Body paragraph style")?;
+    editor.create_text_box_named_paragraph_style(
+        following_style_box.drawable_object_id,
+        body.id(),
+        ParagraphStyleName::new("Litchi Heading")?,
+    )?;
     editor.set_text_box_paragraph_following_style(
         following_style_box.drawable_object_id,
         ParagraphFollowingStyle::Named(body.id()),
