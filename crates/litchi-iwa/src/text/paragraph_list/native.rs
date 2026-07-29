@@ -9,11 +9,12 @@ use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::tswp::list_style_archive::{LabelGeometry, LabelType, NumberType};
 use crate::protobuf::{tsp, tss, tswp};
 use crate::wire::{
-    patch_varint_field, rewrite_repeated_fixed32_fields, rewrite_repeated_length_delimited_fields,
+    patch_length_delimited_field, patch_varint_field, rewrite_repeated_fixed32_fields,
+    rewrite_repeated_length_delimited_fields,
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::types::ParagraphList;
+use super::types::{ParagraphList, ParagraphListLabelColor};
 
 const LIST_STYLE_MESSAGE_TYPE: u32 = 2_023;
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -24,6 +25,8 @@ const TEXT_INDENTS_FIELD: u32 = 12;
 const INDENTS_FIELD: u32 = 13;
 const GEOMETRIES_FIELD: u32 = 14;
 const STRINGS_FIELD: u32 = 16;
+const FONT_COLOR_NULL_FIELD: u32 = 20;
+const FONT_COLOR_FIELD: u32 = 21;
 const FONT_EM_POINTS: f32 = 11.0;
 const NONE_INDENT_STEP_POINTS: f32 = 36.0;
 const BULLET_INDENT_STEP_POINTS: f32 = 9.0;
@@ -212,6 +215,50 @@ pub(super) fn effective_list_text_indents(
     effective_list_float_array(package, style_id, ListFloatArray::TextGaps)
 }
 
+pub(super) fn effective_label_color(
+    package: &IWorkPackage,
+    style_id: u64,
+) -> Result<ParagraphListLabelColor> {
+    if resolved_paragraph_list(package, style_id)? == ParagraphList::None {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} does not have a label color"
+        )));
+    }
+    let mut current_id = style_id;
+    let mut visited = HashSet::new();
+    loop {
+        if !visited.insert(current_id) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list-style inheritance contains a cycle at {current_id}"
+            )));
+        }
+        let style = locate_style(package, current_id)?.style;
+        if style.font_color_null == Some(true) {
+            return Ok(ParagraphListLabelColor::Automatic);
+        }
+        if let Some(color) = style.font_color.as_ref() {
+            return Ok(ParagraphListLabelColor::Explicit(
+                crate::shapes::color_from_native(color)?,
+            ));
+        }
+        if style.font_color_null == Some(false) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {current_id} enables a missing label color"
+            )));
+        }
+        let Some(parent) = style
+            .super_
+            .parent
+            .as_ref()
+            .map(|parent| parent.identifier)
+            .filter(|identifier| *identifier != 0)
+        else {
+            return Ok(ParagraphListLabelColor::Automatic);
+        };
+        current_id = parent;
+    }
+}
+
 #[derive(Clone, Copy)]
 enum ListFloatArray {
     LabelIndents,
@@ -366,6 +413,205 @@ pub(super) fn indentation_variation_object(
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
     info.object_references.push(parent_style_id);
     Ok(object)
+}
+
+pub(super) fn label_color_variation_object(
+    identifier: u64,
+    parent_style_id: u64,
+    stylesheet_id: u64,
+    color: ParagraphListLabelColor,
+) -> Result<ArchiveObject> {
+    let (font_color_null, font_color) = native_label_color(color);
+    let style = tswp::ListStyleArchive {
+        super_: tss::StyleArchive {
+            parent: Some(reference(parent_style_id)),
+            is_variation: Some(true),
+            stylesheet: Some(reference(stylesheet_id)),
+            ..Default::default()
+        },
+        override_count: Some(1),
+        font_color_null,
+        font_color,
+        ..Default::default()
+    };
+    let data = style.encode_to_vec();
+    tswp::ListStyleArchive::decode(data.as_slice())?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: LIST_STYLE_MESSAGE_TYPE,
+            data,
+        }],
+    )?;
+    let info = &mut object.archive_info.message_infos[0];
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.object_references.push(parent_style_id);
+    Ok(object)
+}
+
+pub(super) fn replace_direct_label_color(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+    color: ParagraphListLabelColor,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let data = patch_direct_label_color(&original.data, style_id, color)?;
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+pub(super) fn remove_direct_label_color(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    style_id: u64,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("iWork list style {style_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == LIST_STYLE_MESSAGE_TYPE)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} must have exactly one writable payload"
+            )));
+        };
+        let original = &object.messages[*index];
+        let style = tswp::ListStyleArchive::decode(original.data.as_slice())?;
+        let had_override = style.font_color_null.is_some() || style.font_color.is_some();
+        if !had_override {
+            return Ok(());
+        }
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_sub(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} has label color without an override count"
+                ))
+            })?;
+        let data = patch_varint_field(
+            &original.data,
+            FONT_COLOR_NULL_FIELD,
+            style.font_color_null.is_some(),
+            None,
+        )?;
+        let data = patch_length_delimited_field(
+            &data,
+            FONT_COLOR_FIELD,
+            style.font_color.is_some(),
+            None,
+        )?;
+        let data = patch_varint_field(
+            &data,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+        let decoded = tswp::ListStyleArchive::decode(data.as_slice())?;
+        if decoded.font_color_null.is_some()
+            || decoded.font_color.is_some()
+            || decoded.override_count != Some(override_count)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork list style {style_id} label-color removal failed validation"
+            )));
+        }
+        object.replace_message(
+            *index,
+            RawMessage {
+                type_: original.type_,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn patch_direct_label_color(
+    data: &[u8],
+    style_id: u64,
+    color: ParagraphListLabelColor,
+) -> Result<Vec<u8>> {
+    let style = tswp::ListStyleArchive::decode(data)?;
+    let had_override = style.font_color_null.is_some() || style.font_color.is_some();
+    let (font_color_null, font_color) = native_label_color(color);
+    let mut patched = patch_varint_field(
+        data,
+        FONT_COLOR_NULL_FIELD,
+        style.font_color_null.is_some(),
+        font_color_null.map(u64::from),
+    )?;
+    let encoded_color = font_color.as_ref().map(Message::encode_to_vec);
+    patched = patch_length_delimited_field(
+        &patched,
+        FONT_COLOR_FIELD,
+        style.font_color.is_some(),
+        encoded_color.as_deref(),
+    )?;
+    if !had_override {
+        let override_count = style
+            .override_count
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "iWork list style {style_id} override count overflowed"
+                ))
+            })?;
+        patched = patch_varint_field(
+            &patched,
+            OVERRIDE_COUNT_FIELD,
+            style.override_count.is_some(),
+            Some(u64::from(override_count)),
+        )?;
+    }
+    let decoded = tswp::ListStyleArchive::decode(patched.as_slice())?;
+    if decoded.font_color_null != font_color_null || decoded.font_color != font_color {
+        return Err(Error::InvalidFormat(format!(
+            "iWork list style {style_id} label-color update failed validation"
+        )));
+    }
+    Ok(patched)
+}
+
+fn native_label_color(color: ParagraphListLabelColor) -> (Option<bool>, Option<tsp::Color>) {
+    match color {
+        ParagraphListLabelColor::Automatic => (Some(true), None),
+        ParagraphListLabelColor::Explicit(color) => {
+            (None, Some(crate::shapes::color_to_native(color)))
+        },
+    }
 }
 
 pub(super) fn replace_direct_bullet_strings(
@@ -1136,5 +1382,63 @@ mod tests {
         assert_eq!(decoded.geometries[1].scale, Some(1.5));
         assert_eq!(decoded.indents, indents);
         assert_eq!(decoded.text_indents, text_indents);
+    }
+
+    #[test]
+    fn label_color_updates_compose_with_other_overrides_and_preserve_unknown_fields() {
+        let style = tswp::ListStyleArchive {
+            super_: tss::StyleArchive {
+                parent: Some(reference(8)),
+                is_variation: Some(true),
+                stylesheet: Some(reference(3)),
+                ..Default::default()
+            },
+            override_count: Some(4),
+            geometries: repeated_geometry(|_| 0.0),
+            strings: vec![BULLET_GLYPH.to_owned(); LIST_LEVEL_COUNT],
+            indents: level_indents(BULLET_INDENT_STEP_POINTS),
+            text_indents: vec![BULLET_INDENT_STEP_POINTS / FONT_EM_POINTS; LIST_LEVEL_COUNT],
+            ..Default::default()
+        };
+        let mut encoded = style.encode_to_vec();
+        let unknown = [0xb0, 0x06, 0x0b];
+        encoded.extend_from_slice(&unknown);
+        let color = ParagraphListLabelColor::Explicit(
+            crate::shapes::RgbaColor::new(
+                0.8,
+                0.2,
+                0.1,
+                0.75,
+                crate::shapes::RgbColorSpace::DisplayP3,
+            )
+            .unwrap(),
+        );
+
+        let patched = patch_direct_label_color(&encoded, 10, color).unwrap();
+        assert!(
+            patched
+                .windows(unknown.len())
+                .any(|window| window == unknown)
+        );
+        let decoded = tswp::ListStyleArchive::decode(patched.as_slice()).unwrap();
+        assert_eq!(decoded.override_count, Some(5));
+        assert_eq!(decoded.strings, style.strings);
+        assert_eq!(decoded.geometries, style.geometries);
+        assert_eq!(decoded.indents, style.indents);
+        assert_eq!(decoded.text_indents, style.text_indents);
+        assert_eq!(
+            crate::shapes::color_from_native(decoded.font_color.as_ref().unwrap()).unwrap(),
+            match color {
+                ParagraphListLabelColor::Explicit(color) => color,
+                ParagraphListLabelColor::Automatic => unreachable!(),
+            }
+        );
+
+        let automatic =
+            patch_direct_label_color(&patched, 10, ParagraphListLabelColor::Automatic).unwrap();
+        let decoded = tswp::ListStyleArchive::decode(automatic.as_slice()).unwrap();
+        assert_eq!(decoded.override_count, Some(5));
+        assert_eq!(decoded.font_color_null, Some(true));
+        assert!(decoded.font_color.is_none());
     }
 }

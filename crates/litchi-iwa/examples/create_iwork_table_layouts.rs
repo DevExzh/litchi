@@ -13,14 +13,14 @@ use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphList, ParagraphListBullet,
     ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
-    ParagraphListIndentation, ParagraphListLabelIndent, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement,
-    ParagraphListStart, ParagraphListTextGap, ParagraphSpacing, ParagraphSpacingPoints,
-    ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLabelIndent,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumbering,
+    ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap, ParagraphSpacing,
+    ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment, ParagraphTabLeader,
+    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont,
+    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 
 const ROW: usize = 1;
@@ -167,6 +167,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         )?,
         custom_list_indentation()?
     );
+    assert_eq!(
+        numbers.table_cell_paragraph_list_label_color(
+            numbers_table.object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_list_label_color()?
+    );
 
     let pages = PagesEditor::open(output.join("table-layouts.pages"))?;
     let pages_table = pages.tables()?.remove(0);
@@ -281,6 +290,15 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             bullet_paragraph_start()?,
         )?,
         custom_list_indentation()?
+    );
+    assert_eq!(
+        pages.table_cell_paragraph_list_label_color(
+            pages_table.model_object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_list_label_color()?
     );
 
     let keynote = KeynoteEditor::open(output.join("table-layouts.key"))?;
@@ -441,6 +459,16 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         )?,
         custom_list_indentation()?
     );
+    assert_eq!(
+        keynote.slide_table_cell_paragraph_list_label_color(
+            0,
+            keynote_table.model_object_id,
+            ROW,
+            COLUMN,
+            bullet_paragraph_start()?,
+        )?,
+        custom_list_label_color()?
+    );
     Ok(())
 }
 
@@ -502,6 +530,16 @@ fn custom_list_indentation() -> Result<ParagraphListIndentation, litchi_iwa::Err
         ParagraphListLabelIndent::from_points(20.0)?,
         ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE)?,
     ))
+}
+
+fn custom_list_label_color() -> Result<ParagraphListLabelColor, litchi_iwa::Error> {
+    Ok(ParagraphListLabelColor::Explicit(RgbaColor::new(
+        0.95,
+        0.25,
+        0.08,
+        OPAQUE,
+        RgbColorSpace::DisplayP3,
+    )?))
 }
 
 fn restarted_numbering() -> Result<ParagraphListNumbering, litchi_iwa::Error> {
@@ -850,6 +888,13 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         bullet_paragraph_start()?,
         custom_list_indentation()?,
     )?;
+    editor.set_table_cell_paragraph_list_label_color(
+        table_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        custom_list_label_color()?,
+    )?;
     editor.save(output)?;
     Ok(())
 }
@@ -939,6 +984,13 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         bullet_paragraph_start()?,
         custom_list_indentation()?,
+    )?;
+    editor.set_table_cell_paragraph_list_label_color(
+        table_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        custom_list_label_color()?,
     )?;
     editor.save(output)?;
     Ok(())
@@ -1138,6 +1190,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COLUMN,
         bullet_paragraph_start()?,
         custom_list_indentation()?,
+    )?;
+    editor.set_slide_table_cell_paragraph_list_label_color(
+        0,
+        table.model_object_id,
+        ROW,
+        COLUMN,
+        bullet_paragraph_start()?,
+        custom_list_label_color()?,
     )?;
     editor.save(output)?;
     Ok(())

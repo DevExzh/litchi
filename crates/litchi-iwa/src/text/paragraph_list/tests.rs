@@ -7,7 +7,7 @@ use crate::numbers::NumbersDocumentBuilder;
 use crate::pages::PagesEditor;
 use crate::protobuf::tsp;
 use crate::protobuf::tswp::{self, object_attribute_table::ObjectAttribute};
-use crate::shapes::{DrawablePoint, DrawableSize};
+use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use crate::text::{IWorkTextEditor, ParagraphStart, TextPointSize};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
@@ -386,6 +386,98 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
             )
             .unwrap(),
         indentation
+    );
+}
+
+#[test]
+fn text_boxes_round_trip_list_label_colors_in_every_suite() {
+    let paragraph = ParagraphStart::from_utf16_index(6).unwrap();
+    let color = ParagraphListLabelColor::Explicit(
+        RgbaColor::new(0.9, 0.2, 0.1, 0.8, RgbColorSpace::DisplayP3).unwrap(),
+    );
+
+    let mut pages = PagesEditor::create_with_text("List Label Color").unwrap();
+    let pages_box = pages
+        .add_text_box(5, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    pages
+        .set_text_box_paragraph_list(pages_box.drawable_object_id, ParagraphList::Bullet)
+        .unwrap();
+    let pages_before_color = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_list_label_color(pages_box.drawable_object_id, paragraph, color)
+        .unwrap();
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_list_label_color(pages_box.drawable_object_id, paragraph)
+            .unwrap(),
+        color
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_list_label_color(pages_box.drawable_object_id, paragraph,)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before_color);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(sheet_id, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            ParagraphList::Numbered,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_list_label_color(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            paragraph,
+            color,
+        )
+        .unwrap();
+    let numbers = crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_list_label_color(
+                sheet_id,
+                numbers_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        color
+    );
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(0, "First\nSecond", POSITION, SIZE)
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_list_label_color(
+            0,
+            keynote_box.drawable_object_id,
+            paragraph,
+            color,
+        )
+        .unwrap();
+    let keynote = crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_list_label_color(
+                0,
+                keynote_box.drawable_object_id,
+                paragraph,
+            )
+            .unwrap(),
+        color
     );
 }
 

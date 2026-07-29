@@ -398,6 +398,64 @@ pub(super) fn reset_paragraph_list_indentation(
     Ok(changed)
 }
 
+pub(super) fn paragraph_list_label_color(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<crate::text::ParagraphListLabelColor> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Err(Error::InvalidFormat(
+            "plain iWork table cells do not have list-label colors".to_owned(),
+        ));
+    };
+    crate::text::paragraph_list_label_color_in_storage(package, storage_id, paragraph)
+}
+
+pub(super) fn set_paragraph_list_label_color(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    color: crate::text::ParagraphListLabelColor,
+) -> Result<()> {
+    let mut staged = package.clone();
+    let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
+    let mut text = IWorkTextEditor::from_package(staged);
+    text.set_paragraph_list_label_color(storage_id, paragraph, color)?;
+    staged = text.into_package();
+    if crate::text::paragraph_list_label_color_in_storage(&staged, storage_id, paragraph)? != color
+    {
+        return Err(Error::InvalidFormat(
+            "iWork table-cell paragraph list-label color update failed validation".to_owned(),
+        ));
+    }
+    *package = staged;
+    Ok(())
+}
+
+pub(super) fn reset_paragraph_list_label_color(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    let Some(storage_id) = existing_storage_id(package, table_id, row, column)? else {
+        require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
+        return Ok(false);
+    };
+    let mut text = IWorkTextEditor::from_package(package.clone());
+    let changed = text.reset_paragraph_list_label_color(storage_id, paragraph)?;
+    if changed {
+        *package = text.into_package();
+    }
+    Ok(changed)
+}
+
 fn existing_storage_id(
     package: &IWorkPackage,
     table_id: u64,

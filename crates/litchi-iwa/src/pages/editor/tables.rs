@@ -110,6 +110,7 @@ pub use crate::text::ParagraphList as PagesTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as PagesTableCellParagraphListBullet;
 pub use crate::text::ParagraphListBulletGeometry as PagesTableCellParagraphListBulletGeometry;
 pub use crate::text::ParagraphListIndentation as PagesTableCellParagraphListIndentation;
+pub use crate::text::ParagraphListLabelColor as PagesTableCellParagraphListLabelColor;
 pub use crate::text::ParagraphListLevel as PagesTableCellParagraphListLevel;
 pub use crate::text::ParagraphListLevelPlacement as PagesTableCellParagraphListLevelPlacement;
 pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
@@ -1950,6 +1951,86 @@ impl PagesEditor {
         let mut staged = self.package().clone();
         let changed =
             crate::numbers::editor::reset_table_cell_paragraph_list_indentation_in_package(
+                &mut staged,
+                model_object_id,
+                row,
+                column,
+                paragraph,
+            )?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            verified.require_body_table(model_object_id)?;
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read one body-table list paragraph's effective label color.
+    pub fn table_cell_paragraph_list_label_color(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<PagesTableCellParagraphListLabelColor> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_label_color_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one body-table list paragraph's bullet or number color.
+    pub fn set_table_cell_paragraph_list_label_color(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        color: PagesTableCellParagraphListLabelColor,
+    ) -> Result<()> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_cell_paragraph_list_label_color_in_package(
+            &mut staged,
+            model_object_id,
+            row,
+            column,
+            paragraph,
+            color,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verified.require_body_table(model_object_id)?;
+        if verified.table_cell_paragraph_list_label_color(
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )? != color
+        {
+            return Err(Error::InvalidFormat(
+                "Pages table-cell paragraph list-label color failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the list label to the paragraph's automatic text color.
+    pub fn reset_table_cell_paragraph_list_label_color(
+        &mut self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        self.require_body_table(model_object_id)?;
+        let mut staged = self.package().clone();
+        let changed =
+            crate::numbers::editor::reset_table_cell_paragraph_list_label_color_in_package(
                 &mut staged,
                 model_object_id,
                 row,

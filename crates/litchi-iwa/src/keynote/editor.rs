@@ -28,13 +28,14 @@ use crate::shapes::{
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
-    ParagraphListIndentation, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
-    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
-    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphSpacing, ParagraphStart,
+    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
+    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
+    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -1998,6 +1999,49 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_list_indentation(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one slide text-box list paragraph's effective label color.
+    pub fn slide_text_box_paragraph_list_label_color(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListLabelColor> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_label_color(graph.storage_id, paragraph)
+    }
+
+    /// Set one slide text-box list paragraph's bullet or number color.
+    pub fn set_slide_text_box_paragraph_list_label_color(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        color: ParagraphListLabelColor,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_label_color(graph.storage_id, paragraph, color)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the list label to the paragraph's automatic text color.
+    pub fn reset_slide_text_box_paragraph_list_label_color(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_label_color(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }
@@ -4634,30 +4678,30 @@ pub use slide_tables::{
     KeynoteTableCellParagraphIndents, KeynoteTableCellParagraphLineSpacing,
     KeynoteTableCellParagraphList, KeynoteTableCellParagraphListBullet,
     KeynoteTableCellParagraphListBulletGeometry, KeynoteTableCellParagraphListIndentation,
-    KeynoteTableCellParagraphListLevel, KeynoteTableCellParagraphListLevelPlacement,
-    KeynoteTableCellParagraphListNumbering, KeynoteTableCellParagraphListPlacement,
-    KeynoteTableCellParagraphSpacing, KeynoteTableCellParagraphTabStops,
-    KeynoteTableCellPercentageFormat, KeynoteTableCellPopUpMenuFormat,
-    KeynoteTableCellPopUpMenuInitialSelection, KeynoteTableCellPopUpMenuItem,
-    KeynoteTableCellRegion, KeynoteTableCellScientificFormat, KeynoteTableCellSliderDisplayFormat,
-    KeynoteTableCellSliderFormat, KeynoteTableCellSliderRange, KeynoteTableCellStarRatingFormat,
-    KeynoteTableCellStepperDisplayFormat, KeynoteTableCellStepperFormat,
-    KeynoteTableCellStepperRange, KeynoteTableCellTextAlignment, KeynoteTableCellTextBackground,
-    KeynoteTableCellTextBaselineShift, KeynoteTableCellTextCapitalization,
-    KeynoteTableCellTextCharacterSpacing, KeynoteTableCellTextColor,
-    KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextFormat,
-    KeynoteTableCellTextLigatures, KeynoteTableCellTextOutline, KeynoteTableCellTextScript,
-    KeynoteTableCellTextShadow, KeynoteTableCellTextStyle, KeynoteTableCellTextWrap,
-    KeynoteTableCellThousandsSeparator, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
-    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableHiddenAxes, KeynoteTablePoints,
-    KeynoteTableRowDeletion, KeynoteTableRowInsertion, KeynoteTableSortColumnIndex,
-    KeynoteTableSortDirection, KeynoteTableSortOrder, KeynoteTableSortRowRange,
-    KeynoteTableSortRule, KeynoteTableSortScope, KeynoteTableTitleSettings,
-    RemovedKeynoteSlideTable,
+    KeynoteTableCellParagraphListLabelColor, KeynoteTableCellParagraphListLevel,
+    KeynoteTableCellParagraphListLevelPlacement, KeynoteTableCellParagraphListNumbering,
+    KeynoteTableCellParagraphListPlacement, KeynoteTableCellParagraphSpacing,
+    KeynoteTableCellParagraphTabStops, KeynoteTableCellPercentageFormat,
+    KeynoteTableCellPopUpMenuFormat, KeynoteTableCellPopUpMenuInitialSelection,
+    KeynoteTableCellPopUpMenuItem, KeynoteTableCellRegion, KeynoteTableCellScientificFormat,
+    KeynoteTableCellSliderDisplayFormat, KeynoteTableCellSliderFormat, KeynoteTableCellSliderRange,
+    KeynoteTableCellStarRatingFormat, KeynoteTableCellStepperDisplayFormat,
+    KeynoteTableCellStepperFormat, KeynoteTableCellStepperRange, KeynoteTableCellTextAlignment,
+    KeynoteTableCellTextBackground, KeynoteTableCellTextBaselineShift,
+    KeynoteTableCellTextCapitalization, KeynoteTableCellTextCharacterSpacing,
+    KeynoteTableCellTextColor, KeynoteTableCellTextDecorations, KeynoteTableCellTextFont,
+    KeynoteTableCellTextFormat, KeynoteTableCellTextLigatures, KeynoteTableCellTextOutline,
+    KeynoteTableCellTextScript, KeynoteTableCellTextShadow, KeynoteTableCellTextStyle,
+    KeynoteTableCellTextWrap, KeynoteTableCellThousandsSeparator, KeynoteTableCellUpdate,
+    KeynoteTableCellValue, KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion,
+    KeynoteTableColumnInsertion, KeynoteTableDimension, KeynoteTableDimensionSize,
+    KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
+    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
+    KeynoteTableFormulaExpression, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
+    KeynoteTableHiddenAxes, KeynoteTablePoints, KeynoteTableRowDeletion, KeynoteTableRowInsertion,
+    KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
+    KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
+    KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
 };
 pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;

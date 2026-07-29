@@ -2,6 +2,7 @@
 
 use super::super::drop_cap::ParagraphStart;
 use super::super::style::TextPointSize;
+use crate::shapes::RgbaColor;
 use crate::{Error, Result};
 
 const MAX_PARAGRAPH_LIST_LEVEL: u8 = 8;
@@ -383,6 +384,17 @@ impl ParagraphListTextGap {
 pub struct ParagraphListIndentation {
     pub label_from_margin: ParagraphListLabelIndent,
     pub text_from_label: ParagraphListTextGap,
+}
+
+/// Color used to draw a bullet or number label.
+///
+/// `Automatic` follows the paragraph's text color. `Explicit` keeps the list
+/// label color independent from later paragraph text-color changes.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ParagraphListLabelColor {
+    #[default]
+    Automatic,
+    Explicit(RgbaColor),
 }
 
 impl ParagraphListIndentation {

@@ -3,6 +3,7 @@
 mod bullet;
 mod geometry;
 mod indentation;
+mod label_color;
 mod levels;
 mod native;
 mod numbering;
@@ -20,8 +21,9 @@ use crate::{Error, IWorkPackage, Result};
 pub use types::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
     ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
-    ParagraphListLabelIndent, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement,
+    ParagraphListStart, ParagraphListTextGap,
 };
 
 pub(crate) use bullet::paragraph_list_bullet;
@@ -32,6 +34,8 @@ pub(super) use geometry::{
 };
 pub(crate) use indentation::paragraph_list_indentation;
 pub(super) use indentation::{reset_paragraph_list_indentation, set_paragraph_list_indentation};
+pub(crate) use label_color::paragraph_list_label_color;
+pub(super) use label_color::{reset_paragraph_list_label_color, set_paragraph_list_label_color};
 pub(crate) use levels::{paragraph_list_level, paragraph_list_levels};
 pub(super) use levels::{reset_paragraph_list_level, set_paragraph_list_level};
 pub(crate) use numbering::paragraph_list_numbering;

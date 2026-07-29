@@ -44,12 +44,12 @@ use crate::table_lock::TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphIndents,
     ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
-    ParagraphListIndentation, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
-    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
-    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
+    ParagraphListLevelPlacement, ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing,
+    ParagraphStart, ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
     TextShadow, TextStorageInfo, TextStyle,
 };
@@ -155,6 +155,7 @@ pub type NumbersTableCellParagraphListBullet = ParagraphListBullet;
 pub type NumbersTableCellParagraphListBulletGeometry = ParagraphListBulletGeometry;
 /// Typed native list-label and text-gap indentation in a Numbers table cell.
 pub type NumbersTableCellParagraphListIndentation = ParagraphListIndentation;
+pub type NumbersTableCellParagraphListLabelColor = ParagraphListLabelColor;
 /// A validated zero-based list nesting level in a Numbers table cell.
 pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
 /// One effective list-level boundary in a Numbers table cell.
@@ -1281,6 +1282,49 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_indentation(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one sheet text-box list paragraph's effective label color.
+    pub fn sheet_text_box_paragraph_list_label_color(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListLabelColor> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_list_label_color(graph.storage_id, paragraph)
+    }
+
+    /// Set one sheet text-box list paragraph's bullet or number color.
+    pub fn set_sheet_text_box_paragraph_list_label_color(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        color: ParagraphListLabelColor,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_list_label_color(graph.storage_id, paragraph, color)?;
+        *self = Self::from_package(text.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the list label to the paragraph's automatic text color.
+    pub fn reset_sheet_text_box_paragraph_list_label_color(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_list_label_color(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
@@ -3485,6 +3529,76 @@ impl NumbersEditor {
         Ok(changed)
     }
 
+    /// Read one table-cell list paragraph's effective label color.
+    pub fn table_cell_paragraph_list_label_color(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListLabelColor> {
+        cell_paragraph_list::paragraph_list_label_color(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one table-cell list paragraph's bullet or number color.
+    pub fn set_table_cell_paragraph_list_label_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        color: NumbersTableCellParagraphListLabelColor,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_label_color(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            color,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_label_color(table_id, row, column, paragraph)?
+            != color
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-label color failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the list label to the paragraph's automatic text color.
+    pub fn reset_table_cell_paragraph_list_label_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_label_color(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
     /// Read effective first-line, left, and right paragraph indents.
     pub fn table_cell_paragraph_indents(
         &self,
@@ -5507,6 +5621,39 @@ pub(crate) fn reset_table_cell_paragraph_list_indentation_in_package(
     paragraph: ParagraphStart,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_indentation(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn table_cell_paragraph_list_label_color_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListLabelColor> {
+    cell_paragraph_list::paragraph_list_label_color(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_label_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    color: ParagraphListLabelColor,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_label_color(
+        package, table_id, row, column, paragraph, color,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_label_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_label_color(package, table_id, row, column, paragraph)
 }
 
 pub(crate) fn table_cell_paragraph_indents_in_package(
