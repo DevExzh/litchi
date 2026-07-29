@@ -169,6 +169,7 @@ pub enum BodyStoryEvent {
     NavigationEntry(usize),
     CustomXmlOpen(usize),
     CustomXmlClose(usize),
+    MathZone(usize),
 }
 
 /// A generic field reference embedded in a non-body text story.

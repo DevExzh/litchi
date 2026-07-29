@@ -99,6 +99,8 @@ pub struct RtfDocument<'a> {
     xml_namespaces: Option<Vec<crate::XmlNamespace<'a>>>,
     /// Ordered inert custom XML markup tags spanning body text.
     custom_xml_tags: Vec<crate::CustomXmlTag<'a>>,
+    /// Ordered inert math zones anchored in the body story.
+    math_zones: Vec<crate::MathZone<'a>>,
     /// Ordered inert usernames used by range-level protection.
     protection_user_table: Option<crate::ProtectionUserTable<'a>>,
     /// Explicit passive document hyphenation properties.
@@ -421,6 +423,11 @@ impl<'a> RtfDocument<'a> {
                 .custom_xml_tags
                 .into_iter()
                 .map(crate::CustomXmlTag::into_owned)
+                .collect(),
+            math_zones: parsed
+                .math_zones
+                .into_iter()
+                .map(crate::MathZone::into_owned)
                 .collect(),
             protection_user_table: parsed
                 .protection_user_table
@@ -2014,6 +2021,16 @@ impl<'a> RtfDocument<'a> {
     /// never resolved against a schema.
     pub fn custom_xml_tags(&self) -> &[crate::CustomXmlTag<'_>] {
         &self.custom_xml_tags
+    }
+
+    /// Return the math zones anchored in the body story, in source order.
+    ///
+    /// Math zones are inert `\mmath`/`\mmathPara` destinations (RTF 1.9.1
+    /// mathematics): their typed trees are stored verbatim and are never
+    /// evaluated, laid out, or rendered. Math run text does not enter the
+    /// document body text (like field results).
+    pub fn math_zones(&self) -> &[crate::MathZone<'_>] {
+        &self.math_zones
     }
 
     /// Replace the XML namespace table after full validation.
@@ -3936,6 +3953,7 @@ impl<'a> RtfDocument<'a> {
                 let tag = self.custom_xml_tags.get(index)?;
                 tag.position.checked_add(tag.content.len())?
             },
+            crate::BodyStoryEvent::MathZone(index) => self.math_zones.get(index)?.position,
         })
     }
 

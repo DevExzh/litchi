@@ -79,6 +79,7 @@ mod legacy_text_box;
 mod lexer;
 mod list;
 mod mail_merge;
+mod math;
 mod math_properties;
 mod navigation_entry;
 mod note_options;
@@ -243,6 +244,11 @@ pub use mail_merge::{
     MAX_MAIL_MERGE_FIELD_MAPPINGS, MAX_MAIL_MERGE_NESTING_DEPTH, MAX_MAIL_MERGE_RECIPIENT_DATA,
     MAX_MAIL_MERGE_STRING_BYTES, MAX_MAIL_MERGE_TOTAL_BYTES, MailMerge, MailMergeColumnIndex,
     MailMergeDataSourceObject, MailMergeDataSourceType, MailMergeFieldMapping,
+};
+pub use math::{
+    MathElement, MathElementRole, MathMatrixRow, MathObject, MathProperties, MathPropertiesKind,
+    MathProperty, MathPropertyName, MathRun, MathStructure, MathStructureChild, MathStructureKind,
+    MathZone, MathZoneKind,
 };
 pub use math_properties::{
     DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,

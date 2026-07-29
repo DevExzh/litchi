@@ -87,6 +87,7 @@ enum BodyEventKind<'b, 'a> {
     BookmarkEnd(&'b Bookmark<'a>),
     CustomXmlOpen(&'b crate::CustomXmlTag<'a>),
     CustomXmlClose(&'b crate::CustomXmlTag<'a>),
+    MathZone(&'b crate::MathZone<'a>),
     AnnotationStart(&'b Annotation<'a>),
     AnnotationEnd(&'b Annotation<'a>),
     Note(&'b Note<'a>),
@@ -327,6 +328,7 @@ impl<W: Write> RtfWriter<W> {
             doc.blocks(),
             doc.bookmarks(),
             doc.custom_xml_tags(),
+            doc.math_zones(),
             doc.annotations(),
             doc.notes(),
             doc.revisions(),
@@ -3689,6 +3691,227 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("}")
     }
 
+    fn math_structure_control(kind: crate::MathStructureKind) -> &'static str {
+        use crate::MathStructureKind as K;
+        match kind {
+            K::Accent => "macc",
+            K::Bar => "mbar",
+            K::BorderBox => "mborderBox",
+            K::Box => "mbox",
+            K::Delimiter => "md",
+            K::EquationArray => "meqArr",
+            K::Fraction => "mf",
+            K::Function => "mfunc",
+            K::GroupChar => "mgroupChr",
+            K::LimitLower => "mlimlow",
+            K::LimitUpper => "mlimupp",
+            K::Matrix => "mm",
+            K::Nary => "mnary",
+            K::Phantom => "mphant",
+            K::Radical => "mrad",
+            K::ScriptPre => "msPre",
+            K::ScriptSub => "msSub",
+            K::ScriptSubSup => "msSubSup",
+            K::ScriptSup => "msSup",
+        }
+    }
+
+    fn math_structure_properties_control(kind: crate::MathStructureKind) -> &'static str {
+        use crate::MathStructureKind as K;
+        match kind {
+            K::Accent => "maccPr",
+            K::Bar => "mbarPr",
+            K::BorderBox => "mborderBoxPr",
+            K::Box => "mboxPr",
+            K::Delimiter => "mdPr",
+            K::EquationArray => "meqArrPr",
+            K::Fraction => "mfPr",
+            K::Function => "mfuncPr",
+            K::GroupChar => "mgroupChrPr",
+            K::LimitLower => "mlimlowPr",
+            K::LimitUpper => "mlimuppPr",
+            K::Matrix => "mmPr",
+            K::Nary => "mnaryPr",
+            K::Phantom => "mphantPr",
+            K::Radical => "mradPr",
+            K::ScriptPre => "msPrePr",
+            K::ScriptSub => "msSubPr",
+            K::ScriptSubSup => "msSubSupPr",
+            K::ScriptSup => "msSupPr",
+        }
+    }
+
+    fn math_element_control(role: crate::MathElementRole) -> &'static str {
+        use crate::MathElementRole as R;
+        match role {
+            R::Element => "me",
+            R::Numerator => "mnum",
+            R::Denominator => "mden",
+            R::Degree => "mdeg",
+            R::Subscript => "msub",
+            R::Superscript => "msup",
+            R::Limit => "mlim",
+            R::FunctionName => "mfName",
+        }
+    }
+
+    fn math_property_control(name: crate::MathPropertyName) -> &'static str {
+        use crate::MathPropertyName as N;
+        match name {
+            N::Type => "mtype",
+            N::Grow => "mgrow",
+            N::Char => "mchr",
+            N::BeginChar => "mbegChr",
+            N::EndChar => "mendChr",
+            N::SeparatorChar => "msepChr",
+            N::Position => "mpos",
+            N::VerticalJustify => "mvertJc",
+            N::BaseJustify => "mbaseJc",
+            N::Justify => "mjc",
+            N::Align => "maln",
+            N::AlignScript => "malnScr",
+            N::DegreeHide => "mdegHide",
+            N::Differential => "mdiff",
+            N::DifferentialStyle => "mdiffSty",
+            N::HideBottom => "mhideBot",
+            N::HideLeft => "mhideLeft",
+            N::HideRight => "mhideRight",
+            N::HideTop => "mhideTop",
+            N::LimitLocation => "mlimLoc",
+            N::PlaceholderHide => "mplcHide",
+            N::SubscriptHide => "msubHide",
+            N::SuperscriptHide => "msupHide",
+            N::StrikeBottomLeftToTopRight => "mstrikeBLTR",
+            N::StrikeHorizontal => "mstrikeH",
+            N::StrikeTopLeftToBottomRight => "mstrikeTLBR",
+            N::StrikeVertical => "mstrikeV",
+            N::Style => "msty",
+            N::Script => "mscr",
+            N::Transparent => "mtransp",
+            N::Show => "mshow",
+            N::Shape => "mshp",
+            N::ZeroAscent => "mzeroAsc",
+            N::ZeroDescent => "mzeroDesc",
+            N::ZeroWidth => "mzeroWid",
+            N::OperatorEmulator => "mopEmu",
+            N::NoBreak => "mnoBreak",
+            N::NormalText => "mnor",
+            N::Literal => "mlit",
+            N::MatrixColumnGap => "mcGp",
+            N::MatrixColumnGapRule => "mcGpRule",
+            N::MatrixColumnSpacing => "mcSp",
+            N::MatrixCellCount => "mcount",
+            N::MatrixCellJustify => "mmcJc",
+            N::RowSpacing => "mrSp",
+            N::RowSpacingRule => "mrSpRule",
+            N::Break => "mbrk",
+        }
+    }
+
+    /// Write an inert math zone destination.
+    pub fn write_math_zone(&mut self, zone: &crate::MathZone<'_>) -> io::Result<()> {
+        zone.validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{")?;
+        self.write_control_word(
+            match zone.kind {
+                crate::MathZoneKind::Inline => "mmath",
+                crate::MathZoneKind::Display => "mmathPara",
+            },
+            None,
+        )?;
+        if let Some(properties) = &zone.paragraph_properties {
+            self.write_math_properties_group("mmathParaPr", properties)?;
+        }
+        for object in &zone.content {
+            self.write_math_object(object)?;
+        }
+        self.write_str("}")
+    }
+
+    fn write_math_object(&mut self, object: &crate::MathObject<'_>) -> io::Result<()> {
+        match object {
+            crate::MathObject::Structure(structure) => self.write_math_structure(structure),
+            crate::MathObject::Run(run) => self.write_math_run(run),
+        }
+    }
+
+    fn write_math_structure(&mut self, structure: &crate::MathStructure<'_>) -> io::Result<()> {
+        self.write_str("{")?;
+        self.write_control_word(Self::math_structure_control(structure.kind), None)?;
+        if let Some(properties) = &structure.properties {
+            self.write_math_properties_group(
+                Self::math_structure_properties_control(structure.kind),
+                properties,
+            )?;
+        }
+        for child in &structure.children {
+            match child {
+                crate::MathStructureChild::Element(element) => {
+                    self.write_math_element(element)?
+                },
+                crate::MathStructureChild::MatrixRow(row) => {
+                    self.write_str("{")?;
+                    self.write_control_word("mmr", None)?;
+                    for cell in &row.cells {
+                        self.write_math_element(cell)?;
+                    }
+                    self.write_str("}")?;
+                },
+            }
+        }
+        self.write_str("}")
+    }
+
+    fn write_math_element(&mut self, element: &crate::MathElement<'_>) -> io::Result<()> {
+        self.write_str("{")?;
+        self.write_control_word(Self::math_element_control(element.role), None)?;
+        self.write_str(" ")?;
+        for object in &element.content {
+            self.write_math_object(object)?;
+        }
+        self.write_str("}")
+    }
+
+    fn write_math_run(&mut self, run: &crate::MathRun<'_>) -> io::Result<()> {
+        self.write_str("{")?;
+        self.write_control_word("mr", None)?;
+        if let Some(properties) = &run.properties {
+            self.write_math_properties_group("mrPr", properties)?;
+        }
+        if run.normal_text {
+            self.write_control_word("mnor", None)?;
+        }
+        self.write_str(" ")?;
+        self.write_destination_text(run.text.as_ref())?;
+        self.write_str("}")
+    }
+
+    fn write_math_properties_group(
+        &mut self,
+        destination: &str,
+        properties: &crate::MathProperties<'_>,
+    ) -> io::Result<()> {
+        properties
+            .validate()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        self.write_str("{")?;
+        self.write_control_word(destination, None)?;
+        for property in &properties.properties {
+            self.write_str("{")?;
+            self.write_control_word(Self::math_property_control(property.name), None)?;
+            if !property.value.is_empty() {
+                self.write_str(" ")?;
+                self.write_destination_text(property.value.as_ref())?;
+            }
+            self.write_str("}")?;
+        }
+        if let Some(control) = &properties.control {
+            self.write_math_properties_group("mctrlPr", control)?;
+        }
+        self.write_str("}")
+    }
+
     /// Write an annotation range-start destination.
     pub fn write_annotation_start(&mut self, annotation: &Annotation<'_>) -> io::Result<()> {
         if !annotation.has_reference {
@@ -3762,6 +3985,7 @@ impl<W: Write> RtfWriter<W> {
         blocks: &[StyleBlock<'_>],
         bookmarks: &BookmarkTable<'_>,
         custom_xml_tags: &[crate::CustomXmlTag<'_>],
+        math_zones: &[crate::MathZone<'_>],
         annotations: &[Annotation<'_>],
         notes: &[Note<'_>],
         revisions: &[Revision<'_>],
@@ -3782,6 +4006,7 @@ impl<W: Write> RtfWriter<W> {
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
             && custom_xml_tags.is_empty()
+            && math_zones.is_empty()
             && annotations.is_empty()
             && notes.is_empty()
             && revisions.is_empty()
@@ -3815,6 +4040,7 @@ impl<W: Write> RtfWriter<W> {
             .saturating_mul(2);
         let event_count = event_count.saturating_add(navigation_entries.len());
         let event_count = event_count.saturating_add(custom_xml_tags.len().saturating_mul(2));
+        let event_count = event_count.saturating_add(math_zones.len());
         let event_count = event_count.saturating_add(shapes.len());
         let event_count = event_count.saturating_add(shape_groups.len());
         let event_count = event_count.saturating_add(picture_compatibility_records.len());
@@ -4290,6 +4516,22 @@ impl<W: Write> RtfWriter<W> {
                 ));
             }
         }
+        if math_zones.len() > crate::math::MAX_MATH_ZONES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF math zone count exceeds the safety limit",
+            ));
+        }
+        for zone in math_zones {
+            zone.validate()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+            if body.get(zone.position..zone.position).is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF math zone anchor is outside body text or splits a character",
+                ));
+            }
+        }
         for annotation in annotations {
             annotation
                 .validate()
@@ -4382,6 +4624,7 @@ impl<W: Write> RtfWriter<W> {
         let mut saw_bookmark_ends = vec![false; bookmark_items.len()];
         let mut saw_custom_xml_opens = vec![false; custom_xml_tags.len()];
         let mut saw_custom_xml_closes = vec![false; custom_xml_tags.len()];
+        let mut saw_math_zones = vec![false; math_zones.len()];
         let mut saw_annotation_starts = vec![false; annotations.len()];
         let mut saw_annotation_ends = vec![false; annotations.len()];
         let mut saw_notes = vec![false; notes.len()];
@@ -4515,6 +4758,15 @@ impl<W: Write> RtfWriter<W> {
                             )
                         })?,
                         BodyEventKind::CustomXmlClose(tag),
+                    )
+                },
+                crate::BodyStoryEvent::MathZone(index)
+                    if index < math_zones.len() && !saw_math_zones[index] =>
+                {
+                    saw_math_zones[index] = true;
+                    (
+                        math_zones[index].position,
+                        BodyEventKind::MathZone(&math_zones[index]),
                     )
                 },
                 crate::BodyStoryEvent::AnnotationStart(index)
@@ -4678,6 +4930,7 @@ impl<W: Write> RtfWriter<W> {
             && saw_bookmark_ends.iter().all(|seen| *seen)
             && saw_custom_xml_opens.iter().all(|seen| *seen)
             && saw_custom_xml_closes.iter().all(|seen| *seen)
+            && saw_math_zones.iter().all(|seen| *seen)
             && saw_annotation_starts.iter().all(|seen| *seen)
             && saw_annotation_ends.iter().all(|seen| *seen)
             && saw_notes.iter().all(|seen| *seen)
@@ -4779,6 +5032,7 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
             BodyEventKind::CustomXmlOpen(tag) => self.write_custom_xml_open(tag),
             BodyEventKind::CustomXmlClose(tag) => self.write_custom_xml_close(tag),
+            BodyEventKind::MathZone(zone) => self.write_math_zone(zone),
             BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
             BodyEventKind::AnnotationEnd(annotation) => self.write_annotation_end(annotation),
             BodyEventKind::Note(note) => self.write_note_with_fields(note, fields),
