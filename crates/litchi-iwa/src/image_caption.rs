@@ -6,6 +6,7 @@ use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsa, tsd, tsp, tss, tswp};
+use crate::text::style_registry::{insert_private_style, register_private_style};
 use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
 use crate::{Error, IWorkPackage, Result};
 
@@ -17,6 +18,10 @@ pub(crate) const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
 
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
+const COMPONENTIZED_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
+const CAPTION_DRAWABLE_TEXT_WRAP_FIELD_PATH: [u32; 4] = [1, 1, 1, 12];
+const CAPTION_OWNED_STORAGE_FIELD_PATH: [u32; 2] = [1, 6];
+const CAPTION_DRAWABLE_LOCKED_FIELD_PATH: [u32; 4] = [1, 1, 1, 13];
 const DRAWABLE_TITLE_FIELD: u32 = 10;
 const DRAWABLE_CAPTION_FIELD: u32 = 11;
 const SHAPE_INFO_SUPER_FIELD: u32 = 1;
@@ -64,18 +69,32 @@ impl DrawableCaptionKind {
         }
     }
 
-    const fn placement(self) -> tsa::CaptionPlacementArchive {
-        match self {
-            Self::Caption => tsa::CaptionPlacementArchive {
+    const fn placement(self, profile: CaptionGraphProfile) -> tsa::CaptionPlacementArchive {
+        match (self, profile) {
+            (Self::Caption, CaptionGraphProfile::Inline) => tsa::CaptionPlacementArchive {
                 caption_anchor_location: Some(CaptionAnchorLocation::Bottom as i32),
                 drawable_anchor_location: Some(CaptionAnchorLocation::Top as i32),
             },
-            Self::Title => tsa::CaptionPlacementArchive {
+            (Self::Title, CaptionGraphProfile::Inline) => tsa::CaptionPlacementArchive {
                 caption_anchor_location: Some(CaptionAnchorLocation::Top as i32),
                 drawable_anchor_location: Some(CaptionAnchorLocation::Bottom as i32),
             },
+            (Self::Caption, CaptionGraphProfile::Componentized) => tsa::CaptionPlacementArchive {
+                caption_anchor_location: Some(CaptionAnchorLocation::Top as i32),
+                drawable_anchor_location: Some(CaptionAnchorLocation::Bottom as i32),
+            },
+            (Self::Title, CaptionGraphProfile::Componentized) => tsa::CaptionPlacementArchive {
+                caption_anchor_location: Some(CaptionAnchorLocation::Bottom as i32),
+                drawable_anchor_location: Some(CaptionAnchorLocation::Top as i32),
+            },
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CaptionGraphProfile {
+    Inline,
+    Componentized,
 }
 
 /// Existing theme objects needed to materialize a native drawable title or caption.
@@ -271,6 +290,10 @@ impl CaptionObjectIds {
     pub(crate) const fn all(self) -> [u64; 4] {
         [self.style, self.info, self.storage, self.placement]
     }
+
+    pub(crate) const fn component_objects(self) -> [u64; 3] {
+        [self.info, self.storage, self.placement]
+    }
 }
 
 /// Create all four native objects that back one drawable title or caption.
@@ -283,6 +306,51 @@ pub(crate) fn caption_objects(
     kind: DrawableCaptionKind,
     theme: CaptionThemeStyle,
     language: Option<&str>,
+) -> Result<[ArchiveObject; 4]> {
+    caption_objects_with_profile(
+        ids,
+        drawable_id,
+        drawable_width,
+        text,
+        kind,
+        theme,
+        language,
+        CaptionGraphProfile::Inline,
+    )
+}
+
+/// Create the native cross-component graph used by current Numbers files.
+pub(crate) fn componentized_caption_objects(
+    ids: CaptionObjectIds,
+    drawable_id: u64,
+    drawable_width: f32,
+    text: &str,
+    kind: DrawableCaptionKind,
+    theme: CaptionThemeStyle,
+    language: Option<&str>,
+) -> Result<[ArchiveObject; 4]> {
+    caption_objects_with_profile(
+        ids,
+        drawable_id,
+        drawable_width,
+        text,
+        kind,
+        theme,
+        language,
+        CaptionGraphProfile::Componentized,
+    )
+}
+
+#[allow(deprecated, clippy::too_many_arguments)]
+fn caption_objects_with_profile(
+    ids: CaptionObjectIds,
+    drawable_id: u64,
+    drawable_width: f32,
+    text: &str,
+    kind: DrawableCaptionKind,
+    theme: CaptionThemeStyle,
+    language: Option<&str>,
+    profile: CaptionGraphProfile,
 ) -> Result<[ArchiveObject; 4]> {
     if !drawable_width.is_finite() || drawable_width <= 0.0 {
         return Err(Error::InvalidFormat(
@@ -338,26 +406,58 @@ pub(crate) fn caption_objects(
             SHAPE_STYLE_MESSAGE_TYPE,
             style,
             &[theme.paragraph_style_id],
+            profile,
         )?,
         archive_object(
             ids.info,
             CAPTION_INFO_MESSAGE_TYPE,
             info,
             &[ids.style, ids.storage, ids.placement],
+            profile,
         )?,
         archive_object(
             ids.storage,
             STORAGE_MESSAGE_TYPE,
             storage,
             &[theme.paragraph_style_id],
+            profile,
         )?,
         archive_object(
             ids.placement,
             CAPTION_PLACEMENT_MESSAGE_TYPE,
-            kind.placement(),
+            kind.placement(profile),
             &[],
+            profile,
         )?,
     ])
+}
+
+/// Insert a componentized title/caption style into the document stylesheet and
+/// expose it to the drawable component.
+pub(crate) fn insert_componentized_caption_style(
+    package: &mut IWorkPackage,
+    drawable_archive_name: &str,
+    stylesheet_id: u64,
+    style: ArchiveObject,
+) -> Result<()> {
+    let style_id = style
+        .archive_info
+        .identifier
+        .ok_or_else(|| Error::InvalidFormat("native caption style has no identifier".to_owned()))?;
+    let stylesheet_archive_name = unique_object_archive_name(package, stylesheet_id)?;
+    insert_private_style(
+        package,
+        &stylesheet_archive_name,
+        stylesheet_id,
+        style_id,
+        style,
+    )?;
+    register_private_style(
+        package,
+        drawable_archive_name,
+        &stylesheet_archive_name,
+        style_id,
+    )
 }
 
 /// Create a fresh empty stand-in when a native title or caption is removed.
@@ -676,6 +776,7 @@ fn archive_object(
     message_type: u32,
     message: impl Message,
     object_references: &[u64],
+    profile: CaptionGraphProfile,
 ) -> Result<ArchiveObject> {
     let mut object = ArchiveObject::new(
         identifier,
@@ -685,9 +786,37 @@ fn archive_object(
         }],
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = if profile == CaptionGraphProfile::Componentized
+        && matches!(
+            message_type,
+            CAPTION_INFO_MESSAGE_TYPE | CAPTION_PLACEMENT_MESSAGE_TYPE
+        ) {
+        COMPONENTIZED_CAPTION_MESSAGE_VERSION.to_vec()
+    } else {
+        STANDARD_MESSAGE_VERSION.to_vec()
+    };
     info.object_references = object_references.to_vec();
+    if profile == CaptionGraphProfile::Componentized && message_type == CAPTION_INFO_MESSAGE_TYPE {
+        info.field_infos = [
+            CAPTION_DRAWABLE_TEXT_WRAP_FIELD_PATH.as_slice(),
+            CAPTION_OWNED_STORAGE_FIELD_PATH.as_slice(),
+            CAPTION_DRAWABLE_LOCKED_FIELD_PATH.as_slice(),
+        ]
+        .into_iter()
+        .map(preserved_caption_field)
+        .collect();
+    }
     Ok(object)
+}
+
+fn preserved_caption_field(path: &[u32]) -> tsp::FieldInfo {
+    tsp::FieldInfo {
+        path: tsp::FieldPath {
+            path: path.to_vec(),
+        },
+        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        ..Default::default()
+    }
 }
 
 fn reference(identifier: u64) -> tsp::Reference {
@@ -721,4 +850,81 @@ enum TextWrapFit {
 enum CaptionAnchorLocation {
     Top = 1,
     Bottom = 7,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn componentized_caption_matches_current_numbers_metadata() {
+        let ids = CaptionObjectIds {
+            style: 351,
+            info: 352,
+            storage: 353,
+            placement: 354,
+        };
+        let [style, info, storage, placement] = componentized_caption_objects(
+            ids,
+            149,
+            480.0,
+            "Native caption",
+            DrawableCaptionKind::Caption,
+            CaptionThemeStyle {
+                stylesheet_id: 5,
+                paragraph_style_id: 41,
+            },
+            Some("en"),
+        )
+        .expect("componentized caption graph");
+
+        assert_eq!(ids.component_objects(), [352, 353, 354]);
+        assert_eq!(
+            style.archive_info.message_infos[0].versions,
+            STANDARD_MESSAGE_VERSION
+        );
+        assert_eq!(
+            storage.archive_info.message_infos[0].versions,
+            STANDARD_MESSAGE_VERSION
+        );
+
+        let info_metadata = &info.archive_info.message_infos[0];
+        assert_eq!(
+            info_metadata.versions,
+            COMPONENTIZED_CAPTION_MESSAGE_VERSION
+        );
+        assert_eq!(info_metadata.object_references, [351, 353, 354]);
+        assert_eq!(
+            info_metadata
+                .field_infos
+                .iter()
+                .map(|field| field.path.path.as_slice())
+                .collect::<Vec<_>>(),
+            [
+                CAPTION_DRAWABLE_TEXT_WRAP_FIELD_PATH.as_slice(),
+                CAPTION_OWNED_STORAGE_FIELD_PATH.as_slice(),
+                CAPTION_DRAWABLE_LOCKED_FIELD_PATH.as_slice(),
+            ]
+        );
+        assert!(info_metadata.field_infos.iter().all(|field| {
+            field.unknown_field_rule
+                == Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32)
+        }));
+
+        let placement_metadata = &placement.archive_info.message_infos[0];
+        assert_eq!(
+            placement_metadata.versions,
+            COMPONENTIZED_CAPTION_MESSAGE_VERSION
+        );
+        let decoded = tsa::CaptionPlacementArchive::decode(placement.messages[0].data.as_slice())
+            .expect("caption placement");
+        assert_eq!(
+            decoded.caption_anchor_location,
+            Some(CaptionAnchorLocation::Top as i32)
+        );
+        assert_eq!(
+            decoded.drawable_anchor_location,
+            Some(CaptionAnchorLocation::Bottom as i32)
+        );
+    }
 }

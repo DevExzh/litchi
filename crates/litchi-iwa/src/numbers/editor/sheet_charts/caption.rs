@@ -3,13 +3,20 @@
 use super::*;
 use crate::image_caption::{
     CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind, DrawableCaptionSlot, caption_objects,
-    drawable_caption_slot, patch_drawable_caption_reference, replace_object_reference,
-    standin_caption_object,
+    componentized_caption_objects, drawable_caption_slot, insert_componentized_caption_style,
+    patch_drawable_caption_reference, replace_object_reference, standin_caption_object,
 };
 use crate::wire::transform_length_delimited_field;
 
 /// `TSCH.ChartDrawableArchive` embeds its `TSD.DrawableArchive` in field one.
 const CHART_DRAWABLE_SUPER_FIELD: u32 = 1;
+const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChartCaptionGraphLayout {
+    Inline,
+    Componentized,
+}
 
 impl NumbersEditor {
     /// Read the native caption attached to one sheet chart.
@@ -117,6 +124,7 @@ fn set_sheet_chart_caption(
             .ok_or_else(|| Error::InvalidFormat("Numbers chart has no displayed size".to_owned()))?
             .width;
         let ids = CaptionObjectIds::allocate(next_object_identifier(&editor.package)?)?;
+        let layout = chart_caption_graph_layout(&editor.package, &source.archive_name)?;
         let mut staged = editor.package.clone();
         insert_sheet_chart_caption(
             &mut staged,
@@ -128,8 +136,20 @@ fn set_sheet_chart_caption(
             theme,
             language.as_deref(),
             ids,
+            layout,
         )?;
-        add_component_object_uuids(&mut staged, source.component_id, &ids.all())?;
+        match layout {
+            ChartCaptionGraphLayout::Inline => {
+                add_component_object_uuids(&mut staged, source.component_id, &ids.all())?;
+            },
+            ChartCaptionGraphLayout::Componentized => {
+                add_component_object_uuids(
+                    &mut staged,
+                    source.component_id,
+                    &ids.component_objects(),
+                )?;
+            },
+        }
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
@@ -241,26 +261,75 @@ fn insert_sheet_chart_caption(
     theme: CaptionThemeStyle,
     language: Option<&str>,
     ids: CaptionObjectIds,
+    layout: ChartCaptionGraphLayout,
 ) -> Result<()> {
-    let objects = caption_objects(
-        ids,
-        drawable_object_id,
-        drawable_width,
-        text,
-        DrawableCaptionKind::Caption,
-        theme,
-        language,
-    )?;
-    package.update_archive(archive_name, |archive| {
-        for object in objects {
-            archive.insert_object(object)?;
-        }
-        replace_sheet_chart_caption_reference(
-            archive,
-            drawable_object_id,
-            old_reference_id,
-            ids.info,
-        )
+    match layout {
+        ChartCaptionGraphLayout::Inline => {
+            let objects = caption_objects(
+                ids,
+                drawable_object_id,
+                drawable_width,
+                text,
+                DrawableCaptionKind::Caption,
+                theme,
+                language,
+            )?;
+            package.update_archive(archive_name, |archive| {
+                for object in objects {
+                    archive.insert_object(object)?;
+                }
+                replace_sheet_chart_caption_reference(
+                    archive,
+                    drawable_object_id,
+                    old_reference_id,
+                    ids.info,
+                )
+            })
+        },
+        ChartCaptionGraphLayout::Componentized => {
+            let [style, info, storage, placement] = componentized_caption_objects(
+                ids,
+                drawable_object_id,
+                drawable_width,
+                text,
+                DrawableCaptionKind::Caption,
+                theme,
+                language,
+            )?;
+            insert_componentized_caption_style(package, archive_name, theme.stylesheet_id, style)?;
+            package.update_archive(archive_name, |archive| {
+                for object in [info, storage, placement] {
+                    archive.insert_object(object)?;
+                }
+                replace_sheet_chart_caption_reference(
+                    archive,
+                    drawable_object_id,
+                    old_reference_id,
+                    ids.info,
+                )
+            })
+        },
+    }
+}
+
+fn chart_caption_graph_layout(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+) -> Result<ChartCaptionGraphLayout> {
+    let componentized = package
+        .archive(chart_archive_name)?
+        .objects
+        .iter()
+        .any(|object| {
+            object
+                .messages
+                .iter()
+                .any(|message| message.type_ == CALCULATION_ENGINE_MESSAGE_TYPE)
+        });
+    Ok(if componentized {
+        ChartCaptionGraphLayout::Componentized
+    } else {
+        ChartCaptionGraphLayout::Inline
     })
 }
 

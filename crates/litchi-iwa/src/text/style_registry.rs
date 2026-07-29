@@ -94,7 +94,7 @@ pub(crate) fn register_style_reference(
     Ok(())
 }
 
-pub(super) fn insert_private_style(
+pub(crate) fn insert_private_style(
     package: &mut IWorkPackage,
     archive_name: &str,
     stylesheet_id: u64,
