@@ -43,6 +43,7 @@ use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
 use super::parts::grammar_cookies::GrammarCookieTables;
 use super::parts::captions::CaptionTables;
+use super::parts::repair_bookmarks::DocumentRepairBookmarks;
 use super::parts::table_char_cache::TableCharacterCache;
 use super::parts::text_services::TextServicesTables;
 use super::parts::textbox_breaks::TextBoxBreakTables;
@@ -166,6 +167,8 @@ pub struct Document {
     saved_by_table: Result<SavedByTable>,
     /// Deferred strict caption label and AutoCaption metadata parse
     caption_tables: Result<CaptionTables>,
+    /// Deferred strict repair-bookmark metadata parse
+    repair_bookmarks: Result<Option<DocumentRepairBookmarks>>,
     /// Deferred strict glossary-only AutoText metadata parse
     glossary_metadata: Result<Option<GlossaryMetadata>>,
     /// Deferred strict secondary-FIB glossary parse for templates
@@ -325,6 +328,7 @@ impl Document {
         let text_services = TextServicesTables::parse(&fib, &table_stream);
         let saved_by_table = SavedByTable::parse(&fib, &table_stream);
         let caption_tables = CaptionTables::parse(&fib, &table_stream);
+        let repair_bookmarks = DocumentRepairBookmarks::parse(&fib, &table_stream);
         let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream).and_then(|metadata| {
             if let Some(metadata) = &metadata {
                 metadata.validate_text_boundaries(&text_extractor)?;
@@ -435,6 +439,7 @@ impl Document {
             text_services,
             saved_by_table,
             caption_tables,
+            repair_bookmarks,
             glossary_metadata,
             attached_glossary,
             sections,
@@ -811,6 +816,19 @@ impl Document {
         self.caption_tables.as_ref().map_err(|error| {
             DocError::Corrupted(format!("invalid caption metadata: {error}"))
         })
+    }
+
+    /// Strictly access the repair-bookmark tables recorded when Word repaired
+    /// the document's bookmark pairs.
+    ///
+    /// Parsing is deferred so malformed optional metadata does not prevent the
+    /// document's primary text from opening. Repair descriptions remain inert
+    /// text; no repair is ever applied or reverted.
+    pub fn repair_bookmarks(&self) -> Result<Option<&DocumentRepairBookmarks>> {
+        self.repair_bookmarks
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(|error| DocError::Corrupted(format!("invalid repair bookmark metadata: {error}")))
     }
 
     /// Strictly access glossary-only AutoText and formatted AutoCorrect metadata.

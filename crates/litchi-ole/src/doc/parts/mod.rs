@@ -43,6 +43,7 @@ pub mod paragraph_extractor;
 pub mod piece_table;
 pub mod proofing;
 pub mod protection;
+pub mod repair_bookmarks;
 pub mod revisions;
 pub mod rmd_threading;
 pub mod rsids;

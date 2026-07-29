@@ -199,6 +199,7 @@ pub use parts::proofing::{
 pub use parts::protection::{
     DocumentProtectedRanges, ProtectedRange, ProtectionUser, ProtectionUserRole, UidSel,
 };
+pub use parts::repair_bookmarks::{DocumentRepairBookmarks, RepairBookmark};
 pub use parts::rmd_threading::{
     DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage,
 };
