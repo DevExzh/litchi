@@ -275,6 +275,53 @@ fn push_page_border(
     ]);
 }
 
+/// Generate minimal SEPX (Section Properties) structure (no section SPRMs)
+#[inline]
+pub fn generate_minimal_sepx() -> Vec<u8> {
+    generate_sepx(false, 0)
+}
+
+/// Generate section table (PLCF of SEDs)
+///
+/// Creates a single section covering the entire document
+///
+/// # Arguments
+///
+/// * `text_length` - Total length of document text in characters  
+/// * `sepx_offset` - Offset in WordDocument stream where SEPX was written
+pub fn generate_section_table(text_length: u32, sepx_offset: u32) -> Vec<u8> {
+    let mut plcfsed = Vec::new();
+
+    // PLCF structure (Apache POI's PlexOfCps):
+    // - Array of n+1 CPs (character positions)
+    // - Array of n data elements (SEDs)
+
+    // We have 1 section, so we need 2 CPs
+
+    // CP[0] = 0 (start of document)
+    plcfsed.extend_from_slice(&0u32.to_le_bytes());
+
+    // CP[1] = text_length (end of document)
+    plcfsed.extend_from_slice(&text_length.to_le_bytes());
+
+    // SED (Section Descriptor) - 12 bytes (POI's SectionDescriptor.toByteArray())
+
+    // fn (short) - used internally by Word - 0 for new documents
+    plcfsed.extend_from_slice(&0u16.to_le_bytes());
+
+    // fcSepx (int) - CRITICAL: Must point to SEPX in WordDocument stream
+    // Apache POI sets this to the offset where SEPX was written (line 195)
+    plcfsed.extend_from_slice(&sepx_offset.to_le_bytes());
+
+    // fnMpr (short) - used internally - 0
+    plcfsed.extend_from_slice(&0u16.to_le_bytes());
+
+    // fcMpr (int) - Mac print record offset - 0
+    plcfsed.extend_from_slice(&0u32.to_le_bytes());
+
+    plcfsed
+}
+
 #[cfg(test)]
 mod tests {
     use super::generate_sepx_with_properties;
@@ -322,51 +369,4 @@ mod tests {
             [10, 0, 0x2B, 0x70, 8, 1, 6, 0x23, 0x2F, 0x52, 1, 0]
         );
     }
-}
-
-/// Generate minimal SEPX (Section Properties) structure (no section SPRMs)
-#[inline]
-pub fn generate_minimal_sepx() -> Vec<u8> {
-    generate_sepx(false, 0)
-}
-
-/// Generate section table (PLCF of SEDs)
-///
-/// Creates a single section covering the entire document
-///
-/// # Arguments
-///
-/// * `text_length` - Total length of document text in characters  
-/// * `sepx_offset` - Offset in WordDocument stream where SEPX was written
-pub fn generate_section_table(text_length: u32, sepx_offset: u32) -> Vec<u8> {
-    let mut plcfsed = Vec::new();
-
-    // PLCF structure (Apache POI's PlexOfCps):
-    // - Array of n+1 CPs (character positions)
-    // - Array of n data elements (SEDs)
-
-    // We have 1 section, so we need 2 CPs
-
-    // CP[0] = 0 (start of document)
-    plcfsed.extend_from_slice(&0u32.to_le_bytes());
-
-    // CP[1] = text_length (end of document)
-    plcfsed.extend_from_slice(&text_length.to_le_bytes());
-
-    // SED (Section Descriptor) - 12 bytes (POI's SectionDescriptor.toByteArray())
-
-    // fn (short) - used internally by Word - 0 for new documents
-    plcfsed.extend_from_slice(&0u16.to_le_bytes());
-
-    // fcSepx (int) - CRITICAL: Must point to SEPX in WordDocument stream
-    // Apache POI sets this to the offset where SEPX was written (line 195)
-    plcfsed.extend_from_slice(&sepx_offset.to_le_bytes());
-
-    // fnMpr (short) - used internally - 0
-    plcfsed.extend_from_slice(&0u16.to_le_bytes());
-
-    // fcMpr (int) - Mac print record offset - 0
-    plcfsed.extend_from_slice(&0u32.to_le_bytes());
-
-    plcfsed
 }

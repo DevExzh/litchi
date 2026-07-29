@@ -112,8 +112,10 @@ fn rejects_malformed_doc_descriptor_and_resource_exhaustion() {
 
     let valid = doc_with_object(&[0, 0, 0, 0]);
     let mut ole = OleFile::open(Cursor::new(valid)).unwrap();
-    let mut limits = LegacyOfficeObjectLimits::default();
-    limits.max_stream_size = 4;
+    let limits = LegacyOfficeObjectLimits {
+        max_stream_size: 4,
+        ..LegacyOfficeObjectLimits::default()
+    };
     assert!(discover_legacy_office_objects(
         &mut ole,
         LegacyOfficeObjectFormat::Doc,

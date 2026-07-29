@@ -579,6 +579,7 @@ fn map_crypto_error(error: CryptoApiError) -> PptError {
     }
 }
 
+#[cfg(feature = "imgconv")]
 fn decrypt_picture_segment(
     data: &mut [u8],
     offset: usize,
@@ -615,6 +616,7 @@ fn checked_slice<'a>(data: &'a [u8], offset: usize, len: usize, field: &str) -> 
         .ok_or_else(|| PptError::MalformedEncryptionHeader(format!("{field} is truncated")))
 }
 
+#[cfg(feature = "imgconv")]
 fn checked_slice_mut<'a>(
     data: &'a mut [u8],
     offset: usize,

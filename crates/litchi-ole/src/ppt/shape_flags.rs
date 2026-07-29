@@ -414,8 +414,8 @@ mod tests {
             PowerPointShapeFlagLimits::default(),
         )
         .unwrap();
-        assert_eq!(projection.flags.unwrap().always_on_top, true);
-        assert_eq!(projection.flags10.unwrap().is_photo_album_picture, true);
+        assert!(projection.flags.unwrap().always_on_top);
+        assert!(projection.flags10.unwrap().is_photo_album_picture);
         assert_eq!(projection.trailing_records().len(), 1);
         assert_eq!(
             projection

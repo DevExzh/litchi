@@ -23,11 +23,13 @@ fn reference_plcf(cps: &[u32], descriptors: &[[u8; 2]]) -> Vec<u8> {
     bytes
 }
 
+type StoryCase = (FieldStory, &'static [u32], &'static [[u8; 2]], &'static [FieldType]);
+
 #[test]
 fn apache_poi_reference_plcfs_cover_all_seven_story_tables() {
     // Ported from Apache POI `TestFieldsTables.EXPECTED`, whose source fixture
     // has a malformed CFB root name that strict litchi-cfb intentionally rejects.
-    let cases: &[(FieldStory, &[u32], &[[u8; 2]], &[FieldType])] = &[
+    let cases: &[StoryCase] = &[
         (
             FieldStory::Comment,
             &[19, 43, 54, 59],

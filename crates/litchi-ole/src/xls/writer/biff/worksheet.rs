@@ -1182,63 +1182,6 @@ pub fn write_selection<W: Write>(writer: &mut W) -> XlsResult<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod view_round_trip_tests {
-    use super::*;
-    use crate::xls::view::{
-        PANE_RECORD_TYPE, SCL_RECORD_TYPE, SELECTION_RECORD_TYPE, ViewCollector,
-        WINDOW2_RECORD_TYPE,
-    };
-
-    fn payload(record: &[u8]) -> &[u8] {
-        let length = usize::from(u16::from_le_bytes([record[2], record[3]]));
-        &record[4..4 + length]
-    }
-
-    #[test]
-    fn writes_view_records_that_round_trip_through_reader() {
-        let mut window = Vec::new();
-        let mut scl = Vec::new();
-        let mut pane = Vec::new();
-        let mut selection = Vec::new();
-        write_window2(&mut window, true).unwrap();
-        write_scl(&mut scl, 3, 4).unwrap();
-        write_pane(&mut pane, 7, 5).unwrap();
-        write_default_selection(&mut selection, 7, 5).unwrap();
-
-        let mut collector = ViewCollector::new();
-        collector
-            .feed_record(WINDOW2_RECORD_TYPE, payload(&window))
-            .unwrap();
-        collector
-            .feed_record(SCL_RECORD_TYPE, payload(&scl))
-            .unwrap();
-        collector
-            .feed_record(PANE_RECORD_TYPE, payload(&pane))
-            .unwrap();
-        collector
-            .feed_record(SELECTION_RECORD_TYPE, payload(&selection))
-            .unwrap();
-        let views = collector.finish().unwrap();
-        let view = &views[0];
-        assert_eq!(view.zoom_fraction(), Some((3, 4)));
-        assert_eq!(
-            view.pane().unwrap().active_pane(),
-            crate::xls::view::XlsPaneType::LowerRight
-        );
-        assert_eq!(view.selections()[0].active_row(), 7);
-        assert_eq!(view.selections()[0].active_column(), 5);
-    }
-
-    #[test]
-    fn rejects_invalid_writer_view_bounds() {
-        assert!(write_scl(&mut Vec::new(), 0, 1).is_err());
-        assert!(write_scl(&mut Vec::new(), 5, 1).is_err());
-        assert!(write_pane(&mut Vec::new(), 1, 256).is_err());
-        assert!(write_default_selection(&mut Vec::new(), 0, 256).is_err());
-    }
-}
-
 pub fn write_phonetic_pr<W: Write>(writer: &mut W) -> XlsResult<()> {
     static DATA: &[u8] = &[0x17, 0x00, 0x37, 0x00, 0x00, 0x00];
     write_record_header(writer, 0x00EF, DATA.len() as u16)?;
@@ -1445,4 +1388,61 @@ fn write_mergedcells_chunk<W: Write>(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod view_round_trip_tests {
+    use super::*;
+    use crate::xls::view::{
+        PANE_RECORD_TYPE, SCL_RECORD_TYPE, SELECTION_RECORD_TYPE, ViewCollector,
+        WINDOW2_RECORD_TYPE,
+    };
+
+    fn payload(record: &[u8]) -> &[u8] {
+        let length = usize::from(u16::from_le_bytes([record[2], record[3]]));
+        &record[4..4 + length]
+    }
+
+    #[test]
+    fn writes_view_records_that_round_trip_through_reader() {
+        let mut window = Vec::new();
+        let mut scl = Vec::new();
+        let mut pane = Vec::new();
+        let mut selection = Vec::new();
+        write_window2(&mut window, true).unwrap();
+        write_scl(&mut scl, 3, 4).unwrap();
+        write_pane(&mut pane, 7, 5).unwrap();
+        write_default_selection(&mut selection, 7, 5).unwrap();
+
+        let mut collector = ViewCollector::new();
+        collector
+            .feed_record(WINDOW2_RECORD_TYPE, payload(&window))
+            .unwrap();
+        collector
+            .feed_record(SCL_RECORD_TYPE, payload(&scl))
+            .unwrap();
+        collector
+            .feed_record(PANE_RECORD_TYPE, payload(&pane))
+            .unwrap();
+        collector
+            .feed_record(SELECTION_RECORD_TYPE, payload(&selection))
+            .unwrap();
+        let views = collector.finish().unwrap();
+        let view = &views[0];
+        assert_eq!(view.zoom_fraction(), Some((3, 4)));
+        assert_eq!(
+            view.pane().unwrap().active_pane(),
+            crate::xls::view::XlsPaneType::LowerRight
+        );
+        assert_eq!(view.selections()[0].active_row(), 7);
+        assert_eq!(view.selections()[0].active_column(), 5);
+    }
+
+    #[test]
+    fn rejects_invalid_writer_view_bounds() {
+        assert!(write_scl(&mut Vec::new(), 0, 1).is_err());
+        assert!(write_scl(&mut Vec::new(), 5, 1).is_err());
+        assert!(write_pane(&mut Vec::new(), 1, 256).is_err());
+        assert!(write_default_selection(&mut Vec::new(), 0, 256).is_err());
+    }
 }

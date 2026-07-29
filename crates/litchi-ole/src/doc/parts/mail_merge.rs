@@ -1762,7 +1762,7 @@ mod tests {
         bag.extend_from_slice(&100u32.to_le_bytes());
         assert!(parse_odso_properties(&bag).is_err());
         // Odd-length Unicode string.
-        assert!(parse_odso_properties(&odso_item(ODSO_ID_DATA_TABLE, &[b'a'])).is_err());
+        assert!(parse_odso_properties(&odso_item(ODSO_ID_DATA_TABLE, b"a")).is_err());
         // Wrong scalar sizes.
         assert!(parse_odso_properties(&odso_item(ODSO_ID_CONNECTION_TYPE, &[0; 3])).is_err());
         assert!(parse_odso_properties(&odso_item(ODSO_ID_COLUMN_DELIMITER, &[0; 4])).is_err());
