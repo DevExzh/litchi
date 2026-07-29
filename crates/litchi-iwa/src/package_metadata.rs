@@ -797,6 +797,9 @@ pub(crate) fn remove_component_external_reference(
                         "component {source_component_identifier} duplicates its external reference to object {object_identifier}"
                     )));
                 }
+                if matches == 0 {
+                    return Ok(component_data.to_vec());
+                }
                 remove_repeated_length_delimited_field_where(component_data, 6, |payload| {
                     let reference =
                         crate::protobuf::tsp::ComponentExternalReference::decode(payload)?;
@@ -1155,6 +1158,55 @@ mod tests {
             .unwrap();
 
         assert_eq!(next_object_identifier(&package).unwrap(), 61);
+    }
+
+    #[test]
+    fn removing_absent_component_external_reference_is_an_exact_no_op() {
+        let metadata = PackageMetadata {
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Document".to_owned(),
+                external_references: vec![ComponentExternalReference {
+                    component_identifier: 2,
+                    object_identifier: Some(40),
+                    is_weak: None,
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let original = metadata.encode_to_vec();
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                PACKAGE_METADATA_ENTRY,
+                &Archive {
+                    objects: vec![
+                        ArchiveObject::new(
+                            10,
+                            vec![RawMessage {
+                                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                                data: original.clone(),
+                            }],
+                        )
+                        .unwrap(),
+                    ],
+                },
+            )
+            .unwrap();
+
+        remove_component_external_reference(&mut package, 1, 3, 41).unwrap();
+
+        assert_eq!(
+            package
+                .archive(PACKAGE_METADATA_ENTRY)
+                .unwrap()
+                .object(10)
+                .unwrap()
+                .messages[0]
+                .data,
+            original
+        );
     }
 
     #[test]
