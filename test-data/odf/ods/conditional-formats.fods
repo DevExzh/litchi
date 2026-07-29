@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   LibreOffice `calcext` conditional formatting attached to a sheet, modeled on
-  what LibreOffice Calc writes for Format > Conditional > Condition:
+  what LibreOffice Calc writes for Format > Conditional:
 
-    * "Grades" carries two `calcext:conditional-format` elements. The first
+    * "Grades" carries three `calcext:conditional-format` elements. The first
       pairs two inert `calcext:condition` rules with a base cell address; the
-      second targets two ranges and has one rule without a base address.
+      second targets two ranges and has one rule without a base address; the
+      third holds a `calcext:color-scale` gradient, a `calcext:data-bar`, a
+      `calcext:icon-set`, and a `calcext:date-is` rule.
     * The referenced cell styles "Good"/"Bad" are ordinary common styles.
       Litchi stores the rules as typed inert data and never evaluates the
-      conditions or resolves the style references.
+      conditions, resolves the style references, or renders the thresholds.
 -->
 <office:document
     xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -49,6 +51,23 @@
           </calcext:conditional-format>
           <calcext:conditional-format calcext:target-range-address="Grades.A2:Grades.A3 Grades.B1">
             <calcext:condition calcext:apply-style-name="Bad" calcext:value="cell-content()==&quot;&quot;"/>
+          </calcext:conditional-format>
+          <calcext:conditional-format calcext:target-range-address="Grades.B2:Grades.B3">
+            <calcext:color-scale>
+              <calcext:color-scale-entry calcext:value="0" calcext:type="minimum" calcext:color="#ff0000"/>
+              <calcext:color-scale-entry calcext:value="50" calcext:type="percentile" calcext:color="#ffff00"/>
+              <calcext:color-scale-entry calcext:value="0" calcext:type="maximum" calcext:color="#00ff00"/>
+            </calcext:color-scale>
+            <calcext:data-bar calcext:gradient="false" calcext:show-value="false" calcext:min-length="10" calcext:max-length="90" calcext:negative-color="#ff8080" calcext:axis-position="middle" calcext:positive-color="#638ec6" calcext:axis-color="#000000">
+              <calcext:formatting-entry calcext:value="0" calcext:type="auto-minimum"/>
+              <calcext:formatting-entry calcext:value="0" calcext:type="auto-maximum"/>
+            </calcext:data-bar>
+            <calcext:icon-set calcext:icon-set-type="3TrafficLights1" calcext:show-value="false">
+              <calcext:formatting-entry calcext:value="0" calcext:type="percent"/>
+              <calcext:formatting-entry calcext:value="33" calcext:greater-equal="false" calcext:type="percent"/>
+              <calcext:formatting-entry calcext:value="67" calcext:type="percent"/>
+            </calcext:icon-set>
+            <calcext:date-is calcext:style="Bad" calcext:date="last-7-days"/>
           </calcext:conditional-format>
         </calcext:conditional-formats>
       </table:table>

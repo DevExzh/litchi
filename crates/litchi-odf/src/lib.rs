@@ -125,12 +125,12 @@
 //! - ✅ Calculation settings, row/column label ranges, and inert consolidations
 //! - ✅ Create, edit, remove, and round-trip inert DDE caches
 //! - ✅ Create, edit, remove, and round-trip data-pilot tables
-//! - ✅ `style:map` conditional cell styles and inert `calcext` conditional formats
+//! - ✅ `style:map` conditional cell styles and inert `calcext` conditional
+//!   formats (condition, color-scale, data-bar, icon-set, and date-is rules)
 //! - ✅ Save to file or bytes
 //!
 //! ### TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing
-//! - ⚠️ `calcext` color-scale, data-bar, and icon-set conditional format rules
 //!
 //! ## ✅ ODP - Presentations (COMPLETE for reading/writing)
 //!
@@ -710,8 +710,11 @@ pub use ods::{
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellHyperlink,
     CellMatrixSpan, CellMerge, CellRangeSource, CellStyleProtection, CellTextContent, CellValue,
     Column as SColumn, ConditionalCellStyle,
-    ConditionalCellStyleRule, ConditionalFormat, ConditionalFormatCondition, Consolidation,
-    ConsolidationUseLabels, ContentValidation,
+    ConditionalCellStyleRule, ConditionalColorScale, ConditionalColorScaleEntry,
+    ConditionalDataBar, ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType,
+    ConditionalFormat, ConditionalFormatCondition, ConditionalFormatEntryType,
+    ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry, Consolidation,
+    ConsolidationUseLabels, ContentValidation, DataBarAxisPosition,
     DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
     DataPilotGrandTotal, DataPilotGrandTotalElement, DataPilotGrandTotalOrientation,
     DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,
@@ -721,7 +724,8 @@ pub use ods::{
     DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey, DatabaseSource,
     DdeConversionMode, DdeLink, DdeSource, DetectiveDirection, DetectiveHighlightedRange,
     DetectiveOperation, DetectiveOperationKind, EmbeddedNumberBehavior, FilterCondition,
-    FilterConditionSource, FilterDataType, FilterExpression, FormulaNamespace, IterationStatus,
+    FilterConditionSource, FilterDataType, FilterExpression, FormulaNamespace, IconSetType,
+    IterationStatus,
     LabelRange, LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
     NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet,
     SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetShape,

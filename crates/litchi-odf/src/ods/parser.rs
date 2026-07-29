@@ -2,15 +2,20 @@
 
 use super::{
     Cell, CellDetective, CellHyperlink, CellMatrixSpan, CellMerge, CellRangeSource,
-    CellTextContent, CellValue, Column, ConditionalFormat, ConditionalFormatCondition,
+    CellTextContent, CellValue, Column, ConditionalColorScale, ConditionalColorScaleEntry,
+    ConditionalDataBar, ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType,
+    ConditionalFormat, ConditionalFormatCondition, ConditionalFormatEntryType,
+    ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry, DataBarAxisPosition,
     DetectiveDirection, DetectiveHighlightedRange, DetectiveOperation, DetectiveOperationKind,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, TableGroup, TableRange,
-    TableSourceMode, TableStructure, TableVisibility,
+    IconSetType, NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange,
+    NamedRangeUsage, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource,
+    TableGroup, TableRange, TableSourceMode, TableStructure, TableVisibility,
     annotation::{AnnotationBuilder, decode_reference},
     conditional_format::{
-        CALCEXT_NAMESPACE_URI, MAX_CONDITIONAL_FORMATS_PER_SHEET, MAX_CONDITIONS_PER_FORMAT,
-        validate_condition, validate_conditional_format,
+        CALCEXT_NAMESPACE_URI, DATA_BAR_ENTRY_COUNT, MAX_CONDITIONAL_FORMATS_PER_SHEET,
+        MAX_ENTRIES_PER_RULE, MAX_RULES_PER_FORMAT, validate_color_scale_entry,
+        validate_conditional_format, validate_condition, validate_data_bar_attributes,
+        validate_data_bar_entry, validate_date_is, validate_icon_set_entry, validate_rule,
     },
     dde::parse_source as parse_dde_source,
     rich_text::CellTextContentBuilder,
@@ -61,10 +66,51 @@ struct PendingHyperlink {
 struct PendingConditionalFormat {
     /// Target ranges parsed from `calcext:target-range-address`.
     target_range_addresses: Vec<String>,
-    /// Inert condition rules collected so far, in document order.
-    conditions: Vec<ConditionalFormatCondition>,
+    /// Inert rules collected so far, in document order.
+    rules: Vec<ConditionalFormatRule>,
     /// The `element_depth` value assigned to the element.
     depth: usize,
+}
+
+/// A `calcext:color-scale`, `calcext:data-bar`, or `calcext:icon-set` rule
+/// whose threshold entries are still being read.
+enum PendingCalcextRule {
+    ColorScale {
+        entries: Vec<ConditionalColorScaleEntry>,
+        depth: usize,
+    },
+    DataBar {
+        data_bar: ConditionalDataBar,
+        depth: usize,
+    },
+    IconSet {
+        icon_set: ConditionalIconSet,
+        depth: usize,
+    },
+}
+
+impl PendingCalcextRule {
+    fn depth(&self) -> usize {
+        match self {
+            Self::ColorScale { depth, .. } | Self::DataBar { depth, .. } | Self::IconSet { depth, .. } => *depth,
+        }
+    }
+
+    fn element_name(&self) -> &'static str {
+        match self {
+            Self::ColorScale { .. } => "color-scale",
+            Self::DataBar { .. } => "data-bar",
+            Self::IconSet { .. } => "icon-set",
+        }
+    }
+
+    fn finish(self) -> ConditionalFormatRule {
+        match self {
+            Self::ColorScale { entries, .. } => ConditionalColorScale::new(entries).into(),
+            Self::DataBar { data_bar, .. } => data_bar.into(),
+            Self::IconSet { icon_set, .. } => icon_set.into(),
+        }
+    }
 }
 
 /// Parser for ODS-specific structures.
@@ -117,7 +163,8 @@ impl OdsParser {
         let mut sheet_dde_source_depth = None;
         let mut conditional_formats_depth = None;
         let mut pending_conditional_format: Option<PendingConditionalFormat> = None;
-        let mut calcext_condition_open_depth = None;
+        let mut pending_calcext_rule: Option<PendingCalcextRule> = None;
+        let mut calcext_leaf_open_depth = None;
         let mut calcext_skip_depth = None;
 
         loop {
@@ -161,20 +208,85 @@ impl OdsParser {
                     } else if calcext_skip_depth.is_some() {
                         // Unknown extension content inside
                         // `calcext:conditional-formats` is skipped entirely.
-                    } else if calcext_condition_open_depth.is_some() {
+                    } else if calcext_leaf_open_depth.is_some() {
                         return Err(Error::InvalidFormat(
-                            "calcext:condition must not contain child elements".to_string(),
+                            "calcext rule and entry elements must not contain child elements"
+                                .to_string(),
                         ));
+                    } else if let Some(rule) = pending_calcext_rule.as_mut() {
+                        let is_calcext = |local_name: &str| {
+                            Self::element_name_is(
+                                e.name().as_ref(),
+                                &document_namespaces,
+                                CALCEXT_NAMESPACE_URI,
+                                local_name,
+                            )
+                        };
+                        match rule {
+                            PendingCalcextRule::ColorScale { entries, .. }
+                                if is_calcext("color-scale-entry") =>
+                            {
+                                if entries.len() >= MAX_ENTRIES_PER_RULE {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:color-scale exceeds the {MAX_ENTRIES_PER_RULE} entry safety limit"
+                                    )));
+                                }
+                                entries.push(Self::parse_color_scale_entry(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                                calcext_leaf_open_depth = Some(element_depth);
+                            },
+                            PendingCalcextRule::DataBar { data_bar, .. }
+                                if is_calcext("formatting-entry") || is_calcext("data-bar-entry") =>
+                            {
+                                if data_bar.entries.len() >= DATA_BAR_ENTRY_COUNT {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:data-bar supports exactly {DATA_BAR_ENTRY_COUNT} calcext:formatting-entry elements"
+                                    )));
+                                }
+                                data_bar.entries.push(Self::parse_data_bar_entry(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                                calcext_leaf_open_depth = Some(element_depth);
+                            },
+                            PendingCalcextRule::IconSet { icon_set, .. }
+                                if is_calcext("formatting-entry") =>
+                            {
+                                if icon_set.entries.len() >= MAX_ENTRIES_PER_RULE {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:icon-set exceeds the {MAX_ENTRIES_PER_RULE} entry safety limit"
+                                    )));
+                                }
+                                icon_set.entries.push(Self::parse_icon_set_entry(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                                calcext_leaf_open_depth = Some(element_depth);
+                            },
+                            _ => {
+                                // Unmodeled content such as
+                                // `calcext:custom-iconset` is skipped.
+                                calcext_skip_depth = Some(element_depth);
+                            },
+                        }
                     } else if let Some(pending) = pending_conditional_format.as_mut() {
-                        if Self::element_name_is(
-                            e.name().as_ref(),
-                            &document_namespaces,
-                            CALCEXT_NAMESPACE_URI,
-                            "condition",
-                        ) {
-                            if pending.conditions.len() >= MAX_CONDITIONS_PER_FORMAT {
+                        let is_calcext = |local_name: &str| {
+                            Self::element_name_is(
+                                e.name().as_ref(),
+                                &document_namespaces,
+                                CALCEXT_NAMESPACE_URI,
+                                local_name,
+                            )
+                        };
+                        if is_calcext("condition") {
+                            if pending.rules.len() >= MAX_RULES_PER_FORMAT {
                                 return Err(Error::InvalidFormat(format!(
-                                    "conditional format exceeds the {MAX_CONDITIONS_PER_FORMAT} condition safety limit"
+                                    "conditional format exceeds the {MAX_RULES_PER_FORMAT} rule safety limit"
                                 )));
                             }
                             let condition = Self::parse_calcext_condition(
@@ -182,11 +294,46 @@ impl OdsParser {
                                 reader.decoder(),
                                 &document_namespaces,
                             )?;
-                            pending.conditions.push(condition);
-                            calcext_condition_open_depth = Some(element_depth);
+                            pending.rules.push(condition.into());
+                            calcext_leaf_open_depth = Some(element_depth);
+                        } else if is_calcext("color-scale") {
+                            pending_calcext_rule = Some(PendingCalcextRule::ColorScale {
+                                entries: Vec::new(),
+                                depth: element_depth,
+                            });
+                        } else if is_calcext("data-bar") {
+                            pending_calcext_rule = Some(PendingCalcextRule::DataBar {
+                                data_bar: Self::parse_data_bar_attributes(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?,
+                                depth: element_depth,
+                            });
+                        } else if is_calcext("icon-set") {
+                            pending_calcext_rule = Some(PendingCalcextRule::IconSet {
+                                icon_set: Self::parse_icon_set_attributes(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?,
+                                depth: element_depth,
+                            });
+                        } else if is_calcext("date-is") {
+                            if pending.rules.len() >= MAX_RULES_PER_FORMAT {
+                                return Err(Error::InvalidFormat(format!(
+                                    "conditional format exceeds the {MAX_RULES_PER_FORMAT} rule safety limit"
+                                )));
+                            }
+                            let date_is = Self::parse_date_is(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending.rules.push(date_is.into());
+                            calcext_leaf_open_depth = Some(element_depth);
                         } else {
-                            // `calcext:color-scale`, `calcext:data-bar`, and
-                            // other unmodeled rule types are skipped.
+                            // Unmodeled rule content is skipped.
                             calcext_skip_depth = Some(element_depth);
                         }
                     } else if conditional_formats_depth.is_some() {
@@ -203,7 +350,7 @@ impl OdsParser {
                             )?;
                             pending_conditional_format = Some(PendingConditionalFormat {
                                 target_range_addresses,
-                                conditions: Vec::new(),
+                                rules: Vec::new(),
                                 depth: element_depth,
                             });
                         } else {
@@ -550,21 +697,83 @@ impl OdsParser {
                         buf.clear();
                         continue;
                     }
-                    if calcext_condition_open_depth.is_some() {
+                    if calcext_leaf_open_depth.is_some() {
                         return Err(Error::InvalidFormat(
-                            "calcext:condition must not contain child elements".to_string(),
+                            "calcext rule and entry elements must not contain child elements"
+                                .to_string(),
                         ));
                     }
+                    if let Some(rule) = pending_calcext_rule.as_mut() {
+                        let is_calcext = |local_name: &str| {
+                            Self::element_name_is(
+                                e.name().as_ref(),
+                                &document_namespaces,
+                                CALCEXT_NAMESPACE_URI,
+                                local_name,
+                            )
+                        };
+                        match rule {
+                            PendingCalcextRule::ColorScale { entries, .. }
+                                if is_calcext("color-scale-entry") =>
+                            {
+                                if entries.len() >= MAX_ENTRIES_PER_RULE {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:color-scale exceeds the {MAX_ENTRIES_PER_RULE} entry safety limit"
+                                    )));
+                                }
+                                entries.push(Self::parse_color_scale_entry(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                            },
+                            PendingCalcextRule::DataBar { data_bar, .. }
+                                if is_calcext("formatting-entry") || is_calcext("data-bar-entry") =>
+                            {
+                                if data_bar.entries.len() >= DATA_BAR_ENTRY_COUNT {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:data-bar supports exactly {DATA_BAR_ENTRY_COUNT} calcext:formatting-entry elements"
+                                    )));
+                                }
+                                data_bar.entries.push(Self::parse_data_bar_entry(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                            },
+                            PendingCalcextRule::IconSet { icon_set, .. }
+                                if is_calcext("formatting-entry") =>
+                            {
+                                if icon_set.entries.len() >= MAX_ENTRIES_PER_RULE {
+                                    return Err(Error::InvalidFormat(format!(
+                                        "calcext:icon-set exceeds the {MAX_ENTRIES_PER_RULE} entry safety limit"
+                                    )));
+                                }
+                                icon_set.entries.push(Self::parse_icon_set_entry(
+                                    e,
+                                    reader.decoder(),
+                                    &document_namespaces,
+                                )?);
+                            },
+                            _ => {},
+                        }
+                        Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
+                        buf.clear();
+                        continue;
+                    }
                     if let Some(pending) = pending_conditional_format.as_mut() {
-                        if Self::element_name_is(
-                            e.name().as_ref(),
-                            &document_namespaces,
-                            CALCEXT_NAMESPACE_URI,
-                            "condition",
-                        ) {
-                            if pending.conditions.len() >= MAX_CONDITIONS_PER_FORMAT {
+                        let is_calcext = |local_name: &str| {
+                            Self::element_name_is(
+                                e.name().as_ref(),
+                                &document_namespaces,
+                                CALCEXT_NAMESPACE_URI,
+                                local_name,
+                            )
+                        };
+                        if is_calcext("condition") {
+                            if pending.rules.len() >= MAX_RULES_PER_FORMAT {
                                 return Err(Error::InvalidFormat(format!(
-                                    "conditional format exceeds the {MAX_CONDITIONS_PER_FORMAT} condition safety limit"
+                                    "conditional format exceeds the {MAX_RULES_PER_FORMAT} rule safety limit"
                                 )));
                             }
                             let condition = Self::parse_calcext_condition(
@@ -572,7 +781,39 @@ impl OdsParser {
                                 reader.decoder(),
                                 &document_namespaces,
                             )?;
-                            pending.conditions.push(condition);
+                            pending.rules.push(condition.into());
+                        } else if is_calcext("date-is") {
+                            if pending.rules.len() >= MAX_RULES_PER_FORMAT {
+                                return Err(Error::InvalidFormat(format!(
+                                    "conditional format exceeds the {MAX_RULES_PER_FORMAT} rule safety limit"
+                                )));
+                            }
+                            let date_is = Self::parse_date_is(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            pending.rules.push(date_is.into());
+                        } else if is_calcext("color-scale") {
+                            let rule: ConditionalFormatRule =
+                                ConditionalColorScale::new(Vec::new()).into();
+                            validate_rule(&rule)?;
+                        } else if is_calcext("data-bar") {
+                            let data_bar = Self::parse_data_bar_attributes(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            let rule: ConditionalFormatRule = data_bar.into();
+                            validate_rule(&rule)?;
+                        } else if is_calcext("icon-set") {
+                            let icon_set = Self::parse_icon_set_attributes(
+                                e,
+                                reader.decoder(),
+                                &document_namespaces,
+                            )?;
+                            let rule: ConditionalFormatRule = icon_set.into();
+                            validate_rule(&rule)?;
                         }
                         Self::pop_namespace_scope(&mut document_namespaces, Some(empty_scope));
                         buf.clear();
@@ -591,7 +832,7 @@ impl OdsParser {
                                     reader.decoder(),
                                     &document_namespaces,
                                 )?,
-                                conditions: Vec::new(),
+                                rules: Vec::new(),
                             };
                             validate_conditional_format(&format)?;
                             if let Some(sheet) = current_sheet.as_mut() {
@@ -995,7 +1236,19 @@ impl OdsParser {
                             "spreadsheet",
                         );
                     let closes_calcext_skip = calcext_skip_depth == Some(element_depth);
-                    let closes_calcext_condition = calcext_condition_open_depth == Some(element_depth);
+                    let closes_calcext_leaf = calcext_leaf_open_depth == Some(element_depth);
+                    let closes_calcext_rule = pending_calcext_rule
+                        .as_ref()
+                        .is_some_and(|rule| rule.depth() == element_depth)
+                        && Self::element_name_is(
+                            e.name().as_ref(),
+                            &document_namespaces,
+                            CALCEXT_NAMESPACE_URI,
+                            pending_calcext_rule
+                                .as_ref()
+                                .expect("pending calcext rule was checked")
+                                .element_name(),
+                        );
                     let closes_conditional_format = pending_conditional_format
                         .as_ref()
                         .is_some_and(|pending| pending.depth == element_depth)
@@ -1025,8 +1278,30 @@ impl OdsParser {
                         buf.clear();
                         continue;
                     }
-                    if closes_calcext_condition {
-                        calcext_condition_open_depth = None;
+                    if closes_calcext_leaf {
+                        calcext_leaf_open_depth = None;
+                        Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
+                        buf.clear();
+                        continue;
+                    }
+                    if closes_calcext_rule {
+                        let rule = pending_calcext_rule
+                            .take()
+                            .expect("pending calcext rule was checked")
+                            .finish();
+                        validate_rule(&rule)?;
+                        let pending = pending_conditional_format.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "calcext rule closed outside calcext:conditional-format"
+                                    .to_string(),
+                            )
+                        })?;
+                        if pending.rules.len() >= MAX_RULES_PER_FORMAT {
+                            return Err(Error::InvalidFormat(format!(
+                                "conditional format exceeds the {MAX_RULES_PER_FORMAT} rule safety limit"
+                            )));
+                        }
+                        pending.rules.push(rule);
                         Self::pop_namespace_scope(&mut document_namespaces, namespace_scopes.pop());
                         buf.clear();
                         continue;
@@ -1037,7 +1312,7 @@ impl OdsParser {
                             .expect("pending conditional format was checked");
                         let format = ConditionalFormat {
                             target_range_addresses: pending.target_range_addresses,
-                            conditions: pending.conditions,
+                            rules: pending.rules,
                         };
                         validate_conditional_format(&format)?;
                         if let Some(sheet) = current_sheet.as_mut() {
@@ -2616,6 +2891,293 @@ impl OdsParser {
         };
         validate_condition(&rule)?;
         Ok(rule)
+    }
+
+    /// Parse one inert `calcext:color-scale-entry` from its attributes.
+    fn parse_color_scale_entry(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalColorScaleEntry> {
+        let mut entry_type = None;
+        let mut value = None;
+        let mut color = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("type") {
+                entry_type = Some(ConditionalFormatEntryType::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:type",
+                )?)?);
+            } else if is_calcext("value") {
+                value = Some(Self::decode_attribute(&attribute, decoder, "calcext:value")?);
+            } else if is_calcext("color") {
+                color = Some(Self::decode_attribute(&attribute, decoder, "calcext:color")?);
+            }
+        }
+        let entry = ConditionalColorScaleEntry {
+            entry_type: entry_type.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:color-scale-entry requires calcext:type".to_string(),
+                )
+            })?,
+            value: value.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:color-scale-entry requires calcext:value".to_string(),
+                )
+            })?,
+            color: color.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:color-scale-entry requires calcext:color".to_string(),
+                )
+            })?,
+        };
+        validate_color_scale_entry(&entry)?;
+        Ok(entry)
+    }
+
+    /// Parse one inert data-bar `calcext:formatting-entry` from its attributes.
+    fn parse_data_bar_entry(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalDataBarEntry> {
+        let (entry_type, value) = Self::parse_formatting_entry(element, decoder, namespaces)?;
+        let entry = ConditionalDataBarEntry { entry_type, value };
+        validate_data_bar_entry(&entry)?;
+        Ok(entry)
+    }
+
+    /// Parse one inert icon-set `calcext:formatting-entry` from its attributes.
+    fn parse_icon_set_entry(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalIconSetEntry> {
+        let mut greater_equal = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            if Self::attribute_name_is(
+                attribute.key.as_ref(),
+                namespaces,
+                CALCEXT_NAMESPACE_URI,
+                "greater-equal",
+            ) {
+                greater_equal = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            }
+        }
+        let (entry_type, value) = Self::parse_formatting_entry(element, decoder, namespaces)?;
+        let entry = ConditionalIconSetEntry {
+            entry_type,
+            value,
+            greater_equal,
+        };
+        validate_icon_set_entry(&entry)?;
+        Ok(entry)
+    }
+
+    /// Parse the shared `calcext:type`/`calcext:value` pair of a formatting entry.
+    fn parse_formatting_entry(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<(ConditionalFormatEntryType, String)> {
+        let mut entry_type = None;
+        let mut value = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("type") {
+                entry_type = Some(ConditionalFormatEntryType::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:type",
+                )?)?);
+            } else if is_calcext("value") {
+                value = Some(Self::decode_attribute(&attribute, decoder, "calcext:value")?);
+            }
+        }
+        Ok((
+            entry_type.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:formatting-entry requires calcext:type".to_string(),
+                )
+            })?,
+            value.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:formatting-entry requires calcext:value".to_string(),
+                )
+            })?,
+        ))
+    }
+
+    /// Parse the attributes of an inert `calcext:data-bar` element.
+    fn parse_data_bar_attributes(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalDataBar> {
+        let mut data_bar = ConditionalDataBar::new(Vec::new());
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("positive-color") {
+                data_bar.positive_color = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:positive-color",
+                )?);
+            } else if is_calcext("negative-color") {
+                data_bar.negative_color = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:negative-color",
+                )?);
+            } else if is_calcext("gradient") {
+                data_bar.gradient = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("axis-position") {
+                data_bar.axis_position = Some(DataBarAxisPosition::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:axis-position",
+                )?)?);
+            } else if is_calcext("show-value") {
+                data_bar.show_value = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("axis-color") {
+                data_bar.axis_color = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:axis-color",
+                )?);
+            } else if is_calcext("min-length") {
+                data_bar.min_length = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:min-length",
+                )?);
+            } else if is_calcext("max-length") {
+                data_bar.max_length = Some(Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:max-length",
+                )?);
+            }
+        }
+        validate_data_bar_attributes(&data_bar)?;
+        Ok(data_bar)
+    }
+
+    /// Parse the attributes of an inert `calcext:icon-set` element.
+    fn parse_icon_set_attributes(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalIconSet> {
+        let mut icon_set_type = None;
+        let mut show_value = None;
+        let mut custom = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("icon-set-type") {
+                icon_set_type = Some(IconSetType::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:icon-set-type",
+                )?)?);
+            } else if is_calcext("show-value") {
+                show_value = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            } else if is_calcext("custom") {
+                custom = Some(Self::parse_bool_attribute(&attribute, decoder)?);
+            }
+        }
+        let icon_set = ConditionalIconSet {
+            icon_set_type: icon_set_type.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "calcext:icon-set requires calcext:icon-set-type".to_string(),
+                )
+            })?,
+            show_value,
+            custom,
+            entries: Vec::new(),
+        };
+        Ok(icon_set)
+    }
+
+    /// Parse one inert `calcext:date-is` rule from its attributes.
+    fn parse_date_is(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        namespaces: &BTreeMap<String, String>,
+    ) -> Result<ConditionalDateIs> {
+        let mut date = None;
+        let mut style = None;
+        for attribute in element.attributes() {
+            let attribute = attribute
+                .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
+            let is_calcext = |local_name| {
+                Self::attribute_name_is(
+                    attribute.key.as_ref(),
+                    namespaces,
+                    CALCEXT_NAMESPACE_URI,
+                    local_name,
+                )
+            };
+            if is_calcext("date") {
+                date = Some(ConditionalDateType::parse(&Self::decode_attribute(
+                    &attribute,
+                    decoder,
+                    "calcext:date",
+                )?)?);
+            } else if is_calcext("style") {
+                style = Some(Self::decode_attribute(&attribute, decoder, "calcext:style")?);
+            }
+        }
+        let date_is = ConditionalDateIs {
+            date: date.ok_or_else(|| {
+                Error::InvalidFormat("calcext:date-is requires calcext:date".to_string())
+            })?,
+            style: style.ok_or_else(|| {
+                Error::InvalidFormat("calcext:date-is requires calcext:style".to_string())
+            })?,
+        };
+        validate_date_is(&date_is)?;
+        Ok(date_is)
     }
 
     fn decode_attribute(

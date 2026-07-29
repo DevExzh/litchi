@@ -31,7 +31,8 @@
 //! - ✅ Inert DDE source declarations and document-stored cached tables
 //! - ✅ Data-pilot (pivot-table) sources, fields, levels, references, and groups
 //! - ✅ Standard `style:map` conditional cell styles and inert LibreOffice
-//!   `calcext` conditional formats
+//!   `calcext` conditional formats (condition, color-scale, data-bar,
+//!   icon-set, and date-is rules)
 //!
 //! ## ✅ Formula Support (`formula.rs`) - PARTIAL
 //! - ✅ Formula string representation
@@ -65,7 +66,6 @@
 //!
 //! ## 🚧 TODO - Advanced Features
 //! - ⚠️ Chart creation and parsing (embedded charts)
-//! - ⚠️ `calcext` color-scale, data-bar, and icon-set conditional format rules
 //! - ⚠️ Sparklines
 //! - ⚠️ External data connections
 //!
@@ -114,7 +114,12 @@ pub use calculation::{
     CalculationIteration, CalculationNullDate, CalculationSettings, IterationStatus,
 };
 pub use cell::{Cell, CellMatrixSpan, CellMerge, CellValue};
-pub use conditional_format::{ConditionalFormat, ConditionalFormatCondition};
+pub use conditional_format::{
+    ConditionalColorScale, ConditionalColorScaleEntry, ConditionalDataBar, ConditionalDataBarEntry,
+    ConditionalDateIs, ConditionalDateType, ConditionalFormat, ConditionalFormatCondition,
+    ConditionalFormatEntryType, ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry,
+    DataBarAxisPosition, IconSetType,
+};
 pub use consolidation::{Consolidation, ConsolidationUseLabels};
 pub use data_pilot::{
     DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
