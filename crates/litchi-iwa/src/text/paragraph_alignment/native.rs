@@ -15,6 +15,7 @@ use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, Result};
 
 use super::super::font::{TextFont, TextFontName};
+use super::super::paragraph_direction::ParagraphWritingDirection;
 use super::super::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
 use super::super::paragraph_tabs::ParagraphTabStops;
 use super::super::style::{
@@ -59,6 +60,7 @@ const CHARACTER_DRAWING_STROKE_NULL_FIELD: u32 = 43;
 const CHARACTER_DRAWING_STROKE_FIELD: u32 = 44;
 const CHARACTER_DRAWING_FILL_FIELD: u32 = 46;
 const CHARACTER_CAPITALIZATION_LINGUISTICS_FIELD: u32 = 41;
+const CHARACTER_WRITING_DIRECTION_FIELD: u32 = 35;
 const DRAWING_FILL_COLOR_FIELD: u32 = 1;
 const COLOR_MODEL_FIELD: u32 = 1;
 const COLOR_RED_FIELD: u32 = 3;
@@ -133,6 +135,7 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) keep_with_next: Option<bool>,
     pub(crate) start_on_new_page: Option<bool>,
     pub(crate) prevent_widow_orphan_lines: Option<bool>,
+    pub(crate) writing_direction: Option<ParagraphWritingDirection>,
     pub(crate) underline: Option<TextUnderline>,
     pub(crate) strikethrough: Option<TextStrikethrough>,
     pub(crate) alignment: Option<TextAlignment>,
@@ -181,6 +184,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.keep_with_next.is_some())
             + u32::from(self.start_on_new_page.is_some())
             + u32::from(self.prevent_widow_orphan_lines.is_some())
+            + u32::from(self.writing_direction.is_some())
             + u32::from(self.underline.is_some())
             + u32::from(self.strikethrough.is_some())
             + u32::from(self.alignment.is_some())
@@ -218,6 +222,7 @@ impl ParagraphStyleOverrides {
             && self.keep_with_next.is_none()
             && self.start_on_new_page.is_none()
             && self.prevent_widow_orphan_lines.is_none()
+            && self.writing_direction.is_none()
             && self.underline.is_none()
             && self.strikethrough.is_none()
             && self.alignment.is_none()
@@ -371,6 +376,13 @@ pub(crate) fn inherited_paragraph_flow(
     inheritance::paragraph_flow(package, first_style_id)
 }
 
+pub(crate) fn inherited_paragraph_writing_direction(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphWritingDirection> {
+    inheritance::paragraph_writing_direction(package, first_style_id)
+}
+
 pub(crate) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
@@ -451,6 +463,10 @@ pub(crate) fn direct_overrides(
     let keep_with_next = properties.keep_with_next;
     let start_on_new_page = properties.page_break_before;
     let prevent_widow_orphan_lines = properties.widow_control;
+    let writing_direction = character_properties
+        .writing_direction
+        .map(ParagraphWritingDirection::from_native_value)
+        .transpose()?;
     let underline = character_properties
         .underline
         .map(TextUnderline::from_native_value)
@@ -514,6 +530,7 @@ pub(crate) fn direct_overrides(
         keep_with_next,
         start_on_new_page,
         prevent_widow_orphan_lines,
+        writing_direction,
         underline,
         strikethrough,
         alignment,
@@ -585,6 +602,9 @@ pub(crate) fn direct_overrides(
     }
     remaining_character.underline = None;
     remaining_character.strikethru = None;
+    if writing_direction.is_some() {
+        remaining_character.writing_direction = None;
+    }
     let semantic = !overrides.is_empty()
         && remaining == tswp::ParagraphStylePropertiesArchive::default()
         && remaining_character == tswp::CharacterStylePropertiesArchive::default()
@@ -699,6 +719,9 @@ pub(crate) fn direct_overrides(
     let mut paragraph_fields = Vec::with_capacity(22);
     if alignment.is_some() {
         paragraph_fields.push(PARAGRAPH_ALIGNMENT_FIELD);
+    }
+    if writing_direction.is_some() {
+        character_fields.push(CHARACTER_WRITING_DIRECTION_FIELD);
     }
     if let Some(background) = paragraph_background {
         let field = match background {
@@ -884,6 +907,9 @@ pub(crate) fn variation_object(
             capitalization_uses_linguistics: overrides
                 .capitalization
                 .and_then(TextCapitalization::uses_linguistics),
+            writing_direction: overrides
+                .writing_direction
+                .map(ParagraphWritingDirection::native_value),
             ..Default::default()
         }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {

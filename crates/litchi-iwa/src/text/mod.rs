@@ -31,6 +31,7 @@ mod number_attachment_object;
 mod number_attachment_storage;
 mod number_attachment_types;
 pub(crate) mod paragraph_alignment;
+mod paragraph_direction;
 mod paragraph_flow;
 mod paragraph_list;
 mod paragraph_tabs;
@@ -84,6 +85,7 @@ pub use number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentFormat, TextNumberAttachmentId,
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
 };
+pub use paragraph_direction::ParagraphWritingDirection;
 pub use paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
 pub use paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,

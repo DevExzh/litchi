@@ -61,21 +61,23 @@ use super::number_attachment_types::{
 use super::paragraph_alignment::{
     paragraph_alignment, paragraph_background, paragraph_borders, paragraph_flow,
     paragraph_indents, paragraph_line_spacing, paragraph_spacing, paragraph_tab_stops,
-    reset_paragraph_alignment, reset_paragraph_background, reset_paragraph_borders,
-    reset_paragraph_flow, reset_paragraph_indents, reset_paragraph_line_spacing,
-    reset_paragraph_spacing, reset_paragraph_tab_stops, reset_text_background,
-    reset_text_baseline_shift, reset_text_capitalization, reset_text_character_spacing,
-    reset_text_color, reset_text_decorations, reset_text_font, reset_text_ligatures,
-    reset_text_outline, reset_text_script, reset_text_shadow, reset_text_style,
-    set_paragraph_alignment, set_paragraph_background, set_paragraph_borders, set_paragraph_flow,
-    set_paragraph_indents, set_paragraph_line_spacing, set_paragraph_spacing,
-    set_paragraph_tab_stops, set_text_background, set_text_baseline_shift, set_text_capitalization,
-    set_text_character_spacing, set_text_color, set_text_decorations, set_text_font,
-    set_text_ligatures, set_text_outline, set_text_script, set_text_shadow, set_text_style,
-    text_background, text_baseline_shift, text_capitalization, text_character_spacing, text_color,
-    text_decorations, text_font, text_ligatures, text_outline, text_script, text_shadow,
-    text_style,
+    paragraph_writing_direction, reset_paragraph_alignment, reset_paragraph_background,
+    reset_paragraph_borders, reset_paragraph_flow, reset_paragraph_indents,
+    reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
+    reset_paragraph_writing_direction, reset_text_background, reset_text_baseline_shift,
+    reset_text_capitalization, reset_text_character_spacing, reset_text_color,
+    reset_text_decorations, reset_text_font, reset_text_ligatures, reset_text_outline,
+    reset_text_script, reset_text_shadow, reset_text_style, set_paragraph_alignment,
+    set_paragraph_background, set_paragraph_borders, set_paragraph_flow, set_paragraph_indents,
+    set_paragraph_line_spacing, set_paragraph_spacing, set_paragraph_tab_stops,
+    set_paragraph_writing_direction, set_text_background, set_text_baseline_shift,
+    set_text_capitalization, set_text_character_spacing, set_text_color, set_text_decorations,
+    set_text_font, set_text_ligatures, set_text_outline, set_text_script, set_text_shadow,
+    set_text_style, text_background, text_baseline_shift, text_capitalization,
+    text_character_spacing, text_color, text_decorations, text_font, text_ligatures, text_outline,
+    text_script, text_shadow, text_style,
 };
+use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
@@ -1648,6 +1650,42 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_flow(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_flow(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective base-writing direction of a text storage.
+    pub fn paragraph_writing_direction(&self, object_id: u64) -> Result<ParagraphWritingDirection> {
+        paragraph_writing_direction(&self.package, object_id)
+    }
+
+    /// Atomically set the base-writing direction for every paragraph.
+    pub fn set_paragraph_writing_direction(
+        &mut self,
+        object_id: u64,
+        direction: ParagraphWritingDirection,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_writing_direction(&mut staged, object_id, direction)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_writing_direction(&verified, object_id)? != direction {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph writing-direction update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited base-writing direction while preserving sibling overrides.
+    pub fn reset_paragraph_writing_direction(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_writing_direction(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

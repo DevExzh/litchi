@@ -13,6 +13,7 @@ use crate::{Error, IWorkPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
 use super::font::TextFont;
+use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_tabs::ParagraphTabStops;
 use super::style::{
@@ -42,6 +43,7 @@ enum ParagraphProperty<'a> {
     Background(ParagraphBackground),
     Borders(ParagraphBorders),
     Flow(ParagraphFlow),
+    WritingDirection(ParagraphWritingDirection),
     Alignment(TextAlignment),
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
@@ -66,6 +68,7 @@ enum ParagraphPropertyKind {
     Background,
     Borders,
     Flow,
+    WritingDirection,
     Alignment,
     LineSpacing,
     Spacing,
@@ -455,6 +458,36 @@ pub(super) fn set_paragraph_flow(
 
 pub(super) fn reset_paragraph_flow(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Flow)
+}
+
+pub(super) fn paragraph_writing_direction(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphWritingDirection> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_paragraph_writing_direction(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_writing_direction(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    direction: ParagraphWritingDirection,
+) -> Result<()> {
+    if paragraph_writing_direction(package, storage_id)? == direction {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::WritingDirection(direction),
+    )
+}
+
+pub(super) fn reset_paragraph_writing_direction(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+) -> Result<bool> {
+    reset_property(package, storage_id, ParagraphPropertyKind::WritingDirection)
 }
 
 pub(super) fn paragraph_alignment(
@@ -907,6 +940,9 @@ fn apply_property(
             overrides.start_on_new_page = Some(flow.starts_on_new_page());
             overrides.prevent_widow_orphan_lines = Some(flow.prevents_widow_orphan_lines());
         },
+        ParagraphProperty::WritingDirection(direction) => {
+            overrides.writing_direction = Some(*direction);
+        },
         ParagraphProperty::Alignment(alignment) => overrides.alignment = Some(*alignment),
         ParagraphProperty::LineSpacing(spacing) => overrides.line_spacing = Some(*spacing),
         ParagraphProperty::Spacing(spacing) => {
@@ -952,6 +988,7 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
                 || overrides.start_on_new_page.is_some()
                 || overrides.prevent_widow_orphan_lines.is_some()
         },
+        ParagraphPropertyKind::WritingDirection => overrides.writing_direction.is_some(),
         ParagraphPropertyKind::Alignment => overrides.alignment.is_some(),
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing.is_some(),
         ParagraphPropertyKind::Spacing => {
@@ -996,6 +1033,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.start_on_new_page = None;
             overrides.prevent_widow_orphan_lines = None;
         },
+        ParagraphPropertyKind::WritingDirection => overrides.writing_direction = None,
         ParagraphPropertyKind::Alignment => overrides.alignment = None,
         ParagraphPropertyKind::LineSpacing => overrides.line_spacing = None,
         ParagraphPropertyKind::Spacing => {
@@ -1062,6 +1100,9 @@ fn inherited_property(
         ParagraphPropertyKind::Flow => Ok(ParagraphProperty::Flow(
             native::inherited_paragraph_flow(package, style_id)?,
         )),
+        ParagraphPropertyKind::WritingDirection => Ok(ParagraphProperty::WritingDirection(
+            native::inherited_paragraph_writing_direction(package, style_id)?,
+        )),
         ParagraphPropertyKind::Alignment => Ok(ParagraphProperty::Alignment(
             native::inherited_alignment(package, style_id)?,
         )),
@@ -1125,6 +1166,9 @@ fn validate_expected_property(
         },
         ParagraphProperty::Borders(borders) => paragraph_borders(package, storage_id)? == borders,
         ParagraphProperty::Flow(flow) => paragraph_flow(package, storage_id)? == flow,
+        ParagraphProperty::WritingDirection(direction) => {
+            paragraph_writing_direction(package, storage_id)? == direction
+        },
         ParagraphProperty::Alignment(alignment) => {
             paragraph_alignment(package, storage_id)? == alignment
         },

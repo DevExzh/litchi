@@ -48,10 +48,10 @@ use crate::text::{
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumns, TextComment, TextCommentBody, TextCommentId,
-    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
-    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
     TextShadow, TextStorageInfo, TextStyle,
 };
@@ -2051,6 +2051,54 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_flow(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective base-writing direction of a sheet-owned text box.
+    pub fn sheet_text_box_paragraph_writing_direction(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphWritingDirection> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_writing_direction(graph.storage_id)
+    }
+
+    /// Set one base-writing direction across a sheet-owned text box.
+    pub fn set_sheet_text_box_paragraph_writing_direction(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        direction: ParagraphWritingDirection,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_writing_direction(graph.storage_id, direction)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_writing_direction(sheet_id, drawable_object_id)?
+            != direction
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box paragraph writing-direction update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited base-writing direction.
+    pub fn reset_sheet_text_box_paragraph_writing_direction(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_writing_direction(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

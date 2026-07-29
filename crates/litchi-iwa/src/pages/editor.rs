@@ -35,12 +35,13 @@ use crate::text::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns,
-    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
-    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
-    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    TextOutline, TextPosition, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
+    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -1547,6 +1548,48 @@ impl PagesEditor {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_flow(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective base-writing direction of a reachable ordinary text box.
+    pub fn text_box_paragraph_writing_direction(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphWritingDirection> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        self.text.paragraph_writing_direction(graph.storage_id)
+    }
+
+    /// Set one base-writing direction across a reachable ordinary text box.
+    pub fn set_text_box_paragraph_writing_direction(
+        &mut self,
+        drawable_object_id: u64,
+        direction: ParagraphWritingDirection,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_writing_direction(graph.storage_id, direction)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.text_box_paragraph_writing_direction(drawable_object_id)? != direction {
+            return Err(Error::InvalidFormat(
+                "Pages text-box paragraph writing-direction update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited base-writing direction.
+    pub fn reset_text_box_paragraph_writing_direction(
+        &mut self,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_writing_direction(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

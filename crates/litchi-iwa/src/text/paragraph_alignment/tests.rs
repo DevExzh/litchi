@@ -15,10 +15,11 @@ use crate::text::{
     IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
     ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, TextBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextColumnCount, TextColumns, TextDecorations, TextFont, TextLigatures,
+    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
@@ -54,6 +55,36 @@ fn native_decoration_overrides_are_minimal_and_reversible() {
     let message = &object.messages[0];
     let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
     assert_eq!(archive.override_count, Some(4));
+    assert_eq!(
+        native::direct_overrides(&archive, &message.data).unwrap(),
+        Some(overrides)
+    );
+}
+
+#[test]
+fn native_writing_direction_override_is_minimal_and_reversible() {
+    let overrides = ParagraphStyleOverrides {
+        writing_direction: Some(ParagraphWritingDirection::RightToLeft),
+        ..Default::default()
+    };
+    let object = native::variation_object(13, 14, 15, overrides.clone()).unwrap();
+    let message = &object.messages[0];
+    let archive = tswp::ParagraphStyleArchive::decode(message.data.as_slice()).unwrap();
+    assert_eq!(archive.override_count, Some(1));
+    assert_eq!(
+        archive
+            .char_properties
+            .as_ref()
+            .and_then(|properties| properties.writing_direction),
+        Some(ParagraphWritingDirection::RightToLeft.native_value())
+    );
+    assert_eq!(
+        archive
+            .para_properties
+            .as_ref()
+            .and_then(|properties| properties.writing_direction),
+        None
+    );
     assert_eq!(
         native::direct_overrides(&archive, &message.data).unwrap(),
         Some(overrides)
@@ -2085,6 +2116,116 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
     assert!(
         keynote
             .reset_slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(keynote.to_bytes().unwrap(), keynote_before);
+}
+
+#[test]
+fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
+    let mut pages = PagesEditor::create_with_text("Directions").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            7,
+            "שלום Pages",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_before = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_writing_direction(
+            pages_box.drawable_object_id,
+            ParagraphWritingDirection::RightToLeft,
+        )
+        .unwrap();
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_writing_direction(pages_box.drawable_object_id)
+            .unwrap(),
+        ParagraphWritingDirection::RightToLeft
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_writing_direction(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "مرحبا Numbers",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let numbers_before = numbers.to_bytes().unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_writing_direction(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            ParagraphWritingDirection::RightToLeft,
+        )
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_writing_direction(sheet_id, numbers_box.drawable_object_id,)
+            .unwrap(),
+        ParagraphWritingDirection::RightToLeft
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_paragraph_writing_direction(
+                sheet_id,
+                numbers_box.drawable_object_id,
+            )
+            .unwrap()
+    );
+    assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "שלום Keynote",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let keynote_before = keynote.to_bytes().unwrap();
+    keynote
+        .set_slide_text_box_paragraph_writing_direction(
+            0,
+            keynote_box.drawable_object_id,
+            ParagraphWritingDirection::LeftToRight,
+        )
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_writing_direction(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        ParagraphWritingDirection::LeftToRight
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_paragraph_writing_direction(0, keynote_box.drawable_object_id,)
             .unwrap()
     );
     assert_eq!(keynote.to_bytes().unwrap(), keynote_before);

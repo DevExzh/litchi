@@ -2,6 +2,7 @@
 //!
 //! iWork documents support rich text with character-level and paragraph-level styling.
 
+use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_tabs::ParagraphTabStops;
 use crate::shapes::{
@@ -702,6 +703,8 @@ pub struct ParagraphStyle {
     pub borders: ParagraphBorders,
     /// Pagination, break, widow/orphan, and hyphenation behavior.
     pub flow: ParagraphFlow,
+    /// Base direction used to lay out bidirectional paragraph text.
+    pub writing_direction: ParagraphWritingDirection,
     /// Native paragraph alignment.
     pub alignment: TextAlignment,
     /// Native line-spacing mode and amount.
@@ -721,6 +724,7 @@ impl ParagraphStyle {
             background: ParagraphBackground::None,
             borders: ParagraphBorders::None,
             flow: ParagraphFlow::default(),
+            writing_direction: ParagraphWritingDirection::Natural,
             alignment: TextAlignment::Natural,
             line_spacing: ParagraphLineSpacing::default(),
             spacing: ParagraphSpacing::default(),
@@ -1003,6 +1007,7 @@ mod tests {
         assert_eq!(para.background, ParagraphBackground::None);
         assert_eq!(para.borders, ParagraphBorders::None);
         assert_eq!(para.flow, ParagraphFlow::default());
+        assert_eq!(para.writing_direction, ParagraphWritingDirection::Natural);
         assert_eq!(para.alignment, TextAlignment::Natural);
         assert_eq!(
             para.line_spacing,

@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use crate::protobuf::tswp;
 use crate::shapes::RgbaColor;
 use crate::text::font::TextFont;
+use crate::text::paragraph_direction::ParagraphWritingDirection;
 use crate::text::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
 use crate::text::paragraph_tabs::ParagraphTabStops;
 use crate::text::style::{
@@ -339,6 +340,24 @@ pub(super) fn paragraph_flow(package: &IWorkPackage, first_style_id: u64) -> Res
         .with_prevent_widow_orphan_lines(
             widow_orphan.unwrap_or(defaults.prevents_widow_orphan_lines()),
         ))
+}
+
+pub(super) fn paragraph_writing_direction(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphWritingDirection> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(direction) = style
+            .char_properties
+            .as_ref()
+            .and_then(|properties| properties.writing_direction)
+        else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(ParagraphWritingDirection::from_native_value(direction)?);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
 }
 
 pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<TextAlignment> {

@@ -14,11 +14,11 @@ use litchi_iwa::text::{
     ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList,
     ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns, TextCommentBody,
-    TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
-    TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
+    TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
+    TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
+    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -156,6 +156,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_start_on_new_page(true)
             .with_prevent_widow_orphan_lines(false)
             .with_hyphenation(ParagraphHyphenation::Prevented),
+    )?;
+    editor.set_sheet_text_box_paragraph_writing_direction(
+        sheet_id,
+        created.drawable_object_id,
+        ParagraphWritingDirection::RightToLeft,
     )?;
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,
