@@ -24,16 +24,20 @@ enum SheetDrawableClone {
     Image {
         drawable_id: u64,
     },
+    Shape {
+        drawable_id: u64,
+    },
 }
 
 impl NumbersEditor {
     /// Duplicate a populated sheet immediately after its source.
     ///
     /// Sheet settings and unknown wire fields are retained. Populated tables,
-    /// local formula dependency graphs, ordinary text boxes, and images receive
-    /// fresh object identities. Image assets remain shared, matching Numbers,
-    /// while writable object storage is independent. Unsupported drawable kinds
-    /// and cross-table formula edges are rejected transactionally.
+    /// local formula dependency graphs, ordinary text boxes, images, and shapes
+    /// receive fresh object identities. Image assets and shape styles remain
+    /// shared, matching Numbers, while writable object storage is independent.
+    /// Unsupported drawable kinds and cross-table formula edges are rejected
+    /// transactionally.
     pub fn duplicate_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
         let sheets = self.sheets()?;
         let source = sheets
@@ -137,6 +141,14 @@ impl NumbersEditor {
                     )?;
                     cloned_drawable_ids.push(cloned.drawable_object_id);
                 },
+                SheetDrawableClone::Shape { drawable_id } => {
+                    let cloned = working.duplicate_sheet_shape_to_sheet(
+                        sheet_id,
+                        drawable_id,
+                        new_sheet_id,
+                    )?;
+                    cloned_drawable_ids.push(cloned.drawable_object_id);
+                },
             }
         }
 
@@ -189,6 +201,11 @@ fn classify_sheet_drawables(
         .into_iter()
         .map(|image| image.drawable_object_id)
         .collect::<HashSet<_>>();
+    let shapes = editor
+        .sheet_shapes(sheet_id)?
+        .into_iter()
+        .map(|shape| shape.drawable_object_id)
+        .collect::<HashSet<_>>();
 
     sheet
         .drawable_infos
@@ -212,8 +229,13 @@ fn classify_sheet_drawables(
                     drawable_id: reference.identifier,
                 });
             }
+            if shapes.contains(&reference.identifier) {
+                return Ok(SheetDrawableClone::Shape {
+                    drawable_id: reference.identifier,
+                });
+            }
             Err(Error::ParseError(format!(
-                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table, ordinary text box, or image",
+                "Cannot duplicate Numbers sheet {sheet_id}: drawable {} is not a supported table, ordinary text box, image, or shape",
                 reference.identifier
             )))
         })
@@ -339,7 +361,9 @@ fn restore_table_geometry(
 mod tests {
     use super::*;
     use crate::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
-    use crate::shapes::{DrawablePoint, DrawableSize};
+    use crate::shapes::{
+        DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill, ShapePreset,
+    };
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 84.0, y: 126.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -347,6 +371,117 @@ mod tests {
         height: 155.0,
     };
     const MOVED_IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 440.0, y: 72.0 };
+    const SHAPE_POSITION: DrawablePoint = DrawablePoint { x: 108.0, y: 244.0 };
+    const SHAPE_SIZE: DrawableSize = DrawableSize {
+        width: 180.0,
+        height: 96.0,
+    };
+    const MOVED_SHAPE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
+    const SOURCE_SHAPE_FILL: ShapeFill = ShapeFill::Solid(RgbaColor::black());
+    const COPIED_SHAPE_FILL: ShapeFill = ShapeFill::None;
+
+    #[test]
+    fn source_built_shape_sheet_duplicates_with_native_independent_storage() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Shapes")
+            .build()
+            .unwrap();
+        let source_sheet = editor.sheets().unwrap().remove(0);
+        let source = editor
+            .add_sheet_shape_with_fill(
+                source_sheet.object_id,
+                "Native-style shape",
+                SHAPE_POSITION,
+                SHAPE_SIZE,
+                ShapePreset::Rectangle,
+                SOURCE_SHAPE_FILL,
+            )
+            .unwrap();
+
+        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+
+        assert_eq!(duplicate.index, 1);
+        assert_eq!(duplicate.name, "Shapes-1");
+        let copied = editor.sheet_shapes(duplicate.object_id).unwrap().remove(0);
+        assert_ne!(copied.drawable_object_id, source.drawable_object_id);
+        assert_ne!(copied.storage.object_id, source.storage.object_id);
+        assert_eq!(copied.sheet_id, duplicate.object_id);
+        assert_eq!(copied.storage.text, source.storage.text);
+        assert_eq!(copied.preset, source.preset);
+        assert_eq!(copied.geometry, source.geometry);
+        assert_eq!(
+            editor
+                .sheet_shape_fill(duplicate.object_id, copied.drawable_object_id)
+                .unwrap(),
+            SOURCE_SHAPE_FILL
+        );
+
+        editor
+            .set_sheet_shape_text(
+                duplicate.object_id,
+                copied.drawable_object_id,
+                "Independent copy",
+            )
+            .unwrap();
+        editor
+            .set_sheet_shape_geometry(
+                duplicate.object_id,
+                copied.drawable_object_id,
+                DrawableGeometry {
+                    position: Some(MOVED_SHAPE_POSITION),
+                    ..copied.geometry
+                },
+            )
+            .unwrap();
+        editor
+            .set_sheet_shape_fill(
+                duplicate.object_id,
+                copied.drawable_object_id,
+                &COPIED_SHAPE_FILL,
+            )
+            .unwrap();
+
+        let original = editor
+            .sheet_shapes(source_sheet.object_id)
+            .unwrap()
+            .remove(0);
+        assert_eq!(original.storage.text, "Native-style shape");
+        assert_eq!(original.geometry, source.geometry);
+        assert_eq!(
+            editor
+                .sheet_shape_fill(source_sheet.object_id, source.drawable_object_id)
+                .unwrap(),
+            SOURCE_SHAPE_FILL
+        );
+
+        let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened_source = reopened
+            .sheet_shapes(source_sheet.object_id)
+            .unwrap()
+            .remove(0);
+        let reopened_copy = reopened
+            .sheet_shapes(duplicate.object_id)
+            .unwrap()
+            .remove(0);
+        assert_eq!(reopened_source.storage.text, "Native-style shape");
+        assert_eq!(reopened_copy.storage.text, "Independent copy");
+        assert_ne!(
+            reopened_source.storage.object_id,
+            reopened_copy.storage.object_id
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_fill(source_sheet.object_id, source.drawable_object_id)
+                .unwrap(),
+            SOURCE_SHAPE_FILL
+        );
+        assert_eq!(
+            reopened
+                .sheet_shape_fill(duplicate.object_id, copied.drawable_object_id)
+                .unwrap(),
+            COPIED_SHAPE_FILL
+        );
+    }
 
     #[test]
     fn source_built_image_sheet_duplicates_with_native_shared_asset_semantics() {

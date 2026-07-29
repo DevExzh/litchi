@@ -29,6 +29,12 @@ use caption::*;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShapeClonePlacement {
+    Offset,
+    Preserve,
+}
+
 /// Structural path family used by an ordinary Numbers shape.
 pub type NumbersSheetShapeKind = ShapePathKind;
 
@@ -855,10 +861,46 @@ impl NumbersEditor {
         sheet_id: u64,
         source_drawable_object_id: u64,
     ) -> Result<NumbersSheetShapeInfo> {
-        let source = shape_graph(self, sheet_id, source_drawable_object_id)?;
+        self.clone_sheet_shape(
+            sheet_id,
+            source_drawable_object_id,
+            sheet_id,
+            ShapeClonePlacement::Offset,
+        )
+    }
+
+    pub(super) fn duplicate_sheet_shape_to_sheet(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+    ) -> Result<NumbersSheetShapeInfo> {
+        self.clone_sheet_shape(
+            source_sheet_id,
+            source_drawable_object_id,
+            target_sheet_id,
+            ShapeClonePlacement::Preserve,
+        )
+    }
+
+    fn clone_sheet_shape(
+        &mut self,
+        source_sheet_id: u64,
+        source_drawable_object_id: u64,
+        target_sheet_id: u64,
+        placement: ShapeClonePlacement,
+    ) -> Result<NumbersSheetShapeInfo> {
+        let source = shape_graph(self, source_sheet_id, source_drawable_object_id)?;
+        let (target_archive_name, _, _) = numbers_sheet(&self.package, target_sheet_id)?;
+        if source.archive_name != target_archive_name {
+            return Err(Error::ParseError(format!(
+                "Cannot clone Numbers shape {source_drawable_object_id} across archive components"
+            )));
+        }
         let mut staged = self.package.clone();
         let first_identifier = next_object_identifier(&staged)?;
-        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        let mut remap = HashMap::with_capacity(source.object_ids.len() + 1);
+        remap.insert(source_sheet_id, target_sheet_id);
         for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
             let offset = u64::try_from(offset)
                 .map_err(|_| Error::ParseError("Numbers shape graph is too large".to_owned()))?;
@@ -883,22 +925,29 @@ impl NumbersEditor {
 
         let new_drawable_id = remap[&source_drawable_object_id];
         let new_storage_id = remap[&source.info.storage.object_id];
-        offset_numbers_drawable_clone(
-            &mut staged,
-            &source.archive_name,
-            new_drawable_id,
-            DRAWABLE_DUPLICATE_OFFSET,
-        )?;
+        if placement == ShapeClonePlacement::Offset {
+            offset_numbers_drawable_clone(
+                &mut staged,
+                &source.archive_name,
+                new_drawable_id,
+                DRAWABLE_DUPLICATE_OFFSET,
+            )?;
+        }
         patch_numbers_sheet_drawable_reference(
             &mut staged,
             &source.archive_name,
-            source.sheet_id,
+            target_sheet_id,
             None,
             Some(new_drawable_id),
         )?;
-        let last_identifier = remap.values().copied().max().ok_or_else(|| {
-            Error::InvalidFormat("Numbers shape graph has no object identifiers".to_owned())
-        })?;
+        let last_identifier = source
+            .object_ids
+            .iter()
+            .map(|identifier| remap[identifier])
+            .max()
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers shape graph has no object identifiers".to_owned())
+            })?;
         set_package_last_object_identifier(&mut staged, last_identifier)?;
         let new_uuid_object_ids = source
             .uuid_object_ids
@@ -909,13 +958,13 @@ impl NumbersEditor {
 
         let verified = Self::from_package(staged)?;
         let created = verified
-            .sheet_shapes(sheet_id)?
+            .sheet_shapes(target_sheet_id)?
             .into_iter()
             .find(|shape| shape.drawable_object_id == new_drawable_id)
             .ok_or_else(|| {
                 Error::InvalidFormat("Numbers shape duplication failed validation".to_owned())
             })?;
-        let created_graph = shape_graph(&verified, sheet_id, new_drawable_id)?;
+        let created_graph = shape_graph(&verified, target_sheet_id, new_drawable_id)?;
         if created.storage.object_id != new_storage_id
             || created.storage.text != source.info.storage.text
             || created.kind != source.info.kind
@@ -927,6 +976,8 @@ impl NumbersEditor {
             || created.geometry.angle != source.info.geometry.angle
             || created.properties != source.info.properties
             || created_graph.object_ids.len() != source.object_ids.len()
+            || (placement == ShapeClonePlacement::Preserve
+                && created.geometry != source.info.geometry)
         {
             return Err(Error::InvalidFormat(
                 "Numbers shape duplication produced an inconsistent graph".to_owned(),
