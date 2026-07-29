@@ -8,11 +8,12 @@ use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
-    ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
-    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-    ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartLegendFill, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -1719,6 +1720,42 @@ fn scratch_document_supports_native_chart_legend_visibility_crud() {
         .remove_body_chart(duplicate.drawable_object_id)
         .unwrap();
     assert!(reopened.body_charts().unwrap().is_empty());
+}
+
+#[test]
+fn scratch_document_supports_exact_chart_legend_fill_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart legend fill").unwrap();
+    let chart = editor
+        .add_body_chart(
+            "Chart legend fill".encode_utf16().count(),
+            ChartKind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let object_id = chart.drawable_object_id;
+    let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.body_chart_legend_fill(object_id).unwrap(),
+        ChartLegendFill::Inherited
+    );
+    let solid = ChartLegendFill::Fill(ShapeFill::Solid(
+        RgbaColor::new(0.85, 0.25, 0.2, 1.0, RgbColorSpace::Srgb).unwrap(),
+    ));
+    editor
+        .set_body_chart_legend_fill(object_id, &solid)
+        .unwrap();
+    assert_eq!(editor.body_chart_legend_fill(object_id).unwrap(), solid);
+    assert!(editor.body_chart_legend_visible(object_id).unwrap());
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.body_chart_legend_fill(object_id).unwrap(), solid);
+    reopened
+        .set_body_chart_legend_fill(object_id, &ChartLegendFill::Inherited)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), baseline);
 }
 
 #[test]

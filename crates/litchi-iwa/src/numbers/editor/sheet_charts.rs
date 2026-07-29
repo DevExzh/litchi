@@ -638,15 +638,16 @@ mod tests {
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
         ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue,
-        ChartGapPercentage, ChartGapSpacing, ChartPieLabelDistance, ChartPieLabelVisibility,
-        ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
-        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-        ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-        ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartPieLabelDistance,
+        ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
+        ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+        ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
+        ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
+        ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
+        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+        ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -2258,6 +2259,49 @@ mod tests {
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();
         assert!(reopened.sheet_charts(sheet_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_exact_chart_legend_fill_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let chart = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let object_id = chart.drawable_object_id;
+        let baseline = editor.to_bytes().unwrap();
+
+        assert_eq!(
+            editor.sheet_chart_legend_fill(sheet_id, object_id).unwrap(),
+            ChartLegendFill::Inherited
+        );
+        let solid = ChartLegendFill::Fill(ShapeFill::Solid(
+            RgbaColor::new(0.2, 0.75, 0.4, 1.0, RgbColorSpace::Srgb).unwrap(),
+        ));
+        editor
+            .set_sheet_chart_legend_fill(sheet_id, object_id, &solid)
+            .unwrap();
+        assert_eq!(
+            editor.sheet_chart_legend_fill(sheet_id, object_id).unwrap(),
+            solid
+        );
+        assert!(
+            editor
+                .sheet_chart_legend_visible(sheet_id, object_id)
+                .unwrap()
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_legend_fill(sheet_id, object_id)
+                .unwrap(),
+            solid
+        );
+        reopened
+            .set_sheet_chart_legend_fill(sheet_id, object_id, &ChartLegendFill::Inherited)
+            .unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }
 
     #[test]

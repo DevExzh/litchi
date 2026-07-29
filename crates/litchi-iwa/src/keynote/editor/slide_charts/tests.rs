@@ -8,11 +8,12 @@ use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartGapPercentage, ChartGapSpacing,
-    ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
-    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-    ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartLegendFill, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -1633,6 +1634,46 @@ fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
         .remove_slide_chart(0, duplicate.drawable_object_id)
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
+}
+
+#[test]
+fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let object_id = chart.drawable_object_id;
+    let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.slide_chart_legend_fill(0, object_id).unwrap(),
+        ChartLegendFill::Inherited
+    );
+    let solid = ChartLegendFill::Fill(ShapeFill::Solid(
+        RgbaColor::new(0.15, 0.35, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+    ));
+    editor
+        .set_slide_chart_legend_fill(0, object_id, &solid)
+        .unwrap();
+    assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), solid);
+    assert!(editor.slide_chart_legend_visible(0, object_id).unwrap());
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_fill(0, object_id).unwrap(),
+        solid
+    );
+    reopened
+        .set_slide_chart_legend_fill(0, object_id, &ChartLegendFill::Fill(ShapeFill::None))
+        .unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_fill(0, object_id).unwrap(),
+        ChartLegendFill::Fill(ShapeFill::None)
+    );
+    reopened
+        .set_slide_chart_legend_fill(0, object_id, &ChartLegendFill::Inherited)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), baseline);
 }
 
 #[test]

@@ -1,6 +1,11 @@
 //! Native legend visibility CRUD for Keynote slide charts.
 
 use super::*;
+use crate::charts::ChartLegendFill;
+use crate::charts::legend_fill::{
+    chart_legend_fill as read_native_chart_legend_fill,
+    set_chart_legend_fill as set_native_chart_legend_fill,
+};
 use crate::charts::options::{
     chart_legend_visible as read_native_chart_legend_visible,
     set_chart_legend_visible as set_native_chart_legend_visible,
@@ -24,6 +29,50 @@ impl KeynoteEditor {
         visible: bool,
     ) -> Result<()> {
         set_slide_chart_legend_visible(self, slide_index, drawable_object_id, visible)
+    }
+
+    /// Read the exact inherited or direct native legend fill.
+    pub fn slide_chart_legend_fill(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ChartLegendFill> {
+        let graph = chart_graph(self, slide_index, drawable_object_id)?;
+        read_native_chart_legend_fill(
+            self.package(),
+            &graph.archive_name,
+            drawable_object_id,
+            "Keynote",
+        )
+    }
+
+    /// Set or remove the direct native legend-fill override.
+    pub fn set_slide_chart_legend_fill(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        fill: &ChartLegendFill,
+    ) -> Result<()> {
+        if &self.slide_chart_legend_fill(slide_index, drawable_object_id)? == fill {
+            return Ok(());
+        }
+        let graph = chart_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_native_chart_legend_fill(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            "Keynote",
+            fill,
+        )?;
+        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.slide_chart_legend_fill(slide_index, drawable_object_id)? != *fill {
+            return Err(Error::InvalidFormat(
+                "Keynote chart legend-fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 }
 
