@@ -146,7 +146,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | Path and in-memory workflows |
-| Multiple worksheets | ✅ | ✅ | ✅ | Add, insert at position, access, update, and serialize sheets |
+| Multiple worksheets | ✅ | ✅ | ✅ | Add, insert at position, remove (with defined-name scope remapping and pivot-target rejection), access, update, and serialize sheets |
 | Cell values and ranges | ✅ | ✅ | ✅ | String, rich text, number, boolean, error, date/time, and range access |
 | Formula cells | ✅ | ✅ | ✅ | Formula strings, cached values, shared formulas, and array formulas with typed row-major array-formula discovery (anchor, verbatim `ref` range, text) |
 | Formula evaluation | 🟡 | ✅ | N/A | Shared evaluator with many math, lookup, text, date, financial, and statistical functions |
@@ -208,7 +208,7 @@ conversion, fonts, and image conversion are optional.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | Path and in-memory package workflows |
-| Slides and ordering | ✅ | ✅ | ✅ | Add, insert at position, delete, duplicate, move, resize, enumerate slides and stable IDs, expose hidden state, and validate root slide/master relationships |
+| Slides and ordering | ✅ | ✅ | ✅ | Add, insert at position, insert duplicate at position, delete, duplicate, move, resize, enumerate slides and stable IDs, expose hidden state, and validate root slide/master relationships |
 | Text, text boxes, and bullets | ✅ | ✅ | ✅ | Text extraction and formatted text-box authoring, plus presentation-default text-style inventory and Kinsoku line-breaking settings |
 | Basic shapes and groups | ✅ | ✅ | ✅ | Rectangles, ellipses, text boxes, nested groups, formatting, non-visual IDs, and placeholder inventories |
 | Images and backgrounds | ✅ | ✅ | ✅ | Picture resources, photo-album defaults, plus solid, gradient, pattern, and relationship-resolved picture backgrounds with slide/layout/master inheritance |
@@ -334,7 +334,7 @@ conversion, fonts, and image conversion are optional.
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless `MsoDataStore` item/property XML with typed item GUIDs, schema references, known item-family classification, and IRM redundant/modified promotion markers; schema URIs are never resolved |
 | Page setup, headers/footers, and breaks | ✅ | ✅ | ✅ | Print/page records, page-break authoring, and typed `HeaderFooter` even/first-page text with scale/align flags |
 | Workbook extension flags | ✅ | ✅ | ✅ | Typed `BookExt` AutoRecover/privacy/smart-tag/recovery flags plus conditional ink and publish-state extensions |
-| Miscellaneous workbook records | ✅ | ✅ | ✅ | Typed inert `Backup` save-backup flag, `BkHim` background-image blobs with typed format, `CellWatch` watch ranges, `InterfaceHdr`/`InterfaceEnd` codepage brackets, `HFPicture` header/footer OfficeArt payloads, and `Pls` printer-driver DEVMODE chains reassembled across `Continue` records; all preserve reserved bytes and round-trip byte-exactly |
+| Miscellaneous workbook records | ✅ | ✅ | ✅ | Typed inert `Backup` save-backup flag, `BkHim` background-image blobs with typed format, `CellWatch` watch ranges, `InterfaceHdr`/`InterfaceEnd` codepage brackets, `HFPicture` header/footer OfficeArt payloads, `Pls` printer-driver DEVMODE chains reassembled across `Continue` records, `CrtLayout12`/`CrtLayout12A` chart layout corners with strict mode enums, `ShapePropsStream`/`TextPropsStream`/`RichTextStream` chart XML property streams with verbatim checksums, and `ForceFullCalculation` dependency flags; all preserve reserved bytes and round-trip byte-exactly |
 | Document theme | ✅ | ✅ | ✅ | Inert `Theme` record with custom/default versions and verbatim contents spanning `ContinueFrt12` records |
 | Protection | ✅ | ✅ | ✅ | Sheet, object, scenario, workbook, and password records |
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
@@ -465,6 +465,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Styles and full cell formatting | ✅ | ✅ | ✅ | Text, alignment, borders, backgrounds, number/data styles, protection styles, and read-only named fill-image/gradient/hatch/marker/opacity/stroke-dash inspection; no link following, style-use resolution, or rendering |
 | Conditional cell styles | ✅ | ✅ | ✅ | ODF style-map conditions and ordered mutation; not the full Excel rule family |
 | Sheet conditional formatting | ✅ | ✅ | ✅ | LibreOffice `calcext:conditional-formats` extension parsing and authoring: typed inert condition expressions, color-scale entries, data bars (colors, axis, lengths), icon sets (22 named sets), and date-is buckets with apply-style references, base-cell addresses, and multi-range targets, spoof-rejecting namespace verification, and builder/mutable create/replace/remove round trips; `calcext:custom-iconset` child declarations are skipped on read while the `custom` flag is preserved |
+| Sparklines | ✅ | ✅ | ✅ | LibreOffice `calcext:sparkline-groups` parsing and authoring: typed line/column/stacked groups with date axes, empty-cell handling, direction markers, per-element colors, and multi-range data references, with builder/mutable create/replace/remove round trips; `calcext:sparkline-*-complex-color` theme-color children are skipped on read |
 | Content validation | ✅ | ✅ | ✅ | Conditions, prompts, error messages, events, definitions, and cell bindings |
 | Comments/annotations | ✅ | ✅ | ✅ | Rich text/lists, creator/date, geometry, extensions, and CRUD |
 | Hyperlinks | ✅ | ✅ | ✅ | Typed inert `text:a` anchors preserve and author non-overlapping UTF-8 ranges across namespace-aware mixed paragraph trees, retaining spans, fields, whitespace, extension nodes, and XLink/office/text metadata; links are never followed |
@@ -572,15 +573,15 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 | Form fields | ✅ | ✅ | ✅ | Text, checkbox, dropdown, help/status, defaults, and positional mutation |
 | Mail-merge metadata | ✅ | ✅ | ✅ | Data sources, field mappings, and recipients as inert metadata; no merge execution |
 | Document variables and user properties | ✅ | ✅ | ✅ | Typed values, lexical forms, links, Unicode, and mutation |
-| Embedded OLE objects | ✅ | ✅ | ✅ | OLE1 header decoding, object data/results, positions, alias/section metadata (`\*\objalias`/`\*\objsect`), and mutation; payloads remain inert |
+| Embedded OLE objects | ✅ | ✅ | ✅ | OLE1 header decoding, object data/results, positions, alias/section metadata (`\*\objalias`/`\*\objsect`), last-update timestamps (`\*\objtime`), and mutation; payloads remain inert |
 | Equations/math | 🟡 | ✅ | 🟡 | Typed inert `EQ` field discovery and caller-authored `EQ` field serialization, a typed syntactic model of the ECMA-376 `EQ` instruction switches (fractions, radicals, scripts, integrals/sums/products, arrays, brackets, boxes, overstrikes, lists, and displacements), native `\mmath`/`\mmathPara` zone parsing and writer round trips covering the 19 OMML-mirroring structure kinds, argument/property destinations (including `\margPr`/`\margSz` argument properties and `\mmcs`/`\mmc`/`\mmcPr` matrix-column descriptions), and matrix rows with `\mmathPict` fallback renderings skipped, plus embedded equation objects and math-property metadata; equations are never calculated, formatted, or rendered |
 | Embedded fonts | ✅ | ✅ | ✅ | `fontemb`/`fontfile` destinations and inline data |
 | Themes and data stores | ✅ | ✅ | ✅ | Inert theme/data-store bytes and typed mutation |
 | File table and external references | ✅ | ✅ | ✅ | Bounded inert external-file metadata; targets are never resolved |
 | XML namespaces and XSL transform metadata | ✅ | ✅ | ✅ | Namespace table, transform location/usage, and XML policies; no transform execution |
 | Custom XML markup destinations | ✅ | ✅ | ✅ | Typed inert `\xmlopen`/`\xmlclose`/`\xmlattrname`/`\xmlattrvalue` body-story markup (RTF 1.9.1): tag names, optional `\xmlnsN` namespace references validated against the parsed namespace table, ordered starred attribute pairs, content body-text ranges, proper-nesting/mismatch rejection, and writer round trips; tag names are never schema-validated or resolved, and the markup destinations are rejected with a clear error in non-body stories (notes, headers/footers, shape text, field stories) rather than leaking into story text |
-| Document protection and write reservations | ✅ | ✅ | ✅ | Protection controls, users, hashes, reservations, save preferences, and `\*\protstart`/`\*\protend` exception ranges (validated hex identifiers, arbitrary overlap, unclosed starts extend to body end); no policy enforcement |
-| Document/view/print/compatibility policies | ✅ | ✅ | ✅ | Typed RTF 1.9.1 settings across layout, rendering, privacy, revision, save, style, and compatibility groups |
+| Document protection and write reservations | ✅ | ✅ | ✅ | Protection controls, users, hashes, reservations, save preferences, `\*\protstart`/`\*\protend` exception ranges (validated hex identifiers, arbitrary overlap, unclosed starts extend to body end), and `\ebcstart`/`\ebcend` editable-region boundary marks (positional LIFO pairing, strict rejection outside the body story); no policy enforcement |
+| Document/view/print/compatibility policies | ✅ | ✅ | ✅ | Typed RTF 1.9.1 settings across layout, rendering, privacy, revision, save, style, compatibility, and custom kinsoku (`\*\fchars`/`\*\lchars`/`\ksulangN`, including `\upr`-wrapped CJK header forms) groups |
 | Document info and generator/origin metadata | ✅ | ✅ | ✅ | Title/author/timestamps, generator, origin, caption, and revision-save metadata, with standard `\info` values bridged into the unified metadata facade |
 | Compressed RTF | ✅ | ✅ | ✅ | LZFu compression/decompression |
 | Digital signatures | N/A | N/A | N/A | RTF does not define package signatures |
