@@ -59,16 +59,18 @@ use super::number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
 };
 use super::paragraph_alignment::{
-    paragraph_alignment, paragraph_background, paragraph_borders, paragraph_flow,
-    paragraph_indents, paragraph_line_spacing, paragraph_spacing, paragraph_tab_stops,
-    paragraph_writing_direction, reset_paragraph_alignment, reset_paragraph_background,
-    reset_paragraph_borders, reset_paragraph_flow, reset_paragraph_indents,
+    paragraph_alignment, paragraph_background, paragraph_borders, paragraph_decimal_tab_character,
+    paragraph_default_tab_interval, paragraph_flow, paragraph_indents, paragraph_line_spacing,
+    paragraph_spacing, paragraph_tab_stops, paragraph_writing_direction, reset_paragraph_alignment,
+    reset_paragraph_background, reset_paragraph_borders, reset_paragraph_decimal_tab_character,
+    reset_paragraph_default_tab_interval, reset_paragraph_flow, reset_paragraph_indents,
     reset_paragraph_line_spacing, reset_paragraph_spacing, reset_paragraph_tab_stops,
     reset_paragraph_writing_direction, reset_text_background, reset_text_baseline_shift,
     reset_text_capitalization, reset_text_character_spacing, reset_text_color,
     reset_text_decorations, reset_text_font, reset_text_ligatures, reset_text_outline,
     reset_text_script, reset_text_shadow, reset_text_style, set_paragraph_alignment,
-    set_paragraph_background, set_paragraph_borders, set_paragraph_flow, set_paragraph_indents,
+    set_paragraph_background, set_paragraph_borders, set_paragraph_decimal_tab_character,
+    set_paragraph_default_tab_interval, set_paragraph_flow, set_paragraph_indents,
     set_paragraph_line_spacing, set_paragraph_spacing, set_paragraph_tab_stops,
     set_paragraph_writing_direction, set_text_background, set_text_baseline_shift,
     set_text_capitalization, set_text_character_spacing, set_text_color, set_text_decorations,
@@ -97,7 +99,9 @@ use super::paragraph_list::{
     set_paragraph_list_number_scale, set_paragraph_list_number_tiering,
     set_paragraph_list_numbering, set_paragraph_lists,
 };
-use super::paragraph_tabs::ParagraphTabStops;
+use super::paragraph_tabs::{
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
+};
 use super::position::{TextPosition, TextRange};
 use super::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
@@ -1833,6 +1837,86 @@ impl IWorkTextEditor {
     pub fn reset_paragraph_indents(&mut self, object_id: u64) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = reset_paragraph_indents(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective character used to align decimal tab stops.
+    pub fn paragraph_decimal_tab_character(
+        &self,
+        object_id: u64,
+    ) -> Result<ParagraphDecimalTabCharacter> {
+        paragraph_decimal_tab_character(&self.package, object_id)
+    }
+
+    /// Atomically set the character used to align decimal tab stops.
+    pub fn set_paragraph_decimal_tab_character(
+        &mut self,
+        object_id: u64,
+        character: ParagraphDecimalTabCharacter,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_decimal_tab_character(&mut staged, object_id, character)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_decimal_tab_character(&verified, object_id)? != character {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph decimal-tab character update failed round-trip validation"
+                    .to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited decimal-tab character.
+    pub fn reset_paragraph_decimal_tab_character(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_decimal_tab_character(&mut staged, object_id)?;
+        if changed {
+            let bytes = staged.to_bytes()?;
+            IWorkPackage::from_bytes(&bytes)?;
+            self.package = staged;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective distance between implicit paragraph tab stops.
+    pub fn paragraph_default_tab_interval(
+        &self,
+        object_id: u64,
+    ) -> Result<ParagraphDefaultTabInterval> {
+        paragraph_default_tab_interval(&self.package, object_id)
+    }
+
+    /// Atomically set the distance between implicit paragraph tab stops.
+    pub fn set_paragraph_default_tab_interval(
+        &mut self,
+        object_id: u64,
+        interval: ParagraphDefaultTabInterval,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_paragraph_default_tab_interval(&mut staged, object_id, interval)?;
+        let bytes = staged.to_bytes()?;
+        let verified = IWorkPackage::from_bytes(&bytes)?;
+        if paragraph_default_tab_interval(&verified, object_id)? != interval {
+            return Err(Error::InvalidFormat(
+                "iWork paragraph default-tab interval update failed round-trip validation"
+                    .to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited default-tab interval.
+    pub fn reset_paragraph_default_tab_interval(&mut self, object_id: u64) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = reset_paragraph_default_tab_interval(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
             IWorkPackage::from_bytes(&bytes)?;

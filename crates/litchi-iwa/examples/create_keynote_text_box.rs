@@ -10,11 +10,12 @@ use litchi_iwa::shapes::{
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDropCap, ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList,
-    ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
+    ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns, TextCommentBody,
     TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
     TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
@@ -184,17 +185,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ParagraphIndentPoints::from_points(10.5)?,
         ),
     )?;
-    editor.set_slide_text_box_paragraph_tab_stops(
-        0,
-        created.drawable_object_id,
-        ParagraphTabStops::new(vec![
-            ParagraphTabStop::new(
-                ParagraphTabPosition::from_points(63.0)?,
-                ParagraphTabAlignment::Decimal,
-            )
-            .with_leader(ParagraphTabLeader::new(".")?),
-        ])?,
-    )?;
     editor.set_slide_text_box_paragraph_list(
         0,
         created.drawable_object_id,
@@ -265,6 +255,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_wrap(DropCapWrap::Contour)
             .with_padding(DropCapPadding::from_points(8.0)?)
             .with_outdent(DropCapOutdent::from_ratio(0.40)?),
+    )?;
+    editor.set_slide_text_box_paragraph_tab_stops(
+        0,
+        created.drawable_object_id,
+        ParagraphTabStops::new(vec![
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(63.0)?,
+                ParagraphTabAlignment::Decimal,
+            )
+            .with_leader(ParagraphTabLeader::new(".")?),
+        ])?,
+    )?;
+    let tab_defaults_box = editor.add_slide_text_box(
+        0,
+        "Amount\t12,34",
+        DrawablePoint { x: 144.0, y: 880.0 },
+        DrawableSize {
+            width: 560.0,
+            height: 96.0,
+        },
+    )?;
+    editor.set_slide_text_box_paragraph_decimal_tab_character(
+        0,
+        tab_defaults_box.drawable_object_id,
+        ParagraphDecimalTabCharacter::COMMA,
+    )?;
+    editor.set_slide_text_box_paragraph_default_tab_interval(
+        0,
+        tab_defaults_box.drawable_object_id,
+        ParagraphDefaultTabInterval::from_points(48.0)?,
     )?;
     editor.save(output)?;
     println!(

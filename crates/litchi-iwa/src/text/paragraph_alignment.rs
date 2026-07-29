@@ -15,7 +15,9 @@ use self::native::ParagraphStyleOverrides;
 use super::font::TextFont;
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
-use super::paragraph_tabs::ParagraphTabStops;
+use super::paragraph_tabs::{
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
+};
 use super::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
     ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
@@ -48,6 +50,8 @@ enum ParagraphProperty<'a> {
     LineSpacing(ParagraphLineSpacing),
     Spacing(ParagraphSpacing),
     Indents(ParagraphIndents),
+    DecimalTabCharacter(ParagraphDecimalTabCharacter),
+    DefaultTabInterval(ParagraphDefaultTabInterval),
     TabStops(Cow<'a, ParagraphTabStops>),
 }
 
@@ -73,6 +77,8 @@ enum ParagraphPropertyKind {
     LineSpacing,
     Spacing,
     Indents,
+    DecimalTabCharacter,
+    DefaultTabInterval,
     TabStops,
 }
 
@@ -596,6 +602,74 @@ pub(super) fn paragraph_tab_stops(
     native::inherited_tab_stops(package, storage.style_id)
 }
 
+pub(super) fn paragraph_decimal_tab_character(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphDecimalTabCharacter> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_decimal_tab_character(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_decimal_tab_character(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    character: ParagraphDecimalTabCharacter,
+) -> Result<()> {
+    if paragraph_decimal_tab_character(package, storage_id)? == character {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::DecimalTabCharacter(character),
+    )
+}
+
+pub(super) fn reset_paragraph_decimal_tab_character(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+) -> Result<bool> {
+    reset_property(
+        package,
+        storage_id,
+        ParagraphPropertyKind::DecimalTabCharacter,
+    )
+}
+
+pub(super) fn paragraph_default_tab_interval(
+    package: &IWorkPackage,
+    storage_id: u64,
+) -> Result<ParagraphDefaultTabInterval> {
+    let storage = storage::locate(package, storage_id)?;
+    native::inherited_default_tab_interval(package, storage.style_id)
+}
+
+pub(super) fn set_paragraph_default_tab_interval(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+    interval: ParagraphDefaultTabInterval,
+) -> Result<()> {
+    if paragraph_default_tab_interval(package, storage_id)? == interval {
+        return Ok(());
+    }
+    set_property(
+        package,
+        storage_id,
+        ParagraphProperty::DefaultTabInterval(interval),
+    )
+}
+
+pub(super) fn reset_paragraph_default_tab_interval(
+    package: &mut IWorkPackage,
+    storage_id: u64,
+) -> Result<bool> {
+    reset_property(
+        package,
+        storage_id,
+        ParagraphPropertyKind::DefaultTabInterval,
+    )
+}
+
 pub(super) fn set_paragraph_tab_stops(
     package: &mut IWorkPackage,
     storage_id: u64,
@@ -634,7 +708,15 @@ fn set_property(
         )));
     }
 
+    // iWork normalizes tab defaults as a child variation of the current
+    // paragraph style. Folding them into an existing multi-property variation
+    // is wire-valid but the applications ignore those fields when opening it.
+    let requires_child_variation = matches!(
+        &property,
+        ParagraphProperty::DecimalTabCharacter(_) | ParagraphProperty::DefaultTabInterval(_)
+    );
     if let Some(mut overrides) = native::direct_overrides(&style.style, &style.message.data)?
+        && (!requires_child_variation || overrides.is_tab_defaults_only())
         && native::is_exclusive(package, storage.style_id)?
     {
         let parent_style_id = native::parent_style_id(&style.style, storage.style_id)?;
@@ -954,6 +1036,12 @@ fn apply_property(
             overrides.left_indent = Some(indents.left);
             overrides.right_indent = Some(indents.right);
         },
+        ParagraphProperty::DecimalTabCharacter(character) => {
+            overrides.decimal_tab_character = Some(*character);
+        },
+        ParagraphProperty::DefaultTabInterval(interval) => {
+            overrides.default_tab_interval = Some(*interval);
+        },
         ParagraphProperty::TabStops(stops) => {
             overrides.tab_stops = Some(stops.as_ref().clone());
         },
@@ -999,6 +1087,8 @@ fn has_property(overrides: &ParagraphStyleOverrides, kind: ParagraphPropertyKind
                 || overrides.left_indent.is_some()
                 || overrides.right_indent.is_some()
         },
+        ParagraphPropertyKind::DecimalTabCharacter => overrides.decimal_tab_character.is_some(),
+        ParagraphPropertyKind::DefaultTabInterval => overrides.default_tab_interval.is_some(),
         ParagraphPropertyKind::TabStops => overrides.tab_stops.is_some(),
     }
 }
@@ -1045,6 +1135,8 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
             overrides.left_indent = None;
             overrides.right_indent = None;
         },
+        ParagraphPropertyKind::DecimalTabCharacter => overrides.decimal_tab_character = None,
+        ParagraphPropertyKind::DefaultTabInterval => overrides.default_tab_interval = None,
         ParagraphPropertyKind::TabStops => overrides.tab_stops = None,
     }
 }
@@ -1115,6 +1207,12 @@ fn inherited_property(
         ParagraphPropertyKind::Indents => Ok(ParagraphProperty::Indents(
             native::inherited_indents(package, style_id)?,
         )),
+        ParagraphPropertyKind::DecimalTabCharacter => Ok(ParagraphProperty::DecimalTabCharacter(
+            native::inherited_decimal_tab_character(package, style_id)?,
+        )),
+        ParagraphPropertyKind::DefaultTabInterval => Ok(ParagraphProperty::DefaultTabInterval(
+            native::inherited_default_tab_interval(package, style_id)?,
+        )),
         ParagraphPropertyKind::TabStops => Ok(ParagraphProperty::TabStops(Cow::Owned(
             native::inherited_tab_stops(package, style_id)?,
         ))),
@@ -1177,6 +1275,12 @@ fn validate_expected_property(
         },
         ParagraphProperty::Spacing(spacing) => paragraph_spacing(package, storage_id)? == spacing,
         ParagraphProperty::Indents(indents) => paragraph_indents(package, storage_id)? == indents,
+        ParagraphProperty::DecimalTabCharacter(character) => {
+            paragraph_decimal_tab_character(package, storage_id)? == character
+        },
+        ParagraphProperty::DefaultTabInterval(interval) => {
+            paragraph_default_tab_interval(package, storage_id)? == interval
+        },
         ParagraphProperty::TabStops(stops) => {
             paragraph_tab_stops(package, storage_id)?.as_slice() == stops.as_ref().as_slice()
         },

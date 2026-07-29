@@ -10,11 +10,12 @@ use litchi_iwa::shapes::{
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDropCap, ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList,
-    ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
+    ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
     TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
     TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
@@ -189,17 +190,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ParagraphIndentPoints::from_points(2.833_333_3)?,
         ),
     )?;
-    editor.set_sheet_text_box_paragraph_tab_stops(
-        sheet_id,
-        created.drawable_object_id,
-        ParagraphTabStops::new(vec![
-            ParagraphTabStop::new(
-                ParagraphTabPosition::from_points(43.0)?,
-                ParagraphTabAlignment::Right,
-            )
-            .with_leader(ParagraphTabLeader::new("-")?),
-        ])?,
-    )?;
     editor.set_sheet_text_box_paragraph_list(
         sheet_id,
         created.drawable_object_id,
@@ -269,6 +259,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_raised_lines(DropCapRaisedLines::new(2)?)
             .with_padding(DropCapPadding::from_points(4.0)?)
             .with_outdent(DropCapOutdent::from_ratio(0.10)?),
+    )?;
+    editor.set_sheet_text_box_paragraph_tab_stops(
+        sheet_id,
+        created.drawable_object_id,
+        ParagraphTabStops::new(vec![
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(43.0)?,
+                ParagraphTabAlignment::Right,
+            )
+            .with_leader(ParagraphTabLeader::new("-")?),
+        ])?,
+    )?;
+    let tab_defaults_box = editor.add_sheet_text_box(
+        sheet_id,
+        "Amount\t12,34",
+        DrawablePoint { x: 40.0, y: 560.0 },
+        DrawableSize {
+            width: 280.0,
+            height: 72.0,
+        },
+    )?;
+    editor.set_sheet_text_box_paragraph_decimal_tab_character(
+        sheet_id,
+        tab_defaults_box.drawable_object_id,
+        ParagraphDecimalTabCharacter::COMMA,
+    )?;
+    editor.set_sheet_text_box_paragraph_default_tab_interval(
+        sheet_id,
+        tab_defaults_box.drawable_object_id,
+        ParagraphDefaultTabInterval::from_points(42.0)?,
     )?;
     editor.save(output)?;
     println!(

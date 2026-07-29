@@ -10,11 +10,12 @@ use litchi_iwa::shapes::{
 use litchi_iwa::text::{
     DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
     DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDropCap, ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList,
-    ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
+    ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList, ParagraphListLevel,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
     TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
     TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
@@ -146,20 +147,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ParagraphIndentPoints::from_points(12.0)?,
         ),
     )?;
-    editor.set_text_box_paragraph_tab_stops(
-        created.drawable_object_id,
-        ParagraphTabStops::new(vec![
-            ParagraphTabStop::new(
-                ParagraphTabPosition::from_points(48.5)?,
-                ParagraphTabAlignment::Left,
-            ),
-            ParagraphTabStop::new(
-                ParagraphTabPosition::from_points(56.0)?,
-                ParagraphTabAlignment::Center,
-            )
-            .with_leader(ParagraphTabLeader::new(".")?),
-        ])?,
-    )?;
     editor.set_text_box_paragraph_list(created.drawable_object_id, ParagraphList::Bullet)?;
     let first_word_end = text.find(char::is_whitespace).unwrap_or(text.len());
     editor.add_text_box_highlight(
@@ -219,6 +206,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_wrap(DropCapWrap::Contour)
             .with_padding(DropCapPadding::from_points(6.0)?)
             .with_outdent(DropCapOutdent::from_ratio(0.25)?),
+    )?;
+    editor.set_text_box_paragraph_tab_stops(
+        created.drawable_object_id,
+        ParagraphTabStops::new(vec![
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(48.5)?,
+                ParagraphTabAlignment::Left,
+            ),
+            ParagraphTabStop::new(
+                ParagraphTabPosition::from_points(56.0)?,
+                ParagraphTabAlignment::Center,
+            )
+            .with_leader(ParagraphTabLeader::new(".")?),
+        ])?,
+    )?;
+    let tab_defaults_box = editor.add_text_box(
+        anchor,
+        "Amount\t12,34",
+        DrawablePoint { x: 72.0, y: 540.0 },
+        DrawableSize {
+            width: 280.0,
+            height: 72.0,
+        },
+    )?;
+    editor.set_text_box_paragraph_decimal_tab_character(
+        tab_defaults_box.drawable_object_id,
+        ParagraphDecimalTabCharacter::COMMA,
+    )?;
+    editor.set_text_box_paragraph_default_tab_interval(
+        tab_defaults_box.drawable_object_id,
+        ParagraphDefaultTabInterval::from_points(54.0)?,
     )?;
     editor.save(output)?;
     println!(

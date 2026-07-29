@@ -4,7 +4,9 @@
 
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
-use super::paragraph_tabs::ParagraphTabStops;
+use super::paragraph_tabs::{
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
+};
 use crate::shapes::{
     RgbaColor, ShapeDropShadow, ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance,
     ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeStroke, StrokeCap,
@@ -713,6 +715,10 @@ pub struct ParagraphStyle {
     pub spacing: ParagraphSpacing,
     /// First-line, left, and right paragraph indentation.
     pub indents: ParagraphIndents,
+    /// Character used to align decimal tab stops.
+    pub decimal_tab_character: ParagraphDecimalTabCharacter,
+    /// Distance between implicit paragraph tab stops.
+    pub default_tab_interval: ParagraphDefaultTabInterval,
     /// Explicit ruler tab stops inherited by the paragraph.
     pub tab_stops: ParagraphTabStops,
 }
@@ -729,6 +735,8 @@ impl ParagraphStyle {
             line_spacing: ParagraphLineSpacing::default(),
             spacing: ParagraphSpacing::default(),
             indents: ParagraphIndents::default(),
+            decimal_tab_character: ParagraphDecimalTabCharacter::default(),
+            default_tab_interval: ParagraphDefaultTabInterval::default(),
             tab_stops: ParagraphTabStops::default(),
         }
     }

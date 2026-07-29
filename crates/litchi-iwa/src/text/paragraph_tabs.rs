@@ -1,5 +1,80 @@
 //! Strict public paragraph ruler tab-stop types.
 
+/// Default distance between implicit paragraph tab stops.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct ParagraphDefaultTabInterval(f32);
+
+impl ParagraphDefaultTabInterval {
+    /// Native iWork default: half an inch, or 36 typographic points.
+    pub const DEFAULT: Self = Self(36.0);
+
+    /// Construct a finite, positive interval in typographic points.
+    pub fn from_points(points: f32) -> crate::Result<Self> {
+        if !points.is_finite() || points <= 0.0 {
+            return Err(crate::Error::InvalidFormat(
+                "paragraph default tab interval must be finite and positive".to_owned(),
+            ));
+        }
+        Ok(Self(points))
+    }
+
+    /// Return the interval in typographic points.
+    pub const fn points(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for ParagraphDefaultTabInterval {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// Character used to align decimal tab stops.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ParagraphDecimalTabCharacter(char);
+
+impl ParagraphDecimalTabCharacter {
+    pub const PERIOD: Self = Self('.');
+    pub const COMMA: Self = Self(',');
+
+    /// Construct a decimal-tab character from one non-control Unicode scalar.
+    pub fn new(character: char) -> crate::Result<Self> {
+        if character.is_control() {
+            return Err(crate::Error::InvalidFormat(
+                "paragraph decimal-tab character must not be a control character".to_owned(),
+            ));
+        }
+        Ok(Self(character))
+    }
+
+    /// Return the Unicode scalar used for decimal alignment.
+    pub const fn character(self) -> char {
+        self.0
+    }
+
+    pub(crate) fn from_native(value: &str) -> crate::Result<Self> {
+        let mut characters = value.chars();
+        let Some(character) = characters.next() else {
+            return Err(crate::Error::InvalidFormat(
+                "native iWork decimal-tab character is empty".to_owned(),
+            ));
+        };
+        if characters.next().is_some() {
+            return Err(crate::Error::InvalidFormat(
+                "native iWork decimal-tab character contains multiple Unicode scalars".to_owned(),
+            ));
+        }
+        Self::new(character)
+    }
+}
+
+impl Default for ParagraphDecimalTabCharacter {
+    fn default() -> Self {
+        Self::PERIOD
+    }
+}
+
 /// Nonnegative tab-stop position measured from the left text boundary.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 pub struct ParagraphTabPosition(f32);
@@ -144,6 +219,25 @@ mod tests {
 
     #[test]
     fn tab_stops_are_strict_typed_and_ordered() {
+        assert_eq!(ParagraphDefaultTabInterval::default().points(), 36.0);
+        assert_eq!(
+            ParagraphDefaultTabInterval::from_points(54.0)
+                .unwrap()
+                .points(),
+            54.0
+        );
+        assert!(ParagraphDefaultTabInterval::from_points(0.0).is_err());
+        assert!(ParagraphDefaultTabInterval::from_points(f32::INFINITY).is_err());
+        assert_eq!(ParagraphDecimalTabCharacter::COMMA.character(), ',');
+        assert_eq!(
+            ParagraphDecimalTabCharacter::from_native("٫")
+                .unwrap()
+                .character(),
+            '٫'
+        );
+        assert!(ParagraphDecimalTabCharacter::new('\n').is_err());
+        assert!(ParagraphDecimalTabCharacter::from_native("").is_err());
+        assert!(ParagraphDecimalTabCharacter::from_native("..").is_err());
         let stops = ParagraphTabStops::new(vec![
             ParagraphTabStop::new(
                 ParagraphTabPosition::from_points(48.5).unwrap(),

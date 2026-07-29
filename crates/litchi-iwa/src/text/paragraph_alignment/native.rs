@@ -17,7 +17,9 @@ use crate::{Error, IWorkPackage, Result};
 use super::super::font::{TextFont, TextFontName};
 use super::super::paragraph_direction::ParagraphWritingDirection;
 use super::super::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
-use super::super::paragraph_tabs::ParagraphTabStops;
+use super::super::paragraph_tabs::{
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
+};
 use super::super::style::{
     ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
     ParagraphBorders, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
@@ -69,6 +71,9 @@ const COLOR_BLUE_FIELD: u32 = 5;
 const COLOR_ALPHA_FIELD: u32 = 6;
 const COLOR_RGB_SPACE_FIELD: u32 = 12;
 const PARAGRAPH_ALIGNMENT_FIELD: u32 = 1;
+const PARAGRAPH_DECIMAL_TAB_NULL_FIELD: u32 = 2;
+const PARAGRAPH_DECIMAL_TAB_FIELD: u32 = 3;
+const PARAGRAPH_DEFAULT_TAB_INTERVAL_FIELD: u32 = 4;
 const PARAGRAPH_FILL_NULL_FIELD: u32 = 5;
 const PARAGRAPH_FILL_FIELD: u32 = 6;
 const PARAGRAPH_FIRST_LINE_INDENT_FIELD: u32 = 7;
@@ -145,6 +150,8 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) first_line_indent: Option<ParagraphIndentPoints>,
     pub(crate) left_indent: Option<ParagraphIndentPoints>,
     pub(crate) right_indent: Option<ParagraphIndentPoints>,
+    pub(crate) decimal_tab_character: Option<ParagraphDecimalTabCharacter>,
+    pub(crate) default_tab_interval: Option<ParagraphDefaultTabInterval>,
     pub(crate) tab_stops: Option<ParagraphTabStops>,
 }
 
@@ -194,11 +201,20 @@ impl ParagraphStyleOverrides {
             + u32::from(self.first_line_indent.is_some())
             + u32::from(self.left_indent.is_some())
             + u32::from(self.right_indent.is_some())
+            + u32::from(self.decimal_tab_character.is_some())
+            + u32::from(self.default_tab_interval.is_some())
             + u32::from(self.tab_stops.is_some())
     }
 
     pub(crate) fn is_empty(&self) -> bool {
         self.count() == 0
+    }
+
+    pub(crate) fn is_tab_defaults_only(&self) -> bool {
+        !self.is_empty()
+            && self.count()
+                == u32::from(self.decimal_tab_character.is_some())
+                    + u32::from(self.default_tab_interval.is_some())
     }
 
     pub(crate) fn is_chart_font_format_only(&self) -> bool {
@@ -232,6 +248,8 @@ impl ParagraphStyleOverrides {
             && self.first_line_indent.is_none()
             && self.left_indent.is_none()
             && self.right_indent.is_none()
+            && self.decimal_tab_character.is_none()
+            && self.default_tab_interval.is_none()
             && self.tab_stops.is_none()
     }
 }
@@ -411,6 +429,20 @@ pub(crate) fn inherited_tab_stops(
     inheritance::tab_stops(package, first_style_id)
 }
 
+pub(crate) fn inherited_decimal_tab_character(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphDecimalTabCharacter> {
+    inheritance::decimal_tab_character(package, first_style_id)
+}
+
+pub(crate) fn inherited_default_tab_interval(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphDefaultTabInterval> {
+    inheritance::default_tab_interval(package, first_style_id)
+}
+
 pub(crate) fn direct_overrides(
     style: &tswp::ParagraphStyleArchive,
     raw: &[u8],
@@ -504,6 +536,24 @@ pub(crate) fn direct_overrides(
         .right_indent
         .map(ParagraphIndentPoints::from_points)
         .transpose()?;
+    let decimal_tab_character = if properties.decimal_tab_null == Some(true) {
+        if properties.decimal_tab.is_some() {
+            return Err(Error::InvalidFormat(
+                "native iWork decimal tab is both null and populated".to_owned(),
+            ));
+        }
+        Some(ParagraphDecimalTabCharacter::default())
+    } else {
+        properties
+            .decimal_tab
+            .as_deref()
+            .map(ParagraphDecimalTabCharacter::from_native)
+            .transpose()?
+    };
+    let default_tab_interval = properties
+        .default_tab_stops
+        .map(ParagraphDefaultTabInterval::from_points)
+        .transpose()?;
     let tab_stops = properties
         .tabs
         .as_ref()
@@ -540,6 +590,8 @@ pub(crate) fn direct_overrides(
         first_line_indent,
         left_indent,
         right_indent,
+        decimal_tab_character,
+        default_tab_interval,
         tab_stops,
     };
     let mut remaining = properties.clone();
@@ -569,6 +621,11 @@ pub(crate) fn direct_overrides(
     remaining.first_line_indent = None;
     remaining.left_indent = None;
     remaining.right_indent = None;
+    if decimal_tab_character.is_some() {
+        remaining.decimal_tab_null = None;
+        remaining.decimal_tab = None;
+    }
+    remaining.default_tab_stops = None;
     remaining.tabs = None;
     let mut remaining_character = character_properties.clone();
     remaining_character.bold = None;
@@ -808,6 +865,19 @@ pub(crate) fn direct_overrides(
     if right_indent.is_some() {
         paragraph_fields.push(PARAGRAPH_RIGHT_INDENT_FIELD);
     }
+    if decimal_tab_character.is_some() {
+        if properties.decimal_tab_null == Some(true) {
+            paragraph_fields.push(PARAGRAPH_DECIMAL_TAB_NULL_FIELD);
+            if !has_canonical_bool_field(paragraph_raw, PARAGRAPH_DECIMAL_TAB_NULL_FIELD)? {
+                return Ok(None);
+            }
+        } else {
+            paragraph_fields.push(PARAGRAPH_DECIMAL_TAB_FIELD);
+        }
+    }
+    if default_tab_interval.is_some() {
+        paragraph_fields.push(PARAGRAPH_DEFAULT_TAB_INTERVAL_FIELD);
+    }
     if let Some(stops) = overrides.tab_stops.as_ref() {
         paragraph_fields.push(PARAGRAPH_TABS_FIELD);
         let tabs_raw = required_payload(paragraph_raw, PARAGRAPH_TABS_FIELD, "paragraph tabs")?;
@@ -946,6 +1016,12 @@ pub(crate) fn variation_object(
                 .map(ParagraphIndentPoints::points),
             left_indent: overrides.left_indent.map(ParagraphIndentPoints::points),
             right_indent: overrides.right_indent.map(ParagraphIndentPoints::points),
+            decimal_tab: overrides
+                .decimal_tab_character
+                .map(|character| character.character().to_string()),
+            default_tab_stops: overrides
+                .default_tab_interval
+                .map(ParagraphDefaultTabInterval::points),
             tabs: overrides.tab_stops.as_ref().map(tabs::archive),
             ..Default::default()
         }),

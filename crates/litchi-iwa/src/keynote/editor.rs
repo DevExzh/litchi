@@ -26,18 +26,18 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
-    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
+    ParagraphStart, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
+    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
+    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
+    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
+    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -2996,6 +2996,102 @@ impl KeynoteEditor {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
         let changed = staged.reset_paragraph_indents(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the decimal-tab alignment character of a slide text box.
+    pub fn slide_text_box_paragraph_decimal_tab_character(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphDecimalTabCharacter> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_decimal_tab_character(graph.storage_id)
+    }
+
+    /// Atomically set the decimal-tab alignment character of a slide text box.
+    pub fn set_slide_text_box_paragraph_decimal_tab_character(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        character: ParagraphDecimalTabCharacter,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_decimal_tab_character(graph.storage_id, character)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified
+            .slide_text_box_paragraph_decimal_tab_character(slide_index, drawable_object_id)?
+            != character
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box decimal-tab character update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited decimal-tab alignment character.
+    pub fn reset_slide_text_box_paragraph_decimal_tab_character(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_decimal_tab_character(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the distance between implicit tab stops in a slide text box.
+    pub fn slide_text_box_paragraph_default_tab_interval(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphDefaultTabInterval> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_default_tab_interval(graph.storage_id)
+    }
+
+    /// Atomically set the distance between implicit tab stops in a slide text box.
+    pub fn set_slide_text_box_paragraph_default_tab_interval(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        interval: ParagraphDefaultTabInterval,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_default_tab_interval(graph.storage_id, interval)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified
+            .slide_text_box_paragraph_default_tab_interval(slide_index, drawable_object_id)?
+            != interval
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box default-tab interval update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited default-tab interval.
+    pub fn reset_slide_text_box_paragraph_default_tab_interval(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_default_tab_interval(graph.storage_id)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

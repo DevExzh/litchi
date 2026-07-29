@@ -7,7 +7,9 @@ use crate::shapes::RgbaColor;
 use crate::text::font::TextFont;
 use crate::text::paragraph_direction::ParagraphWritingDirection;
 use crate::text::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
-use crate::text::paragraph_tabs::ParagraphTabStops;
+use crate::text::paragraph_tabs::{
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
+};
 use crate::text::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
     ParagraphLineSpacing, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextBackground,
@@ -489,6 +491,50 @@ pub(super) fn tab_stops(package: &IWorkPackage, first_style_id: u64) -> Result<P
             return Ok(InheritanceControl::Continue);
         };
         *value = Some(tabs::from_archive(archive)?);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn decimal_tab_character(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphDecimalTabCharacter> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(properties) = style.para_properties.as_ref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        if properties.decimal_tab_null == Some(true) {
+            if properties.decimal_tab.is_some() {
+                return Err(Error::InvalidFormat(
+                    "native iWork decimal tab is both null and populated".to_owned(),
+                ));
+            }
+            *value = Some(ParagraphDecimalTabCharacter::default());
+            return Ok(InheritanceControl::Complete);
+        }
+        let Some(character) = properties.decimal_tab.as_deref() else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(ParagraphDecimalTabCharacter::from_native(character)?);
+        Ok(InheritanceControl::Complete)
+    })?;
+    Ok(value.unwrap_or_default())
+}
+
+pub(super) fn default_tab_interval(
+    package: &IWorkPackage,
+    first_style_id: u64,
+) -> Result<ParagraphDefaultTabInterval> {
+    let value = walk(package, first_style_id, None, |value, style| {
+        let Some(points) = style
+            .para_properties
+            .as_ref()
+            .and_then(|properties| properties.default_tab_stops)
+        else {
+            return Ok(InheritanceControl::Continue);
+        };
+        *value = Some(ParagraphDefaultTabInterval::from_points(points)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())

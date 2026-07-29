@@ -42,13 +42,14 @@ use crate::table_appearance::TableAppearance;
 use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
 use crate::table_lock::TableLockState;
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
-    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
+    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
+    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
@@ -2280,6 +2281,102 @@ impl NumbersEditor {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
         let changed = text.reset_paragraph_indents(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the decimal-tab alignment character of a sheet text box.
+    pub fn sheet_text_box_paragraph_decimal_tab_character(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphDecimalTabCharacter> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_decimal_tab_character(graph.storage_id)
+    }
+
+    /// Atomically set the decimal-tab alignment character of a sheet text box.
+    pub fn set_sheet_text_box_paragraph_decimal_tab_character(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        character: ParagraphDecimalTabCharacter,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_decimal_tab_character(graph.storage_id, character)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_decimal_tab_character(sheet_id, drawable_object_id)?
+            != character
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box decimal-tab character update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited decimal-tab alignment character.
+    pub fn reset_sheet_text_box_paragraph_decimal_tab_character(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_decimal_tab_character(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(text.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the distance between implicit tab stops in a sheet text box.
+    pub fn sheet_text_box_paragraph_default_tab_interval(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphDefaultTabInterval> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        IWorkTextEditor::from_package(self.package.clone())
+            .paragraph_default_tab_interval(graph.storage_id)
+    }
+
+    /// Atomically set the distance between implicit tab stops in a sheet text box.
+    pub fn set_sheet_text_box_paragraph_default_tab_interval(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        interval: ParagraphDefaultTabInterval,
+    ) -> Result<()> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        text.set_paragraph_default_tab_interval(graph.storage_id, interval)?;
+        let verified = Self::from_package(text.into_package())?;
+        if verified.sheet_text_box_paragraph_default_tab_interval(sheet_id, drawable_object_id)?
+            != interval
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers text-box default-tab interval update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited default-tab interval.
+    pub fn reset_sheet_text_box_paragraph_default_tab_interval(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
+        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let changed = text.reset_paragraph_default_tab_interval(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

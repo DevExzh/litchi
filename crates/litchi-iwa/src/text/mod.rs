@@ -110,8 +110,8 @@ pub(crate) use paragraph_list::{
     paragraph_lists as paragraph_lists_in_storage, preset_style_id, preset_style_object,
 };
 pub use paragraph_tabs::{
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
 };
 pub use position::{TextPosition, TextRange};
 pub use text_comment_types::{

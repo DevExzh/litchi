@@ -13,7 +13,8 @@ use crate::shapes::{
 };
 use crate::text::{
     IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphHyphenation,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
     ParagraphWritingDirection, TextBackground, TextBaselineShift, TextCapitalization,
@@ -2226,6 +2227,199 @@ fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
     assert!(
         keynote
             .reset_slide_text_box_paragraph_writing_direction(0, keynote_box.drawable_object_id,)
+            .unwrap()
+    );
+    assert_eq!(keynote.to_bytes().unwrap(), keynote_before);
+}
+
+#[test]
+fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
+    let interval = ParagraphDefaultTabInterval::from_points(54.0).unwrap();
+    let character = ParagraphDecimalTabCharacter::COMMA;
+
+    let mut pages = PagesEditor::create_with_text("Tab defaults").unwrap();
+    let pages_box = pages
+        .add_text_box(
+            7,
+            "12,34\tPages",
+            DrawablePoint { x: 20.0, y: 40.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let pages_before = pages.to_bytes().unwrap();
+    pages
+        .set_text_box_paragraph_decimal_tab_character(pages_box.drawable_object_id, character)
+        .unwrap();
+    pages
+        .set_text_box_paragraph_default_tab_interval(pages_box.drawable_object_id, interval)
+        .unwrap();
+    let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        pages
+            .text_box_paragraph_decimal_tab_character(pages_box.drawable_object_id)
+            .unwrap(),
+        character
+    );
+    assert_eq!(
+        pages
+            .text_box_paragraph_default_tab_interval(pages_box.drawable_object_id)
+            .unwrap(),
+        interval
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_decimal_tab_character(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(
+        pages
+            .text_box_paragraph_default_tab_interval(pages_box.drawable_object_id)
+            .unwrap(),
+        interval
+    );
+    assert!(
+        pages
+            .reset_text_box_paragraph_default_tab_interval(pages_box.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(pages.to_bytes().unwrap(), pages_before);
+
+    let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
+    let sheet_id = numbers.sheets().unwrap()[0].object_id;
+    let numbers_box = numbers
+        .add_sheet_text_box(
+            sheet_id,
+            "12,34\tNumbers",
+            DrawablePoint { x: 20.0, y: 200.0 },
+            DrawableSize {
+                width: 240.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let numbers_before = numbers.to_bytes().unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_decimal_tab_character(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            character,
+        )
+        .unwrap();
+    numbers
+        .set_sheet_text_box_paragraph_default_tab_interval(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            interval,
+        )
+        .unwrap();
+    let mut numbers =
+        crate::numbers::NumbersEditor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_decimal_tab_character(
+                sheet_id,
+                numbers_box.drawable_object_id,
+            )
+            .unwrap(),
+        character
+    );
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_default_tab_interval(
+                sheet_id,
+                numbers_box.drawable_object_id,
+            )
+            .unwrap(),
+        interval
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_paragraph_decimal_tab_character(
+                sheet_id,
+                numbers_box.drawable_object_id,
+            )
+            .unwrap()
+    );
+    assert_eq!(
+        numbers
+            .sheet_text_box_paragraph_default_tab_interval(
+                sheet_id,
+                numbers_box.drawable_object_id,
+            )
+            .unwrap(),
+        interval
+    );
+    assert!(
+        numbers
+            .reset_sheet_text_box_paragraph_default_tab_interval(
+                sheet_id,
+                numbers_box.drawable_object_id,
+            )
+            .unwrap()
+    );
+    assert_eq!(numbers.to_bytes().unwrap(), numbers_before);
+
+    let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
+    let keynote_box = keynote
+        .add_slide_text_box(
+            0,
+            "12,34\tKeynote",
+            DrawablePoint { x: 80.0, y: 500.0 },
+            DrawableSize {
+                width: 500.0,
+                height: 100.0,
+            },
+        )
+        .unwrap();
+    let keynote_before = keynote.to_bytes().unwrap();
+    keynote
+        .set_slide_text_box_paragraph_decimal_tab_character(
+            0,
+            keynote_box.drawable_object_id,
+            character,
+        )
+        .unwrap();
+    keynote
+        .set_slide_text_box_paragraph_default_tab_interval(
+            0,
+            keynote_box.drawable_object_id,
+            interval,
+        )
+        .unwrap();
+    let mut keynote =
+        crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_decimal_tab_character(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        character
+    );
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_default_tab_interval(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        interval
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_paragraph_decimal_tab_character(
+                0,
+                keynote_box.drawable_object_id,
+            )
+            .unwrap()
+    );
+    assert_eq!(
+        keynote
+            .slide_text_box_paragraph_default_tab_interval(0, keynote_box.drawable_object_id)
+            .unwrap(),
+        interval
+    );
+    assert!(
+        keynote
+            .reset_slide_text_box_paragraph_default_tab_interval(0, keynote_box.drawable_object_id,)
             .unwrap()
     );
     assert_eq!(keynote.to_bytes().unwrap(), keynote_before);
