@@ -3863,7 +3863,9 @@ impl<'a> Lexer<'a> {
             "sec" => ControlWord::Second(param_value),
 
             // Unicode
-            "u" => ControlWord::Unicode(param_value),
+            "u" => ControlWord::Unicode(param.ok_or_else(|| {
+                RtfError::InvalidUnicode("RTF \\u requires a numeric parameter".to_string())
+            })?),
             "uc" => ControlWord::UnicodeSkip(param_value),
 
             // Special
@@ -3901,12 +3903,16 @@ impl<'a> Lexer<'a> {
         let mut bytes = String::new();
         loop {
             self.advance(); // Skip '\''
-            if self.pos + 1 >= self.input.len() {
-                return Err(RtfError::InvalidUnicode(
-                    "Incomplete hex escape".to_string(),
-                ));
-            }
-            let hex = &self.input[self.pos..self.pos + 2];
+            let pair = self
+                .input
+                .as_bytes()
+                .get(self.pos..self.pos + 2)
+                .ok_or_else(|| RtfError::InvalidUnicode("Incomplete hex escape".to_string()))?;
+            // A mutation or split multi-byte scalar yields non-ASCII bytes
+            // here; treat them as an invalid escape rather than a slice panic.
+            let hex = std::str::from_utf8(pair).map_err(|_| {
+                RtfError::InvalidUnicode("Invalid hex escape".to_string())
+            })?;
             self.pos += 2;
             let byte = u8::from_str_radix(hex, 16)
                 .map_err(|_| RtfError::InvalidUnicode(format!("Invalid hex escape: {hex}")))?;
