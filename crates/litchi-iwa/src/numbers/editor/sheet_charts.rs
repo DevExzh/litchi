@@ -31,6 +31,7 @@ mod pie_start_angle;
 mod pie_wedge_explosion;
 mod reference_lines;
 mod rounded_corners;
+mod scene_3d;
 mod series_connection_line;
 mod series_error_bar_auto_fit;
 mod series_error_bars;

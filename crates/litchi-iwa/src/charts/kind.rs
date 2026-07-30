@@ -42,6 +42,22 @@ pub enum ChartKind {
 }
 
 impl ChartKind {
+    /// Whether the chart exposes the native 3D Scene inspector.
+    pub const fn supports_3d_scene(self) -> bool {
+        matches!(
+            self,
+            Self::Column3d
+                | Self::Bar3d
+                | Self::Line3d
+                | Self::Area3d
+                | Self::Pie3d
+                | Self::StackedColumn3d
+                | Self::StackedBar3d
+                | Self::StackedArea3d
+                | Self::Donut3d
+        )
+    }
+
     /// Whether the chart exposes the native Wedges rotation control.
     pub const fn supports_pie_start_angle(self) -> bool {
         matches!(

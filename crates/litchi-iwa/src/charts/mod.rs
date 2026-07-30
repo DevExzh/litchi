@@ -49,6 +49,7 @@ pub(crate) mod pie_start_angle;
 pub(crate) mod pie_wedge_explosion;
 pub(crate) mod reference_lines;
 pub(crate) mod rounded_corners;
+pub(crate) mod scene_3d;
 pub(crate) mod series_connection_line;
 pub(crate) mod series_error_bar_auto_fit;
 pub(crate) mod series_error_bars;
@@ -106,6 +107,7 @@ pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use reference_lines::{ChartReferenceLine, ChartReferenceLineKind, ChartReferenceLineValue};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
+pub use scene_3d::Chart3dRotation;
 pub use series_connection_line::{ChartSeriesConnectionLine, ChartSeriesConnectionLineKind};
 pub use series_error_bar_auto_fit::ChartSeriesErrorBarAutoFit;
 pub use series_error_bars::{
