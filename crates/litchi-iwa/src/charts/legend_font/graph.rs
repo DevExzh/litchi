@@ -102,10 +102,25 @@ pub(crate) fn set_chart_legend_font(
     if graph.read_font(package)? == *target {
         return Ok(());
     }
-    graph
-        .legend_style
-        .ensure_exclusive(package, drawable_object_id, drawable_label)?;
     let mut staged = package.clone();
+    let mut slot = legend_style_slot(
+        &staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
+    slot.ensure_exclusive(
+        &mut staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
+    let graph = LegendFontGraph::locate(
+        &staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
     match target {
         ChartLegendFont::Inherited => {
             graph.reset_property(&mut staged, TypographyPropertyKind::Font)?
@@ -114,6 +129,7 @@ pub(crate) fn set_chart_legend_font(
             graph.set_property(&mut staged, TypographyProperty::Font(font))?
         },
     }
+    slot.collapse_if_equivalent(&mut staged, chart_archive_name, drawable_object_id)?;
     let verified = LegendFontGraph::locate(
         &staged,
         chart_archive_name,
@@ -146,10 +162,25 @@ pub(crate) fn set_chart_legend_font_size(
     if graph.read_size(package)? == target {
         return Ok(());
     }
-    graph
-        .legend_style
-        .ensure_exclusive(package, drawable_object_id, drawable_label)?;
     let mut staged = package.clone();
+    let mut slot = legend_style_slot(
+        &staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
+    slot.ensure_exclusive(
+        &mut staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
+    let graph = LegendFontGraph::locate(
+        &staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
     match target {
         ChartLegendFontSize::Inherited => {
             graph.reset_property(&mut staged, TypographyPropertyKind::Size)?
@@ -158,6 +189,7 @@ pub(crate) fn set_chart_legend_font_size(
             graph.set_property(&mut staged, TypographyProperty::Size(size))?
         },
     }
+    slot.collapse_if_equivalent(&mut staged, chart_archive_name, drawable_object_id)?;
     let verified = LegendFontGraph::locate(
         &staged,
         chart_archive_name,

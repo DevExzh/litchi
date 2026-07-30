@@ -59,7 +59,7 @@ pub(crate) fn set_chart_legend_fill(
     drawable_label: &str,
     fill: &ChartLegendFill,
 ) -> Result<()> {
-    let slot = legend_style_slot(
+    let mut slot = legend_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
@@ -74,10 +74,22 @@ pub(crate) fn set_chart_legend_fill(
     }
     let old_data_identifier = direct_image_data_identifier(&current);
     let new_data_identifier = direct_image_data_identifier(fill);
-    slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
+    slot.ensure_exclusive(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
     slot.update(package, |data| patch_legend_fill(data, fill))?;
     adjust_legend_style_data_reference(package, &slot, old_data_identifier, new_data_identifier)?;
-    if slot.read(package, read_legend_fill)? != *fill {
+    slot.collapse_if_equivalent(package, chart_archive_name, drawable_object_id)?;
+    if chart_legend_fill(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )? != *fill
+    {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} legend fill update failed validation"
         )));

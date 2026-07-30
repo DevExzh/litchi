@@ -53,7 +53,7 @@ pub(crate) fn set_chart_legend_stroke(
     drawable_label: &str,
     stroke: ChartLegendStroke,
 ) -> Result<()> {
-    let slot = legend_style_slot(
+    let mut slot = legend_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
@@ -62,9 +62,21 @@ pub(crate) fn set_chart_legend_stroke(
     if slot.read(package, read_legend_stroke)? == stroke {
         return Ok(());
     }
-    slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
+    slot.ensure_exclusive(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
     slot.update(package, |data| patch_legend_stroke(data, stroke))?;
-    if slot.read(package, read_legend_stroke)? != stroke {
+    slot.collapse_if_equivalent(package, chart_archive_name, drawable_object_id)?;
+    if chart_legend_stroke(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )? != stroke
+    {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} legend stroke update failed validation"
         )));

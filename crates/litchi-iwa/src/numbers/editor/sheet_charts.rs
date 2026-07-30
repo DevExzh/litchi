@@ -2306,6 +2306,91 @@ mod tests {
     }
 
     #[test]
+    fn legend_style_copy_on_write_is_shared_across_properties() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let chart = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let object_id = chart.drawable_object_id;
+        let graph = chart_graph(&editor, sheet_id, object_id).unwrap();
+        let original = crate::charts::legend_style::legend_style_slot(
+            editor.package(),
+            &graph.archive_name,
+            object_id,
+            "Numbers",
+        )
+        .unwrap();
+        let original_id = original.object_id();
+        let original_bytes = original
+            .read(editor.package(), |data| Ok(data.to_vec()))
+            .unwrap();
+
+        let fill = ChartLegendFill::Fill(ShapeFill::Solid(
+            RgbaColor::new(0.3, 0.6, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
+        ));
+        editor
+            .set_sheet_chart_legend_fill(sheet_id, object_id, &fill)
+            .unwrap();
+        let private = crate::charts::legend_style::legend_style_slot(
+            editor.package(),
+            &graph.archive_name,
+            object_id,
+            "Numbers",
+        )
+        .unwrap();
+        assert_ne!(private.object_id(), original_id);
+        assert_eq!(
+            original
+                .read(editor.package(), |data| Ok(data.to_vec()))
+                .unwrap(),
+            original_bytes
+        );
+
+        let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+            RgbaColor::new(0.8, 0.2, 0.1, 1.0, RgbColorSpace::Srgb).unwrap(),
+            StrokeWidth::new(2.0).unwrap(),
+            StrokePattern::Solid,
+        ));
+        editor
+            .set_sheet_chart_legend_stroke(sheet_id, object_id, stroke)
+            .unwrap();
+        let composed = crate::charts::legend_style::legend_style_slot(
+            editor.package(),
+            &graph.archive_name,
+            object_id,
+            "Numbers",
+        )
+        .unwrap();
+        assert_eq!(composed.object_id(), private.object_id());
+        assert_eq!(
+            editor.sheet_chart_legend_fill(sheet_id, object_id).unwrap(),
+            fill
+        );
+
+        editor
+            .set_sheet_chart_legend_fill(sheet_id, object_id, &ChartLegendFill::Inherited)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_legend_stroke(sheet_id, object_id)
+                .unwrap(),
+            stroke
+        );
+        editor
+            .set_sheet_chart_legend_stroke(sheet_id, object_id, ChartLegendStroke::Inherited)
+            .unwrap();
+        let collapsed = crate::charts::legend_style::legend_style_slot(
+            editor.package(),
+            &graph.archive_name,
+            object_id,
+            "Numbers",
+        )
+        .unwrap();
+        assert_eq!(collapsed.object_id(), original_id);
+    }
+
+    #[test]
     fn scratch_spreadsheet_supports_exact_chart_legend_typography_crud() {
         let mut editor = NumbersDocumentBuilder::new()
             .sheet_name("Legend Font Size")
