@@ -41,6 +41,7 @@ pub(crate) mod legend_frame;
 pub(crate) mod legend_shadow;
 pub(crate) mod legend_stroke;
 pub(crate) mod legend_style;
+pub(crate) mod lighting_3d;
 pub mod metadata_extractor;
 pub(crate) mod non_style;
 pub(crate) mod number_format;
@@ -100,6 +101,7 @@ pub use legend_frame::{
 };
 pub use legend_shadow::ChartLegendShadow;
 pub use legend_stroke::ChartLegendStroke;
+pub use lighting_3d::Chart3dLightingStyle;
 pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
 pub use number_format::{
     ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartLabelAffixes, ChartNegativeStyle,

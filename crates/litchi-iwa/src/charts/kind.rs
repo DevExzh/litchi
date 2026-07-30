@@ -71,6 +71,11 @@ impl ChartKind {
         self.supports_3d_scene()
     }
 
+    /// Whether the chart exposes the native 3D Lighting Style menu.
+    pub const fn supports_3d_lighting_style(self) -> bool {
+        self.supports_3d_scene()
+    }
+
     /// Whether the chart exposes the native Wedges rotation control.
     pub const fn supports_pie_start_angle(self) -> bool {
         matches!(

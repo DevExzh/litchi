@@ -27,6 +27,7 @@ mod gaps;
 mod graph;
 mod hidden_data;
 mod legend;
+mod lighting_3d;
 mod pie_label_distance;
 mod pie_labels;
 mod pie_start_angle;
