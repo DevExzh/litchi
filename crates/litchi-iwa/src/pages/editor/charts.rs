@@ -61,9 +61,8 @@ use crate::charts::source::{
     ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE, LEGEND_STYLE_MESSAGE_TYPE,
     SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
     SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
-    geometry_archive, local_chart_style_ids, reference, register_chart_styles,
-    require_creatable_kind, source_chart_objects, unregister_chart_styles,
-    validate_chart_styles_registered,
+    geometry_archive, reference, register_chart_styles, require_creatable_kind,
+    source_chart_objects, unregister_chart_styles, validate_chart_styles_registered,
 };
 use crate::charts::{
     ChartArrangement, ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive,
@@ -394,8 +393,6 @@ impl PagesEditor {
         anchor_character_index: usize,
     ) -> Result<PagesBodyChartInfo> {
         let source = body_chart_graph(self, source_drawable_object_id)?;
-        let source_style_ids =
-            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut staged = self.package().clone();
         let first_identifier = next_object_identifier(&staged)?;
         let mut remap = HashMap::with_capacity(source.object_ids.len());
@@ -408,40 +405,50 @@ impl PagesEditor {
             remap.insert(identifier, replacement);
         }
 
-        for identifier in &source.object_ids {
-            let cloned = {
-                let archive = staged.archive(&source.archive_name)?;
-                let source_object = archive.object(*identifier).ok_or_else(|| {
-                    Error::InvalidFormat(format!("Pages chart object {identifier} is missing"))
-                })?;
-                clone_pages_drawable_graph_object(source_object, &remap)?
-            };
-            staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
-            })?;
+        for group in &source.archive_groups {
+            for identifier in &group.object_ids {
+                let cloned = {
+                    let archive = staged.archive(&group.archive_name)?;
+                    let source_object = archive.object(*identifier).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Pages chart object {identifier} is missing from {}",
+                            group.archive_name
+                        ))
+                    })?;
+                    clone_pages_drawable_graph_object(source_object, &remap)?
+                };
+                staged
+                    .update_archive(&group.archive_name, |archive| archive.insert_object(cloned))?;
+            }
         }
-        let new_style_ids = source_style_ids
-            .iter()
-            .map(|identifier| {
-                remap.get(identifier).copied().ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Pages chart clone has no style identifier for {identifier}"
-                    ))
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
         let root = root_document(&staged)?;
         let theme_id = root
             .theme
             .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
             .identifier;
         let theme = chart_theme_context(&staged, theme_id)?;
-        register_chart_styles(
-            &mut staged,
-            theme.stylesheet_id,
-            &source.archive_name,
-            &new_style_ids,
-        )?;
+        for group in &source.archive_groups {
+            let new_style_ids = remapped_identifiers(&remap, &group.style_ids, "style")?;
+            if new_style_ids.is_empty() {
+                continue;
+            }
+            register_chart_styles(
+                &mut staged,
+                theme.stylesheet_id,
+                &group.archive_name,
+                &new_style_ids,
+            )?;
+            if group.component_id != source.component_id {
+                for identifier in new_style_ids {
+                    add_component_external_reference(
+                        &mut staged,
+                        source.component_id,
+                        group.component_id,
+                        identifier,
+                    )?;
+                }
+            }
+        }
 
         let new_drawable_id = *remap.get(&source_drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat("Pages chart clone has no drawable identifier".to_owned())
@@ -508,27 +515,24 @@ impl PagesEditor {
             Error::InvalidFormat("Pages chart graph has no object identifiers".to_owned())
         })?;
         set_package_last_object_identifier(&mut staged, last_identifier)?;
-        let new_uuid_object_ids = source
-            .uuid_object_ids
-            .iter()
-            .map(|identifier| {
-                remap.get(identifier).copied().ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Pages chart clone has no UUID identifier for {identifier}"
-                    ))
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-        add_component_object_uuids(&mut staged, source.component_id, &new_uuid_object_ids)?;
-        clone_component_data_references(&mut staged, source.component_id, &remap)?;
+        for group in &source.archive_groups {
+            let new_uuid_object_ids = remapped_identifiers(&remap, &group.uuid_object_ids, "UUID")?;
+            add_component_object_uuids(&mut staged, group.component_id, &new_uuid_object_ids)?;
+            clone_component_data_references(&mut staged, group.component_id, &remap)?;
+        }
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        validate_chart_styles_registered(
-            verified.package(),
-            theme.stylesheet_id,
-            &source.archive_name,
-            &new_style_ids,
-        )?;
+        for group in &source.archive_groups {
+            let new_style_ids = remapped_identifiers(&remap, &group.style_ids, "style")?;
+            if !new_style_ids.is_empty() {
+                validate_chart_styles_registered(
+                    verified.package(),
+                    theme.stylesheet_id,
+                    &group.archive_name,
+                    &new_style_ids,
+                )?;
+            }
+        }
         let created = body_chart_graph(&verified, new_drawable_id)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".into()))?;
@@ -561,8 +565,6 @@ impl PagesEditor {
     /// Remove a body chart, its attachment, and any crate-owned private styles.
     pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyChart> {
         let source = body_chart_graph(self, drawable_object_id)?;
-        let style_ids =
-            local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.clear_comment(drawable_object_id)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
@@ -576,38 +578,49 @@ impl PagesEditor {
             .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
             .identifier;
         let theme = chart_theme_context(&staged, theme_id)?;
-        unregister_chart_styles(
-            &mut staged,
-            theme.stylesheet_id,
-            &source.archive_name,
-            &style_ids,
-        )?;
+        for group in &source.archive_groups {
+            if !group.style_ids.is_empty() {
+                unregister_chart_styles(
+                    &mut staged,
+                    theme.stylesheet_id,
+                    &group.archive_name,
+                    &group.style_ids,
+                )?;
+            }
+        }
         if let Some(preset_id) = source.private_preset_id {
             patch_theme_chart_preset(&mut staged, &theme, Some(preset_id), None)?;
         }
-        for identifier in &source.object_ids {
-            remove_component_external_references_to_object(
-                &mut staged,
-                source.component_id,
-                *identifier,
-            )?;
-        }
-        let affected_data_identifiers = remove_component_data_references_for_objects(
-            &mut staged,
-            source.component_id,
-            &source.object_ids,
-        )?;
-        staged.update_archive(&source.archive_name, |archive| {
-            for identifier in &source.object_ids {
-                archive.remove_object(*identifier).ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Pages chart object {identifier} is missing from {}",
-                        source.archive_name
-                    ))
-                })?;
+        for group in &source.archive_groups {
+            for identifier in &group.object_ids {
+                remove_component_external_references_to_object(
+                    &mut staged,
+                    group.component_id,
+                    *identifier,
+                )?;
             }
-            Ok(())
-        })?;
+        }
+        let mut affected_data_identifiers = HashSet::new();
+        for group in &source.archive_groups {
+            affected_data_identifiers.extend(remove_component_data_references_for_objects(
+                &mut staged,
+                group.component_id,
+                &group.object_ids,
+            )?);
+        }
+        for group in &source.archive_groups {
+            staged.update_archive(&group.archive_name, |archive| {
+                for identifier in &group.object_ids {
+                    archive.remove_object(*identifier).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Pages chart object {identifier} is missing from {}",
+                            group.archive_name
+                        ))
+                    })?;
+                }
+                Ok(())
+            })?;
+        }
         for identifier in &source.object_ids {
             if package_references_object(&staged, *identifier)? {
                 return Err(Error::InvalidFormat(format!(
@@ -615,7 +628,9 @@ impl PagesEditor {
                 )));
             }
         }
-        remove_component_object_uuids(&mut staged, source.component_id, &source.uuid_object_ids)?;
+        for group in &source.archive_groups {
+            remove_component_object_uuids(&mut staged, group.component_id, &group.uuid_object_ids)?;
+        }
         for data_identifier in affected_data_identifiers {
             remove_orphaned_image_asset(&mut staged, Some(data_identifier))?;
         }
@@ -651,6 +666,23 @@ impl PagesEditor {
         *self = Self::from_bytes(&staged.to_bytes()?)?;
         Ok(())
     }
+}
+
+fn remapped_identifiers(
+    remap: &HashMap<u64, u64>,
+    identifiers: &[u64],
+    label: &str,
+) -> Result<Vec<u64>> {
+    identifiers
+        .iter()
+        .map(|identifier| {
+            remap.get(identifier).copied().ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages chart clone has no {label} identifier for {identifier}"
+                ))
+            })
+        })
+        .collect()
 }
 
 fn update_chart_payload(

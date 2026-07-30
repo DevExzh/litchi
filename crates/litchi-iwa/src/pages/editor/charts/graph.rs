@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::image_caption::{DrawableCaptionKind, drawable_caption_slot};
+use crate::package_metadata::component_identifier_for_object_uuid;
 
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 const ATTACHMENT_HORIZONTAL_OFFSET_FIELD: u32 = 3;
@@ -22,12 +23,20 @@ enum VerticalAnchorBasis {
 
 pub(super) struct BodyChartGraph {
     pub(super) archive_name: String,
+    pub(super) archive_groups: Vec<BodyChartArchiveGroup>,
     pub(super) attachment_id: u64,
     pub(super) component_id: u64,
     pub(super) info: PagesBodyChartInfo,
     pub(super) object_ids: Vec<u64>,
-    pub(super) uuid_object_ids: Vec<u64>,
     pub(super) private_preset_id: Option<u64>,
+}
+
+pub(super) struct BodyChartArchiveGroup {
+    pub(super) archive_name: String,
+    pub(super) component_id: u64,
+    pub(super) object_ids: Vec<u64>,
+    pub(super) style_ids: Vec<u64>,
+    pub(super) uuid_object_ids: Vec<u64>,
 }
 
 pub(super) fn body_chart_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyChartInfo>> {
@@ -235,13 +244,33 @@ pub(super) fn body_chart_graph(
     let mut object_ids = vec![drawable_object_id];
     object_ids.extend(&caption.object_ids);
     object_ids.push(title_id);
+    let mut style_ids = HashSet::new();
     if private_preset_id.is_some() {
+        let reference_owner_counts = chart_reference_owner_counts(editor.package())?;
+        if let Some(preset_id) = private_preset_id {
+            if find_object_archive(editor.package(), preset_id)? != archive_name {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages private chart preset {preset_id} is outside {archive_name}"
+                )));
+            }
+            let preset = archive.object(preset_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Pages chart preset {preset_id} is missing"))
+            })?;
+            if preset
+                .messages
+                .iter()
+                .filter(|message| message.type_ == CHART_PRESET_MESSAGE_TYPE)
+                .count()
+                != 1
+                || reference_owner_counts.get(&preset_id) != Some(&1)
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages private chart preset {preset_id} must have one payload and one chart owner"
+                )));
+            }
+            object_ids.push(preset_id);
+        }
         let mut private_styles = Vec::new();
-        private_styles.extend(
-            payload
-                .preset
-                .map(|reference| (reference.identifier, CHART_PRESET_MESSAGE_TYPE, "preset")),
-        );
         private_styles.extend(payload.chart_style.map(|reference| {
             (
                 reference.identifier,
@@ -332,13 +361,21 @@ pub(super) fn body_chart_graph(
                 }),
         );
         private_styles.extend(reference_line_objects);
+        let mut unique_styles = HashMap::new();
         for (identifier, message_type, label) in private_styles {
-            if find_object_archive(editor.package(), identifier)? != archive_name {
-                return Err(Error::InvalidFormat(format!(
-                    "Pages private chart {label} {identifier} is outside {archive_name}"
-                )));
+            if let Some((existing_type, existing_label)) =
+                unique_styles.insert(identifier, (message_type, label))
+            {
+                if existing_type != message_type {
+                    return Err(Error::InvalidFormat(format!(
+                        "Pages chart object {identifier} is both {existing_label} and {label}"
+                    )));
+                }
+                continue;
             }
-            let style = archive.object(identifier).ok_or_else(|| {
+            let style_archive_name = find_object_archive(editor.package(), identifier)?;
+            let style_archive = editor.package().archive(&style_archive_name)?;
+            let style = style_archive.object(identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!("Pages chart {label} {identifier} is missing"))
             })?;
             if style
@@ -352,7 +389,22 @@ pub(super) fn body_chart_graph(
                     "Pages chart {label} {identifier} must have exactly one expected payload"
                 )));
             }
-            object_ids.push(identifier);
+            if reference_owner_counts.get(&identifier) == Some(&1) {
+                object_ids.push(identifier);
+                if matches!(
+                    message_type,
+                    CHART_STYLE_MESSAGE_TYPE
+                        | CHART_NON_STYLE_MESSAGE_TYPE
+                        | LEGEND_STYLE_MESSAGE_TYPE
+                        | LEGEND_NON_STYLE_MESSAGE_TYPE
+                        | AXIS_STYLE_MESSAGE_TYPE
+                        | AXIS_NON_STYLE_MESSAGE_TYPE
+                        | SERIES_STYLE_MESSAGE_TYPE
+                        | SERIES_NON_STYLE_MESSAGE_TYPE
+                ) {
+                    style_ids.insert(identifier);
+                }
+            }
         }
     }
     if find_object_archive(editor.package(), title_id)? != archive_name {
@@ -387,28 +439,97 @@ pub(super) fn body_chart_graph(
                 "Pages chart component {archive_name} is not registered"
             ))
         })?;
-    let registered =
-        component_uuid_identifiers(editor.package(), component_id)?.unwrap_or_default();
-    let uuid_object_ids = object_ids
-        .iter()
-        .copied()
-        .filter(|identifier| *identifier != *attachment_id && registered.contains(identifier))
-        .collect::<Vec<_>>();
+    let mut archive_groups: Vec<BodyChartArchiveGroup> = Vec::new();
+    let mut registered_uuid_count = 0usize;
+    for &identifier in &object_ids {
+        let object_archive_name = find_object_archive(editor.package(), identifier)?;
+        if !style_ids.contains(&identifier) && object_archive_name != archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "Pages private chart object {identifier} is outside {archive_name}"
+            )));
+        }
+        let object_component_id =
+            component_identifier_for_entry(editor.package(), &object_archive_name)?.ok_or_else(
+                || {
+                    Error::InvalidFormat(format!(
+                        "Pages chart object component {object_archive_name} is not registered"
+                    ))
+                },
+            )?;
+        let group_index = archive_groups
+            .iter()
+            .position(|group| group.archive_name == object_archive_name)
+            .unwrap_or_else(|| {
+                archive_groups.push(BodyChartArchiveGroup {
+                    archive_name: object_archive_name.clone(),
+                    component_id: object_component_id,
+                    object_ids: Vec::new(),
+                    style_ids: Vec::new(),
+                    uuid_object_ids: Vec::new(),
+                });
+                archive_groups.len() - 1
+            });
+        let group = &mut archive_groups[group_index];
+        if group.component_id != object_component_id {
+            return Err(Error::InvalidFormat(format!(
+                "Pages chart archive {} resolves to inconsistent components",
+                group.archive_name
+            )));
+        }
+        group.object_ids.push(identifier);
+        if style_ids.contains(&identifier) {
+            group.style_ids.push(identifier);
+        }
+        if identifier == *attachment_id {
+            continue;
+        }
+        if let Some(uuid_component_id) =
+            component_identifier_for_object_uuid(editor.package(), identifier)?
+        {
+            if uuid_component_id != object_component_id {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages chart object {identifier} is stored in component {object_component_id} but registered in component {uuid_component_id}"
+                )));
+            }
+            group.uuid_object_ids.push(identifier);
+            registered_uuid_count = registered_uuid_count.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("Pages chart UUID count overflow".to_owned())
+            })?;
+        }
+    }
     // App-created native captions can leave part of their chart graph out of
     // the component UUID map. Placeholder-only graphs retain the strict
     // source-built invariant, while native caption graphs keep their actual
     // registered subset for safe duplication and removal.
     if private_preset_id.is_some()
         && caption.storage_id.is_none()
-        && uuid_object_ids.len() + 1 != object_ids.len()
+        && registered_uuid_count + 1 != object_ids.len()
     {
         return Err(Error::InvalidFormat(format!(
             "Pages component UUID map does not cover private chart {drawable_object_id}"
         )));
     }
+    let theme_id = document
+        .theme
+        .as_ref()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?;
+    let theme = chart_theme_context(editor.package(), theme_id)?;
+    for group in &archive_groups {
+        if !group.style_ids.is_empty() {
+            validate_chart_styles_registered(
+                editor.package(),
+                theme.stylesheet_id,
+                &group.archive_name,
+                &group.style_ids,
+            )?;
+        }
+    }
 
     Ok(BodyChartGraph {
         archive_name,
+        archive_groups,
         attachment_id: *attachment_id,
         component_id,
         info: PagesBodyChartInfo {
@@ -432,9 +553,30 @@ pub(super) fn body_chart_graph(
             ),
         },
         object_ids,
-        uuid_object_ids,
         private_preset_id,
     })
+}
+
+fn chart_reference_owner_counts(package: &IWorkPackage) -> Result<HashMap<u64, usize>> {
+    let mut counts = HashMap::new();
+    for archive_name in package.iwa_entry_names() {
+        for object in &package.archive(archive_name)?.objects {
+            for message in object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
+            {
+                let chart = IWorkChartArchive::decode(message.data.as_slice())?;
+                for identifier in chart.typed_reference_identifiers()? {
+                    let count = counts.entry(identifier).or_insert(0usize);
+                    *count = count.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("Pages chart owner count overflow".to_owned())
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(counts)
 }
 
 pub(super) fn chart_attachment_object(

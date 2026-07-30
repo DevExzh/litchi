@@ -181,7 +181,7 @@ impl IWorkChartArchive {
         Ok(())
     }
 
-    fn typed_reference_identifiers(&self) -> Result<HashSet<u64>> {
+    pub(crate) fn typed_reference_identifiers(&self) -> Result<HashSet<u64>> {
         let mut identifiers = HashSet::new();
         if let Some(drawable) = self.drawable.super_.as_ref() {
             collect_optional_reference(&mut identifiers, drawable.parent.as_ref());

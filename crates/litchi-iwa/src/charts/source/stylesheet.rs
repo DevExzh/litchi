@@ -172,6 +172,7 @@ pub(crate) fn validate_chart_styles_registered(
     validate_style_ids(package, owner_archive_name, style_ids)?;
     let stylesheet_archive_name =
         unique_chart_object_archive_name(package, stylesheet_id, "chart stylesheet")?;
+    let styles_are_local = stylesheet_archive_name == owner_archive_name;
     let archive = package.archive(&stylesheet_archive_name)?;
     let stylesheet = archive.object(stylesheet_id).ok_or_else(|| {
         Error::InvalidFormat(format!("chart stylesheet {stylesheet_id} is missing"))
@@ -192,15 +193,14 @@ pub(crate) fn validate_chart_styles_registered(
                 "chart stylesheet {stylesheet_id} must contain style {style_id} exactly once"
             )));
         }
-        if info
+        let metadata_count = info
             .object_references
             .iter()
             .filter(|&&identifier| identifier == style_id)
-            .count()
-            != 1
-        {
+            .count();
+        if metadata_count > 1 || (!styles_are_local && metadata_count != 1) {
             return Err(Error::InvalidFormat(format!(
-                "chart stylesheet metadata must reference style {style_id} exactly once"
+                "chart stylesheet metadata has invalid ownership for style {style_id}"
             )));
         }
     }
@@ -217,6 +217,7 @@ pub(crate) fn unregister_chart_styles(
     validate_unique_nonzero_ids(style_ids)?;
     let stylesheet_archive_name =
         unique_chart_object_archive_name(package, stylesheet_id, "chart stylesheet")?;
+    let styles_are_local = stylesheet_archive_name == owner_archive_name;
     let owner_component = component_identifier_for_entry(package, owner_archive_name)?;
     let stylesheet_component = component_identifier_for_entry(package, &stylesheet_archive_name)?;
 
@@ -268,15 +269,14 @@ pub(crate) fn unregister_chart_styles(
         )?;
         let info = &mut stylesheet.archive_info.message_infos[message_index];
         for &style_id in style_ids {
-            if info
+            let metadata_count = info
                 .object_references
                 .iter()
                 .filter(|&&identifier| identifier == style_id)
-                .count()
-                != 1
-            {
+                .count();
+            if metadata_count > 1 || (!styles_are_local && metadata_count != 1) {
                 return Err(Error::InvalidFormat(format!(
-                    "chart stylesheet metadata must reference style {style_id} exactly once"
+                    "chart stylesheet metadata has invalid ownership for style {style_id}"
                 )));
             }
             info.object_references

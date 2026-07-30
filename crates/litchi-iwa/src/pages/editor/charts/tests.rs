@@ -19,6 +19,10 @@ use crate::charts::{
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
 };
+use crate::package_metadata::{
+    add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
+    remove_component_external_reference, remove_component_object_uuids,
+};
 use crate::pages::PagesDocumentBuilder;
 use crate::shapes::{
     RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -97,6 +101,76 @@ fn fixture(relative: &str) -> Vec<u8> {
     fs::read(root.join(relative)).unwrap()
 }
 
+fn normalize_private_chart_styles_like_pages(
+    editor: &PagesEditor,
+    drawable_object_id: u64,
+) -> PagesEditor {
+    let graph = body_chart_graph(editor, drawable_object_id).unwrap();
+    let source_group = graph
+        .archive_groups
+        .iter()
+        .find(|group| !group.style_ids.is_empty())
+        .unwrap();
+    let style_ids = source_group.style_ids.clone();
+    let mut package = editor.package().clone();
+    let root = root_document(&package).unwrap();
+    let theme_id = root.theme.unwrap().identifier;
+    let theme = chart_theme_context(&package, theme_id).unwrap();
+    let stylesheet_archive_name = find_object_archive(&package, theme.stylesheet_id).unwrap();
+    let stylesheet_component_id =
+        component_identifier_for_entry(&package, &stylesheet_archive_name)
+            .unwrap()
+            .unwrap();
+
+    let mut moved = Vec::with_capacity(style_ids.len());
+    package
+        .update_archive(&source_group.archive_name, |archive| {
+            for identifier in &style_ids {
+                moved.push(archive.remove_object(*identifier).unwrap());
+            }
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive(&stylesheet_archive_name, |archive| {
+            for object in moved {
+                archive.insert_object(object)?;
+            }
+            let stylesheet = archive.object_mut(theme.stylesheet_id).unwrap();
+            for info in &mut stylesheet.archive_info.message_infos {
+                info.object_references
+                    .retain(|identifier| !style_ids.contains(identifier));
+                for field in &mut info.field_infos {
+                    field
+                        .object_references
+                        .retain(|identifier| !style_ids.contains(identifier));
+                }
+            }
+            Ok(())
+        })
+        .unwrap();
+
+    remove_component_object_uuids(&mut package, source_group.component_id, &style_ids).unwrap();
+    add_component_object_uuids(&mut package, stylesheet_component_id, &style_ids).unwrap();
+    for identifier in style_ids {
+        remove_component_external_reference(
+            &mut package,
+            stylesheet_component_id,
+            source_group.component_id,
+            identifier,
+        )
+        .unwrap();
+        add_component_external_reference(
+            &mut package,
+            source_group.component_id,
+            stylesheet_component_id,
+            identifier,
+        )
+        .unwrap();
+    }
+    PagesEditor::from_package(package).unwrap()
+}
+
 #[test]
 fn scratch_document_supports_body_chart_crud() {
     let mut editor = PagesEditor::create_with_text("Quarterly results").unwrap();
@@ -155,6 +229,52 @@ fn scratch_document_supports_body_chart_crud() {
     assert_eq!(editor.body_text().unwrap(), "Quarterly results");
     assert!(editor.body_charts().unwrap().is_empty());
     PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+}
+
+#[test]
+fn pages_normalized_chart_styles_support_full_lifecycle_crud() {
+    let mut editor = PagesEditor::create_with_text("Chart").unwrap();
+    let source = editor
+        .add_body_chart(5, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let frame = ChartLegendFrame::Frame(ChartLegendRect::from_points(43.0, 8.0, 0.0, 0.0).unwrap());
+    editor
+        .set_body_chart_legend_frame(source.drawable_object_id, frame)
+        .unwrap();
+    let mut editor = normalize_private_chart_styles_like_pages(&editor, source.drawable_object_id);
+
+    let charts = editor.body_charts().unwrap();
+    assert_eq!(charts.len(), 1);
+    assert_eq!(
+        editor
+            .body_chart_legend_frame(source.drawable_object_id)
+            .unwrap(),
+        frame
+    );
+    let changed_frame =
+        ChartLegendFrame::Frame(ChartLegendRect::from_points(56.0, 10.0, 0.0, 0.0).unwrap());
+    editor
+        .set_body_chart_legend_frame(source.drawable_object_id, changed_frame)
+        .unwrap();
+    let duplicate_anchor = editor.body_text().unwrap().encode_utf16().count();
+    let duplicate = editor
+        .duplicate_body_chart(source.drawable_object_id, duplicate_anchor)
+        .unwrap();
+    editor.remove_body_chart(source.drawable_object_id).unwrap();
+
+    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.body_charts().unwrap().len(), 1);
+    assert_eq!(
+        reopened
+            .body_chart_legend_frame(duplicate.drawable_object_id)
+            .unwrap(),
+        changed_frame
+    );
+    reopened
+        .remove_body_chart(duplicate.drawable_object_id)
+        .unwrap();
+    assert!(reopened.body_charts().unwrap().is_empty());
+    assert_eq!(reopened.body_text().unwrap(), "Chart");
 }
 
 #[test]
