@@ -639,16 +639,16 @@ mod tests {
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
         ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFont,
         ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont,
-        ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-        ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
-        ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-        ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
-        ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
-        ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
-        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
-        ChartValueAxisSteps,
+        ChartLegendFontSize, ChartLegendFrame, ChartLegendRect, ChartLegendShadow,
+        ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
+        ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
+        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
+        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+        ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
+        ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
+        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -2301,6 +2301,47 @@ mod tests {
         );
         reopened
             .set_sheet_chart_legend_fill(sheet_id, object_id, &ChartLegendFill::Inherited)
+            .unwrap();
+        assert_eq!(reopened.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn scratch_spreadsheet_supports_exact_chart_legend_frame_crud() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let chart = editor
+            .add_sheet_chart(sheet_id, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let object_id = chart.drawable_object_id;
+        let baseline = editor.to_bytes().unwrap();
+
+        assert_eq!(
+            editor
+                .sheet_chart_legend_frame(sheet_id, object_id)
+                .unwrap(),
+            ChartLegendFrame::Automatic
+        );
+        let frame =
+            ChartLegendFrame::Frame(ChartLegendRect::from_points(43.5, 12.0, 0.0, 0.0).unwrap());
+        editor
+            .set_sheet_chart_legend_frame(sheet_id, object_id, frame)
+            .unwrap();
+        assert_eq!(
+            editor
+                .sheet_chart_legend_frame(sheet_id, object_id)
+                .unwrap(),
+            frame
+        );
+
+        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_legend_frame(sheet_id, object_id)
+                .unwrap(),
+            frame
+        );
+        reopened
+            .set_sheet_chart_legend_frame(sheet_id, object_id, ChartLegendFrame::Automatic)
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }

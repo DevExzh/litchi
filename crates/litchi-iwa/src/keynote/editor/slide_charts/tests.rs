@@ -8,13 +8,13 @@ use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendShadow,
-    ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
-    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
+    ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
+    ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -1673,6 +1673,40 @@ fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
     );
     reopened
         .set_slide_chart_legend_fill(0, object_id, &ChartLegendFill::Inherited)
+        .unwrap();
+    assert_eq!(reopened.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn scratch_presentation_supports_exact_chart_legend_frame_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let object_id = chart.drawable_object_id;
+    let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.slide_chart_legend_frame(0, object_id).unwrap(),
+        ChartLegendFrame::Automatic
+    );
+    let frame =
+        ChartLegendFrame::Frame(ChartLegendRect::from_points(72.0, 24.0, 0.0, 0.0).unwrap());
+    editor
+        .set_slide_chart_legend_frame(0, object_id, frame)
+        .unwrap();
+    assert_eq!(
+        editor.slide_chart_legend_frame(0, object_id).unwrap(),
+        frame
+    );
+
+    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_frame(0, object_id).unwrap(),
+        frame
+    );
+    reopened
+        .set_slide_chart_legend_frame(0, object_id, ChartLegendFrame::Automatic)
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), baseline);
 }

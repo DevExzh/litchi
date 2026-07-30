@@ -11,6 +11,10 @@ use crate::charts::legend_font::{
     set_chart_legend_font as set_native_chart_legend_font,
     set_chart_legend_font_size as set_native_chart_legend_font_size,
 };
+use crate::charts::legend_frame::{
+    chart_legend_frame as read_native_chart_legend_frame,
+    set_chart_legend_frame as set_native_chart_legend_frame,
+};
 use crate::charts::legend_shadow::{
     chart_legend_shadow as read_native_chart_legend_shadow,
     set_chart_legend_shadow as set_native_chart_legend_shadow,
@@ -24,7 +28,8 @@ use crate::charts::options::{
     set_chart_legend_visible as set_native_chart_legend_visible,
 };
 use crate::charts::{
-    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
+    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendShadow,
+    ChartLegendStroke,
 };
 
 impl PagesEditor {
@@ -40,6 +45,45 @@ impl PagesEditor {
         visible: bool,
     ) -> Result<()> {
         set_body_chart_legend_visible(self, drawable_object_id, visible)
+    }
+
+    /// Read the exact automatic or explicit native legend frame.
+    pub fn body_chart_legend_frame(&self, drawable_object_id: u64) -> Result<ChartLegendFrame> {
+        let graph = body_chart_graph(self, drawable_object_id)?;
+        read_native_chart_legend_frame(
+            self.package(),
+            &graph.archive_name,
+            drawable_object_id,
+            "Pages",
+        )
+    }
+
+    /// Set or remove the native legend rectangle.
+    pub fn set_body_chart_legend_frame(
+        &mut self,
+        drawable_object_id: u64,
+        frame: ChartLegendFrame,
+    ) -> Result<()> {
+        if self.body_chart_legend_frame(drawable_object_id)? == frame {
+            return Ok(());
+        }
+        let graph = body_chart_graph(self, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_native_chart_legend_frame(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            "Pages",
+            frame,
+        )?;
+        let verified = PagesEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.body_chart_legend_frame(drawable_object_id)? != frame {
+            return Err(Error::InvalidFormat(
+                "Pages chart legend-frame update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
     }
 
     /// Read the exact inherited or direct native legend fill.
