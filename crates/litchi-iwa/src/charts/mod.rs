@@ -28,6 +28,7 @@ pub(crate) mod border;
 pub(crate) mod border_stroke;
 pub(crate) mod category_labels;
 mod data;
+pub(crate) mod depth_3d;
 mod direction;
 pub(crate) mod donut_inner_radius;
 pub(crate) mod font;
@@ -86,6 +87,7 @@ pub use category_labels::{
     ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout,
 };
 pub use data::ChartData;
+pub use depth_3d::Chart3dDepth;
 pub use direction::ChartSeriesDirection;
 pub use donut_inner_radius::ChartDonutInnerRadius;
 pub use font::{ChartFont, ChartFontSize};

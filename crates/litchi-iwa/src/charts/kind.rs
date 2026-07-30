@@ -66,6 +66,11 @@ impl ChartKind {
         )
     }
 
+    /// Whether the chart has a native 3D depth ratio.
+    pub const fn supports_3d_depth(self) -> bool {
+        self.supports_3d_scene()
+    }
+
     /// Whether the chart exposes the native Wedges rotation control.
     pub const fn supports_pie_start_angle(self) -> bool {
         matches!(

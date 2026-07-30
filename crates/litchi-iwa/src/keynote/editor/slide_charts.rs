@@ -20,6 +20,7 @@ mod border;
 mod border_stroke;
 mod caption;
 mod category_labels;
+mod depth_3d;
 mod donut_inner_radius;
 mod font;
 mod gaps;
