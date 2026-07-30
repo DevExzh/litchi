@@ -637,17 +637,18 @@ mod tests {
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
-        ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFontSize,
-        ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFontSize,
-        ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility,
-        ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-        ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke,
-        ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-        ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-        ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-        ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-        ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-        ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+        ChartErrorBarCustomValues, ChartErrorBarDirection, ChartErrorBarFixedValue, ChartFont,
+        ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartLegendFill, ChartLegendFont,
+        ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
+        ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
+        ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
+        ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+        ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+        ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit,
+        ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelLocation,
+        ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
+        ChartSeriesValueLabelVisibility, ChartShadow, ChartValueAxisBounds, ChartValueAxisScale,
+        ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
@@ -2305,7 +2306,7 @@ mod tests {
     }
 
     #[test]
-    fn scratch_spreadsheet_supports_exact_chart_legend_font_size_crud() {
+    fn scratch_spreadsheet_supports_exact_chart_legend_typography_crud() {
         let mut editor = NumbersDocumentBuilder::new()
             .sheet_name("Legend Font Size")
             .build()
@@ -2316,6 +2317,16 @@ mod tests {
             .unwrap();
         let object_id = chart.drawable_object_id;
         let baseline = editor.to_bytes().unwrap();
+
+        assert_eq!(
+            editor.sheet_chart_legend_font(sheet_id, object_id).unwrap(),
+            ChartLegendFont::Inherited
+        );
+        let bold =
+            ChartLegendFont::Font(ChartFont::named("AvenirNext-Bold").unwrap().with_bold(true));
+        editor
+            .set_sheet_chart_legend_font(sheet_id, object_id, &bold)
+            .unwrap();
 
         assert_eq!(
             editor
@@ -2335,9 +2346,32 @@ mod tests {
         );
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_legend_font(sheet_id, object_id)
+                .unwrap(),
+            bold
+        );
+        let italic = ChartLegendFont::Font(
+            ChartFont::named("AvenirNext-Italic")
+                .unwrap()
+                .with_italic(true),
+        );
+        reopened
+            .set_sheet_chart_legend_font(sheet_id, object_id, &italic)
+            .unwrap();
         let fourteen = ChartLegendFontSize::Size(ChartFontSize::from_points(14.0).unwrap());
         reopened
             .set_sheet_chart_legend_font_size(sheet_id, object_id, fourteen)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .sheet_chart_legend_font_size(sheet_id, object_id)
+                .unwrap(),
+            fourteen
+        );
+        reopened
+            .set_sheet_chart_legend_font(sheet_id, object_id, &ChartLegendFont::Inherited)
             .unwrap();
         assert_eq!(
             reopened

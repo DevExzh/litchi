@@ -7,13 +7,14 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartLegendFill, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
-    ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
-    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-    ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
+    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendShadow,
+    ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -1677,7 +1678,7 @@ fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
 }
 
 #[test]
-fn scratch_presentation_supports_exact_chart_legend_font_size_crud() {
+fn scratch_presentation_supports_exact_chart_legend_typography_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
@@ -1690,6 +1691,16 @@ fn scratch_presentation_supports_exact_chart_legend_font_size_crud() {
         .set_slide_chart_legend_fill(0, object_id, &fill)
         .unwrap();
     let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.slide_chart_legend_font(0, object_id).unwrap(),
+        ChartLegendFont::Inherited
+    );
+    let bold = ChartLegendFont::Font(ChartFont::named("AvenirNext-Bold").unwrap().with_bold(true));
+    editor
+        .set_slide_chart_legend_font(0, object_id, &bold)
+        .unwrap();
+    assert_eq!(editor.slide_chart_legend_font(0, object_id).unwrap(), bold);
 
     assert_eq!(
         editor.slide_chart_legend_font_size(0, object_id).unwrap(),
@@ -1706,9 +1717,32 @@ fn scratch_presentation_supports_exact_chart_legend_font_size_crud() {
     assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), fill);
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_font(0, object_id).unwrap(),
+        bold
+    );
+    let italic = ChartLegendFont::Font(
+        ChartFont::named("AvenirNext-Italic")
+            .unwrap()
+            .with_italic(true),
+    );
+    reopened
+        .set_slide_chart_legend_font(0, object_id, &italic)
+        .unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_font(0, object_id).unwrap(),
+        italic
+    );
     let sixteen = ChartLegendFontSize::Size(ChartFontSize::from_points(16.0).unwrap());
     reopened
         .set_slide_chart_legend_font_size(0, object_id, sixteen)
+        .unwrap();
+    assert_eq!(
+        reopened.slide_chart_legend_font_size(0, object_id).unwrap(),
+        sixteen
+    );
+    reopened
+        .set_slide_chart_legend_font(0, object_id, &ChartLegendFont::Inherited)
         .unwrap();
     assert_eq!(
         reopened.slide_chart_legend_font_size(0, object_id).unwrap(),
@@ -1721,7 +1755,7 @@ fn scratch_presentation_supports_exact_chart_legend_font_size_crud() {
 }
 
 #[test]
-fn duplicated_legend_font_size_is_copy_on_write() {
+fn duplicated_legend_typography_is_copy_on_write() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
         .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
@@ -1730,12 +1764,24 @@ fn duplicated_legend_font_size_is_copy_on_write() {
     editor
         .set_slide_chart_legend_font_size(0, chart.drawable_object_id, eighteen)
         .unwrap();
+    let bold = ChartLegendFont::Font(ChartFont::named("AvenirNext-Bold").unwrap().with_bold(true));
+    editor
+        .set_slide_chart_legend_font(0, chart.drawable_object_id, &bold)
+        .unwrap();
     let duplicate = editor
         .duplicate_slide_chart(0, chart.drawable_object_id)
         .unwrap();
     let sixteen = ChartLegendFontSize::Size(ChartFontSize::from_points(16.0).unwrap());
     editor
         .set_slide_chart_legend_font_size(0, chart.drawable_object_id, sixteen)
+        .unwrap();
+    let italic = ChartLegendFont::Font(
+        ChartFont::named("AvenirNext-Italic")
+            .unwrap()
+            .with_italic(true),
+    );
+    editor
+        .set_slide_chart_legend_font(0, chart.drawable_object_id, &italic)
         .unwrap();
 
     assert_eq!(
@@ -1749,6 +1795,18 @@ fn duplicated_legend_font_size_is_copy_on_write() {
             .slide_chart_legend_font_size(0, duplicate.drawable_object_id)
             .unwrap(),
         eighteen
+    );
+    assert_eq!(
+        editor
+            .slide_chart_legend_font(0, chart.drawable_object_id)
+            .unwrap(),
+        italic
+    );
+    assert_eq!(
+        editor
+            .slide_chart_legend_font(0, duplicate.drawable_object_id)
+            .unwrap(),
+        bold
     );
 }
 

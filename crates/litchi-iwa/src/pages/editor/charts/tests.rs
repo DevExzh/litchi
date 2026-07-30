@@ -7,13 +7,14 @@ use super::*;
 use crate::charts::{
     ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
     ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartLegendFill, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
-    ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion,
-    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
-    ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
+    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendShadow,
+    ChartLegendStroke, ChartPieLabelDistance, ChartPieLabelVisibility, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -1760,13 +1761,21 @@ fn scratch_document_supports_exact_chart_legend_fill_crud() {
 }
 
 #[test]
-fn scratch_document_supports_exact_chart_legend_font_size_crud() {
+fn scratch_document_supports_exact_chart_legend_typography_crud() {
     let mut editor = PagesDocumentBuilder::new().build().unwrap();
     let chart = editor
         .add_body_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let object_id = chart.drawable_object_id;
     let baseline = editor.to_bytes().unwrap();
+
+    assert_eq!(
+        editor.body_chart_legend_font(object_id).unwrap(),
+        ChartLegendFont::Inherited
+    );
+    let bold = ChartLegendFont::Font(ChartFont::named("AvenirNext-Bold").unwrap().with_bold(true));
+    editor.set_body_chart_legend_font(object_id, &bold).unwrap();
+    assert_eq!(editor.body_chart_legend_font(object_id).unwrap(), bold);
 
     assert_eq!(
         editor.body_chart_legend_font_size(object_id).unwrap(),
@@ -1782,9 +1791,25 @@ fn scratch_document_supports_exact_chart_legend_font_size_crud() {
     );
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.body_chart_legend_font(object_id).unwrap(), bold);
+    let italic = ChartLegendFont::Font(
+        ChartFont::named("AvenirNext-Italic")
+            .unwrap()
+            .with_italic(true),
+    );
+    reopened
+        .set_body_chart_legend_font(object_id, &italic)
+        .unwrap();
     let fifteen = ChartLegendFontSize::Size(ChartFontSize::from_points(15.0).unwrap());
     reopened
         .set_body_chart_legend_font_size(object_id, fifteen)
+        .unwrap();
+    assert_eq!(
+        reopened.body_chart_legend_font_size(object_id).unwrap(),
+        fifteen
+    );
+    reopened
+        .set_body_chart_legend_font(object_id, &ChartLegendFont::Inherited)
         .unwrap();
     assert_eq!(
         reopened.body_chart_legend_font_size(object_id).unwrap(),

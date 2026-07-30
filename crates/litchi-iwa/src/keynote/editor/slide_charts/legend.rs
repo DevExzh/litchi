@@ -5,8 +5,10 @@ use crate::charts::legend_fill::{
     chart_legend_fill as read_native_chart_legend_fill,
     set_chart_legend_fill as set_native_chart_legend_fill,
 };
-use crate::charts::legend_font_size::{
+use crate::charts::legend_font::{
+    chart_legend_font as read_native_chart_legend_font,
     chart_legend_font_size as read_native_chart_legend_font_size,
+    set_chart_legend_font as set_native_chart_legend_font,
     set_chart_legend_font_size as set_native_chart_legend_font_size,
 };
 use crate::charts::legend_shadow::{
@@ -21,7 +23,9 @@ use crate::charts::options::{
     chart_legend_visible as read_native_chart_legend_visible,
     set_chart_legend_visible as set_native_chart_legend_visible,
 };
-use crate::charts::{ChartLegendFill, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke};
+use crate::charts::{
+    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
+};
 
 impl KeynoteEditor {
     /// Read whether Keynote shows the native legend for one slide chart.
@@ -81,6 +85,50 @@ impl KeynoteEditor {
         if verified.slide_chart_legend_fill(slide_index, drawable_object_id)? != *fill {
             return Err(Error::InvalidFormat(
                 "Keynote chart legend-fill update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read the exact inherited or direct native legend font and face traits.
+    pub fn slide_chart_legend_font(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ChartLegendFont> {
+        let graph = chart_graph(self, slide_index, drawable_object_id)?;
+        read_native_chart_legend_font(
+            self.package(),
+            &graph.archive_name,
+            drawable_object_id,
+            "Keynote",
+        )
+    }
+
+    /// Set or remove the direct native legend font and face-trait override.
+    pub fn set_slide_chart_legend_font(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        font: &ChartLegendFont,
+    ) -> Result<()> {
+        if &self.slide_chart_legend_font(slide_index, drawable_object_id)? == font {
+            return Ok(());
+        }
+        let graph = chart_graph(self, slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_native_chart_legend_font(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            "Keynote",
+            font,
+        )?;
+        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.slide_chart_legend_font(slide_index, drawable_object_id)? != *font {
+            return Err(Error::InvalidFormat(
+                "Keynote chart legend font update failed validation".to_owned(),
             ));
         }
         *self = verified;

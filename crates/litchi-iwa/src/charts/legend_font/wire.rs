@@ -1,4 +1,4 @@
-//! Focused wire patches for legend paragraph-style selection and point size.
+//! Focused wire patches for legend paragraph-style selection and typography.
 
 use prost::Message;
 
@@ -8,6 +8,7 @@ use crate::charts::legend_style::{
     GENERATED_LEGEND_STYLE_EXTENSION_FIELD, generated_legend_style_extension,
 };
 use crate::protobuf::tsch;
+use crate::text::TextFont;
 use crate::text::paragraph_alignment::native::{direct_overrides, locate_style};
 use crate::wire::{
     patch_fixed32_field, patch_length_delimited_field, patch_varint_field,
@@ -23,6 +24,14 @@ const PARAGRAPH_OVERRIDE_COUNT_FIELD: u32 = 10;
 const PARAGRAPH_CHARACTER_PROPERTIES_FIELD: u32 = 11;
 /// `TSWP.CharacterStylePropertiesArchive.font_size`.
 const CHARACTER_FONT_SIZE_FIELD: u32 = 3;
+/// `TSWP.CharacterStylePropertiesArchive.bold`.
+const CHARACTER_BOLD_FIELD: u32 = 1;
+/// `TSWP.CharacterStylePropertiesArchive.italic`.
+const CHARACTER_ITALIC_FIELD: u32 = 2;
+/// `TSWP.CharacterStylePropertiesArchive.font_name_null`.
+const CHARACTER_FONT_NAME_NULL_FIELD: u32 = 4;
+/// `TSWP.CharacterStylePropertiesArchive.font_name`.
+const CHARACTER_FONT_NAME_FIELD: u32 = 5;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 
 pub(super) fn direct_paragraph_style_index(data: &[u8]) -> Result<Option<usize>> {
@@ -150,6 +159,96 @@ pub(super) fn patch_existing_size(
     if actual != expected {
         return Err(Error::InvalidFormat(format!(
             "legend paragraph style {style_id} font-size wire patch failed validation"
+        )));
+    }
+    Ok(())
+}
+
+pub(super) fn patch_existing_font(
+    package: &mut IWorkPackage,
+    style_id: u64,
+    expected: &crate::text::paragraph_alignment::native::ParagraphStyleOverrides,
+) -> Result<()> {
+    let location = locate_style(package, style_id)?;
+    let current = direct_overrides(&location.style, &location.message.data)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "legend paragraph style {style_id} is not an exact native variation"
+        ))
+    })?;
+    let current_font_null = matches!(current.font, Some(TextFont::Default));
+    let current_font_name = matches!(current.font, Some(TextFont::Named(_)));
+    let expected_font_null = matches!(expected.font, Some(TextFont::Default));
+    let expected_font_name = expected.font.as_ref().and_then(TextFont::name);
+    let next_count = u64::from(expected.count());
+    package.update_archive(&location.archive_name, |archive| {
+        let object = archive.object_mut(style_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("legend paragraph style {style_id} is missing"))
+        })?;
+        let messages = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        let [(message_index, message)] = messages.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "legend paragraph style {style_id} must have exactly one paragraph-style payload"
+            )));
+        };
+        let data = transform_length_delimited_field(
+            &message.data,
+            PARAGRAPH_CHARACTER_PROPERTIES_FIELD,
+            |characters| {
+                let characters = patch_varint_field(
+                    characters,
+                    CHARACTER_BOLD_FIELD,
+                    current.bold.is_some(),
+                    expected.bold.map(u64::from),
+                )?;
+                let characters = patch_varint_field(
+                    &characters,
+                    CHARACTER_ITALIC_FIELD,
+                    current.italic.is_some(),
+                    expected.italic.map(u64::from),
+                )?;
+                let characters = patch_varint_field(
+                    &characters,
+                    CHARACTER_FONT_NAME_NULL_FIELD,
+                    current_font_null,
+                    expected_font_null.then_some(1),
+                )?;
+                patch_length_delimited_field(
+                    &characters,
+                    CHARACTER_FONT_NAME_FIELD,
+                    current_font_name,
+                    expected_font_name.map(str::as_bytes),
+                )
+            },
+        )?;
+        let data = patch_varint_field(
+            &data,
+            PARAGRAPH_OVERRIDE_COUNT_FIELD,
+            location.style.override_count.is_some(),
+            Some(next_count),
+        )?;
+        object.replace_message(
+            *message_index,
+            RawMessage {
+                type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })?;
+    let verified = locate_style(package, style_id)?;
+    let actual = direct_overrides(&verified.style, &verified.message.data)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "legend paragraph style {style_id} stopped being an exact native variation"
+        ))
+    })?;
+    if actual != *expected {
+        return Err(Error::InvalidFormat(format!(
+            "legend paragraph style {style_id} font wire patch failed validation"
         )));
     }
     Ok(())

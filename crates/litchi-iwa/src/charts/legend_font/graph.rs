@@ -1,15 +1,15 @@
-//! Paragraph-style graph lifecycle for native chart-legend font sizes.
+//! Paragraph-style graph lifecycle for native chart-legend typography.
 //!
 //! iWork stores legend typography indirectly: field 2 of the generated legend
-//! style selects one entry in the chart's paragraph-style table. A direct font
-//! size is a private paragraph-style variation appended to that table.
+//! style selects one entry in the chart's paragraph-style table. Direct font
+//! identity, face traits, and size share one private paragraph-style variation.
 
 use std::collections::HashSet;
 
 use prost::Message;
 
 use crate::archive::RawMessage;
-use crate::charts::font::ChartFontSize;
+use crate::charts::font::{ChartFont, ChartFontSize};
 use crate::charts::legend_style::{LegendStyleSlot, legend_style_slot};
 use crate::charts::source::CHART_MESSAGE_TYPE;
 use crate::package_metadata::{
@@ -18,8 +18,8 @@ use crate::package_metadata::{
 use crate::protobuf::{tsp, tswp};
 use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::text::paragraph_alignment::native::{
-    ParagraphStyleOverrides, direct_overrides, locate_style, parent_style_id, stylesheet_id,
-    variation_object,
+    ParagraphStyleOverrides, direct_overrides, inherited_text_font, inherited_text_style,
+    locate_style, parent_style_id, stylesheet_id, variation_object,
 };
 use crate::text::style_registry::{
     register_private_style, register_style_reference, unregister_owner_reference_if_unused,
@@ -28,10 +28,11 @@ use crate::text::style_registry::{
 use crate::wire::{rewrite_repeated_length_delimited_fields, transform_length_delimited_field};
 use crate::{Error, IWorkPackage, Result};
 
-use super::ChartLegendFontSize;
 use super::wire::{
-    direct_paragraph_style_index, patch_direct_paragraph_style_index, patch_existing_size,
+    direct_paragraph_style_index, patch_direct_paragraph_style_index, patch_existing_font,
+    patch_existing_size,
 };
+use super::{ChartLegendFont, ChartLegendFontSize};
 
 /// `TSCH.ChartArchive.paragraph_styles`.
 const CHART_PARAGRAPH_STYLES_FIELD: u32 = 20;
@@ -39,6 +40,34 @@ const CHART_PARAGRAPH_STYLES_FIELD: u32 = 20;
 const CHART_ARCHIVE_EXTENSION_FIELD: u32 = 10_000;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+
+#[derive(Debug, Clone, Copy)]
+enum TypographyProperty<'a> {
+    Font(&'a ChartFont),
+    Size(ChartFontSize),
+}
+
+#[derive(Debug, Clone, Copy)]
+enum TypographyPropertyKind {
+    Font,
+    Size,
+}
+
+/// Read the exact direct legend font-identity and face-trait state.
+pub(crate) fn chart_legend_font(
+    package: &IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+) -> Result<ChartLegendFont> {
+    LegendFontGraph::locate(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?
+    .read_font(package)
+}
 
 /// Read the exact direct legend font-size state of one native chart.
 pub(crate) fn chart_legend_font_size(
@@ -53,7 +82,51 @@ pub(crate) fn chart_legend_font_size(
         drawable_object_id,
         drawable_label,
     )?;
-    graph.read(package)
+    graph.read_size(package)
+}
+
+/// Set or remove the direct legend font-identity and face-trait override.
+pub(crate) fn set_chart_legend_font(
+    package: &mut IWorkPackage,
+    chart_archive_name: &str,
+    drawable_object_id: u64,
+    drawable_label: &str,
+    target: &ChartLegendFont,
+) -> Result<()> {
+    let graph = LegendFontGraph::locate(
+        package,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
+    if graph.read_font(package)? == *target {
+        return Ok(());
+    }
+    graph
+        .legend_style
+        .ensure_exclusive(package, drawable_object_id, drawable_label)?;
+    let mut staged = package.clone();
+    match target {
+        ChartLegendFont::Inherited => {
+            graph.reset_property(&mut staged, TypographyPropertyKind::Font)?
+        },
+        ChartLegendFont::Font(font) => {
+            graph.set_property(&mut staged, TypographyProperty::Font(font))?
+        },
+    }
+    let verified = LegendFontGraph::locate(
+        &staged,
+        chart_archive_name,
+        drawable_object_id,
+        drawable_label,
+    )?;
+    if verified.read_font(&staged)? != *target {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} legend font update failed validation"
+        )));
+    }
+    *package = staged;
+    Ok(())
 }
 
 /// Set or remove the direct legend font-size override of one native chart.
@@ -70,7 +143,7 @@ pub(crate) fn set_chart_legend_font_size(
         drawable_object_id,
         drawable_label,
     )?;
-    if graph.read(package)? == target {
+    if graph.read_size(package)? == target {
         return Ok(());
     }
     graph
@@ -78,8 +151,12 @@ pub(crate) fn set_chart_legend_font_size(
         .ensure_exclusive(package, drawable_object_id, drawable_label)?;
     let mut staged = package.clone();
     match target {
-        ChartLegendFontSize::Inherited => graph.reset(&mut staged)?,
-        ChartLegendFontSize::Size(size) => graph.set(&mut staged, size)?,
+        ChartLegendFontSize::Inherited => {
+            graph.reset_property(&mut staged, TypographyPropertyKind::Size)?
+        },
+        ChartLegendFontSize::Size(size) => {
+            graph.set_property(&mut staged, TypographyProperty::Size(size))?
+        },
     }
     let verified = LegendFontGraph::locate(
         &staged,
@@ -87,7 +164,7 @@ pub(crate) fn set_chart_legend_font_size(
         drawable_object_id,
         drawable_label,
     )?;
-    if verified.read(&staged)? != target {
+    if verified.read_size(&staged)? != target {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} legend font-size update failed validation"
         )));
@@ -180,36 +257,58 @@ impl LegendFontGraph {
         })
     }
 
-    fn read(&self, package: &IWorkPackage) -> Result<ChartLegendFontSize> {
+    fn direct_overrides(&self, package: &IWorkPackage) -> Result<Option<ParagraphStyleOverrides>> {
         let Some(index) = self.direct_index else {
-            return Ok(ChartLegendFontSize::Inherited);
+            return Ok(None);
         };
         let style_id = self.paragraph_style_ids[index];
         let location = locate_style(package, style_id)?;
-        let overrides =
-            direct_overrides(&location.style, &location.message.data)?.ok_or_else(|| {
+        direct_overrides(&location.style, &location.message.data)?
+            .map(Some)
+            .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "legend paragraph style {style_id} is not an exact native variation"
                 ))
-            })?;
+            })
+    }
+
+    fn read_font(&self, package: &IWorkPackage) -> Result<ChartLegendFont> {
+        let Some(index) = self.direct_index else {
+            return Ok(ChartLegendFont::Inherited);
+        };
+        let Some(overrides) = self.direct_overrides(package)? else {
+            return Ok(ChartLegendFont::Inherited);
+        };
+        if overrides.font.is_none() && overrides.bold.is_none() && overrides.italic.is_none() {
+            return Ok(ChartLegendFont::Inherited);
+        }
+        let style_id = self.paragraph_style_ids[index];
+        let font = inherited_text_font(package, style_id)?;
+        let style = inherited_text_style(package, style_id)?;
+        Ok(ChartLegendFont::Font(
+            ChartFont::new(font)
+                .with_bold(style.bold)
+                .with_italic(style.italic),
+        ))
+    }
+
+    fn read_size(&self, package: &IWorkPackage) -> Result<ChartLegendFontSize> {
+        let Some(overrides) = self.direct_overrides(package)? else {
+            return Ok(ChartLegendFontSize::Inherited);
+        };
         Ok(overrides
             .point_size
             .map(ChartFontSize::from)
             .map_or(ChartLegendFontSize::Inherited, ChartLegendFontSize::Size))
     }
 
-    fn set(&self, package: &mut IWorkPackage, size: ChartFontSize) -> Result<()> {
+    fn set_property(
+        &self,
+        package: &mut IWorkPackage,
+        property: TypographyProperty<'_>,
+    ) -> Result<()> {
         if let Some(index) = self.direct_index {
             let style_id = self.paragraph_style_ids[index];
-            let exclusive = style_is_exclusive_to_chart(
-                package,
-                style_id,
-                &self.chart_archive_name,
-                self.drawable_object_id,
-            )?;
-            if exclusive {
-                return patch_existing_size(package, style_id, Some(size));
-            }
             let location = locate_style(package, style_id)?;
             let mut overrides = direct_overrides(&location.style, &location.message.data)?
                 .ok_or_else(|| {
@@ -217,7 +316,17 @@ impl LegendFontGraph {
                         "legend paragraph style {style_id} is not an exact native variation"
                     ))
                 })?;
-            overrides.point_size = Some(size.text_point_size());
+            let parent_id = parent_style_id(&location.style, style_id)?;
+            apply_property(package, parent_id, &mut overrides, property)?;
+            let exclusive = style_is_exclusive_to_chart(
+                package,
+                style_id,
+                &self.chart_archive_name,
+                self.drawable_object_id,
+            )?;
+            if exclusive {
+                return patch_existing_property(package, style_id, &overrides, property);
+            }
             return self.replace_shared_style(package, index, style_id, overrides);
         }
 
@@ -225,10 +334,8 @@ impl LegendFontGraph {
         let parent = locate_style(package, parent_id)?;
         let stylesheet = stylesheet_id(&parent.style, parent_id)?;
         let style_id = next_object_identifier(package)?;
-        let overrides = ParagraphStyleOverrides {
-            point_size: Some(size.text_point_size()),
-            ..Default::default()
-        };
+        let mut overrides = ParagraphStyleOverrides::default();
+        apply_property(package, parent_id, &mut overrides, property)?;
         let variation = variation_object(style_id, parent_id, stylesheet, overrides)?;
         let new_index = self.paragraph_style_ids.len();
         let native_index = u64::try_from(new_index).map_err(|_| {
@@ -256,7 +363,11 @@ impl LegendFontGraph {
         set_package_last_object_identifier(package, style_id)
     }
 
-    fn reset(&self, package: &mut IWorkPackage) -> Result<()> {
+    fn reset_property(
+        &self,
+        package: &mut IWorkPackage,
+        kind: TypographyPropertyKind,
+    ) -> Result<()> {
         let Some(index) = self.direct_index else {
             return Ok(());
         };
@@ -267,7 +378,7 @@ impl LegendFontGraph {
                 "legend paragraph style {style_id} is not an exact native variation"
             )));
         };
-        if overrides.point_size.take().is_none() {
+        if !clear_property(&mut overrides, kind) {
             return Ok(());
         }
         let exclusive = style_is_exclusive_to_chart(
@@ -278,7 +389,7 @@ impl LegendFontGraph {
         )?;
         if !overrides.is_empty() {
             if exclusive {
-                return patch_existing_size(package, style_id, None);
+                return patch_cleared_property(package, style_id, &overrides, kind);
             }
             return self.replace_shared_style(package, index, style_id, overrides);
         }
@@ -446,6 +557,71 @@ impl LegendFontGraph {
             }
             Ok(())
         })
+    }
+}
+
+fn apply_property(
+    package: &IWorkPackage,
+    parent_style_id: u64,
+    overrides: &mut ParagraphStyleOverrides,
+    property: TypographyProperty<'_>,
+) -> Result<()> {
+    match property {
+        TypographyProperty::Font(target) => {
+            let inherited_style = inherited_text_style(package, parent_style_id)?;
+            // Keep a direct identity even when it matches the parent so the
+            // public direct/inherited state remains stable after round-trip.
+            overrides.font = Some(target.font().clone());
+            overrides.bold = (target.bold() != inherited_style.bold).then_some(target.bold());
+            overrides.italic =
+                (target.italic() != inherited_style.italic).then_some(target.italic());
+        },
+        TypographyProperty::Size(size) => {
+            overrides.point_size = Some(size.text_point_size());
+        },
+    }
+    Ok(())
+}
+
+fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: TypographyPropertyKind) -> bool {
+    match kind {
+        TypographyPropertyKind::Font => {
+            let present =
+                overrides.font.is_some() || overrides.bold.is_some() || overrides.italic.is_some();
+            overrides.font = None;
+            overrides.bold = None;
+            overrides.italic = None;
+            present
+        },
+        TypographyPropertyKind::Size => overrides.point_size.take().is_some(),
+    }
+}
+
+fn patch_existing_property(
+    package: &mut IWorkPackage,
+    style_id: u64,
+    overrides: &ParagraphStyleOverrides,
+    property: TypographyProperty<'_>,
+) -> Result<()> {
+    match property {
+        TypographyProperty::Font(_) => patch_existing_font(package, style_id, overrides),
+        TypographyProperty::Size(_) => patch_existing_size(
+            package,
+            style_id,
+            overrides.point_size.map(ChartFontSize::from),
+        ),
+    }
+}
+
+fn patch_cleared_property(
+    package: &mut IWorkPackage,
+    style_id: u64,
+    overrides: &ParagraphStyleOverrides,
+    kind: TypographyPropertyKind,
+) -> Result<()> {
+    match kind {
+        TypographyPropertyKind::Font => patch_existing_font(package, style_id, overrides),
+        TypographyPropertyKind::Size => patch_existing_size(package, style_id, None),
     }
 }
 
