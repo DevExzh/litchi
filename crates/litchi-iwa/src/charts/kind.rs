@@ -42,6 +42,14 @@ pub enum ChartKind {
 }
 
 impl ChartKind {
+    /// Whether the 3D Scene inspector exposes rectangular/cylindrical bars.
+    pub const fn supports_3d_bar_shape(self) -> bool {
+        matches!(
+            self,
+            Self::Column3d | Self::Bar3d | Self::StackedColumn3d | Self::StackedBar3d
+        )
+    }
+
     /// Whether the chart exposes the native 3D Scene inspector.
     pub const fn supports_3d_scene(self) -> bool {
         matches!(

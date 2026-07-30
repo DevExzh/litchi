@@ -15,6 +15,7 @@ mod axis_series_names;
 mod axis_steps;
 mod axis_tick_marks;
 mod background_fill;
+mod bar_shape_3d;
 mod border;
 mod border_stroke;
 mod caption;

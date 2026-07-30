@@ -23,6 +23,7 @@ pub(crate) mod axis_scale;
 pub(crate) mod axis_steps;
 pub(crate) mod axis_style;
 pub(crate) mod background_fill;
+pub(crate) mod bar_shape_3d;
 pub(crate) mod border;
 pub(crate) mod border_stroke;
 pub(crate) mod category_labels;
@@ -80,6 +81,7 @@ pub use axis_label_angle::ChartAxisLabelAngle;
 pub use axis_scale::ChartValueAxisScale;
 pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValueAxisSteps};
 pub use axis_style::ChartAxisTickMarkLocation;
+pub use bar_shape_3d::Chart3dBarShape;
 pub use category_labels::{
     ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout,
 };
