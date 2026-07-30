@@ -239,6 +239,34 @@ impl IWorkPackage {
         self.insert_entry(normalized, compressed)
     }
 
+    /// Serialize and insert a new IWA component before an existing package member.
+    pub(crate) fn insert_archive_before(
+        &mut self,
+        name: &str,
+        archive: &Archive,
+        before: &str,
+    ) -> Result<()> {
+        let normalized = normalize_entry_name(name).to_string();
+        let before = normalize_entry_name(before);
+        validate_entry_name(&normalized)?;
+        if !normalized.ends_with(".iwa") {
+            return Err(Error::Bundle(format!(
+                "Package entry {normalized} is not an IWA component"
+            )));
+        }
+        if self.contains_entry(&normalized) {
+            return Err(Error::InvalidFormat(format!(
+                "IWA package entry already exists: {normalized}"
+            )));
+        }
+        let position = self
+            .entry_position(before)
+            .ok_or_else(|| Error::Bundle(format!("IWA insertion anchor not found: {before}")))?;
+        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        self.entries.insert(position, (normalized, compressed));
+        Ok(())
+    }
+
     /// Parse, mutate, validate, and replace an IWA component as one operation.
     /// If the callback or serialization fails, the original package is unchanged.
     pub fn update_archive<F>(&mut self, name: &str, update: F) -> Result<()>

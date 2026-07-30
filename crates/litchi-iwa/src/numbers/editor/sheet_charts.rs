@@ -643,7 +643,9 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::charts::object_container::is_object_container_archive;
     use crate::charts::source::SERIES_NON_STYLE_MESSAGE_TYPE;
+    use crate::charts::unique_chart_object_archive_name;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
@@ -661,6 +663,7 @@ mod tests {
         ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
+    use crate::package_metadata::{component_identifier_for_entry, component_uuid_identifiers};
     use crate::protobuf::tsch;
     use crate::shapes::{
         RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
@@ -711,7 +714,20 @@ mod tests {
         let entries = chart.series_non_styles.unwrap().entries;
         assert_eq!(entries.len(), expected_count);
         for entry in entries {
-            let non_style = archive.object(entry.reference.identifier).unwrap();
+            let non_style_archive_name = unique_chart_object_archive_name(
+                editor.package(),
+                entry.reference.identifier,
+                "test series non-style",
+            )
+            .unwrap();
+            assert_ne!(non_style_archive_name, graph.archive_name);
+            assert!(
+                is_object_container_archive(editor.package(), &non_style_archive_name).unwrap()
+            );
+            let non_style_archive = editor.package().archive(&non_style_archive_name).unwrap();
+            let non_style = non_style_archive
+                .object(entry.reference.identifier)
+                .unwrap();
             let message = non_style
                 .messages
                 .iter()
@@ -722,6 +738,16 @@ mod tests {
                 .super_
                 .unwrap();
             assert_eq!(parent.stylesheet, None);
+            let component_id =
+                component_identifier_for_entry(editor.package(), &non_style_archive_name)
+                    .unwrap()
+                    .unwrap();
+            assert!(
+                component_uuid_identifiers(editor.package(), component_id)
+                    .unwrap()
+                    .unwrap()
+                    .contains(&entry.reference.identifier)
+            );
         }
     }
 

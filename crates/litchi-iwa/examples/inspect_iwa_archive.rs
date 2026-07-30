@@ -14,7 +14,7 @@ use litchi_iwa::protobuf::tsce::{CalculationEngineArchive, NamedReferenceManager
 use litchi_iwa::protobuf::tsd::CommentStorageArchive;
 use litchi_iwa::protobuf::tsd::GuideStorageArchive;
 use litchi_iwa::protobuf::tsk::{AnnotationAuthorArchive, AnnotationAuthorStorageArchive};
-use litchi_iwa::protobuf::tsp::PackageMetadata;
+use litchi_iwa::protobuf::tsp::{ObjectContainer, PackageMetadata};
 use litchi_iwa::protobuf::tss::StylesheetArchive;
 use litchi_iwa::protobuf::tst::{
     CellStyleArchive, ColumnRowUidMapArchive, HeaderNameMgrArchive, HiddenStateFormulaOwnerArchive,
@@ -455,8 +455,13 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                     metadata.file_format_version,
                 );
                 for component in metadata.components {
+                    let is_object_container = component
+                        .locator
+                        .as_deref()
+                        .unwrap_or(&component.preferred_locator)
+                        .starts_with("ObjectContainer");
                     println!(
-                        "  component={} locator={:?} versions={:?}/{:?}/{:?} uuid_objects={:?} external_refs={:?}",
+                        "  component={} locator={:?} versions={:?}/{:?}/{:?} save_token={:?} outside={:?} required_package={:?} uuid_objects={:?} external_refs={:?}",
                         component.identifier,
                         component
                             .locator
@@ -465,6 +470,9 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                         component.document_read_version,
                         component.document_write_version,
                         component.component_read_version,
+                        component.save_token,
+                        component.is_stored_outside_object_archive,
+                        component.required_package_identifier,
                         component
                             .object_uuid_map_entries
                             .iter()
@@ -483,7 +491,15 @@ fn print_archive(archive: litchi_iwa::archive::Archive, object_id: Option<u64>) 
                             ))
                             .collect::<Vec<_>>()
                     );
+                    if is_object_container {
+                        println!("  object_container_component={component:#?}");
+                    }
                 }
+            }
+            if message.type_ == 11_008
+                && let Ok(container) = ObjectContainer::decode(message.data.as_slice())
+            {
+                println!("  object_container={container:#?}");
             }
         }
     }

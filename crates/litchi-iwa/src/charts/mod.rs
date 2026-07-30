@@ -46,6 +46,7 @@ pub(crate) mod lighting_3d;
 pub mod metadata_extractor;
 pub(crate) mod non_style;
 pub(crate) mod number_format;
+pub(crate) mod object_container;
 pub(crate) mod options;
 pub(crate) mod pie_label_distance;
 pub(crate) mod pie_labels;

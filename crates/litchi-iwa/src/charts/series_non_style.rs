@@ -12,6 +12,10 @@ use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::charts::IWorkChartArchive;
+use crate::charts::object_container::{
+    ObjectContainerAllocation, insert_object_container, is_object_container_archive,
+    remove_object_container_objects, reserve_object_container,
+};
 use crate::charts::source::{
     CHART_MESSAGE_TYPE, SERIES_NON_STYLE_MESSAGE_TYPE, register_chart_styles,
     unregister_chart_styles,
@@ -134,7 +138,10 @@ where
         .collect::<Vec<_>>();
     let mut updates = Vec::new();
     let mut removals = Vec::new();
-    let mut creations = Vec::new();
+    let mut styled_creations = Vec::new();
+    let mut unstyled_creations = Vec::new();
+    let mut object_container = None;
+    let mut created_ids = Vec::new();
     let mut registrations_by_archive = HashMap::<String, Vec<u64>>::new();
     let mut unregistrations_by_archive = HashMap::<String, Vec<u64>>::new();
     for (index, ((slot, current), replacement)) in
@@ -144,7 +151,6 @@ where
             continue;
         }
         if let Some(slot) = slot {
-            slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
             let (mut patched, registered_stylesheet_id) = slot.read(package, |data| {
                 Ok((
                     patch(data, replacement)?,
@@ -159,19 +165,53 @@ where
                     slot.object_id
                 )));
             }
-            if new_object_base == NewChartSeriesNonStyleBase::Styled
+            let needs_stylesheet_registration = new_object_base
+                == NewChartSeriesNonStyleBase::Styled
                 && replacement != &default
-                && registered_stylesheet_id.is_none()
-            {
+                && registered_stylesheet_id.is_none();
+            if needs_stylesheet_registration {
                 patched = set_chart_series_non_style_stylesheet(&patched, Some(stylesheet_id))?;
-                registrations_by_archive
-                    .entry(slot.archive_name.clone())
-                    .or_default()
-                    .push(slot.object_id);
             }
-            if patched.as_slice() == styled_empty.as_slice()
+            let is_empty = patched.as_slice() == styled_empty.as_slice()
                 || patched.as_slice() == unstyled_empty.as_slice()
-            {
+                || patched.as_slice() == unstyled_new_base.as_slice();
+            let owner_count = slot.owner_count(package)?;
+            if owner_count == 0 {
+                return Err(Error::InvalidFormat(format!(
+                    "{drawable_label} chart {drawable_object_id} series non-style {} has no owner",
+                    slot.object_id
+                )));
+            }
+            if owner_count > 1 {
+                if is_empty {
+                    final_ids[index] = None;
+                    continue;
+                }
+                let allocation_base = if registered_stylesheet_id.is_some() {
+                    NewChartSeriesNonStyleBase::Styled
+                } else {
+                    new_object_base
+                };
+                let identifier = allocate_series_non_style_identifier(
+                    package,
+                    &mut next_identifier,
+                    allocation_base,
+                    &mut object_container,
+                )?;
+                final_ids[index] = Some(identifier);
+                let object = chart_series_non_style_object(identifier, patched)?;
+                match allocation_base {
+                    NewChartSeriesNonStyleBase::Styled => {
+                        registrations_by_archive
+                            .entry(chart_archive_name.to_owned())
+                            .or_default()
+                            .push(identifier);
+                        styled_creations.push(object);
+                    },
+                    NewChartSeriesNonStyleBase::Unstyled => unstyled_creations.push(object),
+                }
+                created_ids.push(identifier);
+            } else if is_empty {
                 final_ids[index] = None;
                 if registered_stylesheet_id.is_some() {
                     unregistrations_by_archive
@@ -181,6 +221,12 @@ where
                 }
                 removals.push(slot.clone());
             } else {
+                if needs_stylesheet_registration {
+                    registrations_by_archive
+                        .entry(slot.archive_name.clone())
+                        .or_default()
+                        .push(slot.object_id);
+                }
                 updates.push((slot.clone(), patched));
             }
         } else if replacement != &default {
@@ -193,10 +239,12 @@ where
             if new_object_base == NewChartSeriesNonStyleBase::Unstyled {
                 append_chart_series_non_style_capabilities(&mut data)?;
             }
-            let identifier = next_identifier;
-            next_identifier = next_identifier
-                .checked_add(1)
-                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            let identifier = allocate_series_non_style_identifier(
+                package,
+                &mut next_identifier,
+                new_object_base,
+                &mut object_container,
+            )?;
             final_ids[index] = Some(identifier);
             if new_object_base == NewChartSeriesNonStyleBase::Styled {
                 registrations_by_archive
@@ -204,7 +252,12 @@ where
                     .or_default()
                     .push(identifier);
             }
-            creations.push((identifier, chart_series_non_style_object(identifier, data)?));
+            let object = chart_series_non_style_object(identifier, data)?;
+            match new_object_base {
+                NewChartSeriesNonStyleBase::Styled => styled_creations.push(object),
+                NewChartSeriesNonStyleBase::Unstyled => unstyled_creations.push(object),
+            }
+            created_ids.push(identifier);
         }
     }
 
@@ -214,7 +267,19 @@ where
     for (archive_name, identifiers) in &unregistrations_by_archive {
         unregister_chart_styles(package, stylesheet_id, archive_name, identifiers)?;
     }
+    let mut container_removals = HashMap::<String, Vec<u64>>::new();
+    let mut ordinary_removals = Vec::new();
     for slot in &removals {
+        if is_object_container_archive(package, &slot.archive_name)? {
+            container_removals
+                .entry(slot.archive_name.clone())
+                .or_default()
+                .push(slot.object_id);
+        } else {
+            ordinary_removals.push(slot);
+        }
+    }
+    for slot in ordinary_removals {
         package.update_archive(&slot.archive_name, |archive| {
             archive.remove_object(slot.object_id).ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -225,17 +290,29 @@ where
             Ok(())
         })?;
     }
-    let created_ids = creations
-        .iter()
-        .map(|(identifier, _)| *identifier)
-        .collect::<Vec<_>>();
-    if !creations.is_empty() {
+    let mut released_container_ids = Vec::new();
+    for (archive_name, identifiers) in container_removals {
+        if let Some(container_id) =
+            remove_object_container_objects(package, &archive_name, &identifiers)?
+        {
+            released_container_ids.push(container_id);
+        }
+    }
+    if !styled_creations.is_empty() {
         package.update_archive(chart_archive_name, |archive| {
-            for (_, object) in creations.drain(..) {
+            for object in styled_creations.drain(..) {
                 archive.insert_object(object)?;
             }
             Ok(())
         })?;
+    }
+    if !unstyled_creations.is_empty() {
+        let allocation = object_container.take().ok_or_else(|| {
+            Error::InvalidFormat(
+                "unstyled chart series creation lost its object container".to_owned(),
+            )
+        })?;
+        insert_object_container(package, chart_archive_name, allocation, unstyled_creations)?;
     }
     for (archive_name, identifiers) in &registrations_by_archive {
         register_chart_styles(package, stylesheet_id, archive_name, identifiers)?;
@@ -255,7 +332,26 @@ where
             .collect::<Vec<_>>(),
         &final_ids,
     )?;
-    update_component_registrations(package, chart_archive_name, &removals, &created_ids)?;
+    update_component_registrations(
+        package,
+        chart_archive_name,
+        &removals,
+        registrations_by_archive
+            .get(chart_archive_name)
+            .map(Vec::as_slice)
+            .unwrap_or_default(),
+    )?;
+    if let Some(last_identifier) = created_ids.last().copied() {
+        set_package_last_object_identifier(package, last_identifier)?;
+    }
+    let mut released_ids = removals
+        .iter()
+        .map(|slot| slot.object_id)
+        .collect::<Vec<_>>();
+    released_ids.extend(released_container_ids);
+    if !released_ids.is_empty() {
+        release_package_identifier_suffix(package, &released_ids)?;
+    }
 
     if chart_series_non_style_values(
         package,
@@ -272,6 +368,22 @@ where
         )));
     }
     Ok(())
+}
+
+fn allocate_series_non_style_identifier(
+    package: &IWorkPackage,
+    next_identifier: &mut u64,
+    base: NewChartSeriesNonStyleBase,
+    object_container: &mut Option<ObjectContainerAllocation>,
+) -> Result<u64> {
+    if base == NewChartSeriesNonStyleBase::Unstyled && object_container.is_none() {
+        *object_container = Some(reserve_object_container(package, next_identifier)?);
+    }
+    let identifier = *next_identifier;
+    *next_identifier = next_identifier
+        .checked_add(1)
+        .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+    Ok(identifier)
 }
 
 fn chart_stylesheet_id(
@@ -509,12 +621,7 @@ impl ChartSeriesNonStyleSlot {
         })
     }
 
-    fn ensure_exclusive(
-        &self,
-        package: &IWorkPackage,
-        drawable_object_id: u64,
-        drawable_label: &str,
-    ) -> Result<()> {
+    fn owner_count(&self, package: &IWorkPackage) -> Result<usize> {
         let mut owner_count = 0usize;
         for archive_name in package.iwa_entry_names() {
             let archive = package.archive(archive_name)?;
@@ -542,13 +649,7 @@ impl ChartSeriesNonStyleSlot {
                 }
             }
         }
-        if owner_count != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "{drawable_label} chart {drawable_object_id} series non-style {} is shared by {owner_count} charts",
-                self.object_id
-            )));
-        }
-        Ok(())
+        Ok(owner_count)
     }
 }
 
@@ -637,12 +738,8 @@ fn update_component_registrations(
     package: &mut IWorkPackage,
     chart_archive_name: &str,
     removals: &[ChartSeriesNonStyleSlot],
-    created_ids: &[u64],
+    chart_created_ids: &[u64],
 ) -> Result<()> {
-    let removed_ids = removals
-        .iter()
-        .map(|slot| slot.object_id)
-        .collect::<Vec<_>>();
     let mut removed_by_component = HashMap::<u64, Vec<u64>>::new();
     for slot in removals {
         if let Some(component_id) = component_identifier_for_entry(package, &slot.archive_name)? {
@@ -659,17 +756,10 @@ fn update_component_registrations(
         remove_component_object_uuids(package, component_id, &identifiers)?;
     }
 
-    if !created_ids.is_empty() {
+    if !chart_created_ids.is_empty() {
         if let Some(component_id) = component_identifier_for_entry(package, chart_archive_name)? {
-            add_component_object_uuids(package, component_id, created_ids)?;
+            add_component_object_uuids(package, component_id, chart_created_ids)?;
         }
-        let last_identifier = *created_ids.last().ok_or_else(|| {
-            Error::InvalidFormat("chart series creation lost allocated identifiers".to_owned())
-        })?;
-        set_package_last_object_identifier(package, last_identifier)?;
-    }
-    if !removed_ids.is_empty() {
-        release_package_identifier_suffix(package, &removed_ids)?;
     }
     Ok(())
 }

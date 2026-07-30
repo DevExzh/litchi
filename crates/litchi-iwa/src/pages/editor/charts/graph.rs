@@ -390,7 +390,6 @@ pub(super) fn body_chart_graph(
                 )));
             }
             if reference_owner_counts.get(&identifier) == Some(&1) {
-                object_ids.push(identifier);
                 let is_registered_style = if message_type == SERIES_NON_STYLE_MESSAGE_TYPE {
                     let message = style
                         .messages
@@ -420,6 +419,9 @@ pub(super) fn body_chart_graph(
                             | SERIES_STYLE_MESSAGE_TYPE
                     )
                 };
+                if style_archive_name == archive_name || is_registered_style {
+                    object_ids.push(identifier);
+                }
                 if is_registered_style {
                     style_ids.insert(identifier);
                 }

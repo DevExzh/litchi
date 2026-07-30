@@ -90,6 +90,34 @@ pub(crate) fn package_last_object_identifier(package: &IWorkPackage) -> Result<O
     Ok(Some(metadata.last_object_identifier))
 }
 
+pub(crate) fn package_save_token(package: &IWorkPackage) -> Result<Option<u64>> {
+    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        return Ok(None);
+    }
+    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
+    let (object_index, message_index) = package_metadata_location(&archive)?;
+    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
+        archive.objects[object_index].messages[message_index]
+            .data
+            .as_slice(),
+    )?;
+    Ok(metadata.save_token)
+}
+
+pub(crate) fn package_has_data_metadata_map(package: &IWorkPackage) -> Result<bool> {
+    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        return Ok(false);
+    }
+    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
+    let (object_index, message_index) = package_metadata_location(&archive)?;
+    let metadata = crate::protobuf::tsp::PackageMetadata::decode(
+        archive.objects[object_index].messages[message_index]
+            .data
+            .as_slice(),
+    )?;
+    Ok(metadata.data_metadata_map.is_some())
+}
+
 pub(crate) fn set_package_last_object_identifier(
     package: &mut IWorkPackage,
     identifier: u64,
@@ -462,21 +490,24 @@ pub(crate) fn remove_component_registration(
                     (6, component.external_references.as_slice()),
                     (18, component.versioned_external_references.as_slice()),
                 ] {
-                    if !references
+                    for reference in references
                         .iter()
-                        .any(|reference| reference.component_identifier == component_identifier)
+                        .filter(|reference| {
+                            reference.component_identifier == component_identifier
+                        })
                     {
-                        continue;
+                        component_data = remove_repeated_length_delimited_field_where(
+                            &component_data,
+                            reference_field,
+                            |payload| {
+                                Ok(
+                                    crate::protobuf::tsp::ComponentExternalReference::decode(
+                                        payload,
+                                    )? == *reference,
+                                )
+                            },
+                        )?;
                     }
-                    component_data = remove_repeated_length_delimited_field_where(
-                        &component_data,
-                        reference_field,
-                        |payload| {
-                            Ok(crate::protobuf::tsp::ComponentExternalReference::decode(payload)?
-                                .component_identifier
-                                == component_identifier)
-                        },
-                    )?;
                 }
                 Ok(component_data)
             })?;
