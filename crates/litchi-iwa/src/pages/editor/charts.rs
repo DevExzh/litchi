@@ -39,6 +39,7 @@ mod series_connection_line;
 mod series_error_bar_auto_fit;
 mod series_error_bars;
 mod series_fill;
+mod series_gap_3d;
 mod series_stroke;
 mod series_symbol;
 mod series_symbol_fill;

@@ -90,6 +90,11 @@ impl ChartKind {
         )
     }
 
+    /// Whether the chart exposes the native 3D `Between Series` gap.
+    pub const fn supports_3d_series_gap(self) -> bool {
+        matches!(self, Self::Line3d | Self::Area3d)
+    }
+
     /// Whether the chart exposes the native Wedges rotation control.
     pub const fn supports_pie_start_angle(self) -> bool {
         matches!(
