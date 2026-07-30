@@ -113,6 +113,11 @@ impl ChartKind {
         matches!(self, Self::Radar2d)
     }
 
+    /// Whether the chart exposes the native Radar series-style controls.
+    pub const fn supports_radar_series_style(self) -> bool {
+        matches!(self, Self::Radar2d)
+    }
+
     /// Whether the chart exposes the native Radar rotation-angle control.
     pub const fn supports_radar_start_angle(self) -> bool {
         matches!(self, Self::Radar2d)
@@ -237,6 +242,20 @@ mod tests {
             ChartKind::Line3d,
         ] {
             assert!(!kind.supports_radar_start_angle());
+        }
+    }
+
+    #[test]
+    fn radar_series_style_support_is_exact() {
+        assert!(ChartKind::Radar2d.supports_radar_series_style());
+        for kind in [
+            ChartKind::Area2d,
+            ChartKind::Line2d,
+            ChartKind::Pie2d,
+            ChartKind::Area3d,
+            ChartKind::Unsupported(100),
+        ] {
+            assert!(!kind.supports_radar_series_style());
         }
     }
 }

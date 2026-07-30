@@ -302,7 +302,7 @@ pub(crate) fn source_chart_objects(
             tsch::ChartSeriesStyleArchive {
                 super_: Some(source_style(stylesheet_id)),
             },
-            default_series_style(index),
+            default_series_style(index)?,
             &[
                 SUPPORTS_PRIMARY_FEATURE_FIELD,
                 SUPPORTS_SECONDARY_FEATURE_FIELD,
@@ -428,7 +428,7 @@ fn default_axis_non_style() -> tsch::generated::ChartAxisNonStyleArchive {
     }
 }
 
-fn default_series_style(index: usize) -> tsch::generated::ChartSeriesStyleArchive {
+fn default_series_style(index: usize) -> Result<tsch::generated::ChartSeriesStyleArchive> {
     const COLORS: [(f32, f32, f32); SERIES_STYLE_COUNT] = [
         (0.16, 0.55, 0.88),
         (0.29, 0.70, 0.39),
@@ -438,6 +438,7 @@ fn default_series_style(index: usize) -> tsch::generated::ChartSeriesStyleArchiv
         (0.62, 0.25, 0.55),
     ];
     let (red, green, blue) = COLORS[index % COLORS.len()];
+    let color = RgbaColor::new(red, green, blue, 1.0, RgbColorSpace::Srgb)?;
     let fill = tsd::FillArchive {
         color: Some(tsp::Color {
             model: tsp::color::ColorModel::Rgb as i32,
@@ -450,19 +451,25 @@ fn default_series_style(index: usize) -> tsch::generated::ChartSeriesStyleArchiv
         }),
         ..Default::default()
     };
-    tsch::generated::ChartSeriesStyleArchive {
+    let radar_stroke = stroke_to_native(ShapeStroke::new(
+        color,
+        StrokeWidth::new(NATIVE_RADAR_STROKE_WIDTH_POINTS)?,
+        StrokePattern::Solid,
+    ));
+    Ok(tsch::generated::ChartSeriesStyleArchive {
         tschchartseriesdefaultfill: Some(fill.clone()),
         tschchartseriescolumnfill: Some(fill.clone()),
         tschchartseriesbarfill: Some(fill.clone()),
         tschchartseriesareafill: Some(fill.clone()),
         tschchartseriespiefill: Some(fill.clone()),
         tschchartseriesradarareafill: Some(fill),
+        tschchartseriesradarareastroke: Some(radar_stroke),
         tschchartseriesradarareafilluseseriesstroke: Some(true),
         tschchartseriesradarareafilluseseriesstrokealphamultiplier: Some(
             DEFAULT_RADAR_FILL_STROKE_ALPHA_MULTIPLIER,
         ),
         ..Default::default()
-    }
+    })
 }
 
 fn default_cached_formatters(

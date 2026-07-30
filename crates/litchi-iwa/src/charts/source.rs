@@ -23,7 +23,10 @@ use prost::Message;
 use super::{ChartData, ChartGapSpacing, ChartKind, IWorkChartArchive};
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tn, tsch, tsd, tsk, tsp, tss};
-use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
+use crate::shapes::{
+    DrawableGeometry, DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke,
+    StrokePattern, StrokeWidth, stroke_to_native,
+};
 use crate::wire::{
     append_length_delimited_field, append_varint_field, patch_varint_field,
     transform_length_delimited_fields_at_path,
@@ -66,6 +69,7 @@ const DEFAULT_CHART_DATASET_INDEX: u32 = 0;
 const DEFAULT_CHART_NUMBER_FORMAT_TYPE: u32 = 256;
 const AUTOMATIC_CHART_DECIMAL_PLACES: u32 = 253;
 const DEFAULT_CHART_NEGATIVE_STYLE: u32 = 0;
+const NATIVE_RADAR_STROKE_WIDTH_POINTS: f32 = 4.0;
 const NUMBERS_PARAGRAPH_STYLE_COUNT: usize = 30;
 const PAGES_PARAGRAPH_STYLE_COUNT: usize = 30;
 const KEYNOTE_PARAGRAPH_STYLE_COUNT: usize = 25;
