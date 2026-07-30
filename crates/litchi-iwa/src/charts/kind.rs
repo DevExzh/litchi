@@ -113,6 +113,11 @@ impl ChartKind {
         matches!(self, Self::Radar2d)
     }
 
+    /// Whether the chart exposes the native Radar rotation-angle control.
+    pub const fn supports_radar_start_angle(self) -> bool {
+        matches!(self, Self::Radar2d)
+    }
+
     /// Decode the integer stored by the iWork protobuf schema.
     pub const fn from_raw(value: i32) -> Self {
         match value {
@@ -218,6 +223,20 @@ mod tests {
             ChartKind::Line3d,
         ] {
             assert!(!kind.supports_radar_grid_shape());
+        }
+    }
+
+    #[test]
+    fn radar_start_angle_support_is_exact() {
+        assert!(ChartKind::Radar2d.supports_radar_start_angle());
+        for kind in [
+            ChartKind::Line2d,
+            ChartKind::Area2d,
+            ChartKind::Pie2d,
+            ChartKind::Donut2d,
+            ChartKind::Line3d,
+        ] {
+            assert!(!kind.supports_radar_start_angle());
         }
     }
 }

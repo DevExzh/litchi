@@ -34,6 +34,7 @@ mod pie_labels;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod radar_grid_shape;
+mod radar_start_angle;
 mod reference_lines;
 mod rounded_corners;
 mod scene_3d;
