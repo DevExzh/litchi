@@ -6,8 +6,9 @@
 
 use crate::charts::ChartKind;
 use crate::charts::series_non_style::{
-    GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD, chart_series_non_style_values,
-    generated_chart_series_non_style_extension, set_chart_series_non_style_values,
+    GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD, NewChartSeriesNonStyleBase,
+    chart_series_non_style_values, generated_chart_series_non_style_extension,
+    set_chart_series_non_style_values,
 };
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
@@ -147,6 +148,7 @@ pub(crate) fn set_chart_series_connection_lines(
         drawable_object_id,
         drawable_label,
         "series connection-line",
+        NewChartSeriesNonStyleBase::Styled,
         expected,
         storage.default_value(),
         |data| read_connection_line(data, storage),

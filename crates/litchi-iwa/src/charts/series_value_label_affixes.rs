@@ -9,8 +9,9 @@ use prost::Message;
 use crate::charts::ChartKind;
 use crate::charts::number_format::{DualNumberFormatFields, patch_dual_affixes, read_dual_affixes};
 use crate::charts::series_non_style::{
-    chart_series_non_style_values, generated_chart_series_non_style_extension,
-    patch_chart_series_non_style_extension, set_chart_series_non_style_values,
+    NewChartSeriesNonStyleBase, chart_series_non_style_values,
+    generated_chart_series_non_style_extension, patch_chart_series_non_style_extension,
+    set_chart_series_non_style_values,
 };
 use crate::protobuf::tsch;
 use crate::{Error, IWorkPackage, Result};
@@ -61,6 +62,7 @@ pub(crate) fn set_chart_series_value_label_affixes(
         drawable_object_id,
         drawable_label,
         "series value-label affixes",
+        NewChartSeriesNonStyleBase::Styled,
         expected,
         ChartSeriesValueLabelAffixes::default(),
         read_affixes,

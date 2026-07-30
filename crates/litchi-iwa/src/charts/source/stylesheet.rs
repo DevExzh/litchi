@@ -15,7 +15,7 @@ use crate::package_metadata::{
     add_component_external_reference, component_identifier_for_entry,
     remove_component_external_reference,
 };
-use crate::protobuf::{tsp, tss};
+use crate::protobuf::{tsch, tsp, tss};
 use crate::wire::{
     append_repeated_length_delimited_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
@@ -49,15 +49,27 @@ pub(crate) fn local_chart_style_ids(
                 "chart graph object {identifier} is missing from {archive_name}"
             ))
         })?;
-        let style_payload_count = object
+        let style_payloads = object
             .messages
             .iter()
             .filter(|message| CHART_STYLE_MESSAGE_TYPES.contains(&message.type_))
-            .count();
-        match style_payload_count {
-            0 => {},
-            1 => style_ids.push(identifier),
-            count => {
+            .collect::<Vec<_>>();
+        match style_payloads.as_slice() {
+            [message] if message.type_ == SERIES_NON_STYLE_MESSAGE_TYPE => {
+                let non_style = tsch::ChartSeriesNonStyleArchive::decode(message.data.as_slice())?;
+                let parent = non_style.super_.ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "chart series non-style {identifier} has no native style parent"
+                    ))
+                })?;
+                if parent.stylesheet.is_some() {
+                    style_ids.push(identifier);
+                }
+            },
+            [_] => style_ids.push(identifier),
+            [] => {},
+            messages => {
+                let count = messages.len();
                 return Err(Error::InvalidFormat(format!(
                     "chart style object {identifier} has {count} style payloads"
                 )));

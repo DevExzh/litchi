@@ -391,17 +391,36 @@ pub(super) fn body_chart_graph(
             }
             if reference_owner_counts.get(&identifier) == Some(&1) {
                 object_ids.push(identifier);
-                if matches!(
-                    message_type,
-                    CHART_STYLE_MESSAGE_TYPE
-                        | CHART_NON_STYLE_MESSAGE_TYPE
-                        | LEGEND_STYLE_MESSAGE_TYPE
-                        | LEGEND_NON_STYLE_MESSAGE_TYPE
-                        | AXIS_STYLE_MESSAGE_TYPE
-                        | AXIS_NON_STYLE_MESSAGE_TYPE
-                        | SERIES_STYLE_MESSAGE_TYPE
-                        | SERIES_NON_STYLE_MESSAGE_TYPE
-                ) {
+                let is_registered_style = if message_type == SERIES_NON_STYLE_MESSAGE_TYPE {
+                    let message = style
+                        .messages
+                        .iter()
+                        .find(|message| message.type_ == SERIES_NON_STYLE_MESSAGE_TYPE)
+                        .expect("validated unique series non-style payload");
+                    let non_style =
+                        tsch::ChartSeriesNonStyleArchive::decode(message.data.as_slice())?;
+                    non_style
+                        .super_
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "Pages chart series non-style {identifier} has no native style parent"
+                            ))
+                        })?
+                        .stylesheet
+                        .is_some()
+                } else {
+                    matches!(
+                        message_type,
+                        CHART_STYLE_MESSAGE_TYPE
+                            | CHART_NON_STYLE_MESSAGE_TYPE
+                            | LEGEND_STYLE_MESSAGE_TYPE
+                            | LEGEND_NON_STYLE_MESSAGE_TYPE
+                            | AXIS_STYLE_MESSAGE_TYPE
+                            | AXIS_NON_STYLE_MESSAGE_TYPE
+                            | SERIES_STYLE_MESSAGE_TYPE
+                    )
+                };
+                if is_registered_style {
                     style_ids.insert(identifier);
                 }
             }

@@ -643,6 +643,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::charts::source::SERIES_NON_STYLE_MESSAGE_TYPE;
     use crate::charts::{
         ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
         ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius,
@@ -660,6 +661,7 @@ mod tests {
         ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
     };
     use crate::numbers::NumbersDocumentBuilder;
+    use crate::protobuf::tsch;
     use crate::shapes::{
         RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
         ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
@@ -688,6 +690,39 @@ mod tests {
             vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
         )
         .unwrap()
+    }
+
+    fn assert_series_non_styles_are_unstyled(
+        editor: &NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        expected_count: usize,
+    ) {
+        let graph = chart_graph(editor, sheet_id, drawable_object_id).unwrap();
+        let archive = editor.package().archive(&graph.archive_name).unwrap();
+        let chart = archive.object(drawable_object_id).unwrap();
+        let chart = chart
+            .messages
+            .iter()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .and_then(|message| IWorkChartArchive::decode(message.data.as_slice()).ok())
+            .and_then(|archive| archive.chart)
+            .unwrap();
+        let entries = chart.series_non_styles.unwrap().entries;
+        assert_eq!(entries.len(), expected_count);
+        for entry in entries {
+            let non_style = archive.object(entry.reference.identifier).unwrap();
+            let message = non_style
+                .messages
+                .iter()
+                .find(|message| message.type_ == SERIES_NON_STYLE_MESSAGE_TYPE)
+                .unwrap();
+            let parent = tsch::ChartSeriesNonStyleArchive::decode(message.data.as_slice())
+                .unwrap()
+                .super_
+                .unwrap();
+            assert_eq!(parent.stylesheet, None);
+        }
     }
 
     fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
@@ -3586,6 +3621,12 @@ mod tests {
         editor
             .set_sheet_chart_pie_wedge_explosions(sheet_id, source.drawable_object_id, &customized)
             .unwrap();
+        assert_series_non_styles_are_unstyled(
+            &editor,
+            sheet_id,
+            source.drawable_object_id,
+            customized.len(),
+        );
         assert_eq!(
             editor
                 .sheet_chart_pie_wedge_explosion(
@@ -3842,6 +3883,12 @@ mod tests {
         editor
             .set_sheet_chart_pie_label_distances(sheet_id, source.drawable_object_id, &customized)
             .unwrap();
+        assert_series_non_styles_are_unstyled(
+            &editor,
+            sheet_id,
+            source.drawable_object_id,
+            customized.len(),
+        );
         assert_eq!(
             editor
                 .sheet_chart_pie_label_distance(

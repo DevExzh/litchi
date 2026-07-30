@@ -7,8 +7,9 @@ use prost::Message;
 
 use crate::charts::ChartKind;
 use crate::charts::series_non_style::{
-    chart_series_non_style_values, generated_chart_series_non_style_extension,
-    patch_chart_series_non_style_extension, set_chart_series_non_style_values,
+    NewChartSeriesNonStyleBase, chart_series_non_style_values,
+    generated_chart_series_non_style_extension, patch_chart_series_non_style_extension,
+    set_chart_series_non_style_values,
 };
 use crate::charts::series_style::{
     GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD, effective_chart_series_style_slots,
@@ -258,6 +259,7 @@ pub(crate) fn set_chart_series_symbols(
         drawable_object_id,
         drawable_label,
         "data symbols",
+        NewChartSeriesNonStyleBase::Styled,
         &non_styles,
         default,
         |data| read_non_style(data, storage),

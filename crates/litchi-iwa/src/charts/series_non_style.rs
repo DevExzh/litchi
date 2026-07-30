@@ -34,6 +34,16 @@ const SUPPORTS_CUSTOM_DATE_FORMAT_FIELD: u32 = 10_002;
 const SUPPORTS_CALLOUT_LINES_FIELD: u32 = 10_003;
 const STANDARD_MESSAGE_VERSION: &[u32] = &[1, 0, 5];
 
+/// Native parent used when allocating a previously absent series non-style.
+///
+/// Most label and formatter overrides are document styles. Pure geometry
+/// overrides, however, use an empty style parent in files saved by iWork.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NewChartSeriesNonStyleBase {
+    Styled,
+    Unstyled,
+}
+
 #[derive(Debug, Clone)]
 struct ChartSeriesNonStyleSlot {
     archive_name: String,
@@ -77,6 +87,7 @@ pub(crate) fn set_chart_series_non_style_values<T>(
     drawable_object_id: u64,
     drawable_label: &str,
     property_label: &str,
+    new_object_base: NewChartSeriesNonStyleBase,
     expected: &[T],
     default: T,
     read: impl Fn(&[u8]) -> Result<T> + Copy,
@@ -108,8 +119,13 @@ where
         return Ok(());
     }
 
-    let canonical_empty =
-        canonical_empty_chart_series_non_style_data_with_stylesheet(stylesheet_id)?;
+    let styled_empty = canonical_empty_chart_series_non_style_data_with_stylesheet(stylesheet_id)?;
+    let unstyled_empty = canonical_empty_chart_series_non_style_data()?;
+    let unstyled_new_base = chart_series_non_style_data_with_style(tss::StyleArchive::default());
+    let canonical_empty = match new_object_base {
+        NewChartSeriesNonStyleBase::Styled => styled_empty.as_slice(),
+        NewChartSeriesNonStyleBase::Unstyled => unstyled_new_base.as_slice(),
+    };
     let mut next_identifier = next_object_identifier(package)?;
     let mut final_ids = graph
         .slots
@@ -119,6 +135,8 @@ where
     let mut updates = Vec::new();
     let mut removals = Vec::new();
     let mut creations = Vec::new();
+    let mut registrations_by_archive = HashMap::<String, Vec<u64>>::new();
+    let mut unregistrations_by_archive = HashMap::<String, Vec<u64>>::new();
     for (index, ((slot, current), replacement)) in
         graph.slots.iter().zip(&current).zip(expected).enumerate()
     {
@@ -127,25 +145,65 @@ where
         }
         if let Some(slot) = slot {
             slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
-            let patched = slot.read(package, |data| patch(data, replacement))?;
-            if patched == canonical_empty {
+            let (mut patched, registered_stylesheet_id) = slot.read(package, |data| {
+                Ok((
+                    patch(data, replacement)?,
+                    chart_series_non_style_stylesheet_id(data)?,
+                ))
+            })?;
+            if let Some(registered_stylesheet_id) = registered_stylesheet_id
+                && registered_stylesheet_id != stylesheet_id
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "{drawable_label} chart series non-style {} belongs to stylesheet {registered_stylesheet_id}, expected {stylesheet_id}",
+                    slot.object_id
+                )));
+            }
+            if new_object_base == NewChartSeriesNonStyleBase::Styled
+                && replacement != &default
+                && registered_stylesheet_id.is_none()
+            {
+                patched = set_chart_series_non_style_stylesheet(&patched, Some(stylesheet_id))?;
+                registrations_by_archive
+                    .entry(slot.archive_name.clone())
+                    .or_default()
+                    .push(slot.object_id);
+            }
+            if patched.as_slice() == styled_empty.as_slice()
+                || patched.as_slice() == unstyled_empty.as_slice()
+            {
                 final_ids[index] = None;
+                if registered_stylesheet_id.is_some() {
+                    unregistrations_by_archive
+                        .entry(slot.archive_name.clone())
+                        .or_default()
+                        .push(slot.object_id);
+                }
                 removals.push(slot.clone());
             } else {
                 updates.push((slot.clone(), patched));
             }
         } else if replacement != &default {
-            let data = patch(canonical_empty.as_slice(), replacement)?;
-            if data == canonical_empty {
+            let mut data = patch(canonical_empty, replacement)?;
+            if data.as_slice() == canonical_empty {
                 return Err(Error::InvalidFormat(format!(
                     "{drawable_label} chart {drawable_object_id} {property_label} patch produced no native override"
                 )));
+            }
+            if new_object_base == NewChartSeriesNonStyleBase::Unstyled {
+                append_chart_series_non_style_capabilities(&mut data)?;
             }
             let identifier = next_identifier;
             next_identifier = next_identifier
                 .checked_add(1)
                 .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
             final_ids[index] = Some(identifier);
+            if new_object_base == NewChartSeriesNonStyleBase::Styled {
+                registrations_by_archive
+                    .entry(chart_archive_name.to_owned())
+                    .or_default()
+                    .push(identifier);
+            }
             creations.push((identifier, chart_series_non_style_object(identifier, data)?));
         }
     }
@@ -153,14 +211,7 @@ where
     for (slot, data) in updates {
         slot.replace(package, data)?;
     }
-    let mut removals_by_archive = HashMap::<String, Vec<u64>>::new();
-    for slot in &removals {
-        removals_by_archive
-            .entry(slot.archive_name.clone())
-            .or_default()
-            .push(slot.object_id);
-    }
-    for (archive_name, identifiers) in &removals_by_archive {
+    for (archive_name, identifiers) in &unregistrations_by_archive {
         unregister_chart_styles(package, stylesheet_id, archive_name, identifiers)?;
     }
     for slot in &removals {
@@ -185,7 +236,9 @@ where
             }
             Ok(())
         })?;
-        register_chart_styles(package, stylesheet_id, chart_archive_name, &created_ids)?;
+    }
+    for (archive_name, identifiers) in &registrations_by_archive {
+        register_chart_styles(package, stylesheet_id, archive_name, identifiers)?;
     }
 
     patch_chart_series_non_style_references(
@@ -634,7 +687,6 @@ fn chart_series_non_style_object(identifier: u64, data: Vec<u8>) -> Result<Archi
 }
 
 /// Return the native empty private series non-style payload.
-#[cfg(test)]
 pub(crate) fn canonical_empty_chart_series_non_style_data() -> Result<Vec<u8>> {
     canonical_empty_chart_series_non_style_data_with_style(tss::StyleArchive::default())
 }
@@ -654,14 +706,50 @@ fn canonical_empty_chart_series_non_style_data_with_stylesheet(
 fn canonical_empty_chart_series_non_style_data_with_style(
     style: tss::StyleArchive,
 ) -> Result<Vec<u8>> {
-    let mut data = tsch::ChartSeriesNonStyleArchive {
+    let mut data = chart_series_non_style_data_with_style(style);
+    append_chart_series_non_style_capabilities(&mut data)?;
+    Ok(data)
+}
+
+fn chart_series_non_style_data_with_style(style: tss::StyleArchive) -> Vec<u8> {
+    tsch::ChartSeriesNonStyleArchive {
         super_: Some(style),
     }
+    .encode_to_vec()
+}
+
+fn append_chart_series_non_style_capabilities(data: &mut Vec<u8>) -> Result<()> {
+    append_varint_field(data, SUPPORTS_CUSTOM_NUMBER_FORMAT_FIELD, 1)?;
+    append_varint_field(data, SUPPORTS_CUSTOM_DATE_FORMAT_FIELD, 1)?;
+    append_varint_field(data, SUPPORTS_CALLOUT_LINES_FIELD, 1)?;
+    Ok(())
+}
+
+fn chart_series_non_style_stylesheet_id(data: &[u8]) -> Result<Option<u64>> {
+    let archive = tsch::ChartSeriesNonStyleArchive::decode(data)?;
+    let style = archive.super_.ok_or_else(|| {
+        Error::InvalidFormat("chart series non-style has no native style parent".to_owned())
+    })?;
+    Ok(style.stylesheet.map(|reference| reference.identifier))
+}
+
+fn set_chart_series_non_style_stylesheet(
+    data: &[u8],
+    stylesheet_id: Option<u64>,
+) -> Result<Vec<u8>> {
+    let current = chart_series_non_style_stylesheet_id(data)?;
+    if current == stylesheet_id {
+        return Ok(data.to_vec());
+    }
+    let style = tss::StyleArchive {
+        stylesheet: stylesheet_id.map(|identifier| tsp::Reference {
+            identifier,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
     .encode_to_vec();
-    append_varint_field(&mut data, SUPPORTS_CUSTOM_NUMBER_FORMAT_FIELD, 1)?;
-    append_varint_field(&mut data, SUPPORTS_CUSTOM_DATE_FORMAT_FIELD, 1)?;
-    append_varint_field(&mut data, SUPPORTS_CALLOUT_LINES_FIELD, 1)?;
-    Ok(data)
+    patch_length_delimited_field(data, 1, true, Some(&style))
 }
 
 /// Decode an outer series non-style payload and locate its generated extension.

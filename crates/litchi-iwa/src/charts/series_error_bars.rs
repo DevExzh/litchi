@@ -4,8 +4,9 @@
 //! and type-specific values inside each series non-style extension.
 
 use crate::charts::series_non_style::{
-    chart_series_non_style_values, generated_chart_series_non_style_extension,
-    patch_chart_series_non_style_extension, set_chart_series_non_style_values,
+    NewChartSeriesNonStyleBase, chart_series_non_style_values,
+    generated_chart_series_non_style_extension, patch_chart_series_non_style_extension,
+    set_chart_series_non_style_values,
 };
 use crate::protobuf::tsch;
 use crate::wire::{
@@ -397,6 +398,7 @@ pub(crate) fn set_chart_series_error_bars(
         drawable_object_id,
         drawable_label,
         "series error bars",
+        NewChartSeriesNonStyleBase::Styled,
         expected,
         ChartSeriesErrorBars::None,
         read_error_bars,

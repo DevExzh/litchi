@@ -8,8 +8,9 @@ use prost::Message;
 
 use crate::charts::ChartKind;
 use crate::charts::series_non_style::{
-    chart_series_non_style_values, generated_chart_series_non_style_extension,
-    patch_chart_series_non_style_extension, set_chart_series_non_style_values,
+    NewChartSeriesNonStyleBase, chart_series_non_style_values,
+    generated_chart_series_non_style_extension, patch_chart_series_non_style_extension,
+    set_chart_series_non_style_values,
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_varint_field};
@@ -103,6 +104,7 @@ pub(crate) fn set_chart_series_value_label_visibilities(
         drawable_object_id,
         drawable_label,
         "series value-label visibility",
+        NewChartSeriesNonStyleBase::Styled,
         expected,
         storage.default_visibility(),
         |data| read_series_value_label_visibility(data, storage),
