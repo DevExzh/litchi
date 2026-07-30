@@ -7,6 +7,7 @@ pub(super) struct ChartThemeContext {
     pub(super) component_id: u64,
     pub(super) theme_id: u64,
     pub(super) stylesheet_id: u64,
+    pub(super) stylesheet_component_id: u64,
     pub(super) paragraph_style_id: u64,
 }
 
@@ -55,6 +56,17 @@ pub(super) fn chart_theme_context(package: &IWorkPackage) -> Result<ChartThemeCo
         .ok_or_else(|| {
             Error::InvalidFormat("Numbers theme has no paragraph style preset".to_owned())
         })?;
+    let stylesheet_archive_name = locations.get(&paragraph_style_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers theme paragraph style {paragraph_style_id} is missing"
+        ))
+    })?;
+    let stylesheet_component_id = component_identifier_for_entry(package, stylesheet_archive_name)?
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers stylesheet component {stylesheet_archive_name} is not registered"
+            ))
+        })?;
     let component_id =
         component_identifier_for_entry(package, &archive_name)?.ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -66,6 +78,7 @@ pub(super) fn chart_theme_context(package: &IWorkPackage) -> Result<ChartThemeCo
         component_id,
         theme_id,
         stylesheet_id,
+        stylesheet_component_id,
         paragraph_style_id,
     })
 }

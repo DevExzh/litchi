@@ -10,11 +10,12 @@ use crate::charts::{
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
     ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
     ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-    ChartPieLabelVisibility, ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex,
-    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesIndex,
-    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
+    ChartPieLabelVisibility, ChartPieLeaderLineVisibility, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
     ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
     ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
     ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
@@ -2823,6 +2824,51 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
         .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &defaults)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+    let leader_line_defaults = [ChartPieLeaderLineVisibility::Visible; 3];
+    let leader_line_customized = [
+        ChartPieLeaderLineVisibility::Hidden,
+        ChartPieLeaderLineVisibility::Visible,
+        ChartPieLeaderLineVisibility::Hidden,
+    ];
+    assert_eq!(
+        editor
+            .slide_chart_pie_leader_line_visibilities(0, source.drawable_object_id)
+            .unwrap(),
+        leader_line_defaults
+    );
+    editor
+        .set_slide_chart_pie_leader_line_visibilities(
+            0,
+            source.drawable_object_id,
+            &leader_line_defaults,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    editor
+        .set_slide_chart_pie_leader_line_visibilities(
+            0,
+            source.drawable_object_id,
+            &leader_line_customized,
+        )
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_pie_leader_line_visibility(
+                0,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(0),
+            )
+            .unwrap(),
+        ChartPieLeaderLineVisibility::Hidden
+    );
+    editor
+        .set_slide_chart_pie_leader_line_visibilities(
+            0,
+            source.drawable_object_id,
+            &leader_line_defaults,
+        )
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
         .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &customized)
@@ -2866,6 +2912,13 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
     editor
         .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &customized)
         .unwrap();
+    editor
+        .set_slide_chart_pie_leader_line_visibilities(
+            0,
+            source.drawable_object_id,
+            &leader_line_customized,
+        )
+        .unwrap();
     let duplicate = editor
         .duplicate_slide_chart(0, source.drawable_object_id)
         .unwrap();
@@ -2880,6 +2933,14 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
             ChartPieLabelDistance::DEFAULT,
         )
         .unwrap();
+    editor
+        .set_slide_chart_pie_leader_line_visibility(
+            0,
+            source.drawable_object_id,
+            ChartPieWedgeIndex::from_zero_based(0),
+            ChartPieLeaderLineVisibility::Visible,
+        )
+        .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
@@ -2887,10 +2948,44 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
             .unwrap(),
         customized
     );
+    assert_eq!(
+        reopened
+            .slide_chart_pie_leader_line_visibilities(0, duplicate.drawable_object_id)
+            .unwrap(),
+        leader_line_customized
+    );
+    assert_eq!(
+        reopened
+            .slide_chart_pie_leader_line_visibilities(0, source.drawable_object_id)
+            .unwrap(),
+        [
+            ChartPieLeaderLineVisibility::Visible,
+            ChartPieLeaderLineVisibility::Visible,
+            ChartPieLeaderLineVisibility::Hidden,
+        ]
+    );
     let before_rejected = reopened.to_bytes().unwrap();
     assert!(
         reopened
             .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &customized[..2],)
+            .is_err()
+    );
+    assert!(
+        reopened
+            .set_slide_chart_pie_leader_line_visibilities(
+                0,
+                source.drawable_object_id,
+                &leader_line_customized[..2],
+            )
+            .is_err()
+    );
+    assert!(
+        reopened
+            .slide_chart_pie_leader_line_visibility(
+                0,
+                source.drawable_object_id,
+                ChartPieWedgeIndex::from_zero_based(3),
+            )
             .is_err()
     );
     assert!(

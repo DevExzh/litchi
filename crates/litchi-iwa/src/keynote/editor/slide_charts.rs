@@ -30,6 +30,7 @@ mod legend;
 mod lighting_3d;
 mod pie_label_distance;
 mod pie_labels;
+mod pie_leader_lines;
 mod pie_start_angle;
 mod pie_wedge_explosion;
 mod radar_grid_shape;

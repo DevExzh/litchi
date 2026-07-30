@@ -50,6 +50,7 @@ pub(crate) mod object_container;
 pub(crate) mod options;
 pub(crate) mod pie_label_distance;
 pub(crate) mod pie_labels;
+pub(crate) mod pie_leader_lines;
 pub(crate) mod pie_start_angle;
 pub(crate) mod pie_wedge_explosion;
 pub(crate) mod radar_grid_shape;
@@ -116,6 +117,7 @@ pub use number_format::{
 };
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_labels::ChartPieLabelVisibility;
+pub use pie_leader_lines::ChartPieLeaderLineVisibility;
 pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use radar_grid_shape::ChartRadarGridShape;

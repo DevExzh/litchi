@@ -139,6 +139,7 @@ where
     let mut updates = Vec::new();
     let mut removals = Vec::new();
     let mut styled_creations = Vec::new();
+    let mut chart_creation_ids = Vec::new();
     let mut unstyled_creations = Vec::new();
     let mut object_container = None;
     let mut created_ids = Vec::new();
@@ -206,6 +207,7 @@ where
                             .entry(chart_archive_name.to_owned())
                             .or_default()
                             .push(identifier);
+                        chart_creation_ids.push(identifier);
                         styled_creations.push(object);
                     },
                     NewChartSeriesNonStyleBase::Unstyled => unstyled_creations.push(object),
@@ -251,6 +253,7 @@ where
                     .entry(chart_archive_name.to_owned())
                     .or_default()
                     .push(identifier);
+                chart_creation_ids.push(identifier);
             }
             let object = chart_series_non_style_object(identifier, data)?;
             match new_object_base {
@@ -332,15 +335,7 @@ where
             .collect::<Vec<_>>(),
         &final_ids,
     )?;
-    update_component_registrations(
-        package,
-        chart_archive_name,
-        &removals,
-        registrations_by_archive
-            .get(chart_archive_name)
-            .map(Vec::as_slice)
-            .unwrap_or_default(),
-    )?;
+    update_component_registrations(package, chart_archive_name, &removals, &chart_creation_ids)?;
     if let Some(last_identifier) = created_ids.last().copied() {
         set_package_last_object_identifier(package, last_identifier)?;
     }

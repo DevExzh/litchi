@@ -25,8 +25,9 @@ use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     component_uuid_identifiers, next_object_identifier, release_package_identifier_suffix,
-    remove_component_external_references_to_object, remove_component_object_uuids,
-    remove_component_registration, set_package_last_object_identifier,
+    remove_component_external_reference, remove_component_external_references_to_object,
+    remove_component_object_uuids, remove_component_registration,
+    set_package_last_object_identifier,
 };
 use crate::protobuf::tst::{
     self, TableDataList, TableDataListSegment, TableModelArchive, Tile, TileRowInfo,
