@@ -76,6 +76,20 @@ impl ChartKind {
         self.supports_3d_scene()
     }
 
+    /// Whether the chart exposes 3D primary value-axis label placement.
+    pub const fn supports_3d_value_axis_label_position(self) -> bool {
+        matches!(
+            self,
+            Self::Column3d
+                | Self::Bar3d
+                | Self::Line3d
+                | Self::Area3d
+                | Self::StackedColumn3d
+                | Self::StackedBar3d
+                | Self::StackedArea3d
+        )
+    }
+
     /// Whether the chart exposes the native Wedges rotation control.
     pub const fn supports_pie_start_angle(self) -> bool {
         matches!(
