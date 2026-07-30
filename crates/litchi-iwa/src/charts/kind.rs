@@ -108,6 +108,11 @@ impl ChartKind {
         matches!(self, Self::Donut2d | Self::Donut3d)
     }
 
+    /// Whether the chart exposes the native Radar Chart Grid Shape menu.
+    pub const fn supports_radar_grid_shape(self) -> bool {
+        matches!(self, Self::Radar2d)
+    }
+
     /// Decode the integer stored by the iWork protobuf schema.
     pub const fn from_raw(value: i32) -> Self {
         match value {
@@ -200,5 +205,19 @@ mod tests {
             ChartKind::Unsupported(FUTURE_KIND)
         );
         assert_eq!(ChartKind::Unsupported(FUTURE_KIND).into_raw(), FUTURE_KIND);
+    }
+
+    #[test]
+    fn radar_grid_shape_support_is_exact() {
+        assert!(ChartKind::Radar2d.supports_radar_grid_shape());
+        for kind in [
+            ChartKind::Line2d,
+            ChartKind::Area2d,
+            ChartKind::Pie2d,
+            ChartKind::Donut2d,
+            ChartKind::Line3d,
+        ] {
+            assert!(!kind.supports_radar_grid_shape());
+        }
     }
 }
