@@ -272,16 +272,51 @@ dimension and stored records in this artifact. It does not certify dimension
 shrinking, an Office resave of this exact artifact, other producers, or other
 worksheet feature families.
 
+The ninth implementation slice adds checked row-visibility reads and
+transactional updates without conflating them with destructive row insertion
+or deletion. `RowAt` accepts a
+checked coordinate or a raw zero-based index, while `Sheet::row` returns a
+borrowed `row::Row` for every logical grid row and preserves the distinction
+between an implicit default row and an explicit stored `<row>` record.
+`Sheet::rows` lazily visits only explicit records. The coordinate type is
+re-exported as `RowIndex`, leaving the short `Row` name for the semantic view.
+The parser accepts the SpreadsheetML boolean forms for `hidden` and rejects
+malformed values. This follows the checked-in `[MS-OE376]` §2.1.1788 note that
+row hiding is represented by the `row` element's `hidden` attribute rather than
+the unrelated comment-row marker.
+
+Transactions select the same checked row through `sheet.row(index)?` and expose
+the short verbs `hide` and `show`. Hiding an implicit row creates one sparse
+empty row record; showing an implicit row is a no-op. Touched row tags retain
+their namespace prefix, unknown attributes, children, and cell payloads, while
+untouched bytes remain exact. Protected sheets return a typed row-edit block.
+`Change` and `Conflict` are now non-exhaustive data-bearing enums separating
+cell and row effects: visibility edits on the same row conflict, but a cell
+payload and row visibility on that row are independent and may join. Reversible
+patches record `Missing` versus `Stored { hidden }` row states and restore the
+original package bytes. Recalculation invalidation and calculation-chain
+removal now occur only when primary cell content actually changes; row
+visibility and style-only transactions preserve those unrelated parts.
+
+The public row example produced an A1:A3 workbook with row index 1 hidden.
+Desktop Excel for macOS opened it without repair, displayed row headers 1 and 3
+as adjacent to hidden cells while omitting row 2, and reported A1:A3 as the used
+range. Excel then changed A3 and resaved the workbook. ZIP validation passed,
+and the public Litchi reader recovered the Excel-authored A3 text, all three
+cell values, and the hidden row state. This certifies this hide/read/native-
+resave path on the tested Excel build; it does not certify other row properties,
+column visibility, protected-sheet permission exceptions, or structural shifts.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement row and column insertion/deletion, shifting references,
-merge/group-formula edits, validation evaluation, shared-style definition
-editing or forking, named-style and row/column/theme resolution, rich text,
-dynamic arrays, patch serialization, full structured diagnostics,
-eviction/resource budgets, range/structural effect joins, three-way merge,
-raw-copy preservation of clean compressed entries, cancellation-aware save
-contexts, scratch planning, or output budgets. Those remain certification work;
-no allocation, latency, contention, or scaling conclusion follows from the
-functional tests.
+hints or implement row properties beyond visibility, column visibility, row and
+column insertion/deletion, shifting references, merge/group-formula edits,
+validation evaluation, shared-style definition editing or forking, named-style
+and row/column/theme resolution, rich text, dynamic arrays, patch serialization,
+full structured diagnostics, eviction/resource budgets, range/structural effect
+joins, three-way merge, raw-copy preservation of clean compressed entries,
+cancellation-aware save contexts, scratch planning, or output budgets. Those
+remain certification work; no allocation, latency, contention, or scaling
+conclusion follows from the functional tests.
 
 ## Evidence levels
 

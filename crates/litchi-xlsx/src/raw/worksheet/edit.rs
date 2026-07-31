@@ -1,4 +1,4 @@
-//! Minimal worksheet XML surgery for ordinary cell transactions.
+//! Minimal worksheet XML surgery for ordinary cell and row-property transactions.
 //!
 //! The scanner records exact byte ranges and regenerates only touched rows and
 //! cells. Untouched XML, unknown worksheet children, extension payloads, and
@@ -17,7 +17,7 @@ use quick_xml::reader::NsReader;
 
 use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row};
 use crate::cell::{Content, Value};
-use crate::error::{EditBlock, Error, Result, invalid};
+use crate::error::{EditBlock, Error, Result, RowEditBlock, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::strings::encode_spreadsheet_text;
 
@@ -166,6 +166,45 @@ impl Action {
                 style: Some(effect),
             },
         };
+    }
+}
+
+/// One explicit row-visibility effect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RowAction {
+    Hide,
+    Show,
+}
+
+impl RowAction {
+    pub(crate) const fn hidden(self) -> bool {
+        matches!(self, Self::Hide)
+    }
+}
+
+/// Move-only worksheet rewrite plan with orthogonal cell and row facets.
+#[derive(Debug, Default)]
+pub(crate) struct Plan {
+    pub(crate) cells: BTreeMap<Address, Action>,
+    pub(crate) rows: BTreeMap<Row, RowAction>,
+}
+
+impl Plan {
+    pub(crate) fn cells(cells: BTreeMap<Address, Action>) -> Self {
+        Self {
+            cells,
+            rows: BTreeMap::new(),
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.cells.is_empty() && self.rows.is_empty()
+    }
+}
+
+impl From<BTreeMap<Address, Action>> for Plan {
+    fn from(value: BTreeMap<Address, Action>) -> Self {
+        Self::cells(value)
     }
 }
 
@@ -391,20 +430,22 @@ struct Scanner {
     formulas: Vec<FormulaStorage>,
 }
 
-pub(crate) fn rewrite(
-    content: &[u8],
-    sheet: &str,
-    actions: BTreeMap<Address, Action>,
-) -> Result<Vec<u8>> {
-    if actions.is_empty() {
+pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Result<Vec<u8>> {
+    let plan = plan.into();
+    if plan.is_empty() {
         return Ok(content.to_vec());
     }
     let layout = scan(content)?;
-    validate_actions(&layout, sheet, &actions)?;
-    let dimension = expanded_dimension(&layout, &actions);
+    validate_actions(&layout, sheet, &plan.cells)?;
+    validate_row_actions(&layout, sheet, &plan.rows)?;
+    let dimension = expanded_dimension(&layout, &plan.cells);
 
-    let extra = actions
+    let effects = plan
+        .cells
         .len()
+        .checked_add(plan.rows.len())
+        .ok_or_else(|| invalid("worksheet edit effect count overflow"))?;
+    let extra = effects
         .checked_mul(128)
         .and_then(|value| content.len().checked_add(value))
         .ok_or_else(|| invalid("worksheet edit output size overflow"))?;
@@ -425,9 +466,32 @@ pub(crate) fn rewrite(
     } else {
         output.extend_from_slice(&content[..layout.sheet_data.span.start]);
     }
-    write_sheet_data(&mut output, content, &layout.sheet_data, actions)?;
+    write_sheet_data(
+        &mut output,
+        content,
+        &layout.sheet_data,
+        plan.cells,
+        plan.rows,
+    )?;
     output.extend_from_slice(&content[layout.sheet_data.span.end..]);
     Ok(output)
+}
+
+fn validate_row_actions(
+    layout: &Layout,
+    sheet: &str,
+    actions: &BTreeMap<Row, RowAction>,
+) -> Result<()> {
+    if layout.protected
+        && let Some(row) = actions.keys().next()
+    {
+        return Err(Error::RowEditBlocked {
+            sheet: sheet.to_owned(),
+            row: *row,
+            reason: RowEditBlock::ProtectedSheet,
+        });
+    }
+    Ok(())
 }
 
 fn validate_actions(
@@ -1077,20 +1141,25 @@ fn write_sheet_data(
     output: &mut Vec<u8>,
     source: &[u8],
     data: &SheetData,
-    actions: BTreeMap<Address, Action>,
+    cells: BTreeMap<Address, Action>,
+    rows: BTreeMap<Row, RowAction>,
 ) -> Result<()> {
-    let mut by_row = BTreeMap::<u32, BTreeMap<Address, Action>>::new();
-    for (address, action) in actions {
+    let mut by_row = BTreeMap::<u32, RowEdits>::new();
+    for (address, action) in cells {
         by_row
             .entry(address.row().get() + 1)
             .or_default()
+            .cells
             .insert(address, action);
+    }
+    for (row, action) in rows {
+        by_row.entry(row.get() + 1).or_default().visibility = Some(action);
     }
 
     if data.empty {
         write_tag(output, &data.tag, false, &[], &[]);
-        for (number, actions) in by_row {
-            write_new_row(output, &data.tag.name, number, &actions)?;
+        for (number, edits) in by_row {
+            write_new_row(output, &data.tag.name, number, &edits)?;
         }
         write_close(output, &data.tag.name);
         return Ok(());
@@ -1105,37 +1174,39 @@ fn write_sheet_data(
             .peek()
             .is_some_and(|(number, _)| *number < row.number)
         {
-            if let Some((number, actions)) = pending.next() {
-                write_new_row(output, &data.tag.name, number, &actions)?;
+            if let Some((number, edits)) = pending.next() {
+                write_new_row(output, &data.tag.name, number, &edits)?;
             }
         }
         if pending
             .peek()
             .is_some_and(|(number, _)| *number == row.number)
         {
-            let (_, actions) = pending
+            let (_, edits) = pending
                 .next()
                 .ok_or_else(|| invalid("worksheet row edit ordering was lost"))?;
-            write_row(output, source, row, &actions)?;
+            write_row(output, source, row, &edits)?;
         } else {
             output.extend_from_slice(&source[row.span.start..row.span.end]);
         }
         cursor = row.span.end;
     }
     output.extend_from_slice(&source[cursor..data.close_start]);
-    for (number, actions) in pending {
-        write_new_row(output, &data.tag.name, number, &actions)?;
+    for (number, edits) in pending {
+        write_new_row(output, &data.tag.name, number, &edits)?;
     }
     output.extend_from_slice(&source[data.close_start..data.span.end]);
     Ok(())
 }
 
-fn write_row(
-    output: &mut Vec<u8>,
-    source: &[u8],
-    row: &RowSlot,
-    actions: &BTreeMap<Address, Action>,
-) -> Result<()> {
+#[derive(Debug, Default)]
+struct RowEdits {
+    cells: BTreeMap<Address, Action>,
+    visibility: Option<RowAction>,
+}
+
+fn write_row(output: &mut Vec<u8>, source: &[u8], row: &RowSlot, edits: &RowEdits) -> Result<()> {
+    let actions = &edits.cells;
     let membership_changed = actions.iter().any(|(address, action)| {
         let exists = row
             .cells
@@ -1145,13 +1216,23 @@ fn write_row(
     });
 
     if row.empty {
-        write_tag(
-            output,
-            &row.tag,
-            false,
-            &["spans", "r"],
-            &[("r", row.number.to_string())],
-        );
+        let creates_cell = actions.values().any(Action::creates_missing);
+        let mut removed = Vec::new();
+        let mut appended = Vec::new();
+        if creates_cell {
+            removed.extend(["spans", "r"]);
+            appended.push(("r", row.number.to_string()));
+        }
+        if let Some(visibility) = edits.visibility {
+            removed.push("hidden");
+            if visibility.hidden() {
+                appended.push(("hidden", "1".to_owned()));
+            }
+        }
+        write_tag(output, &row.tag, !creates_cell, &removed, &appended);
+        if !creates_cell {
+            return Ok(());
+        }
         for (address, action) in actions {
             write_new_action(output, &row.tag.name, *address, action)?;
         }
@@ -1159,8 +1240,19 @@ fn write_row(
         return Ok(());
     }
 
-    if membership_changed {
-        write_tag(output, &row.tag, false, &["spans"], &[]);
+    if membership_changed || edits.visibility.is_some() {
+        let mut removed = Vec::new();
+        let mut appended = Vec::new();
+        if membership_changed {
+            removed.push("spans");
+        }
+        if let Some(visibility) = edits.visibility {
+            removed.push("hidden");
+            if visibility.hidden() {
+                appended.push(("hidden", "1".to_owned()));
+            }
+        }
+        write_tag(output, &row.tag, false, &removed, &appended);
     } else {
         output.extend_from_slice(&source[row.span.start..row.tag_end]);
     }
@@ -1205,15 +1297,27 @@ fn write_new_row(
     output: &mut Vec<u8>,
     sheet_data_name: &str,
     number: u32,
-    actions: &BTreeMap<Address, Action>,
+    edits: &RowEdits,
 ) -> Result<()> {
+    let creates_cell = edits.cells.values().any(Action::creates_missing);
+    let hide = edits.visibility.is_some_and(RowAction::hidden);
+    if !creates_cell && !hide {
+        return Ok(());
+    }
     let name = sibling_name(sheet_data_name, "row");
     let tag = Tag {
         name: name.clone().into_boxed_str(),
         attributes: Box::new([]),
     };
-    write_tag(output, &tag, false, &[], &[("r", number.to_string())]);
-    for (address, action) in actions {
+    let mut appended = vec![("r", number.to_string())];
+    if hide {
+        appended.push(("hidden", "1".to_owned()));
+    }
+    write_tag(output, &tag, !creates_cell, &[], &appended);
+    if !creates_cell {
+        return Ok(());
+    }
+    for (address, action) in &edits.cells {
         write_new_action(output, &name, *address, action)?;
     }
     write_close(output, &name);
@@ -1603,6 +1707,65 @@ mod tests {
                 .expect("UTF-8")
                 .contains("dimension")
         );
+    }
+
+    #[test]
+    fn row_visibility_surgery_is_sparse_lossless_and_composes_with_cells() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:dimension ref="A1:A4"/><x:sheetData><x:row r="1" hidden="1" z:keep="yes"><x:c r="A1"><x:v>1</x:v></x:c></x:row><x:row r="2" hidden="0" z:empty="keep"/><x:row r="4"><x:c r="A4"><x:v>4</x:v></x:c></x:row></x:sheetData></x:worksheet>"#
+        );
+        let plan = Plan {
+            cells: BTreeMap::from([(
+                Address::from_a1("A4").expect("A4"),
+                Action::set(40_i32.into()),
+            )]),
+            rows: BTreeMap::from([
+                (Row::new(0).expect("row 1"), RowAction::Show),
+                (Row::new(1).expect("row 2"), RowAction::Hide),
+                (Row::new(2).expect("row 3"), RowAction::Hide),
+                (Row::new(3).expect("row 4"), RowAction::Hide),
+            ]),
+        };
+
+        let edited = rewrite(xml.as_bytes(), "Data", plan).expect("visibility edit");
+        let edited = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(edited.contains(r#"<x:row r="1" z:keep="yes">"#));
+        assert!(edited.contains(r#"<x:row r="2" z:empty="keep" hidden="1"/>"#));
+        assert!(edited.contains(r#"<x:row r="3" hidden="1"/>"#));
+        assert!(edited.contains(r#"<x:row r="4" hidden="1"><x:c r="A4"><x:v>40</x:v>"#));
+        assert!(edited.contains(r#"<x:dimension ref="A1:A4"/>"#));
+
+        let store = worksheet::parse(edited.as_bytes(), || Ok(None)).expect("reparse rows");
+        assert!(!store.row(Row::new(0).expect("row 1")).hidden());
+        assert!(store.row(Row::new(1).expect("row 2")).hidden());
+        assert!(store.row(Row::new(2).expect("row 3")).hidden());
+        assert!(store.row(Row::new(3).expect("row 4")).hidden());
+        assert!(matches!(
+            store.get(Address::from_a1("A4").expect("A4")),
+            Some(Cell::Value(Value::Number(value))) if value.as_str() == "40"
+        ));
+    }
+
+    #[test]
+    fn protected_sheet_blocks_row_visibility_before_rewrite() {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}"><sheetData/><sheetProtection sheet="1"/></worksheet>"#
+        );
+        let result = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::from([(Row::new(0).expect("row 1"), RowAction::Hide)]),
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(Error::RowEditBlocked {
+                reason: RowEditBlock::ProtectedSheet,
+                ..
+            })
+        ));
     }
 
     #[test]

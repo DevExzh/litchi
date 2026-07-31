@@ -5,10 +5,11 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime};
-use litchi_sheet::{Cell as Address, Column, Rect};
+use litchi_sheet::{Cell as Address, Column, Rect, Row as RowIndex};
 
 use crate::error::{Result, invalid};
 use crate::formula::{Formula, Kind};
+use crate::row;
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
 
@@ -461,6 +462,7 @@ pub(crate) struct Stored {
 #[derive(Debug, Default)]
 pub(crate) struct Store {
     cells: Box<[Stored]>,
+    rows: Box<[row::Stored]>,
     extents: Extents,
 }
 
@@ -512,7 +514,11 @@ impl Extents {
 }
 
 impl Store {
-    pub(crate) fn from_unsorted(mut cells: Vec<Stored>, declared: Option<Rect>) -> Result<Self> {
+    pub(crate) fn from_unsorted(
+        mut cells: Vec<Stored>,
+        mut rows: Vec<row::Stored>,
+        declared: Option<Rect>,
+    ) -> Result<Self> {
         cells.sort_unstable_by_key(|entry| entry.address);
         if let Some(pair) = cells
             .windows(2)
@@ -521,6 +527,13 @@ impl Store {
             return Err(invalid(format!(
                 "duplicate worksheet cell at {:?}",
                 pair[0].address
+            )));
+        }
+        rows.sort_unstable_by_key(|entry| entry.index);
+        if let Some(pair) = rows.windows(2).find(|pair| pair[0].index == pair[1].index) {
+            return Err(invalid(format!(
+                "duplicate worksheet row {}",
+                pair[0].index.get() + 1
             )));
         }
 
@@ -538,6 +551,7 @@ impl Store {
         }
         Ok(Self {
             cells: cells.into_boxed_slice(),
+            rows: rows.into_boxed_slice(),
             extents: Extents {
                 declared,
                 stored: stored.finish()?,
@@ -560,6 +574,21 @@ impl Store {
 
     pub(crate) fn entries(&self) -> &[Stored] {
         &self.cells
+    }
+
+    pub(crate) fn row(&self, index: RowIndex) -> row::Row<'_> {
+        row::Row::new(index, self.row_entry(index))
+    }
+
+    pub(crate) fn row_entry(&self, index: RowIndex) -> Option<&row::Stored> {
+        self.rows
+            .binary_search_by_key(&index, |entry| entry.index)
+            .ok()
+            .and_then(|position| self.rows.get(position))
+    }
+
+    pub(crate) fn rows(&self) -> row::Rows<'_> {
+        row::Rows::new(&self.rows)
     }
 
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {

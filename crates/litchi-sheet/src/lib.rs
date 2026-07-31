@@ -60,6 +60,48 @@ impl From<Row> for u32 {
     }
 }
 
+impl fmt::Display for Row {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.get())
+    }
+}
+
+/// Convenient row input accepted by format facades.
+///
+/// Raw indices are zero-based and checked when resolved. A reusable [`Row`]
+/// avoids repeated validation in hot paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RowAt {
+    /// A coordinate that has already been checked.
+    Checked(Row),
+    /// A raw zero-based index.
+    Index(u32),
+}
+
+impl RowAt {
+    /// Resolve this input into a checked row coordinate.
+    #[inline]
+    pub const fn resolve(self) -> Result<Row, CoordinateError> {
+        match self {
+            Self::Checked(row) => Ok(row),
+            Self::Index(index) => Row::new(index),
+        }
+    }
+}
+
+impl From<Row> for RowAt {
+    fn from(value: Row) -> Self {
+        Self::Checked(value)
+    }
+}
+
+impl From<u32> for RowAt {
+    fn from(value: u32) -> Self {
+        Self::Index(value)
+    }
+}
+
 /// Zero-based spreadsheet column coordinate proven to be inside the grid.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -584,6 +626,12 @@ mod tests {
     #[test]
     fn coordinates_make_out_of_grid_cells_unrepresentable() {
         assert_eq!(Cell::at(0, 0), Ok(Cell::new(Row::FIRST, Column::FIRST)));
+        assert_eq!(RowAt::from(0).resolve(), Ok(Row::FIRST));
+        assert_eq!(RowAt::from(Row::LAST).resolve(), Ok(Row::LAST));
+        assert!(matches!(
+            RowAt::from(ROWS).resolve(),
+            Err(CoordinateError::Row { .. })
+        ));
         assert_eq!(
             Cell::at(ROWS - 1, COLUMNS - 1).ok().map(Cell::row),
             Some(Row::LAST)

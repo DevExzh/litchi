@@ -1,17 +1,17 @@
-//! Isolated cell transactions, disjoint joins, and source-checked patches.
+//! Isolated worksheet transactions, disjoint joins, and source-checked patches.
 
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::fmt;
 use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
-use litchi_sheet::{At, Cell as Address};
+use litchi_sheet::{At, Cell as Address, Row as RowIndex, RowAt};
 
 use super::{Sheet, SheetKind, SheetSelector, Workbook};
 use crate::cell::{Cell, Content, Stored};
 use crate::error::{EditBlock, Error, Result, invalid};
 use crate::raw;
-use crate::raw::worksheet::edit::{Action, Payload, StyleEffect};
+use crate::raw::worksheet::edit::{Action, Payload, Plan, RowAction, StyleEffect};
 use crate::{Style, StyleKey, StyleState};
 
 /// Cell state recorded before or after one semantic change.
@@ -81,57 +81,181 @@ impl State {
             }
         )
     }
+
+    fn calculation_content(&self) -> Option<&Cell> {
+        match self {
+            Self::Cell { content, .. } if !matches!(content, Cell::Empty) => Some(content),
+            Self::Missing | Self::Cell { .. } => None,
+        }
+    }
 }
 
-/// One deterministic semantic cell change in a patch.
+/// Exact row-record state before or after a visibility edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RowState {
+    Missing,
+    Stored { hidden: bool },
+}
+
+impl RowState {
+    fn read(value: Option<&crate::row::Stored>) -> Self {
+        value.map_or(Self::Missing, |row| Self::Stored { hidden: row.hidden })
+    }
+
+    fn after(before: Option<&crate::row::Stored>, action: RowAction) -> Self {
+        match (before, action) {
+            (None, RowAction::Show) => Self::Missing,
+            (_, action) => Self::Stored {
+                hidden: action.hidden(),
+            },
+        }
+    }
+}
+
+/// One deterministic semantic change in a reversible patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Change {
-    sheet: Box<str>,
-    address: Address,
-    before: State,
-    after: State,
+#[non_exhaustive]
+pub enum Change {
+    Cell {
+        sheet: Box<str>,
+        address: Address,
+        before: State,
+        after: State,
+    },
+    Row {
+        sheet: Box<str>,
+        row: RowIndex,
+        before: RowState,
+        after: RowState,
+    },
 }
 
 impl Change {
     pub fn sheet(&self) -> &str {
-        &self.sheet
+        match self {
+            Self::Cell { sheet, .. } | Self::Row { sheet, .. } => sheet,
+        }
     }
 
-    pub fn address(&self) -> Address {
-        self.address
+    /// Cell state tuple when this is an ordinary cell change.
+    pub fn cell(&self) -> Option<(Address, &State, &State)> {
+        match self {
+            Self::Cell {
+                address,
+                before,
+                after,
+                ..
+            } => Some((*address, before, after)),
+            Self::Row { .. } => None,
+        }
     }
 
-    pub fn before(&self) -> &State {
-        &self.before
+    /// Row state tuple when this is a row-property change.
+    pub fn row(&self) -> Option<(RowIndex, RowState, RowState)> {
+        match self {
+            Self::Row {
+                row, before, after, ..
+            } => Some((*row, *before, *after)),
+            Self::Cell { .. } => None,
+        }
     }
 
-    pub fn after(&self) -> &State {
-        &self.after
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Cell {
+                sheet,
+                address,
+                before,
+                after,
+            } => Self::Cell {
+                sheet: sheet.clone(),
+                address: *address,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Row {
+                sheet,
+                row,
+                before,
+                after,
+            } => Self::Row {
+                sheet: sheet.clone(),
+                row: *row,
+                before: *after,
+                after: *before,
+            },
+        }
+    }
+
+    fn rebind_style(&mut self, workbook: &Workbook) {
+        if let Self::Cell { before, after, .. } = self {
+            before.rebind_style(workbook);
+            after.rebind_style(workbook);
+        }
+    }
+
+    fn uses_shared_style(&self) -> bool {
+        matches!(
+            self,
+            Self::Cell { before, after, .. }
+                if before.uses_shared_style() || after.uses_shared_style()
+        )
     }
 }
 
-/// Overlapping cell effects on one logical worksheet.
+/// Overlapping effects on one logical worksheet.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Conflict {
-    sheet: Box<str>,
-    position: usize,
-    addresses: Box<[Address]>,
+#[non_exhaustive]
+pub enum Conflict {
+    Cells {
+        sheet: Box<str>,
+        position: usize,
+        addresses: Box<[Address]>,
+    },
+    Rows {
+        sheet: Box<str>,
+        position: usize,
+        rows: Box<[RowIndex]>,
+    },
 }
 
 impl Conflict {
     /// Developer-facing worksheet name.
     pub fn sheet(&self) -> &str {
-        &self.sheet
+        match self {
+            Self::Cells { sheet, .. } | Self::Rows { sheet, .. } => sheet,
+        }
     }
 
     /// Checked zero-based worksheet position in the shared base snapshot.
     pub fn position(&self) -> usize {
-        self.position
+        match self {
+            Self::Cells { position, .. } | Self::Rows { position, .. } => *position,
+        }
     }
 
-    /// Deterministically ordered cells written by both edits.
-    pub fn addresses(&self) -> &[Address] {
-        &self.addresses
+    /// Deterministically ordered cells written by both edits, when applicable.
+    pub fn cells(&self) -> Option<&[Address]> {
+        match self {
+            Self::Cells { addresses, .. } => Some(addresses),
+            Self::Rows { .. } => None,
+        }
+    }
+
+    /// Deterministically ordered rows written by both edits, when applicable.
+    pub fn rows(&self) -> Option<&[RowIndex]> {
+        match self {
+            Self::Rows { rows, .. } => Some(rows),
+            Self::Cells { .. } => None,
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Cells { addresses, .. } => addresses.len(),
+            Self::Rows { rows, .. } => rows.len(),
+        }
     }
 }
 
@@ -147,15 +271,12 @@ impl ConflictSet {
         &self.conflicts
     }
 
-    /// Number of overlapping cell effects across all worksheets.
+    /// Number of overlapping effects across all worksheets.
     pub fn len(&self) -> usize {
-        self.conflicts
-            .iter()
-            .map(|conflict| conflict.addresses.len())
-            .sum()
+        self.conflicts.iter().map(Conflict::len).sum()
     }
 
-    /// Whether no overlapping cell effects were found.
+    /// Whether no overlapping effects were found.
     pub fn is_empty(&self) -> bool {
         self.conflicts.is_empty()
     }
@@ -165,7 +286,7 @@ impl fmt::Display for ConflictSet {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "{} overlapping cell effect(s) across {} worksheet(s)",
+            "{} overlapping effect(s) across {} conflict group(s)",
             self.len(),
             self.conflicts.len()
         )
@@ -178,7 +299,7 @@ impl fmt::Display for ConflictSet {
 pub enum JoinFailure {
     /// The edits were not created from the same immutable snapshot lineage.
     DifferentSnapshot,
-    /// Both edits write at least one of the same cells.
+    /// Both edits write at least one of the same effect facets.
     Overlap(ConflictSet),
 }
 
@@ -339,12 +460,7 @@ impl Patch {
             changes: self
                 .changes
                 .iter()
-                .map(|change| Change {
-                    sheet: change.sheet.clone(),
-                    address: change.address,
-                    before: change.after.clone(),
-                    after: change.before.clone(),
-                })
+                .map(Change::inverse)
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             parts: self
@@ -409,8 +525,7 @@ impl Patch {
         let workbook = Workbook::from_package_with_styles(package, Some(workbook))?;
         let mut patch = self.clone();
         for change in &mut patch.changes {
-            change.before.rebind_style(&workbook);
-            change.after.rebind_style(&workbook);
+            change.rebind_style(&workbook);
         }
         Ok(Commit { workbook, patch })
     }
@@ -512,11 +627,27 @@ impl GraphChange {
     }
 }
 
+#[derive(Debug, Default)]
+struct SheetActions {
+    cells: BTreeMap<Address, Action>,
+    rows: BTreeMap<RowIndex, RowAction>,
+}
+
+impl SheetActions {
+    fn len(&self) -> usize {
+        self.cells.len().saturating_add(self.rows.len())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.cells.is_empty() && self.rows.is_empty()
+    }
+}
+
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
 #[derive(Debug)]
 pub struct Edit {
     base: Workbook,
-    sheets: BTreeMap<usize, BTreeMap<Address, Action>>,
+    sheets: BTreeMap<usize, SheetActions>,
 }
 
 impl Edit {
@@ -528,7 +659,7 @@ impl Edit {
         })
     }
 
-    /// Select a worksheet for short transaction-scoped cell operations.
+    /// Select a worksheet for short transaction-scoped operations.
     pub fn sheet<'e, 's>(
         &'e mut self,
         selector: impl Into<SheetSelector<'s>>,
@@ -550,14 +681,14 @@ impl Edit {
     }
 
     pub fn len(&self) -> usize {
-        self.sheets.values().map(BTreeMap::len).sum()
+        self.sheets.values().map(SheetActions::len).sum()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.sheets.values().all(BTreeMap::is_empty)
+        self.sheets.values().all(SheetActions::is_empty)
     }
 
-    /// Join an independently prepared edit when every cell effect is disjoint.
+    /// Join an independently prepared edit when every effect is disjoint.
     ///
     /// Both edits must originate from the same immutable snapshot. On failure
     /// `self` is unchanged and [`JoinError`] returns ownership of `other`, so
@@ -584,8 +715,8 @@ impl Edit {
                 },
                 Entry::Occupied(entry) => {
                     let accepted = entry.into_mut();
-                    for (address, action) in actions {
-                        match accepted.entry(address) {
+                    for (address, action) in actions.cells {
+                        match accepted.cells.entry(address) {
                             Entry::Vacant(entry) => {
                                 entry.insert(action);
                             },
@@ -594,6 +725,7 @@ impl Edit {
                             },
                         }
                     }
+                    accepted.rows.extend(actions.rows);
                 },
             }
         }
@@ -612,7 +744,7 @@ impl Edit {
         let Self { base, sheets } = self;
         let mut changes = Vec::new();
         let mut parts = Vec::new();
-        let graph = calculation_chain_removal(&base)?;
+        let mut needs_recalculation = false;
         for (position, requested) in sheets {
             let data =
                 base.inner.sheets.get(position).cloned().ok_or_else(|| {
@@ -628,8 +760,9 @@ impl Edit {
                 data: Arc::clone(&data),
             };
             let store = sheet.store()?;
-            let mut effective = BTreeMap::new();
-            for (address, action) in requested {
+            let change_start = changes.len();
+            let mut effective_cells = BTreeMap::new();
+            for (address, action) in requested.cells {
                 let before = store.entry(address);
                 if before.is_some_and(|stored| matches!(stored.cell, Cell::Unknown(_)))
                     && action.payload().is_some()
@@ -645,31 +778,74 @@ impl Edit {
                 if before_state == after_state {
                     continue;
                 }
-                effective.insert(address, action);
-                changes.push(Change {
+                needs_recalculation |= State::calculation_content(&before_state)
+                    != State::calculation_content(&after_state);
+                effective_cells.insert(address, action);
+                changes.push(Change::Cell {
                     sheet: data.name.clone().into_boxed_str(),
                     address,
                     before: before_state,
                     after: after_state,
                 });
             }
-            if effective.is_empty() {
+            let mut effective_rows = BTreeMap::new();
+            for (row, action) in requested.rows {
+                let before = store.row_entry(row);
+                let before_state = RowState::read(before);
+                let after_state = RowState::after(before, action);
+                if before_state == after_state {
+                    continue;
+                }
+                effective_rows.insert(row, action);
+                changes.push(Change::Row {
+                    sheet: data.name.clone().into_boxed_str(),
+                    row,
+                    before: before_state,
+                    after: after_state,
+                });
+            }
+            if effective_cells.is_empty() && effective_rows.is_empty() {
                 continue;
             }
 
             let part = base.inner.package.get_part(&data.part_uri)?;
             let before = part.blob_arc();
-            let effective_len = effective.len();
-            let after = raw::worksheet::edit::rewrite(&before, &data.name, effective)?;
+            let after = raw::worksheet::edit::rewrite(
+                &before,
+                &data.name,
+                Plan {
+                    cells: effective_cells,
+                    rows: effective_rows,
+                },
+            )?;
             let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
             base.inner.validate_styles(&parsed)?;
-            for change in changes.iter().rev().take(effective_len) {
-                let actual = State::read(parsed.entry(change.address), &base);
-                if actual != change.after {
-                    return Err(invalid(format!(
-                        "worksheet edit verification failed at {}!{}",
-                        change.sheet, change.address
-                    )));
+            for change in &changes[change_start..] {
+                match change {
+                    Change::Cell {
+                        sheet,
+                        address,
+                        after,
+                        ..
+                    } => {
+                        let actual = State::read(parsed.entry(*address), &base);
+                        if actual != *after {
+                            return Err(invalid(format!(
+                                "worksheet edit verification failed at {sheet}!{address}"
+                            )));
+                        }
+                    },
+                    Change::Row {
+                        sheet, row, after, ..
+                    } => {
+                        let actual = RowState::read(parsed.row_entry(*row));
+                        if actual != *after {
+                            return Err(invalid(format!(
+                                "worksheet row edit verification failed at {sheet}!row {}",
+                                row.get()
+                            )));
+                        }
+                    },
                 }
             }
             parts.push(PartChange {
@@ -687,7 +863,7 @@ impl Edit {
         }
         let style_guard = changes
             .iter()
-            .any(|change| change.before.uses_shared_style() || change.after.uses_shared_style())
+            .any(Change::uses_shared_style)
             .then(|| {
                 let uri = base
                     .inner
@@ -699,15 +875,22 @@ impl Edit {
                 Ok::<_, Error>(StyleGuard { uri, content })
             })
             .transpose()?;
-        let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
-        let before = workbook_part.blob_arc();
-        let after = raw::recalc::invalidate(&before)?;
-        if after.as_slice() != before.as_slice() {
-            parts.push(PartChange {
-                uri: base.inner.workbook_uri.clone(),
-                before,
-                after: Arc::new(after),
-            });
+        let graph = if needs_recalculation {
+            calculation_chain_removal(&base)?
+        } else {
+            Vec::new()
+        };
+        if needs_recalculation {
+            let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
+            let before = workbook_part.blob_arc();
+            let after = raw::recalc::invalidate(&before)?;
+            if after.as_slice() != before.as_slice() {
+                parts.push(PartChange {
+                    uri: base.inner.workbook_uri.clone(),
+                    before,
+                    after: Arc::new(after),
+                });
+            }
         }
         let mut package = base.inner.package.clone();
         for part in &parts {
@@ -732,7 +915,11 @@ impl Edit {
     }
 
     fn actions(&mut self, position: usize) -> &mut BTreeMap<Address, Action> {
-        self.sheets.entry(position).or_default()
+        &mut self.sheets.entry(position).or_default().cells
+    }
+
+    fn row_actions(&mut self, position: usize) -> &mut BTreeMap<RowIndex, RowAction> {
+        &mut self.sheets.entry(position).or_default().rows
     }
 
     fn conflicts_with(&self, other: &Self) -> ConflictSet {
@@ -741,42 +928,55 @@ impl Edit {
             let Some(right) = other.sheets.get(position) else {
                 continue;
             };
-            let mut addresses = Vec::new();
-            let mut left = left.iter().peekable();
-            let mut right = right.iter().peekable();
-            while let (Some((left_address, left_action)), Some((right_address, right_action))) =
-                (left.peek(), right.peek())
-            {
-                match left_address.cmp(right_address) {
-                    std::cmp::Ordering::Less => {
-                        left.next();
-                    },
-                    std::cmp::Ordering::Greater => {
-                        right.next();
-                    },
-                    std::cmp::Ordering::Equal => {
-                        if left_action.overlaps(right_action) {
-                            addresses.push(**left_address);
-                        }
-                        left.next();
-                        right.next();
-                    },
-                }
-            }
-            if addresses.is_empty() {
-                continue;
-            }
             let sheet = self
                 .base
                 .inner
                 .sheets
                 .get(*position)
                 .map_or("<missing sheet>", |sheet| sheet.name.as_str());
-            conflicts.push(Conflict {
-                sheet: sheet.into(),
-                position: *position,
-                addresses: addresses.into_boxed_slice(),
-            });
+            let mut addresses = Vec::new();
+            let mut left_cells = left.cells.iter().peekable();
+            let mut right_cells = right.cells.iter().peekable();
+            while let (Some((left_address, left_action)), Some((right_address, right_action))) =
+                (left_cells.peek(), right_cells.peek())
+            {
+                match left_address.cmp(right_address) {
+                    std::cmp::Ordering::Less => {
+                        left_cells.next();
+                    },
+                    std::cmp::Ordering::Greater => {
+                        right_cells.next();
+                    },
+                    std::cmp::Ordering::Equal => {
+                        if left_action.overlaps(right_action) {
+                            addresses.push(**left_address);
+                        }
+                        left_cells.next();
+                        right_cells.next();
+                    },
+                }
+            }
+            if !addresses.is_empty() {
+                conflicts.push(Conflict::Cells {
+                    sheet: sheet.into(),
+                    position: *position,
+                    addresses: addresses.into_boxed_slice(),
+                });
+            }
+
+            let rows = left
+                .rows
+                .keys()
+                .filter(|row| right.rows.contains_key(row))
+                .copied()
+                .collect::<Vec<_>>();
+            if !rows.is_empty() {
+                conflicts.push(Conflict::Rows {
+                    sheet: sheet.into(),
+                    position: *position,
+                    rows: rows.into_boxed_slice(),
+                });
+            }
         }
         ConflictSet {
             conflicts: conflicts.into_boxed_slice(),
@@ -792,6 +992,16 @@ pub struct SheetEdit<'a> {
 }
 
 impl SheetEdit<'_> {
+    /// Select one checked row for short property-editing verbs.
+    pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
+        let row = at.into().resolve()?;
+        Ok(RowEdit {
+            edit: &mut *self.edit,
+            position: self.position,
+            row,
+        })
+    }
+
     /// Create or replace a cell's primary value or formula.
     pub fn set<'a>(
         &mut self,
@@ -874,6 +1084,32 @@ impl SheetEdit<'_> {
             .actions(self.position)
             .insert(address, Action::Remove);
         Ok(self)
+    }
+}
+
+/// Transaction-scoped editor for one checked worksheet row.
+#[derive(Debug)]
+pub struct RowEdit<'a> {
+    edit: &'a mut Edit,
+    position: usize,
+    row: RowIndex,
+}
+
+impl RowEdit<'_> {
+    /// Hide this row while preserving all row and cell content.
+    pub fn hide(&mut self) -> &mut Self {
+        self.edit
+            .row_actions(self.position)
+            .insert(self.row, RowAction::Hide);
+        self
+    }
+
+    /// Show this row while preserving all row and cell content.
+    pub fn show(&mut self) -> &mut Self {
+        self.edit
+            .row_actions(self.position)
+            .insert(self.row, RowAction::Show);
+        self
     }
 }
 
@@ -1093,6 +1329,78 @@ mod tests {
     }
 
     #[test]
+    fn row_visibility_is_checked_reversible_and_patch_visible() {
+        let source = Workbook::new().expect("source workbook");
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("sheet");
+        sheet.set("A1", "visible").expect("cell");
+        sheet.row(1).expect("row 2").hide();
+        let committed = edit.commit().expect("commit");
+
+        assert_eq!(committed.patch().len(), 2);
+        assert!(matches!(
+            committed.patch().changes()[1],
+            Change::Row {
+                row,
+                before: RowState::Missing,
+                after: RowState::Stored { hidden: true },
+                ..
+            } if row.get() == 1
+        ));
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        let row = sheet.row(1).expect("row 2");
+        assert!(row.stored());
+        assert!(row.hidden());
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let mut edit = committed.workbook().edit().expect("show edit");
+        edit.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(RowIndex::new(1).expect("row 2"))
+            .expect("checked row")
+            .show();
+        let shown = edit.commit().expect("show commit");
+        let shown_sheet = shown
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet");
+        let shown_row = shown_sheet.row(1).expect("row 2");
+        assert!(shown_row.stored());
+        assert!(!shown_row.hidden());
+
+        let mut no_op = source.edit().expect("no-op edit");
+        no_op
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(10)
+            .expect("row 11")
+            .show();
+        assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+        let mut invalid = source.edit().expect("invalid row edit");
+        let mut sheet = invalid.sheet(0usize).expect("lookup").expect("sheet");
+        assert!(matches!(
+            sheet.row(litchi_sheet::ROWS),
+            Err(Error::Coordinate(_))
+        ));
+    }
+
+    #[test]
     fn clearing_a_cell_created_in_the_same_transaction_keeps_an_empty_record() {
         let source = Workbook::new().expect("source workbook");
         let mut edit = source.edit().expect("edit");
@@ -1203,7 +1511,7 @@ mod tests {
         assert_eq!(conflicts.conflicts()[0].sheet(), "Sheet1");
         assert_eq!(conflicts.conflicts()[0].position(), 0);
         assert_eq!(
-            conflicts.conflicts()[0].addresses(),
+            conflicts.conflicts()[0].cells().expect("cell conflicts"),
             &[
                 Address::from_a1("A1").expect("first address"),
                 Address::from_a1("C3").expect("tail address"),
@@ -1221,6 +1529,61 @@ mod tests {
         assert!(matches!(error.failure(), JoinFailure::DifferentSnapshot));
         assert!(error.conflicts().is_none());
         assert_eq!(left.len(), 2);
+    }
+
+    #[test]
+    fn row_visibility_joins_with_cells_and_conflicts_by_row() {
+        let source = Workbook::new().expect("source workbook");
+        let mut cell = source.edit().expect("cell edit");
+        cell.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .set("A2", "same row")
+            .expect("cell");
+        let mut row = source.edit().expect("row edit");
+        row.sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet")
+            .row(1)
+            .expect("row 2")
+            .hide();
+        cell.join(row).expect("orthogonal row and cell effects");
+        let committed = cell.commit().expect("joined commit");
+        let sheet = committed
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet");
+        assert!(sheet.row(1).expect("row 2").hidden());
+        assert!(matches!(
+            sheet.cell("A2").expect("A2"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "same row"
+        ));
+
+        let mut left = source.edit().expect("left");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(4)
+            .expect("row 5")
+            .hide();
+        let mut right = source.edit().expect("right");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(4)
+            .expect("row 5")
+            .show();
+        let error = left.join(right).expect_err("same row must conflict");
+        let conflicts = error.conflicts().expect("row conflicts");
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts.conflicts().len(), 1);
+        assert_eq!(
+            conflicts.conflicts()[0].rows().expect("row conflict"),
+            &[RowIndex::new(4).expect("row 5")]
+        );
+        assert!(conflicts.conflicts()[0].cells().is_none());
     }
 
     #[test]
@@ -1249,6 +1612,41 @@ mod tests {
             .expect("chain relationship");
         let source = Workbook::from_package(package).expect("workbook with chain");
         let source_bytes = source.to_bytes().expect("source bytes");
+        let workbook_before = source
+            .inner
+            .package
+            .get_part(&source.inner.workbook_uri)
+            .expect("workbook part")
+            .blob_arc();
+
+        let mut visibility = source.edit().expect("visibility edit");
+        visibility
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(1)
+            .expect("row 2")
+            .hide();
+        let visibility = visibility.commit().expect("visibility commit");
+        assert!(visibility.patch().graph.is_empty());
+        assert!(
+            visibility
+                .workbook()
+                .inner
+                .package
+                .get_part(&chain_uri)
+                .is_ok()
+        );
+        assert_eq!(
+            visibility
+                .workbook()
+                .inner
+                .package
+                .get_part(&source.inner.workbook_uri)
+                .expect("unchanged workbook part")
+                .blob(),
+            workbook_before.as_slice()
+        );
 
         let mut edit = source.edit().expect("edit");
         edit.sheet(0usize)
@@ -1348,15 +1746,15 @@ mod tests {
         let committed = edit.commit().expect("commit");
         assert_eq!(committed.patch().len(), 2);
         assert!(matches!(
-            committed.patch().changes()[0].before(),
-            State::Missing
+            committed.patch().changes()[0].cell(),
+            Some((_, State::Missing, _))
         ));
         assert!(matches!(
-            committed.patch().changes()[0].after(),
-            State::Cell {
+            committed.patch().changes()[0].cell(),
+            Some((_, _, State::Cell {
                 content: Cell::Value(Value::Number(number)),
                 style: StyleState::Shared(_),
-            } if number.as_str() == "42"
+            })) if number.as_str() == "42"
         ));
 
         let book = committed.workbook();
@@ -1405,10 +1803,14 @@ mod tests {
         let replayed = reopened
             .apply(committed.patch())
             .expect("replay onto byte-identical source");
-        let State::Cell {
-            style: StyleState::Shared(replayed_key),
-            ..
-        } = replayed.patch().changes()[0].after()
+        let (
+            _,
+            _,
+            State::Cell {
+                style: StyleState::Shared(replayed_key),
+                ..
+            },
+        ) = replayed.patch().changes()[0].cell().expect("cell change")
         else {
             panic!("replayed change must retain its shared style")
         };
@@ -1522,11 +1924,11 @@ mod tests {
         let committed = payload.commit().expect("commit");
         assert_eq!(committed.patch().len(), 1);
         assert!(matches!(
-            committed.patch().changes()[0].after(),
-            State::Cell {
+            committed.patch().changes()[0].cell(),
+            Some((_, _, State::Cell {
                 content: Cell::Value(Value::Number(number)),
                 style: StyleState::Shared(_),
-            } if number.as_str() == "9"
+            })) if number.as_str() == "9"
         ));
 
         let sheet = committed
@@ -1557,11 +1959,15 @@ mod tests {
         let committed = edit.commit().expect("commit");
         assert_eq!(committed.patch().len(), 1);
         assert!(matches!(
-            committed.patch().changes()[0].after(),
-            State::Cell {
-                style: StyleState::Default,
-                ..
-            }
+            committed.patch().changes()[0].cell(),
+            Some((
+                _,
+                _,
+                State::Cell {
+                    style: StyleState::Default,
+                    ..
+                }
+            ))
         ));
         let sheet = committed
             .workbook()

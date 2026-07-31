@@ -5,7 +5,7 @@ pub(crate) mod edit;
 use std::collections::{HashMap, HashSet};
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
-use litchi_sheet::{COLUMNS, Cell as Address, ROWS, Rect};
+use litchi_sheet::{COLUMNS, Cell as Address, ROWS, Rect, Row as RowIndex};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -17,6 +17,7 @@ use super::strings::decode_spreadsheet_text;
 use crate::cell::{Cell, Date, ErrorValue, Number, Store, Stored, Text, Unknown, Value};
 use crate::error::{Result, invalid};
 use crate::formula::{Cache, Formula, Kind};
+use crate::row;
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
 const MAX_FORMULA_CHARACTERS: usize = 8_192;
@@ -51,6 +52,7 @@ enum TextTarget {
 struct PendingRow {
     number: u32,
     last_column: u32,
+    hidden: bool,
 }
 
 #[derive(Debug)]
@@ -123,6 +125,7 @@ struct SharedMaster {
 #[derive(Debug)]
 struct Parser {
     cells: Vec<RawCell>,
+    rows: Vec<row::Stored>,
     declared_extent: Option<Rect>,
     row: Option<PendingRow>,
     cell: Option<PendingCell>,
@@ -146,6 +149,7 @@ impl Parser {
     fn new() -> Self {
         Self {
             cells: Vec::new(),
+            rows: Vec::new(),
             declared_extent: None,
             row: None,
             cell: None,
@@ -260,10 +264,11 @@ impl Parser {
             .try_reserve(parser.cells.len())
             .map_err(|error| invalid(format!("cannot reserve sparse worksheet cells: {error}")))?;
         let declared_extent = parser.declared_extent;
+        let rows = parser.rows;
         for cell in parser.cells {
             cells.push(materialize(cell, strings)?);
         }
-        Store::from_unsorted(cells, declared_extent)
+        Store::from_unsorted(cells, rows, declared_extent)
     }
 
     fn start(
@@ -362,6 +367,8 @@ impl Parser {
         self.row = Some(PendingRow {
             number,
             last_column: 0,
+            hidden: optional_bool(element, b"hidden", decoder, "worksheet row hidden flag")?
+                .unwrap_or(false),
         });
         Ok(())
     }
@@ -649,9 +656,15 @@ impl Parser {
         if self.cell.is_some() {
             return Err(invalid("unterminated worksheet cell"));
         }
-        self.row
+        let row = self
+            .row
             .take()
             .ok_or_else(|| invalid("missing worksheet row"))?;
+        self.rows
+            .try_reserve(1)
+            .map_err(|error| invalid(format!("cannot grow sparse worksheet rows: {error}")))?;
+        self.rows
+            .push(row::Stored::new(RowIndex::new(row.number - 1)?, row.hidden));
         Ok(())
     }
 }
@@ -1025,7 +1038,7 @@ mod tests {
     #[test]
     fn keeps_declared_stored_content_and_style_extents_distinct() {
         let xml = format!(
-            r#"<worksheet xmlns="{S}"><dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>1</v></c></row><row r="4"><c r="D4"/></row><row r="9"><c r="F9" s="1"/></row></sheetData></worksheet>"#
+            r#"<worksheet xmlns="{S}"><dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>1</v></c></row><row r="4" hidden="true"><c r="D4"/></row><row r="9" hidden="0"><c r="F9" s="1"/></row></sheetData></worksheet>"#
         );
         let store = parse(xml.as_bytes(), || Ok(None)).expect("valid extents");
         let extents = store.extents();
@@ -1034,15 +1047,22 @@ mod tests {
         assert_eq!(extents.content().map(Rect::a1).as_deref(), Some("B2"));
         assert_eq!(extents.styled().map(Rect::a1).as_deref(), Some("F9"));
         assert_eq!(extents.used().map(Rect::a1).as_deref(), Some("B2:F9"));
+        assert!(store.row(RowIndex::new(3).expect("row 4")).hidden());
+        assert!(!store.row(RowIndex::new(8).expect("row 9")).hidden());
+        let implicit = store.row(RowIndex::new(5).expect("row 6"));
+        assert!(!implicit.stored());
+        assert!(!implicit.hidden());
+        assert_eq!(store.rows().count(), 3);
     }
 
     #[test]
-    fn rejects_missing_invalid_and_duplicate_dimensions() {
+    fn rejects_malformed_dimensions_and_row_visibility() {
         for body in [
             "<dimension/><sheetData/>",
             r#"<dimension ref="A0"/><sheetData/>"#,
             r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#,
             r#"<sheetData/><dimension ref="A1"/>"#,
+            r#"<sheetData><row r="1" hidden="yes"/></sheetData>"#,
         ] {
             let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
             assert!(

@@ -30,6 +30,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     address.column().get()
                 );
             }
+            for row in sheet.rows()?.filter(|row| row.hidden()) {
+                println!("  hidden row: {}", row.index().get());
+            }
         }
     }
     Ok(())

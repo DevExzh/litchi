@@ -3,7 +3,8 @@
 mod edit;
 
 pub use edit::{
-    Change, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure, Patch, SheetEdit, State,
+    Change, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure, Patch, RowEdit, RowState,
+    SheetEdit, State,
 };
 
 use std::collections::HashMap;
@@ -15,13 +16,13 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::Selector;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
-use litchi_sheet::{Area, At, Rect};
+use litchi_sheet::{Area, At, Rect, RowAt};
 
 use crate::cell::{Extents, Store, Text};
 use crate::error::{Error, Result, invalid};
 use crate::raw;
 use crate::style::StyleLineage;
-use crate::{Cell, Cells, LocalStyle, Style, Styles};
+use crate::{Cell, Cells, LocalStyle, Row, Rows, Style, Styles};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -540,6 +541,17 @@ impl Sheet {
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
         let range = area.into().resolve()?;
         Ok(self.store()?.cells(range))
+    }
+
+    /// Borrow one checked logical row, including an implicit default row.
+    pub fn row(&self, at: impl Into<RowAt>) -> Result<Row<'_>> {
+        let index = at.into().resolve()?;
+        Ok(self.store()?.row(index))
+    }
+
+    /// Lazily traverse only explicit worksheet row records.
+    pub fn rows(&self) -> Result<Rows<'_>> {
+        Ok(self.store()?.rows())
     }
 
     /// Distinct declared, stored, content, and directly styled cell bounds.
@@ -1113,6 +1125,21 @@ mod tests {
             sheet.cell((litchi_sheet::ROWS, 0)),
             Err(Error::Coordinate(_))
         ));
+        assert!(sheet.row(0).expect("stored row 1").stored());
+        assert!(!sheet.row(3).expect("implicit row 4").stored());
+        assert!(!sheet.row(4).expect("stored row 5").hidden());
+        assert!(matches!(
+            sheet.row(litchi_sheet::ROWS),
+            Err(Error::Coordinate(_))
+        ));
+        assert_eq!(
+            sheet
+                .rows()
+                .expect("stored rows")
+                .map(|row| row.index().get())
+                .collect::<Vec<_>>(),
+            [0, 1, 2, 4]
+        );
 
         let addresses = sheet
             .cells("B1:D4")
