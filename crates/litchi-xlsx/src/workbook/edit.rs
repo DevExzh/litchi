@@ -1,6 +1,7 @@
-//! Isolated cell transactions, atomic commits, and reversible exact patches.
+//! Isolated cell transactions, disjoint joins, and source-checked patches.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, btree_map::Entry};
+use std::fmt;
 use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
@@ -52,6 +53,139 @@ impl Change {
         &self.after
     }
 }
+
+/// Overlapping cell effects on one logical worksheet.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Conflict {
+    sheet: Box<str>,
+    position: usize,
+    addresses: Box<[Address]>,
+}
+
+impl Conflict {
+    /// Developer-facing worksheet name.
+    pub fn sheet(&self) -> &str {
+        &self.sheet
+    }
+
+    /// Checked zero-based worksheet position in the shared base snapshot.
+    pub fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Deterministically ordered cells written by both edits.
+    pub fn addresses(&self) -> &[Address] {
+        &self.addresses
+    }
+}
+
+/// Structured overlap report returned by [`Edit::join`].
+#[derive(Debug, PartialEq, Eq)]
+pub struct ConflictSet {
+    conflicts: Box<[Conflict]>,
+}
+
+impl ConflictSet {
+    /// Conflicts grouped in worksheet order.
+    pub fn conflicts(&self) -> &[Conflict] {
+        &self.conflicts
+    }
+
+    /// Number of overlapping cell effects across all worksheets.
+    pub fn len(&self) -> usize {
+        self.conflicts
+            .iter()
+            .map(|conflict| conflict.addresses.len())
+            .sum()
+    }
+
+    /// Whether no overlapping cell effects were found.
+    pub fn is_empty(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+}
+
+impl fmt::Display for ConflictSet {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{} overlapping cell effect(s) across {} worksheet(s)",
+            self.len(),
+            self.conflicts.len()
+        )
+    }
+}
+
+/// Why two independently prepared edits could not be joined.
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum JoinFailure {
+    /// The edits were not created from the same immutable snapshot lineage.
+    DifferentSnapshot,
+    /// Both edits write at least one of the same cells.
+    Overlap(ConflictSet),
+}
+
+/// Recoverable join failure that returns ownership of the rejected edit.
+pub struct JoinError {
+    failure: JoinFailure,
+    rejected: Edit,
+}
+
+impl fmt::Debug for JoinError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("JoinError")
+            .field("failure", &self.failure)
+            .field("rejected_effects", &self.rejected.len())
+            .finish()
+    }
+}
+
+impl JoinError {
+    /// Structured reason the join was refused.
+    pub fn failure(&self) -> &JoinFailure {
+        &self.failure
+    }
+
+    /// Overlapping effects, or `None` for a lineage mismatch.
+    pub fn conflicts(&self) -> Option<&ConflictSet> {
+        match &self.failure {
+            JoinFailure::Overlap(conflicts) => Some(conflicts),
+            JoinFailure::DifferentSnapshot => None,
+        }
+    }
+
+    /// Borrow the edit that was not merged.
+    pub fn rejected(&self) -> &Edit {
+        &self.rejected
+    }
+
+    /// Recover the edit that was not merged.
+    pub fn into_rejected(self) -> Edit {
+        self.rejected
+    }
+
+    /// Recover both the structured reason and rejected edit.
+    pub fn into_parts(self) -> (JoinFailure, Edit) {
+        (self.failure, self.rejected)
+    }
+}
+
+impl fmt::Display for JoinError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.failure {
+            JoinFailure::DifferentSnapshot => {
+                formatter.write_str("edits belong to different workbook snapshots")
+            },
+            JoinFailure::Overlap(conflicts) => {
+                write!(formatter, "edit effects overlap: {conflicts}")
+            },
+        }
+    }
+}
+
+impl std::error::Error for JoinError {}
 
 #[derive(Debug, Clone)]
 struct PartChange {
@@ -336,6 +470,39 @@ impl Edit {
         self.sheets.values().all(BTreeMap::is_empty)
     }
 
+    /// Join an independently prepared edit when every cell effect is disjoint.
+    ///
+    /// Both edits must originate from the same immutable snapshot. On failure
+    /// `self` is unchanged and [`JoinError`] returns ownership of `other`, so
+    /// callers never lose prepared work while resolving a conflict.
+    pub fn join(&mut self, other: Self) -> std::result::Result<&mut Self, JoinError> {
+        if !Arc::ptr_eq(&self.base.inner, &other.base.inner) {
+            return Err(JoinError {
+                failure: JoinFailure::DifferentSnapshot,
+                rejected: other,
+            });
+        }
+        let conflicts = self.conflicts_with(&other);
+        if !conflicts.is_empty() {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(conflicts),
+                rejected: other,
+            });
+        }
+
+        for (position, mut actions) in other.sheets {
+            match self.sheets.entry(position) {
+                Entry::Vacant(entry) => {
+                    entry.insert(actions);
+                },
+                Entry::Occupied(entry) => {
+                    entry.into_mut().append(&mut actions);
+                },
+            }
+        }
+        Ok(self)
+    }
+
     /// Validate and atomically publish a new immutable snapshot.
     pub fn commit(self) -> Result<Commit> {
         ensure_unsigned(&self.base)?;
@@ -463,6 +630,50 @@ impl Edit {
 
     fn actions(&mut self, position: usize) -> &mut BTreeMap<Address, Action> {
         self.sheets.entry(position).or_default()
+    }
+
+    fn conflicts_with(&self, other: &Self) -> ConflictSet {
+        let mut conflicts = Vec::new();
+        for (position, left) in &self.sheets {
+            let Some(right) = other.sheets.get(position) else {
+                continue;
+            };
+            let mut addresses = Vec::new();
+            let mut left = left.keys().peekable();
+            let mut right = right.keys().peekable();
+            while let (Some(left_address), Some(right_address)) = (left.peek(), right.peek()) {
+                match left_address.cmp(right_address) {
+                    std::cmp::Ordering::Less => {
+                        left.next();
+                    },
+                    std::cmp::Ordering::Greater => {
+                        right.next();
+                    },
+                    std::cmp::Ordering::Equal => {
+                        addresses.push(**left_address);
+                        left.next();
+                        right.next();
+                    },
+                }
+            }
+            if addresses.is_empty() {
+                continue;
+            }
+            let sheet = self
+                .base
+                .inner
+                .sheets
+                .get(*position)
+                .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+            conflicts.push(Conflict {
+                sheet: sheet.into(),
+                position: *position,
+                addresses: addresses.into_boxed_slice(),
+            });
+        }
+        ConflictSet {
+            conflicts: conflicts.into_boxed_slice(),
+        }
     }
 }
 
@@ -737,6 +948,117 @@ mod tests {
                 .expect("cell"),
             Some(Cell::Empty)
         ));
+    }
+
+    #[test]
+    fn independently_prepared_disjoint_edits_join_after_threaded_work() {
+        fn assert_send<T: Send>() {}
+        assert_send::<Edit>();
+
+        let source = Workbook::new().expect("source workbook");
+        let (mut left, right) = std::thread::scope(|scope| {
+            let left_source = source.clone();
+            let right_source = source.clone();
+            let left = scope.spawn(move || {
+                let mut edit = left_source.edit().expect("left edit");
+                edit.sheet("Sheet1")
+                    .expect("lookup")
+                    .expect("sheet")
+                    .set("A1", "left")
+                    .expect("left cell");
+                edit
+            });
+            let right = scope.spawn(move || {
+                let mut edit = right_source.edit().expect("right edit");
+                edit.sheet(0usize)
+                    .expect("lookup")
+                    .expect("sheet")
+                    .set("C3", 42_i32)
+                    .expect("right cell");
+                edit
+            });
+            (
+                left.join().expect("left worker"),
+                right.join().expect("right worker"),
+            )
+        });
+
+        left.join(right).expect("disjoint join");
+        assert_eq!(left.len(), 2);
+        let committed = left.commit().expect("joined commit");
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        assert!(matches!(
+            sheet.cell("A1").expect("A1"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "left"
+        ));
+        assert!(matches!(
+            sheet.cell("C3").expect("C3"),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "42"
+        ));
+
+        let mut empty = source.edit().expect("empty edit");
+        let mut incoming = source.edit().expect("incoming edit");
+        incoming
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet")
+            .set("D4", true)
+            .expect("incoming cell");
+        empty.join(incoming).expect("adopt incoming sheet map");
+        assert_eq!(empty.len(), 1);
+    }
+
+    #[test]
+    fn join_conflicts_are_structured_and_return_the_rejected_edit() {
+        let source = Workbook::new().expect("source workbook");
+        let mut left = source.edit().expect("left edit");
+        let mut left_sheet = left.sheet(0usize).expect("lookup").expect("sheet");
+        left_sheet
+            .set("C3", "left tail")
+            .expect("left tail cell")
+            .set("A1", "left")
+            .expect("left first cell");
+        let mut right = source.edit().expect("right edit");
+        let mut right_sheet = right.sheet("Sheet1").expect("lookup").expect("sheet");
+        right_sheet
+            .set("A1", "right")
+            .expect("right first cell")
+            .set("C3", "right tail")
+            .expect("right tail cell");
+
+        let error = match left.join(right) {
+            Ok(_) => panic!("overlapping edits must not join"),
+            Err(error) => error,
+        };
+        assert_eq!(left.len(), 2);
+        let conflicts = error.conflicts().expect("overlap details");
+        assert_eq!(conflicts.len(), 2);
+        assert_eq!(conflicts.conflicts().len(), 1);
+        assert_eq!(conflicts.conflicts()[0].sheet(), "Sheet1");
+        assert_eq!(conflicts.conflicts()[0].position(), 0);
+        assert_eq!(
+            conflicts.conflicts()[0].addresses(),
+            &[
+                Address::from_a1("A1").expect("first address"),
+                Address::from_a1("C3").expect("tail address"),
+            ]
+        );
+        let rejected = error.into_rejected();
+        assert_eq!(rejected.len(), 2);
+
+        let other_source = Workbook::new().expect("other source");
+        let other = other_source.edit().expect("other edit");
+        let error = match left.join(other) {
+            Ok(_) => panic!("different snapshots must not join"),
+            Err(error) => error,
+        };
+        assert!(matches!(error.failure(), JoinFailure::DifferentSnapshot));
+        assert!(error.conflicts().is_none());
+        assert_eq!(left.len(), 2);
     }
 
     #[test]

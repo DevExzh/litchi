@@ -2,8 +2,11 @@
 
 mod edit;
 
-pub use edit::{Change, Commit, Edit, Patch, SheetEdit, State};
+pub use edit::{
+    Change, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure, Patch, SheetEdit, State,
+};
 
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::io::Read;
 use std::path::Path;
@@ -491,7 +494,8 @@ fn validate_sheet_graph(
     sheets: &[raw::Sheet],
 ) -> Result<Vec<SheetPart>> {
     let mut parts = Vec::with_capacity(sheets.len());
-    for sheet in sheets {
+    let mut targets = HashMap::<PackURI, usize>::with_capacity(sheets.len());
+    for (position, sheet) in sheets.iter().enumerate() {
         let relationship = workbook.rels().get(&sheet.relationship_id).ok_or_else(|| {
             invalid(format!(
                 "sheet '{}' references missing relationship '{}'",
@@ -519,7 +523,14 @@ fn validate_sheet_graph(
             MACROSHEET_REL | INTL_MACROSHEET_REL => SheetKind::Macro,
             _ => SheetKind::Unknown,
         };
-        parts.push(SheetPart { kind, uri: target });
+        let uri = part.partname().clone();
+        if let Some(previous) = targets.insert(uri.clone(), position) {
+            return Err(invalid(format!(
+                "sheet part '{uri}' is referenced by both '{}' and '{}'",
+                sheets[previous].name, sheet.name
+            )));
+        }
+        parts.push(SheetPart { kind, uri });
     }
     Ok(parts)
 }
@@ -665,6 +676,31 @@ mod tests {
         assert!(matches!(
             Workbook::from_package(package_with_workbook(dangling_xml)),
             Err(Error::Invalid(_))
+        ));
+
+        let aliased_xml = br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="One" sheetId="1" r:id="rId1"/><sheet name="Two" sheetId="2" r:id="rId2"/></sheets></workbook>"#;
+        let mut package = package_with_workbook(aliased_xml);
+        let workbook_uri = PackURI::new("/xl/workbook.xml").expect("valid URI");
+        let workbook = package.get_part_mut(&workbook_uri).expect("workbook part");
+        for id in ["rId1", "rId2"] {
+            workbook
+                .rels_mut()
+                .try_add_relationship(
+                    rt::WORKSHEET.to_owned(),
+                    "worksheets/sheet1.xml".to_owned(),
+                    id.to_owned(),
+                    TargetMode::Internal,
+                )
+                .expect("sheet relationship");
+        }
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/worksheets/sheet1.xml").expect("valid URI"),
+            ct::SML_WORKSHEET.into(),
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec(),
+        )));
+        assert!(matches!(
+            Workbook::from_package(package),
+            Err(Error::Invalid(message)) if message.contains("referenced by both 'One' and 'Two'")
         ));
     }
 

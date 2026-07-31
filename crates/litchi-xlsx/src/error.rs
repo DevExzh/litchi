@@ -4,6 +4,8 @@ use thiserror::Error;
 
 use litchi_sheet::Cell as Address;
 
+use crate::workbook::JoinError;
+
 /// Result of an XLSX operation.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -46,9 +48,18 @@ pub enum Error {
     /// A patch expected different source bytes and was not applied.
     #[error("patch conflict in '{part}': target content differs from the expected state")]
     PatchConflict { part: String },
+    /// Independently prepared edits could not be joined.
+    #[error(transparent)]
+    Join(Box<JoinError>),
     /// A selector variant is not supported by this API version.
     #[error("unsupported sheet selector")]
     UnsupportedSelector,
+}
+
+impl From<JoinError> for Error {
+    fn from(error: JoinError) -> Self {
+        Self::Join(Box::new(error))
+    }
 }
 
 /// Why the ordinary cell editor refused a mutation.

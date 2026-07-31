@@ -16,6 +16,6 @@ pub use error::{EditBlock, Error, Result};
 pub use formula::Formula;
 pub use litchi_sheet::{At, Cell as Address, Column, Rect, Row};
 pub use workbook::{
-    Change, Commit, DateSystem, Edit, Flavor, Patch, Sheet, SheetEdit, SheetKind, SheetSelector,
-    State, Visibility, Workbook,
+    Change, Commit, Conflict, ConflictSet, DateSystem, Edit, Flavor, JoinError, JoinFailure, Patch,
+    Sheet, SheetEdit, SheetKind, SheetSelector, State, Visibility, Workbook,
 };

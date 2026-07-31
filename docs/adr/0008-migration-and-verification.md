@@ -103,21 +103,46 @@ Successful commits return semantic before/after changes and an in-memory
 source-checked reversible patch. Private part deltas share their byte owners;
 application checks expected source bytes and relationship state before
 mutation. It retains exact changed-part bytes and relationship fields, but does
-not claim byte-identical ZIP containers. Cell
-edits remove an existing calculation-chain relationship and part, set
+not claim byte-identical ZIP containers. Cell edits remove an existing
+calculation-chain relationship and part, set
 calculation properties for a full refresh, and retain the removed graph in the
 inverse patch. The boolean spellings used for calculation properties follow
 the Office compatibility notes in `[MS-OE376]` §2.1.599. This is intentionally
 not yet the format-independent deterministic patch wire representation required
 by ADR 0003.
 
-This slice does not yet update the worksheet `dimension` hint or implement row
+The fifth implementation slice makes ordinary-cell edit planning composable
+across threads without exposing locks. Multiple `Edit` values may be prepared
+independently from cheap clones of the same immutable workbook snapshot and
+then joined. `join` accepts only exact snapshot lineage and only cell-disjoint
+write sets. It checks ordered maps without materializing a combined copy, then
+moves the incoming edit's action maps into the accepted edit. It does not use
+last-writer-wins behavior.
+
+An overlap returns a deterministic `ConflictSet` grouped by developer-facing
+sheet name and checked position, with ordered cell addresses. A lineage mismatch
+is distinct from an overlap. In either case the accepted edit remains unchanged
+and `JoinError` returns ownership of the rejected edit, so error handling cannot
+silently discard prepared work. `JoinError` also converts into the crate's
+boxed error variant for concise `?` use. Workbook opening now rejects two
+logical sheets that alias the same physical sheet part; otherwise apparently
+disjoint logical edits could overwrite one another during commit.
+
+The fifth-slice example artifact was produced by joining two independently
+prepared edits. Microsoft Excel for macOS opened the generated package without
+a repair or compatibility dialog, reported a used range of `A1:B1`, and exposed
+`Revenue` at `A1` and `42` at `B1`. This verifies native open and cell values for
+that artifact only; it is not evidence of native resave fidelity, contention,
+or performance.
+
+These slices do not yet update the worksheet `dimension` hint or implement row
 and column insertion/deletion, shifting references, merge/group-formula edits,
 validation evaluation, style/resource editing, rich text, dynamic arrays,
 patch serialization, full structured diagnostics, eviction/resource budgets,
-concurrent subedit merging, or the container-level raw-copy/atomic-replacement
-save pipeline. Those remain certification work; no allocation, latency,
-contention, or scaling conclusion follows from the functional tests.
+range/structural effect joins, three-way merge, or the container-level
+raw-copy/atomic-replacement save pipeline. Those remain certification work; no
+allocation, latency, contention, or scaling conclusion follows from the
+functional tests.
 
 ## Evidence levels
 
