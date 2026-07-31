@@ -136,6 +136,7 @@ impl From<raw::Visibility> for Visibility {
 struct SheetData {
     position: usize,
     name: String,
+    name_key: Box<str>,
     kind: SheetKind,
     visibility: Visibility,
     part_uri: PackURI,
@@ -310,9 +311,11 @@ impl Workbook {
             .zip(sheet_parts)
             .enumerate()
             .map(|(position, (sheet, part))| {
+                let name_key = crate::sheet::key(&sheet.name);
                 Arc::new(SheetData {
                     position,
                     name: sheet.name,
+                    name_key,
                     kind: part.kind,
                     visibility: sheet.visibility.into(),
                     part_uri: part.uri,
@@ -381,23 +384,12 @@ impl Workbook {
         let data = match selector.into() {
             Selector::Position(position) => self.inner.sheets.get(position.get()).cloned(),
             Selector::Name(name) => {
-                let mut found = None;
-                let mut matches = 0usize;
-                for sheet in &self.inner.sheets {
-                    if sheet.name.eq_ignore_ascii_case(&name) {
-                        matches = matches.saturating_add(1);
-                        if found.is_none() {
-                            found = Some(Arc::clone(sheet));
-                        }
-                    }
-                }
-                if matches > 1 {
-                    return Err(Error::AmbiguousSheetName {
-                        name: name.into_owned(),
-                        matches,
-                    });
-                }
-                found
+                let key = crate::sheet::key(&name);
+                self.inner
+                    .sheets
+                    .iter()
+                    .find(|sheet| sheet.name_key == key)
+                    .cloned()
             },
             Selector::Id(never) => match never {},
             _ => return Err(Error::UnsupportedSelector),
@@ -940,6 +932,14 @@ mod tests {
 
         let by_name = first.sheet("sheet1").expect("lookup").expect("present");
         let by_position = first.sheet(0usize).expect("lookup").expect("present");
+        let checked_name = crate::sheet::Name::new("SHEET1").expect("checked name");
+        assert!(
+            first
+                .sheet(&checked_name)
+                .expect("checked lookup")
+                .is_some()
+        );
+        assert!(first.sheet(checked_name).expect("moved lookup").is_some());
         assert_eq!(by_name.name(), "Sheet1");
         assert_eq!(by_position.position(), 0);
         assert!(by_name.same_workbook(&by_position));
@@ -1019,7 +1019,7 @@ mod tests {
     }
 
     #[test]
-    fn ambiguous_names_and_dangling_relationships_are_typed_errors() {
+    fn duplicate_names_and_dangling_relationships_are_typed_errors() {
         let duplicate_xml = br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/><sheet name="data" sheetId="2" r:id="rId2"/></sheets></workbook>"#;
         let mut package = package_with_workbook(duplicate_xml);
         let workbook_uri = PackURI::new("/xl/workbook.xml").expect("valid URI");
@@ -1033,10 +1033,13 @@ mod tests {
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec(),
             )));
         }
-        let workbook = Workbook::from_package(package).expect("valid graph");
         assert!(matches!(
-            workbook.sheet("DATA"),
-            Err(Error::AmbiguousSheetName { matches: 2, .. })
+            Workbook::from_package(package),
+            Err(Error::SheetNameConflict {
+                first: 0,
+                second: 1,
+                ..
+            })
         ));
 
         let dangling_xml = br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Missing" sheetId="1" r:id="absent"/></sheets></workbook>"#;

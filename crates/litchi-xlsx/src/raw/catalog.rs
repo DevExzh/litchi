@@ -1,6 +1,6 @@
 //! Namespace-aware streaming parser for `xl/workbook.xml`.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use quick_xml::encoding::Decoder;
@@ -15,6 +15,9 @@ use crate::raw::namespace::{
 };
 
 const INITIAL_SHEETS_CAPACITY: usize = 16;
+const MAX_SHEETS: usize = 32_767;
+const MAX_SHEET_ID: u32 = 65_534;
+const MAX_RELATIONSHIP_ID_CHARACTERS: usize = 255;
 const MAX_DEFINED_NAMES: usize = 65_536;
 const MAX_DEFINED_NAME_FORMULA_BYTES: usize = 1_048_576;
 const MAX_DEFINED_NAME_CHARACTERS: usize = 255;
@@ -47,6 +50,7 @@ struct WorkbookInfo {
     seen_external_references: bool,
     seen_workbook_view: bool,
     sheet_ids: HashSet<u32>,
+    sheet_names: HashMap<Box<str>, usize>,
     relationship_ids: HashSet<String>,
     defined_name_keys: HashSet<(Option<u32>, String)>,
     defined_names: Vec<DefinedName>,
@@ -72,6 +76,7 @@ impl WorkbookInfo {
             seen_external_references: false,
             seen_workbook_view: false,
             sheet_ids: HashSet::new(),
+            sheet_names: HashMap::new(),
             relationship_ids: HashSet::new(),
             defined_name_keys: HashSet::new(),
             defined_names: Vec::new(),
@@ -216,7 +221,21 @@ impl WorkbookInfo {
         } else if parent == WorkbookContext::Sheets
             && is_spreadsheetml_name(namespace, element.name(), b"sheet")
         {
+            if self.sheets.len() >= MAX_SHEETS {
+                return Err(invalid(format!(
+                    "workbook sheet count exceeds Office's {MAX_SHEETS}-sheet limit"
+                )));
+            }
             let sheet = parse_sheet_element(element, decoder, resolver)?;
+            let position = self.sheets.len();
+            let name_key = crate::sheet::key(&sheet.name);
+            if let Some(first) = self.sheet_names.insert(name_key, position) {
+                return Err(crate::Error::SheetNameConflict {
+                    name: sheet.name,
+                    first,
+                    second: position,
+                });
+            }
             if !self.sheet_ids.insert(sheet.sheet_id) {
                 return Err(invalid(format!(
                     "duplicate workbook sheet ID {}",
@@ -533,17 +552,22 @@ fn parse_sheet_element(
     resolver: &NamespaceResolver,
 ) -> Result<Sheet> {
     let name = required_string(element, b"name", decoder, "workbook sheet name")?;
-    if name.is_empty() {
-        return Err(invalid("workbook sheet name cannot be empty"));
-    }
+    crate::sheet::validate_str(&name)?;
     let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
         .ok_or_else(|| invalid("workbook sheet is missing relationship ID"))?;
     if relationship_id.is_empty() {
         return Err(invalid("workbook sheet relationship ID cannot be empty"));
     }
+    if relationship_id.chars().count() > MAX_RELATIONSHIP_ID_CHARACTERS {
+        return Err(invalid(format!(
+            "workbook sheet relationship ID exceeds {MAX_RELATIONSHIP_ID_CHARACTERS} characters"
+        )));
+    }
     let sheet_id = required_u32(element, b"sheetId", decoder, "workbook sheet ID")?;
-    if sheet_id == 0 {
-        return Err(invalid("workbook sheet ID must be positive"));
+    if !(1..=MAX_SHEET_ID).contains(&sheet_id) {
+        return Err(invalid(format!(
+            "workbook sheet ID must be between 1 and {MAX_SHEET_ID}"
+        )));
     }
     let visibility = match optional_string(element, b"state", decoder)?.as_deref() {
         None | Some("visible") => Visibility::Visible,

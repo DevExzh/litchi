@@ -32,6 +32,14 @@ Transitional-compatible baseline unless explicitly pinned to Strict or another
 target. Format and flavor are content-derived, never inferred from a filename.
 Known incompatible extensions are typed errors; extensionless paths are valid.
 
+Structural identity changes traverse recognized incoming references as one
+atomic graph edit. References to the same document are updated; external-book
+references, VBA source text, and other inert external identities are not
+rewritten by textual guesswork. If an unmodeled formula-like field can refer to
+the changed identity, the safe facade returns a typed dependency block. Markup-
+compatibility alternatives are edited only when their effective semantics are
+modeled; otherwise the operation is blocked before any bytes are published.
+
 Serialization is deterministic unless a `Clock`, actor identity, or
 cryptographic RNG is explicitly supplied. Existing timestamps are preserved;
 new files do not consult ambient time, process identity, filesystem metadata, or

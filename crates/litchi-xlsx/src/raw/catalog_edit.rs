@@ -48,6 +48,15 @@ pub(crate) struct Tab<'a> {
     pub(crate) state: State,
 }
 
+/// One checked semantic sheet-name change.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Rename<'a> {
+    pub(crate) sheet: &'a str,
+    pub(crate) position: usize,
+    pub(crate) relationship_id: &'a str,
+    pub(crate) name: &'a str,
+}
+
 /// Semantic active-tab target. The physical workbook view remains private to
 /// this low-level boundary.
 #[derive(Debug, Clone, Copy)]
@@ -70,6 +79,7 @@ pub(crate) struct Order<'a> {
 #[derive(Debug)]
 pub(crate) struct Plan<'a> {
     pub(crate) tabs: Vec<Tab<'a>>,
+    pub(crate) renames: Vec<Rename<'a>>,
     /// A replacement for the first workbook view's active tab. `None` leaves
     /// its active sheet unchanged unless an order edit remaps its position.
     pub(crate) active: Option<Active<'a>>,
@@ -207,22 +217,32 @@ struct OrderMap {
 /// Rewrite recognized tab state/order and their positional dependencies. The
 /// caller reparses and verifies the semantic result before publish.
 pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
-    if plan.tabs.is_empty() && plan.active.is_none() && plan.order.is_none() {
+    if plan.tabs.is_empty()
+        && plan.renames.is_empty()
+        && plan.active.is_none()
+        && plan.order.is_none()
+    {
         return Ok(content.to_vec());
     }
     let layout = scan(content)?;
     let Plan {
         tabs,
+        renames,
         active,
         order,
     } = plan;
     let first = tabs.first().copied();
+    let first_rename = renames.first().copied();
     let order_context = order.as_ref().map(|order| (order.sheet, order.position));
     let context = order_context
         .or_else(|| active.map(|active| (active.sheet, active.position)))
-        .or_else(|| first.map(|tab| (tab.sheet, tab.position)));
-    if layout.protected && (!tabs.is_empty() || order.is_some()) {
+        .or_else(|| first.map(|tab| (tab.sheet, tab.position)))
+        .or_else(|| first_rename.map(|rename| (rename.sheet, rename.position)));
+    if layout.protected && (!tabs.is_empty() || !renames.is_empty() || order.is_some()) {
         return Err(block(context, TabEditBlock::ProtectedWorkbook));
+    }
+    if !renames.is_empty() && (layout.sheets.payload || layout.alternate_dependencies) {
+        return Err(block(context, TabEditBlock::MarkupCompatibility));
     }
     if let Some(active) = active
         && active.position > MAX_ACTIVE_TAB
@@ -242,6 +262,7 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     replacements
         .try_reserve(
             tabs.len()
+                .saturating_add(renames.len())
                 .saturating_add(order_map.as_ref().map_or(0, |_| layout.sheet_slots.len()))
                 .saturating_add(layout.workbook_views.len())
                 .saturating_add(layout.defined_name_slots.len()),
@@ -251,6 +272,7 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
         content,
         &layout,
         &tabs,
+        &renames,
         order_map.as_ref(),
         &mut replacements,
     )?;
@@ -383,18 +405,47 @@ fn sheet_replacements(
     source: &[u8],
     layout: &Layout,
     tabs: &[Tab<'_>],
+    renames: &[Rename<'_>],
     order: Option<&OrderMap>,
     replacements: &mut Vec<Replacement>,
 ) -> Result<()> {
-    let mut states = HashMap::new();
-    states
-        .try_reserve(tabs.len())
-        .map_err(|error| invalid(format!("cannot reserve tab-state index: {error}")))?;
+    #[derive(Clone, Copy)]
+    struct Update<'a> {
+        sheet: &'a str,
+        position: usize,
+        state: Option<State>,
+        name: Option<&'a str>,
+    }
+
+    let mut updates = HashMap::<&str, Update<'_>>::new();
+    updates
+        .try_reserve(tabs.len().saturating_add(renames.len()))
+        .map_err(|error| invalid(format!("cannot reserve tab update index: {error}")))?;
     for tab in tabs {
-        if states.insert(tab.relationship_id, *tab).is_some() {
+        let update = updates.entry(tab.relationship_id).or_insert(Update {
+            sheet: tab.sheet,
+            position: tab.position,
+            state: None,
+            name: None,
+        });
+        if update.state.replace(tab.state).is_some() {
             return Err(invalid(format!(
                 "duplicate tab state for relationship '{}'",
                 tab.relationship_id
+            )));
+        }
+    }
+    for rename in renames {
+        let update = updates.entry(rename.relationship_id).or_insert(Update {
+            sheet: rename.sheet,
+            position: rename.position,
+            state: None,
+            name: None,
+        });
+        if update.name.replace(rename.name).is_some() {
+            return Err(invalid(format!(
+                "duplicate tab rename for relationship '{}'",
+                rename.relationship_id
             )));
         }
     }
@@ -403,13 +454,13 @@ fn sheet_replacements(
         for (new, old) in order.new_to_old.iter().copied().enumerate() {
             let destination = &layout.sheet_slots[new];
             let selected = &layout.sheet_slots[old];
-            let state = states.remove(selected.relationship_id.as_ref());
-            if new == old && state.is_none() {
+            let update = updates.remove(selected.relationship_id.as_ref());
+            if new == old && update.is_none() {
                 continue;
             }
-            let bytes = state.map_or_else(
+            let bytes = update.map_or_else(
                 || source[selected.slot.span.start..selected.slot.span.end].to_vec(),
-                |tab| state_replacement(source, &selected.slot, tab.state),
+                |update| sheet_replacement(source, &selected.slot, update.state, update.name),
             );
             replacements.push(Replacement {
                 span: destination.slot.span,
@@ -417,48 +468,45 @@ fn sheet_replacements(
             });
         }
     } else {
-        for tab in tabs {
-            let mut matches = layout
-                .sheet_slots
-                .iter()
-                .filter(|slot| slot.relationship_id.as_ref() == tab.relationship_id);
-            let Some(found) = matches.next() else {
-                return Err(Error::TabEditBlocked {
-                    sheet: tab.sheet.to_owned(),
-                    position: tab.position,
-                    reason: TabEditBlock::MarkupCompatibility,
-                });
+        for found in &layout.sheet_slots {
+            let Some(update) = updates.remove(found.relationship_id.as_ref()) else {
+                continue;
             };
-            if matches.next().is_some() {
-                return Err(invalid(format!(
-                    "duplicate direct workbook sheet relationship '{}' during edit",
-                    tab.relationship_id
-                )));
-            }
-            states.remove(tab.relationship_id);
             replacements.push(Replacement {
                 span: found.slot.span,
-                bytes: state_replacement(source, &found.slot, tab.state),
+                bytes: sheet_replacement(source, &found.slot, update.state, update.name),
             });
         }
     }
-    if let Some(tab) = states.values().next() {
+    if let Some(update) = updates.values().next() {
         return Err(Error::TabEditBlocked {
-            sheet: tab.sheet.to_owned(),
-            position: tab.position,
+            sheet: update.sheet.to_owned(),
+            position: update.position,
             reason: TabEditBlock::MarkupCompatibility,
         });
     }
     Ok(())
 }
 
-fn state_replacement(source: &[u8], slot: &Slot, state: State) -> Vec<u8> {
-    let appended = state
-        .attribute()
-        .map(|value| ("state", value.to_owned()))
-        .into_iter()
-        .collect::<Vec<_>>();
-    rewrite_slot(source, slot, &["state"], &appended)
+fn sheet_replacement(
+    source: &[u8],
+    slot: &Slot,
+    state: Option<State>,
+    name: Option<&str>,
+) -> Vec<u8> {
+    let mut removed = Vec::new();
+    let mut appended = Vec::new();
+    if let Some(state) = state {
+        removed.push("state");
+        if let Some(value) = state.attribute() {
+            appended.push(("state", value.to_owned()));
+        }
+    }
+    if let Some(name) = name {
+        removed.push("name");
+        appended.push(("name", name.to_owned()));
+    }
+    rewrite_slot(source, slot, &removed, &appended)
 }
 
 fn view_replacements(
@@ -1287,6 +1335,7 @@ mod tests {
     fn plan<'a>(tabs: Vec<Tab<'a>>, active: Option<usize>) -> Plan<'a> {
         Plan {
             tabs,
+            renames: Vec::new(),
             active: active.map(|position| Active {
                 sheet: "Active",
                 position,
@@ -1333,6 +1382,39 @@ mod tests {
         assert_eq!(catalog.active_sheet_index, 1);
         assert_eq!(catalog.sheets[0].visibility, Visibility::Hidden);
         assert_eq!(catalog.sheets[1].visibility, Visibility::Visible);
+    }
+
+    #[test]
+    fn composes_name_and_visibility_on_one_lossless_sheet_slot() {
+        let source = format!(
+            r#"<x:workbook xmlns:x="{S}" xmlns:r="{R}" xmlns:z="urn:future"><x:sheets><x:sheet name="Data" sheetId="7" r:id="r1" z:keep="exact"/></x:sheets></x:workbook>"#
+        );
+        let output = rewrite(
+            source.as_bytes(),
+            Plan {
+                tabs: vec![Tab {
+                    sheet: "Data",
+                    position: 0,
+                    relationship_id: "r1",
+                    state: State::Hidden,
+                }],
+                renames: vec![Rename {
+                    sheet: "Data",
+                    position: 0,
+                    relationship_id: "r1",
+                    name: "Input 2026",
+                }],
+                active: None,
+                order: None,
+            },
+        )
+        .expect("catalog rewrite");
+        assert_eq!(
+            std::str::from_utf8(&output).expect("UTF-8"),
+            format!(
+                r#"<x:workbook xmlns:x="{S}" xmlns:r="{R}" xmlns:z="urn:future"><x:sheets><x:sheet sheetId="7" r:id="r1" z:keep="exact" state="hidden" name="Input 2026"/></x:sheets></x:workbook>"#
+            )
+        );
     }
 
     #[test]
@@ -1509,6 +1591,7 @@ mod tests {
                 source.as_bytes(),
                 Plan {
                     tabs: Vec::new(),
+                    renames: Vec::new(),
                     active: Some(Active {
                         sheet: "Too Far",
                         position: MAX_ACTIVE_TAB + 1,
@@ -1539,6 +1622,7 @@ mod tests {
                     relationship_id: "r2",
                     state: State::VeryHidden,
                 }],
+                renames: Vec::new(),
                 active: None,
                 order: Some(Order {
                     sheet: "Three",
@@ -1607,6 +1691,7 @@ mod tests {
                     source.as_bytes(),
                     Plan {
                         tabs: Vec::new(),
+                        renames: Vec::new(),
                         active: None,
                         order: Some(order()),
                     }
@@ -1626,6 +1711,7 @@ mod tests {
                 invalid_view.as_bytes(),
                 Plan {
                     tabs: Vec::new(),
+                    renames: Vec::new(),
                     active: None,
                     order: Some(order()),
                 }

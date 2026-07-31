@@ -7,6 +7,7 @@ pub(crate) mod catalog_edit;
 mod formula;
 pub mod namespace;
 pub(crate) mod recalc;
+pub(crate) mod reference_edit;
 pub(crate) mod sheet_view_edit;
 pub(crate) mod strings;
 pub(crate) mod styles;

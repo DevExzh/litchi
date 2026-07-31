@@ -23,6 +23,7 @@ bitflags      = { version = "2.10", features = ["std", "serde"] }
 blowfish      = "0.9"
 bumpalo       = { version = "3", features = ["collections"] }
 bytes         = { version = "1", features = ["serde"] }
+caseless      = "0.2.2"
 cbc           = { version = "0.2", features = ["alloc"] }
 chrono        = { version = "0", features = ["serde"] }
 crc-fast      = { version = "1.8", features = ["optimize_crc32_auto"] }
@@ -98,6 +99,7 @@ thiserror     = "2.0"
 tokio         = { version = "1", features = ["full"] }
 url           = "2.5"
 urlencoding   = "2.1"
+unicode-normalization = "0.1"
 x509-cert     = { version = "0.2", features = ["pem"] }
 xml-minifier     = { path = "crates/xml-minifier" }
 zerocopy      = { version = "0.8", features = ["std"] }

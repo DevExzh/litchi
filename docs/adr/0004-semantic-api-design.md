@@ -35,6 +35,15 @@ valid. Otherwise use a consuming builder or data-bearing enum. Typestate is
 reserved for high-value safety boundaries and must not spread generic noise
 through normal CRUD.
 
+Names with an Office-defined domain use focused checked types such as
+`xlsx::sheet::Name`, while short verbs continue to accept borrowed strings and
+validate them internally. Owned strings and prevalidated names move into edit
+plans without another payload copy; borrowed or owned checked names are also
+ordinary lookup selectors. A case-preserving name type uses the
+document format's identity semantics for equality and hashing; spreadsheet
+sheet names therefore use canonical, locale-independent Unicode caseless
+identity rather than process locale or ASCII-only comparison.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

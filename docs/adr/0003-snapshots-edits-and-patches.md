@@ -14,6 +14,9 @@ Mutation consumes or borrows a snapshot into an `Edit`. Attached document trees
 are never publicly mutable. Transaction-scoped proxies expose short semantic
 verbs such as `set`, `add`, `move_before`, `clear`, and `remove`. Detached
 builders may be ordinary mutable values when every field combination is valid.
+Identity-changing verbs such as `rename` update their modeled dependency
+closure in the same transaction. They never expose a catalog-string-only mode
+through the ordinary facade.
 
 `commit()` validates the changed dependency closure atomically and returns a
 named `Commit<T>` containing the new snapshot, a reversible patch, and

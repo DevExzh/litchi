@@ -578,8 +578,83 @@ covers two ordinary worksheets, one workbook view, one reorder, and one macOS
 Excel build; it does not certify chart sheets, local defined names, multiple
 views, every markup-compatibility alternative, or other Office builds.
 
+The fourteenth slice adds dependency-aware worksheet rename. The concise entry
+is `edit.tab(selector)?.rename(name)?`; it accepts the same semantic name or
+checked zero-based selectors as other tab operations. Borrowed strings are
+checked and copied once, while an owned `String` or prevalidated
+`sheet::Name` moves into the transaction. Source selectors remain stable for
+the transaction, and multiple pending renames are interpreted simultaneously,
+so swaps do not cascade through each other's formulas. `Change::Rename`
+records the checked source position and case-preserving before/after names;
+name is its own per-sheet join facet and remains orthogonal to cell, property,
+visibility, activation, and order effects.
+
+`sheet::Name` enforces the checked-in `[MS-OE376]` Office profile: a nonempty
+maximum of 31 characters, no leading/trailing apostrophe, no NUL, ETX,
+`* / : ? [ \\ ]`, and only XML 1.0-representable characters. Opening also
+enforces the 32,767-sheet limit, native sheet IDs in `1..=65_534`, relationship
+IDs through 255 characters, and case-insensitive uniqueness. Identity keys use
+canonical normalization plus locale-independent full Unicode case folding
+instead of `eq_ignore_ascii_case`; equality covers length-changing folds such
+as `Straße`/`STRASSE` and canonically equivalent spellings. The selected
+`caseless` 0.2.2 table is Unicode 16.0 and the selected
+`unicode-normalization` 0.1.25 table is Unicode 17.0; both compile below the
+workspace MSRV. This is a deterministic format-identity rule, not an ambient
+locale decision.
+
+Rename preserves native `sheetId`, relationship, part URI, sheet kind, order,
+visibility, selection, and every sheet-part byte unless another dependency in
+that part changes. A single-pass formula scanner rewrites local unquoted,
+apostrophe-quoted, doubled-apostrophe, `[0]` current-workbook, and 3-D sheet
+prefixes. It evaluates all source names before emitting any target name,
+quotes target spellings only when the formula grammar requires it, and leaves
+string constants, structured references, nonzero external-workbook indexes,
+external paths/books, and VBA bytes inert.
+
+The package transaction recognizes workbook defined names; worksheet cell,
+conditional-format, and data-validation formulas; table calculated/totals
+formulas; DrawingML chart formulas; Excel sparkline formulas; internal
+hyperlink locations; pivot-cache `worksheetSource@sheet`; and extended
+property `TitlesOfParts` sheet/named-range values. SpreadsheetML data-
+consolidation `dataRef@sheet` is another checked direct-name carrier. Formula-
+like fields not in the modeled set, including legacy VML `Fmla*` payloads,
+produce `RenameBlocked::UnmodeledReference` when they contain the source
+identity. Expanded names distinguish recognized formulas from namespace
+spoofs, while the ordered extended-property sheet slots are checked against
+the workbook catalog so an equal named-range title is not mistaken for a
+sheet. A matching reference inside `mc:AlternateContent`
+produces a distinct markup-compatibility block. External-link parts are
+excluded deliberately. Workbook structure protection, revision-header
+tracking, and signatures keep their existing typed blocks.
+
+The rewriter plans byte spans and allocates a replacement part only after a
+recognized match. Clean OPC payloads remain shared `Arc` owners; changed
+worksheet formulas compose over simultaneous cell edits, and workbook formula
+changes compose with catalog state, activation, order, and recalculation in
+one part delta. XML nesting and simultaneous decoded-reference capture have
+explicit edit budgets. Final catalog relationship/name pairs are reparsed and
+checked before publication. Tests cover typed name failures, Unicode/canonical
+collisions, case-only lookup, simultaneous swaps, owned/prevalidated input,
+join facets, formulas followed by both A1 references and defined names, 3-D
+references, workbook index zero, excluded external references, hyperlinks,
+pivot sources, tables, charts, extended properties, compatibility and unknown
+blocks, preservation of native identities, source immutability, and exact
+inverse part bytes.
+
+For native evidence, Microsoft Excel for Mac 16.110.2 authored and saved a
+two-sheet baseline whose `Sheet2!A2` formula referred to `Sheet1!A1`. The
+public `tabs` example renamed `Sheet1` to `Input Data`; Excel opened the result
+without a repair or compatibility dialog, displayed the cached value, and
+reported `='Input Data'!A1` in the formula bar. Excel then added a marker and
+resaved that Litchi-produced workbook. ZIP validation passed, and the public
+reader recovered the renamed tab, rewritten formula, Excel-authored marker,
+and an existing hidden column. This certifies one local scalar-reference
+rename/open/resave path on that Excel build. It does not certify every modeled
+reference carrier, name grammar edge, external-link behavior, signed or
+protected packages, macros, other Office applications, or other Office builds.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement sheet add/delete/rename, grouped-tab selection CRUD,
+hints or implement sheet add/delete, grouped-tab selection CRUD,
 workbook-protection unlocking, row/column properties beyond
 visibility, row and column insertion/deletion, shifting references,
 merge/group-formula edits,

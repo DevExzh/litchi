@@ -4,7 +4,7 @@ use std::io;
 
 use litchi_xlsx::Workbook;
 
-const USAGE: &str = "usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <show|hide|very-hide|activate|show-activate|before|after|to> [anchor-or-position]";
+const USAGE: &str = "usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <rename|show|hide|very-hide|activate|show-activate|before|after|to> [new-name|anchor|position]";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
@@ -16,7 +16,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let source = Workbook::open(&input)?;
     let mut edit = source.edit()?;
+    let mut reported_name = name.as_str();
     match operation.as_str() {
+        "rename" => {
+            let new_name = target.as_deref().ok_or(USAGE)?;
+            edit.tab(name.as_str())?
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("workbook has no sheet named '{name}'"),
+                    )
+                })?
+                .rename(new_name)?;
+            reported_name = new_name;
+        },
         "before" | "after" => {
             let anchor = target.as_deref().ok_or(USAGE)?;
             let moved = if operation == "before" {
@@ -90,12 +103,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let committed = edit.commit()?;
     let tab = committed
         .workbook()
-        .sheet(name.as_str())?
+        .sheet(reported_name)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "edited tab disappeared"))?;
     committed.workbook().save(&output)?;
     println!(
-        "saved {} semantic change(s); {name} is {:?}, active={}, position={}",
+        "saved {} semantic change(s); {} is {:?}, active={}, position={}",
         committed.patch().len(),
+        tab.name(),
         tab.visibility(),
         tab.is_active(),
         tab.position()

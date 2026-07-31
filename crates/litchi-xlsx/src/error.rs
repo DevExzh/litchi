@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Row as RowIndex};
 
+use crate::sheet::NameError;
 use crate::workbook::JoinError;
 
 /// Result of an XLSX operation.
@@ -28,12 +29,21 @@ pub enum Error {
     /// A spreadsheet range is empty, inverted, or outside its typed domain.
     #[error(transparent)]
     Range(#[from] litchi_sheet::RangeError),
+    /// A worksheet name is outside Office's checked domain.
+    #[error(transparent)]
+    SheetName(#[from] NameError),
     /// An XLSX structural invariant is invalid.
     #[error("invalid XLSX structure: {0}")]
     Invalid(String),
-    /// A requested name matches more than one sheet.
-    #[error("sheet name '{name}' is ambiguous ({matches} matches)")]
-    AmbiguousSheetName { name: String, matches: usize },
+    /// Two logical sheets would have the same locale-independent name.
+    #[error(
+        "sheet name '{name}' conflicts between positions {first} and {second} under Unicode caseless matching"
+    )]
+    SheetNameConflict {
+        name: String,
+        first: usize,
+        second: usize,
+    },
     /// A shared-style handle belongs to an unrelated resource-table lineage.
     #[error("shared style belongs to a different resource-table lineage")]
     ForeignStyle,
@@ -71,6 +81,17 @@ pub enum Error {
         position: usize,
         reason: TabEditBlock,
     },
+    /// A sheet rename found a local reference that cannot be updated without
+    /// guessing at an unmodeled producer extension.
+    #[error(
+        "cannot rename tab at position {position} ('{sheet}') while processing '{part}': {reason}"
+    )]
+    RenameBlocked {
+        sheet: String,
+        position: usize,
+        part: String,
+        reason: RenameBlock,
+    },
     /// Editing would invalidate an OPC digital signature.
     #[error("signed workbooks require explicit signature stripping before editing")]
     Signed,
@@ -83,6 +104,12 @@ pub enum Error {
     /// A selector variant is not supported by this API version.
     #[error("unsupported sheet selector")]
     UnsupportedSelector,
+}
+
+impl From<std::convert::Infallible> for Error {
+    fn from(never: std::convert::Infallible) -> Self {
+        match never {}
+    }
 }
 
 impl From<JoinError> for Error {
@@ -129,6 +156,27 @@ pub enum TabEditBlock {
     TrackedWorkbook,
     ProtectedWorkbook,
     MarkupCompatibility,
+}
+
+/// Why dependency-aware sheet rename refused one package part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RenameBlock {
+    MarkupCompatibility,
+    UnmodeledReference,
+}
+
+impl std::fmt::Display for RenameBlock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::MarkupCompatibility => {
+                "a local sheet reference is controlled by markup-compatibility content"
+            },
+            Self::UnmodeledReference => {
+                "an unmodeled or inconsistent field can carry a local sheet reference"
+            },
+        })
+    }
 }
 
 impl std::fmt::Display for TabEditBlock {

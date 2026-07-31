@@ -1,6 +1,6 @@
 //! Isolated worksheet transactions, disjoint joins, and source-checked patches.
 
-use std::collections::{BTreeMap, btree_map::Entry};
+use std::collections::{BTreeMap, HashMap, btree_map::Entry};
 use std::fmt;
 use std::sync::Arc;
 
@@ -12,6 +12,7 @@ use crate::cell::{Cell, Content, Stored};
 use crate::error::{EditBlock, Error, Result, TabEditBlock, invalid};
 use crate::raw;
 use crate::raw::worksheet::edit::{Action, ColumnAction, Payload, Plan, RowAction, StyleEffect};
+use crate::sheet::Name;
 use crate::{Style, StyleKey, StyleState};
 
 /// Cell state recorded before or after one semantic change.
@@ -164,6 +165,11 @@ impl RowState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Change {
+    Rename {
+        position: usize,
+        before: Box<str>,
+        after: Box<str>,
+    },
     Move {
         sheet: Box<str>,
         from: usize,
@@ -202,6 +208,7 @@ pub enum Change {
 impl Change {
     pub fn sheet(&self) -> &str {
         match self {
+            Self::Rename { after, .. } => after,
             Self::Active { after, .. } => after.name(),
             Self::Move { sheet, .. }
             | Self::Visibility { sheet, .. }
@@ -215,7 +222,25 @@ impl Change {
     pub fn moved(&self) -> Option<(usize, usize)> {
         match self {
             Self::Move { from, to, .. } => Some((*from, *to)),
-            Self::Active { .. }
+            Self::Rename { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. } => None,
+        }
+    }
+
+    /// Name transition when this is a dependency-aware sheet rename.
+    pub fn renamed(&self) -> Option<(usize, &str, &str)> {
+        match self {
+            Self::Rename {
+                position,
+                before,
+                after,
+            } => Some((*position, before, after)),
+            Self::Move { .. }
+            | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
@@ -227,7 +252,8 @@ impl Change {
     pub fn active(&self) -> Option<(&ActiveTab, &ActiveTab)> {
         match self {
             Self::Active { before, after } => Some((before, after)),
-            Self::Move { .. }
+            Self::Rename { .. }
+            | Self::Move { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
@@ -244,7 +270,8 @@ impl Change {
                 after,
                 ..
             } => Some((*position, before, after)),
-            Self::Move { .. }
+            Self::Rename { .. }
+            | Self::Move { .. }
             | Self::Active { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
@@ -261,7 +288,8 @@ impl Change {
                 after,
                 ..
             } => Some((*address, before, after)),
-            Self::Move { .. }
+            Self::Rename { .. }
+            | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Row { .. }
@@ -275,7 +303,8 @@ impl Change {
             Self::Row {
                 row, before, after, ..
             } => Some((*row, *before, *after)),
-            Self::Move { .. }
+            Self::Rename { .. }
+            | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
@@ -292,7 +321,8 @@ impl Change {
                 after,
                 ..
             } => Some((*column, *before, *after)),
-            Self::Move { .. }
+            Self::Rename { .. }
+            | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
@@ -302,6 +332,15 @@ impl Change {
 
     fn inverse(&self) -> Self {
         match self {
+            Self::Rename {
+                position,
+                before,
+                after,
+            } => Self::Rename {
+                position: *position,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::Move { sheet, from, to } => Self::Move {
                 sheet: sheet.clone(),
                 from: *to,
@@ -378,6 +417,10 @@ impl Change {
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Conflict {
+    Name {
+        sheet: Box<str>,
+        position: usize,
+    },
     Order {
         sheet: Box<str>,
         position: usize,
@@ -411,7 +454,8 @@ impl Conflict {
     /// Developer-facing sheet name.
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Order { sheet, .. }
+            Self::Name { sheet, .. }
+            | Self::Order { sheet, .. }
             | Self::Active { sheet, .. }
             | Self::Tab { sheet, .. }
             | Self::Cells { sheet, .. }
@@ -423,13 +467,19 @@ impl Conflict {
     /// Checked zero-based sheet position in the shared base snapshot.
     pub fn position(&self) -> usize {
         match self {
-            Self::Order { position, .. }
+            Self::Name { position, .. }
+            | Self::Order { position, .. }
             | Self::Active { position, .. }
             | Self::Tab { position, .. }
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
             | Self::Columns { position, .. } => *position,
         }
+    }
+
+    /// Whether both edits target this sheet's catalog name.
+    pub const fn is_name(&self) -> bool {
+        matches!(self, Self::Name { .. })
     }
 
     /// Whether both edits target this sheet tab's visibility.
@@ -451,7 +501,8 @@ impl Conflict {
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
             Self::Cells { addresses, .. } => Some(addresses),
-            Self::Order { .. }
+            Self::Name { .. }
+            | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Rows { .. }
@@ -463,7 +514,8 @@ impl Conflict {
     pub fn rows(&self) -> Option<&[RowIndex]> {
         match self {
             Self::Rows { rows, .. } => Some(rows),
-            Self::Order { .. }
+            Self::Name { .. }
+            | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Cells { .. }
@@ -476,7 +528,8 @@ impl Conflict {
     pub fn columns(&self) -> Option<&[ColumnIndex]> {
         match self {
             Self::Columns { columns, .. } => Some(columns),
-            Self::Order { .. }
+            Self::Name { .. }
+            | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Cells { .. }
@@ -486,7 +539,7 @@ impl Conflict {
 
     fn len(&self) -> usize {
         match self {
-            Self::Order { .. } | Self::Active { .. } | Self::Tab { .. } => 1,
+            Self::Name { .. } | Self::Order { .. } | Self::Active { .. } | Self::Tab { .. } => 1,
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
@@ -867,6 +920,7 @@ impl GraphChange {
 
 #[derive(Debug, Default)]
 struct SheetActions {
+    rename: Option<Name>,
     visibility: Option<TabAction>,
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<RowIndex, RowAction>,
@@ -875,14 +929,16 @@ struct SheetActions {
 
 impl SheetActions {
     fn len(&self) -> usize {
-        usize::from(self.visibility.is_some())
+        usize::from(self.rename.is_some())
+            .saturating_add(usize::from(self.visibility.is_some()))
             .saturating_add(self.cells.len())
             .saturating_add(self.rows.len())
             .saturating_add(self.columns.len())
     }
 
     fn is_empty(&self) -> bool {
-        self.visibility.is_none()
+        self.rename.is_none()
+            && self.visibility.is_none()
             && self.cells.is_empty()
             && self.rows.is_empty()
             && self.columns.is_empty()
@@ -1109,6 +1165,9 @@ impl Edit {
                 },
                 Entry::Occupied(entry) => {
                     let accepted = entry.into_mut();
+                    if accepted.rename.is_none() {
+                        accepted.rename = actions.rename;
+                    }
                     if accepted.visibility.is_none() {
                         accepted.visibility = actions.visibility;
                     }
@@ -1143,11 +1202,67 @@ impl Edit {
             base,
             active: requested_active,
             order: requested_order,
-            sheets,
+            mut sheets,
         } = self;
         let mut changes = Vec::new();
         let mut parts = Vec::new();
         let mut needs_recalculation = false;
+
+        let mut effective_renames = Vec::<(usize, Name)>::new();
+        for (position, actions) in &mut sheets {
+            let Some(name) = actions.rename.take() else {
+                continue;
+            };
+            let data =
+                base.inner.sheets.get(*position).ok_or_else(|| {
+                    invalid(format!("renamed sheet position {position} disappeared"))
+                })?;
+            if name.as_str() != data.name {
+                effective_renames.push((*position, name));
+            }
+        }
+        if let Some((position, _)) = effective_renames.first() {
+            let data = base
+                .inner
+                .sheets
+                .get(*position)
+                .ok_or_else(|| invalid("renamed tab disappeared during edit"))?;
+            ensure_reorder_supported(&base, &data.name, *position)?;
+        }
+        let rename_by_position = effective_renames
+            .iter()
+            .map(|(position, name)| (*position, name))
+            .collect::<HashMap<_, _>>();
+        let mut final_names = HashMap::<&str, usize>::new();
+        final_names
+            .try_reserve(base.inner.sheets.len())
+            .map_err(|error| invalid(format!("cannot reserve final sheet-name index: {error}")))?;
+        for (position, data) in base.inner.sheets.iter().enumerate() {
+            let (name, key) = rename_by_position
+                .get(&position)
+                .map_or((data.name.as_str(), data.name_key.as_ref()), |name| {
+                    (name.as_str(), name.identity_key())
+                });
+            if let Some(first) = final_names.insert(key, position) {
+                return Err(Error::SheetNameConflict {
+                    name: name.to_owned(),
+                    first,
+                    second: position,
+                });
+            }
+        }
+        for (position, after) in &effective_renames {
+            let before = base
+                .inner
+                .sheets
+                .get(*position)
+                .ok_or_else(|| invalid("renamed tab disappeared during patch creation"))?;
+            changes.push(Change::Rename {
+                position: *position,
+                before: before.name.clone().into_boxed_str(),
+                after: after.as_str().into(),
+            });
+        }
 
         let effective_order = requested_order.filter(OrderPlan::is_effective);
         if let Some(order) = &effective_order {
@@ -1304,15 +1419,23 @@ impl Edit {
         }
 
         let active_before = current_active
-            .map(|identity| active_tab_at(&base, identity, identity))
+            .map(|identity| active_tab_at(&base, identity, identity, None))
             .transpose()?;
         let active_after = final_active
             .zip(final_active_position)
-            .map(|(identity, position)| active_tab_at(&base, identity, position))
+            .map(|(identity, position)| {
+                active_tab_at(
+                    &base,
+                    identity,
+                    position,
+                    rename_by_position.get(&identity).map(|name| name.as_str()),
+                )
+            })
             .transpose()?;
-        let active_change = (active_before != active_after)
-            .then_some(final_active_position)
-            .flatten();
+        let active_change = (current_active.map(|identity| (identity, identity))
+            != final_active.zip(final_active_position))
+        .then_some(final_active_position)
+        .flatten();
         if active_change.is_some() {
             let before = active_before
                 .ok_or_else(|| invalid("non-empty workbook has no source active tab"))?;
@@ -1341,6 +1464,7 @@ impl Edit {
                     invalid(format!("edited sheet position {position} disappeared"))
                 })?;
             let SheetActions {
+                rename: _,
                 visibility: _,
                 cells,
                 rows,
@@ -1441,7 +1565,10 @@ impl Edit {
             base.inner.validate_styles(&parsed)?;
             for change in &changes[change_start..] {
                 match change {
-                    Change::Move { .. } | Change::Active { .. } | Change::Visibility { .. } => {},
+                    Change::Rename { .. }
+                    | Change::Move { .. }
+                    | Change::Active { .. }
+                    | Change::Visibility { .. } => {},
                     Change::Cell {
                         sheet,
                         address,
@@ -1539,6 +1666,69 @@ impl Edit {
             })?;
         }
 
+        let reference_renames = effective_renames
+            .iter()
+            .map(|(position, after)| {
+                let before = base.inner.sheets.get(*position).ok_or_else(|| {
+                    invalid("renamed sheet disappeared during reference planning")
+                })?;
+                Ok(raw::reference_edit::Rename {
+                    before: &before.name,
+                    after: after.as_str(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let sheet_titles = if effective_renames.is_empty() {
+            Vec::new()
+        } else {
+            base.inner
+                .sheets
+                .iter()
+                .map(|sheet| sheet.name.as_str())
+                .collect::<Vec<_>>()
+        };
+        if let Some((position, _)) = effective_renames.first() {
+            let sheet = base
+                .inner
+                .sheets
+                .get(*position)
+                .ok_or_else(|| invalid("rename context sheet disappeared"))?;
+            let mut reference_parts = base
+                .inner
+                .package
+                .iter_parts()
+                .filter(|part| part.partname() != &base.inner.workbook_uri && reference_part(*part))
+                .map(|part| {
+                    (
+                        part.partname().clone(),
+                        part.content_type()
+                            == litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES,
+                    )
+                })
+                .collect::<Vec<_>>();
+            reference_parts.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+            for (uri, extended_properties) in reference_parts {
+                let part_name = uri.to_string();
+                let part_titles = if extended_properties {
+                    sheet_titles.as_slice()
+                } else {
+                    &[]
+                };
+                compose_part_optional(&mut parts, &base, &uri, |content| {
+                    raw::reference_edit::rewrite(
+                        content,
+                        &reference_renames,
+                        raw::reference_edit::Context {
+                            sheet: &sheet.name,
+                            position: *position,
+                            part: &part_name,
+                            sheet_titles: part_titles,
+                        },
+                    )
+                })?;
+            }
+        }
+
         let style_guard = changes
             .iter()
             .any(Change::uses_shared_style)
@@ -1559,13 +1749,34 @@ impl Edit {
             Vec::new()
         };
 
-        if !effective_tabs.is_empty()
+        if !effective_renames.is_empty()
+            || !effective_tabs.is_empty()
             || active_change.is_some()
             || effective_order.is_some()
             || needs_recalculation
         {
             let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
             let before = workbook_part.blob_arc();
+            let referenced_workbook = if let Some((position, _)) = effective_renames.first() {
+                let sheet = base
+                    .inner
+                    .sheets
+                    .get(*position)
+                    .ok_or_else(|| invalid("rename workbook context disappeared"))?;
+                raw::reference_edit::rewrite(
+                    &before,
+                    &reference_renames,
+                    raw::reference_edit::Context {
+                        sheet: &sheet.name,
+                        position: *position,
+                        part: base.inner.workbook_uri.as_str(),
+                        sheet_titles: &[],
+                    },
+                )?
+            } else {
+                None
+            };
+            let workbook_input = referenced_workbook.as_deref().unwrap_or(&before);
             let active = active_change
                 .map(|position| {
                     let identity = final_active.ok_or_else(|| {
@@ -1617,9 +1828,27 @@ impl Edit {
                     })
                 })
                 .transpose()?;
-            let mut after = if effective_tabs.is_empty() && active.is_none() && raw_order.is_none()
+            let raw_renames = effective_renames
+                .iter()
+                .map(|(position, after)| {
+                    let data =
+                        base.inner.sheets.get(*position).ok_or_else(|| {
+                            invalid("tab rename target disappeared during commit")
+                        })?;
+                    Ok(raw::catalog_edit::Rename {
+                        sheet: &data.name,
+                        position: *position,
+                        relationship_id: &data.relationship_id,
+                        name: after.as_str(),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let mut after = if effective_renames.is_empty()
+                && effective_tabs.is_empty()
+                && active.is_none()
+                && raw_order.is_none()
             {
-                raw::recalc::invalidate(&before)?
+                raw::recalc::invalidate(workbook_input)?
             } else {
                 let tabs = effective_tabs
                     .iter()
@@ -1636,20 +1865,28 @@ impl Edit {
                     })
                     .collect::<Result<Vec<_>>>()?;
                 raw::catalog_edit::rewrite(
-                    &before,
+                    workbook_input,
                     raw::catalog_edit::Plan {
                         tabs,
+                        renames: raw_renames,
                         active,
                         order: raw_order,
                     },
                 )?
             };
             if needs_recalculation
-                && (!effective_tabs.is_empty() || active.is_some() || effective_order.is_some())
+                && (!effective_renames.is_empty()
+                    || !effective_tabs.is_empty()
+                    || active.is_some()
+                    || effective_order.is_some())
             {
                 after = raw::recalc::invalidate(&after)?;
             }
-            if !effective_tabs.is_empty() || active.is_some() || effective_order.is_some() {
+            if !effective_renames.is_empty()
+                || !effective_tabs.is_empty()
+                || active.is_some()
+                || effective_order.is_some()
+            {
                 let catalog = raw::parse_catalog(&after)?;
                 if Some(catalog.active_sheet_index) != final_active_position {
                     return Err(invalid("workbook active-tab edit verification failed"));
@@ -1670,6 +1907,25 @@ impl Edit {
                             .map_or("<missing sheet>", |sheet| sheet.name.as_str());
                         return Err(invalid(format!(
                             "workbook tab visibility verification failed at {sheet}"
+                        )));
+                    }
+                }
+                for (identity, expected_name) in &effective_renames {
+                    let position = final_position(*identity).ok_or_else(|| {
+                        invalid("renamed tab disappeared from the final workbook order")
+                    })?;
+                    let actual = catalog
+                        .sheets
+                        .get(position)
+                        .ok_or_else(|| invalid("workbook rename verification lost a sheet"))?;
+                    let expected = base.inner.sheets.get(*identity).ok_or_else(|| {
+                        invalid("renamed tab identity disappeared during verification")
+                    })?;
+                    if actual.relationship_id != expected.relationship_id
+                        || actual.name != expected_name.as_str()
+                    {
+                        return Err(invalid(format!(
+                            "workbook tab rename verification failed at position {position}"
                         )));
                     }
                 }
@@ -1734,6 +1990,10 @@ impl Edit {
 
     fn set_visibility(&mut self, position: usize, action: TabAction) {
         self.sheets.entry(position).or_default().visibility = Some(action);
+    }
+
+    fn set_name(&mut self, position: usize, name: Name) {
+        self.sheets.entry(position).or_default().rename = Some(name);
     }
 
     fn set_active(&mut self, position: usize) {
@@ -1872,6 +2132,12 @@ impl Edit {
                 .sheets
                 .get(*position)
                 .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+            if left.rename.is_some() && right.rename.is_some() {
+                conflicts.push(Conflict::Name {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
             if left.visibility.is_some() && right.visibility.is_some() {
                 conflicts.push(Conflict::Tab {
                     sheet: sheet.into(),
@@ -1950,6 +2216,20 @@ pub struct TabEdit<'a> {
 }
 
 impl TabEdit<'_> {
+    /// Rename this tab and every modeled local formula/reference dependency.
+    ///
+    /// Borrowed strings are validated and copied once. Passing a prevalidated
+    /// [`crate::sheet::Name`] or owned `String` keeps the operation move-first.
+    pub fn rename<T>(&mut self, name: T) -> Result<&mut Self>
+    where
+        T: TryInto<Name>,
+        Error: From<T::Error>,
+    {
+        self.edit
+            .set_name(self.position, name.try_into().map_err(Error::from)?);
+        Ok(self)
+    }
+
     /// Make this the active tab while preserving unrelated grouped selections.
     /// The tab must be visible in the transaction's final state.
     pub fn activate(&mut self) -> &mut Self {
@@ -2152,14 +2432,19 @@ fn raw_visibility_matches(value: &raw::Visibility, action: TabAction) -> bool {
     )
 }
 
-fn active_tab_at(workbook: &Workbook, identity: usize, position: usize) -> Result<ActiveTab> {
+fn active_tab_at(
+    workbook: &Workbook,
+    identity: usize,
+    position: usize,
+    name: Option<&str>,
+) -> Result<ActiveTab> {
     let sheet = workbook
         .inner
         .sheets
         .get(identity)
         .ok_or_else(|| invalid("active tab points outside the workbook catalog"))?;
     Ok(ActiveTab {
-        name: sheet.name.clone().into_boxed_str(),
+        name: name.unwrap_or(&sheet.name).into(),
         position,
     })
 }
@@ -2316,6 +2601,47 @@ fn compose_part(
         });
     }
     Ok(())
+}
+
+fn compose_part_optional(
+    parts: &mut Vec<PartChange>,
+    workbook: &Workbook,
+    uri: &PackURI,
+    rewrite: impl FnOnce(&[u8]) -> Result<Option<Vec<u8>>>,
+) -> Result<()> {
+    if let Some(part) = parts.iter_mut().find(|part| &part.uri == uri) {
+        if let Some(after) = rewrite(&part.after)?
+            && after.as_slice() != part.after.as_slice()
+        {
+            part.after = Arc::new(after);
+        }
+        return Ok(());
+    }
+    let before = workbook.inner.package.get_part(uri)?.blob_arc();
+    let Some(after) = rewrite(&before)? else {
+        return Ok(());
+    };
+    if after.as_slice() != before.as_slice() {
+        parts.push(PartChange {
+            uri: uri.clone(),
+            before,
+            after: Arc::new(after),
+        });
+    }
+    Ok(())
+}
+
+fn reference_part(part: &dyn Part) -> bool {
+    let uri = part.partname().as_str();
+    if uri.starts_with("/xl/externalLinks/")
+        || part.content_type() == litchi_opc::constants::content_type::SML_EXTERNAL_LINK
+    {
+        return false;
+    }
+    (uri.starts_with("/xl/")
+        && (part.content_type().ends_with("+xml")
+            || part.content_type() == litchi_opc::constants::content_type::OFC_VML_DRAWING))
+        || part.content_type() == litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES
 }
 
 fn ensure_unsigned(workbook: &Workbook) -> Result<()> {
@@ -3031,6 +3357,165 @@ mod tests {
     }
 
     #[test]
+    fn tab_rename_is_typed_dependency_aware_move_first_and_reversible() {
+        let source = rename_reference_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let source_part = source.inner.sheets[0].part_uri.clone();
+        let source_id = source.inner.sheets[0].native_id;
+        let source_relationship = source.inner.sheets[0].relationship_id.clone();
+
+        let mut edit = source.edit().expect("edit");
+        edit.tab("data")
+            .expect("caseless lookup")
+            .expect("tab")
+            .rename(String::from("Input 2026"))
+            .expect("checked rename");
+        edit.sheet("Calc")
+            .expect("Calc lookup")
+            .expect("Calc sheet")
+            .set("D1", "composed")
+            .expect("same-part cell edit");
+        let committed = edit.commit().expect("rename commit");
+        assert!(
+            committed
+                .workbook()
+                .sheet("Data")
+                .expect("lookup")
+                .is_none()
+        );
+        let renamed = committed
+            .workbook()
+            .sheet("INPUT 2026")
+            .expect("Unicode caseless lookup")
+            .expect("renamed sheet");
+        assert_eq!(renamed.name(), "Input 2026");
+        assert_eq!(renamed.data.part_uri, source_part);
+        assert_eq!(renamed.data.native_id, source_id);
+        assert_eq!(renamed.data.relationship_id, source_relationship);
+        assert_eq!(committed.patch().len(), 2);
+        assert_eq!(
+            committed.patch().changes()[0].renamed(),
+            Some((0, "Data", "Input 2026"))
+        );
+
+        let calc = committed
+            .workbook()
+            .sheet("Calc")
+            .expect("lookup")
+            .expect("Calc");
+        assert!(matches!(
+            calc.cell("A1").expect("formula cell"),
+            Some(Cell::Formula(formula)) if formula.text() == "'Input 2026'!A1"
+        ));
+        assert!(matches!(
+            calc.cell("D1").expect("composed cell"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "composed"
+        ));
+        for uri in [
+            "/xl/workbook.xml",
+            "/xl/worksheets/sheet2.xml",
+            "/xl/tables/table1.xml",
+            "/xl/charts/chart1.xml",
+            "/xl/pivotCache/pivotCacheDefinition1.xml",
+            "/docProps/app.xml",
+        ] {
+            let text = part_text(committed.workbook(), uri);
+            assert!(
+                text.contains("Input 2026"),
+                "expected renamed dependency in {uri}: {text}"
+            );
+        }
+        assert!(
+            part_text(committed.workbook(), "/xl/externalLinks/externalLink1.xml")
+                .contains("[1]Data!A1")
+        );
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse rename");
+        assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+        assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
+    }
+
+    #[test]
+    fn tab_rename_validates_names_collisions_swaps_and_join_facets() {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut invalid = source.edit().expect("invalid edit");
+        let error = invalid
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .rename("bad/name")
+            .expect_err("invalid name");
+        assert!(matches!(error, Error::SheetName(_)));
+
+        let mut collision = source.edit().expect("collision edit");
+        collision
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .rename("sheet2")
+            .expect("valid spelling");
+        assert!(matches!(
+            collision.commit(),
+            Err(Error::SheetNameConflict {
+                first: 0,
+                second: 1,
+                ..
+            })
+        ));
+
+        let mut swap = source.edit().expect("swap edit");
+        swap.tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .rename("Sheet2")
+            .expect("first swap");
+        swap.tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .rename("Sheet1")
+            .expect("second swap");
+        let swapped = swap.commit().expect("simultaneous swap");
+        assert_eq!(
+            swapped
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet2", "Sheet1"]
+        );
+
+        let mut left = source.edit().expect("left");
+        left.tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .rename("First")
+            .expect("left rename");
+        let mut same = source.edit().expect("same");
+        same.tab(0usize)
+            .expect("lookup")
+            .expect("tab")
+            .rename("Other")
+            .expect("same rename");
+        let error = left.join(same).expect_err("same name facet conflicts");
+        assert!(error.conflicts().expect("conflicts").conflicts()[0].is_name());
+
+        let mut right = source.edit().expect("right");
+        right
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .rename(Name::new("Second").expect("prevalidated"))
+            .expect("moved typed name");
+        left.join(right).expect("disjoint names join");
+        let joined = left.commit().expect("joined renames");
+        assert!(joined.workbook().sheet("first").expect("lookup").is_some());
+        assert!(joined.workbook().sheet("second").expect("lookup").is_some());
+    }
+
+    #[test]
     fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
         let source = three_sheet_workbook();
         let source_bytes = source.to_bytes().expect("source bytes");
@@ -3381,6 +3866,20 @@ mod tests {
                 ..
             })
         ));
+        let mut rename = protected.edit().expect("rename edit");
+        rename
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .rename("Input")
+            .expect("checked name");
+        assert!(matches!(
+            rename.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::ProtectedWorkbook,
+                ..
+            })
+        ));
 
         let mut package = source.inner.package.clone();
         package
@@ -3411,6 +3910,20 @@ mod tests {
             .expect("tabs");
         assert!(matches!(
             edit.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::TrackedWorkbook,
+                ..
+            })
+        ));
+        let mut rename = tracked.edit().expect("rename edit");
+        rename
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .rename("Input")
+            .expect("checked name");
+        assert!(matches!(
+            rename.commit(),
             Err(Error::TabEditBlocked {
                 reason: TabEditBlock::TrackedWorkbook,
                 ..
@@ -4238,6 +4751,76 @@ mod tests {
             signed.apply(&Patch::default()),
             Err(Error::Signed)
         ));
+    }
+
+    fn rename_reference_workbook() -> Workbook {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut package = source.inner.package.clone();
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook part")
+            .set_blob(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/><sheet name="Calc" sheetId="2" r:id="rIdTab2"/></sheets><definedNames><definedName name="Source">Data!$A$1</definedName></definedNames></workbook>"#.to_vec(),
+            );
+        package
+            .get_part_mut(&source.inner.sheets[0].part_uri)
+            .expect("Data worksheet")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#.to_vec(),
+            );
+        package
+            .get_part_mut(&source.inner.sheets[1].part_uri)
+            .expect("Calc worksheet")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetData><row r="1"><c r="A1"><f>Data!A1</f><v>7</v></c></row></sheetData><dataValidations count="1"><dataValidation type="custom" sqref="B1"><formula1>Data!A1&gt;0</formula1></dataValidation></dataValidations><hyperlinks><hyperlink ref="C1" location="Data!$A$1"/></hyperlinks></worksheet>"#.to_vec(),
+            );
+        for (uri, content_type, content) in [
+            (
+                "/xl/tables/table1.xml",
+                litchi_opc::constants::content_type::SML_TABLE,
+                br#"<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><tableColumns count="1"><tableColumn id="1" name="Value"><calculatedColumnFormula>Data!A1</calculatedColumnFormula></tableColumn></tableColumns></table>"#.as_slice(),
+            ),
+            (
+                "/xl/charts/chart1.xml",
+                litchi_opc::constants::content_type::DML_CHART,
+                br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:barChart><c:ser><c:val><c:numRef><c:f>Data!$A$1</c:f></c:numRef></c:val></c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>"#.as_slice(),
+            ),
+            (
+                "/xl/pivotCache/pivotCacheDefinition1.xml",
+                litchi_opc::constants::content_type::SML_PIVOT_CACHE_DEFINITION,
+                br#"<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cacheSource type="worksheet"><worksheetSource sheet="Data" ref="A1"/></cacheSource></pivotCacheDefinition>"#.as_slice(),
+            ),
+            (
+                "/docProps/app.xml",
+                litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES,
+                br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><TitlesOfParts><vt:vector size="3" baseType="lpstr"><vt:lpstr>Data</vt:lpstr><vt:lpstr>Calc</vt:lpstr><vt:lpstr>Data!Print_Area</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#.as_slice(),
+            ),
+            (
+                "/xl/externalLinks/externalLink1.xml",
+                litchi_opc::constants::content_type::SML_EXTERNAL_LINK,
+                br#"<externalLink xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><externalBook><definedNames><definedName name="External" refersTo="[1]Data!A1"/></definedNames></externalBook></externalLink>"#.as_slice(),
+            ),
+        ] {
+            package
+                .try_add_part(Box::new(BlobPart::new(
+                    PackURI::new(uri).expect("part URI"),
+                    content_type.to_owned(),
+                    content.to_vec(),
+                )))
+                .expect("reference part");
+        }
+        Workbook::from_package(package).expect("rename reference workbook")
+    }
+
+    fn part_text<'a>(workbook: &'a Workbook, uri: &str) -> &'a str {
+        let uri = PackURI::new(uri).expect("part URI");
+        let bytes = workbook
+            .inner
+            .package
+            .get_part(&uri)
+            .expect("package part")
+            .blob();
+        std::str::from_utf8(bytes).expect("XML part")
     }
 
     fn styled_workbook() -> Workbook {
