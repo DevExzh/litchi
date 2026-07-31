@@ -39,6 +39,10 @@ pub enum OoxmlError {
     #[error("markup compatibility error: {0}")]
     MarkupCompatibility(#[from] litchi_ooxml_common::MceError),
 
+    /// Shared OOXML decoding error.
+    #[error("OOXML decoding error: {0}")]
+    CommonXml(#[from] litchi_ooxml_common::XmlError),
+
     /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -93,6 +97,7 @@ impl From<OoxmlError> for litchi_core::Error {
             OoxmlError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             OoxmlError::Drawing(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::MarkupCompatibility(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::CommonXml(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),
             OoxmlError::IoError(e) => litchi_core::Error::Io(e),
             OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),

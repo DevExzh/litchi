@@ -309,7 +309,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                 }
             },
             Ok(Event::GeneralRef(reference)) => {
-                let text = crate::common::xml::decode_xml_reference(&reference)?;
+                let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
                 if let Some(node) = stack.last_mut() {
                     node.content.push(Content::Text(text));
                 } else {

@@ -5,7 +5,7 @@
 //! a slide-library item on a server. Loading and storing this part never
 //! contacts the server, opens the library, or performs any synchronization.
 
-use crate::common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
 use litchi_core::xml::escape_xml;

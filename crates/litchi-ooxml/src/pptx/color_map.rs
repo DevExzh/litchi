@@ -1,6 +1,6 @@
 //! PresentationML color-map parsing and resolution.
 
-use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::parts::{Theme, ThemeColor};

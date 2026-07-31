@@ -8,7 +8,7 @@ use quick_xml::reader::NsReader;
 use ryu::Buffer as RyuBuffer;
 use std::fmt::Write as FmtWrite;
 
-use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::xlsx::cell::Cell;
 use crate::xlsx::namespace::is_spreadsheetml_name;
 

@@ -107,7 +107,13 @@ impl PackageWriter {
 
     /// Write all parts and their relationships.
     fn write_parts(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
-        for part in package.iter_parts() {
+        // `OpcPackage` uses a hash map for O(1) lookup. Never let its randomized
+        // iteration order leak into serialized artifacts.
+        let mut parts = package.iter_parts().collect::<Vec<_>>();
+        parts.sort_unstable_by(|left, right| {
+            left.partname().as_str().cmp(right.partname().as_str())
+        });
+        for part in parts {
             // Write the part itself
             let blob = part.blob();
             phys_writer.write(part.partname(), blob)?;

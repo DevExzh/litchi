@@ -36,7 +36,6 @@
 //! ```
 pub mod api;
 pub mod charts;
-mod common;
 pub mod custom_properties;
 pub mod custom_xml_data;
 pub mod diagrams;

@@ -31,6 +31,7 @@ litchi-fonts    = { workspace = true, optional = true }
 litchi-ole      = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc      = { workspace = true }
+litchi-xlsx     = { workspace = true }
 memchr          = { workspace = true }
 quick-xml       = { workspace = true }
 rand            = { workspace = true }

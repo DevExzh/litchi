@@ -54,6 +54,7 @@ litchi-rtf       = { version = "0.0.1", path = "crates/litchi-rtf" }
 litchi-sheet     = { version = "0.0.1", path = "crates/litchi-sheet" }
 litchi-slide     = { version = "0.0.1", path = "crates/litchi-slide" }
 litchi-word      = { version = "0.0.1", path = "crates/litchi-word" }
+litchi-xlsx      = { version = "0.0.1", path = "crates/litchi-xlsx" }
 md-5          = { version = "0.11", features = ["zeroize"] }
 memchr        = "2.7"
 num-complex   = "0.4"

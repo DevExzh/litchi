@@ -11,7 +11,7 @@
 //! instantiates a control, resolves a CLSID, decodes MS-OFORMS/CFB state,
 //! executes a macro, or follows an external relationship.
 
-use crate::common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
 use crate::xlsx::active_x::ActiveXDescriptor;

@@ -847,7 +847,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
             Event::Start(ref element) | Event::Empty(ref element) => {
                 if depth == 0 {
                     if saw_root
-                        || !crate::common::xml::is_drawingml_chart_name(
+                        || !litchi_ooxml_common::xml::is_drawingml_chart_name(
                             &namespace,
                             element.name(),
                             b"userShapes",
@@ -899,7 +899,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
                 }
                 depth -= 1;
                 if depth == 0 {
-                    if !crate::common::xml::is_drawingml_chart_name(
+                    if !litchi_ooxml_common::xml::is_drawingml_chart_name(
                         &namespace,
                         element.name(),
                         b"userShapes",

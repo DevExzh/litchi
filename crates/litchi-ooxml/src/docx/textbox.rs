@@ -17,7 +17,7 @@
 //! Everything is treated as inert metadata: linked OLE objects, scripts, and
 //! style bodies are never interpreted or followed.
 
-use crate::common::xml::{decode_xml_reference, is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{decode_xml_reference, is_drawingml_name, unqualified_attribute_value};
 use crate::docx::drawing::ShapeType;
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
@@ -945,7 +945,7 @@ fn attribute(
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>> {
-    unqualified_attribute_value(element, name, decoder)
+    Ok(unqualified_attribute_value(element, name, decoder)?)
 }
 
 fn invalid(message: impl Into<String>) -> OoxmlError {

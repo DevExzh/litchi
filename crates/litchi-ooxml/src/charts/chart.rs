@@ -8,7 +8,7 @@ use crate::charts::models::{Layout, TitleText};
 use crate::charts::plot_area::PlotArea;
 use crate::charts::series::{DataLabel, Marker};
 use crate::charts::types::DisplayBlanks;
-use crate::common::xml::is_drawingml_chart_name;
+use litchi_ooxml_common::xml::is_drawingml_chart_name;
 use crate::error::{OoxmlError, Result};
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;

@@ -11,7 +11,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result as SheetResult};
 
 const DRAWINGML: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";

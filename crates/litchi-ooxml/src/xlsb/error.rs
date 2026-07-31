@@ -203,6 +203,7 @@ impl From<crate::error::OoxmlError> for XlsbError {
             crate::error::OoxmlError::MarkupCompatibility(err) => {
                 XlsbError::Encoding(err.to_string())
             },
+            crate::error::OoxmlError::CommonXml(err) => XlsbError::Encoding(err.to_string()),
             crate::error::OoxmlError::UnsafeEdit {
                 format,
                 operation,

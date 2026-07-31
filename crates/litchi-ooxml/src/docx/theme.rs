@@ -1,7 +1,7 @@
 /// Theme support for Word documents.
 ///
 /// Themes define the color scheme, fonts, and effects used in a document.
-use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
 use quick_xml::encoding::Decoder;

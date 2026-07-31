@@ -241,7 +241,7 @@ impl DiagramDataModel {
                     if text_depth.is_some()
                         && let Some((_, builder)) = &mut open_point
                     {
-                        let text = crate::common::xml::decode_xml_reference(&reference)?;
+                        let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
                         if builder.text.len() + text.len() > MAX_TEXT_BYTES {
                             return Err(limit("diagram text bytes"));
                         }

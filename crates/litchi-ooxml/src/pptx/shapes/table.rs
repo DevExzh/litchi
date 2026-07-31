@@ -1,5 +1,5 @@
 /// Table shape implementation for PowerPoint presentations.
-use crate::common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::shapes::textframe::{extract_drawingml_text, scan_drawingml_element_ranges};
 use quick_xml::events::Event;

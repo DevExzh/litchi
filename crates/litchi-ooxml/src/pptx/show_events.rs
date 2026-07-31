@@ -4,7 +4,7 @@
 //! module never replays, renders, seeks, pauses, resumes, stops, or otherwise
 //! executes a recorded action.
 
-use crate::common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};

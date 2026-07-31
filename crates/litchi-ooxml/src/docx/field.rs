@@ -2,7 +2,7 @@
 ///
 /// This module provides types and methods for accessing fields in Word documents.
 /// Fields are dynamic content like page numbers, dates, formulas, and cross-references.
-use crate::common::xml::decode_xml_reference;
+use litchi_ooxml_common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

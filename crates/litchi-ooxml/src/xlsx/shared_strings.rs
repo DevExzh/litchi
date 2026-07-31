@@ -10,7 +10,7 @@ use quick_xml::reader::NsReader;
 
 use super::RichTextRun;
 use super::namespace::is_spreadsheetml_name;
-use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 
 const MAX_PREALLOCATED_STRINGS: usize = 4096;

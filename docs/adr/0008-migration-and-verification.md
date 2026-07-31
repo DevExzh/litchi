@@ -35,6 +35,16 @@ properties, and external-workbook relationship vocabulary have moved into
 moved into `litchi-drawingml`. The monolith remains only as a migration host and
 `litchi-core` still carries explicitly fenced extraction debt.
 
+The second implementation slice moves shared OOXML namespace, entity,
+attribute, and bounded OMML scanning helpers into `litchi-ooxml-common`. It also
+introduces the independent `litchi-xlsx` crate: the canonical workbook-catalog
+parser now lives there, while the migration host contains only conversions to
+its legacy internal records. `litchi-xlsx::Workbook` is an immutable `Send +
+Sync` snapshot with lifetime-free sheet handles, content-derived flavor, a
+deterministic one-visible-sheet baseline, and selector-first `Result<Option<_>>`
+lookup by name or checked zero-based position. This is the first XLSX vertical
+slice; cell loading and lossless edit/patch commits remain migration work.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
@@ -79,6 +89,13 @@ Post-fix desktop PowerPoint verification on macOS opened a generated one-slide
 artifact without a repair dialog. PowerPoint then added a second slide and
 saved the file; Litchi reverse-read both slides, and the resaved package retained
 only the intended `theme1.xml` and distinct notes `theme2.xml` theme parts.
+
+Desktop Excel verification on macOS opened the deterministic workbook emitted
+by the second slice without a repair or compatibility dialog. Excel accepted an
+edit to cell A1 and saved the workbook; the Office-resaved archive passed ZIP
+integrity checks and `litchi_xlsx::Workbook` reverse-read its `Sheet1` catalog
+entry as a worksheet. This evidence certifies the minimal package and catalog
+round trip only; it does not certify cell CRUD, which is not part of this slice.
 
 ## Quality gates
 

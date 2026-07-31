@@ -8,7 +8,7 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
-use crate::common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 
 const SPREADSHEETML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -908,7 +908,7 @@ fn optional_string(
     name: &[u8],
     decoder: Decoder,
 ) -> Result<Option<String>> {
-    unqualified_attribute_value(element, name, decoder)
+    Ok(unqualified_attribute_value(element, name, decoder)?)
 }
 
 fn required_u32(

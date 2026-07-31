@@ -15,7 +15,7 @@
 //! Everything here is read-only and inert: no pivot refresh, no cache
 //! rebuild, and no rendering.
 
-use crate::common::xml::{
+use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, unqualified_attribute_value,
 };
 use crate::error::{OoxmlError, Result};
@@ -998,7 +998,7 @@ fn quote_sheet_name(sheet: &str) -> String {
 pub(crate) fn pivot_options_extension_xml(options: &PivotChartPivotOptions) -> Vec<u8> {
     let mut xml = Vec::new();
     xml.extend_from_slice(b"<c:extLst xmlns:c=\"");
-    xml.extend_from_slice(crate::common::xml::DRAWINGML_CHART_NAMESPACE);
+    xml.extend_from_slice(litchi_ooxml_common::xml::DRAWINGML_CHART_NAMESPACE);
     xml.extend_from_slice(b"\"><c:ext uri=\"");
     xml.extend_from_slice(PIVOT_OPTIONS_EXTENSION_URI.as_bytes());
     xml.extend_from_slice(b"\" xmlns:c14=\"");

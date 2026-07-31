@@ -950,7 +950,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
                 append_text(stack.last_mut(), &d, &mut strings)?;
             },
             Event::GeneralRef(r) => {
-                let d = crate::common::xml::decode_xml_reference(&r)?;
+                let d = litchi_ooxml_common::xml::decode_xml_reference(&r)?;
                 append_text(stack.last_mut(), &d, &mut strings)?;
             },
             Event::CData(_) => return Err(invalid("CDATA is rejected in revision parts")),

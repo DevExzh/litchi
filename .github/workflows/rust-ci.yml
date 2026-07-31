@@ -70,6 +70,7 @@ jobs:
           -p litchi-sheet
           -p litchi-slide
           -p litchi-word
+          -p litchi-xlsx
           -p litchi-ooxml-common
 
   check-and-clippy:

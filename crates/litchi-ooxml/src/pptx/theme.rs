@@ -665,8 +665,8 @@ fn parse_theme_override(xml: &[u8]) -> Result<ThemeOverride> {
                 let is_dml = matches!(
                     namespace,
                     ResolveResult::Bound(Namespace(uri))
-                        if uri == crate::common::xml::DRAWINGML_NAMESPACE
-                            || uri == crate::common::xml::STRICT_DRAWINGML_NAMESPACE
+                        if uri == litchi_ooxml_common::xml::DRAWINGML_NAMESPACE
+                            || uri == litchi_ooxml_common::xml::STRICT_DRAWINGML_NAMESPACE
                 );
                 if !root_seen {
                     if !is_dml || local != "themeOverride" {

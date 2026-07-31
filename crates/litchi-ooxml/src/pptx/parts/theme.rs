@@ -1,7 +1,7 @@
 /// Theme parts for PowerPoint presentations.
 ///
 /// This module provides types for working with themes in PPTX files.
-use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
 use quick_xml::encoding::Decoder;

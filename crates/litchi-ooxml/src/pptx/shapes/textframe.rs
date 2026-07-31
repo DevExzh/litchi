@@ -1,5 +1,5 @@
 /// Text frame for accessing text content in shapes.
-use crate::common::xml::{
+use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, extract_omml_formulas,
 };
 use crate::error::{OoxmlError, Result};
@@ -352,7 +352,7 @@ impl TextFrame {
     ///
     /// Returns the exact XML of each OMML `<oMath>` element in document order.
     pub fn omml_formulas(&self) -> Result<Vec<String>> {
-        extract_omml_formulas(&self.xml_bytes)
+        Ok(extract_omml_formulas(&self.xml_bytes)?)
     }
 }
 

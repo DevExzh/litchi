@@ -316,7 +316,7 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             Ok(Event::GeneralRef(t)) => {
                 if let Some(n) = stack.last_mut() {
                     n.content
-                        .push(Content::Text(crate::common::xml::decode_xml_reference(&t)?))
+                        .push(Content::Text(litchi_ooxml_common::xml::decode_xml_reference(&t)?))
                 } else {
                     return Err(invalid("entity outside viewPr"));
                 }

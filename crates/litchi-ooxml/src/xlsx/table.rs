@@ -10,7 +10,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::xlsx::cell::Cell;
 use crate::xlsx::namespace::is_spreadsheetml_name;
 use crate::xlsx::sort::{SortBy, SortCondition, SortMethod, SortState};

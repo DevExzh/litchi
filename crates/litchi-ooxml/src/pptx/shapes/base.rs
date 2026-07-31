@@ -1,5 +1,5 @@
 /// Base shape types for PowerPoint presentations.
-use crate::common::xml::{
+use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, unqualified_attribute_value,
 };
 use crate::error::{OoxmlError, Result};

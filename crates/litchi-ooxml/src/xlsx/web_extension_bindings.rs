@@ -10,7 +10,7 @@ use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::common::xml::decode_xml_reference;
+use litchi_ooxml_common::xml::decode_xml_reference;
 
 pub const WEB_EXTENSIONS_EXTENSION_URI: &str = "{F7C9EE02-42E1-4005-9D12-6889AFFD525C}";
 pub const X15_NAMESPACE: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";

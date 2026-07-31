@@ -13,7 +13,7 @@
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 
-use crate::common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 
 use super::{

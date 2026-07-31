@@ -25,6 +25,12 @@ INTERNAL_ALLOWLIST: dict[str, set[str]] = {
         "litchi-ooxml-common",
         "litchi-sheet",
     },
+    "litchi-xlsx": {
+        "litchi-core",
+        "litchi-ooxml-common",
+        "litchi-opc",
+        "litchi-sheet",
+    },
     "litchi-ole-common": {"litchi-cfb", "litchi-core"},
     "litchi-odraw": {"litchi-cfb", "litchi-core", "litchi-ole-common"},
 }

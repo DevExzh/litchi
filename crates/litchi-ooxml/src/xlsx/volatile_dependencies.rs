@@ -630,7 +630,7 @@ fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
             Event::GeneralRef(r) => push_text(
                 &mut types,
                 stack.last().copied(),
-                &crate::common::xml::decode_xml_reference(&r)?,
+                &litchi_ooxml_common::xml::decode_xml_reference(&r)?,
             )?,
             Event::End(_) => {
                 let ended = stack

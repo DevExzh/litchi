@@ -4,7 +4,7 @@
 //! parses, opens, activates, renders, executes, or otherwise inspects embedded
 //! object or package payload bytes.
 
-use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};

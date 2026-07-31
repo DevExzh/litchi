@@ -1,6 +1,6 @@
 //! Strict OPC core-properties metadata extraction.
 
-use crate::common::xml::decode_xml_reference;
+use litchi_ooxml_common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, Utc};
 use litchi_core::Metadata;

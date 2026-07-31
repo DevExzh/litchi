@@ -7,7 +7,7 @@
 //! deep schema validation remain the responsibility of Office-compatible
 //! renderers.
 
-use crate::common::xml::{
+use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, decode_xml_reference, extract_omml_formulas, is_omml_name,
 };
 use crate::error::{OoxmlError, Result};

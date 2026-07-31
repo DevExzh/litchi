@@ -15,7 +15,7 @@ use super::{
     MAX_THREADED_COMMENTS, MAX_THREADED_MENTIONS, MAX_THREADED_PART_BYTES, MAX_THREADED_PERSONS,
     MAX_THREADED_TEXT_UTF16, ThreadedComment, ThreadedComments, validate_threaded_timestamp,
 };
-use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::xlsx::Cell;
 
 const THREADED_COMMENTS_NAMESPACE: &[u8] =

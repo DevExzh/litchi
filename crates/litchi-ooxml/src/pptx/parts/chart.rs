@@ -2,7 +2,7 @@
 //!
 //! This module provides types for working with charts in PPTX files.
 
-use crate::common::xml::{
+use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,
 };
 use crate::error::{OoxmlError, Result};

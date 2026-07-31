@@ -4,7 +4,7 @@
 //! follows hyperlinks, opens files or presentations, runs macros or programs,
 //! plays media, or ends, navigates, or otherwise controls a slide show.
 
-use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};

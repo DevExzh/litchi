@@ -11,7 +11,7 @@ use quick_xml::reader::NsReader;
 use super::cell::Cell;
 use super::namespace::is_spreadsheetml_name;
 use super::worksheet::Comment;
-use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Context {

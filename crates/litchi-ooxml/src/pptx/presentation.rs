@@ -1,5 +1,5 @@
 /// Main presentation object - the high-level API for working with presentations.
-use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
 use crate::pptx::controls::{ControlLoadLimits, PptxSlideControl, load_slide_controls};

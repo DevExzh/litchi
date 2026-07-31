@@ -4224,7 +4224,9 @@ fn parse_shape_id(value: &str) -> Result<u32> {
 }
 
 fn attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<String>> {
-    crate::common::xml::unqualified_attribute_value(element, name, decoder)
+    Ok(litchi_ooxml_common::xml::unqualified_attribute_value(
+        element, name, decoder,
+    )?)
 }
 
 fn check_attribute_count(element: &BytesStart<'_>) -> Result<()> {

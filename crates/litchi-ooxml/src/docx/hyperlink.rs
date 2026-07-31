@@ -215,7 +215,7 @@ impl Hyperlink {
                     current_text.push_str(&decoded);
                 },
                 Ok(Event::GeneralRef(reference)) if in_hyperlink && in_text => {
-                    current_text.push_str(&crate::common::xml::decode_xml_reference(&reference)?);
+                    current_text.push_str(&litchi_ooxml_common::xml::decode_xml_reference(&reference)?);
                 },
                 Ok(Event::End(e)) => {
                     match e.local_name().as_ref() {

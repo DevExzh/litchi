@@ -1,4 +1,4 @@
-use crate::common::xml::{
+use litchi_ooxml_common::xml::{
     decode_xml_reference, extract_omml_formulas, omml_formula_xml, scan_omml_formula_ranges,
 };
 use crate::docx::drawing::{DrawingObject, parse_drawing_objects};
@@ -817,7 +817,7 @@ impl Paragraph {
             if is_inline {
                 formulas.push(omml_formula_xml(self.xml_bytes(), start, length)?);
             }
-            Ok(())
+            Ok::<(), OoxmlError>(())
         })?;
         Ok(formulas)
     }
@@ -942,7 +942,7 @@ impl Paragraph {
             if !is_inline {
                 formulas.push(omml_formula_xml(self.xml_bytes(), start, length)?);
             }
-            Ok(())
+            Ok::<(), OoxmlError>(())
         })?;
         Ok(formulas)
     }

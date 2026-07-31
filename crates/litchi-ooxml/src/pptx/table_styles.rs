@@ -9,7 +9,7 @@
 //! each one defines. Cell style payloads (fills, borders, text styles) are
 //! retained as presence metadata only and are never resolved or rendered.
 
-use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
