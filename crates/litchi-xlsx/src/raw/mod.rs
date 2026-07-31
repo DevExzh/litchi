@@ -7,6 +7,7 @@ mod formula;
 pub mod namespace;
 pub(crate) mod recalc;
 pub(crate) mod strings;
+pub(crate) mod styles;
 pub(crate) mod worksheet;
 
 pub use catalog::{parse_catalog, parse_sheet};

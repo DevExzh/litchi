@@ -62,9 +62,9 @@ strings through cheaply cloned immutable text, expands shared-formula storage
 records, retains exact numeric lexical forms, and keeps formula cache origin and
 freshness separate. Sparse `cells(range)` traversal and stored extent are now
 implemented; declared/content/formatted extents, rich-text formatting, merge
-coverage, dynamic-array spill states, shared-style handles, dense budgeted
-grids, editable transactions, cache eviction, and operation budgets remain
-open, as does replacing remaining parser `Invalid` messages with the full
+coverage, dynamic-array spill states, shared-style definition editing, dense
+budgeted grids, cache eviction, and operation budgets remain open, as does
+replacing remaining parser `Invalid` messages with the full
 structured context taxonomy. The current non-evicting cache is therefore a safe
 migration step, not the weighted-cache design promised by ADR 0005.
 
@@ -114,10 +114,11 @@ by ADR 0003.
 The fifth implementation slice makes ordinary-cell edit planning composable
 across threads without exposing locks. Multiple `Edit` values may be prepared
 independently from cheap clones of the same immutable workbook snapshot and
-then joined. `join` accepts only exact snapshot lineage and only cell-disjoint
-write sets. It checks ordered maps without materializing a combined copy, then
-moves the incoming edit's action maps into the accepted edit. It does not use
-last-writer-wins behavior.
+then joined. The initial `join` accepted only exact snapshot lineage and
+cell-disjoint write sets; the seventh slice refines this to disjoint effect
+facets on a cell. It checks ordered maps without materializing a combined copy,
+then moves the incoming edit's action maps into the accepted edit. It does not
+use last-writer-wins behavior.
 
 An overlap returns a deterministic `ConflictSet` grouped by developer-facing
 sheet name and checked position, with ordered cell addresses. A lineage mismatch
@@ -160,9 +161,77 @@ atomic streaming path without a repair or compatibility dialog and reported
 native-open evidence for the physical save path only; it does not certify crash
 durability on every filesystem or native resave fidelity.
 
+The seventh implementation slice makes SpreadsheetML shared cell formats
+first-class without exposing their numeric `s` identifiers. The workbook
+validates that there is at most one internal styles relationship with the
+required content type, then lazily preprocesses `styles.xml` through the common
+markup-compatibility engine and validates the direct `cellXfs` collection.
+Counts and cell references are bounded against the checked-in `[MS-OE376]`
+profile: §2.1.599 defines `c/@s` as a `cellXfs` index through 65,490, while
+§2.1.728 limits the `cellXfs` collection itself to 65,430 records. Missing,
+empty, duplicate, count-mismatched, and out-of-range tables/references fail
+before the affected style is observed or a style-dependent edit is published.
+`Workbook::new()` now includes a minimal valid base style resource.
+
+`Workbook::styles()` returns a compact immutable `Styles` view;
+`Styles::base`, checked `get`, and iteration return cheap `Style` handles.
+The ordinary semantic entry is `Sheet::style(cell)`, while numeric position is
+the secondary import/diagnostic path. `Sheet::local_style` distinguishes a
+missing cell, an existing cell with no local style, and an explicit shared
+style reference; `Sheet::style` separately resolves the omitted local
+reference to the base cell format. Handles carry exact snapshot ownership,
+which pins the snapshot used by queries such as fan-out, plus a separate
+pointer-identity lineage for the immutable shared-style table. That resource
+lineage is retained across descendant cell-only commits, so handles and opaque
+patch keys remain safely reusable while the table is unchanged; unrelated
+tables are rejected by a typed error and cannot compare equal accidentally. No
+public constructor or getter exposes the physical SpreadsheetML index. When a
+source-checked patch is replayed onto a separately opened byte-identical
+workbook, its reported style states are rebound to that target table's lineage
+so every returned key resolves against the resulting snapshot. A patch whose
+before/after state contains an explicit shared style also retains a shared byte
+guard for the styles resource; replay against a different relationship target
+or table is rejected rather than reinterpreting the opaque key.
+
+`Style::fan_out` reports the number of stored worksheet cells whose effective
+cell format is that resource, including implicit base-format use. It
+deliberately does not guess at unstored grid positions or row/column defaults.
+`SheetEdit::style` retargets a cell to an existing shared resource and creates a
+styled empty record when necessary; `reset_style` removes only the explicit
+local reference. Shared format definitions remain immutable in this slice, so
+editing/forking a resource and reporting its prospective selection-wide
+fan-out remain separate future operations.
+
+Cell edit plans now represent payload and local-style effects as orthogonal
+facets. Independent edits may join on the same cell when one changes content
+and the other changes style; two payload effects, two style effects, or a
+whole-cell removal still conflict deterministically. Commit moves accepted
+actions into the rewrite plan instead of cloning their content. The XML surgery
+rewrites only the touched cell tag for style-only changes, preserving its
+payload, metadata, extensions, unknown attributes, and untouched bytes. Patch
+states are now a data-bearing enum that makes invalid combinations
+unrepresentable: a cell state always contains both content and exact local
+style state, while a missing state contains neither. Tests cover local versus
+resolved semantics, stored-cell fan-out, styled empty cells, reset, inverse
+byte restoration, foreign-lineage rejection, malformed style graphs/tables,
+same-cell threaded joins, and composed payload/style rewrites.
+
+For native evidence, Excel for macOS applied bold formatting to `A1` and saved
+the source workbook itself. The public `copy_style` example opened that native
+file, obtained `A1` through `Sheet::style`, set `C1` to `42`, retargeted `C1`
+with the borrowed handle, and atomically saved the result. Excel opened the
+result without a repair or compatibility dialog, reported the used range as
+`A1:C1`, exposed `A1` and `C1` as bold while `B1` remained plain, and showed
+`42` at `C1`. The retained worksheet XML independently showed the same opaque
+shared-style reference on `A1` and `C1`. This verifies native interpretation of
+one existing shared cell format and the public retarget path; it does not yet
+certify shared-format definition editing, every formatting component, or a
+native resave of the Litchi-produced output.
+
 These slices do not yet update the worksheet `dimension` hint or implement row
 and column insertion/deletion, shifting references, merge/group-formula edits,
-validation evaluation, style/resource editing, rich text, dynamic arrays,
+validation evaluation, shared-style definition editing or forking, named-style
+and row/column/theme resolution, rich text, dynamic arrays,
 patch serialization, full structured diagnostics, eviction/resource budgets,
 range/structural effect joins, three-way merge, raw-copy preservation of clean
 compressed entries, cancellation-aware save contexts, scratch planning, or

@@ -31,6 +31,9 @@ pub enum Error {
     /// A requested name matches more than one sheet.
     #[error("sheet name '{name}' is ambiguous ({matches} matches)")]
     AmbiguousSheetName { name: String, matches: usize },
+    /// A shared-style handle belongs to an unrelated resource-table lineage.
+    #[error("shared style belongs to a different resource-table lineage")]
+    ForeignStyle,
     /// A worksheet-only operation targeted another sheet kind.
     #[error("sheet '{sheet}' is not a worksheet")]
     NotWorksheet { sheet: String },

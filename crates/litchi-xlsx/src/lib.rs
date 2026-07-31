@@ -9,12 +9,14 @@ pub mod cell;
 mod error;
 pub mod formula;
 pub mod raw;
+pub mod style;
 mod workbook;
 
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Number, Text, Value};
 pub use error::{EditBlock, Error, Result};
 pub use formula::Formula;
 pub use litchi_sheet::{At, Cell as Address, Column, Rect, Row};
+pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use workbook::{
     Change, Commit, Conflict, ConflictSet, DateSystem, Edit, Flavor, JoinError, JoinFailure, Patch,
     Sheet, SheetEdit, SheetKind, SheetSelector, State, Visibility, Workbook,

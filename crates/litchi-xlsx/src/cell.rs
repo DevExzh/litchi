@@ -451,7 +451,6 @@ pub(crate) struct Stored {
     pub(crate) cell: Cell,
     // Retained for the shared-style facade. Native indexes never escape this
     // migration boundary.
-    #[allow(dead_code)]
     pub(crate) style: Option<u32>,
     #[allow(dead_code)]
     pub(crate) cell_metadata: Option<u32>,
@@ -486,11 +485,18 @@ impl Store {
     }
 
     pub(crate) fn get(&self, address: Address) -> Option<&Cell> {
+        self.entry(address).map(|entry| &entry.cell)
+    }
+
+    pub(crate) fn entry(&self, address: Address) -> Option<&Stored> {
         self.cells
             .binary_search_by_key(&address, |entry| entry.address)
             .ok()
             .and_then(|index| self.cells.get(index))
-            .map(|entry| &entry.cell)
+    }
+
+    pub(crate) fn entries(&self) -> &[Stored] {
+        &self.cells
     }
 
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {

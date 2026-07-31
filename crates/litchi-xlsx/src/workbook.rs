@@ -20,7 +20,8 @@ use litchi_sheet::{At, Rect};
 use crate::cell::{Store, Text};
 use crate::error::{Error, Result, invalid};
 use crate::raw;
-use crate::{Cell, Cells};
+use crate::style::StyleLineage;
+use crate::{Cell, Cells, LocalStyle, Style, Styles};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -128,12 +129,15 @@ struct SheetData {
 }
 
 #[derive(Debug)]
-struct Inner {
+pub(crate) struct Inner {
     package: OpcPackage,
     #[allow(dead_code)]
     workbook_uri: PackURI,
     shared_strings_uri: Option<PackURI>,
     shared_strings: OnceLock<Box<[Text]>>,
+    styles_uri: Option<PackURI>,
+    styles: OnceLock<raw::styles::Catalog>,
+    pub(crate) style_lineage: Arc<StyleLineage>,
     flavor: Flavor,
     date_system: DateSystem,
     active_sheet: Option<usize>,
@@ -155,6 +159,7 @@ impl Workbook {
         let mut package = OpcPackage::new();
         let workbook_uri = PackURI::new("/xl/workbook.xml").map_err(invalid)?;
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").map_err(invalid)?;
+        let styles_uri = PackURI::new("/xl/styles.xml").map_err(invalid)?;
 
         let mut workbook = BlobPart::new(
             workbook_uri,
@@ -175,6 +180,12 @@ impl Workbook {
             "rId1".to_owned(),
             TargetMode::Internal,
         )?;
+        workbook.rels_mut().try_add_relationship(
+            rt::STYLES.to_owned(),
+            "styles.xml".to_owned(),
+            "rId2".to_owned(),
+            TargetMode::Internal,
+        )?;
         package.try_add_part(Box::new(workbook))?;
         package.try_add_part(Box::new(BlobPart::new(
             worksheet_uri,
@@ -183,6 +194,24 @@ impl Workbook {
                 r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
                 r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
                 r#"<sheetData/></worksheet>"#
+            )
+            .as_bytes()
+            .to_vec(),
+        )))?;
+        package.try_add_part(Box::new(BlobPart::new(
+            styles_uri,
+            ct::SML_STYLES.to_string(),
+            concat!(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+                r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
+                r#"<fonts count="1"><font/></fonts>"#,
+                r#"<fills count="2"><fill><patternFill patternType="none"/></fill>"#,
+                r#"<fill><patternFill patternType="gray125"/></fill></fills>"#,
+                r#"<borders count="1"><border/></borders>"#,
+                r#"<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>"#,
+                r#"<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>"#,
+                r#"<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>"#,
+                r#"</styleSheet>"#
             )
             .as_bytes()
             .to_vec(),
@@ -220,7 +249,11 @@ impl Workbook {
     /// Build a snapshot from a validated OPC package without exposing it in
     /// ordinary sheet APIs.
     pub fn from_package(package: OpcPackage) -> Result<Self> {
-        let (workbook_uri, flavor, catalog, sheet_parts, shared_strings_uri) = {
+        Self::from_package_with_styles(package, None)
+    }
+
+    fn from_package_with_styles(package: OpcPackage, source: Option<&Workbook>) -> Result<Self> {
+        let (workbook_uri, flavor, catalog, sheet_parts, shared_strings_uri, styles_uri) = {
             let workbook = package.main_document_part()?;
             let flavor = Flavor::from_content_type(workbook.content_type()).ok_or_else(|| {
                 invalid(format!(
@@ -232,12 +265,14 @@ impl Workbook {
             let catalog = raw::parse_catalog(workbook.blob())?;
             let sheet_parts = validate_sheet_graph(&package, workbook, &catalog.sheets)?;
             let shared_strings_uri = validate_shared_strings(&package, workbook)?;
+            let styles_uri = validate_styles(&package, workbook)?;
             (
                 workbook.partname().clone(),
                 flavor,
                 catalog,
                 sheet_parts,
                 shared_strings_uri,
+                styles_uri,
             )
         };
 
@@ -245,6 +280,12 @@ impl Workbook {
             None
         } else {
             Some(catalog.active_sheet_index)
+        };
+        let style_lineage = match source {
+            Some(source) if same_style_table(source, &package, styles_uri.as_ref())? => {
+                Arc::clone(&source.inner.style_lineage)
+            },
+            Some(_) | None => Arc::new(StyleLineage),
         };
         let sheets = catalog
             .sheets
@@ -272,6 +313,9 @@ impl Workbook {
                 workbook_uri,
                 shared_strings_uri,
                 shared_strings: OnceLock::new(),
+                styles_uri,
+                styles: OnceLock::new(),
+                style_lineage,
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
                     DateSystem::Excel1904
@@ -375,6 +419,12 @@ impl Workbook {
         &self.inner.external_reference_ids
     }
 
+    /// Shared immutable cell formats in this workbook snapshot.
+    pub fn styles(&self) -> Result<Styles> {
+        let len = self.inner.style_count()?;
+        Ok(Styles::new(Arc::clone(&self.inner), len))
+    }
+
     /// Serialize the immutable package snapshot to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         Ok(PackageWriter::to_bytes(&self.inner.package)?)
@@ -450,6 +500,41 @@ impl Sheet {
         Ok(self.store()?.get(address))
     }
 
+    /// Exact local style state for a stored cell.
+    ///
+    /// `None` means no cell record exists. [`LocalStyle::Default`] means the
+    /// record exists without an explicit shared-style reference.
+    pub fn local_style<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<LocalStyle>> {
+        let address = at.into().resolve()?;
+        let Some(entry) = self.store()?.entry(address) else {
+            return Ok(None);
+        };
+        entry.style.map_or(Ok(Some(LocalStyle::Default)), |key| {
+            self.owner.require_style(key)?;
+            Ok(Some(LocalStyle::Shared(Style::from_raw(
+                Arc::clone(&self.owner),
+                key,
+            ))))
+        })
+    }
+
+    /// Effective shared style for a stored cell.
+    ///
+    /// Cells without a local style resolve to the base shared format. If the
+    /// workbook has no style part, an unstyled cell resolves to `None`.
+    pub fn style<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<Style>> {
+        let address = at.into().resolve()?;
+        let Some(entry) = self.store()?.entry(address) else {
+            return Ok(None);
+        };
+        let key = entry.style.unwrap_or(0);
+        if self.owner.style_count()? == 0 {
+            return Ok(None);
+        }
+        self.owner.require_style(key)?;
+        Ok(Some(Style::from_raw(Arc::clone(&self.owner), key)))
+    }
+
     /// Lazily traverse only stored cells inside a checked half-open range.
     pub fn cells(&self, range: Rect) -> Result<Cells<'_>> {
         Ok(self.store()?.cells(range))
@@ -473,6 +558,7 @@ impl Sheet {
 
         let part = self.owner.package.get_part(&self.data.part_uri)?;
         let parsed = raw::worksheet::parse(part.blob(), || self.owner.shared_strings())?;
+        self.owner.validate_styles(&parsed)?;
         let _ = self.data.cells.set(parsed);
         self.data
             .cells
@@ -497,6 +583,81 @@ impl Inner {
             .get()
             .map(|strings| Some(strings.as_ref()))
             .ok_or_else(|| invalid("shared-string cache initialization did not publish a value"))
+    }
+
+    fn style_catalog(&self) -> Result<Option<&raw::styles::Catalog>> {
+        let Some(uri) = self.styles_uri.as_ref() else {
+            return Ok(None);
+        };
+        if let Some(styles) = self.styles.get() {
+            return Ok(Some(styles));
+        }
+
+        let part = self.package.get_part(uri)?;
+        let parsed = raw::styles::parse(part.blob())?;
+        let _ = self.styles.set(parsed);
+        self.styles
+            .get()
+            .map(Some)
+            .ok_or_else(|| invalid("style cache initialization did not publish a value"))
+    }
+
+    pub(crate) fn style_count(&self) -> Result<u32> {
+        Ok(self.style_catalog()?.map_or(0, raw::styles::Catalog::len))
+    }
+
+    fn require_style(&self, key: u32) -> Result<()> {
+        let len = self.style_count()?;
+        if key >= len {
+            return Err(invalid(format!(
+                "worksheet cell references shared style {key}, but the workbook contains {len} cell formats"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_styles(&self, store: &Store) -> Result<()> {
+        if !store.entries().iter().any(|entry| entry.style.is_some()) {
+            return Ok(());
+        }
+        let len = self.style_count()?;
+        if let Some(entry) = store
+            .entries()
+            .iter()
+            .find(|entry| entry.style.is_some_and(|key| key >= len))
+        {
+            return Err(invalid(format!(
+                "worksheet cell {} references shared style {}, but the workbook contains {len} cell formats",
+                entry.address,
+                entry.style.unwrap_or_default()
+            )));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn style_fan_out(self: &Arc<Self>, key: u32) -> Result<usize> {
+        self.require_style(key)?;
+        let mut count = 0usize;
+        for data in &self.sheets {
+            if data.kind != SheetKind::Worksheet {
+                continue;
+            }
+            let sheet = Sheet {
+                owner: Arc::clone(self),
+                data: Arc::clone(data),
+            };
+            count = count
+                .checked_add(
+                    sheet
+                        .store()?
+                        .entries()
+                        .iter()
+                        .filter(|entry| entry.style.unwrap_or(0) == key)
+                        .count(),
+                )
+                .ok_or_else(|| invalid("shared style fan-out count overflowed usize"))?;
+        }
+        Ok(count)
     }
 }
 
@@ -580,6 +741,55 @@ fn validate_shared_strings(package: &OpcPackage, workbook: &dyn Part) -> Result<
     Ok(found)
 }
 
+fn validate_styles(package: &OpcPackage, workbook: &dyn Part) -> Result<Option<PackURI>> {
+    let mut found = None;
+    for relationship in workbook
+        .rels()
+        .iter()
+        .filter(|relationship| matches!(relationship.reltype(), rt::STYLES | rt::STRICT_STYLES))
+    {
+        if found.is_some() {
+            return Err(invalid("workbook has multiple styles relationships"));
+        }
+        if relationship.is_external() {
+            return Err(invalid("styles relationship cannot be external"));
+        }
+        let uri = relationship.target_partname()?;
+        let part = package.get_part(&uri)?;
+        if part.content_type() != ct::SML_STYLES {
+            return Err(invalid(format!(
+                "styles part has content type '{}', expected '{}'",
+                part.content_type(),
+                ct::SML_STYLES
+            )));
+        }
+        found = Some(uri);
+    }
+    Ok(found)
+}
+
+fn same_style_table(
+    source: &Workbook,
+    package: &OpcPackage,
+    styles_uri: Option<&PackURI>,
+) -> Result<bool> {
+    let (Some(source_uri), Some(styles_uri)) = (source.inner.styles_uri.as_ref(), styles_uri)
+    else {
+        return Ok(source.inner.styles_uri.is_none() && styles_uri.is_none());
+    };
+    if source_uri != styles_uri {
+        return Ok(false);
+    }
+    let before = source.inner.package.get_part(source_uri)?;
+    let after = package.get_part(styles_uri)?;
+    if before.content_type() != after.content_type() {
+        return Ok(false);
+    }
+    let before_blob = before.blob_arc();
+    let after_blob = after.blob_arc();
+    Ok(Arc::ptr_eq(&before_blob, &after_blob) || before_blob.as_slice() == after_blob.as_slice())
+}
+
 fn require_content_type(sheet: &raw::Sheet, actual: &str, expected: &str) -> Result<()> {
     if actual != expected {
         return Err(invalid(format!(
@@ -659,18 +869,30 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Workbook>();
         assert_send_sync::<Sheet>();
+        assert_send_sync::<Style>();
+        assert_send_sync::<Styles>();
+        assert_send_sync::<crate::StyleKey>();
+        assert_send_sync::<LocalStyle>();
 
         let workbook = Workbook::new().expect("valid baseline");
         let clone = workbook.clone();
         let sheet = workbook.active_sheet().expect("active sheet");
+        let style = workbook
+            .styles()
+            .expect("styles")
+            .base()
+            .expect("base style");
         drop(workbook);
 
         assert_eq!(sheet.name(), "Sheet1");
+        assert_eq!(style.fan_out().expect("fan-out"), 0);
         assert_eq!(
             clone.active_sheet().map(|sheet| sheet.name().to_owned()),
             Some("Sheet1".into())
         );
         assert!(std::mem::size_of::<Workbook>() <= 2 * std::mem::size_of::<usize>());
+        assert!(std::mem::size_of::<Style>() <= 2 * std::mem::size_of::<usize>());
+        assert!(std::mem::size_of::<Styles>() <= 2 * std::mem::size_of::<usize>());
     }
 
     #[test]
@@ -749,6 +971,85 @@ mod tests {
         assert!(matches!(
             Workbook::from_package(package),
             Err(Error::Invalid(message)) if message.contains("referenced by both 'One' and 'Two'")
+        ));
+    }
+
+    #[test]
+    fn styles_graph_table_and_cell_references_are_checked() {
+        let baseline = Workbook::new().expect("baseline");
+
+        let mut duplicate = baseline.inner.package.clone();
+        duplicate
+            .get_part_mut(&baseline.inner.workbook_uri)
+            .expect("workbook part")
+            .rels_mut()
+            .try_add_relationship(
+                rt::STYLES.into(),
+                "styles.xml".into(),
+                "rId3".into(),
+                TargetMode::Internal,
+            )
+            .expect("second styles relationship");
+        assert!(matches!(
+            Workbook::from_package(duplicate),
+            Err(Error::Invalid(message)) if message.contains("multiple styles relationships")
+        ));
+
+        let mut external = baseline.inner.package.clone();
+        let rels = external
+            .get_part_mut(&baseline.inner.workbook_uri)
+            .expect("workbook part")
+            .rels_mut();
+        rels.remove("rId2").expect("styles relationship");
+        rels.try_add_relationship(
+            rt::STYLES.into(),
+            "https://example.invalid/styles.xml".into(),
+            "rId2".into(),
+            TargetMode::External,
+        )
+        .expect("external styles relationship");
+        assert!(matches!(
+            Workbook::from_package(external),
+            Err(Error::Invalid(message)) if message.contains("cannot be external")
+        ));
+
+        let styles_uri = PackURI::new("/xl/styles.xml").expect("styles URI");
+        let mut wrong_type = baseline.inner.package.clone();
+        wrong_type
+            .get_part_mut(&styles_uri)
+            .expect("styles part")
+            .set_content_type("application/xml".into())
+            .expect("replace content type");
+        assert!(matches!(
+            Workbook::from_package(wrong_type),
+            Err(Error::Invalid(message)) if message.contains("styles part has content type")
+        ));
+
+        let mut malformed = baseline.inner.package.clone();
+        malformed
+            .get_part_mut(&styles_uri)
+            .expect("styles part")
+            .set_blob(
+                br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cellXfs count="2"><xf/></cellXfs></styleSheet>"#.to_vec(),
+            );
+        let malformed = Workbook::from_package(malformed).expect("graph remains lazy");
+        assert!(matches!(malformed.styles(), Err(Error::Invalid(_))));
+
+        let mut dangling = baseline.inner.package.clone();
+        dangling
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+            .expect("sheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"/></row></sheetData></worksheet>"#.to_vec(),
+            );
+        let dangling = Workbook::from_package(dangling).expect("lazy worksheet");
+        assert!(matches!(
+            dangling
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .cell("A1"),
+            Err(Error::Invalid(message)) if message.contains("A1 references shared style 1")
         ));
     }
 
@@ -918,6 +1219,7 @@ mod tests {
         let workbook_uri = PackURI::new("/xl/workbook.xml").expect("valid URI");
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").expect("valid URI");
         let strings_uri = PackURI::new("/xl/sharedStrings.xml").expect("valid URI");
+        let styles_uri = PackURI::new("/xl/styles.xml").expect("valid URI");
         let mut workbook = BlobPart::new(
             workbook_uri,
             ct::SML_SHEET_MAIN.into(),
@@ -941,6 +1243,15 @@ mod tests {
                 TargetMode::Internal,
             )
             .expect("shared-string relationship");
+        workbook
+            .rels_mut()
+            .try_add_relationship(
+                rt::STYLES.into(),
+                "styles.xml".into(),
+                "rId3".into(),
+                TargetMode::Internal,
+            )
+            .expect("styles relationship");
         package.add_part(Box::new(workbook));
         package.add_part(Box::new(BlobPart::new(
             worksheet_uri,
@@ -951,6 +1262,11 @@ mod tests {
             strings_uri,
             ct::SML_SHARED_STRINGS.into(),
             br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><r><t>Office &amp; </t></r><r><t>Litchi</t></r></si></sst>"#.to_vec(),
+        )));
+        package.add_part(Box::new(BlobPart::new(
+            styles_uri,
+            ct::SML_STYLES.into(),
+            br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cellXfs count="3"><xf/><xf numFmtId="1"/><xf numFmtId="2"/></cellXfs></styleSheet>"#.to_vec(),
         )));
         package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
         package

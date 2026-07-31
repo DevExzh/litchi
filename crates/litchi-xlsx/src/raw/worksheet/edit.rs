@@ -25,13 +25,148 @@ const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006
 const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Action {
+pub(crate) enum Payload {
     Set(Content),
     /// Ensure an explicit empty cell record exists.
     Clear,
-    /// Clear only when the base snapshot already contains the cell.
+    /// Clear only when another effect or the base snapshot retains the cell.
     ClearIfPresent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StyleEffect {
+    Set(u32),
+    Reset,
+}
+
+/// Orthogonal effects on one cell record.
+///
+/// `Remove` owns the whole record. An `Update` may independently change its
+/// payload and local style, allowing proven-disjoint effects to be joined.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Action {
+    Update {
+        payload: Option<Payload>,
+        style: Option<StyleEffect>,
+    },
     Remove,
+}
+
+impl Action {
+    pub(crate) fn set(content: Content) -> Self {
+        Self::Update {
+            payload: Some(Payload::Set(content)),
+            style: None,
+        }
+    }
+
+    pub(crate) const fn clear(create: bool) -> Self {
+        Self::Update {
+            payload: Some(if create {
+                Payload::Clear
+            } else {
+                Payload::ClearIfPresent
+            }),
+            style: None,
+        }
+    }
+
+    pub(crate) const fn style(key: u32) -> Self {
+        Self::Update {
+            payload: None,
+            style: Some(StyleEffect::Set(key)),
+        }
+    }
+
+    pub(crate) const fn reset_style() -> Self {
+        Self::Update {
+            payload: None,
+            style: Some(StyleEffect::Reset),
+        }
+    }
+
+    pub(crate) const fn payload(&self) -> Option<&Payload> {
+        match self {
+            Self::Update { payload, .. } => payload.as_ref(),
+            Self::Remove => None,
+        }
+    }
+
+    pub(crate) const fn creates_missing(&self) -> bool {
+        match self {
+            Self::Update { payload, style } => {
+                matches!(payload, Some(Payload::Set(_) | Payload::Clear))
+                    || matches!(style, Some(StyleEffect::Set(_)))
+            },
+            Self::Remove => false,
+        }
+    }
+
+    pub(crate) const fn overlaps(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Remove, _) | (_, Self::Remove) => true,
+            (
+                Self::Update {
+                    payload: left_payload,
+                    style: left_style,
+                },
+                Self::Update {
+                    payload: right_payload,
+                    style: right_style,
+                },
+            ) => {
+                (left_payload.is_some() && right_payload.is_some())
+                    || (left_style.is_some() && right_style.is_some())
+            },
+        }
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        if let (
+            Self::Update { payload, style },
+            Self::Update {
+                payload: other_payload,
+                style: other_style,
+            },
+        ) = (self, other)
+        {
+            // `Edit::join` proves these facets disjoint before moving either
+            // map. The conditional assignments keep this primitive total and
+            // panic-free if an internal caller ever violates that contract.
+            if payload.is_none() {
+                *payload = other_payload;
+            }
+            if style.is_none() {
+                *style = other_style;
+            }
+        }
+    }
+
+    pub(crate) fn set_payload(&mut self, effect: Payload) {
+        *self = match std::mem::replace(self, Self::Remove) {
+            Self::Update { style, .. } => Self::Update {
+                payload: Some(effect),
+                style,
+            },
+            Self::Remove => Self::Update {
+                payload: Some(effect),
+                style: None,
+            },
+        };
+    }
+
+    pub(crate) fn set_style(&mut self, effect: StyleEffect) {
+        *self = match std::mem::replace(self, Self::Remove) {
+            Self::Update { payload, .. } => Self::Update {
+                payload,
+                style: Some(effect),
+            },
+            Self::Remove => Self::Update {
+                payload: None,
+                style: Some(effect),
+            },
+        };
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -311,7 +446,7 @@ fn validate_actions(
                 reason,
             });
         }
-        if let Action::Set(content) = action {
+        if let Some(Payload::Set(content)) = action.payload() {
             content.validate_for_write()?;
         }
     }
@@ -900,10 +1035,7 @@ fn write_row(
             .cells
             .binary_search_by_key(address, |cell| cell.address)
             .is_ok();
-        matches!(
-            (exists, action),
-            (false, Action::Set(_) | Action::Clear) | (true, Action::Remove)
-        )
+        (!exists && action.creates_missing()) || (exists && matches!(action, Action::Remove))
     });
 
     if row.empty {
@@ -947,8 +1079,7 @@ fn write_row(
                 .next()
                 .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
             match action {
-                Action::Set(content) => write_cell(output, source, cell, Some(content))?,
-                Action::Clear | Action::ClearIfPresent => write_cell(output, source, cell, None)?,
+                Action::Update { .. } => write_cell(output, source, cell, action)?,
                 Action::Remove => {},
             }
         } else {
@@ -983,52 +1114,51 @@ fn write_new_row(
     Ok(())
 }
 
-fn write_cell(
-    output: &mut Vec<u8>,
-    source: &[u8],
-    cell: &CellSlot,
-    content: Option<&Content>,
-) -> Result<()> {
+fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Action) -> Result<()> {
+    let Action::Update { payload, style } = action else {
+        return Err(invalid("cannot rewrite a removed cell"));
+    };
+    let content = match payload.as_ref() {
+        Some(Payload::Set(content)) => Some(content),
+        Some(Payload::Clear | Payload::ClearIfPresent) | None => None,
+    };
     let cell_type = content.and_then(content_type);
+    let mut removed = vec!["r"];
+    if payload.is_some() {
+        removed.push("t");
+    }
+    if style.is_some() {
+        removed.push("s");
+    }
     let mut appended = vec![("r", cell.address.a1())];
     if let Some(cell_type) = cell_type {
         appended.push(("t", cell_type.to_owned()));
     }
-    write_tag(output, &cell.tag, false, &["r", "t"], &appended);
+    if let Some(StyleEffect::Set(key)) = style {
+        appended.push(("s", key.to_string()));
+    }
+    let remains_empty = cell.empty && payload.is_none();
+    write_tag(output, &cell.tag, remains_empty, &removed, &appended);
+    if remains_empty {
+        return Ok(());
+    }
     if let Some(content) = content {
         write_content(output, &cell.tag.name, content)?;
     }
     if !cell.empty {
-        copy_without(
-            output,
-            source,
-            cell.tag_end,
-            cell.close_start,
-            &cell.primary,
-        );
+        if payload.is_some() {
+            copy_without(
+                output,
+                source,
+                cell.tag_end,
+                cell.close_start,
+                &cell.primary,
+            );
+        } else {
+            output.extend_from_slice(&source[cell.tag_end..cell.close_start]);
+        }
     }
     write_close(output, &cell.tag.name);
-    Ok(())
-}
-
-fn write_new_cell(
-    output: &mut Vec<u8>,
-    row_name: &str,
-    address: Address,
-    content: &Content,
-) -> Result<()> {
-    let name = sibling_name(row_name, "c");
-    let tag = Tag {
-        name: name.clone().into_boxed_str(),
-        attributes: Box::new([]),
-    };
-    let mut appended = vec![("r", address.a1())];
-    if let Some(cell_type) = content_type(content) {
-        appended.push(("t", cell_type.to_owned()));
-    }
-    write_tag(output, &tag, false, &[], &appended);
-    write_content(output, &name, content)?;
-    write_close(output, &name);
     Ok(())
 }
 
@@ -1038,19 +1168,35 @@ fn write_new_action(
     address: Address,
     action: &Action,
 ) -> Result<()> {
-    match action {
-        Action::Set(content) => write_new_cell(output, row_name, address, content),
-        Action::Clear => {
-            let name = sibling_name(row_name, "c");
-            let tag = Tag {
-                name: name.into_boxed_str(),
-                attributes: Box::new([]),
-            };
-            write_tag(output, &tag, true, &[], &[("r", address.a1())]);
-            Ok(())
-        },
-        Action::ClearIfPresent | Action::Remove => Ok(()),
+    let Action::Update { payload, style } = action else {
+        return Ok(());
+    };
+    if !action.creates_missing() {
+        return Ok(());
     }
+    let content = match payload.as_ref() {
+        Some(Payload::Set(content)) => Some(content),
+        Some(Payload::Clear | Payload::ClearIfPresent) | None => None,
+    };
+    let name = sibling_name(row_name, "c");
+    let tag = Tag {
+        name: name.clone().into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    let mut appended = vec![("r", address.a1())];
+    if let Some(cell_type) = content.and_then(content_type) {
+        appended.push(("t", cell_type.to_owned()));
+    }
+    if let Some(StyleEffect::Set(key)) = style {
+        appended.push(("s", key.to_string()));
+    }
+    let empty = content.is_none();
+    write_tag(output, &tag, empty, &[], &appended);
+    if let Some(content) = content {
+        write_content(output, &name, content)?;
+        write_close(output, &name);
+    }
+    Ok(())
 }
 
 fn content_type(content: &Content) -> Option<&'static str> {
@@ -1268,12 +1414,12 @@ mod tests {
         let mut actions = BTreeMap::new();
         actions.insert(
             Address::from_a1("A1").unwrap(),
-            Action::Set("new & text".into()),
+            Action::set("new & text".into()),
         );
-        actions.insert(Address::from_a1("B1").unwrap(), Action::Set(42_i32.into()));
+        actions.insert(Address::from_a1("B1").unwrap(), Action::set(42_i32.into()));
         actions.insert(Address::from_a1("C1").unwrap(), Action::Remove);
-        actions.insert(Address::from_a1("D5").unwrap(), Action::Clear);
-        actions.insert(Address::from_a1("A3").unwrap(), Action::Set(true.into()));
+        actions.insert(Address::from_a1("D5").unwrap(), Action::clear(true));
+        actions.insert(Address::from_a1("A3").unwrap(), Action::set(true.into()));
 
         let edited = rewrite(xml.as_bytes(), "Data", &actions).unwrap();
         let edited = std::str::from_utf8(&edited).unwrap();
@@ -1297,6 +1443,42 @@ mod tests {
         assert!(store.get(Address::from_a1("C1").unwrap()).is_none());
         assert!(matches!(
             store.get(Address::from_a1("D5").unwrap()),
+            Some(Cell::Empty)
+        ));
+    }
+
+    #[test]
+    fn style_effects_preserve_payload_and_compose_with_value_effects() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:sheetData><x:row r="1"><x:c r="A1" s="1" z:keep="yes"><x:v>5</x:v></x:c><x:c r="B1" s="1"/></x:row></x:sheetData></x:worksheet>"#
+        );
+        let mut combined = Action::set(7_i32.into());
+        combined.set_style(StyleEffect::Set(3));
+        let actions = BTreeMap::from([
+            (Address::from_a1("A1").unwrap(), Action::style(2)),
+            (Address::from_a1("B1").unwrap(), Action::reset_style()),
+            (Address::from_a1("C1").unwrap(), Action::style(3)),
+            (Address::from_a1("D1").unwrap(), combined),
+        ]);
+
+        let edited = rewrite(xml.as_bytes(), "Data", &actions).unwrap();
+        let edited = std::str::from_utf8(&edited).unwrap();
+        assert!(edited.contains(r#"z:keep="yes" r="A1" s="2"><x:v>5</x:v>"#));
+        assert!(edited.contains(r#"<x:c r="B1"/>"#));
+        assert!(edited.contains(r#"<x:c r="C1" s="3"/>"#));
+        assert!(edited.contains(r#"<x:c r="D1" s="3"><x:v>7</x:v></x:c>"#));
+
+        let store = worksheet::parse(edited.as_bytes(), || Ok(None)).unwrap();
+        assert_eq!(
+            store.entry(Address::from_a1("A1").unwrap()).unwrap().style,
+            Some(2)
+        );
+        assert_eq!(
+            store.entry(Address::from_a1("B1").unwrap()).unwrap().style,
+            None
+        );
+        assert!(matches!(
+            store.get(Address::from_a1("C1").unwrap()),
             Some(Cell::Empty)
         ));
     }
@@ -1342,7 +1524,7 @@ mod tests {
         ];
         for (xml, address, expected) in cases {
             let address = Address::from_a1(address).unwrap();
-            let actions = BTreeMap::from([(address, Action::Set(1_i32.into()))]);
+            let actions = BTreeMap::from([(address, Action::set(1_i32.into()))]);
             assert!(matches!(
                 rewrite(xml.as_bytes(), "Data", &actions),
                 Err(Error::EditBlocked { reason, .. }) if reason == expected

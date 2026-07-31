@@ -8,22 +8,78 @@ use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use litchi_sheet::{At, Cell as Address};
 
 use super::{Sheet, SheetKind, SheetSelector, Workbook};
-use crate::cell::{Cell, Content};
+use crate::cell::{Cell, Content, Stored};
 use crate::error::{EditBlock, Error, Result, invalid};
 use crate::raw;
-use crate::raw::worksheet::edit::Action;
+use crate::raw::worksheet::edit::{Action, Payload, StyleEffect};
+use crate::{Style, StyleKey, StyleState};
 
 /// Cell state recorded before or after one semantic change.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum State {
     Missing,
-    Cell(Cell),
+    Cell { content: Cell, style: StyleState },
 }
 
 impl State {
-    fn read(value: Option<&Cell>) -> Self {
-        value.map_or(Self::Missing, |cell| Self::Cell(cell.clone()))
+    fn read(value: Option<&Stored>, workbook: &Workbook) -> Self {
+        value.map_or(Self::Missing, |stored| Self::Cell {
+            content: stored.cell.clone(),
+            style: stored.style.map_or(StyleState::Default, |key| {
+                StyleState::Shared(StyleKey::new(
+                    key,
+                    Arc::clone(&workbook.inner.style_lineage),
+                ))
+            }),
+        })
+    }
+
+    fn after(before: Option<&Stored>, action: &Action, workbook: &Workbook) -> Self {
+        let Action::Update { payload, style } = action else {
+            return Self::Missing;
+        };
+        let exists = before.is_some() || action.creates_missing();
+        if !exists {
+            return Self::Missing;
+        }
+        let content = match payload {
+            Some(Payload::Set(content)) => content.as_cell(),
+            Some(Payload::Clear | Payload::ClearIfPresent) => Cell::Empty,
+            None => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
+        };
+        let style = match style {
+            Some(StyleEffect::Set(key)) => StyleState::Shared(StyleKey::new(
+                *key,
+                Arc::clone(&workbook.inner.style_lineage),
+            )),
+            Some(StyleEffect::Reset) => StyleState::Default,
+            None => before
+                .and_then(|stored| stored.style)
+                .map_or(StyleState::Default, |key| {
+                    StyleState::Shared(StyleKey::new(
+                        key,
+                        Arc::clone(&workbook.inner.style_lineage),
+                    ))
+                }),
+        };
+        Self::Cell { content, style }
+    }
+
+    fn rebind_style(&mut self, workbook: &Workbook) {
+        if let Self::Cell { style, .. } = self {
+            style.rebind(&workbook.inner.style_lineage);
+        }
+    }
+
+    const fn uses_shared_style(&self) -> bool {
+        matches!(
+            self,
+            Self::Cell {
+                style: StyleState::Shared(_),
+                ..
+            }
+        )
     }
 }
 
@@ -194,6 +250,30 @@ struct PartChange {
     after: Arc<Vec<u8>>,
 }
 
+#[derive(Debug, Clone)]
+struct StyleGuard {
+    uri: PackURI,
+    content: Arc<Vec<u8>>,
+}
+
+impl StyleGuard {
+    fn validate(&self, workbook: &Workbook) -> Result<()> {
+        let matches = workbook.inner.styles_uri.as_ref() == Some(&self.uri)
+            && workbook
+                .inner
+                .package
+                .get_part(&self.uri)
+                .is_ok_and(|part| part.blob() == self.content.as_slice());
+        if matches {
+            Ok(())
+        } else {
+            Err(Error::PatchConflict {
+                part: self.uri.to_string(),
+            })
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GraphAction {
     Add,
@@ -231,6 +311,7 @@ pub struct Patch {
     changes: Box<[Change]>,
     parts: Box<[PartChange]>,
     graph: Box<[GraphChange]>,
+    style_guard: Option<StyleGuard>,
 }
 
 impl Patch {
@@ -290,11 +371,15 @@ impl Patch {
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
+            style_guard: self.style_guard.clone(),
         }
     }
 
     pub(super) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
         ensure_unsigned(workbook)?;
+        if let Some(guard) = &self.style_guard {
+            guard.validate(workbook)?;
+        }
         if self.parts.is_empty() && self.graph.is_empty() {
             return Ok(Commit {
                 workbook: workbook.clone(),
@@ -321,11 +406,13 @@ impl Patch {
         for change in &self.graph {
             change.apply(&mut package)?;
         }
-        let workbook = Workbook::from_package(package)?;
-        Ok(Commit {
-            workbook,
-            patch: self.clone(),
-        })
+        let workbook = Workbook::from_package_with_styles(package, Some(workbook))?;
+        let mut patch = self.clone();
+        for change in &mut patch.changes {
+            change.before.rebind_style(&workbook);
+            change.after.rebind_style(&workbook);
+        }
+        Ok(Commit { workbook, patch })
     }
 }
 
@@ -490,13 +577,23 @@ impl Edit {
             });
         }
 
-        for (position, mut actions) in other.sheets {
+        for (position, actions) in other.sheets {
             match self.sheets.entry(position) {
                 Entry::Vacant(entry) => {
                     entry.insert(actions);
                 },
                 Entry::Occupied(entry) => {
-                    entry.into_mut().append(&mut actions);
+                    let accepted = entry.into_mut();
+                    for (address, action) in actions {
+                        match accepted.entry(address) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(action);
+                            },
+                            Entry::Occupied(mut entry) => {
+                                entry.get_mut().merge(action);
+                            },
+                        }
+                    }
                 },
             }
         }
@@ -512,53 +609,46 @@ impl Edit {
                 patch: Patch::default(),
             });
         }
+        let Self { base, sheets } = self;
         let mut changes = Vec::new();
         let mut parts = Vec::new();
-        let graph = calculation_chain_removal(&self.base)?;
-        for (position, requested) in &self.sheets {
-            let data = self
-                .base
-                .inner
-                .sheets
-                .get(*position)
-                .cloned()
-                .ok_or_else(|| invalid(format!("edited sheet position {position} disappeared")))?;
+        let graph = calculation_chain_removal(&base)?;
+        for (position, requested) in sheets {
+            let data =
+                base.inner.sheets.get(position).cloned().ok_or_else(|| {
+                    invalid(format!("edited sheet position {position} disappeared"))
+                })?;
             if data.kind != SheetKind::Worksheet {
                 return Err(Error::NotWorksheet {
                     sheet: data.name.clone(),
                 });
             }
             let sheet = Sheet {
-                owner: Arc::clone(&self.base.inner),
+                owner: Arc::clone(&base.inner),
                 data: Arc::clone(&data),
             };
             let store = sheet.store()?;
             let mut effective = BTreeMap::new();
             for (address, action) in requested {
-                let before = store.get(*address);
-                if before.is_some_and(|cell| matches!(cell, Cell::Unknown(_)))
-                    && !matches!(action, Action::Remove)
+                let before = store.entry(address);
+                if before.is_some_and(|stored| matches!(stored.cell, Cell::Unknown(_)))
+                    && action.payload().is_some()
                 {
                     return Err(Error::EditBlocked {
                         sheet: data.name.clone(),
-                        address: *address,
+                        address,
                         reason: EditBlock::UnknownCell,
                     });
                 }
-                let before_state = State::read(before);
-                let after_state = match action {
-                    Action::Set(content) => State::Cell(content.as_cell()),
-                    Action::Clear => State::Cell(Cell::Empty),
-                    Action::ClearIfPresent if before.is_some() => State::Cell(Cell::Empty),
-                    Action::ClearIfPresent | Action::Remove => State::Missing,
-                };
+                let before_state = State::read(before, &base);
+                let after_state = State::after(before, &action, &base);
                 if before_state == after_state {
                     continue;
                 }
-                effective.insert(*address, action.clone());
+                effective.insert(address, action);
                 changes.push(Change {
                     sheet: data.name.clone().into_boxed_str(),
-                    address: *address,
+                    address,
                     before: before_state,
                     after: after_state,
                 });
@@ -567,12 +657,13 @@ impl Edit {
                 continue;
             }
 
-            let part = self.base.inner.package.get_part(&data.part_uri)?;
+            let part = base.inner.package.get_part(&data.part_uri)?;
             let before = part.blob_arc();
             let after = raw::worksheet::edit::rewrite(&before, &data.name, &effective)?;
-            let parsed = raw::worksheet::parse(&after, || self.base.inner.shared_strings())?;
+            let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
+            base.inner.validate_styles(&parsed)?;
             for change in changes.iter().rev().take(effective.len()) {
-                let actual = State::read(parsed.get(change.address));
+                let actual = State::read(parsed.entry(change.address), &base);
                 if actual != change.after {
                     return Err(invalid(format!(
                         "worksheet edit verification failed at {}!{}",
@@ -589,25 +680,35 @@ impl Edit {
 
         if parts.is_empty() {
             return Ok(Commit {
-                workbook: self.base,
+                workbook: base,
                 patch: Patch::default(),
             });
         }
-        let workbook_part = self
-            .base
-            .inner
-            .package
-            .get_part(&self.base.inner.workbook_uri)?;
+        let style_guard = changes
+            .iter()
+            .any(|change| change.before.uses_shared_style() || change.after.uses_shared_style())
+            .then(|| {
+                let uri = base
+                    .inner
+                    .styles_uri
+                    .as_ref()
+                    .ok_or_else(|| invalid("shared style state has no styles part"))?
+                    .clone();
+                let content = base.inner.package.get_part(&uri)?.blob_arc();
+                Ok::<_, Error>(StyleGuard { uri, content })
+            })
+            .transpose()?;
+        let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
         let before = workbook_part.blob_arc();
         let after = raw::recalc::invalidate(&before)?;
         if after.as_slice() != before.as_slice() {
             parts.push(PartChange {
-                uri: self.base.inner.workbook_uri.clone(),
+                uri: base.inner.workbook_uri.clone(),
                 before,
                 after: Arc::new(after),
             });
         }
-        let mut package = self.base.inner.package.clone();
+        let mut package = base.inner.package.clone();
         for part in &parts {
             package
                 .get_part_mut(&part.uri)?
@@ -617,13 +718,14 @@ impl Edit {
             change.validate(&package)?;
             change.apply(&mut package)?;
         }
-        let workbook = Workbook::from_package(package)?;
+        let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
         Ok(Commit {
             workbook,
             patch: Patch {
                 changes: changes.into_boxed_slice(),
                 parts: parts.into_boxed_slice(),
                 graph: graph.into_boxed_slice(),
+                style_guard,
             },
         })
     }
@@ -639,9 +741,11 @@ impl Edit {
                 continue;
             };
             let mut addresses = Vec::new();
-            let mut left = left.keys().peekable();
-            let mut right = right.keys().peekable();
-            while let (Some(left_address), Some(right_address)) = (left.peek(), right.peek()) {
+            let mut left = left.iter().peekable();
+            let mut right = right.iter().peekable();
+            while let (Some((left_address, left_action)), Some((right_address, right_action))) =
+                (left.peek(), right.peek())
+            {
                 match left_address.cmp(right_address) {
                     std::cmp::Ordering::Less => {
                         left.next();
@@ -650,7 +754,9 @@ impl Edit {
                         right.next();
                     },
                     std::cmp::Ordering::Equal => {
-                        addresses.push(**left_address);
+                        if left_action.overlaps(right_action) {
+                            addresses.push(**left_address);
+                        }
                         left.next();
                         right.next();
                     },
@@ -694,9 +800,12 @@ impl SheetEdit<'_> {
         let address = at.into().resolve()?;
         let content = content.into();
         content.validate_for_write()?;
-        self.edit
-            .actions(self.position)
-            .insert(address, Action::Set(content));
+        match self.edit.actions(self.position).entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::set(content));
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Set(content)),
+        }
         Ok(self)
     }
 
@@ -705,12 +814,55 @@ impl SheetEdit<'_> {
     pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         let actions = self.edit.actions(self.position);
-        let action = if matches!(actions.get(&address), Some(Action::Set(_) | Action::Clear)) {
-            Action::Clear
-        } else {
-            Action::ClearIfPresent
-        };
-        actions.insert(address, action);
+        let create = actions.get(&address).is_some_and(|action| {
+            matches!(action.payload(), Some(Payload::Set(_) | Payload::Clear))
+        });
+        match actions.entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::clear(create));
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_payload(if create {
+                Payload::Clear
+            } else {
+                Payload::ClearIfPresent
+            }),
+        }
+        Ok(self)
+    }
+
+    /// Apply an existing shared style without copying its formatting payload.
+    ///
+    /// The handle must belong to this edit's shared-style table lineage.
+    /// Styling a missing cell creates an explicit empty cell record.
+    pub fn style<'a>(&mut self, at: impl Into<At<'a>>, style: &Style) -> Result<&mut Self> {
+        if !Arc::ptr_eq(
+            &self.edit.base.inner.style_lineage,
+            &style.owner.style_lineage,
+        ) {
+            return Err(Error::ForeignStyle);
+        }
+        let address = at.into().resolve()?;
+        let effect = StyleEffect::Set(style.raw());
+        match self.edit.actions(self.position).entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::style(style.raw()));
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_style(effect),
+        }
+        Ok(self)
+    }
+
+    /// Remove an explicit local style reference, retaining the cell payload.
+    ///
+    /// A missing cell remains missing and resolves as a no-op at commit.
+    pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        match self.edit.actions(self.position).entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::reset_style());
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_style(StyleEffect::Reset),
+        }
         Ok(self)
     }
 
@@ -1081,7 +1233,7 @@ mod tests {
             .try_add_relationship(
                 litchi_opc::constants::relationship_type::CALC_CHAIN.to_owned(),
                 "calcChain.xml".to_owned(),
-                "rId2".to_owned(),
+                "rId3".to_owned(),
                 TargetMode::Internal,
             )
             .expect("chain relationship");
@@ -1149,6 +1301,277 @@ mod tests {
     }
 
     #[test]
+    fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
+        let source = styled_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let styles = source.styles().expect("styles");
+        assert_eq!(styles.len(), 2);
+        let base = styles.base().expect("base style");
+        let accent = styles.get(1).expect("accent style");
+        assert_eq!(base.fan_out().expect("base fan-out"), 1);
+        assert_eq!(accent.fan_out().expect("accent fan-out"), 1);
+
+        let sheet = source.sheet("Sheet1").expect("lookup").expect("sheet");
+        assert!(matches!(
+            sheet.local_style("B1").expect("local style"),
+            Some(crate::LocalStyle::Default)
+        ));
+        let Some(crate::LocalStyle::Shared(local)) = sheet.local_style("A1").expect("local style")
+        else {
+            panic!("A1 must have an explicit shared style")
+        };
+        assert!(local.same(&accent));
+        assert!(
+            sheet
+                .style("B1")
+                .expect("resolved style")
+                .is_some_and(|style| style.same(&base))
+        );
+
+        let mut edit = source.edit().expect("edit");
+        let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("sheet");
+        sheet
+            .set("C1", 42_i32)
+            .and_then(|sheet| sheet.style("C1", &accent))
+            .and_then(|sheet| sheet.style("D1", &accent))
+            .expect("style changes");
+        let committed = edit.commit().expect("commit");
+        assert_eq!(committed.patch().len(), 2);
+        assert!(matches!(
+            committed.patch().changes()[0].before(),
+            State::Missing
+        ));
+        assert!(matches!(
+            committed.patch().changes()[0].after(),
+            State::Cell {
+                content: Cell::Value(Value::Number(number)),
+                style: StyleState::Shared(_),
+            } if number.as_str() == "42"
+        ));
+
+        let book = committed.workbook();
+        let sheet = book.sheet(0usize).expect("lookup").expect("sheet");
+        assert!(matches!(sheet.cell("D1").expect("D1"), Some(Cell::Empty)));
+        let styles = book.styles().expect("styles");
+        let inherited = styles.find(&accent.key()).expect("inherited style key");
+        assert!(inherited.same(&accent));
+        assert!(!inherited.same_workbook(&accent));
+        assert_eq!(accent.fan_out().expect("source fan-out"), 1);
+        assert_eq!(inherited.fan_out().expect("descendant fan-out"), 3);
+        assert!(
+            sheet
+                .style("C1")
+                .expect("style")
+                .is_some_and(|style| style.same(&inherited))
+        );
+
+        let mut descendant = book.edit().expect("descendant edit");
+        descendant
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .style("E1", &accent)
+            .expect("reuse inherited style lineage");
+        let descendant = descendant.commit().expect("descendant commit");
+        assert!(matches!(
+            descendant
+                .workbook()
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .local_style("E1")
+                .expect("local style"),
+            Some(crate::LocalStyle::Shared(_))
+        ));
+
+        let reopened = Workbook::from_bytes(source_bytes.clone()).expect("reopened source");
+        assert!(
+            reopened
+                .styles()
+                .expect("reopened styles")
+                .find(&accent.key())
+                .is_none()
+        );
+        let replayed = reopened
+            .apply(committed.patch())
+            .expect("replay onto byte-identical source");
+        let State::Cell {
+            style: StyleState::Shared(replayed_key),
+            ..
+        } = replayed.patch().changes()[0].after()
+        else {
+            panic!("replayed change must retain its shared style")
+        };
+        assert!(
+            replayed
+                .workbook()
+                .styles()
+                .expect("replayed styles")
+                .find(replayed_key)
+                .is_some()
+        );
+        assert!(
+            book.styles()
+                .expect("original lineage")
+                .find(replayed_key)
+                .is_none()
+        );
+
+        let restored = book
+            .apply(&committed.patch().inverse())
+            .expect("inverse patch");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let foreign = Workbook::new()
+            .expect("other workbook")
+            .styles()
+            .expect("other styles")
+            .base()
+            .expect("other base style");
+        let mut edit = source.edit().expect("edit");
+        assert!(matches!(
+            edit.sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .style("A1", &foreign),
+            Err(Error::ForeignStyle)
+        ));
+
+        let mut changed_package = source.inner.package.clone();
+        let styles_uri = PackURI::new("/xl/styles.xml").expect("styles URI");
+        let changed_xml = {
+            let styles = changed_package.get_part(&styles_uri).expect("styles part");
+            std::str::from_utf8(styles.blob())
+                .expect("UTF-8 styles")
+                .replace("FFFFFF00", "FFFF0000")
+                .into_bytes()
+        };
+        changed_package
+            .get_part_mut(&styles_uri)
+            .expect("styles part")
+            .set_blob(changed_xml);
+        let changed = Workbook::from_package_with_styles(changed_package, Some(&source))
+            .expect("changed style table");
+        assert!(
+            changed
+                .styles()
+                .expect("changed styles")
+                .find(&accent.key())
+                .is_none()
+        );
+        let mut edit = changed.edit().expect("changed edit");
+        assert!(matches!(
+            edit.sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .style("A1", &accent),
+            Err(Error::ForeignStyle)
+        ));
+        assert!(matches!(
+            changed.apply(committed.patch()),
+            Err(Error::PatchConflict { part }) if part == "/xl/styles.xml"
+        ));
+    }
+
+    #[test]
+    fn payload_and_style_effects_on_one_cell_join_without_locks() {
+        let source = styled_workbook();
+        let accent = source.styles().expect("styles").get(1).expect("accent");
+        let (mut payload, style) = std::thread::scope(|scope| {
+            let payload_source = source.clone();
+            let style_source = source.clone();
+            let accent = accent.clone();
+            let payload = scope.spawn(move || {
+                let mut edit = payload_source.edit().expect("payload edit");
+                edit.sheet(0usize)
+                    .expect("lookup")
+                    .expect("sheet")
+                    .set("B1", 9_i32)
+                    .expect("payload");
+                edit
+            });
+            let style = scope.spawn(move || {
+                let mut edit = style_source.edit().expect("style edit");
+                edit.sheet("Sheet1")
+                    .expect("lookup")
+                    .expect("sheet")
+                    .style("B1", &accent)
+                    .expect("style");
+                edit
+            });
+            (
+                payload.join().expect("payload worker"),
+                style.join().expect("style worker"),
+            )
+        });
+        payload.join(style).expect("disjoint cell facets");
+        assert_eq!(payload.len(), 1);
+        let committed = payload.commit().expect("commit");
+        assert_eq!(committed.patch().len(), 1);
+        assert!(matches!(
+            committed.patch().changes()[0].after(),
+            State::Cell {
+                content: Cell::Value(Value::Number(number)),
+                style: StyleState::Shared(_),
+            } if number.as_str() == "9"
+        ));
+
+        let sheet = committed
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet");
+        assert!(matches!(
+            sheet.cell("B1").expect("B1"),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "9"
+        ));
+        assert!(matches!(
+            sheet.local_style("B1").expect("style"),
+            Some(crate::LocalStyle::Shared(_))
+        ));
+    }
+
+    #[test]
+    fn resetting_style_is_distinct_from_removal_and_missing_is_a_no_op() {
+        let source = styled_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        let mut sheet = edit.sheet(0usize).expect("lookup").expect("sheet");
+        sheet
+            .reset_style("A1")
+            .and_then(|sheet| sheet.reset_style("Z99"))
+            .expect("style resets");
+        let committed = edit.commit().expect("commit");
+        assert_eq!(committed.patch().len(), 1);
+        assert!(matches!(
+            committed.patch().changes()[0].after(),
+            State::Cell {
+                style: StyleState::Default,
+                ..
+            }
+        ));
+        let sheet = committed
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet");
+        assert!(matches!(
+            sheet.local_style("A1").expect("local style"),
+            Some(crate::LocalStyle::Default)
+        ));
+        assert!(sheet.cell("Z99").expect("missing").is_none());
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+    }
+
+    #[test]
     fn signed_packages_refuse_edits_before_mutation() {
         let baseline = Workbook::new().expect("baseline");
         let mut package = baseline.inner.package.clone();
@@ -1168,5 +1591,23 @@ mod tests {
             signed.apply(&Patch::default()),
             Err(Error::Signed)
         ));
+    }
+
+    fn styled_workbook() -> Workbook {
+        let baseline = Workbook::new().expect("baseline");
+        let mut package = baseline.inner.package.clone();
+        package
+            .get_part_mut(&PackURI::new("/xl/styles.xml").expect("styles URI"))
+            .expect("styles part")
+            .set_blob(
+                br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font/></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="2" fontId="0" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#.to_vec(),
+            );
+        package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+            .expect("worksheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#.to_vec(),
+            );
+        Workbook::from_package(package).expect("styled workbook")
     }
 }
