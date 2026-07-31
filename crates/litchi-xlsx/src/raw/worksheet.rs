@@ -5,7 +5,7 @@ pub(crate) mod edit;
 use std::collections::{HashMap, HashSet};
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
-use litchi_sheet::{COLUMNS, Cell as Address, ROWS, Rect, Row as RowIndex};
+use litchi_sheet::{COLUMNS, Cell as Address, Column as ColumnIndex, ROWS, Rect, Row as RowIndex};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -15,6 +15,7 @@ use super::formula::{Range as FormulaRange, translate};
 use super::namespace::is_spreadsheetml_name;
 use super::strings::decode_spreadsheet_text;
 use crate::cell::{Cell, Date, ErrorValue, Number, Store, Stored, Text, Unknown, Value};
+use crate::column::{self, Assignments, Flags};
 use crate::error::{Result, invalid};
 use crate::formula::{Cache, Formula, Kind};
 use crate::row;
@@ -25,11 +26,13 @@ const MAX_FORMULA_CHARACTERS: usize = 8_192;
 // SpreadsheetML escapes before decoding.
 const MAX_ENCODED_CELL_BYTES: usize = MAX_CELL_CHARACTERS * 14;
 const MAX_CELL_STYLE: u32 = 65_490;
+const MAX_COLUMN_STYLE: u32 = 65_429;
 const MAX_METADATA_INDEX: u32 = 2_147_483_647;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Context {
     Worksheet,
+    Columns,
     SheetData,
     Row,
     Cell,
@@ -126,12 +129,15 @@ struct SharedMaster {
 struct Parser {
     cells: Vec<RawCell>,
     rows: Vec<row::Stored>,
+    columns: Option<Assignments<column::Properties>>,
     declared_extent: Option<Rect>,
     row: Option<PendingRow>,
     cell: Option<PendingCell>,
     seen_rows: HashSet<u32>,
     previous_row: u32,
     seen_dimension: bool,
+    seen_columns: bool,
+    column_records: usize,
     seen_sheet_data: bool,
 }
 
@@ -150,12 +156,15 @@ impl Parser {
         Self {
             cells: Vec::new(),
             rows: Vec::new(),
+            columns: None,
             declared_extent: None,
             row: None,
             cell: None,
             seen_rows: HashSet::new(),
             previous_row: 0,
             seen_dimension: false,
+            seen_columns: false,
+            column_records: 0,
             seen_sheet_data: false,
         }
     }
@@ -265,10 +274,11 @@ impl Parser {
             .map_err(|error| invalid(format!("cannot reserve sparse worksheet cells: {error}")))?;
         let declared_extent = parser.declared_extent;
         let rows = parser.rows;
+        let columns = column::resolve(parser.columns)?;
         for cell in parser.cells {
             cells.push(materialize(cell, strings)?);
         }
-        Store::from_unsorted(cells, rows, declared_extent)
+        Store::from_unsorted(cells, rows, columns, declared_extent)
     }
 
     fn start(
@@ -281,8 +291,10 @@ impl Parser {
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
         {
-            if self.seen_sheet_data {
-                return Err(invalid("worksheet dimension appears after sheetData"));
+            if self.seen_columns || self.seen_sheet_data {
+                return Err(invalid(
+                    "worksheet dimension appears after column or cell data",
+                ));
             }
             if self.seen_dimension {
                 return Err(invalid("worksheet has duplicate dimension elements"));
@@ -295,6 +307,15 @@ impl Parser {
                     "invalid worksheet dimension '{reference}': {error}"
                 ))
             })?);
+            return Ok(Context::Other);
+        }
+        if parent == Context::Worksheet && is_spreadsheetml_name(namespace, element.name(), b"cols")
+        {
+            self.start_columns()?;
+            return Ok(Context::Columns);
+        }
+        if parent == Context::Columns && is_spreadsheetml_name(namespace, element.name(), b"col") {
+            self.start_column(element, decoder)?;
             return Ok(Context::Other);
         }
         if parent == Context::Worksheet
@@ -370,6 +391,84 @@ impl Parser {
             hidden: optional_bool(element, b"hidden", decoder, "worksheet row hidden flag")?
                 .unwrap_or(false),
         });
+        Ok(())
+    }
+
+    fn start_columns(&mut self) -> Result<()> {
+        if self.seen_columns {
+            return Err(invalid("worksheet has duplicate cols elements"));
+        }
+        if self.seen_sheet_data {
+            return Err(invalid("worksheet cols appears after sheetData"));
+        }
+        self.seen_columns = true;
+        self.columns = Some(Assignments::new()?);
+        Ok(())
+    }
+
+    fn start_column(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        let min = required_u32(element, b"min", decoder, "worksheet column minimum")?;
+        let max = required_u32(element, b"max", decoder, "worksheet column maximum")?;
+        if min == 0 || max > COLUMNS || min > max {
+            return Err(invalid(format!(
+                "invalid worksheet column range '{min}:{max}'"
+            )));
+        }
+        let width = optional_f64(element, b"width", decoder, "worksheet column width")?
+            .map(column::Width::new)
+            .transpose()?;
+        let style = optional_u32(element, b"style", decoder, "worksheet column style")?;
+        if style.is_some_and(|style| style > MAX_COLUMN_STYLE) {
+            return Err(invalid(format!(
+                "worksheet column style exceeds {MAX_COLUMN_STYLE}"
+            )));
+        }
+        let outline_level = optional_u32(
+            element,
+            b"outlineLevel",
+            decoder,
+            "worksheet column outline level",
+        )?
+        .unwrap_or(0);
+        let outline_level = u8::try_from(outline_level)
+            .ok()
+            .filter(|level| *level <= 7)
+            .ok_or_else(|| invalid("worksheet column outline level exceeds 7"))?;
+        let mut flags = Flags::empty();
+        for (attribute, flag, field) in [
+            (b"hidden".as_slice(), Flags::HIDDEN, "hidden"),
+            (b"bestFit".as_slice(), Flags::BEST_FIT, "bestFit"),
+            (
+                b"customWidth".as_slice(),
+                Flags::CUSTOM_WIDTH,
+                "customWidth",
+            ),
+            (b"phonetic".as_slice(), Flags::PHONETIC, "phonetic"),
+            (b"collapsed".as_slice(), Flags::COLLAPSED, "collapsed"),
+        ] {
+            if optional_bool(element, attribute, decoder, field)?.unwrap_or(false) {
+                flags.insert(flag);
+            }
+        }
+        let first = ColumnIndex::new(min - 1)?;
+        let last = ColumnIndex::new(max - 1)?;
+        self.columns
+            .as_mut()
+            .ok_or_else(|| invalid("worksheet col appears outside cols"))?
+            .assign(
+                first,
+                last,
+                column::Properties {
+                    width,
+                    style,
+                    outline_level,
+                    flags,
+                },
+            );
+        self.column_records = self
+            .column_records
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet column record count overflow"))?;
         Ok(())
     }
 
@@ -585,6 +684,9 @@ impl Parser {
             Context::Value => Ok(()),
             Context::Cell => self.finish_cell(),
             Context::Row => self.finish_row(),
+            Context::Columns if self.column_records == 0 => {
+                Err(invalid("worksheet cols contains no col records"))
+            },
             _ => Ok(()),
         }
     }
@@ -940,6 +1042,31 @@ fn optional_u32(
         .transpose()
 }
 
+fn required_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<u32> {
+    optional_u32(element, name, decoder, description)?
+        .ok_or_else(|| invalid(format!("missing {description}")))
+}
+
+fn optional_f64(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<f64>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<f64>()
+                .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+        })
+        .transpose()
+}
+
 fn optional_bool(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -1053,6 +1180,85 @@ mod tests {
         assert!(!implicit.stored());
         assert!(!implicit.hidden());
         assert_eq!(store.rows().count(), 3);
+    }
+
+    #[test]
+    fn resolves_complete_last_matching_column_records() {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}"><cols><col min="2" max="4" width="20" style="1" hidden="1" bestFit="true" customWidth="1" phonetic="1" outlineLevel="2" collapsed="1"/><col min="3" max="3" width="10"/></cols><sheetData/></worksheet>"#
+        );
+        let store = parse(xml.as_bytes(), || Ok(None)).expect("valid columns");
+
+        let a = store.column(ColumnIndex::new(0).expect("A"));
+        assert!(!a.stored());
+        assert!(!a.hidden());
+        let b = store.column(ColumnIndex::new(1).expect("B"));
+        assert!(b.stored());
+        assert!(b.hidden());
+        assert_eq!(b.width().map(column::Width::get), Some(20.0));
+        assert!(b.best_fit());
+        assert!(b.custom_width());
+        assert!(b.phonetic());
+        assert_eq!(b.outline_level(), 2);
+        assert!(b.collapsed());
+        assert_eq!(
+            store.column_entry(b.index()).unwrap().properties.style,
+            Some(1)
+        );
+
+        let c = store.column(ColumnIndex::new(2).expect("C"));
+        assert!(c.stored());
+        assert!(!c.hidden());
+        assert_eq!(c.width().map(column::Width::get), Some(10.0));
+        assert!(!c.best_fit());
+        assert!(!c.custom_width());
+        assert!(!c.phonetic());
+        assert_eq!(c.outline_level(), 0);
+        assert!(!c.collapsed());
+        assert_eq!(
+            store.column_entry(c.index()).unwrap().properties.style,
+            None
+        );
+
+        let d = store.column(ColumnIndex::new(3).expect("D"));
+        assert!(d.hidden());
+        assert_eq!(
+            store
+                .columns()
+                .map(|column| column.index())
+                .collect::<Vec<_>>(),
+            [
+                ColumnIndex::new(1).expect("B"),
+                ColumnIndex::new(2).expect("C"),
+                ColumnIndex::new(3).expect("D"),
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_column_property_records() {
+        for body in [
+            "<cols/>",
+            "<cols></cols>",
+            r#"<cols><col max="1"/></cols>"#,
+            r#"<cols><col min="1"/></cols>"#,
+            r#"<cols><col min="0" max="1"/></cols>"#,
+            r#"<cols><col min="2" max="1"/></cols>"#,
+            r#"<cols><col min="1" max="16385"/></cols>"#,
+            r#"<cols><col min="1" max="1" width="256"/></cols>"#,
+            r#"<cols><col min="1" max="1" width="NaN"/></cols>"#,
+            r#"<cols><col min="1" max="1" style="65430"/></cols>"#,
+            r#"<cols><col min="1" max="1" outlineLevel="8"/></cols>"#,
+            r#"<cols><col min="1" max="1" hidden="yes"/></cols>"#,
+            r#"<cols><col min="1" max="1"/></cols><cols><col min="2" max="2"/></cols>"#,
+            r#"<sheetData/><cols><col min="1" max="1"/></cols>"#,
+        ] {
+            let xml = format!(r#"<worksheet xmlns="{S}">{body}<sheetData/></worksheet>"#);
+            assert!(
+                parse(xml.as_bytes(), || Ok(None)).is_err(),
+                "accepted {body}"
+            );
+        }
     }
 
     #[test]

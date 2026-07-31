@@ -112,16 +112,12 @@ impl SimdTransform {
 
     /// AVX512F implementation (8 points per iteration)
     ///
-    /// Note: AVX-512 intrinsics are stable since Rust 1.89 while the workspace
-    /// MSRV is 1.85. The `incompatible_msrv` clippy lint is allowed here because
-    /// the entire function is gated behind a runtime `is_x86_feature_detected!`
-    /// check at the call site, so users on older toolchains that lack AVX-512
-    /// hardware never hit this code path. When the workspace MSRV is bumped to
-    /// 1.89+ this allow can be removed.
+    /// AVX-512 target features and intrinsics are stable at the workspace's
+    /// Rust 1.89 MSRV. The call site still performs runtime feature detection
+    /// because compiler support does not prove that the current CPU has it.
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx512f")]
     #[inline]
-    #[allow(clippy::incompatible_msrv)]
     unsafe fn transform_batch_avx512(
         &self,
         xs: &[i16],

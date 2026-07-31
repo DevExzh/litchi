@@ -9,6 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bitflags = { workspace = true }
 chrono = { workspace = true }
 litchi-core = { workspace = true }
 litchi-ooxml-common = { workspace = true }

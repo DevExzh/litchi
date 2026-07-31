@@ -44,6 +44,26 @@ impl Row {
     pub const fn get(self) -> u32 {
         self.0
     }
+
+    /// Next checked row, or `None` at the grid boundary.
+    #[inline]
+    pub const fn next(self) -> Option<Self> {
+        if self.0 < Self::LAST.0 {
+            Some(Self(self.0 + 1))
+        } else {
+            None
+        }
+    }
+
+    /// Previous checked row, or `None` at the grid boundary.
+    #[inline]
+    pub const fn previous(self) -> Option<Self> {
+        if self.0 > Self::FIRST.0 {
+            Some(Self(self.0 - 1))
+        } else {
+            None
+        }
+    }
 }
 
 impl TryFrom<u32> for Row {
@@ -128,6 +148,26 @@ impl Column {
     pub const fn get(self) -> u32 {
         self.0
     }
+
+    /// Next checked column, or `None` at the grid boundary.
+    #[inline]
+    pub const fn next(self) -> Option<Self> {
+        if self.0 < Self::LAST.0 {
+            Some(Self(self.0 + 1))
+        } else {
+            None
+        }
+    }
+
+    /// Previous checked column, or `None` at the grid boundary.
+    #[inline]
+    pub const fn previous(self) -> Option<Self> {
+        if self.0 > Self::FIRST.0 {
+            Some(Self(self.0 - 1))
+        } else {
+            None
+        }
+    }
 }
 
 impl TryFrom<u32> for Column {
@@ -141,6 +181,48 @@ impl TryFrom<u32> for Column {
 impl From<Column> for u32 {
     fn from(value: Column) -> Self {
         value.get()
+    }
+}
+
+impl fmt::Display for Column {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.get())
+    }
+}
+
+/// Convenient column input accepted by format facades.
+///
+/// Raw indices are zero-based and checked when resolved. A reusable [`Column`]
+/// avoids repeated validation in hot paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ColumnAt {
+    /// A coordinate that has already been checked.
+    Checked(Column),
+    /// A raw zero-based index.
+    Index(u32),
+}
+
+impl ColumnAt {
+    /// Resolve this input into a checked column coordinate.
+    #[inline]
+    pub const fn resolve(self) -> Result<Column, CoordinateError> {
+        match self {
+            Self::Checked(column) => Ok(column),
+            Self::Index(index) => Column::new(index),
+        }
+    }
+}
+
+impl From<Column> for ColumnAt {
+    fn from(value: Column) -> Self {
+        Self::Checked(value)
+    }
+}
+
+impl From<u32> for ColumnAt {
+    fn from(value: u32) -> Self {
+        Self::Index(value)
     }
 }
 
@@ -628,9 +710,15 @@ mod tests {
         assert_eq!(Cell::at(0, 0), Ok(Cell::new(Row::FIRST, Column::FIRST)));
         assert_eq!(RowAt::from(0).resolve(), Ok(Row::FIRST));
         assert_eq!(RowAt::from(Row::LAST).resolve(), Ok(Row::LAST));
+        assert_eq!(ColumnAt::from(0).resolve(), Ok(Column::FIRST));
+        assert_eq!(ColumnAt::from(Column::LAST).resolve(), Ok(Column::LAST));
         assert!(matches!(
             RowAt::from(ROWS).resolve(),
             Err(CoordinateError::Row { .. })
+        ));
+        assert!(matches!(
+            ColumnAt::from(COLUMNS).resolve(),
+            Err(CoordinateError::Column { .. })
         ));
         assert_eq!(
             Cell::at(ROWS - 1, COLUMNS - 1).ok().map(Cell::row),

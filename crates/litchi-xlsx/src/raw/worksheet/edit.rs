@@ -15,9 +15,10 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row};
+use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32};
 use crate::cell::{Content, Value};
-use crate::error::{EditBlock, Error, Result, RowEditBlock, invalid};
+use crate::column::Assignments;
+use crate::error::{ColumnEditBlock, EditBlock, Error, Result, RowEditBlock, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::strings::encode_spreadsheet_text;
 
@@ -176,6 +177,19 @@ pub(crate) enum RowAction {
     Show,
 }
 
+/// One explicit column-visibility effect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ColumnAction {
+    Hide,
+    Show,
+}
+
+impl ColumnAction {
+    pub(crate) const fn hidden(self) -> bool {
+        matches!(self, Self::Hide)
+    }
+}
+
 impl RowAction {
     pub(crate) const fn hidden(self) -> bool {
         matches!(self, Self::Hide)
@@ -187,6 +201,7 @@ impl RowAction {
 pub(crate) struct Plan {
     pub(crate) cells: BTreeMap<Address, Action>,
     pub(crate) rows: BTreeMap<Row, RowAction>,
+    pub(crate) columns: BTreeMap<Column, ColumnAction>,
 }
 
 impl Plan {
@@ -194,11 +209,12 @@ impl Plan {
         Self {
             cells,
             rows: BTreeMap::new(),
+            columns: BTreeMap::new(),
         }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.cells.is_empty() && self.rows.is_empty()
+        self.cells.is_empty() && self.rows.is_empty() && self.columns.is_empty()
     }
 }
 
@@ -250,6 +266,29 @@ struct RowSlot {
 }
 
 #[derive(Debug)]
+struct ColumnSlot {
+    first: Column,
+    last: Column,
+    span: Span,
+    tag_end: usize,
+    close_start: usize,
+    tag: Tag,
+    payload: bool,
+    empty: bool,
+}
+
+#[derive(Debug)]
+struct ColumnsSlot {
+    span: Span,
+    tag_end: usize,
+    close_start: usize,
+    tag: Tag,
+    columns: Box<[ColumnSlot]>,
+    payload: bool,
+    empty: bool,
+}
+
+#[derive(Debug)]
 struct SheetData {
     span: Span,
     tag_end: usize,
@@ -270,6 +309,8 @@ struct DimensionTag {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FrameKind {
     Worksheet,
+    Columns,
+    Column,
     SheetData,
     Row,
     Cell,
@@ -301,6 +342,25 @@ struct PendingRow {
     tag_end: usize,
     tag: Tag,
     cells: Vec<CellSlot>,
+}
+
+#[derive(Debug)]
+struct PendingColumn {
+    first: Column,
+    last: Column,
+    start: usize,
+    tag_end: usize,
+    tag: Tag,
+    payload: bool,
+}
+
+#[derive(Debug)]
+struct PendingColumns {
+    start: usize,
+    tag_end: usize,
+    tag: Tag,
+    columns: Vec<ColumnSlot>,
+    payload: bool,
 }
 
 #[derive(Debug)]
@@ -407,6 +467,7 @@ struct FormulaStorage {
 #[derive(Debug)]
 struct Layout {
     sheet_data: SheetData,
+    columns: Option<ColumnsSlot>,
     dimension: Option<DimensionTag>,
     protected: bool,
     merged: Box<[SelectionRange]>,
@@ -418,8 +479,11 @@ struct Layout {
 #[derive(Debug, Default)]
 struct Scanner {
     sheet_data: Option<SheetData>,
+    columns: Option<ColumnsSlot>,
     dimension: Option<DimensionTag>,
     pending_sheet_data: Option<PendingSheetData>,
+    pending_columns: Option<PendingColumns>,
+    column: Option<PendingColumn>,
     row: Option<PendingRow>,
     cell: Option<PendingCell>,
     previous_row: u32,
@@ -438,12 +502,14 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
     let layout = scan(content)?;
     validate_actions(&layout, sheet, &plan.cells)?;
     validate_row_actions(&layout, sheet, &plan.rows)?;
+    validate_column_actions(&layout, sheet, &plan.columns)?;
     let dimension = expanded_dimension(&layout, &plan.cells);
 
     let effects = plan
         .cells
         .len()
         .checked_add(plan.rows.len())
+        .and_then(|count| count.checked_add(plan.columns.len()))
         .ok_or_else(|| invalid("worksheet edit effect count overflow"))?;
     let extra = effects
         .checked_mul(128)
@@ -453,8 +519,14 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
     output
         .try_reserve(extra)
         .map_err(|error| invalid(format!("cannot reserve worksheet edit output: {error}")))?;
+    let Plan {
+        cells,
+        rows,
+        columns,
+    } = plan;
+    let mut cursor = 0usize;
     if let Some((tag, range)) = dimension {
-        output.extend_from_slice(&content[..tag.span.start]);
+        output.extend_from_slice(&content[cursor..tag.span.start]);
         write_tag(
             &mut output,
             &tag.tag,
@@ -462,19 +534,48 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
             &["ref"],
             &[("ref", range.a1())],
         );
-        output.extend_from_slice(&content[tag.span.end..layout.sheet_data.span.start]);
-    } else {
-        output.extend_from_slice(&content[..layout.sheet_data.span.start]);
+        cursor = tag.span.end;
     }
-    write_sheet_data(
-        &mut output,
-        content,
-        &layout.sheet_data,
-        plan.cells,
-        plan.rows,
-    )?;
+    if !columns.is_empty() {
+        match layout.columns.as_ref() {
+            Some(stored) => {
+                output.extend_from_slice(&content[cursor..stored.span.start]);
+                write_columns(&mut output, content, stored, columns, sheet)?;
+                cursor = stored.span.end;
+            },
+            None => {
+                output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
+                write_new_columns(&mut output, &layout.sheet_data.tag.name, columns);
+                cursor = layout.sheet_data.span.start;
+            },
+        }
+    }
+    output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
+    if cells.is_empty() && rows.is_empty() {
+        output
+            .extend_from_slice(&content[layout.sheet_data.span.start..layout.sheet_data.span.end]);
+    } else {
+        write_sheet_data(&mut output, content, &layout.sheet_data, cells, rows)?;
+    }
     output.extend_from_slice(&content[layout.sheet_data.span.end..]);
     Ok(output)
+}
+
+fn validate_column_actions(
+    layout: &Layout,
+    sheet: &str,
+    actions: &BTreeMap<Column, ColumnAction>,
+) -> Result<()> {
+    if layout.protected
+        && let Some(column) = actions.keys().next()
+    {
+        return Err(Error::ColumnEditBlocked {
+            sheet: sheet.to_owned(),
+            column: *column,
+            reason: ColumnEditBlock::ProtectedSheet,
+        });
+    }
+    Ok(())
 }
 
 fn validate_row_actions(
@@ -633,6 +734,40 @@ impl Scanner {
             return Ok(FrameKind::Other);
         }
         if parent == Some(FrameKind::Worksheet)
+            && is_spreadsheetml_name(namespace, element.name(), b"cols")
+        {
+            if self.pending_columns.is_some() || self.columns.is_some() {
+                return Err(invalid("worksheet has duplicate cols during edit"));
+            }
+            if self.sheet_data.is_some() || self.pending_sheet_data.is_some() {
+                return Err(invalid(
+                    "worksheet cols appears after sheetData during edit",
+                ));
+            }
+            self.pending_columns = Some(PendingColumns {
+                start,
+                tag_end: end,
+                tag: tag(element, decoder)?,
+                columns: Vec::new(),
+                payload: false,
+            });
+            return Ok(FrameKind::Columns);
+        }
+        if parent == Some(FrameKind::Columns)
+            && is_spreadsheetml_name(namespace, element.name(), b"col")
+        {
+            let (first, last) = column_range(element, decoder)?;
+            self.column = Some(PendingColumn {
+                first,
+                last,
+                start,
+                tag_end: end,
+                tag: tag(element, decoder)?,
+                payload: false,
+            });
+            return Ok(FrameKind::Column);
+        }
+        if parent == Some(FrameKind::Worksheet)
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
             if self.pending_sheet_data.is_some() || self.sheet_data.is_some() {
@@ -682,6 +817,16 @@ impl Scanner {
                 cell.mce_payload = true;
             }
         }
+        if parent == Some(FrameKind::Column)
+            && let Some(column) = self.column.as_mut()
+        {
+            column.payload = true;
+        }
+        if parent == Some(FrameKind::Columns)
+            && let Some(columns) = self.pending_columns.as_mut()
+        {
+            columns.payload = true;
+        }
         Ok(FrameKind::Other)
     }
 
@@ -698,6 +843,48 @@ impl Scanner {
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
         {
             self.record_dimension(element, decoder, span, true)?;
+            return Ok(());
+        }
+        if parent == Some(FrameKind::Worksheet)
+            && is_spreadsheetml_name(namespace, element.name(), b"cols")
+        {
+            if self.pending_columns.is_some() || self.columns.is_some() {
+                return Err(invalid("worksheet has duplicate cols during edit"));
+            }
+            if self.sheet_data.is_some() || self.pending_sheet_data.is_some() {
+                return Err(invalid(
+                    "worksheet cols appears after sheetData during edit",
+                ));
+            }
+            self.columns = Some(ColumnsSlot {
+                span,
+                tag_end: span.end,
+                close_start: span.end,
+                tag: tag(element, decoder)?,
+                columns: Box::new([]),
+                payload: false,
+                empty: true,
+            });
+            return Ok(());
+        }
+        if parent == Some(FrameKind::Columns)
+            && is_spreadsheetml_name(namespace, element.name(), b"col")
+        {
+            let (first, last) = column_range(element, decoder)?;
+            self.pending_columns
+                .as_mut()
+                .ok_or_else(|| invalid("empty col outside cols"))?
+                .columns
+                .push(ColumnSlot {
+                    first,
+                    last,
+                    span,
+                    tag_end: span.end,
+                    close_start: span.end,
+                    tag: tag(element, decoder)?,
+                    payload: false,
+                    empty: true,
+                });
             return Ok(());
         }
         if parent == Some(FrameKind::Worksheet)
@@ -775,16 +962,69 @@ impl Scanner {
             && (is_mce_name(namespace, element, b"AlternateContent")
                 || (parent == Some(FrameKind::Cell)
                     && !is_spreadsheetml_name(namespace, element.name(), b"extLst")))
+            && let Some(cell) = self.cell.as_mut()
         {
-            if let Some(cell) = self.cell.as_mut() {
-                cell.mce_payload = true;
-            }
+            cell.mce_payload = true;
+        }
+        if parent == Some(FrameKind::Column)
+            && let Some(column) = self.column.as_mut()
+        {
+            column.payload = true;
+        }
+        if parent == Some(FrameKind::Columns)
+            && let Some(columns) = self.pending_columns.as_mut()
+        {
+            columns.payload = true;
         }
         Ok(())
     }
 
     fn finish(&mut self, frame: Frame, close_start: usize, end: usize) -> Result<()> {
         match frame.kind {
+            FrameKind::Column => {
+                let column = self
+                    .column
+                    .take()
+                    .ok_or_else(|| invalid("col close without edit state"))?;
+                self.pending_columns
+                    .as_mut()
+                    .ok_or_else(|| invalid("col closed outside cols"))?
+                    .columns
+                    .push(ColumnSlot {
+                        first: column.first,
+                        last: column.last,
+                        span: Span {
+                            start: column.start,
+                            end,
+                        },
+                        tag_end: column.tag_end,
+                        close_start,
+                        tag: column.tag,
+                        payload: column.payload,
+                        empty: false,
+                    });
+            },
+            FrameKind::Columns => {
+                let columns = self
+                    .pending_columns
+                    .take()
+                    .ok_or_else(|| invalid("cols close without edit state"))?;
+                if columns.columns.is_empty() {
+                    return Err(invalid("worksheet cols contains no col during edit"));
+                }
+                self.columns = Some(ColumnsSlot {
+                    span: Span {
+                        start: columns.start,
+                        end,
+                    },
+                    tag_end: columns.tag_end,
+                    close_start,
+                    tag: columns.tag,
+                    columns: columns.columns.into_boxed_slice(),
+                    payload: columns.payload,
+                    empty: false,
+                });
+            },
             FrameKind::Primary => {
                 self.cell
                     .as_mut()
@@ -1049,6 +1289,20 @@ impl Scanner {
             .sheet_data
             .ok_or_else(|| invalid("worksheet cell edits require a direct sheetData element"))?;
         if self
+            .columns
+            .as_ref()
+            .is_some_and(|columns| columns.columns.is_empty())
+        {
+            return Err(invalid("worksheet cols contains no col during edit"));
+        }
+        if self
+            .columns
+            .as_ref()
+            .is_some_and(|columns| columns.span.start >= sheet_data.span.start)
+        {
+            return Err(invalid("worksheet cols must precede sheetData during edit"));
+        }
+        if self
             .dimension
             .as_ref()
             .is_some_and(|dimension| dimension.span.start >= sheet_data.span.start)
@@ -1094,6 +1348,7 @@ impl Scanner {
         }
         Ok(Layout {
             sheet_data,
+            columns: self.columns,
             dimension: self.dimension,
             protected: self.protected,
             merged: self.merged.into_boxed_slice(),
@@ -1135,6 +1390,203 @@ fn expanded_dimension<'a>(
     let result = bounds.0?;
     let expanded = dimension.declared.union(result);
     (expanded != dimension.declared).then_some((dimension, expanded))
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ColumnPiece {
+    Keep(Column, Column),
+    Edit(Column, Column, ColumnAction),
+}
+
+fn write_columns(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    stored: &ColumnsSlot,
+    actions: BTreeMap<Column, ColumnAction>,
+    sheet: &str,
+) -> Result<()> {
+    let mut owners = Assignments::new()?;
+    for (index, column) in stored.columns.iter().enumerate() {
+        owners.assign(column.first, column.last, index);
+    }
+    let mut by_owner = HashMap::<usize, BTreeMap<Column, ColumnAction>>::new();
+    let mut implicit = BTreeMap::new();
+    for (column, action) in actions {
+        if let Some(owner) = owners.get(column) {
+            by_owner.entry(owner).or_default().insert(column, action);
+        } else if action.hidden() {
+            implicit.insert(column, action);
+        }
+    }
+
+    if stored.payload
+        && let Some(column) = implicit.keys().next()
+    {
+        return Err(Error::ColumnEditBlocked {
+            sheet: sheet.to_owned(),
+            column: *column,
+            reason: ColumnEditBlock::MarkupCompatibility,
+        });
+    }
+
+    if stored.empty {
+        return Err(invalid("worksheet cols contains no col during edit"));
+    }
+    output.extend_from_slice(&source[stored.span.start..stored.tag_end]);
+    let mut cursor = stored.tag_end;
+    for (index, column) in stored.columns.iter().enumerate() {
+        output.extend_from_slice(&source[cursor..column.span.start]);
+        if let Some(edits) = by_owner.remove(&index) {
+            let pieces = column_pieces(column, &edits)?;
+            if column.payload && pieces.len() > 1 {
+                let edited = edits.keys().next().copied().unwrap_or(column.first);
+                return Err(Error::ColumnEditBlocked {
+                    sheet: sheet.to_owned(),
+                    column: edited,
+                    reason: ColumnEditBlock::MarkupCompatibility,
+                });
+            }
+            for piece in pieces {
+                write_column_piece(output, source, column, piece);
+            }
+        } else {
+            output.extend_from_slice(&source[column.span.start..column.span.end]);
+        }
+        cursor = column.span.end;
+    }
+    output.extend_from_slice(&source[cursor..stored.close_start]);
+    write_column_actions(output, &stored.tag.name, implicit);
+    output.extend_from_slice(&source[stored.close_start..stored.span.end]);
+    Ok(())
+}
+
+fn column_pieces(
+    stored: &ColumnSlot,
+    edits: &BTreeMap<Column, ColumnAction>,
+) -> Result<Vec<ColumnPiece>> {
+    let capacity = edits
+        .len()
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| invalid("column edit split count overflow"))?;
+    let mut pieces = Vec::new();
+    pieces
+        .try_reserve_exact(capacity)
+        .map_err(|error| invalid(format!("cannot reserve column edit splits: {error}")))?;
+    let mut next = stored.first.get();
+    for (column, action) in edits {
+        if column.get() > next {
+            pieces.push(ColumnPiece::Keep(
+                Column::new(next)?,
+                Column::new(column.get() - 1)?,
+            ));
+        }
+        if let Some(ColumnPiece::Edit(_, last, previous)) = pieces.last_mut()
+            && previous == action
+            && last.next() == Some(*column)
+        {
+            *last = *column;
+        } else {
+            pieces.push(ColumnPiece::Edit(*column, *column, *action));
+        }
+        next = column.get().saturating_add(1);
+    }
+    if next <= stored.last.get() {
+        pieces.push(ColumnPiece::Keep(Column::new(next)?, stored.last));
+    }
+    Ok(pieces)
+}
+
+fn write_column_piece(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    stored: &ColumnSlot,
+    piece: ColumnPiece,
+) {
+    let (first, last, visibility) = match piece {
+        ColumnPiece::Keep(first, last) => (first, last, None),
+        ColumnPiece::Edit(first, last, action) => (first, last, Some(action)),
+    };
+    let mut appended = vec![
+        ("min", (first.get() + 1).to_string()),
+        ("max", (last.get() + 1).to_string()),
+    ];
+    if visibility.is_some_and(ColumnAction::hidden) {
+        appended.push(("hidden", "1".to_owned()));
+    }
+    let removed = if visibility.is_some() {
+        &["min", "max", "hidden"][..]
+    } else {
+        &["min", "max"][..]
+    };
+    write_tag(output, &stored.tag, stored.empty, removed, &appended);
+    if !stored.empty {
+        output.extend_from_slice(&source[stored.tag_end..stored.close_start]);
+        write_close(output, &stored.tag.name);
+    }
+}
+
+fn write_new_columns(
+    output: &mut Vec<u8>,
+    sheet_data_name: &str,
+    actions: BTreeMap<Column, ColumnAction>,
+) {
+    if !actions.values().any(|action| action.hidden()) {
+        return;
+    }
+    let name = sibling_name(sheet_data_name, "cols");
+    let tag = Tag {
+        name: name.clone().into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    write_tag(output, &tag, false, &[], &[]);
+    write_column_actions(output, &name, actions);
+    write_close(output, &name);
+}
+
+fn write_column_actions(
+    output: &mut Vec<u8>,
+    columns_name: &str,
+    actions: BTreeMap<Column, ColumnAction>,
+) {
+    let name = sibling_name(columns_name, "col");
+    let tag = Tag {
+        name: name.into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    let mut pending: Option<(Column, Column)> = None;
+    for (column, action) in actions {
+        if !action.hidden() {
+            continue;
+        }
+        match pending {
+            Some((first, last)) if last.next() == Some(column) => {
+                pending = Some((first, column));
+            },
+            Some((first, last)) => {
+                write_hidden_column(output, &tag, first, last);
+                pending = Some((column, column));
+            },
+            None => pending = Some((column, column)),
+        }
+    }
+    if let Some((first, last)) = pending {
+        write_hidden_column(output, &tag, first, last);
+    }
+}
+
+fn write_hidden_column(output: &mut Vec<u8>, tag: &Tag, first: Column, last: Column) {
+    write_tag(
+        output,
+        tag,
+        true,
+        &[],
+        &[
+            ("min", (first.get() + 1).to_string()),
+            ("max", (last.get() + 1).to_string()),
+            ("hidden", "1".to_owned()),
+        ],
+    );
 }
 
 fn write_sheet_data(
@@ -1564,6 +2016,17 @@ fn sibling_name(name: &str, local: &str) -> String {
     )
 }
 
+fn column_range(element: &BytesStart<'_>, decoder: Decoder) -> Result<(Column, Column)> {
+    let min = required_u32(element, b"min", decoder, "worksheet column minimum")?;
+    let max = required_u32(element, b"max", decoder, "worksheet column maximum")?;
+    if min == 0 || min > max || max > COLUMNS {
+        return Err(invalid(format!(
+            "invalid worksheet column range '{min}:{max}' during edit"
+        )));
+    }
+    Ok((Column::new(min - 1)?, Column::new(max - 1)?))
+}
+
 fn is_mce_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &[u8]) -> bool {
     element.name().local_name().as_ref() == local
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE)
@@ -1725,6 +2188,7 @@ mod tests {
                 (Row::new(2).expect("row 3"), RowAction::Hide),
                 (Row::new(3).expect("row 4"), RowAction::Hide),
             ]),
+            columns: BTreeMap::new(),
         };
 
         let edited = rewrite(xml.as_bytes(), "Data", plan).expect("visibility edit");
@@ -1757,12 +2221,130 @@ mod tests {
             Plan {
                 cells: BTreeMap::new(),
                 rows: BTreeMap::from([(Row::new(0).expect("row 1"), RowAction::Hide)]),
+                columns: BTreeMap::new(),
             },
         );
         assert!(matches!(
             result,
             Err(Error::RowEditBlocked {
                 reason: RowEditBlock::ProtectedSheet,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn column_visibility_splits_effective_owners_and_preserves_other_properties() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:cols><x:col min="2" max="4" width="20" hidden="1" z:keep="yes"/><x:col min="3" max="3" width="10"/></x:cols><x:sheetData z:untouched="yes"/></x:worksheet>"#
+        );
+        let edited = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::new(),
+                columns: BTreeMap::from([
+                    (Column::new(1).expect("B"), ColumnAction::Show),
+                    (Column::new(2).expect("C"), ColumnAction::Hide),
+                    (Column::new(4).expect("E"), ColumnAction::Hide),
+                ]),
+            },
+        )
+        .expect("column rewrite");
+        let text = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(text.contains(r#"<x:col width="20" z:keep="yes" min="2" max="2"/>"#));
+        assert!(text.contains(r#"<x:col width="20" hidden="1" z:keep="yes" min="3" max="4"/>"#));
+        assert!(text.contains(r#"<x:col width="10" min="3" max="3" hidden="1"/>"#));
+        assert!(text.contains(r#"<x:col min="5" max="5" hidden="1"/>"#));
+        assert!(text.contains(r#"<x:sheetData z:untouched="yes"/>"#));
+
+        let store = worksheet::parse(&edited, || Ok(None)).expect("reparse columns");
+        let b = store.column(Column::new(1).expect("B"));
+        assert!(!b.hidden());
+        assert_eq!(b.width().map(crate::column::Width::get), Some(20.0));
+        let c = store.column(Column::new(2).expect("C"));
+        assert!(c.hidden());
+        assert_eq!(c.width().map(crate::column::Width::get), Some(10.0));
+        assert!(store.column(Column::new(3).expect("D")).hidden());
+        assert!(store.column(Column::new(4).expect("E")).hidden());
+    }
+
+    #[test]
+    fn column_visibility_inserts_sparse_cols_and_blocks_unsafe_splits() {
+        let plain = format!(r#"<x:worksheet xmlns:x="{S}"><x:sheetData/></x:worksheet>"#);
+        let inserted = rewrite(
+            plain.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::new(),
+                columns: BTreeMap::from([
+                    (Column::new(1).expect("B"), ColumnAction::Hide),
+                    (Column::new(2).expect("C"), ColumnAction::Hide),
+                ]),
+            },
+        )
+        .expect("insert cols");
+        assert!(
+            std::str::from_utf8(&inserted)
+                .expect("UTF-8")
+                .contains(r#"<x:cols><x:col min="2" max="3" hidden="1"/></x:cols><x:sheetData/>"#)
+        );
+
+        let extended = format!(
+            r#"<worksheet xmlns="{S}" xmlns:z="urn:future"><cols><col min="1" max="2"><z:future/></col></cols><sheetData/></worksheet>"#
+        );
+        assert!(matches!(
+            rewrite(
+                extended.as_bytes(),
+                "Data",
+                Plan {
+                    cells: BTreeMap::new(),
+                    rows: BTreeMap::new(),
+                    columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::Hide,)]),
+                },
+            ),
+            Err(Error::ColumnEditBlocked {
+                reason: ColumnEditBlock::MarkupCompatibility,
+                ..
+            })
+        ));
+
+        let extended_columns = format!(
+            r#"<worksheet xmlns="{S}" xmlns:z="urn:future"><cols><col min="1" max="1"/><z:future/></cols><sheetData/></worksheet>"#
+        );
+        assert!(matches!(
+            rewrite(
+                extended_columns.as_bytes(),
+                "Data",
+                Plan {
+                    cells: BTreeMap::new(),
+                    rows: BTreeMap::new(),
+                    columns: BTreeMap::from([(Column::new(1).expect("B"), ColumnAction::Hide,)]),
+                },
+            ),
+            Err(Error::ColumnEditBlocked {
+                reason: ColumnEditBlock::MarkupCompatibility,
+                ..
+            })
+        ));
+
+        let protected = format!(
+            r#"<worksheet xmlns="{S}"><sheetData/><sheetProtection sheet="1"/></worksheet>"#
+        );
+        assert!(matches!(
+            rewrite(
+                protected.as_bytes(),
+                "Data",
+                Plan {
+                    cells: BTreeMap::new(),
+                    rows: BTreeMap::new(),
+                    columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::Hide,)]),
+                },
+            ),
+            Err(Error::ColumnEditBlocked {
+                reason: ColumnEditBlock::ProtectedSheet,
                 ..
             })
         ));

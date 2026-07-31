@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod cell;
+pub mod column;
 mod error;
 pub mod formula;
 pub mod raw;
@@ -14,12 +15,16 @@ pub mod style;
 mod workbook;
 
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
-pub use error::{EditBlock, Error, Result, RowEditBlock};
+pub use column::{Column, Columns};
+pub use error::{ColumnEditBlock, EditBlock, Error, Result, RowEditBlock};
 pub use formula::Formula;
-pub use litchi_sheet::{Area, At, Cell as Address, Column, Rect, Row as RowIndex, RowAt};
+pub use litchi_sheet::{
+    Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
+};
 pub use row::{Row, Rows};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use workbook::{
-    Change, Commit, Conflict, ConflictSet, DateSystem, Edit, Flavor, JoinError, JoinFailure, Patch,
-    RowEdit, RowState, Sheet, SheetEdit, SheetKind, SheetSelector, State, Visibility, Workbook,
+    Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, DateSystem, Edit, Flavor,
+    JoinError, JoinFailure, Patch, RowEdit, RowState, Sheet, SheetEdit, SheetKind, SheetSelector,
+    State, Visibility, Workbook,
 };

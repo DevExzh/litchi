@@ -5,8 +5,9 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime};
-use litchi_sheet::{Cell as Address, Column, Rect, Row as RowIndex};
+use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
 
+use crate::column;
 use crate::error::{Result, invalid};
 use crate::formula::{Formula, Kind};
 use crate::row;
@@ -463,6 +464,7 @@ pub(crate) struct Stored {
 pub(crate) struct Store {
     cells: Box<[Stored]>,
     rows: Box<[row::Stored]>,
+    columns: Box<[column::Stored]>,
     extents: Extents,
 }
 
@@ -517,6 +519,7 @@ impl Store {
     pub(crate) fn from_unsorted(
         mut cells: Vec<Stored>,
         mut rows: Vec<row::Stored>,
+        columns: Box<[column::Stored]>,
         declared: Option<Rect>,
     ) -> Result<Self> {
         cells.sort_unstable_by_key(|entry| entry.address);
@@ -552,6 +555,7 @@ impl Store {
         Ok(Self {
             cells: cells.into_boxed_slice(),
             rows: rows.into_boxed_slice(),
+            columns,
             extents: Extents {
                 declared,
                 stored: stored.finish()?,
@@ -591,8 +595,24 @@ impl Store {
         row::Rows::new(&self.rows)
     }
 
+    pub(crate) fn column(&self, index: ColumnIndex) -> column::Column<'_> {
+        column::Column::new(index, self.column_entry(index))
+    }
+
+    pub(crate) fn column_entry(&self, index: ColumnIndex) -> Option<&column::Stored> {
+        column::entry(&self.columns, index)
+    }
+
+    pub(crate) fn column_entries(&self) -> &[column::Stored] {
+        &self.columns
+    }
+
+    pub(crate) fn columns(&self) -> column::Columns<'_> {
+        column::Columns::new(&self.columns)
+    }
+
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {
-        let first = Address::new(range.start().row(), Column::FIRST);
+        let first = Address::new(range.start().row(), ColumnIndex::FIRST);
         let start = self.cells.partition_point(|entry| entry.address < first);
         Cells {
             remaining: &self.cells[start..],

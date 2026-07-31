@@ -307,9 +307,65 @@ cell values, and the hidden row state. This certifies this hide/read/native-
 resave path on the tested Excel build; it does not certify other row properties,
 column visibility, protected-sheet permission exceptions, or structural shifts.
 
+The tenth implementation slice adds checked column-property reads and
+transactional visibility updates. `ColumnAt` accepts a reusable checked
+coordinate or a raw zero-based index; `Sheet::column` returns a borrowed
+semantic `Column` for every grid position, while `Sheet::columns` lazily visits
+only logical columns covered by explicit effective property records. The short
+`Column` name is reserved for that view and the coordinate is re-exported as
+`ColumnIndex`. Width is a finite checked `Width` in the Office range `0..=255`;
+style references, outline levels, and boolean flags are validated before the
+view is published. `Sheet::column_style` exposes a shared resource handle or
+the explicit default state without leaking the physical `style` index. Shared
+style fan-out continues to count stored cells only and does not silently fold
+column defaults into its existing contract.
+
+Excel's interpretation of overlapping producer records was established with a
+desktop probe before implementing the resolver. For a hidden B:D record
+followed by a C-only record that omitted `hidden`, Excel displayed B and D as
+hidden and C as visible, then normalized the file on save into three disjoint
+records. The parser therefore treats the last matching `<col>` as the complete
+effective record; omitted fields in that later record do not inherit from an
+earlier overlap. A bounded fixed-grid interval assignment tree applies each
+record without work proportional to its covered width and compacts the result
+into disjoint borrowed ranges. This is an algorithmic bound, not a measured
+latency or allocation claim.
+
+Transactions use `sheet.column(index)?.hide()` and `show()`. Hiding an implicit
+column creates a narrow sparse record; showing an implicit column is a no-op.
+For an existing range, byte surgery identifies the last physical owner of each
+edited coordinate, splits only that owner, changes only `min`, `max`, and
+`hidden`, and retains widths, styles, outline state, unknown attributes,
+namespace prefixes, untouched records, and `sheetData` bytes. Adjacent new
+hidden columns coalesce. A split that would duplicate an unmodeled child
+payload, or insertion into an unmodeled `cols` payload, returns a typed markup-
+compatibility block. Protected sheets return a distinct typed column block.
+The rewritten worksheet is semantically reparsed before the new snapshot is
+published.
+
+Column changes and conflicts have their own checked state and coordinate
+variants. Two visibility effects on the same column conflict; cell, row, and
+column facets remain orthogonal and can be prepared on separate `Edit` values
+and joined without exposing locks. Patch inversion restores exact source part
+bytes. Unit tests cover complete overlap replacement, malformed bounds and
+properties, shared-style reference validation, prefix/attribute preservation,
+lossless interval splitting, implicit insertion, protected sheets, extension
+blocks, no-op filtering, inverse restoration, checked bounds, and disjoint
+joins.
+
+The public column example produced an A1:C1 workbook with column index 1
+hidden. Desktop Excel for macOS opened it without a repair or compatibility
+dialog, displayed A and C as adjacent headers, omitted B, and reported A1:C1 as
+the used range. Excel changed C1, saved the workbook, and normalized the hidden
+record to width zero. ZIP validation passed; the public Litchi reader recovered
+all three cell values, the Excel-authored C1 text, and the hidden column state.
+This certifies this hide/read/native-resave path on the tested Excel build; it
+does not certify column width editing, outline/style authoring, structural
+column shifts, protected-sheet permission exceptions, or other Office builds.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement row properties beyond visibility, column visibility, row and
-column insertion/deletion, shifting references, merge/group-formula edits,
+hints or implement row/column properties beyond visibility, row and column
+insertion/deletion, shifting references, merge/group-formula edits,
 validation evaluation, shared-style definition editing or forking, named-style
 and row/column/theme resolution, rich text, dynamic arrays, patch serialization,
 full structured diagnostics, eviction/resource budgets, range/structural effect
@@ -404,8 +460,11 @@ contention, and scaling claims still require the measurement work in ADR 0005.
 
 ## Quality gates
 
-- Stable Rust with workspace MSRV 1.85 initially; bumps require a concrete
-  safety, ergonomic, or measured-performance reason.
+- Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
+  corrected because the workspace deliberately uses Rust 2024 `let` chains
+  (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512
+  target features and intrinsics (stable in 1.89). Later bumps require a
+  concrete safety, ergonomic, or measured-performance reason.
 - Windows, macOS, and Linux CI; WASM where the selected I/O/crypto stack permits.
   `no_std` is not an initial support promise.
 - Unit, integration, property, fuzz, Miri, sanitizer, malformed-corpus, and

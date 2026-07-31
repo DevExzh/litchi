@@ -3,8 +3,8 @@
 mod edit;
 
 pub use edit::{
-    Change, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure, Patch, RowEdit, RowState,
-    SheetEdit, State,
+    Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure,
+    Patch, RowEdit, RowState, SheetEdit, State,
 };
 
 use std::collections::HashMap;
@@ -16,13 +16,13 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::Selector;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
-use litchi_sheet::{Area, At, Rect, RowAt};
+use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 
 use crate::cell::{Extents, Store, Text};
 use crate::error::{Error, Result, invalid};
 use crate::raw;
 use crate::style::StyleLineage;
-use crate::{Cell, Cells, LocalStyle, Row, Rows, Style, Styles};
+use crate::{Cell, Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -554,6 +554,41 @@ impl Sheet {
         Ok(self.store()?.rows())
     }
 
+    /// Borrow one checked logical column, including an implicit default
+    /// column. Raw inputs are zero-based and validated before lookup.
+    pub fn column(&self, at: impl Into<ColumnAt>) -> Result<Column<'_>> {
+        let index = at.into().resolve()?;
+        Ok(self.store()?.column(index))
+    }
+
+    /// Lazily traverse logical columns covered by explicit property records.
+    /// Overlapping producer records have already been resolved using Excel's
+    /// last-record-wins semantics.
+    pub fn columns(&self) -> Result<Columns<'_>> {
+        Ok(self.store()?.columns())
+    }
+
+    /// Exact shared-style state contributed by a column-property record.
+    ///
+    /// `None` means the logical column is implicit. [`LocalStyle::Default`]
+    /// means an explicit record applies without a shared-style reference.
+    pub fn column_style(&self, at: impl Into<ColumnAt>) -> Result<Option<LocalStyle>> {
+        let index = at.into().resolve()?;
+        let Some(entry) = self.store()?.column_entry(index) else {
+            return Ok(None);
+        };
+        entry
+            .properties
+            .style
+            .map_or(Ok(Some(LocalStyle::Default)), |key| {
+                self.owner.require_style(key)?;
+                Ok(Some(LocalStyle::Shared(Style::from_raw(
+                    Arc::clone(&self.owner),
+                    key,
+                ))))
+            })
+    }
+
     /// Distinct declared, stored, content, and directly styled cell bounds.
     pub fn extents(&self) -> Result<&Extents> {
         Ok(self.store()?.extents())
@@ -636,7 +671,12 @@ impl Inner {
     }
 
     fn validate_styles(&self, store: &Store) -> Result<()> {
-        if !store.entries().iter().any(|entry| entry.style.is_some()) {
+        if !store.entries().iter().any(|entry| entry.style.is_some())
+            && !store
+                .column_entries()
+                .iter()
+                .any(|entry| entry.properties.style.is_some())
+        {
             return Ok(());
         }
         let len = self.style_count()?;
@@ -649,6 +689,17 @@ impl Inner {
                 "worksheet cell {} references shared style {}, but the workbook contains {len} cell formats",
                 entry.address,
                 entry.style.unwrap_or_default()
+            )));
+        }
+        if let Some(entry) = store
+            .column_entries()
+            .iter()
+            .find(|entry| entry.properties.style.is_some_and(|key| key >= len))
+        {
+            return Err(invalid(format!(
+                "worksheet column {} references shared style {}, but the workbook contains {len} cell formats",
+                entry.first,
+                entry.properties.style.unwrap_or_default()
             )));
         }
         Ok(())
@@ -1075,6 +1126,23 @@ mod tests {
                 .expect("sheet")
                 .cell("A1"),
             Err(Error::Invalid(message)) if message.contains("A1 references shared style 1")
+        ));
+
+        let mut dangling_column = baseline.inner.package.clone();
+        dangling_column
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+            .expect("sheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="2" max="2" style="1"/></cols><sheetData/></worksheet>"#.to_vec(),
+            );
+        let dangling_column = Workbook::from_package(dangling_column).expect("lazy column style");
+        assert!(matches!(
+            dangling_column
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .column(1),
+            Err(Error::Invalid(message)) if message.contains("column 1 references shared style 1")
         ));
     }
 

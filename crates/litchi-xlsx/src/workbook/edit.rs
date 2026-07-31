@@ -5,13 +5,13 @@ use std::fmt;
 use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
-use litchi_sheet::{At, Cell as Address, Row as RowIndex, RowAt};
+use litchi_sheet::{At, Cell as Address, Column as ColumnIndex, ColumnAt, Row as RowIndex, RowAt};
 
 use super::{Sheet, SheetKind, SheetSelector, Workbook};
 use crate::cell::{Cell, Content, Stored};
 use crate::error::{EditBlock, Error, Result, invalid};
 use crate::raw;
-use crate::raw::worksheet::edit::{Action, Payload, Plan, RowAction, StyleEffect};
+use crate::raw::worksheet::edit::{Action, ColumnAction, Payload, Plan, RowAction, StyleEffect};
 use crate::{Style, StyleKey, StyleState};
 
 /// Cell state recorded before or after one semantic change.
@@ -98,6 +98,34 @@ pub enum RowState {
     Stored { hidden: bool },
 }
 
+/// Exact effective column-record state before or after a visibility edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ColumnState {
+    Missing,
+    Stored { hidden: bool },
+}
+
+impl ColumnState {
+    fn read(value: Option<&crate::column::Stored>) -> Self {
+        value.map_or(Self::Missing, |column| Self::Stored {
+            hidden: column
+                .properties
+                .flags
+                .contains(crate::column::Flags::HIDDEN),
+        })
+    }
+
+    fn after(before: Option<&crate::column::Stored>, action: ColumnAction) -> Self {
+        match (before, action) {
+            (None, ColumnAction::Show) => Self::Missing,
+            (_, action) => Self::Stored {
+                hidden: action.hidden(),
+            },
+        }
+    }
+}
+
 impl RowState {
     fn read(value: Option<&crate::row::Stored>) -> Self {
         value.map_or(Self::Missing, |row| Self::Stored { hidden: row.hidden })
@@ -129,12 +157,20 @@ pub enum Change {
         before: RowState,
         after: RowState,
     },
+    Column {
+        sheet: Box<str>,
+        column: ColumnIndex,
+        before: ColumnState,
+        after: ColumnState,
+    },
 }
 
 impl Change {
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Cell { sheet, .. } | Self::Row { sheet, .. } => sheet,
+            Self::Cell { sheet, .. } | Self::Row { sheet, .. } | Self::Column { sheet, .. } => {
+                sheet
+            },
         }
     }
 
@@ -147,7 +183,7 @@ impl Change {
                 after,
                 ..
             } => Some((*address, before, after)),
-            Self::Row { .. } => None,
+            Self::Row { .. } | Self::Column { .. } => None,
         }
     }
 
@@ -157,7 +193,20 @@ impl Change {
             Self::Row {
                 row, before, after, ..
             } => Some((*row, *before, *after)),
-            Self::Cell { .. } => None,
+            Self::Cell { .. } | Self::Column { .. } => None,
+        }
+    }
+
+    /// Column state tuple when this is a column-property change.
+    pub fn column(&self) -> Option<(ColumnIndex, ColumnState, ColumnState)> {
+        match self {
+            Self::Column {
+                column,
+                before,
+                after,
+                ..
+            } => Some((*column, *before, *after)),
+            Self::Cell { .. } | Self::Row { .. } => None,
         }
     }
 
@@ -182,6 +231,17 @@ impl Change {
             } => Self::Row {
                 sheet: sheet.clone(),
                 row: *row,
+                before: *after,
+                after: *before,
+            },
+            Self::Column {
+                sheet,
+                column,
+                before,
+                after,
+            } => Self::Column {
+                sheet: sheet.clone(),
+                column: *column,
                 before: *after,
                 after: *before,
             },
@@ -218,20 +278,29 @@ pub enum Conflict {
         position: usize,
         rows: Box<[RowIndex]>,
     },
+    Columns {
+        sheet: Box<str>,
+        position: usize,
+        columns: Box<[ColumnIndex]>,
+    },
 }
 
 impl Conflict {
     /// Developer-facing worksheet name.
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Cells { sheet, .. } | Self::Rows { sheet, .. } => sheet,
+            Self::Cells { sheet, .. } | Self::Rows { sheet, .. } | Self::Columns { sheet, .. } => {
+                sheet
+            },
         }
     }
 
     /// Checked zero-based worksheet position in the shared base snapshot.
     pub fn position(&self) -> usize {
         match self {
-            Self::Cells { position, .. } | Self::Rows { position, .. } => *position,
+            Self::Cells { position, .. }
+            | Self::Rows { position, .. }
+            | Self::Columns { position, .. } => *position,
         }
     }
 
@@ -239,7 +308,7 @@ impl Conflict {
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
             Self::Cells { addresses, .. } => Some(addresses),
-            Self::Rows { .. } => None,
+            Self::Rows { .. } | Self::Columns { .. } => None,
         }
     }
 
@@ -247,7 +316,16 @@ impl Conflict {
     pub fn rows(&self) -> Option<&[RowIndex]> {
         match self {
             Self::Rows { rows, .. } => Some(rows),
-            Self::Cells { .. } => None,
+            Self::Cells { .. } | Self::Columns { .. } => None,
+        }
+    }
+
+    /// Deterministically ordered columns written by both edits, when
+    /// applicable.
+    pub fn columns(&self) -> Option<&[ColumnIndex]> {
+        match self {
+            Self::Columns { columns, .. } => Some(columns),
+            Self::Cells { .. } | Self::Rows { .. } => None,
         }
     }
 
@@ -255,6 +333,7 @@ impl Conflict {
         match self {
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
+            Self::Columns { columns, .. } => columns.len(),
         }
     }
 }
@@ -631,15 +710,19 @@ impl GraphChange {
 struct SheetActions {
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<RowIndex, RowAction>,
+    columns: BTreeMap<ColumnIndex, ColumnAction>,
 }
 
 impl SheetActions {
     fn len(&self) -> usize {
-        self.cells.len().saturating_add(self.rows.len())
+        self.cells
+            .len()
+            .saturating_add(self.rows.len())
+            .saturating_add(self.columns.len())
     }
 
     fn is_empty(&self) -> bool {
-        self.cells.is_empty() && self.rows.is_empty()
+        self.cells.is_empty() && self.rows.is_empty() && self.columns.is_empty()
     }
 }
 
@@ -726,6 +809,7 @@ impl Edit {
                         }
                     }
                     accepted.rows.extend(actions.rows);
+                    accepted.columns.extend(actions.columns);
                 },
             }
         }
@@ -804,7 +888,26 @@ impl Edit {
                     after: after_state,
                 });
             }
-            if effective_cells.is_empty() && effective_rows.is_empty() {
+            let mut effective_columns = BTreeMap::new();
+            for (column, action) in requested.columns {
+                let before = store.column_entry(column);
+                let before_state = ColumnState::read(before);
+                let after_state = ColumnState::after(before, action);
+                if before_state == after_state {
+                    continue;
+                }
+                effective_columns.insert(column, action);
+                changes.push(Change::Column {
+                    sheet: data.name.clone().into_boxed_str(),
+                    column,
+                    before: before_state,
+                    after: after_state,
+                });
+            }
+            if effective_cells.is_empty()
+                && effective_rows.is_empty()
+                && effective_columns.is_empty()
+            {
                 continue;
             }
 
@@ -816,6 +919,7 @@ impl Edit {
                 Plan {
                     cells: effective_cells,
                     rows: effective_rows,
+                    columns: effective_columns,
                 },
             )?;
             let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
@@ -843,6 +947,20 @@ impl Edit {
                             return Err(invalid(format!(
                                 "worksheet row edit verification failed at {sheet}!row {}",
                                 row.get()
+                            )));
+                        }
+                    },
+                    Change::Column {
+                        sheet,
+                        column,
+                        after,
+                        ..
+                    } => {
+                        let actual = ColumnState::read(parsed.column_entry(*column));
+                        if actual != *after {
+                            return Err(invalid(format!(
+                                "worksheet column edit verification failed at {sheet}!column {}",
+                                column.get()
                             )));
                         }
                     },
@@ -922,6 +1040,10 @@ impl Edit {
         &mut self.sheets.entry(position).or_default().rows
     }
 
+    fn column_actions(&mut self, position: usize) -> &mut BTreeMap<ColumnIndex, ColumnAction> {
+        &mut self.sheets.entry(position).or_default().columns
+    }
+
     fn conflicts_with(&self, other: &Self) -> ConflictSet {
         let mut conflicts = Vec::new();
         for (position, left) in &self.sheets {
@@ -977,6 +1099,20 @@ impl Edit {
                     rows: rows.into_boxed_slice(),
                 });
             }
+
+            let columns = left
+                .columns
+                .keys()
+                .filter(|column| right.columns.contains_key(column))
+                .copied()
+                .collect::<Vec<_>>();
+            if !columns.is_empty() {
+                conflicts.push(Conflict::Columns {
+                    sheet: sheet.into(),
+                    position: *position,
+                    columns: columns.into_boxed_slice(),
+                });
+            }
         }
         ConflictSet {
             conflicts: conflicts.into_boxed_slice(),
@@ -999,6 +1135,16 @@ impl SheetEdit<'_> {
             edit: &mut *self.edit,
             position: self.position,
             row,
+        })
+    }
+
+    /// Select one checked column for short property-editing verbs.
+    pub fn column(&mut self, at: impl Into<ColumnAt>) -> Result<ColumnEdit<'_>> {
+        let column = at.into().resolve()?;
+        Ok(ColumnEdit {
+            edit: &mut *self.edit,
+            position: self.position,
+            column,
         })
     }
 
@@ -1109,6 +1255,34 @@ impl RowEdit<'_> {
         self.edit
             .row_actions(self.position)
             .insert(self.row, RowAction::Show);
+        self
+    }
+}
+
+/// Transaction-scoped editor for one checked worksheet column.
+#[derive(Debug)]
+pub struct ColumnEdit<'a> {
+    edit: &'a mut Edit,
+    position: usize,
+    column: ColumnIndex,
+}
+
+impl ColumnEdit<'_> {
+    /// Hide this column while preserving its other effective properties and
+    /// every cell record.
+    pub fn hide(&mut self) -> &mut Self {
+        self.edit
+            .column_actions(self.position)
+            .insert(self.column, ColumnAction::Hide);
+        self
+    }
+
+    /// Show this column while preserving its other effective properties and
+    /// every cell record.
+    pub fn show(&mut self) -> &mut Self {
+        self.edit
+            .column_actions(self.position)
+            .insert(self.column, ColumnAction::Show);
         self
     }
 }
@@ -1398,6 +1572,127 @@ mod tests {
             sheet.row(litchi_sheet::ROWS),
             Err(Error::Coordinate(_))
         ));
+    }
+
+    #[test]
+    fn column_visibility_is_checked_reversible_and_composable() {
+        let source = Workbook::new().expect("source workbook");
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("sheet");
+        sheet.set("A1", "left").expect("A1");
+        sheet.set("C1", "right").expect("C1");
+        sheet.column(1).expect("column B").hide();
+        let committed = edit.commit().expect("commit");
+
+        assert_eq!(committed.patch().len(), 3);
+        assert!(committed.patch().changes().iter().any(|change| matches!(
+            change,
+            Change::Column {
+                column,
+                before: ColumnState::Missing,
+                after: ColumnState::Stored { hidden: true },
+                ..
+            } if column.get() == 1
+        )));
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        let column = sheet.column(1).expect("column B");
+        assert!(column.stored());
+        assert!(column.hidden());
+        assert_eq!(sheet.columns().expect("columns").count(), 1);
+        assert!(matches!(
+            sheet.column_style(1).expect("column style"),
+            Some(crate::LocalStyle::Default)
+        ));
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let mut show = committed.workbook().edit().expect("show edit");
+        show.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .column(ColumnIndex::new(1).expect("column B"))
+            .expect("checked column")
+            .show();
+        let shown = show.commit().expect("show commit");
+        let shown_sheet = shown
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet");
+        let shown_column = shown_sheet.column(1).expect("column B");
+        assert!(shown_column.stored());
+        assert!(!shown_column.hidden());
+
+        let mut no_op = source.edit().expect("no-op edit");
+        let mut sheet = no_op.sheet(0usize).expect("lookup").expect("sheet");
+        sheet.column(10).expect("column K").show();
+        assert!(matches!(
+            sheet.column(litchi_sheet::COLUMNS),
+            Err(Error::Coordinate(_))
+        ));
+        assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+
+        let mut cell = source.edit().expect("cell edit");
+        cell.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .set("B1", "orthogonal")
+            .expect("B1");
+        let mut column = source.edit().expect("column edit");
+        column
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .column(1)
+            .expect("column B")
+            .hide();
+        cell.join(column).expect("cell and column join");
+        assert!(
+            cell.commit()
+                .expect("joined commit")
+                .workbook()
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .column(1)
+                .expect("column B")
+                .hidden()
+        );
+
+        let mut left = source.edit().expect("left");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .column(4)
+            .expect("column E")
+            .hide();
+        let mut right = source.edit().expect("right");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .column(4)
+            .expect("column E")
+            .show();
+        let error = left.join(right).expect_err("same column must conflict");
+        assert_eq!(
+            error.conflicts().expect("conflicts").conflicts()[0]
+                .columns()
+                .expect("column conflict"),
+            &[ColumnIndex::new(4).expect("column E")]
+        );
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use litchi_sheet::{Cell as Address, Row as RowIndex};
+use litchi_sheet::{Cell as Address, Column as ColumnIndex, Row as RowIndex};
 
 use crate::workbook::JoinError;
 
@@ -55,6 +55,14 @@ pub enum Error {
         row: RowIndex,
         reason: RowEditBlock,
     },
+    /// A safe column-property edit is forbidden by worksheet state or by an
+    /// extension payload that cannot be split without changing its meaning.
+    #[error("cannot edit column index {column} on sheet '{sheet}': {reason}")]
+    ColumnEditBlocked {
+        sheet: String,
+        column: ColumnIndex,
+        reason: ColumnEditBlock,
+    },
     /// Editing would invalidate an OPC digital signature.
     #[error("signed workbooks require explicit signature stripping before editing")]
     Signed,
@@ -92,6 +100,25 @@ pub enum EditBlock {
 #[non_exhaustive]
 pub enum RowEditBlock {
     ProtectedSheet,
+}
+
+/// Why the ordinary column editor refused a property mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ColumnEditBlock {
+    ProtectedSheet,
+    MarkupCompatibility,
+}
+
+impl std::fmt::Display for ColumnEditBlock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::ProtectedSheet => "the worksheet is protected",
+            Self::MarkupCompatibility => {
+                "the effective column record contains an unmodeled extension payload"
+            },
+        })
+    }
 }
 
 impl std::fmt::Display for RowEditBlock {
