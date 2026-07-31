@@ -15,9 +15,9 @@ use std::sync::{Arc, OnceLock};
 use litchi_core::Selector;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
-use litchi_sheet::{At, Rect};
+use litchi_sheet::{Area, At, Rect};
 
-use crate::cell::{Store, Text};
+use crate::cell::{Extents, Store, Text};
 use crate::error::{Error, Result, invalid};
 use crate::raw;
 use crate::style::StyleLineage;
@@ -193,7 +193,7 @@ impl Workbook {
             concat!(
                 r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
                 r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
-                r#"<sheetData/></worksheet>"#
+                r#"<dimension ref="A1"/><sheetData/></worksheet>"#
             )
             .as_bytes()
             .to_vec(),
@@ -535,15 +535,22 @@ impl Sheet {
         Ok(Some(Style::from_raw(Arc::clone(&self.owner), key)))
     }
 
-    /// Lazily traverse only stored cells inside a checked half-open range.
-    pub fn cells(&self, range: Rect) -> Result<Cells<'_>> {
+    /// Lazily traverse stored cells selected by A1 range, raw zero-based
+    /// half-open bounds, or a reusable checked rectangle.
+    pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
+        let range = area.into().resolve()?;
         Ok(self.store()?.cells(range))
+    }
+
+    /// Distinct declared, stored, content, and directly styled cell bounds.
+    pub fn extents(&self) -> Result<&Extents> {
+        Ok(self.store()?.extents())
     }
 
     /// Bounding rectangle of stored cell records, distinct from declared,
     /// formatted, and content extents.
     pub fn stored_extent(&self) -> Result<Option<Rect>> {
-        Ok(self.store()?.extent())
+        Ok(self.store()?.extents().stored())
     }
 
     fn store(&self) -> Result<&Store> {
@@ -855,6 +862,11 @@ mod tests {
         assert!(matches!(by_name.kind(), SheetKind::Worksheet));
         assert!(matches!(by_name.visibility(), Visibility::Visible));
         assert!(first.sheet(1usize).expect("lookup").is_none());
+        let extents = by_name.extents().expect("empty extents");
+        assert_eq!(extents.declared().map(Rect::a1).as_deref(), Some("A1"));
+        assert_eq!(extents.stored(), None);
+        assert_eq!(extents.content(), None);
+        assert_eq!(extents.styled(), None);
 
         let reopened = Workbook::from_bytes(first.to_bytes().expect("serialize"))
             .expect("reopen generated workbook");
@@ -873,6 +885,7 @@ mod tests {
         assert_send_sync::<Styles>();
         assert_send_sync::<crate::StyleKey>();
         assert_send_sync::<LocalStyle>();
+        assert_send_sync::<Extents>();
 
         let workbook = Workbook::new().expect("valid baseline");
         let clone = workbook.clone();
@@ -1101,13 +1114,19 @@ mod tests {
             Err(Error::Coordinate(_))
         ));
 
-        let range = Rect::at(0, 1, 4, 4).expect("valid range");
         let addresses = sheet
-            .cells(range)
+            .cells("B1:D4")
             .expect("sparse traversal")
             .map(|(address, _)| (address.row().get(), address.column().get()))
             .collect::<Vec<_>>();
         assert_eq!(addresses, [(1, 2), (2, 1)]);
+        assert!(matches!(sheet.cells("B2:A1"), Err(Error::Range(_))));
+        let extents = sheet.extents().expect("cell extents");
+        assert_eq!(extents.declared(), None);
+        assert_eq!(extents.stored().map(Rect::a1).as_deref(), Some("A1:D5"));
+        assert_eq!(extents.content().map(Rect::a1).as_deref(), Some("A1:C3"));
+        assert_eq!(extents.styled().map(Rect::a1).as_deref(), Some("D5"));
+        assert_eq!(extents.used().map(Rect::a1).as_deref(), Some("A1:D5"));
         assert_eq!(
             sheet.stored_extent().expect("extent").map(Rect::end),
             Some((5, 4))

@@ -461,11 +461,58 @@ pub(crate) struct Stored {
 #[derive(Debug, Default)]
 pub(crate) struct Store {
     cells: Box<[Stored]>,
-    extent: Option<Rect>,
+    extents: Extents,
+}
+
+/// Distinct worksheet cell-bound summaries.
+///
+/// Except for the producer-declared hint, these ranges describe stored cell
+/// records only. Row/column defaults, drawings, merges, and other sheet objects
+/// are intentionally not folded into the semantic cell extents.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Extents {
+    declared: Option<Rect>,
+    stored: Option<Rect>,
+    content: Option<Rect>,
+    styled: Option<Rect>,
+}
+
+impl Extents {
+    /// Producer-declared worksheet `dimension`, when present.
+    pub const fn declared(&self) -> Option<Rect> {
+        self.declared
+    }
+
+    /// Bounds of every explicit cell record, including empty metadata cells.
+    pub const fn stored(&self) -> Option<Rect> {
+        self.stored
+    }
+
+    /// Bounds of cells with a value, formula, or unknown primary payload.
+    pub const fn content(&self) -> Option<Rect> {
+        self.content
+    }
+
+    /// Bounds of cells with an explicit local shared-style reference.
+    pub const fn styled(&self) -> Option<Rect> {
+        self.styled
+    }
+
+    /// Bounds of cells with content or direct local formatting.
+    ///
+    /// This does not include formatting inherited from row/column defaults.
+    pub const fn used(&self) -> Option<Rect> {
+        match (self.content, self.styled) {
+            (Some(content), Some(styled)) => Some(content.union(styled)),
+            (Some(content), None) => Some(content),
+            (None, Some(styled)) => Some(styled),
+            (None, None) => None,
+        }
+    }
 }
 
 impl Store {
-    pub(crate) fn from_unsorted(mut cells: Vec<Stored>) -> Result<Self> {
+    pub(crate) fn from_unsorted(mut cells: Vec<Stored>, declared: Option<Rect>) -> Result<Self> {
         cells.sort_unstable_by_key(|entry| entry.address);
         if let Some(pair) = cells
             .windows(2)
@@ -477,10 +524,26 @@ impl Store {
             )));
         }
 
-        let extent = extent(&cells)?;
+        let mut stored = Bounds::default();
+        let mut content = Bounds::default();
+        let mut styled = Bounds::default();
+        for entry in &cells {
+            stored.push(entry.address);
+            if !matches!(entry.cell, Cell::Empty) {
+                content.push(entry.address);
+            }
+            if entry.style.is_some() {
+                styled.push(entry.address);
+            }
+        }
         Ok(Self {
             cells: cells.into_boxed_slice(),
-            extent,
+            extents: Extents {
+                declared,
+                stored: stored.finish()?,
+                content: content.finish()?,
+                styled: styled.finish()?,
+            },
         })
     }
 
@@ -508,31 +571,42 @@ impl Store {
         }
     }
 
-    pub(crate) fn extent(&self) -> Option<Rect> {
-        self.extent
+    pub(crate) const fn extents(&self) -> &Extents {
+        &self.extents
     }
 }
 
-fn extent(cells: &[Stored]) -> Result<Option<Rect>> {
-    let Some(first) = cells.first() else {
-        return Ok(None);
-    };
-    let mut min_row = first.address.row().get();
-    let mut min_column = first.address.column().get();
-    let mut max_row = min_row;
-    let mut max_column = min_column;
-    for entry in &cells[1..] {
-        let row = entry.address.row().get();
-        let column = entry.address.column().get();
-        min_row = min_row.min(row);
-        min_column = min_column.min(column);
-        max_row = max_row.max(row);
-        max_column = max_column.max(column);
+#[derive(Debug, Default)]
+struct Bounds {
+    value: Option<(u32, u32, u32, u32)>,
+}
+
+impl Bounds {
+    fn push(&mut self, address: Address) {
+        let row = address.row().get();
+        let column = address.column().get();
+        self.value = Some(self.value.map_or(
+            (row, column, row, column),
+            |(min_row, min_column, max_row, max_column)| {
+                (
+                    min_row.min(row),
+                    min_column.min(column),
+                    max_row.max(row),
+                    max_column.max(column),
+                )
+            },
+        ));
     }
-    let start = Address::at(min_row, min_column)?;
-    Rect::new(start, max_row + 1, max_column + 1)
-        .map(Some)
-        .map_err(|error| invalid(error.to_string()))
+
+    fn finish(self) -> Result<Option<Rect>> {
+        let Some((min_row, min_column, max_row, max_column)) = self.value else {
+            return Ok(None);
+        };
+        let start = Address::at(min_row, min_column)?;
+        Rect::new(start, max_row + 1, max_column + 1)
+            .map(Some)
+            .map_err(|error| invalid(error.to_string()))
+    }
 }
 
 /// Borrowed sparse cells inside a half-open range.

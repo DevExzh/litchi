@@ -5,7 +5,7 @@ pub(crate) mod edit;
 use std::collections::{HashMap, HashSet};
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
-use litchi_sheet::{COLUMNS, Cell as Address, ROWS};
+use litchi_sheet::{COLUMNS, Cell as Address, ROWS, Rect};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -123,10 +123,12 @@ struct SharedMaster {
 #[derive(Debug)]
 struct Parser {
     cells: Vec<RawCell>,
+    declared_extent: Option<Rect>,
     row: Option<PendingRow>,
     cell: Option<PendingCell>,
     seen_rows: HashSet<u32>,
     previous_row: u32,
+    seen_dimension: bool,
     seen_sheet_data: bool,
 }
 
@@ -144,10 +146,12 @@ impl Parser {
     fn new() -> Self {
         Self {
             cells: Vec::new(),
+            declared_extent: None,
             row: None,
             cell: None,
             seen_rows: HashSet::new(),
             previous_row: 0,
+            seen_dimension: false,
             seen_sheet_data: false,
         }
     }
@@ -255,10 +259,11 @@ impl Parser {
         cells
             .try_reserve(parser.cells.len())
             .map_err(|error| invalid(format!("cannot reserve sparse worksheet cells: {error}")))?;
+        let declared_extent = parser.declared_extent;
         for cell in parser.cells {
             cells.push(materialize(cell, strings)?);
         }
-        Store::from_unsorted(cells)
+        Store::from_unsorted(cells, declared_extent)
     }
 
     fn start(
@@ -268,6 +273,25 @@ impl Parser {
         element: &BytesStart<'_>,
         decoder: Decoder,
     ) -> Result<Context> {
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"dimension")
+        {
+            if self.seen_sheet_data {
+                return Err(invalid("worksheet dimension appears after sheetData"));
+            }
+            if self.seen_dimension {
+                return Err(invalid("worksheet has duplicate dimension elements"));
+            }
+            self.seen_dimension = true;
+            let reference = unqualified_attribute_value(element, b"ref", decoder)?
+                .ok_or_else(|| invalid("worksheet dimension is missing ref"))?;
+            self.declared_extent = Some(Rect::from_a1(&reference).map_err(|error| {
+                invalid(format!(
+                    "invalid worksheet dimension '{reference}': {error}"
+                ))
+            })?);
+            return Ok(Context::Other);
+        }
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
@@ -996,6 +1020,36 @@ mod tests {
             formula.cached().map(Cache::value),
             Some(Value::Number(number)) if number.as_str() == "2"
         ));
+    }
+
+    #[test]
+    fn keeps_declared_stored_content_and_style_extents_distinct() {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}"><dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>1</v></c></row><row r="4"><c r="D4"/></row><row r="9"><c r="F9" s="1"/></row></sheetData></worksheet>"#
+        );
+        let store = parse(xml.as_bytes(), || Ok(None)).expect("valid extents");
+        let extents = store.extents();
+        assert_eq!(extents.declared().map(Rect::a1).as_deref(), Some("B2:F9"));
+        assert_eq!(extents.stored().map(Rect::a1).as_deref(), Some("B2:F9"));
+        assert_eq!(extents.content().map(Rect::a1).as_deref(), Some("B2"));
+        assert_eq!(extents.styled().map(Rect::a1).as_deref(), Some("F9"));
+        assert_eq!(extents.used().map(Rect::a1).as_deref(), Some("B2:F9"));
+    }
+
+    #[test]
+    fn rejects_missing_invalid_and_duplicate_dimensions() {
+        for body in [
+            "<dimension/><sheetData/>",
+            r#"<dimension ref="A0"/><sheetData/>"#,
+            r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#,
+            r#"<sheetData/><dimension ref="A1"/>"#,
+        ] {
+            let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+            assert!(
+                parse(xml.as_bytes(), || Ok(None)).is_err(),
+                "accepted {body}"
+            );
+        }
     }
 
     #[test]

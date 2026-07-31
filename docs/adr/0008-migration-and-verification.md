@@ -60,13 +60,14 @@ Worksheet payloads load on first use into hidden thread-safe snapshot caches.
 The parser streams into a row-major compact sparse slice, resolves shared
 strings through cheaply cloned immutable text, expands shared-formula storage
 records, retains exact numeric lexical forms, and keeps formula cache origin and
-freshness separate. Sparse `cells(range)` traversal and stored extent are now
-implemented; declared/content/formatted extents, rich-text formatting, merge
-coverage, dynamic-array spill states, shared-style definition editing, dense
-budgeted grids, cache eviction, and operation budgets remain open, as does
-replacing remaining parser `Invalid` messages with the full
-structured context taxonomy. The current non-evicting cache is therefore a safe
-migration step, not the weighted-cache design promised by ADR 0005.
+freshness separate. Sparse `cells(range)` traversal and stored extent are
+implemented; the eighth slice later separates declared, content, and direct-
+style extents. Fully resolved formatted extents including row/column defaults,
+rich-text formatting, merge coverage, dynamic-array spill states, shared-style
+definition editing, dense budgeted grids, cache eviction, and operation budgets
+remain open, as does replacing remaining parser `Invalid` messages with the
+full structured context taxonomy. The current non-evicting cache is therefore a
+safe migration step, not the weighted-cache design promised by ADR 0005.
 
 The parser's Office-profile limits follow the checked-in `[MS-OE376]`
 conformance notes: row and column grid bounds, non-decreasing row order, cell
@@ -228,15 +229,59 @@ one existing shared cell format and the public retarget path; it does not yet
 certify shared-format definition editing, every formatting component, or a
 native resave of the Litchi-produced output.
 
-These slices do not yet update the worksheet `dimension` hint or implement row
-and column insertion/deletion, shifting references, merge/group-formula edits,
-validation evaluation, shared-style definition editing or forking, named-style
-and row/column/theme resolution, rich text, dynamic arrays,
-patch serialization, full structured diagnostics, eviction/resource budgets,
-range/structural effect joins, three-way merge, raw-copy preservation of clean
-compressed entries, cancellation-aware save contexts, scratch planning, or
-output budgets. Those remain certification work; no allocation, latency,
-contention, or scaling conclusion follows from the functional tests.
+The eighth implementation slice adds a semantic rectangular selector to
+`litchi-sheet`. `Area` accepts an A1 cell/range as the primary entry, raw
+zero-based half-open bounds as a convenience, or a reusable checked `Rect`.
+`Rect::from_a1`, `FromStr`, compact display, single-cell construction, and
+union all preserve the grid bounds in the type. Parsing follows the checked-in
+`[MS-OE376]` §2.1.1119 Office grammar: one cell or two ordered cell references
+separated by a colon. `Sheet::cells` now accepts these selector forms directly,
+so sparse traversal can use `sheet.cells("B2:F20")` without constructing an
+intermediate range or risking an indexing panic.
+
+Each lazily loaded worksheet now computes a borrowed `Extents` view in the same
+pass that builds its sparse cell store. It keeps producer-declared `dimension`,
+all stored cell records, known/unknown content cells, and cells with explicit
+local styles distinct; `used` is the union of direct content and direct cell
+formatting and explicitly excludes row/column defaults. The parser validates a
+single bounded direct `dimension` before `sheetData`; missing `ref`, reversed or
+out-of-grid references, duplicates, and invalid order are rejected. This keeps
+a producer hint available for diagnostics without treating it as authoritative
+cell content.
+
+New workbooks carry the conventional `A1` dimension. When an ordinary cell
+commit creates a stored record outside an existing declared range, the XML
+surgery expands that range and preserves its prefix, unknown attributes, and
+surrounding bytes. It never narrows a producer range on clear/removal and does
+not invent a missing dimension, because row/column formatting and other used-
+range contributors are not modeled yet. Inverse patches retain the original
+part bytes exactly. The rewrite action and payload types no longer implement
+`Clone`; commit moves the accepted ordered maps through row partitioning, so a
+future regression cannot silently reintroduce whole cell-content copies at
+that boundary. Semantic before/after patch states still clone their owned
+values intentionally. The public edit example produced `A1:D4`, serialized the
+matching dimension, and the public open example recovered the same four sparse
+cell records and extent categories. These type and functional checks do not
+establish an allocation or latency result.
+
+Desktop Excel for macOS opened that eighth-slice artifact without a repair or
+compatibility prompt, reported its used range as A1:D4, displayed the A1 text
+and B2 number, and exposed C3 as a formula evaluating to 84. This is native
+evidence that the tested Excel build accepts the conservatively expanded
+dimension and stored records in this artifact. It does not certify dimension
+shrinking, an Office resave of this exact artifact, other producers, or other
+worksheet feature families.
+
+These slices do not yet shrink or synthesize absent worksheet `dimension`
+hints or implement row and column insertion/deletion, shifting references,
+merge/group-formula edits, validation evaluation, shared-style definition
+editing or forking, named-style and row/column/theme resolution, rich text,
+dynamic arrays, patch serialization, full structured diagnostics,
+eviction/resource budgets, range/structural effect joins, three-way merge,
+raw-copy preservation of clean compressed entries, cancellation-aware save
+contexts, scratch planning, or output budgets. Those remain certification work;
+no allocation, latency, contention, or scaling conclusion follows from the
+functional tests.
 
 ## Evidence levels
 

@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
-use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Row};
+use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Rect, Row};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -24,7 +24,7 @@ use crate::raw::strings::encode_spreadsheet_text;
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Payload {
     Set(Content),
     /// Ensure an explicit empty cell record exists.
@@ -43,7 +43,7 @@ pub(crate) enum StyleEffect {
 ///
 /// `Remove` owns the whole record. An `Update` may independently change its
 /// payload and local style, allowing proven-disjoint effects to be joined.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Action {
     Update {
         payload: Option<Payload>,
@@ -220,6 +220,14 @@ struct SheetData {
     empty: bool,
 }
 
+#[derive(Debug)]
+struct DimensionTag {
+    span: Span,
+    tag: Tag,
+    empty: bool,
+    declared: Rect,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FrameKind {
     Worksheet,
@@ -360,6 +368,7 @@ struct FormulaStorage {
 #[derive(Debug)]
 struct Layout {
     sheet_data: SheetData,
+    dimension: Option<DimensionTag>,
     protected: bool,
     merged: Box<[SelectionRange]>,
     validations: Box<[SelectionRange]>,
@@ -370,6 +379,7 @@ struct Layout {
 #[derive(Debug, Default)]
 struct Scanner {
     sheet_data: Option<SheetData>,
+    dimension: Option<DimensionTag>,
     pending_sheet_data: Option<PendingSheetData>,
     row: Option<PendingRow>,
     cell: Option<PendingCell>,
@@ -384,13 +394,14 @@ struct Scanner {
 pub(crate) fn rewrite(
     content: &[u8],
     sheet: &str,
-    actions: &BTreeMap<Address, Action>,
+    actions: BTreeMap<Address, Action>,
 ) -> Result<Vec<u8>> {
     if actions.is_empty() {
         return Ok(content.to_vec());
     }
     let layout = scan(content)?;
-    validate_actions(&layout, sheet, actions)?;
+    validate_actions(&layout, sheet, &actions)?;
+    let dimension = expanded_dimension(&layout, &actions);
 
     let extra = actions
         .len()
@@ -401,7 +412,19 @@ pub(crate) fn rewrite(
     output
         .try_reserve(extra)
         .map_err(|error| invalid(format!("cannot reserve worksheet edit output: {error}")))?;
-    output.extend_from_slice(&content[..layout.sheet_data.span.start]);
+    if let Some((tag, range)) = dimension {
+        output.extend_from_slice(&content[..tag.span.start]);
+        write_tag(
+            &mut output,
+            &tag.tag,
+            tag.empty,
+            &["ref"],
+            &[("ref", range.a1())],
+        );
+        output.extend_from_slice(&content[tag.span.end..layout.sheet_data.span.start]);
+    } else {
+        output.extend_from_slice(&content[..layout.sheet_data.span.start]);
+    }
     write_sheet_data(&mut output, content, &layout.sheet_data, actions)?;
     output.extend_from_slice(&content[layout.sheet_data.span.end..]);
     Ok(output)
@@ -540,6 +563,12 @@ impl Scanner {
             return Ok(FrameKind::Worksheet);
         }
         if parent == Some(FrameKind::Worksheet)
+            && is_spreadsheetml_name(namespace, element.name(), b"dimension")
+        {
+            self.record_dimension(element, decoder, Span { start, end }, false)?;
+            return Ok(FrameKind::Other);
+        }
+        if parent == Some(FrameKind::Worksheet)
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
             if self.pending_sheet_data.is_some() || self.sheet_data.is_some() {
@@ -601,6 +630,12 @@ impl Scanner {
         span: Span,
     ) -> Result<()> {
         self.scan_guard(namespace, element, decoder)?;
+        if parent == Some(FrameKind::Worksheet)
+            && is_spreadsheetml_name(namespace, element.name(), b"dimension")
+        {
+            self.record_dimension(element, decoder, span, true)?;
+            return Ok(());
+        }
         if parent == Some(FrameKind::Worksheet)
             && is_spreadsheetml_name(namespace, element.name(), b"sheetData")
         {
@@ -917,10 +952,47 @@ impl Scanner {
         Ok(())
     }
 
+    fn record_dimension(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        span: Span,
+        empty: bool,
+    ) -> Result<()> {
+        if self.dimension.is_some() {
+            return Err(invalid(
+                "worksheet has duplicate dimension elements during edit",
+            ));
+        }
+        let reference = unqualified_attribute_value(element, b"ref", decoder)?
+            .ok_or_else(|| invalid("worksheet dimension is missing ref during edit"))?;
+        let declared = Rect::from_a1(&reference).map_err(|error| {
+            invalid(format!(
+                "invalid worksheet dimension '{reference}' during edit: {error}"
+            ))
+        })?;
+        self.dimension = Some(DimensionTag {
+            span,
+            tag: tag(element, decoder)?,
+            empty,
+            declared,
+        });
+        Ok(())
+    }
+
     fn finish_layout(self) -> Result<Layout> {
         let sheet_data = self
             .sheet_data
             .ok_or_else(|| invalid("worksheet cell edits require a direct sheetData element"))?;
+        if self
+            .dimension
+            .as_ref()
+            .is_some_and(|dimension| dimension.span.start >= sheet_data.span.start)
+        {
+            return Err(invalid(
+                "worksheet dimension must precede sheetData during cell edits",
+            ));
+        }
         let mut formula_ranges = Vec::new();
         let mut shared = HashMap::<u32, SelectionRange>::new();
         for formula in &self.formulas {
@@ -958,6 +1030,7 @@ impl Scanner {
         }
         Ok(Layout {
             sheet_data,
+            dimension: self.dimension,
             protected: self.protected,
             merged: self.merged.into_boxed_slice(),
             validations: self.validations.into_boxed_slice(),
@@ -967,18 +1040,51 @@ impl Scanner {
     }
 }
 
+#[derive(Debug, Default)]
+struct CellBounds(Option<Rect>);
+
+impl CellBounds {
+    fn push(&mut self, address: Address) {
+        let cell = Rect::single(address);
+        self.0 = Some(self.0.map_or(cell, |range| range.union(cell)));
+    }
+}
+
+fn expanded_dimension<'a>(
+    layout: &'a Layout,
+    actions: &BTreeMap<Address, Action>,
+) -> Option<(&'a DimensionTag, Rect)> {
+    let dimension = layout.dimension.as_ref()?;
+    let mut bounds = CellBounds::default();
+    for row in &layout.sheet_data.rows {
+        for cell in &row.cells {
+            if !matches!(actions.get(&cell.address), Some(Action::Remove)) {
+                bounds.push(cell.address);
+            }
+        }
+    }
+    for (address, action) in actions {
+        if action.creates_missing() {
+            bounds.push(*address);
+        }
+    }
+    let result = bounds.0?;
+    let expanded = dimension.declared.union(result);
+    (expanded != dimension.declared).then_some((dimension, expanded))
+}
+
 fn write_sheet_data(
     output: &mut Vec<u8>,
     source: &[u8],
     data: &SheetData,
-    actions: &BTreeMap<Address, Action>,
+    actions: BTreeMap<Address, Action>,
 ) -> Result<()> {
     let mut by_row = BTreeMap::<u32, BTreeMap<Address, Action>>::new();
     for (address, action) in actions {
         by_row
             .entry(address.row().get() + 1)
             .or_default()
-            .insert(*address, action.clone());
+            .insert(address, action);
     }
 
     if data.empty {
@@ -1406,7 +1512,7 @@ mod tests {
     #[test]
     fn minimally_rewrites_set_clear_remove_and_new_rows() {
         let xml = format!(
-            r#"<?xml version="1.0"?><x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:dimension ref="A1:D5"/><x:sheetData data="kept">
+            r#"<?xml version="1.0"?><x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:dimension ref="A1:C1" z:hint="kept"/><x:sheetData data="kept">
   <x:row r="1" spans="1:4" z:row="kept"><x:c r="A1" s="2" t="s" z:cell="kept"><x:v>0</x:v><x:extLst><z:data/></x:extLst></x:c><x:c r="C1"><x:v>3</x:v></x:c></x:row>
   <x:row r="5"><x:c r="D5" s="4"/></x:row>
 </x:sheetData><x:extLst><z:untouched value="yes"/></x:extLst></x:worksheet>"#
@@ -1421,9 +1527,10 @@ mod tests {
         actions.insert(Address::from_a1("D5").unwrap(), Action::clear(true));
         actions.insert(Address::from_a1("A3").unwrap(), Action::set(true.into()));
 
-        let edited = rewrite(xml.as_bytes(), "Data", &actions).unwrap();
+        let edited = rewrite(xml.as_bytes(), "Data", actions).unwrap();
         let edited = std::str::from_utf8(&edited).unwrap();
         assert!(edited.contains(r#"z:cell="kept""#));
+        assert!(edited.contains(r#"<x:dimension z:hint="kept" ref="A1:D5"/>"#));
         assert!(edited.contains("<x:extLst><z:data/></x:extLst>"));
         assert!(edited.contains(
             r#"<x:c s="2" z:cell="kept" r="A1" t="inlineStr"><x:is><x:t xml:space="preserve">new &amp; text</x:t></x:is>"#
@@ -1448,6 +1555,57 @@ mod tests {
     }
 
     #[test]
+    fn dimension_expansion_never_narrows_producer_bounds() {
+        let empty =
+            format!(r#"<worksheet xmlns="{S}"><dimension ref="A1"/><sheetData/></worksheet>"#);
+        let created = rewrite(
+            empty.as_bytes(),
+            "Data",
+            BTreeMap::from([(
+                Address::from_a1("C3").expect("address"),
+                Action::set(1_i32.into()),
+            )]),
+        )
+        .expect("create C3");
+        assert!(
+            std::str::from_utf8(&created)
+                .expect("UTF-8")
+                .contains(r#"<dimension ref="A1:C3"/>"#)
+        );
+
+        let populated = format!(
+            r#"<worksheet xmlns="{S}"><dimension ref="A1:C3"/><sheetData><row r="3"><c r="C3"><v>1</v></c></row></sheetData></worksheet>"#
+        );
+        let removed = rewrite(
+            populated.as_bytes(),
+            "Data",
+            BTreeMap::from([(Address::from_a1("C3").expect("address"), Action::Remove)]),
+        )
+        .expect("remove C3");
+        assert!(
+            std::str::from_utf8(&removed)
+                .expect("UTF-8")
+                .contains(r#"<dimension ref="A1:C3"/>"#)
+        );
+
+        let absent = format!(r#"<worksheet xmlns="{S}"><sheetData/></worksheet>"#);
+        let edited = rewrite(
+            absent.as_bytes(),
+            "Data",
+            BTreeMap::from([(
+                Address::from_a1("B2").expect("address"),
+                Action::set(1_i32.into()),
+            )]),
+        )
+        .expect("edit without producer dimension");
+        assert!(
+            !std::str::from_utf8(&edited)
+                .expect("UTF-8")
+                .contains("dimension")
+        );
+    }
+
+    #[test]
     fn style_effects_preserve_payload_and_compose_with_value_effects() {
         let xml = format!(
             r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:sheetData><x:row r="1"><x:c r="A1" s="1" z:keep="yes"><x:v>5</x:v></x:c><x:c r="B1" s="1"/></x:row></x:sheetData></x:worksheet>"#
@@ -1461,7 +1619,7 @@ mod tests {
             (Address::from_a1("D1").unwrap(), combined),
         ]);
 
-        let edited = rewrite(xml.as_bytes(), "Data", &actions).unwrap();
+        let edited = rewrite(xml.as_bytes(), "Data", actions).unwrap();
         let edited = std::str::from_utf8(&edited).unwrap();
         assert!(edited.contains(r#"z:keep="yes" r="A1" s="2"><x:v>5</x:v>"#));
         assert!(edited.contains(r#"<x:c r="B1"/>"#));
@@ -1526,7 +1684,7 @@ mod tests {
             let address = Address::from_a1(address).unwrap();
             let actions = BTreeMap::from([(address, Action::set(1_i32.into()))]);
             assert!(matches!(
-                rewrite(xml.as_bytes(), "Data", &actions),
+                rewrite(xml.as_bytes(), "Data", actions),
                 Err(Error::EditBlocked { reason, .. }) if reason == expected
             ));
         }

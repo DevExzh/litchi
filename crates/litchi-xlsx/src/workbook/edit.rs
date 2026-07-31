@@ -659,10 +659,11 @@ impl Edit {
 
             let part = base.inner.package.get_part(&data.part_uri)?;
             let before = part.blob_arc();
-            let after = raw::worksheet::edit::rewrite(&before, &data.name, &effective)?;
+            let effective_len = effective.len();
+            let after = raw::worksheet::edit::rewrite(&before, &data.name, effective)?;
             let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
             base.inner.validate_styles(&parsed)?;
-            for change in changes.iter().rev().take(effective.len()) {
+            for change in changes.iter().rev().take(effective_len) {
                 let actual = State::read(parsed.entry(change.address), &base);
                 if actual != change.after {
                     return Err(invalid(format!(
@@ -1020,6 +1021,15 @@ mod tests {
             sheet.cell("C3").expect("C3"),
             Some(Cell::Formula(_))
         ));
+        let extents = sheet.extents().expect("committed extents");
+        assert_eq!(
+            extents.declared().map(crate::Rect::a1).as_deref(),
+            Some("A1:C3")
+        );
+        assert_eq!(
+            extents.content().map(crate::Rect::a1).as_deref(),
+            Some("A1:C3")
+        );
 
         let restored = book
             .apply(&committed.patch().inverse())

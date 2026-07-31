@@ -8,6 +8,7 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::str::FromStr;
 
 use litchi_core::Selector;
 use thiserror::Error;
@@ -306,6 +307,16 @@ impl Rect {
         end_column: COLUMNS,
     };
 
+    /// Create a one-cell range.
+    #[inline]
+    pub const fn single(cell: Cell) -> Self {
+        Self {
+            start: cell,
+            end_row: cell.row.get() + 1,
+            end_column: cell.column.get() + 1,
+        }
+    }
+
     /// Create a range from a checked start and raw exclusive end coordinates.
     pub const fn new(start: Cell, end_row: u32, end_column: u32) -> Result<Self, RangeError> {
         if end_row > ROWS || end_column > COLUMNS {
@@ -337,6 +348,28 @@ impl Rect {
     ) -> Result<Self, RangeError> {
         let start = Cell::at(start_row, start_column).map_err(RangeError::Start)?;
         Self::new(start, end_row, end_column)
+    }
+
+    /// Parse one bounded A1 cell or rectangular range.
+    pub fn from_a1(reference: &str) -> Result<Self, RangeError> {
+        let (first, last) = reference.split_once(':').unwrap_or((reference, reference));
+        if last.contains(':') {
+            return Err(RangeError::A1 {
+                reference: reference.into(),
+                source: CoordinateError::A1 {
+                    reference: reference.into(),
+                },
+            });
+        }
+        let first = Cell::from_a1(first).map_err(|source| RangeError::A1 {
+            reference: reference.into(),
+            source,
+        })?;
+        let last = Cell::from_a1(last).map_err(|source| RangeError::A1 {
+            reference: reference.into(),
+            source,
+        })?;
+        Self::new(first, last.row.get() + 1, last.column.get() + 1)
     }
 
     /// Checked inclusive start address.
@@ -371,6 +404,131 @@ impl Rect {
             && address.column.get() >= self.start.column.get()
             && address.column.get() < self.end_column
     }
+
+    /// Smallest rectangle containing both inputs.
+    #[inline]
+    pub const fn union(self, other: Self) -> Self {
+        let start_row = if self.start.row.get() < other.start.row.get() {
+            self.start.row
+        } else {
+            other.start.row
+        };
+        let start_column = if self.start.column.get() < other.start.column.get() {
+            self.start.column
+        } else {
+            other.start.column
+        };
+        Self {
+            start: Cell::new(start_row, start_column),
+            end_row: if self.end_row > other.end_row {
+                self.end_row
+            } else {
+                other.end_row
+            },
+            end_column: if self.end_column > other.end_column {
+                self.end_column
+            } else {
+                other.end_column
+            },
+        }
+    }
+
+    /// Render this range in compact relative A1 notation.
+    pub fn a1(self) -> String {
+        if self.rows() == 1 && self.columns() == 1 {
+            return self.start.a1();
+        }
+        // `Rect::new` proves both exclusive ends are inside the grid and
+        // strictly beyond the start, so their predecessors are valid cells.
+        let last = Cell::new(Row(self.end_row - 1), Column(self.end_column - 1));
+        format!("{}:{last}", self.start.a1())
+    }
+}
+
+impl fmt::Display for Rect {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.a1())
+    }
+}
+
+impl FromStr for Rect {
+    type Err = RangeError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::from_a1(value)
+    }
+}
+
+/// Convenient rectangular-range input accepted by format facades.
+///
+/// A1 notation is the primary entry point. Raw zero-based half-open bounds
+/// remain available, while a checked [`Rect`] avoids repeated validation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Area<'a> {
+    /// A checked rectangle.
+    Range(Rect),
+    /// Raw zero-based half-open bounds.
+    Bounds {
+        start_row: u32,
+        start_column: u32,
+        end_row: u32,
+        end_column: u32,
+    },
+    /// A borrowed or owned A1 cell/range reference.
+    A1(Cow<'a, str>),
+}
+
+impl Area<'_> {
+    /// Resolve this input into a checked rectangle.
+    #[inline]
+    pub fn resolve(self) -> Result<Rect, RangeError> {
+        match self {
+            Self::Range(range) => Ok(range),
+            Self::Bounds {
+                start_row,
+                start_column,
+                end_row,
+                end_column,
+            } => Rect::at(start_row, start_column, end_row, end_column),
+            Self::A1(reference) => Rect::from_a1(&reference),
+        }
+    }
+}
+
+impl<'a> From<Rect> for Area<'a> {
+    fn from(value: Rect) -> Self {
+        Self::Range(value)
+    }
+}
+
+impl<'a> From<(u32, u32, u32, u32)> for Area<'a> {
+    fn from((start_row, start_column, end_row, end_column): (u32, u32, u32, u32)) -> Self {
+        Self::Bounds {
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+        }
+    }
+}
+
+impl<'a> From<&'a str> for Area<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::A1(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<&'a String> for Area<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::A1(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<String> for Area<'a> {
+    fn from(value: String) -> Self {
+        Self::A1(Cow::Owned(value))
+    }
 }
 
 /// Invalid spreadsheet coordinate.
@@ -395,6 +553,13 @@ pub enum RangeError {
     /// The inclusive start is outside the grid.
     #[error("invalid range start: {0}")]
     Start(CoordinateError),
+    /// The string is not one bounded A1 cell or rectangular range.
+    #[error("invalid A1 range '{reference}': {source}")]
+    A1 {
+        reference: String,
+        #[source]
+        source: CoordinateError,
+    },
     /// The exclusive end exceeds the grid boundary.
     #[error("range end ({row}, {column}) exceeds exclusive grid boundary ({ROWS}, {COLUMNS})")]
     EndOutsideGrid { row: u32, column: u32 },
@@ -453,6 +618,27 @@ mod tests {
         assert!(!range.contains(Cell::at(2, 5).expect("valid address")));
         assert_eq!(Rect::ALL.end(), (ROWS, COLUMNS));
         assert!(Rect::ALL.contains(Cell::at(ROWS - 1, COLUMNS - 1).expect("last cell")));
+    }
+
+    #[test]
+    fn a1_areas_are_checked_compact_and_selector_friendly() {
+        let range = Rect::from_a1("$B$2:D4").expect("bounded area");
+        assert_eq!(range.start(), Cell::at(1, 1).expect("start"));
+        assert_eq!(range.end(), (4, 4));
+        assert_eq!(range.a1(), "B2:D4");
+        assert_eq!(
+            Rect::from_a1("XFD1048576").map(Rect::a1).as_deref(),
+            Ok("XFD1048576")
+        );
+
+        let expanded = range.union(Rect::single(Cell::from_a1("A9").expect("cell")));
+        assert_eq!(expanded.to_string(), "A2:D9");
+        assert_eq!(Area::from("B2:D4").resolve(), Ok(range));
+        assert_eq!(Area::from((1, 1, 4, 4)).resolve(), Ok(range));
+
+        for invalid in ["", "A", "A0", "XFE1", "A1:B2:C3", "B2:A1"] {
+            assert!(Rect::from_a1(invalid).is_err(), "accepted {invalid}");
+        }
     }
 
     #[test]

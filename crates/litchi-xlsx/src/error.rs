@@ -25,6 +25,9 @@ pub enum Error {
     /// A spreadsheet coordinate lies outside its typed domain.
     #[error(transparent)]
     Coordinate(#[from] litchi_sheet::CoordinateError),
+    /// A spreadsheet range is empty, inverted, or outside its typed domain.
+    #[error(transparent)]
+    Range(#[from] litchi_sheet::RangeError),
     /// An XLSX structural invariant is invalid.
     #[error("invalid XLSX structure: {0}")]
     Invalid(String),

@@ -16,6 +16,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             sheet.kind()
         );
         if sheet.kind() == SheetKind::Worksheet {
+            let extents = sheet.extents()?;
+            println!(
+                "  bounds: declared={:?}, used={:?}, stored={:?}",
+                extents.declared().map(Rect::a1),
+                extents.used().map(Rect::a1),
+                extents.stored().map(Rect::a1),
+            );
             for (address, cell) in sheet.cells(Rect::ALL)? {
                 println!(
                     "  ({}, {}): {cell:?}",
