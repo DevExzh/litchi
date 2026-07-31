@@ -363,9 +363,100 @@ This certifies this hide/read/native-resave path on the tested Excel build; it
 does not certify column width editing, outline/style authoring, structural
 column shifts, protected-sheet permission exceptions, or other Office builds.
 
+The eleventh implementation slice completes the first workbook/row/column
+visibility family with selector-first sheet-tab updates. Workbook-level
+`edit.tab(name_or_position)?` deliberately accepts every sheet kind, while
+worksheet-only `edit.sheet(...)` remains the cell and grid-property entry
+point. A borrowed `TabEdit` exposes the short verbs `show`, `hide`, and
+`very_hide`; the last maps to SpreadsheetML `veryHidden`, which Excel omits
+from its ordinary Unhide dialog. Read-side `Visibility` retains unknown
+producer values and adds `is_visible`, `is_hidden`, and `is_very_hidden` for
+the recognized cases. This keeps native sheet IDs and relationship IDs out of
+the facade without forcing routine callers to match an enum for a boolean
+query.
+
+The transaction computes the final visibility set before touching package
+bytes. It refuses any result without a recognized visible tab, treating an
+unknown producer state as insufficient proof of visibility. If the active tab
+would become hidden, the transaction selects the next final visible tab in
+workbook order with wraparound; if the source active position is absent or
+invalid internally, it falls back to the first visible tab. That arithmetic is
+total even for an empty catalog. The checked-in `[MS-XLSB]` §2.5.143 state
+table corroborates visible, hidden, and very-hidden semantics, while
+`[MS-OE376]` §2.1.622 records Office's 0-through-32766 `activeTab` bound. An
+explicit `show` can replace an unknown source state, but ordinary commits never
+guess that the unknown value already means visible.
+
+Workbook XML surgery matches the selected semantic sheet through its private
+relationship ID, regenerates only touched direct `sheet` start tags, and
+removes `state` entirely for the default visible state. Unknown attributes,
+namespace prefixes, child payloads, interstitial XML, subsequent workbook
+views, and every untouched byte remain preserved. Active relocation updates
+the first direct `workbookView`; an absent view is inserted into an existing
+safe `bookViews` container or a prefixed `bookViews` is inserted in schema
+order before `sheets`. The same atomic effect synchronizes
+`sheetView[@workbookViewId=0]/@tabSelected` in the old and new active sheet
+parts. Existing view payloads remain intact. When a new selected view is
+needed, the editor inserts the minimal prefixed structure after the last
+schema predecessor (`sheetPr`/`dimension`) for worksheet/dialog/macro sheets
+or after `sheetPr` for chart sheets. This
+implements the SpreadsheetML rule documented by Microsoft's
+[`SheetView` reference](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.sheetview):
+a singly selected sheet's `tabSelected` state should agree with
+`activeTab`; multiple tabs may be selected, but only one is active.
+
+Workbook structure protection returns a typed block. Effective sheets without
+a direct editable slot, or selection/view insertion beside an unmodeled
+compatibility alternative, also return a typed block rather than allowing a
+lossy rewrite. Unrelated compatibility content remains exact; a
+structure-protection element nested in such content is still detected
+conservatively. The final workbook catalog and every rewritten per-sheet view
+are reparsed to verify requested visibility, active position, and selection
+bits before publishing the immutable snapshot.
+
+Tab visibility is an orthogonal transaction facet. Two prepared visibility
+effects on the same tab conflict, while a tab effect can join cell, row, or
+column work on that sheet without exposing a lock. A single composed workbook
+part delta carries both tab changes and recalculation invalidation, while a
+single part composer folds selection synchronization into any simultaneous
+worksheet edit. This avoids duplicate source expectations for either part.
+`Change::Visibility` records the semantic before/after states and checked
+position; inverse patches restore the exact source bytes. Focused tests cover
+name and numeric selectors,
+visible/hidden/VeryHidden transitions, last-visible refusal, active relocation,
+unknown-state repair, no-op filtering, structure protection, compatibility
+blocks, prefix and unknown-attribute retention, non-worksheet tabs, per-sheet
+selection synchronization and schema-ordered insertion, reversible bytes, tab
+conflicts, tab/cell joins, and workbook/recalculation composition. The
+rewriter reserves the exact computed output length and borrows tab names and
+relationship IDs for the duration of the synchronous rewrite rather than
+copying them into another owned catalog. These are functional and algorithmic
+properties, not allocation or latency measurements.
+
+The first native Excel probe prevented an incomplete implementation from being
+accepted. Excel opened the initial hidden-tab artifact without repair and hid
+Sheet2, but displayed `[Group]` in the title because the workbook's
+`activeTab` had moved while Sheet2's `tabSelected="1"` remained stale. The
+dependency was added to the transaction and the artifact regenerated from an
+Excel-authored two-sheet baseline. Desktop Excel for macOS 16.110.2 (build
+16.110.26062818) then opened the corrected ordinary-hidden artifact without
+repair, displayed only Sheet1 with no grouped-sheet marker, edited C1, and
+resaved. ZIP validation passed; the
+public reader recovered the Excel-authored C1 text, Sheet1 as visible, and
+Sheet2 as hidden. Excel also opened the VeryHidden artifact without repair;
+its ordinary **Unhide Sheet** command was disabled, as expected when no
+ordinary-hidden sheet exists. After another C1 edit and resave, ZIP validation
+passed and the reader recovered both the Excel-authored text and Sheet2 as
+VeryHidden. This certifies these two active-tab hide/edit/resave/reverse-read
+paths on the tested Excel build. It does not certify grouped-selection
+preservation under every visibility transition, protected-workbook unlocking,
+other sheet kinds in native Office, or other Office builds.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement row/column properties beyond visibility, row and column
-insertion/deletion, shifting references, merge/group-formula edits,
+hints or implement sheet add/delete/rename/reorder, direct active-tab
+selection, workbook-protection unlocking, row/column properties beyond
+visibility, row and column insertion/deletion, shifting references,
+merge/group-formula edits,
 validation evaluation, shared-style definition editing or forking, named-style
 and row/column/theme resolution, rich text, dynamic arrays, patch serialization,
 full structured diagnostics, eviction/resource budgets, range/structural effect

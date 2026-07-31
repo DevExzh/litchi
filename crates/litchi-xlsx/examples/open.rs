@@ -10,10 +10,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let workbook = Workbook::open(path)?;
     for sheet in workbook.sheets() {
         println!(
-            "{}: {} ({:?})",
+            "{}: {} ({:?}, {:?})",
             sheet.position(),
             sheet.name(),
-            sheet.kind()
+            sheet.kind(),
+            sheet.visibility()
         );
         if sheet.kind() == SheetKind::Worksheet {
             let extents = sheet.extents()?;

@@ -63,6 +63,14 @@ pub enum Error {
         column: ColumnIndex,
         reason: ColumnEditBlock,
     },
+    /// A safe workbook tab edit is forbidden by workbook structure or by an
+    /// extension payload whose effective catalog cannot be edited losslessly.
+    #[error("cannot edit tab at position {position} ('{sheet}'): {reason}")]
+    TabEditBlocked {
+        sheet: String,
+        position: usize,
+        reason: TabEditBlock,
+    },
     /// Editing would invalidate an OPC digital signature.
     #[error("signed workbooks require explicit signature stripping before editing")]
     Signed,
@@ -108,6 +116,27 @@ pub enum RowEditBlock {
 pub enum ColumnEditBlock {
     ProtectedSheet,
     MarkupCompatibility,
+}
+
+/// Why the workbook tab editor refused a visibility mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TabEditBlock {
+    LastVisibleTab,
+    ProtectedWorkbook,
+    MarkupCompatibility,
+}
+
+impl std::fmt::Display for TabEditBlock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::LastVisibleTab => "the workbook must retain at least one visible tab",
+            Self::ProtectedWorkbook => "the workbook structure is protected",
+            Self::MarkupCompatibility => {
+                "the effective workbook catalog contains unmodeled compatibility markup"
+            },
+        })
+    }
 }
 
 impl std::fmt::Display for ColumnEditBlock {

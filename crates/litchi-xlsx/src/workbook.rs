@@ -4,7 +4,7 @@ mod edit;
 
 pub use edit::{
     Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure,
-    Patch, RowEdit, RowState, SheetEdit, State,
+    Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
 };
 
 use std::collections::HashMap;
@@ -104,6 +104,23 @@ pub enum Visibility {
     Unknown(Box<str>),
 }
 
+impl Visibility {
+    /// Whether Excel displays this sheet tab.
+    pub const fn is_visible(&self) -> bool {
+        matches!(self, Self::Visible)
+    }
+
+    /// Whether this tab is hidden by either recognized mechanism.
+    pub const fn is_hidden(&self) -> bool {
+        matches!(self, Self::Hidden | Self::VeryHidden)
+    }
+
+    /// Whether Excel omits this tab from its ordinary Unhide dialog.
+    pub const fn is_very_hidden(&self) -> bool {
+        matches!(self, Self::VeryHidden)
+    }
+}
+
 impl From<raw::Visibility> for Visibility {
     fn from(value: raw::Visibility) -> Self {
         match value {
@@ -125,7 +142,6 @@ struct SheetData {
     cells: OnceLock<Store>,
     #[allow(dead_code)]
     native_id: u32,
-    #[allow(dead_code)]
     relationship_id: String,
 }
 

@@ -3,9 +3,11 @@
 //! Relationship IDs and native sheet IDs are deliberately isolated here.
 
 mod catalog;
+pub(crate) mod catalog_edit;
 mod formula;
 pub mod namespace;
 pub(crate) mod recalc;
+pub(crate) mod sheet_view_edit;
 pub(crate) mod strings;
 pub(crate) mod styles;
 pub(crate) mod worksheet;

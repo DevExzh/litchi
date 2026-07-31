@@ -7,9 +7,9 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use litchi_sheet::{At, Cell as Address, Column as ColumnIndex, ColumnAt, Row as RowIndex, RowAt};
 
-use super::{Sheet, SheetKind, SheetSelector, Workbook};
+use super::{Sheet, SheetKind, SheetSelector, Visibility, Workbook};
 use crate::cell::{Cell, Content, Stored};
-use crate::error::{EditBlock, Error, Result, invalid};
+use crate::error::{EditBlock, Error, Result, TabEditBlock, invalid};
 use crate::raw;
 use crate::raw::worksheet::edit::{Action, ColumnAction, Payload, Plan, RowAction, StyleEffect};
 use crate::{Style, StyleKey, StyleState};
@@ -145,6 +145,12 @@ impl RowState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Change {
+    Visibility {
+        sheet: Box<str>,
+        position: usize,
+        before: Visibility,
+        after: Visibility,
+    },
     Cell {
         sheet: Box<str>,
         address: Address,
@@ -168,9 +174,23 @@ pub enum Change {
 impl Change {
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Cell { sheet, .. } | Self::Row { sheet, .. } | Self::Column { sheet, .. } => {
-                sheet
-            },
+            Self::Visibility { sheet, .. }
+            | Self::Cell { sheet, .. }
+            | Self::Row { sheet, .. }
+            | Self::Column { sheet, .. } => sheet,
+        }
+    }
+
+    /// Visibility state tuple when this is a workbook tab change.
+    pub fn visibility(&self) -> Option<(usize, &Visibility, &Visibility)> {
+        match self {
+            Self::Visibility {
+                position,
+                before,
+                after,
+                ..
+            } => Some((*position, before, after)),
+            Self::Cell { .. } | Self::Row { .. } | Self::Column { .. } => None,
         }
     }
 
@@ -183,7 +203,7 @@ impl Change {
                 after,
                 ..
             } => Some((*address, before, after)),
-            Self::Row { .. } | Self::Column { .. } => None,
+            Self::Visibility { .. } | Self::Row { .. } | Self::Column { .. } => None,
         }
     }
 
@@ -193,7 +213,7 @@ impl Change {
             Self::Row {
                 row, before, after, ..
             } => Some((*row, *before, *after)),
-            Self::Cell { .. } | Self::Column { .. } => None,
+            Self::Visibility { .. } | Self::Cell { .. } | Self::Column { .. } => None,
         }
     }
 
@@ -206,12 +226,23 @@ impl Change {
                 after,
                 ..
             } => Some((*column, *before, *after)),
-            Self::Cell { .. } | Self::Row { .. } => None,
+            Self::Visibility { .. } | Self::Cell { .. } | Self::Row { .. } => None,
         }
     }
 
     fn inverse(&self) -> Self {
         match self {
+            Self::Visibility {
+                sheet,
+                position,
+                before,
+                after,
+            } => Self::Visibility {
+                sheet: sheet.clone(),
+                position: *position,
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::Cell {
                 sheet,
                 address,
@@ -264,10 +295,14 @@ impl Change {
     }
 }
 
-/// Overlapping effects on one logical worksheet.
+/// Overlapping effects on one logical workbook sheet.
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Conflict {
+    Tab {
+        sheet: Box<str>,
+        position: usize,
+    },
     Cells {
         sheet: Box<str>,
         position: usize,
@@ -286,29 +321,36 @@ pub enum Conflict {
 }
 
 impl Conflict {
-    /// Developer-facing worksheet name.
+    /// Developer-facing sheet name.
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Cells { sheet, .. } | Self::Rows { sheet, .. } | Self::Columns { sheet, .. } => {
-                sheet
-            },
+            Self::Tab { sheet, .. }
+            | Self::Cells { sheet, .. }
+            | Self::Rows { sheet, .. }
+            | Self::Columns { sheet, .. } => sheet,
         }
     }
 
-    /// Checked zero-based worksheet position in the shared base snapshot.
+    /// Checked zero-based sheet position in the shared base snapshot.
     pub fn position(&self) -> usize {
         match self {
-            Self::Cells { position, .. }
+            Self::Tab { position, .. }
+            | Self::Cells { position, .. }
             | Self::Rows { position, .. }
             | Self::Columns { position, .. } => *position,
         }
+    }
+
+    /// Whether both edits target this sheet tab's visibility.
+    pub const fn is_tab(&self) -> bool {
+        matches!(self, Self::Tab { .. })
     }
 
     /// Deterministically ordered cells written by both edits, when applicable.
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
             Self::Cells { addresses, .. } => Some(addresses),
-            Self::Rows { .. } | Self::Columns { .. } => None,
+            Self::Tab { .. } | Self::Rows { .. } | Self::Columns { .. } => None,
         }
     }
 
@@ -316,7 +358,7 @@ impl Conflict {
     pub fn rows(&self) -> Option<&[RowIndex]> {
         match self {
             Self::Rows { rows, .. } => Some(rows),
-            Self::Cells { .. } | Self::Columns { .. } => None,
+            Self::Tab { .. } | Self::Cells { .. } | Self::Columns { .. } => None,
         }
     }
 
@@ -325,12 +367,13 @@ impl Conflict {
     pub fn columns(&self) -> Option<&[ColumnIndex]> {
         match self {
             Self::Columns { columns, .. } => Some(columns),
-            Self::Cells { .. } | Self::Rows { .. } => None,
+            Self::Tab { .. } | Self::Cells { .. } | Self::Rows { .. } => None,
         }
     }
 
     fn len(&self) -> usize {
         match self {
+            Self::Tab { .. } => 1,
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
@@ -708,6 +751,7 @@ impl GraphChange {
 
 #[derive(Debug, Default)]
 struct SheetActions {
+    visibility: Option<TabAction>,
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<RowIndex, RowAction>,
     columns: BTreeMap<ColumnIndex, ColumnAction>,
@@ -715,14 +759,42 @@ struct SheetActions {
 
 impl SheetActions {
     fn len(&self) -> usize {
-        self.cells
-            .len()
+        usize::from(self.visibility.is_some())
+            .saturating_add(self.cells.len())
             .saturating_add(self.rows.len())
             .saturating_add(self.columns.len())
     }
 
     fn is_empty(&self) -> bool {
-        self.cells.is_empty() && self.rows.is_empty() && self.columns.is_empty()
+        self.visibility.is_none()
+            && self.cells.is_empty()
+            && self.rows.is_empty()
+            && self.columns.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TabAction {
+    Show,
+    Hide,
+    VeryHide,
+}
+
+impl TabAction {
+    const fn visibility(self) -> Visibility {
+        match self {
+            Self::Show => Visibility::Visible,
+            Self::Hide => Visibility::Hidden,
+            Self::VeryHide => Visibility::VeryHidden,
+        }
+    }
+
+    const fn raw(self) -> raw::catalog_edit::State {
+        match self {
+            Self::Show => raw::catalog_edit::State::Visible,
+            Self::Hide => raw::catalog_edit::State::Hidden,
+            Self::VeryHide => raw::catalog_edit::State::VeryHidden,
+        }
     }
 }
 
@@ -763,6 +835,21 @@ impl Edit {
         }))
     }
 
+    /// Select any workbook sheet tab by its developer-facing name or checked
+    /// zero-based position. Unlike [`Self::sheet`], this entry point also
+    /// accepts chart, dialog, and macro sheets because visibility belongs to
+    /// the workbook catalog rather than worksheet cell storage.
+    pub fn tab<'e, 's>(
+        &'e mut self,
+        selector: impl Into<SheetSelector<'s>>,
+    ) -> Result<Option<TabEdit<'e>>> {
+        let tab = self.base.sheet(selector)?;
+        Ok(tab.map(|tab| TabEdit {
+            edit: self,
+            position: tab.position(),
+        }))
+    }
+
     pub fn len(&self) -> usize {
         self.sheets.values().map(SheetActions::len).sum()
     }
@@ -798,6 +885,9 @@ impl Edit {
                 },
                 Entry::Occupied(entry) => {
                     let accepted = entry.into_mut();
+                    if accepted.visibility.is_none() {
+                        accepted.visibility = actions.visibility;
+                    }
                     for (address, action) in actions.cells {
                         match accepted.cells.entry(address) {
                             Entry::Vacant(entry) => {
@@ -829,11 +919,113 @@ impl Edit {
         let mut changes = Vec::new();
         let mut parts = Vec::new();
         let mut needs_recalculation = false;
+
+        let mut effective_tabs = Vec::new();
+        for (position, requested) in &sheets {
+            let Some(action) = requested.visibility else {
+                continue;
+            };
+            let data =
+                base.inner.sheets.get(*position).ok_or_else(|| {
+                    invalid(format!("edited sheet position {position} disappeared"))
+                })?;
+            let after = action.visibility();
+            if data.visibility == after {
+                continue;
+            }
+            effective_tabs.push((*position, action));
+        }
+
+        let final_is_visible = |position: usize| {
+            sheets
+                .get(&position)
+                .and_then(|requested| requested.visibility)
+                .map_or_else(
+                    || {
+                        base.inner
+                            .sheets
+                            .get(position)
+                            .is_some_and(|sheet| sheet.visibility == Visibility::Visible)
+                    },
+                    |action| action == TabAction::Show,
+                )
+        };
+        if !effective_tabs.is_empty() && !(0..base.inner.sheets.len()).any(&final_is_visible) {
+            let (position, _) = effective_tabs
+                .iter()
+                .find(|(_, action)| *action != TabAction::Show)
+                .copied()
+                .ok_or_else(|| invalid("tab visibility invariant failed without a hide action"))?;
+            let data = base
+                .inner
+                .sheets
+                .get(position)
+                .ok_or_else(|| invalid("last visible tab disappeared during edit"))?;
+            return Err(Error::TabEditBlocked {
+                sheet: data.name.clone(),
+                position,
+                reason: TabEditBlock::LastVisibleTab,
+            });
+        }
+
+        let current_active = base.inner.active_sheet;
+        let final_active =
+            if effective_tabs.is_empty() || current_active.is_some_and(final_is_visible) {
+                current_active
+            } else {
+                let len = base.inner.sheets.len();
+                if len == 0 {
+                    None
+                } else {
+                    current_active
+                        .filter(|current| *current < len)
+                        .and_then(|current| {
+                            let remaining = len - current;
+                            (1..=len)
+                                .map(|offset| {
+                                    if offset >= remaining {
+                                        offset - remaining
+                                    } else {
+                                        current + offset
+                                    }
+                                })
+                                .find(|position| final_is_visible(*position))
+                        })
+                        .or_else(|| (0..len).find(|position| final_is_visible(*position)))
+                }
+            };
+        let active_change = (final_active != current_active)
+            .then_some(final_active)
+            .flatten();
+
+        for (position, action) in &effective_tabs {
+            let data = base
+                .inner
+                .sheets
+                .get(*position)
+                .ok_or_else(|| invalid("effective tab disappeared during edit"))?;
+            changes.push(Change::Visibility {
+                sheet: data.name.clone().into_boxed_str(),
+                position: *position,
+                before: data.visibility.clone(),
+                after: action.visibility(),
+            });
+        }
+
         for (position, requested) in sheets {
             let data =
                 base.inner.sheets.get(position).cloned().ok_or_else(|| {
                     invalid(format!("edited sheet position {position} disappeared"))
                 })?;
+            let SheetActions {
+                visibility: _,
+                cells,
+                rows,
+                columns,
+            } = requested;
+            if cells.is_empty() && rows.is_empty() && columns.is_empty() {
+                continue;
+            }
             if data.kind != SheetKind::Worksheet {
                 return Err(Error::NotWorksheet {
                     sheet: data.name.clone(),
@@ -846,7 +1038,7 @@ impl Edit {
             let store = sheet.store()?;
             let change_start = changes.len();
             let mut effective_cells = BTreeMap::new();
-            for (address, action) in requested.cells {
+            for (address, action) in cells {
                 let before = store.entry(address);
                 if before.is_some_and(|stored| matches!(stored.cell, Cell::Unknown(_)))
                     && action.payload().is_some()
@@ -873,7 +1065,7 @@ impl Edit {
                 });
             }
             let mut effective_rows = BTreeMap::new();
-            for (row, action) in requested.rows {
+            for (row, action) in rows {
                 let before = store.row_entry(row);
                 let before_state = RowState::read(before);
                 let after_state = RowState::after(before, action);
@@ -889,7 +1081,7 @@ impl Edit {
                 });
             }
             let mut effective_columns = BTreeMap::new();
-            for (column, action) in requested.columns {
+            for (column, action) in columns {
                 let before = store.column_entry(column);
                 let before_state = ColumnState::read(before);
                 let after_state = ColumnState::after(before, action);
@@ -926,6 +1118,7 @@ impl Edit {
             base.inner.validate_styles(&parsed)?;
             for change in &changes[change_start..] {
                 match change {
+                    Change::Visibility { .. } => {},
                     Change::Cell {
                         sheet,
                         address,
@@ -973,12 +1166,54 @@ impl Edit {
             });
         }
 
-        if parts.is_empty() {
-            return Ok(Commit {
-                workbook: base,
-                patch: Patch::default(),
-            });
+        if let Some(new_active) = active_change {
+            if let Some(old_active) = current_active {
+                let data =
+                    base.inner.sheets.get(old_active).ok_or_else(|| {
+                        invalid("previous active sheet disappeared during tab edit")
+                    })?;
+                if data.kind == SheetKind::Unknown {
+                    return Err(Error::TabEditBlocked {
+                        sheet: data.name.clone(),
+                        position: old_active,
+                        reason: TabEditBlock::MarkupCompatibility,
+                    });
+                }
+                compose_part(&mut parts, &base, &data.part_uri, |content| {
+                    raw::sheet_view_edit::rewrite(
+                        content,
+                        false,
+                        raw::sheet_view_edit::Context {
+                            sheet: &data.name,
+                            position: old_active,
+                        },
+                    )
+                })?;
+            }
+            let data = base
+                .inner
+                .sheets
+                .get(new_active)
+                .ok_or_else(|| invalid("new active sheet disappeared during tab edit"))?;
+            if data.kind == SheetKind::Unknown {
+                return Err(Error::TabEditBlocked {
+                    sheet: data.name.clone(),
+                    position: new_active,
+                    reason: TabEditBlock::MarkupCompatibility,
+                });
+            }
+            compose_part(&mut parts, &base, &data.part_uri, |content| {
+                raw::sheet_view_edit::rewrite(
+                    content,
+                    true,
+                    raw::sheet_view_edit::Context {
+                        sheet: &data.name,
+                        position: new_active,
+                    },
+                )
+            })?;
         }
+
         let style_guard = changes
             .iter()
             .any(Change::uses_shared_style)
@@ -998,10 +1233,60 @@ impl Edit {
         } else {
             Vec::new()
         };
-        if needs_recalculation {
+
+        if !effective_tabs.is_empty() || needs_recalculation {
             let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
             let before = workbook_part.blob_arc();
-            let after = raw::recalc::invalidate(&before)?;
+            let mut after = if effective_tabs.is_empty() {
+                raw::recalc::invalidate(&before)?
+            } else {
+                let tabs = effective_tabs
+                    .iter()
+                    .map(|(position, action)| {
+                        let data = base.inner.sheets.get(*position).ok_or_else(|| {
+                            invalid("tab rewrite target disappeared during commit")
+                        })?;
+                        Ok(raw::catalog_edit::Tab {
+                            sheet: &data.name,
+                            position: *position,
+                            relationship_id: &data.relationship_id,
+                            state: action.raw(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                raw::catalog_edit::rewrite(
+                    &before,
+                    raw::catalog_edit::Plan {
+                        tabs,
+                        active: active_change,
+                    },
+                )?
+            };
+            if needs_recalculation && !effective_tabs.is_empty() {
+                after = raw::recalc::invalidate(&after)?;
+            }
+            if !effective_tabs.is_empty() {
+                let catalog = raw::parse_catalog(&after)?;
+                if Some(catalog.active_sheet_index) != final_active {
+                    return Err(invalid("workbook active-tab edit verification failed"));
+                }
+                for (position, action) in &effective_tabs {
+                    let actual = catalog
+                        .sheets
+                        .get(*position)
+                        .ok_or_else(|| invalid("workbook tab edit verification lost a sheet"))?;
+                    if !raw_visibility_matches(&actual.visibility, *action) {
+                        let sheet = base
+                            .inner
+                            .sheets
+                            .get(*position)
+                            .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+                        return Err(invalid(format!(
+                            "workbook tab visibility verification failed at {sheet}"
+                        )));
+                    }
+                }
+            }
             if after.as_slice() != before.as_slice() {
                 parts.push(PartChange {
                     uri: base.inner.workbook_uri.clone(),
@@ -1009,6 +1294,13 @@ impl Edit {
                     after: Arc::new(after),
                 });
             }
+        }
+
+        if changes.is_empty() && parts.is_empty() && graph.is_empty() {
+            return Ok(Commit {
+                workbook: base,
+                patch: Patch::default(),
+            });
         }
         let mut package = base.inner.package.clone();
         for part in &parts {
@@ -1036,6 +1328,10 @@ impl Edit {
         &mut self.sheets.entry(position).or_default().cells
     }
 
+    fn set_visibility(&mut self, position: usize, action: TabAction) {
+        self.sheets.entry(position).or_default().visibility = Some(action);
+    }
+
     fn row_actions(&mut self, position: usize) -> &mut BTreeMap<RowIndex, RowAction> {
         &mut self.sheets.entry(position).or_default().rows
     }
@@ -1056,6 +1352,12 @@ impl Edit {
                 .sheets
                 .get(*position)
                 .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+            if left.visibility.is_some() && right.visibility.is_some() {
+                conflicts.push(Conflict::Tab {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
             let mut addresses = Vec::new();
             let mut left_cells = left.cells.iter().peekable();
             let mut right_cells = right.cells.iter().peekable();
@@ -1117,6 +1419,33 @@ impl Edit {
         ConflictSet {
             conflicts: conflicts.into_boxed_slice(),
         }
+    }
+}
+
+/// Transaction-scoped visibility editor for any workbook sheet tab.
+#[derive(Debug)]
+pub struct TabEdit<'a> {
+    edit: &'a mut Edit,
+    position: usize,
+}
+
+impl TabEdit<'_> {
+    /// Make this tab visible.
+    pub fn show(&mut self) -> &mut Self {
+        self.edit.set_visibility(self.position, TabAction::Show);
+        self
+    }
+
+    /// Hide this tab while retaining it in Excel's ordinary Unhide dialog.
+    pub fn hide(&mut self) -> &mut Self {
+        self.edit.set_visibility(self.position, TabAction::Hide);
+        self
+    }
+
+    /// Hide this tab from Excel's ordinary Unhide dialog (`veryHidden`).
+    pub fn very_hide(&mut self) -> &mut Self {
+        self.edit.set_visibility(self.position, TabAction::VeryHide);
+        self
     }
 }
 
@@ -1285,6 +1614,40 @@ impl ColumnEdit<'_> {
             .insert(self.column, ColumnAction::Show);
         self
     }
+}
+
+fn raw_visibility_matches(value: &raw::Visibility, action: TabAction) -> bool {
+    matches!(
+        (value, action),
+        (raw::Visibility::Visible, TabAction::Show)
+            | (raw::Visibility::Hidden, TabAction::Hide)
+            | (raw::Visibility::VeryHidden, TabAction::VeryHide)
+    )
+}
+
+fn compose_part(
+    parts: &mut Vec<PartChange>,
+    workbook: &Workbook,
+    uri: &PackURI,
+    rewrite: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
+) -> Result<()> {
+    if let Some(part) = parts.iter_mut().find(|part| &part.uri == uri) {
+        let after = rewrite(&part.after)?;
+        if after.as_slice() != part.after.as_slice() {
+            part.after = Arc::new(after);
+        }
+        return Ok(());
+    }
+    let before = workbook.inner.package.get_part(uri)?.blob_arc();
+    let after = rewrite(&before)?;
+    if after.as_slice() != before.as_slice() {
+        parts.push(PartChange {
+            uri: uri.clone(),
+            before,
+            after: Arc::new(after),
+        });
+    }
+    Ok(())
 }
 
 fn ensure_unsigned(workbook: &Workbook) -> Result<()> {
@@ -1692,6 +2055,289 @@ mod tests {
                 .columns()
                 .expect("column conflict"),
             &[ColumnIndex::new(4).expect("column E")]
+        );
+    }
+
+    #[test]
+    fn tab_visibility_is_selector_first_reversible_and_active_safe() {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let source_bytes = source.to_bytes().expect("source bytes");
+        assert_eq!(
+            source.active_sheet().map(|sheet| sheet.name().to_owned()),
+            Some("Sheet1".to_owned())
+        );
+
+        let mut edit = source.edit().expect("edit");
+        edit.tab("Sheet1")
+            .expect("name lookup")
+            .expect("tab")
+            .hide();
+        let hidden = edit.commit().expect("hide active tab");
+        assert_eq!(hidden.patch().len(), 1);
+        assert!(matches!(
+            hidden.patch().changes()[0],
+            Change::Visibility {
+                position: 0,
+                before: Visibility::Visible,
+                after: Visibility::Hidden,
+                ..
+            }
+        ));
+        assert_eq!(
+            hidden
+                .workbook()
+                .sheet("Sheet1")
+                .expect("lookup")
+                .expect("sheet")
+                .visibility(),
+            &Visibility::Hidden
+        );
+        assert_eq!(
+            hidden
+                .workbook()
+                .active_sheet()
+                .map(|sheet| sheet.name().to_owned()),
+            Some("Sheet2".to_owned())
+        );
+
+        let restored = hidden
+            .workbook()
+            .apply(&hidden.patch().inverse())
+            .expect("inverse");
+        assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+
+        let mut last = hidden.workbook().edit().expect("last visible edit");
+        last.tab(1usize)
+            .expect("position lookup")
+            .expect("tab")
+            .very_hide();
+        assert!(matches!(
+            last.commit(),
+            Err(Error::TabEditBlocked {
+                sheet,
+                position: 1,
+                reason: TabEditBlock::LastVisibleTab,
+            }) if sheet == "Sheet2"
+        ));
+
+        let mut swap = hidden.workbook().edit().expect("swap visibility");
+        swap.tab("Sheet1").expect("lookup").expect("tab").show();
+        swap.tab(1usize).expect("lookup").expect("tab").very_hide();
+        let swapped = swap.commit().expect("swap commit");
+        assert_eq!(
+            swapped
+                .workbook()
+                .sheet(1usize)
+                .expect("lookup")
+                .expect("sheet")
+                .visibility(),
+            &Visibility::VeryHidden
+        );
+        assert_eq!(
+            swapped
+                .workbook()
+                .active_sheet()
+                .map(|sheet| sheet.name().to_owned()),
+            Some("Sheet1".to_owned())
+        );
+
+        let mut no_op = source.edit().expect("no-op edit");
+        no_op.tab(0usize).expect("lookup").expect("tab").show();
+        assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+    }
+
+    #[test]
+    fn tab_visibility_composes_with_cells_and_conflicts_by_facet() {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut cell = source.edit().expect("cell edit");
+        cell.sheet("Sheet2")
+            .expect("lookup")
+            .expect("worksheet")
+            .set("A1", "preserved while hidden")
+            .expect("cell");
+        let mut tab = source.edit().expect("tab edit");
+        tab.tab(1usize).expect("lookup").expect("tab").hide();
+        cell.join(tab).expect("orthogonal join");
+        let committed = cell.commit().expect("joined commit");
+        assert_eq!(committed.patch().len(), 2);
+        assert_eq!(
+            committed
+                .patch()
+                .parts
+                .iter()
+                .filter(|part| part.uri == source.inner.workbook_uri)
+                .count(),
+            1
+        );
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet2")
+            .expect("lookup")
+            .expect("sheet");
+        assert_eq!(sheet.visibility(), &Visibility::Hidden);
+        assert!(matches!(
+            sheet.cell("A1").expect("cell"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "preserved while hidden"
+        ));
+
+        let mut left = source.edit().expect("left");
+        left.tab("Sheet2").expect("lookup").expect("tab").hide();
+        let mut right = source.edit().expect("right");
+        right.tab(1usize).expect("lookup").expect("tab").very_hide();
+        let error = left.join(right).expect_err("same tab facet must conflict");
+        let conflicts = error.conflicts().expect("tab conflicts");
+        assert_eq!(conflicts.len(), 1);
+        assert!(conflicts.conflicts()[0].is_tab());
+        assert_eq!(conflicts.conflicts()[0].sheet(), "Sheet2");
+    }
+
+    #[test]
+    fn tab_visibility_applies_to_non_worksheet_sheet_kinds() {
+        let source = two_sheet_workbook(SheetKind::Chart);
+        assert_eq!(
+            source
+                .sheet("Sheet2")
+                .expect("lookup")
+                .expect("chart sheet")
+                .kind(),
+            SheetKind::Chart
+        );
+        let mut edit = source.edit().expect("edit");
+        edit.tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .very_hide();
+        let committed = edit.commit().expect("chart tab commit");
+        assert_eq!(
+            committed
+                .workbook()
+                .sheet("Sheet2")
+                .expect("lookup")
+                .expect("chart sheet")
+                .visibility(),
+            &Visibility::VeryHidden
+        );
+    }
+
+    #[test]
+    fn active_relocation_synchronizes_worksheet_and_chart_view_selection() {
+        for kind in [SheetKind::Worksheet, SheetKind::Chart] {
+            let source = active_second_sheet_workbook(kind);
+            let source_bytes = source.to_bytes().expect("source bytes");
+            assert_eq!(
+                source.active_sheet().map(|sheet| sheet.name().to_owned()),
+                Some("Sheet2".to_owned())
+            );
+            let mut edit = source.edit().expect("edit");
+            edit.tab("Sheet2").expect("lookup").expect("tab").hide();
+            let committed = edit.commit().expect("active hide");
+            assert_eq!(
+                committed
+                    .workbook()
+                    .active_sheet()
+                    .map(|sheet| sheet.name().to_owned()),
+                Some("Sheet1".to_owned())
+            );
+            let new_active = committed
+                .workbook()
+                .inner
+                .package
+                .get_part(&committed.workbook().inner.sheets[0].part_uri)
+                .expect("new active part")
+                .blob();
+            assert!(
+                std::str::from_utf8(new_active)
+                    .expect("new active XML")
+                    .contains(r#"tabSelected="1""#)
+            );
+            let old_active = committed
+                .workbook()
+                .inner
+                .package
+                .get_part(&committed.workbook().inner.sheets[1].part_uri)
+                .expect("old active part")
+                .blob();
+            assert!(
+                !std::str::from_utf8(old_active)
+                    .expect("old active XML")
+                    .contains("tabSelected")
+            );
+            assert_eq!(
+                committed
+                    .workbook()
+                    .apply(&committed.patch().inverse())
+                    .expect("inverse")
+                    .workbook()
+                    .to_bytes()
+                    .expect("restored bytes"),
+                source_bytes
+            );
+        }
+    }
+
+    #[test]
+    fn tab_visibility_blocks_protected_workbook_structure() {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut package = source.inner.package.clone();
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook part")
+            .set_blob(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookProtection lockStructure="1"/><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" r:id="rIdTab2"/></sheets></workbook>"#.to_vec(),
+            );
+        let protected = Workbook::from_package(package).expect("protected workbook");
+        let mut edit = protected.edit().expect("edit");
+        edit.tab("Sheet2").expect("lookup").expect("tab").hide();
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::ProtectedWorkbook,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn showing_an_unknown_producer_state_repairs_it_explicitly() {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut package = source.inner.package.clone();
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook part")
+            .set_blob(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" state="show" r:id="rIdTab2"/></sheets></workbook>"#.to_vec(),
+            );
+        let source = Workbook::from_package(package).expect("producer workbook");
+        assert!(matches!(
+            source
+                .sheet("Sheet2")
+                .expect("lookup")
+                .expect("sheet")
+                .visibility(),
+            Visibility::Unknown(value) if value.as_ref() == "show"
+        ));
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        edit.tab("Sheet2").expect("lookup").expect("tab").show();
+        let committed = edit.commit().expect("repair commit");
+        assert!(
+            committed
+                .workbook()
+                .sheet("Sheet2")
+                .expect("lookup")
+                .expect("sheet")
+                .visibility()
+                .is_visible()
+        );
+        assert_eq!(
+            committed
+                .workbook()
+                .apply(&committed.patch().inverse())
+                .expect("inverse")
+                .workbook()
+                .to_bytes()
+                .expect("restored bytes"),
+            source_bytes
         );
     }
 
@@ -2320,5 +2966,85 @@ mod tests {
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#.to_vec(),
             );
         Workbook::from_package(package).expect("styled workbook")
+    }
+
+    fn two_sheet_workbook(second_kind: SheetKind) -> Workbook {
+        let baseline = Workbook::new().expect("baseline");
+        let mut package = baseline.inner.package.clone();
+        package
+            .get_part_mut(&baseline.inner.workbook_uri)
+            .expect("workbook part")
+            .set_blob(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" r:id="rIdTab2"/></sheets></workbook>"#.to_vec(),
+            );
+        let (relationship_type, content_type, part_xml) = match second_kind {
+            SheetKind::Worksheet => (
+                litchi_opc::constants::relationship_type::WORKSHEET,
+                litchi_opc::constants::content_type::SML_WORKSHEET,
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetData/></worksheet>"#.as_slice(),
+            ),
+            SheetKind::Chart => (
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml",
+                br#"<chartsheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#.as_slice(),
+            ),
+            _ => panic!("test helper only models worksheet and chart tabs"),
+        };
+        package
+            .get_part_mut(&baseline.inner.workbook_uri)
+            .expect("workbook part")
+            .rels_mut()
+            .try_add_relationship(
+                relationship_type.to_owned(),
+                match second_kind {
+                    SheetKind::Worksheet => "worksheets/sheet2.xml",
+                    SheetKind::Chart => "chartsheets/sheet2.xml",
+                    _ => unreachable!("guarded above"),
+                }
+                .to_owned(),
+                "rIdTab2".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("second sheet relationship");
+        let part_uri = match second_kind {
+            SheetKind::Worksheet => "/xl/worksheets/sheet2.xml",
+            SheetKind::Chart => "/xl/chartsheets/sheet2.xml",
+            _ => unreachable!("guarded above"),
+        };
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new(part_uri).expect("second sheet URI"),
+                content_type.to_owned(),
+                part_xml.to_vec(),
+            )))
+            .expect("second sheet part");
+        Workbook::from_package(package).expect("two-sheet workbook")
+    }
+
+    fn active_second_sheet_workbook(second_kind: SheetKind) -> Workbook {
+        let source = two_sheet_workbook(second_kind);
+        let mut package = source.inner.package.clone();
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook part")
+            .set_blob(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="1"/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" r:id="rIdTab2"/></sheets></workbook>"#.to_vec(),
+            );
+        package
+            .get_part_mut(&source.inner.sheets[0].part_uri)
+            .expect("first sheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetData/></worksheet>"#.to_vec(),
+            );
+        let second_xml = match second_kind {
+            SheetKind::Worksheet => br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews><sheetData/></worksheet>"#.as_slice(),
+            SheetKind::Chart => br#"<chartsheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews></chartsheet>"#.as_slice(),
+            _ => unreachable!("test helper only models worksheet and chart tabs"),
+        };
+        package
+            .get_part_mut(&source.inner.sheets[1].part_uri)
+            .expect("second sheet part")
+            .set_blob(second_xml.to_vec());
+        Workbook::from_package(package).expect("active second sheet workbook")
     }
 }

@@ -16,7 +16,7 @@ mod workbook;
 
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
 pub use column::{Column, Columns};
-pub use error::{ColumnEditBlock, EditBlock, Error, Result, RowEditBlock};
+pub use error::{ColumnEditBlock, EditBlock, Error, Result, RowEditBlock, TabEditBlock};
 pub use formula::Formula;
 pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
@@ -26,5 +26,5 @@ pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use workbook::{
     Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, DateSystem, Edit, Flavor,
     JoinError, JoinFailure, Patch, RowEdit, RowState, Sheet, SheetEdit, SheetKind, SheetSelector,
-    State, Visibility, Workbook,
+    State, TabEdit, Visibility, Workbook,
 };
