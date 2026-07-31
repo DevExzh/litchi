@@ -13,7 +13,7 @@ use crate::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
 use crate::pkgreader::PackageReader;
 use crate::rel::Relationships;
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 
 /// Options for saving an OPC package.
@@ -471,10 +471,10 @@ impl OpcPackage {
         self.parts.contains_key(partname)
     }
 
-    /// Save the package to a file.
+    /// Atomically save the package to a file.
     ///
-    /// Writes the complete OPC package including all parts, relationships,
-    /// and content types to a ZIP file.
+    /// Writes and synchronizes a finalized sibling artifact before replacing
+    /// the destination. A failure before replacement leaves it untouched.
     ///
     /// # Arguments
     /// * `path` - Path where the package should be written
@@ -495,10 +495,11 @@ impl OpcPackage {
     /// Save the package to a stream.
     ///
     /// Writes the complete OPC package including all parts, relationships,
-    /// and content types to a writer stream.
+    /// and content types directly to a writer stream. A failure can leave the
+    /// caller-owned stream incomplete; the error reports accepted bytes.
     ///
     /// # Arguments
-    /// * `writer` - A writer that implements Write + Seek
+    /// * `writer` - Any sequential writer; seeking is not required
     ///
     /// # Example
     /// ```no_run
@@ -511,7 +512,7 @@ impl OpcPackage {
     /// pkg.to_stream(file)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn to_stream<W: std::io::Write + std::io::Seek>(&self, writer: W) -> Result<()> {
+    pub fn to_stream<W: Write>(&self, writer: W) -> Result<()> {
         crate::pkgwriter::PackageWriter::write_to_stream(writer, self)
     }
 }

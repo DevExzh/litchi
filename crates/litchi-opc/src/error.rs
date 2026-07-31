@@ -2,6 +2,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum OpcError {
     #[error("Package not found: {0}")]
     PackageNotFound(String),
@@ -70,6 +71,13 @@ pub enum OpcError {
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("incomplete OPC output after {written} byte(s): {source}")]
+    IncompleteOutput {
+        written: u64,
+        #[source]
+        source: Box<OpcError>,
+    },
 
     #[error("Quick-XML error: {0}")]
     QuickXmlError(#[from] quick_xml::Error),

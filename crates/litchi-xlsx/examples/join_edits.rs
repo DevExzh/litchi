@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "B1 was not joined").into());
     }
     if let Some(output) = output {
-        std::fs::write(output, committed.workbook().to_bytes()?)?;
+        committed.workbook().save(output)?;
     }
     Ok(())
 }

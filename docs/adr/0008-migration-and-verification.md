@@ -135,14 +135,39 @@ a repair or compatibility dialog, reported a used range of `A1:B1`, and exposed
 that artifact only; it is not evidence of native resave fidelity, contention,
 or performance.
 
+The sixth implementation slice replaces archive-sized buffering in the shared
+OPC output path. `PackageWriter` now emits ZIP records directly to any
+sequential `Write` sink; seeking is not required, and the memory-returning
+`to_bytes` path remains an explicit choice. A caller-owned sink failure after
+output begins returns typed `IncompleteOutput` context with the accepted byte
+count. `litchi-xlsx::Workbook` exposes the concise `write_to` and `save` entry
+points over this substrate.
+
+Ordinary filesystem save now writes a sibling temporary artifact, finalizes and
+flushes the ZIP, synchronizes the file, and only then replaces the destination.
+It preserves an existing regular file's permissions, refuses symbolic-link and
+non-file destinations, cleans up a failed temporary artifact, and synchronizes
+the parent directory where the platform supports it. Tests inject a failure
+after a partial temporary write and prove the original bytes remain unchanged.
+A separate 2 MiB incompressible-payload test uses a non-seekable sink that
+rejects any write over 64 KiB; direct streaming succeeds and an injected sink
+failure reports the exact 128 accepted bytes. These are functional output-shape
+checks, not allocation, latency, or throughput measurements.
+
+Desktop Excel for macOS opened the joined-edit artifact written through the new
+atomic streaming path without a repair or compatibility dialog and reported
+`Revenue` at `A1`, `42` at `B1`, and the expected `A1:B1` used range. This adds
+native-open evidence for the physical save path only; it does not certify crash
+durability on every filesystem or native resave fidelity.
+
 These slices do not yet update the worksheet `dimension` hint or implement row
 and column insertion/deletion, shifting references, merge/group-formula edits,
 validation evaluation, style/resource editing, rich text, dynamic arrays,
 patch serialization, full structured diagnostics, eviction/resource budgets,
-range/structural effect joins, three-way merge, or the container-level
-raw-copy/atomic-replacement save pipeline. Those remain certification work; no
-allocation, latency, contention, or scaling conclusion follows from the
-functional tests.
+range/structural effect joins, three-way merge, raw-copy preservation of clean
+compressed entries, cancellation-aware save contexts, scratch planning, or
+output budgets. Those remain certification work; no allocation, latency,
+contention, or scaling conclusion follows from the functional tests.
 
 ## Evidence levels
 

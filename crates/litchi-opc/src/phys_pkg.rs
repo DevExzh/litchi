@@ -8,7 +8,7 @@
 use crate::error::{OpcError, Result};
 use crate::packuri::PackURI;
 use soapberry_zip::office::LazyArchiveReader;
-use std::io::Read;
+use std::io::{Cursor, Read, Write};
 use std::path::Path;
 
 /// Physical package reader that provides access to parts in a ZIP-based OPC package.
@@ -249,16 +249,34 @@ impl<'data> PhysPkgReader<'data> {
 ///
 /// Handles the low-level writing of parts to a ZIP archive with optimal compression.
 /// Uses soapberry-zip's high-performance writer.
-pub struct PhysPkgWriter {
+pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
     /// The underlying ZIP archive writer
-    archive: soapberry_zip::office::StreamingArchiveWriter<std::io::Cursor<Vec<u8>>>,
+    archive: soapberry_zip::office::StreamingArchiveWriter<W>,
 }
 
-impl PhysPkgWriter {
+impl PhysPkgWriter<Cursor<Vec<u8>>> {
     /// Create a new package writer that writes to memory.
     pub fn new() -> Self {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::new(),
+        }
+    }
+
+    /// Finish writing and return the package bytes.
+    ///
+    /// Consumes the writer and returns the complete ZIP archive.
+    pub fn finish(self) -> Result<Vec<u8>> {
+        self.archive
+            .finish_to_bytes()
+            .map_err(|error| OpcError::ZipError(error.to_string()))
+    }
+}
+
+impl<W: Write> PhysPkgWriter<W> {
+    /// Create a physical package writer over a sequential sink.
+    pub fn with_writer(writer: W) -> Self {
+        Self {
+            archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(writer),
         }
     }
 
@@ -270,7 +288,7 @@ impl PhysPkgWriter {
     pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
         self.archive
             .write_deflated(pack_uri.membername(), blob)
-            .map_err(|e| OpcError::ZipError(e.to_string()))
+            .map_err(|error| OpcError::ZipError(error.to_string()))
     }
 
     /// Write a part to the package without compression (stored).
@@ -281,20 +299,18 @@ impl PhysPkgWriter {
     pub fn write_stored(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
         self.archive
             .write_stored(pack_uri.membername(), blob)
-            .map_err(|e| OpcError::ZipError(e.to_string()))
+            .map_err(|error| OpcError::ZipError(error.to_string()))
     }
 
-    /// Finish writing and return the package bytes.
-    ///
-    /// Consumes the writer and returns the complete ZIP archive.
-    pub fn finish(self) -> Result<Vec<u8>> {
+    /// Finalize the archive and recover the sequential sink.
+    pub fn finish_into_inner(self) -> Result<W> {
         self.archive
-            .finish_to_bytes()
-            .map_err(|e| OpcError::ZipError(e.to_string()))
+            .finish()
+            .map_err(|error| OpcError::ZipError(error.to_string()))
     }
 }
 
-impl Default for PhysPkgWriter {
+impl Default for PhysPkgWriter<Cursor<Vec<u8>>> {
     fn default() -> Self {
         Self::new()
     }

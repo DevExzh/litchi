@@ -8,7 +8,7 @@ pub use edit::{
 
 use std::collections::HashMap;
 use std::convert::Infallible;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
@@ -380,6 +380,23 @@ impl Workbook {
         Ok(PackageWriter::to_bytes(&self.inner.package)?)
     }
 
+    /// Stream a finalized workbook to any sequential sink without seeking.
+    ///
+    /// A sink failure can leave caller-owned output incomplete. Use [`Self::save`]
+    /// for atomic filesystem replacement.
+    pub fn write_to(&self, writer: impl Write) -> Result<()> {
+        Ok(PackageWriter::write_to_stream(writer, &self.inner.package)?)
+    }
+
+    /// Atomically save through a finalized sibling temporary artifact.
+    ///
+    /// Serialization, flushing, and file synchronization finish before the
+    /// destination is replaced. Existing symbolic-link destinations are
+    /// refused instead of being followed or silently replaced.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        Ok(PackageWriter::write(path, &self.inner.package)?)
+    }
+
     /// Start an isolated semantic transaction over this immutable snapshot.
     pub fn edit(&self) -> Result<Edit> {
         Edit::new(self.clone())
@@ -579,12 +596,43 @@ mod tests {
     use crate::cell::Value;
     use crate::formula::Cache;
 
+    #[derive(Default)]
+    struct WriteOnly(Vec<u8>);
+
+    impl std::io::Write for WriteOnly {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn new_workbook_is_deterministic_and_selector_first() {
         let first = Workbook::new().expect("valid baseline");
         let second = Workbook::new().expect("valid baseline");
 
         assert_eq!(first.to_bytes().ok(), second.to_bytes().ok());
+
+        let mut streamed = WriteOnly::default();
+        first.write_to(&mut streamed).expect("stream workbook");
+        assert_eq!(
+            streamed.0,
+            first.to_bytes().expect("buffered serialization")
+        );
+        let streamed = Workbook::from_slice(&streamed.0).expect("reopen streamed workbook");
+        assert_eq!(streamed.len(), 1);
+        assert_eq!(
+            streamed
+                .sheet("Sheet1")
+                .expect("lookup")
+                .expect("default sheet")
+                .name(),
+            "Sheet1"
+        );
         assert_eq!(first.len(), 1);
         assert_eq!(first.flavor(), Flavor::Workbook);
         assert_eq!(first.date_system(), DateSystem::Excel1900);

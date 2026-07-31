@@ -10,7 +10,25 @@ use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgWriter;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
+
+struct Counted<'a, W> {
+    inner: W,
+    written: &'a mut u64,
+}
+
+impl<W: Write> Write for Counted<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        *self.written = self.written.saturating_add(written as u64);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
 
 /// Package writer that serializes an OPC package to a ZIP file.
 ///
@@ -33,25 +51,48 @@ use std::path::Path;
 pub struct PackageWriter;
 
 impl PackageWriter {
-    /// Write an OPC package to a file.
+    /// Atomically write an OPC package to a file.
     ///
     /// # Arguments
     /// * `path` - Path where the package should be written
     /// * `package` - The OPC package to write
     pub fn write<P: AsRef<Path>>(path: P, package: &OpcPackage) -> Result<()> {
-        let bytes = Self::to_bytes(package)?;
-        std::fs::write(path, bytes)?;
-        Ok(())
+        crate::atomic::replace(path.as_ref(), |writer| {
+            Self::write_to_stream(writer, package)
+        })
     }
 
-    /// Write an OPC package to a stream.
+    /// Write an OPC package directly to a sequential stream.
+    ///
+    /// On failure after output begins, [`crate::OpcError::IncompleteOutput`]
+    /// reports how many bytes the sink accepted. Seeking is not required.
     ///
     /// # Arguments
     /// * `writer` - A writer that implements Write
     /// * `package` - The OPC package to write
-    pub fn write_to_stream<W: std::io::Write>(mut writer: W, package: &OpcPackage) -> Result<()> {
-        let bytes = Self::to_bytes(package)?;
-        writer.write_all(&bytes)?;
+    pub fn write_to_stream<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
+        let mut written = 0_u64;
+        let result = Self::write_counted(
+            Counted {
+                inner: writer,
+                written: &mut written,
+            },
+            package,
+        );
+        match result {
+            Err(source) if written != 0 => Err(crate::OpcError::IncompleteOutput {
+                written,
+                source: Box::new(source),
+            }),
+            result => result,
+        }
+    }
+
+    fn write_counted<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
+        let mut physical = PhysPkgWriter::with_writer(writer);
+        Self::write_package(&mut physical, package)?;
+        let mut writer = physical.finish_into_inner()?;
+        writer.flush()?;
         Ok(())
     }
 
@@ -63,25 +104,27 @@ impl PackageWriter {
     /// # Returns
     /// The serialized package as a byte vector
     pub fn to_bytes(package: &OpcPackage) -> Result<Vec<u8>> {
-        let mut phys_writer = PhysPkgWriter::new();
+        let mut physical = PhysPkgWriter::new();
+        Self::write_package(&mut physical, package)?;
+        physical.finish()
+    }
 
-        // Write [Content_Types].xml
-        Self::write_content_types(&mut phys_writer, package)?;
-
-        // Write package-level relationships (_rels/.rels)
-        Self::write_pkg_rels(&mut phys_writer, package)?;
-
-        // Write all parts and their relationships
-        Self::write_parts(&mut phys_writer, package)?;
-
-        // Finish writing and return the bytes
-        phys_writer.finish()
+    fn write_package<W: Write>(
+        physical: &mut PhysPkgWriter<W>,
+        package: &OpcPackage,
+    ) -> Result<()> {
+        Self::write_content_types(physical, package)?;
+        Self::write_pkg_rels(physical, package)?;
+        Self::write_parts(physical, package)
     }
 
     /// Write the [Content_Types].xml part.
     ///
     /// This file maps file extensions and part names to content types.
-    fn write_content_types(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
+    fn write_content_types<W: Write>(
+        phys_writer: &mut PhysPkgWriter<W>,
+        package: &OpcPackage,
+    ) -> Result<()> {
         let cti = ContentTypesItem::from_package(package)?;
         let blob = cti.to_xml();
 
@@ -93,7 +136,10 @@ impl PackageWriter {
     }
 
     /// Write package-level relationships.
-    fn write_pkg_rels(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
+    fn write_pkg_rels<W: Write>(
+        phys_writer: &mut PhysPkgWriter<W>,
+        package: &OpcPackage,
+    ) -> Result<()> {
         let package_uri =
             PackURI::new(PACKAGE_URI).map_err(crate::error::OpcError::InvalidPackUri)?;
         let rels_uri = package_uri
@@ -106,7 +152,10 @@ impl PackageWriter {
     }
 
     /// Write all parts and their relationships.
-    fn write_parts(phys_writer: &mut PhysPkgWriter, package: &OpcPackage) -> Result<()> {
+    fn write_parts<W: Write>(
+        phys_writer: &mut PhysPkgWriter<W>,
+        package: &OpcPackage,
+    ) -> Result<()> {
         // `OpcPackage` uses a hash map for O(1) lookup. Never let its randomized
         // iteration order leak into serialized artifacts.
         let mut parts = package.iter_parts().collect::<Vec<_>>();
@@ -248,7 +297,59 @@ impl ContentTypesItem {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use super::*;
+
+    struct ChunkSink {
+        total: usize,
+        writes: usize,
+        largest: usize,
+        limit: usize,
+    }
+
+    struct FailAfter {
+        written: usize,
+        limit: usize,
+    }
+
+    impl Write for FailAfter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            let available = self.limit.saturating_sub(self.written);
+            if available == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "injected sink failure",
+                ));
+            }
+            let accepted = available.min(bytes.len());
+            self.written += accepted;
+            Ok(accepted)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Write for ChunkSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if bytes.len() > self.limit {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "writer received an archive-sized chunk",
+                ));
+            }
+            self.total = self.total.saturating_add(bytes.len());
+            self.writes = self.writes.saturating_add(1);
+            self.largest = self.largest.max(bytes.len());
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_content_types_xml() {
@@ -278,5 +379,101 @@ mod tests {
             PackageWriter::to_bytes(&package),
             Err(crate::OpcError::InvalidContentType { .. })
         ));
+    }
+
+    #[test]
+    fn streams_large_packages_to_a_non_seekable_bounded_chunk_sink() {
+        let mut state = 0x9e37_79b9_u32;
+        let mut payload = Vec::with_capacity(2 * 1024 * 1024);
+        while payload.len() < payload.capacity() {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            payload.push((state >> 24) as u8);
+        }
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/random.bin").expect("valid part URI"),
+            "application/octet-stream".to_owned(),
+            payload,
+        )));
+        let mut sink = ChunkSink {
+            total: 0,
+            writes: 0,
+            largest: 0,
+            limit: 64 * 1024,
+        };
+
+        PackageWriter::write_to_stream(&mut sink, &package).expect("stream package");
+
+        assert!(sink.total > 1024 * 1024);
+        assert!(sink.writes > 1);
+        assert!(sink.largest <= sink.limit);
+    }
+
+    #[test]
+    fn incomplete_stream_errors_report_accepted_bytes() {
+        let package = OpcPackage::new();
+        let sink = FailAfter {
+            written: 0,
+            limit: 128,
+        };
+
+        let error = PackageWriter::write_to_stream(sink, &package)
+            .expect_err("bounded sink must reject the package");
+
+        assert!(matches!(
+            error,
+            crate::OpcError::IncompleteOutput {
+                written: 128,
+                source,
+            } if matches!(*source, crate::OpcError::ZipError(_))
+        ));
+    }
+
+    #[test]
+    fn filesystem_write_replaces_only_with_a_finalized_package() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("package.xlsx");
+        std::fs::write(&destination, b"previous artifact").expect("seed destination");
+        let mut package = OpcPackage::new();
+        let partname = PackURI::new("/custom/data.bin").expect("valid part URI");
+        package.add_part(Box::new(crate::BlobPart::new(
+            partname.clone(),
+            "application/octet-stream".to_owned(),
+            b"payload".to_vec(),
+        )));
+
+        PackageWriter::write(&destination, &package).expect("atomic package write");
+
+        let reopened = OpcPackage::open(destination).expect("reopen package");
+        assert_eq!(
+            reopened.get_part(&partname).expect("saved part").blob(),
+            b"payload"
+        );
+    }
+
+    #[test]
+    fn invalid_packages_never_replace_an_existing_artifact() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("package.xlsx");
+        std::fs::write(&destination, b"previous artifact").expect("seed destination");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/data.bin").expect("valid part URI"),
+            "invalid content type".to_owned(),
+            Vec::new(),
+        )));
+
+        let result = PackageWriter::write(&destination, &package);
+
+        assert!(matches!(
+            result,
+            Err(crate::OpcError::InvalidContentType { .. })
+        ));
+        assert_eq!(
+            std::fs::read(destination).expect("read destination"),
+            b"previous artifact"
+        );
     }
 }
