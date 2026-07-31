@@ -32,7 +32,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// * `part` - The part containing the document.xml content
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml = match crate::common::mce::process_ooxml(part.blob())? {
+        let xml = match litchi_ooxml_common::mce::process_ooxml(part.blob())? {
             std::borrow::Cow::Borrowed(_) => part.blob_arc(),
             std::borrow::Cow::Owned(v) => Arc::new(v),
         };

@@ -102,7 +102,7 @@ impl WorkbookInfo {
     }
 
     fn parse(content: &str) -> Result<Self> {
-        let processed = crate::common::mce::process_ooxml(content.as_bytes())?;
+        let processed = litchi_ooxml_common::mce::process_ooxml(content.as_bytes())?;
         let content =
             std::str::from_utf8(processed.as_ref()).map_err(|e| OoxmlError::Xml(e.to_string()))?;
         let mut reader = NsReader::from_reader(content.as_bytes());

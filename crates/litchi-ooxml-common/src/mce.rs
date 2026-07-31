@@ -109,6 +109,7 @@ pub struct MceOutput<'a> {
     pub report: MceReport,
 }
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MceError {
     #[error("non-conformant markup compatibility XML: {0}")]
     NonConformant(String),
@@ -894,28 +895,31 @@ fn esc(o: &mut Vec<u8>, s: &str) {
         }
     }
 }
-pub(crate) fn process_ooxml(x: &[u8]) -> crate::error::Result<Cow<'_, [u8]>> {
+/// Applies the baseline OOXML markup-compatibility profile.
+pub fn process_ooxml(x: &[u8]) -> R<Cow<'_, [u8]>> {
     process_markup_compatibility(x, &MceCapabilities::default(), &MceLimits::default())
         .map(|x| x.xml)
-        .map_err(crate::error::OoxmlError::MarkupCompatibility)
 }
-pub(crate) fn process_part(part: &dyn litchi_opc::Part) -> crate::error::Result<Cow<'_, [u8]>> {
+
+/// Applies baseline preprocessing to one OPC part.
+pub fn process_part(part: &dyn litchi_opc::Part) -> R<Cow<'_, [u8]>> {
     process_ooxml(part.blob())
 }
-pub(crate) fn process_part_arc(
-    part: &dyn litchi_opc::Part,
-) -> crate::error::Result<std::sync::Arc<Vec<u8>>> {
+
+/// Applies baseline preprocessing while retaining the part's shared blob on the fast path.
+pub fn process_part_arc(part: &dyn litchi_opc::Part) -> R<std::sync::Arc<Vec<u8>>> {
     Ok(match process_part(part)? {
         Cow::Borrowed(_) => part.blob_arc(),
         Cow::Owned(v) => std::sync::Arc::new(v),
     })
 }
-pub(crate) fn process_str(x: &str) -> crate::error::Result<Cow<'_, str>> {
+/// Applies baseline preprocessing to UTF-8 OOXML.
+pub fn process_str(x: &str) -> R<Cow<'_, str>> {
     match process_ooxml(x.as_bytes())? {
         Cow::Borrowed(_) => Ok(Cow::Borrowed(x)),
-        Cow::Owned(v) => String::from_utf8(v).map(Cow::Owned).map_err(|e| {
-            crate::error::OoxmlError::InvalidFormat(format!("MCE output is not UTF-8: {e}"))
-        }),
+        Cow::Owned(v) => String::from_utf8(v)
+            .map(Cow::Owned)
+            .map_err(|error| MceError::Xml(format!("MCE output is not UTF-8: {error}"))),
     }
 }
 #[cfg(test)]
@@ -976,7 +980,7 @@ mod fixture_tests {
     #[test]
     fn poi_styles_select_unsupported_vendor_fallbacks() {
         let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
+            "../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
         ))
         .unwrap();
         let part = package
@@ -997,7 +1001,7 @@ mod fixture_tests {
     #[test]
     fn libreoffice_pptx_emits_only_fallback_shape() {
         let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
+            "../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
         ))
         .unwrap();
         let part = package
@@ -1014,44 +1018,5 @@ mod fixture_tests {
         assert!(!xml.contains("a14:m"));
         assert!(xml.contains("a:blipFill"));
         assert_eq!(output.report.selected_fallbacks, 1);
-    }
-}
-
-#[cfg(test)]
-mod adapter_tests {
-    use crate::docx::enums::WdHeaderFooter;
-    use crate::docx::header_footer::HeaderFooter;
-    use crate::xlsx::SharedStrings;
-
-    #[test]
-    fn docx_header_uses_fallback_without_mutating_raw_xml() {
-        let raw = br#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><w:p><w:r><w:t>choice</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:hdr>"#;
-        let header = HeaderFooter::from_xml_bytes(raw.to_vec(), WdHeaderFooter::Primary);
-        assert_eq!(header.xml_bytes(), raw);
-        assert_eq!(header.text().unwrap(), "fallback");
-        assert_eq!(header.paragraph_count().unwrap(), 1);
-    }
-
-    #[test]
-    fn xlsx_shared_strings_uses_fallback() {
-        let xml = r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported" count="1" uniqueCount="1"><mc:AlternateContent><mc:Choice Requires="x"><si><t>choice</t></si></mc:Choice><mc:Fallback><si><t>fallback</t></si></mc:Fallback></mc:AlternateContent></sst>"#;
-        let strings = SharedStrings::parse(xml).unwrap();
-        assert_eq!(strings.get(0), Some("fallback"));
-    }
-
-    #[test]
-    fn generic_chart_reader_uses_fallback() {
-        let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><x:chart/></mc:Choice><mc:Fallback><c:chart/></mc:Fallback></mc:AlternateContent></c:chartSpace>"#;
-        crate::charts::reader::parse_chart(xml.as_slice()).unwrap();
-    }
-
-    #[test]
-    fn alternate_content_picture_selects_fallback() {
-        let xml = br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><x:picture/></mc:Choice><mc:Fallback><w:pict><w:t>fallback-picture</w:t></w:pict></mc:Fallback></mc:AlternateContent></w:r>"#;
-        let output = super::process_ooxml(xml).unwrap();
-        let semantic = std::str::from_utf8(output.as_ref()).unwrap();
-        assert!(semantic.contains("w:pict"));
-        assert!(!semantic.contains("x:picture"));
-        assert!(!semantic.contains("AlternateContent"));
     }
 }

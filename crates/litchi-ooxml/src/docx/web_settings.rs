@@ -1341,7 +1341,7 @@ impl WebSettings {
     }
 
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        let xml = crate::common::mce::process_part(part)?;
+        let xml = litchi_ooxml_common::mce::process_part(part)?;
         let settings = Self::extract_from_xml(xml.as_ref())?;
         validate_frame_relationships(part, &settings)?;
         Ok(settings)

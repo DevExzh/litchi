@@ -1,0 +1,65 @@
+# ADR 0002: Crate topology and dependency direction
+
+- Status: Accepted
+- Date: 2026-07-31
+
+## Decision
+
+The target workspace uses small single-responsibility crates and rejects peer
+format dependencies in CI. In the diagram, `A -> B` means that `B` may depend on
+the more foundational `A`.
+
+```text
+litchi-core
+├── litchi-detect
+├── litchi-word
+├── litchi-slide
+└── litchi-sheet
+
+litchi-opc -> litchi-ooxml-common -> litchi-drawingml
+                                      ├── litchi-docx
+                                      ├── litchi-pptx
+                                      ├── litchi-xlsx
+                                      └── litchi-xlsb
+
+litchi-cfb -> litchi-ole-common -> litchi-odraw
+                                   ├── litchi-doc
+                                   ├── litchi-ppt
+                                   └── litchi-xls
+```
+
+The diagram shows the main direction, not every foundation edge. In particular,
+concrete Word, presentation, and spreadsheet crates also depend on their neutral
+vocabulary crate. `litchi-drawingml` may depend on `litchi-sheet` for neutral
+chart data references; no concrete spreadsheet crate may depend on another.
+
+`litchi-word`, `litchi-slide`, and `litchi-sheet` depend only on `litchi-core`.
+They contain selectors, queries, events, detached builders, and semantic values,
+not container parsing or concrete document handles. Concrete imported objects
+remain canonical in their format crate.
+
+Additional focused crates are permitted where the responsibility is real:
+
+- `litchi-math` replaces the current equation-focused `litchi-formula` name.
+- `litchi-calc` owns spreadsheet formula parsing, dependency graphs, and pure
+  calculation; it has no network or async-runtime dependency.
+- `litchi-crypto`, `litchi-sign`, and `litchi-vba` own shared inert security
+  capabilities rather than creating OPC/OLE cross-dependencies.
+- Runtime adapters such as `litchi-tokio` are separate optional crates.
+
+The current `litchi-ooxml` and `litchi-ole` monoliths are removed after their
+contents migrate. They do not remain as compatibility crates. The umbrella
+`litchi` contains no format implementation logic and re-exports canonical types
+without creating aliases with redundant prefixes.
+
+## Enforcement
+
+- A checked-in dependency allowlist rejects concrete peer edges, including dev
+  and optional dependencies.
+- `litchi-core` owns only format-neutral sources, blobs, budgets, execution,
+  scalars, selectors, diagnostics, patch envelopes, and content events. It owns
+  no ZIP, XML, CFB, format feature, Tokio, Reqwest, or Rayon dependency.
+- Container/common crates do not depend on concrete formats.
+- Default `litchi` enables DOCX, PPTX, and XLSX. XLSB, legacy formats, crypto,
+  signing, VBA parsing, calculation, rendering, and runtime adapters are opt-in.
+  Enabling a feature adds capability and never changes existing semantics.

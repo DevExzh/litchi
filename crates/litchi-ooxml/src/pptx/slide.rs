@@ -71,7 +71,7 @@ fn resolve_picture_background(
 fn picture_background_reference(
     xml: &[u8],
 ) -> Result<Option<(String, crate::pptx::backgrounds::PictureStyle)>> {
-    let xml = crate::common::mce::process_ooxml(xml)?;
+    let xml = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let mut reader = Reader::from_reader(xml.as_ref());
     let mut in_background = false;
     let mut in_blip_fill = false;
@@ -84,7 +84,7 @@ fn picture_background_reference(
                 b"bg" => in_background = true,
                 b"blipFill" if in_background => in_blip_fill = true,
                 b"blip" if in_blip_fill => {
-                    relationship_id = crate::drawings::blip::read_blip_embed_attr(&element)?;
+                    relationship_id = litchi_drawingml::blip::read_embed(&element)?;
                 },
                 b"tile" if in_blip_fill => {
                     style = crate::pptx::backgrounds::PictureStyle::Tile;
@@ -93,7 +93,7 @@ fn picture_background_reference(
             },
             Ok(Event::Empty(element)) => {
                 if in_blip_fill && element.local_name().as_ref() == b"blip" {
-                    relationship_id = crate::drawings::blip::read_blip_embed_attr(&element)?;
+                    relationship_id = litchi_drawingml::blip::read_embed(&element)?;
                 } else if in_blip_fill && element.local_name().as_ref() == b"tile" {
                     style = crate::pptx::backgrounds::PictureStyle::Tile;
                 }

@@ -5,9 +5,9 @@
 //! object or package payload bytes.
 
 use crate::common::xml::{is_drawingml_name, unqualified_attribute_value};
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::encoding::Decoder;

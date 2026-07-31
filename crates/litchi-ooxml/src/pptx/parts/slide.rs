@@ -19,10 +19,12 @@ const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
 fn processed(part: &dyn Part) -> Result<Arc<Vec<u8>>> {
-    Ok(match crate::common::mce::process_ooxml(part.blob())? {
-        std::borrow::Cow::Borrowed(_) => part.blob_arc(),
-        std::borrow::Cow::Owned(v) => Arc::new(v),
-    })
+    Ok(
+        match litchi_ooxml_common::mce::process_ooxml(part.blob())? {
+            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Owned(v) => Arc::new(v),
+        },
+    )
 }
 
 fn parse_shapes(xml: &[u8]) -> Result<Vec<BaseShape>> {

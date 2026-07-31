@@ -3,9 +3,9 @@
 //! Comment text and extension payloads are inert data. This module never
 //! resolves identities, follows external targets, or executes embedded data.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -461,8 +461,12 @@ pub fn find_presentation_comment_author(
     package: &OpcPackage,
     author_id: u32,
 ) -> Result<Option<PresentationCommentAuthor>> {
-    Ok(load_presentation_comments(package)?
-        .and_then(|graph| graph.authors.into_iter().find(|author| author.id == author_id)))
+    Ok(load_presentation_comments(package)?.and_then(|graph| {
+        graph
+            .authors
+            .into_iter()
+            .find(|author| author.id == author_id)
+    }))
 }
 
 pub fn add_presentation_comment_author(
@@ -487,7 +491,10 @@ pub fn add_presentation_comment_author(
         return Ok(());
     };
     if graph.authors.iter().any(|item| item.id == author.id) {
-        return Err(invalid(format!("comment author {} already exists", author.id)));
+        return Err(invalid(format!(
+            "comment author {} already exists",
+            author.id
+        )));
     }
     graph.authors.push(author);
     commit_legacy_authors(package, &graph, conformance)
@@ -527,11 +534,22 @@ pub fn remove_presentation_comment_author(
     author_id: u32,
     conformance: PresentationCommentConformance,
 ) -> Result<bool> {
-    let Some(mut graph) = load_presentation_comments(package)? else { return Ok(false); };
-    if graph.slides.iter().any(|slide| slide.comments.iter().any(|comment| comment.author_id == author_id)) {
+    let Some(mut graph) = load_presentation_comments(package)? else {
+        return Ok(false);
+    };
+    if graph.slides.iter().any(|slide| {
+        slide
+            .comments
+            .iter()
+            .any(|comment| comment.author_id == author_id)
+    }) {
         return Err(invalid("cannot remove an author referenced by a comment"));
     }
-    let Some(offset) = graph.authors.iter().position(|author| author.id == author_id) else {
+    let Some(offset) = graph
+        .authors
+        .iter()
+        .position(|author| author.id == author_id)
+    else {
         return Ok(false);
     };
     graph.authors.remove(offset);
@@ -546,14 +564,25 @@ pub fn reorder_presentation_comment_authors(
 ) -> Result<()> {
     let mut graph = load_presentation_comments(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
-    let expected = graph.authors.iter().map(|author| author.id).collect::<HashSet<_>>();
+    let expected = graph
+        .authors
+        .iter()
+        .map(|author| author.id)
+        .collect::<HashSet<_>>();
     let actual = ordered_ids.iter().copied().collect::<HashSet<_>>();
     if expected != actual || actual.len() != ordered_ids.len() {
         return Err(invalid("comment-author reorder is not a permutation"));
     }
     graph.authors = ordered_ids
         .iter()
-        .map(|id| graph.authors.iter().find(|author| author.id == *id).unwrap().clone())
+        .map(|id| {
+            graph
+                .authors
+                .iter()
+                .find(|author| author.id == *id)
+                .unwrap()
+                .clone()
+        })
         .collect();
     commit_legacy_authors(package, &graph, conformance)
 }
@@ -590,12 +619,28 @@ pub fn add_presentation_comment(
         .authors
         .iter_mut()
         .find(|author| author.id == comment.author_id)
-        .ok_or_else(|| invalid(format!("comment references missing author {}", comment.author_id)))?;
-    if comment.index > author.last_index { author.last_index = comment.index; }
-    if graph.slides.iter().flat_map(|slide| &slide.comments).any(|item| item.author_id == comment.author_id && item.index == comment.index) {
+        .ok_or_else(|| {
+            invalid(format!(
+                "comment references missing author {}",
+                comment.author_id
+            ))
+        })?;
+    if comment.index > author.last_index {
+        author.last_index = comment.index;
+    }
+    if graph
+        .slides
+        .iter()
+        .flat_map(|slide| &slide.comments)
+        .any(|item| item.author_id == comment.author_id && item.index == comment.index)
+    {
         return Err(invalid("comment author/index key already exists"));
     }
-    if let Some(slide) = graph.slides.iter_mut().find(|slide| slide.slide_part_name == slide_part_name) {
+    if let Some(slide) = graph
+        .slides
+        .iter_mut()
+        .find(|slide| slide.slide_part_name == slide_part_name)
+    {
         slide.comments.push(comment);
         let xml = write_slide_comments(&slide.comments, conformance)?;
         parse_slide_comments(&xml)?;
@@ -608,13 +653,20 @@ pub fn add_presentation_comment(
         let relationship_id = next_relationship_id(slide, "rIdComments")?;
         let part_uri = next_legacy_comment_part_name(package)?;
         let xml = write_slide_comments(std::slice::from_ref(&comment), conformance)?;
-        package.try_add_part(Box::new(BlobPart::new(part_uri.clone(), COMMENTS_CONTENT_TYPE.into(), xml)))?;
-        package.get_part_mut(&slide_uri)?.rels_mut().add_relationship(
-            conformance.comments_relationship().into(),
-            part_uri.relative_ref(slide_uri.base_uri()),
-            relationship_id,
-            false,
-        );
+        package.try_add_part(Box::new(BlobPart::new(
+            part_uri.clone(),
+            COMMENTS_CONTENT_TYPE.into(),
+            xml,
+        )))?;
+        package
+            .get_part_mut(&slide_uri)?
+            .rels_mut()
+            .add_relationship(
+                conformance.comments_relationship().into(),
+                part_uri.relative_ref(slide_uri.base_uri()),
+                relationship_id,
+                false,
+            );
     }
     commit_legacy_authors(package, &graph, conformance)?;
     let _ = package.clear_digital_signatures();
@@ -634,10 +686,15 @@ pub fn update_presentation_comment(
     }
     let graph = load_presentation_comments(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
-    let slide = graph.slides.iter().find(|slide| slide.slide_part_name == slide_part_name)
+    let slide = graph
+        .slides
+        .iter()
+        .find(|slide| slide.slide_part_name == slide_part_name)
         .ok_or_else(|| invalid("slide has no legacy comments"))?;
     let mut comments = slide.comments.clone();
-    let target = comments.iter_mut().find(|item| item.author_id == author_id && item.index == index)
+    let target = comments
+        .iter_mut()
+        .find(|item| item.author_id == author_id && item.index == index)
         .ok_or_else(|| invalid("comment was not found"))?;
     *target = replacement;
     commit_legacy_slide_comments(package, slide, comments, conformance)
@@ -651,7 +708,14 @@ pub fn replace_presentation_comment(
     replacement: PresentationComment,
     conformance: PresentationCommentConformance,
 ) -> Result<()> {
-    update_presentation_comment(package, slide_part_name, author_id, index, replacement, conformance)
+    update_presentation_comment(
+        package,
+        slide_part_name,
+        author_id,
+        index,
+        replacement,
+        conformance,
+    )
 }
 
 pub fn remove_presentation_comment(
@@ -661,16 +725,34 @@ pub fn remove_presentation_comment(
     index: u32,
     conformance: PresentationCommentConformance,
 ) -> Result<bool> {
-    let Some(graph) = load_presentation_comments(package)? else { return Ok(false); };
-    let Some(slide) = graph.slides.iter().find(|slide| slide.slide_part_name == slide_part_name) else { return Ok(false); };
+    let Some(graph) = load_presentation_comments(package)? else {
+        return Ok(false);
+    };
+    let Some(slide) = graph
+        .slides
+        .iter()
+        .find(|slide| slide.slide_part_name == slide_part_name)
+    else {
+        return Ok(false);
+    };
     let mut comments = slide.comments.clone();
-    let Some(offset) = comments.iter().position(|item| item.author_id == author_id && item.index == index) else { return Ok(false); };
+    let Some(offset) = comments
+        .iter()
+        .position(|item| item.author_id == author_id && item.index == index)
+    else {
+        return Ok(false);
+    };
     comments.remove(offset);
     if comments.is_empty() {
         let slide_uri = PackURI::new(slide_part_name).map_err(OoxmlError::InvalidUri)?;
         let part_uri = PackURI::new(&slide.part_name).map_err(OoxmlError::InvalidUri)?;
-        package.get_part_mut(&slide_uri)?.rels_mut().remove(&slide.relationship_id);
-        if !part_is_referenced(package, &part_uri) { package.remove_part(&part_uri); }
+        package
+            .get_part_mut(&slide_uri)?
+            .rels_mut()
+            .remove(&slide.relationship_id);
+        if !part_is_referenced(package, &part_uri) {
+            package.remove_part(&part_uri);
+        }
         let _ = package.clear_digital_signatures();
     } else {
         commit_legacy_slide_comments(package, slide, comments, conformance)?;
@@ -684,17 +766,41 @@ pub fn reorder_presentation_comments(
     ordered_keys: &[(u32, u32)],
     conformance: PresentationCommentConformance,
 ) -> Result<()> {
-    let graph = load_presentation_comments(package)?.ok_or_else(|| invalid("legacy comment graph does not exist"))?;
-    let slide = graph.slides.iter().find(|slide| slide.slide_part_name == slide_part_name)
+    let graph = load_presentation_comments(package)?
+        .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
+    let slide = graph
+        .slides
+        .iter()
+        .find(|slide| slide.slide_part_name == slide_part_name)
         .ok_or_else(|| invalid("slide has no legacy comments"))?;
-    let expected = slide.comments.iter().map(|item| (item.author_id, item.index)).collect::<HashSet<_>>();
+    let expected = slide
+        .comments
+        .iter()
+        .map(|item| (item.author_id, item.index))
+        .collect::<HashSet<_>>();
     let actual = ordered_keys.iter().copied().collect::<HashSet<_>>();
-    if expected != actual || actual.len() != ordered_keys.len() { return Err(invalid("comment reorder is not a permutation")); }
-    let comments = ordered_keys.iter().map(|key| slide.comments.iter().find(|item| (item.author_id, item.index) == *key).unwrap().clone()).collect();
+    if expected != actual || actual.len() != ordered_keys.len() {
+        return Err(invalid("comment reorder is not a permutation"));
+    }
+    let comments = ordered_keys
+        .iter()
+        .map(|key| {
+            slide
+                .comments
+                .iter()
+                .find(|item| (item.author_id, item.index) == *key)
+                .unwrap()
+                .clone()
+        })
+        .collect();
     commit_legacy_slide_comments(package, slide, comments, conformance)
 }
 
-fn commit_legacy_authors(package: &mut OpcPackage, graph: &PresentationComments, conformance: PresentationCommentConformance) -> Result<()> {
+fn commit_legacy_authors(
+    package: &mut OpcPackage,
+    graph: &PresentationComments,
+    conformance: PresentationCommentConformance,
+) -> Result<()> {
     validate_package_value(graph)?;
     let xml = write_comment_authors(&graph.authors, conformance)?;
     parse_comment_authors(&xml)?;
@@ -704,7 +810,12 @@ fn commit_legacy_authors(package: &mut OpcPackage, graph: &PresentationComments,
     Ok(())
 }
 
-fn commit_legacy_slide_comments(package: &mut OpcPackage, slide: &SlideCommentList, comments: Vec<PresentationComment>, conformance: PresentationCommentConformance) -> Result<()> {
+fn commit_legacy_slide_comments(
+    package: &mut OpcPackage,
+    slide: &SlideCommentList,
+    comments: Vec<PresentationComment>,
+    conformance: PresentationCommentConformance,
+) -> Result<()> {
     let xml = write_slide_comments(&comments, conformance)?;
     parse_slide_comments(&xml)?;
     let uri = PackURI::new(&slide.part_name).map_err(OoxmlError::InvalidUri)?;
@@ -716,32 +827,53 @@ fn commit_legacy_slide_comments(package: &mut OpcPackage, slide: &SlideCommentLi
 fn next_relationship_id(part: &dyn Part, prefix: &str) -> Result<String> {
     for suffix in 1..=65_537u32 {
         let id = format!("{prefix}{suffix}");
-        if part.rels().get(&id).is_none() { return Ok(id); }
+        if part.rels().get(&id).is_none() {
+            return Ok(id);
+        }
     }
     Err(invalid("no free comment relationship ID"))
 }
 
 fn next_legacy_comment_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=100_001u32 {
-        let uri = PackURI::new(format!("/ppt/comments/comment{suffix}.xml")).map_err(OoxmlError::InvalidUri)?;
-        if package.get_part(&uri).is_err() { return Ok(uri); }
+        let uri = PackURI::new(format!("/ppt/comments/comment{suffix}.xml"))
+            .map_err(OoxmlError::InvalidUri)?;
+        if package.get_part(&uri).is_err() {
+            return Ok(uri);
+        }
     }
     Err(invalid("no free legacy comment part name"))
 }
 
 fn next_legacy_author_part_name(package: &OpcPackage) -> Result<PackURI> {
     let canonical = PackURI::new("/ppt/commentAuthors.xml").map_err(invalid)?;
-    if package.get_part(&canonical).is_err() { return Ok(canonical); }
+    if package.get_part(&canonical).is_err() {
+        return Ok(canonical);
+    }
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(format!("/ppt/commentAuthors{suffix}.xml")).map_err(invalid)?;
-        if package.get_part(&candidate).is_err() { return Ok(candidate); }
+        let candidate =
+            PackURI::new(format!("/ppt/commentAuthors{suffix}.xml")).map_err(invalid)?;
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
     }
     Err(invalid("no free legacy comment-author part name"))
 }
 
 fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.iter_parts().any(|part| part.rels().iter().any(|relationship| !relationship.is_external() && relationship.target_partname().is_ok_and(|name| name == *target)))
-        || package.rels().iter().any(|relationship| !relationship.is_external() && relationship.target_partname().is_ok_and(|name| name == *target))
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|name| name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
+    })
 }
 
 fn validate_authors(authors: &[PresentationCommentAuthor]) -> Result<()> {

@@ -3,9 +3,9 @@
 //! Nested edit descriptors are retained as bounded XML. They are never
 //! executed and relationship-looking content inside them is never resolved.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

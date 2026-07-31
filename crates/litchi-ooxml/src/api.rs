@@ -351,12 +351,12 @@
 //! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 //! ```
 
-pub use crate::common::DocumentProperties;
 /// Re-export main types for convenience
 pub use crate::docx::{Document, MutableDocument, Package as DocxPackage};
 pub use crate::error::{OoxmlError, Result};
 pub use crate::pptx::{MutablePresentation, Package as PptxPackage, Presentation};
 pub use crate::xlsx::{MutableWorksheet, Workbook, Worksheet};
+pub use litchi_ooxml_common::DocumentProperties;
 
 /// Unified document interface for reading different Office formats.
 ///

@@ -1,7 +1,7 @@
-use crate::drawings::blip::find_first_blip_embed;
 /// Picture (image) shape implementation.
 use crate::error::{OoxmlError, Result};
 use crate::pptx::shapes::base::BaseShape;
+use litchi_drawingml::blip::find_first_embed;
 
 /// A picture (image) shape in a presentation.
 ///
@@ -47,7 +47,7 @@ impl Picture {
     /// // Use r_id to get the image from the package
     /// ```
     pub fn image_r_id(&self) -> Result<String> {
-        find_first_blip_embed(self.base.xml_bytes())?
+        find_first_embed(self.base.xml_bytes())?
             .ok_or_else(|| OoxmlError::PartNotFound("Image relationship not found".to_string()))
     }
 

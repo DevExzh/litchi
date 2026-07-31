@@ -412,7 +412,7 @@ impl ThemeFontScheme {
 /// Identity of a theme part created by [`add_theme`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredTheme {
-    /// Part name of the new theme, e.g. `/ppt/theme/theme2.xml`.
+    /// Part name of the new theme, e.g. `/ppt/theme/themeN.xml`.
     pub part_name: String,
 }
 
@@ -436,9 +436,7 @@ pub fn add_theme(
     require_color_scheme(color_scheme)?;
     require_font_scheme(font_scheme)?;
 
-    let index = next_part_index(package, "/ppt/theme/theme", ".xml")?;
-    let uri = PackURI::new(format!("/ppt/theme/theme{index}.xml"))
-        .map_err(|error| OoxmlError::InvalidUri(format!("theme partname: {error}")))?;
+    let uri = next_theme_part_uri(package)?;
     let xml = theme_xml(name, color_scheme, font_scheme)?;
     package.add_part(Box::new(BlobPart::new(
         uri.clone(),
@@ -601,9 +599,7 @@ impl ThemeOverride {
 impl ThemeColorSlot {
     /// Parse a slot element name (`dk1`, `lt1`, ...).
     pub fn from_token(token: &str) -> Option<Self> {
-        Self::ALL
-            .into_iter()
-            .find(|slot| slot.as_str() == token)
+        Self::ALL.into_iter().find(|slot| slot.as_str() == token)
     }
 }
 
@@ -611,7 +607,9 @@ impl ThemeColorSlot {
 fn theme_override_xml(value: &ThemeOverride) -> Result<String> {
     let mut xml = String::with_capacity(1024);
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-    xml.push_str(r#"<a:themeOverride xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#);
+    xml.push_str(
+        r#"<a:themeOverride xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#,
+    );
     if let Some(scheme) = &value.color_scheme {
         push_color_scheme(&mut xml, scheme, false);
     }
@@ -631,7 +629,7 @@ fn parse_theme_override(xml: &[u8]) -> Result<ThemeOverride> {
     if xml.len() > MAX_OVERRIDE_XML {
         return Err(limit("theme override XML bytes"));
     }
-    let processed = crate::common::mce::process_ooxml(xml)?;
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
     if processed.len() > MAX_OVERRIDE_XML {
         return Err(limit("processed theme override XML bytes"));
     }
@@ -850,8 +848,10 @@ pub fn store_theme_override(
 
     // Reuse an existing override part + relationship when present.
     let existing = parent.rels().iter().find(|relationship| {
-        matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
-            && !relationship.is_external()
+        matches!(
+            relationship.reltype(),
+            rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL
+        ) && !relationship.is_external()
     });
     if let Some(relationship) = existing {
         let uri = relationship.target_partname().map_err(|error| {
@@ -893,13 +893,18 @@ pub fn store_theme_override(
 }
 
 /// Read the theme override attached to a slide layout or slide part.
-pub fn theme_override(package: &OpcPackage, parent_part_name: &str) -> Result<Option<ThemeOverride>> {
+pub fn theme_override(
+    package: &OpcPackage,
+    parent_part_name: &str,
+) -> Result<Option<ThemeOverride>> {
     let parent_uri = PackURI::new(parent_part_name)
         .map_err(|error| OoxmlError::InvalidUri(format!("theme override parent: {error}")))?;
     let parent = package.get_part(&parent_uri)?;
     let Some(relationship) = parent.rels().iter().find(|relationship| {
-        matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
-            && !relationship.is_external()
+        matches!(
+            relationship.reltype(),
+            rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL
+        ) && !relationship.is_external()
     }) else {
         return Ok(None);
     };
@@ -920,8 +925,10 @@ pub fn remove_theme_override(package: &mut OpcPackage, parent_part_name: &str) -
         .map_err(|error| OoxmlError::InvalidUri(format!("theme override parent: {error}")))?;
     let parent = package.get_part(&parent_uri)?;
     let Some(relationship) = parent.rels().iter().find(|relationship| {
-        matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
-            && !relationship.is_external()
+        matches!(
+            relationship.reltype(),
+            rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL
+        ) && !relationship.is_external()
     }) else {
         return Ok(false);
     };
@@ -936,9 +943,13 @@ pub fn remove_theme_override(package: &mut OpcPackage, parent_part_name: &str) -
     let orphaned = !package.iter_parts().any(|part| {
         part.partname() != &parent_uri
             && part.rels().iter().any(|relationship| {
-                matches!(relationship.reltype(), rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL)
-                    && !relationship.is_external()
-                    && relationship.target_partname().is_ok_and(|target| target == uri)
+                matches!(
+                    relationship.reltype(),
+                    rt::THEME_OVERRIDE | STRICT_THEME_OVERRIDE_REL
+                ) && !relationship.is_external()
+                    && relationship
+                        .target_partname()
+                        .is_ok_and(|target| target == uri)
             })
     });
     if orphaned {
@@ -947,7 +958,6 @@ pub fn remove_theme_override(package: &mut OpcPackage, parent_part_name: &str) -
     invalidate_signatures(package)?;
     Ok(true)
 }
-
 
 /// Validate the master/layout/theme graph of a package.
 ///
@@ -1294,6 +1304,13 @@ fn next_part_index(package: &OpcPackage, prefix: &str, suffix: &str) -> Result<u
     }
 }
 
+/// Allocate the lowest free ordinary theme part name from the package graph.
+pub(crate) fn next_theme_part_uri(package: &OpcPackage) -> Result<PackURI> {
+    let index = next_part_index(package, "/ppt/theme/theme", ".xml")?;
+    PackURI::new(format!("/ppt/theme/theme{index}.xml"))
+        .map_err(|error| OoxmlError::InvalidUri(format!("theme partname: {error}")))
+}
+
 /// Compute the relationship target for `target` relative to `source_dir`.
 ///
 /// Both names must be absolute pack URIs; the result uses `..` segments to
@@ -1491,7 +1508,7 @@ mod tests {
         let theme = package
             .add_theme("Corporate Theme", &corporate_colors(), &corporate_fonts())
             .unwrap();
-        assert_eq!(theme.part_name, "/ppt/theme/theme2.xml");
+        assert_eq!(theme.part_name, "/ppt/theme/theme3.xml");
 
         let relationship_id = package
             .attach_theme_to_master(&master.part_name, &theme.part_name)
@@ -1737,7 +1754,7 @@ mod tests {
         let first = build();
         let second = build();
         for part_name in [
-            "/ppt/theme/theme2.xml",
+            "/ppt/theme/theme3.xml",
             "/ppt/theme/theme1.xml",
             "/ppt/slideMasters/slideMaster2.xml",
         ] {
@@ -1798,18 +1815,23 @@ mod tests {
         let mut package = Package::new().unwrap();
         let layout = default_layout_name(&package);
         let value = sample_override();
-        let part_name = package
-            .store_theme_override(&layout, &value)
-            .unwrap();
+        let part_name = package.store_theme_override(&layout, &value).unwrap();
         assert_eq!(part_name, "/ppt/theme/themeOverride1.xml");
 
         // Read back before and after a package round-trip.
-        assert_eq!(package.theme_override(&layout).unwrap(), Some(value.clone()));
+        assert_eq!(
+            package.theme_override(&layout).unwrap(),
+            Some(value.clone())
+        );
         let reopened = roundtrip(&package);
         assert_eq!(reopened.theme_override(&layout).unwrap(), Some(value));
         let uri = PackURI::new(&part_name).unwrap();
         assert_eq!(
-            reopened.opc_package().get_part(&uri).unwrap().content_type(),
+            reopened
+                .opc_package()
+                .get_part(&uri)
+                .unwrap()
+                .content_type(),
             ct::OFC_THEME_OVERRIDE
         );
     }
@@ -1822,14 +1844,9 @@ mod tests {
             .store_theme_override(&layout, &sample_override())
             .unwrap();
         let replacement = ThemeOverride::new().with_color_scheme(corporate_colors());
-        let second_name = package
-            .store_theme_override(&layout, &replacement)
-            .unwrap();
+        let second_name = package.store_theme_override(&layout, &replacement).unwrap();
         assert_eq!(first_name, second_name);
-        assert_eq!(
-            package.theme_override(&layout).unwrap(),
-            Some(replacement)
-        );
+        assert_eq!(package.theme_override(&layout).unwrap(), Some(replacement));
     }
 
     #[test]

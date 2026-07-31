@@ -1,8 +1,8 @@
 //! Immutable XLSX workbook calculation-properties read model.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::is_spreadsheetml_name;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -212,10 +212,12 @@ pub fn parse_workbook_calculation_properties(
                 }
                 depth -= 1;
             },
-            Event::Text(text) if leaf_depth.is_some_and(|value| depth >= value)
-                && !text.decode().map_err(xml_error)?.trim().is_empty() => {
-                    return Err(invalid("calcPr cannot contain text"));
-                },
+            Event::Text(text)
+                if leaf_depth.is_some_and(|value| depth >= value)
+                    && !text.decode().map_err(xml_error)?.trim().is_empty() =>
+            {
+                return Err(invalid("calcPr cannot contain text"));
+            },
             Event::CData(_) if leaf_depth.is_some_and(|value| depth >= value) => {
                 return Err(invalid("calcPr cannot contain CDATA"));
             },

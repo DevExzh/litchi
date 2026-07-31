@@ -1,8 +1,8 @@
 //! Shape types and implementation for PPTX presentations.
-use crate::drawings::blip::write_a_blip_embed;
-use crate::drawings::fill::write_a_stretch_fill_rect;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
+use litchi_drawingml::blip::write_embed;
+use litchi_drawingml::fill::write_stretch_rect;
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types
@@ -604,8 +604,8 @@ impl MutableShape {
 
                 xml.push_str("<p:blipFill>");
                 let rid = rel_ids.image_rel_id.unwrap_or("rIdImagePlaceholder");
-                write_a_blip_embed(xml, rid, false).map_err(|e| OoxmlError::Xml(e.to_string()))?;
-                write_a_stretch_fill_rect(xml);
+                write_embed(xml, rid, false).map_err(|e| OoxmlError::Xml(e.to_string()))?;
+                write_stretch_rect(xml);
                 xml.push_str("</p:blipFill>");
 
                 xml.push_str("<p:spPr>");

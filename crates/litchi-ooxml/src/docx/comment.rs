@@ -161,7 +161,7 @@ impl Comment {
     ///
     /// A vector of comments
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Vec<Comment>> {
-        let source = crate::common::mce::process_part_arc(part)?;
+        let source = litchi_ooxml_common::mce::process_part_arc(part)?;
         let mut comments = Vec::new();
         scan_word_element_ranges(
             source.as_slice(),

@@ -18,8 +18,8 @@ use quick_xml::reader::NsReader;
 
 use super::namespace::is_spreadsheetml_name;
 use super::sheet_protection::{ProtectionPasswordVerifier, StrongProtectionPasswordVerifier};
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;

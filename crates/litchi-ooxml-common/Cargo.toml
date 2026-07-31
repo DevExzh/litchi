@@ -1,0 +1,16 @@
+[package]
+name = "litchi-ooxml-common"
+description = "Shared lossless OOXML vocabulary and preprocessing for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+litchi-core = { workspace = true }
+litchi-opc = { workspace = true }
+quick-xml = { workspace = true }
+thiserror = { workspace = true }

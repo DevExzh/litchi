@@ -1,8 +1,8 @@
 //! Immutable XLSX worksheet outline-properties read model.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::is_spreadsheetml_name;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

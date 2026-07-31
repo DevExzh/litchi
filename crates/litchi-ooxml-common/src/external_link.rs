@@ -20,7 +20,7 @@ use litchi_opc::constants::relationship_type;
 /// Every relationship type accepted as an external-workbook target.
 ///
 /// Ordered standard-first so the common case matches on the first comparison.
-pub(crate) const EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES: &[&str] = &[
+pub const EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES: &[&str] = &[
     // ECMA-376 transitional and strict.
     relationship_type::EXTERNAL_LINK_PATH,
     relationship_type::STRICT_EXTERNAL_LINK_PATH,
@@ -38,7 +38,7 @@ pub(crate) const EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES: &[&str] = &[
 ];
 
 /// Whether `reltype` may be used to target an external workbook.
-pub(crate) fn is_external_workbook_relationship(reltype: &str) -> bool {
+pub fn is_external_workbook_relationship(reltype: &str) -> bool {
     EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES.contains(&reltype)
 }
 

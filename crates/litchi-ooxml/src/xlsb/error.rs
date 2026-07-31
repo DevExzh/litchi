@@ -198,10 +198,18 @@ impl From<crate::error::OoxmlError> for XlsbError {
                 XlsbError::Encoding(format!("Invalid relationship: {}", msg))
             },
             crate::error::OoxmlError::InvalidFormat(msg) => XlsbError::Encoding(msg),
+            crate::error::OoxmlError::Drawing(err) => XlsbError::Encoding(err.to_string()),
             crate::error::OoxmlError::Io(e) => XlsbError::Io(e),
             crate::error::OoxmlError::MarkupCompatibility(err) => {
                 XlsbError::Encoding(err.to_string())
             },
+            crate::error::OoxmlError::UnsafeEdit {
+                format,
+                operation,
+                reason,
+            } => XlsbError::UnsupportedFeature(format!(
+                "unsafe {format} edit rejected during {operation}: {reason}"
+            )),
             crate::error::OoxmlError::Other(msg) => XlsbError::Encoding(msg),
         }
     }

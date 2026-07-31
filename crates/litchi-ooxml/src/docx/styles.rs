@@ -147,7 +147,7 @@ impl<'a> Styles<'a> {
             return Ok(());
         }
 
-        let xml_bytes = crate::common::mce::process_part(self.part)?;
+        let xml_bytes = litchi_ooxml_common::mce::process_part(self.part)?;
         let mut reader = Reader::from_reader(xml_bytes.as_ref());
         reader.config_mut().trim_text(true);
 

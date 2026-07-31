@@ -122,8 +122,15 @@ impl CustomShowList {
 
     /// Reorder custom shows by a complete ID permutation.
     pub fn reorder(&mut self, ordered_ids: &[u32]) -> Result<()> {
-        let expected = self.shows.iter().map(|show| show.id).collect::<std::collections::HashSet<_>>();
-        let actual = ordered_ids.iter().copied().collect::<std::collections::HashSet<_>>();
+        let expected = self
+            .shows
+            .iter()
+            .map(|show| show.id)
+            .collect::<std::collections::HashSet<_>>();
+        let actual = ordered_ids
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>();
         if expected != actual || ordered_ids.len() != self.shows.len() {
             return Err(OoxmlError::InvalidFormat(
                 "custom-show reorder is not a permutation".into(),
@@ -131,7 +138,11 @@ impl CustomShowList {
         }
         self.shows = ordered_ids
             .iter()
-            .map(|id| self.get_by_id(*id).expect("permutation was validated").clone())
+            .map(|id| {
+                self.get_by_id(*id)
+                    .expect("permutation was validated")
+                    .clone()
+            })
             .collect();
         Ok(())
     }
@@ -165,7 +176,7 @@ impl CustomShowList {
     /// Parse custom shows from presentation XML.
     pub fn parse_xml(xml: &str) -> Result<Self> {
         let mut list = Self::new();
-        let xml = crate::common::mce::process_str(xml)?;
+        let xml = litchi_ooxml_common::mce::process_str(xml)?;
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 

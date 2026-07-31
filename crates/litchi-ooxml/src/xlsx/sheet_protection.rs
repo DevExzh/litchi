@@ -12,8 +12,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -191,22 +191,54 @@ impl WorksheetProtection {
         Ok(())
     }
 
-    pub fn set_sheet_locked(&mut self, value: bool) { self.sheet = value; }
-    pub fn set_objects_locked(&mut self, value: bool) { self.objects = value; }
-    pub fn set_scenarios_locked(&mut self, value: bool) { self.scenarios = value; }
-    pub fn set_format_cells_locked(&mut self, value: bool) { self.format_cells = value; }
-    pub fn set_format_columns_locked(&mut self, value: bool) { self.format_columns = value; }
-    pub fn set_format_rows_locked(&mut self, value: bool) { self.format_rows = value; }
-    pub fn set_insert_columns_locked(&mut self, value: bool) { self.insert_columns = value; }
-    pub fn set_insert_rows_locked(&mut self, value: bool) { self.insert_rows = value; }
-    pub fn set_insert_hyperlinks_locked(&mut self, value: bool) { self.insert_hyperlinks = value; }
-    pub fn set_delete_columns_locked(&mut self, value: bool) { self.delete_columns = value; }
-    pub fn set_delete_rows_locked(&mut self, value: bool) { self.delete_rows = value; }
-    pub fn set_select_locked_cells_locked(&mut self, value: bool) { self.select_locked_cells = value; }
-    pub fn set_sort_locked(&mut self, value: bool) { self.sort = value; }
-    pub fn set_auto_filter_locked(&mut self, value: bool) { self.auto_filter = value; }
-    pub fn set_pivot_tables_locked(&mut self, value: bool) { self.pivot_tables = value; }
-    pub fn set_select_unlocked_cells_locked(&mut self, value: bool) { self.select_unlocked_cells = value; }
+    pub fn set_sheet_locked(&mut self, value: bool) {
+        self.sheet = value;
+    }
+    pub fn set_objects_locked(&mut self, value: bool) {
+        self.objects = value;
+    }
+    pub fn set_scenarios_locked(&mut self, value: bool) {
+        self.scenarios = value;
+    }
+    pub fn set_format_cells_locked(&mut self, value: bool) {
+        self.format_cells = value;
+    }
+    pub fn set_format_columns_locked(&mut self, value: bool) {
+        self.format_columns = value;
+    }
+    pub fn set_format_rows_locked(&mut self, value: bool) {
+        self.format_rows = value;
+    }
+    pub fn set_insert_columns_locked(&mut self, value: bool) {
+        self.insert_columns = value;
+    }
+    pub fn set_insert_rows_locked(&mut self, value: bool) {
+        self.insert_rows = value;
+    }
+    pub fn set_insert_hyperlinks_locked(&mut self, value: bool) {
+        self.insert_hyperlinks = value;
+    }
+    pub fn set_delete_columns_locked(&mut self, value: bool) {
+        self.delete_columns = value;
+    }
+    pub fn set_delete_rows_locked(&mut self, value: bool) {
+        self.delete_rows = value;
+    }
+    pub fn set_select_locked_cells_locked(&mut self, value: bool) {
+        self.select_locked_cells = value;
+    }
+    pub fn set_sort_locked(&mut self, value: bool) {
+        self.sort = value;
+    }
+    pub fn set_auto_filter_locked(&mut self, value: bool) {
+        self.auto_filter = value;
+    }
+    pub fn set_pivot_tables_locked(&mut self, value: bool) {
+        self.pivot_tables = value;
+    }
+    pub fn set_select_unlocked_cells_locked(&mut self, value: bool) {
+        self.select_unlocked_cells = value;
+    }
 }
 
 impl Default for WorksheetProtection {
@@ -357,10 +389,7 @@ pub struct WorksheetProtectedRangeCollection {
 }
 
 impl WorksheetProtectedRangeCollection {
-    pub fn new(
-        source: ProtectedRangeSource,
-        ranges: Vec<WorksheetProtectedRange>,
-    ) -> Result<Self> {
+    pub fn new(source: ProtectedRangeSource, ranges: Vec<WorksheetProtectedRange>) -> Result<Self> {
         let value = Self { source, ranges };
         validate_collection(&value)?;
         Ok(value)
@@ -1118,7 +1147,10 @@ pub fn write_worksheet_protection(
 ) -> Result<String> {
     validate_worksheet_protection_metadata(metadata)?;
     let mut xml = write_worksheet_protection_core(metadata, conformance)?;
-    xml.push_str(&write_worksheet_protection_extensions(metadata, conformance)?);
+    xml.push_str(&write_worksheet_protection_extensions(
+        metadata,
+        conformance,
+    )?);
     Ok(xml)
 }
 
@@ -1274,7 +1306,9 @@ fn validate_collection(value: &WorksheetProtectedRangeCollection) -> Result<()> 
     let mut names = HashSet::new();
     for range in &value.ranges {
         if range.source != value.source {
-            return Err(invalid("protectedRange source does not match its collection"));
+            return Err(invalid(
+                "protectedRange source does not match its collection",
+            ));
         }
         validate_range(range)?;
         if !names.insert(range.name.to_lowercase()) {
@@ -1306,7 +1340,9 @@ fn validate_xml_text(value: &str, field: &str) -> Result<()> {
         let code = ch as u32;
         !matches!(code, 0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
     }) {
-        return Err(invalid(format!("{field} contains an invalid XML character")));
+        return Err(invalid(format!(
+            "{field} contains an invalid XML character"
+        )));
     }
     Ok(())
 }
@@ -1402,7 +1438,10 @@ pub fn replace_worksheet_protection(
         .map(|range| (range, Vec::new()))
         .collect();
     if !direct.is_empty() {
-        edits.push((scan.sheet_data_end..scan.sheet_data_end, direct.into_bytes()));
+        edits.push((
+            scan.sheet_data_end..scan.sheet_data_end,
+            direct.into_bytes(),
+        ));
     }
     if !extensions.is_empty() {
         let inner = extension_inner(&extensions)?;
@@ -1527,10 +1566,7 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
             Event::Empty(element) => {
                 let local = element.local_name();
                 let element_depth = depth + 1;
-                if element_depth == 2
-                    && spreadsheet(&namespace)
-                    && local.as_ref() == b"sheetData"
-                {
+                if element_depth == 2 && spreadsheet(&namespace) && local.as_ref() == b"sheetData" {
                     sheet_data_end = Some(end);
                 }
                 if element_depth == 2

@@ -1587,7 +1587,7 @@ pub struct AnimationTimingTree {
 impl AnimationTimingTree {
     pub fn parse(xml: &str) -> Result<Self> {
         check_xml_size(xml.len())?;
-        let processed = crate::common::mce::process_str(xml)?;
+        let processed = litchi_ooxml_common::mce::process_str(xml)?;
         parse_recursive_timing_tree(&processed)
     }
     pub fn to_xml(&self) -> String {
@@ -1702,7 +1702,7 @@ impl AnimationSequence {
     /// Parse timing XML from a slide.
     pub fn parse_timing_xml(xml: &str) -> Result<Self> {
         check_xml_size(xml.len())?;
-        let xml = crate::common::mce::process_str(xml)?;
+        let xml = litchi_ooxml_common::mce::process_str(xml)?;
         check_xml_size(xml.len())?;
         parse_processed_timing(xml.as_bytes(), false)
     }
@@ -3543,15 +3543,14 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                                 .map(|v| parse_xml_bool(&v))
                                 .transpose()?
                                 .unwrap_or(false);
-                            let next_action =
-                                match attribute(element, b"nextAc", reader.decoder())?
-                                    .as_deref()
-                                    .unwrap_or("none")
-                                {
-                                    "none" => AnimationNextAction::None,
-                                    "seek" => AnimationNextAction::Seek,
-                                    _ => return Err(invalid("invalid animation next action")),
-                                };
+                            let next_action = match attribute(element, b"nextAc", reader.decoder())?
+                                .as_deref()
+                                .unwrap_or("none")
+                            {
+                                "none" => AnimationNextAction::None,
+                                "seek" => AnimationNextAction::Seek,
+                                _ => return Err(invalid("invalid animation next action")),
+                            };
                             let previous_action =
                                 match attribute(element, b"prevAc", reader.decoder())?
                                     .as_deref()
@@ -3577,7 +3576,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                             node: AnimationTimingNode {
                                 kind,
                                 common: AnimationCommonTimeNode {
-                                id: None,
+                                    id: None,
                                     duration: None,
                                     node_type: None,
                                     preset: None,
@@ -3591,9 +3590,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                             },
                         });
                     } else if is_presentationml_name(&namespace, element.name(), b"cTn")
-                        && frames
-                            .last()
-                            .is_some_and(|frame| depth == frame.depth + 1)
+                        && frames.last().is_some_and(|frame| depth == frame.depth + 1)
                     {
                         let frame = frames
                             .last_mut()
@@ -5066,7 +5063,8 @@ mod tests {
             format!(r#"<p:tmpl><p:tnLst>{par}{par}</p:tnLst></p:tmpl>"#),
             r#"<p:tmpl><p:tnLst><p:par><p:cTn/><p:cTn/></p:par></p:tnLst></p:tmpl>"#.to_string(),
             r#"<p:tmpl><p:tnLst><p:seq><p:cTn/></p:seq></p:tnLst></p:tmpl>"#.to_string(),
-            r#"<p:tmpl><p:tnLst><x:par xmlns:x="urn:foreign"><x:cTn/></x:par></p:tnLst></p:tmpl>"#.to_string(),
+            r#"<p:tmpl><p:tnLst><x:par xmlns:x="urn:foreign"><x:cTn/></x:par></p:tnLst></p:tmpl>"#
+                .to_string(),
             format!(r#"<p:tmpl><p:tnLst>{par}</p:tnLst><p:tnLst>{par}</p:tnLst></p:tmpl>"#),
             format!(r#"<p:tmpl lvl="10"><p:tnLst>{par}</p:tnLst></p:tmpl>"#),
             format!(r#"<p:tmpl lvl="nope"><p:tnLst>{par}</p:tnLst></p:tmpl>"#),

@@ -10,14 +10,18 @@
 // Submodule declarations
 pub mod binary;
 pub mod bom;
+pub mod bounded;
+pub mod budget;
 pub mod detection;
 #[cfg(any(feature = "ole", feature = "rtf"))]
 pub mod encoding;
 pub mod error;
 pub mod metadata;
+pub mod selector;
 pub mod shapes;
 pub mod sheet;
 pub mod simd;
+pub mod source;
 pub mod style;
 /// Common unit conversion utilities (length units used across all formats)
 pub mod unit;
@@ -32,10 +36,14 @@ pub mod id;
 pub use bom::{
     BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom, write_bom,
 };
+pub use bounded::{BoundedU32, BoundsError};
+pub use budget::{Budget, Limits, Profile, Reservation, Resource, ResourceLimit};
 pub use detection::FileFormat;
 pub use error::{Error, Result};
 pub use metadata::Metadata;
+pub use selector::{Position, Selector};
 pub use shapes::{PlaceholderType, ShapeType};
+pub use source::{OwnedSource, ReadAt, SliceSource, SourceVersion};
 pub use style::{Length, RGBColor, VerticalPosition};
 // Unit conversions
 pub use unit::LengthUnit;

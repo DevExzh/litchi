@@ -1,7 +1,7 @@
 //! Immutable SpreadsheetML conditional-formatting and differential-style models.
 
-use crate::common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -326,7 +326,7 @@ pub(crate) fn parse_conditional_formattings(
 }
 
 pub(crate) fn parse_differential_formats(xml: &[u8]) -> Result<Vec<DifferentialFormat>> {
-    let processed = crate::common::mce::process_ooxml(xml)?;
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let Some(fragment) = capture_first(processed.as_ref(), CORE, STRICT, b"dxfs")? else {
         return Ok(Vec::new());
     };

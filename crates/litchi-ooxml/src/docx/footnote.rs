@@ -236,7 +236,7 @@ impl Note {
 
     /// Extract notes from a part (generic for footnotes and endnotes).
     fn extract_notes_from_part(part: &dyn Part, note_tag: &[u8]) -> Result<Vec<Note>> {
-        let source = crate::common::mce::process_part_arc(part)?;
+        let source = litchi_ooxml_common::mce::process_part_arc(part)?;
         let mut notes = Vec::new();
         scan_word_element_ranges(source.as_slice(), &[note_tag], |_, start, length| {
             let start_index = start as usize;

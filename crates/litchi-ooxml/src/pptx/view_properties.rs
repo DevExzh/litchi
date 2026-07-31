@@ -143,7 +143,7 @@ impl ViewProperties {
         if xml.len() > MAX {
             return Err(invalid("view properties exceed 8 MiB"));
         }
-        let x = crate::common::mce::process_ooxml(xml)?;
+        let x = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if x.len() > MAX {
             return Err(invalid("processed view properties exceed 8 MiB"));
         }

@@ -5,9 +5,9 @@
 //! events.
 
 use crate::common::xml::unqualified_attribute_value;
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
 use quick_xml::encoding::Decoder;
@@ -394,7 +394,11 @@ fn classify_element(
             .as_mut()
             .ok_or_else(|| invalid("laser trace point has no active trace"))?
             .push(point);
-        return Ok(if empty { ElementKind::Other } else { ElementKind::LaserPoint });
+        return Ok(if empty {
+            ElementKind::Other
+        } else {
+            ElementKind::LaserPoint
+        });
     }
 
     if parent.is_known() {
@@ -612,22 +616,15 @@ pub fn store_slide_laser_trace(
 
     let updated = crate::pptx::slide_patch::insert_extension_fragment(slide.blob(), &fragment)?;
     // Self-check: the patched slide must read back through the discovery path.
-    let probe = litchi_opc::BlobPart::new(
-        slide_name.clone(),
-        ct::PML_SLIDE.into(),
-        updated.clone(),
-    );
+    let probe =
+        litchi_opc::BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
     let traces = load_slide_laser_traces(0, &probe, &mut LaserLoadLimits::default())?;
     if traces.len() != 1 || traces[0].points().len() != points.len() {
-        return Err(invalid(
-            "laser-trace storage failed read-back validation",
-        ));
+        return Err(invalid("laser-trace storage failed read-back validation"));
     }
     package.get_part_mut(slide_name)?.set_blob(updated);
     Ok(())
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -694,8 +691,7 @@ mod tests {
         store_slide_laser_trace(&mut package, &slide_name, &points).unwrap();
 
         let slide = package.get_part(&slide_name).unwrap();
-        let traces =
-            load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default()).unwrap();
+        let traces = load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default()).unwrap();
         assert_eq!(traces.len(), 1);
         assert_eq!(traces[0].points(), points.as_slice());
 
@@ -724,8 +720,7 @@ mod tests {
         let (mut package, slide_name) = slide_package("<p:extLst/>");
         store_slide_laser_trace(&mut package, &slide_name, &sample_points()).unwrap();
         let slide = package.get_part(&slide_name).unwrap();
-        let traces =
-            load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default()).unwrap();
+        let traces = load_slide_laser_traces(0, slide, &mut LaserLoadLimits::default()).unwrap();
         assert_eq!(traces.len(), 1);
         assert_eq!(traces[0].point_count(), 2);
     }

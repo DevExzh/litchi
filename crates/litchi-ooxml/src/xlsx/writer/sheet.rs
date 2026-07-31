@@ -1,19 +1,15 @@
-use crate::drawings::blip::write_a_blip_embed_rid_num;
-use crate::drawings::ext::write_a16_creation_id_extlst;
-use crate::drawings::fill::write_a_stretch_fill_rect;
 use crate::xlsx::cell::Cell;
 use crate::xlsx::data_validation::{
-    DataValidationCollection, DataValidationConformance,
-    validate_data_validation_collections, write_data_validation_core,
-    write_data_validation_extensions,
+    DataValidationCollection, DataValidationConformance, validate_data_validation_collections,
+    write_data_validation_core, write_data_validation_extensions,
 };
-use crate::xlsx::sort::{SortCondition, SortState};
-use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
 use crate::xlsx::sheet_protection::{
     ProtectionPasswordVerifier, WorksheetProtection, WorksheetProtectionConformance,
     WorksheetProtectionMetadata, write_worksheet_protection_core,
     write_worksheet_protection_extensions,
 };
+use crate::xlsx::sort::{SortCondition, SortState};
+use crate::xlsx::sparkline::{SparklineGroup, write_sparkline_groups_ext};
 use crate::xlsx::table::Table;
 use crate::xlsx::views::{SheetPane, SheetSelection, SheetView};
 use crate::xlsx::writer::shape::{
@@ -22,6 +18,9 @@ use crate::xlsx::writer::shape::{
 /// Writer module for creating and modifying Excel worksheets.
 use litchi_core::sheet::{CellValue, Result as SheetResult};
 use litchi_core::{id::generate_guid_braced, xml::escape::escape_xml};
+use litchi_drawingml::blip::write_embed_id;
+use litchi_drawingml::ext::write_creation_id;
+use litchi_drawingml::fill::write_stretch_rect;
 use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 
@@ -1722,7 +1721,7 @@ impl MutableWorksheet {
 
             if image.description.is_some() {
                 let creation_id = generate_guid_braced();
-                write_a16_creation_id_extlst(&mut xml, &creation_id)
+                write_creation_id(&mut xml, &creation_id)
                     .map_err(|e| format!("XML write error: {}", e))?;
             }
 
@@ -1732,9 +1731,9 @@ impl MutableWorksheet {
                 r#"<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>"#,
             );
             xml.push_str("<xdr:blipFill>");
-            write_a_blip_embed_rid_num(&mut xml, (idx + 1) as u32, true)
+            write_embed_id(&mut xml, (idx + 1) as u32, true)
                 .map_err(|e| format!("XML write error: {}", e))?;
-            write_a_stretch_fill_rect(&mut xml);
+            write_stretch_rect(&mut xml);
             xml.push_str("</xdr:blipFill>");
 
             // Shape properties
@@ -4404,7 +4403,10 @@ mod tests {
         let page_setup = properties.page_setup_properties().unwrap();
         assert!(page_setup.automatic_page_breaks());
         assert!(page_setup.fit_to_page());
-        assert_eq!(properties.tab_color().unwrap().argb(), Some([255, 51, 102, 153]));
+        assert_eq!(
+            properties.tab_color().unwrap().argb(),
+            Some([255, 51, 102, 153])
+        );
     }
 
     #[test]
@@ -4412,10 +4414,11 @@ mod tests {
         let mut ws = MutableWorksheet::new("Sheet1".to_string(), 1);
         let mut shared_strings = MutableSharedStrings::new();
         let styles = HashMap::new();
-        assert!(!ws
-            .to_xml(&mut shared_strings, &styles)
-            .unwrap()
-            .contains("<sheetPr>"));
+        assert!(
+            !ws.to_xml(&mut shared_strings, &styles)
+                .unwrap()
+                .contains("<sheetPr>")
+        );
 
         ws.set_fit_to_page(false);
         assert_eq!(ws.fit_to_page(), Some(false));
@@ -4424,10 +4427,11 @@ mod tests {
 
         ws.clear_fit_to_page();
         assert_eq!(ws.fit_to_page(), None);
-        assert!(!ws
-            .to_xml(&mut shared_strings, &styles)
-            .unwrap()
-            .contains("<sheetPr>"));
+        assert!(
+            !ws.to_xml(&mut shared_strings, &styles)
+                .unwrap()
+                .contains("<sheetPr>")
+        );
     }
 
     #[test]

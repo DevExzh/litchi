@@ -6,9 +6,9 @@
 //! header as inert metadata; the layout algorithm and style bodies are not
 //! interpreted.
 
-use crate::common::mce::process_str;
 use crate::diagrams::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_str;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -152,8 +152,7 @@ impl DefinitionScan<'_> {
             },
             "cat" => {
                 if let Some(category_type) = attribute(element, "type")? {
-                    let priority =
-                        attribute(element, "pri")?.and_then(|value| value.parse().ok());
+                    let priority = attribute(element, "pri")?.and_then(|value| value.parse().ok());
                     self.definition.categories.push(DiagramCategory {
                         category_type,
                         priority,

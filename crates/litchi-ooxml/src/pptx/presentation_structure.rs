@@ -18,8 +18,7 @@ const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const RS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-const SLIDE_REL: &str =
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
+const SLIDE_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
 const SLIDE_REL_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/slide";
 const SECTION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 const MAX_BYTES: usize = 8 * 1024 * 1024;
@@ -58,7 +57,8 @@ pub fn store_presentation_structure(
     let presentation_name = package.main_document_part()?.partname().clone();
     let original = package.get_part(&presentation_name)?.blob().to_vec();
     let (p_namespace, r_namespace) = document_namespaces(&original);
-    let custom_xml = write_custom_shows(&value.custom_shows, &value.slides, p_namespace, r_namespace)?;
+    let custom_xml =
+        write_custom_shows(&value.custom_shows, &value.slides, p_namespace, r_namespace)?;
     let mut staged = patch_custom_shows(&original, custom_xml.as_bytes())?;
     let section_xml = write_section_extension(&value.sections, p_namespace)?;
     staged = patch_sections(&staged, section_xml.as_bytes(), p_namespace)?;
@@ -70,15 +70,18 @@ pub fn store_presentation_structure(
     {
         return Err(invalid("staged presentation structure did not round-trip"));
     }
-    package
-        .clear_digital_signatures()
-        .map_err(|error| OoxmlError::Other(format!("cannot invalidate package signatures: {error}")))?;
+    package.clear_digital_signatures().map_err(|error| {
+        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
+    })?;
     package.get_part_mut(&presentation_name)?.set_blob(staged);
     Ok(())
 }
 
 pub fn find_custom_show(package: &OpcPackage, id: u32) -> Result<Option<CustomShow>> {
-    Ok(load_presentation_structure(package)?.custom_shows.get_by_id(id).cloned())
+    Ok(load_presentation_structure(package)?
+        .custom_shows
+        .get_by_id(id)
+        .cloned())
 }
 
 pub fn add_custom_show(package: &mut OpcPackage, show: CustomShow) -> Result<()> {
@@ -98,7 +101,9 @@ pub fn update_custom_show(
     id: u32,
     replacement: CustomShow,
 ) -> Result<()> {
-    mutate(package, |graph| graph.custom_shows.replace_by_id(id, replacement))
+    mutate(package, |graph| {
+        graph.custom_shows.replace_by_id(id, replacement)
+    })
 }
 
 pub fn replace_custom_show(
@@ -172,7 +177,10 @@ pub fn reorder_custom_show_slides(
 }
 
 pub fn find_section(package: &OpcPackage, id: &str) -> Result<Option<Section>> {
-    Ok(load_presentation_structure(package)?.sections.get_by_id(id).cloned())
+    Ok(load_presentation_structure(package)?
+        .sections
+        .get_by_id(id)
+        .cloned())
 }
 
 pub fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<String> {
@@ -187,7 +195,11 @@ pub fn add_section(package: &mut OpcPackage, mut section: Section) -> Result<Str
         }
         graph.sections.add_section(section);
         graph.sections.sort_slide_membership(
-            &graph.slides.iter().map(|slide| slide.slide_id).collect::<Vec<_>>(),
+            &graph
+                .slides
+                .iter()
+                .map(|slide| slide.slide_id)
+                .collect::<Vec<_>>(),
         );
         Ok(())
     })?;
@@ -199,7 +211,11 @@ pub fn update_section(package: &mut OpcPackage, id: &str, replacement: Section) 
     mutate(package, move |graph| {
         graph.sections.replace_by_id(&id, replacement)?;
         graph.sections.sort_slide_membership(
-            &graph.slides.iter().map(|slide| slide.slide_id).collect::<Vec<_>>(),
+            &graph
+                .slides
+                .iter()
+                .map(|slide| slide.slide_id)
+                .collect::<Vec<_>>(),
         );
         Ok(())
     })
@@ -241,7 +257,11 @@ pub fn add_section_slide(package: &mut OpcPackage, section_id: &str, slide_id: u
             .slide_ids
             .push(slide_id);
         graph.sections.sort_slide_membership(
-            &graph.slides.iter().map(|slide| slide.slide_id).collect::<Vec<_>>(),
+            &graph
+                .slides
+                .iter()
+                .map(|slide| slide.slide_id)
+                .collect::<Vec<_>>(),
         );
         Ok(())
     })
@@ -291,7 +311,11 @@ pub fn synchronize_presentation_structure_after_slide_mutation(
 ) -> Result<()> {
     let presentation = package.main_document_part()?;
     let mut graph = parse_structure_blob(package, presentation.blob(), false)?;
-    let live = graph.slides.iter().map(|slide| slide.slide_id).collect::<HashSet<_>>();
+    let live = graph
+        .slides
+        .iter()
+        .map(|slide| slide.slide_id)
+        .collect::<HashSet<_>>();
     for show in &mut graph.custom_shows.shows {
         show.slide_ids.retain(|id| live.contains(id));
     }
@@ -299,7 +323,11 @@ pub fn synchronize_presentation_structure_after_slide_mutation(
         section.slide_ids.retain(|id| live.contains(id));
     }
     graph.sections.sort_slide_membership(
-        &graph.slides.iter().map(|slide| slide.slide_id).collect::<Vec<_>>(),
+        &graph
+            .slides
+            .iter()
+            .map(|slide| slide.slide_id)
+            .collect::<Vec<_>>(),
     );
     store_presentation_structure(package, &graph)
 }
@@ -321,13 +349,15 @@ fn parse_structure_blob(
     if xml.len() > MAX_BYTES {
         return Err(invalid("presentation structure exceeds 8 MiB"));
     }
-    let processed = crate::common::mce::process_ooxml(xml)?;
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let (raw_slides, raw_shows) = parse_core(processed.as_ref())?;
     let presentation = package.main_document_part()?;
     let mut slides = Vec::with_capacity(raw_slides.len());
     for (slide_id, relationship_id) in raw_slides {
         let relationship = presentation.rels().get(&relationship_id).ok_or_else(|| {
-            invalid(format!("orphan presentation slide relationship {relationship_id}"))
+            invalid(format!(
+                "orphan presentation slide relationship {relationship_id}"
+            ))
         })?;
         if relationship.is_external()
             || !matches!(relationship.reltype(), SLIDE_REL | SLIDE_REL_STRICT)
@@ -341,7 +371,9 @@ fn parse_structure_blob(
         if part.content_type()
             != "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"
         {
-            return Err(invalid(format!("relationship {relationship_id} targets a non-slide part")));
+            return Err(invalid(format!(
+                "relationship {relationship_id} targets a non-slide part"
+            )));
         }
         slides.push(PresentationSlideReference {
             slide_id,
@@ -419,9 +451,7 @@ fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
                     && ancestors.last().map(String::as_str) == Some("sldIdLst")
                 {
                     slides.push(parse_slide_reference(&element, decoder)?);
-                } else if local == "sld"
-                    && ancestors.last().map(String::as_str) == Some("sldLst")
-                {
+                } else if local == "sld" && ancestors.last().map(String::as_str) == Some("sldLst") {
                     let relationship_id = relationship_id(&element, decoder)?;
                     current_show
                         .as_mut()
@@ -432,12 +462,18 @@ fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
             },
             Ok(Event::End(element)) => {
                 let local = local_name(element.name().as_ref())?;
-                let open = ancestors.pop().ok_or_else(|| invalid("unexpected closing element"))?;
+                let open = ancestors
+                    .pop()
+                    .ok_or_else(|| invalid("unexpected closing element"))?;
                 if open != local {
                     return Err(invalid("mismatched presentation element"));
                 }
                 if local == "custShow" {
-                    shows.push(current_show.take().ok_or_else(|| invalid("missing custom show"))?);
+                    shows.push(
+                        current_show
+                            .take()
+                            .ok_or_else(|| invalid("missing custom show"))?,
+                    );
                 }
             },
             Ok(Event::DocType(_) | Event::PI(_)) => {
@@ -463,7 +499,11 @@ fn parse_show(element: &BytesStart<'_>, decoder: quick_xml::encoding::Decoder) -
     if name.is_empty() {
         return Err(invalid("custom-show name cannot be empty"));
     }
-    Ok(RawShow { id, name, relationship_ids: Vec::new() })
+    Ok(RawShow {
+        id,
+        name,
+        relationship_ids: Vec::new(),
+    })
 }
 
 fn parse_slide_reference(
@@ -542,7 +582,9 @@ fn validate_graph(package: &OpcPackage, graph: &PresentationStructure) -> Result
         if !rel_ids.insert(slide.relationship_id.as_str())
             || !part_names.insert(slide.part_name.as_str())
         {
-            return Err(invalid("duplicate presentation slide relationship or target"));
+            return Err(invalid(
+                "duplicate presentation slide relationship or target",
+            ));
         }
     }
     let presentation = package.main_document_part()?;
@@ -550,7 +592,12 @@ fn validate_graph(package: &OpcPackage, graph: &PresentationStructure) -> Result
         let relationship = presentation
             .rels()
             .get(&slide.relationship_id)
-            .ok_or_else(|| invalid(format!("orphan slide relationship {}", slide.relationship_id)))?;
+            .ok_or_else(|| {
+                invalid(format!(
+                    "orphan slide relationship {}",
+                    slide.relationship_id
+                ))
+            })?;
         if relationship.is_external()
             || !matches!(relationship.reltype(), SLIDE_REL | SLIDE_REL_STRICT)
             || relationship.target_partname()?.as_str() != slide.part_name
@@ -658,11 +705,7 @@ fn write_section_extension(sections: &SectionList, p_namespace: &str) -> Result<
         .strip_prefix("<p:extLst>")
         .and_then(|value| value.strip_suffix("</p:extLst>"))
         .ok_or_else(|| invalid("invalid serialized section extension"))?;
-    Ok(inner.replacen(
-        "<p:ext ",
-        &format!("<p:ext xmlns:p=\"{p_namespace}\" "),
-        1,
-    ))
+    Ok(inner.replacen("<p:ext ", &format!("<p:ext xmlns:p=\"{p_namespace}\" "), 1))
 }
 
 #[derive(Clone)]
@@ -741,7 +784,9 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
                 }
             },
             Ok(Event::End(_)) => {
-                let frame = stack.pop().ok_or_else(|| invalid("unexpected closing element"))?;
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("unexpected closing element"))?;
                 let span = Span {
                     start: frame.start,
                     end: reader.buffer_position() as usize,
@@ -855,9 +900,21 @@ fn insert_bytes(xml: &[u8], offset: usize, value: &[u8]) -> Result<Vec<u8>> {
 
 fn schema_rank(local: &str) -> Option<usize> {
     [
-        "sldMasterIdLst", "notesMasterIdLst", "handoutMasterIdLst", "sldIdLst", "sldSz",
-        "notesSz", "smartTags", "embeddedFontLst", "custShowLst", "photoAlbum", "custDataLst",
-        "kinsoku", "defaultTextStyle", "modifyVerifier", "extLst",
+        "sldMasterIdLst",
+        "notesMasterIdLst",
+        "handoutMasterIdLst",
+        "sldIdLst",
+        "sldSz",
+        "notesSz",
+        "smartTags",
+        "embeddedFontLst",
+        "custShowLst",
+        "photoAlbum",
+        "custDataLst",
+        "kinsoku",
+        "defaultTextStyle",
+        "modifyVerifier",
+        "extLst",
     ]
     .iter()
     .position(|name| *name == local)
@@ -903,7 +960,9 @@ fn require_presentation(content_type: &str) -> Result<()> {
 
 fn resource(nodes: usize, depth: usize) -> Result<()> {
     if nodes > MAX_NODES || depth >= MAX_DEPTH {
-        Err(invalid("presentation structure XML resource limit exceeded"))
+        Err(invalid(
+            "presentation structure XML resource limit exceeded",
+        ))
     } else {
         Ok(())
     }
@@ -911,7 +970,10 @@ fn resource(nodes: usize, depth: usize) -> Result<()> {
 
 fn local_name(name: &[u8]) -> Result<String> {
     let name = std::str::from_utf8(name).map_err(|error| OoxmlError::Xml(error.to_string()))?;
-    Ok(name.rsplit_once(':').map_or(name, |(_, local)| local).to_owned())
+    Ok(name
+        .rsplit_once(':')
+        .map_or(name, |(_, local)| local)
+        .to_owned())
 }
 
 fn invalid(message: impl Into<String>) -> OoxmlError {
@@ -986,8 +1048,14 @@ mod tests {
         .unwrap();
         assert_eq!(section_id, "{11111111-1111-1111-1111-111111111111}");
         let graph = load_presentation_structure(package.opc_package()).unwrap();
-        assert_eq!(graph.custom_shows.get_by_id(7).unwrap().slide_ids, vec![300, 256]);
-        assert_eq!(graph.sections.get_by_id(&section_id).unwrap().slide_ids, vec![256, 300]);
+        assert_eq!(
+            graph.custom_shows.get_by_id(7).unwrap().slide_ids,
+            vec![300, 256]
+        );
+        assert_eq!(
+            graph.sections.get_by_id(&section_id).unwrap().slide_ids,
+            vec![256, 300]
+        );
         let xml = std::str::from_utf8(package.opc_package().main_document_part().unwrap().blob())
             .unwrap();
         assert!(xml.contains("r:id=\"slide-beta\""));
@@ -996,8 +1064,20 @@ mod tests {
         reorder_custom_show_slides(package.opc_package_mut(), 7, &[256, 300]).unwrap();
         remove_custom_show_slide(package.opc_package_mut(), 7, 300).unwrap();
         remove_section_slide(package.opc_package_mut(), &section_id, 300).unwrap();
-        assert_eq!(find_custom_show(package.opc_package(), 7).unwrap().unwrap().slide_ids, vec![256]);
-        assert_eq!(find_section(package.opc_package(), &section_id).unwrap().unwrap().slide_ids, vec![256]);
+        assert_eq!(
+            find_custom_show(package.opc_package(), 7)
+                .unwrap()
+                .unwrap()
+                .slide_ids,
+            vec![256]
+        );
+        assert_eq!(
+            find_section(package.opc_package(), &section_id)
+                .unwrap()
+                .unwrap()
+                .slide_ids,
+            vec![256]
+        );
         assert!(remove_custom_show(package.opc_package_mut(), 7).unwrap());
         assert!(remove_section(package.opc_package_mut(), &section_id).unwrap());
     }
@@ -1010,15 +1090,28 @@ mod tests {
             CustomShow::new(9, "Demo").with_slides(vec![256, 300]),
         )
         .unwrap();
-        let before = package.opc_package().main_document_part().unwrap().blob().to_vec();
+        let before = package
+            .opc_package()
+            .main_document_part()
+            .unwrap()
+            .blob()
+            .to_vec();
         assert!(reorder_custom_show_slides(package.opc_package_mut(), 9, &[256, 256]).is_err());
-        assert_eq!(package.opc_package().main_document_part().unwrap().blob(), before);
-        assert!(add_custom_show(
-            package.opc_package_mut(),
-            CustomShow::new(10, "Broken").with_slides(vec![999]),
-        )
-        .is_err());
-        assert_eq!(package.opc_package().main_document_part().unwrap().blob(), before);
+        assert_eq!(
+            package.opc_package().main_document_part().unwrap().blob(),
+            before
+        );
+        assert!(
+            add_custom_show(
+                package.opc_package_mut(),
+                CustomShow::new(10, "Broken").with_slides(vec![999]),
+            )
+            .is_err()
+        );
+        assert_eq!(
+            package.opc_package().main_document_part().unwrap().blob(),
+            before
+        );
     }
 
     #[test]
@@ -1031,12 +1124,24 @@ mod tests {
         presentation.create_custom_show("All", vec![256, 257, 258]);
 
         presentation.delete_slide(1).unwrap();
-        assert_eq!(presentation.sections().sections()[0].slide_ids, vec![256, 258]);
-        assert_eq!(presentation.custom_shows().shows[0].slide_ids, vec![256, 258]);
+        assert_eq!(
+            presentation.sections().sections()[0].slide_ids,
+            vec![256, 258]
+        );
+        assert_eq!(
+            presentation.custom_shows().shows[0].slide_ids,
+            vec![256, 258]
+        );
 
         presentation.move_slide(1, 0).unwrap();
-        assert_eq!(presentation.sections().sections()[0].slide_ids, vec![258, 256]);
-        assert_eq!(presentation.custom_shows().shows[0].slide_ids, vec![256, 258]);
+        assert_eq!(
+            presentation.sections().sections()[0].slide_ids,
+            vec![258, 256]
+        );
+        assert_eq!(
+            presentation.custom_shows().shows[0].slide_ids,
+            vec![256, 258]
+        );
         assert_eq!(presentation.add_slide().unwrap().slide_id(), 259);
     }
 
@@ -1055,6 +1160,10 @@ mod tests {
                 .count(),
             2
         );
-        assert!(patched.windows(b"<!--keep-->".len()).any(|window| window == b"<!--keep-->"));
+        assert!(
+            patched
+                .windows(b"<!--keep-->".len())
+                .any(|window| window == b"<!--keep-->")
+        );
     }
 }

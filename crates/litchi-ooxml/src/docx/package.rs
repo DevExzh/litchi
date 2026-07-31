@@ -1,4 +1,3 @@
-use crate::common::DocumentProperties;
 use crate::custom_properties::CustomProperties;
 use crate::custom_xml_data::{
     CustomXmlDataItem, CustomXmlDataProperties, NewCustomXmlDataItem, add_custom_xml_data,
@@ -12,23 +11,21 @@ use crate::docx::alt_chunk::{
 use crate::docx::bibliography::{
     BibliographySource, BibliographySourceStore, discover_bibliography_source_stores,
 };
-use crate::docx::document::Document;
-use crate::docx::mail_merge::{
-    MailMergeConformance, MailMergeRecipients, MailMergeSettings, MailMergeSource,
-    MailMergeTarget,
-};
 use crate::docx::content_control::ContentControl;
 use crate::docx::custom_xml::{CustomXmlBinding, NewCustomXmlDataStore};
+use crate::docx::document::Document;
 use crate::docx::font_table::{FontTable, is_font_table_relationship};
 use crate::docx::glossary::{
-    GlossaryDocument, GlossaryEntry, GlossaryPackage, load_from_package,
-    load_package_from_package, remove_from_package, store_in_package,
+    GlossaryDocument, GlossaryEntry, GlossaryPackage, load_from_package, load_package_from_package,
+    remove_from_package, store_in_package,
+};
+use crate::docx::mail_merge::{
+    MailMergeConformance, MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget,
 };
 use crate::docx::parts::DocumentPart;
 use crate::docx::settings::{
-    ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings,
-    patch_attached_template, patch_document_variables, patch_mail_merge,
-    validate_attached_template_target,
+    ATTACHED_TEMPLATE_RELATIONSHIP, AttachedTemplate, DocumentSettings, patch_attached_template,
+    patch_document_variables, patch_mail_merge, validate_attached_template_target,
 };
 use crate::docx::variables::DocumentVariables;
 use crate::docx::vba_project::{
@@ -38,6 +35,8 @@ use crate::docx::vba_project::{
 };
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
+/// Package implementation for Word documents.
+use crate::error::{OoxmlError, Result};
 use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
     load_ribbon_customizations, store_ribbon_customization,
@@ -46,8 +45,7 @@ use crate::web_extensions::{
     OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
     remove_web_extension_task_panes, store_web_extension_task_panes,
 };
-/// Package implementation for Word documents.
-use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::DocumentProperties;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -672,13 +670,7 @@ impl Package {
         limits: &crate::vba::VbaLimits,
     ) -> Result<VbaProject> {
         let source = self.opc.main_document_part()?.partname().clone();
-        store_vba_project_in_document(
-            &mut self.opc,
-            &source,
-            payload,
-            supplemental_data,
-            limits,
-        )
+        store_vba_project_in_document(&mut self.opc, &source, payload, supplemental_data, limits)
     }
 
     /// Remove the VBA project and supplemental-data graph and restore DOCX/DOTX type.
@@ -910,7 +902,8 @@ impl Package {
             )));
         }
         let namespace = self.alt_chunk_namespace()?;
-        let (chunk, installed_part) = self.install_alt_chunk_target(import, match_source, namespace)?;
+        let (chunk, installed_part) =
+            self.install_alt_chunk_target(import, match_source, namespace)?;
         if let Err(error) = self
             .document_mut()?
             .insert_alt_chunk(index, chunk.clone(), namespace)
@@ -938,7 +931,8 @@ impl Package {
             })?;
         let old_target = self.validate_alt_chunk_relationship(&old)?;
         let namespace = self.alt_chunk_namespace()?;
-        let (new, installed_part) = self.install_alt_chunk_target(import, match_source, namespace)?;
+        let (new, installed_part) =
+            self.install_alt_chunk_target(import, match_source, namespace)?;
         if let Err(error) = self
             .document_mut()?
             .replace_alt_chunk(index, new.clone(), namespace)
@@ -1028,7 +1022,10 @@ impl Package {
                     .find_map(|number| {
                         let target_ref = format!("afchunk{number}.{}", data.extension());
                         let uri = PackURI::new(format!("/word/{target_ref}")).ok()?;
-                        self.opc.get_part(&uri).is_err().then_some((uri, target_ref))
+                        self.opc
+                            .get_part(&uri)
+                            .is_err()
+                            .then_some((uri, target_ref))
                     })
                     .expect("the alternative-format part-name space is unbounded");
                 self.opc.try_add_part(Box::new(BlobPart::new(
@@ -1055,7 +1052,10 @@ impl Package {
             }
             return Err(error.into());
         }
-        Ok((AltChunk::new(relationship_id, match_source)?, installed_part))
+        Ok((
+            AltChunk::new(relationship_id, match_source)?,
+            installed_part,
+        ))
     }
 
     fn validate_alt_chunk_relationship(&self, chunk: &AltChunk) -> Result<Option<PackURI>> {
@@ -1111,16 +1111,12 @@ impl Package {
         chunk: &AltChunk,
         target: Option<&PackURI>,
     ) -> Result<()> {
-        if self
-            .mutable_doc
-            .as_ref()
-            .is_some_and(|document| {
-                document
-                    .alt_chunks()
-                    .iter()
-                    .any(|remaining| remaining.relationship_id() == chunk.relationship_id())
-            })
-        {
+        if self.mutable_doc.as_ref().is_some_and(|document| {
+            document
+                .alt_chunks()
+                .iter()
+                .any(|remaining| remaining.relationship_id() == chunk.relationship_id())
+        }) {
             return Ok(());
         }
         let document_uri = PackURI::new("/word/document.xml")
@@ -1134,12 +1130,16 @@ impl Package {
         };
         let package_reference = self.opc.rels().iter().any(|relationship| {
             !relationship.is_external()
-                && relationship.target_partname().is_ok_and(|part| &part == target)
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|part| &part == target)
         });
         let part_reference = self.opc.iter_parts().any(|part| {
             part.rels().iter().any(|relationship| {
                 !relationship.is_external()
-                    && relationship.target_partname().is_ok_and(|part| &part == target)
+                    && relationship
+                        .target_partname()
+                        .is_ok_and(|part| &part == target)
             })
         });
         if !package_reference && !part_reference {
@@ -1183,11 +1183,13 @@ impl Package {
 
     /// Find a Custom XML data store by its case-insensitive datastore item GUID.
     pub fn find_custom_xml_data_store(&self, item_id: &str) -> Result<Option<CustomXmlDataItem>> {
-        Ok(discover_custom_xml_data(&self.opc)?.into_iter().find(|item| {
-            item.properties
-                .as_ref()
-                .is_some_and(|properties| properties.item_id.eq_ignore_ascii_case(item_id))
-        }))
+        Ok(discover_custom_xml_data(&self.opc)?
+            .into_iter()
+            .find(|item| {
+                item.properties
+                    .as_ref()
+                    .is_some_and(|properties| properties.item_id.eq_ignore_ascii_case(item_id))
+            }))
     }
 
     /// Add a collision-safe `/customXml/itemN.xml` data store to the main document.
@@ -1327,9 +1329,11 @@ impl Package {
         if matching.is_empty() {
             return Ok(false);
         }
-        if self.custom_xml_bindings()?.iter().any(|binding| {
-            binding.store_item_id.eq_ignore_ascii_case(item_id)
-        }) {
+        if self
+            .custom_xml_bindings()?
+            .iter()
+            .any(|binding| binding.store_item_id.eq_ignore_ascii_case(item_id))
+        {
             return Err(OoxmlError::InvalidFormat(format!(
                 "Custom XML itemID '{item_id}' is still referenced by a content control"
             )));
@@ -1372,13 +1376,9 @@ impl Package {
                 )
             })?
             .to_owned();
-        let item = self
-            .find_custom_xml_data_store(&item_id)?
-            .ok_or_else(|| {
-                OoxmlError::PartNotFound(format!(
-                    "bibliography source store item '{item_id}'"
-                ))
-            })?;
+        let item = self.find_custom_xml_data_store(&item_id)?.ok_or_else(|| {
+            OoxmlError::PartNotFound(format!("bibliography source store item '{item_id}'"))
+        })?;
         Ok(Some((item_id, item.xml)))
     }
 
@@ -1405,9 +1405,7 @@ impl Package {
                 xml: xml.into_bytes(),
                 content_type: "application/xml".to_string(),
                 item_id: crate::docx::bibliography_writer::DEFAULT_STORE_ITEM_ID.to_string(),
-                schema_references: vec![
-                    crate::docx::OOXML_BIBLIOGRAPHY_NAMESPACE.to_string(),
-                ],
+                schema_references: vec![crate::docx::OOXML_BIBLIOGRAPHY_NAMESPACE.to_string()],
                 conformance: crate::custom_xml_data::CustomXmlConformance::Transitional,
             })?;
             Ok(item
@@ -1467,9 +1465,14 @@ impl Package {
         }
         let mut by_id = std::collections::HashMap::new();
         for item in &items {
-            let id = item.properties.as_ref().ok_or_else(|| {
-                OoxmlError::InvalidFormat("Custom XML item has no datastore itemID".into())
-            })?.item_id.to_ascii_lowercase();
+            let id = item
+                .properties
+                .as_ref()
+                .ok_or_else(|| {
+                    OoxmlError::InvalidFormat("Custom XML item has no datastore itemID".into())
+                })?
+                .item_id
+                .to_ascii_lowercase();
             if by_id.insert(id, item).is_some() {
                 return Err(OoxmlError::InvalidFormat(
                     "main-document Custom XML items are not uniquely reorderable".into(),
@@ -1512,7 +1515,10 @@ impl Package {
                 let candidates = (0..ordered.len())
                     .map(|index| format!("rIdCustomXmlOrder{batch:04}_{index:06}"))
                     .collect::<Vec<_>>();
-                candidates.iter().all(|id| !reserved.contains(id)).then_some(candidates)
+                candidates
+                    .iter()
+                    .all(|id| !reserved.contains(id))
+                    .then_some(candidates)
             })
             .next()
             .expect("the relationship ID space is unbounded");
@@ -1560,9 +1566,7 @@ impl Package {
                         content_control_id: control.id(),
                         xpath: xpath.to_string(),
                         store_item_id: store_item_id.to_string(),
-                        prefix_mappings: control
-                            .data_binding_prefix_mappings()
-                            .map(str::to_string),
+                        prefix_mappings: control.data_binding_prefix_mappings().map(str::to_string),
                     });
                 }
             }
@@ -1580,7 +1584,10 @@ impl Package {
     pub fn validate_custom_xml_binding_integrity(&self) -> Result<()> {
         let item_ids = discover_custom_xml_data(&self.opc)?
             .into_iter()
-            .filter_map(|item| item.properties.map(|properties| properties.item_id.to_ascii_lowercase()))
+            .filter_map(|item| {
+                item.properties
+                    .map(|properties| properties.item_id.to_ascii_lowercase())
+            })
             .collect::<std::collections::HashSet<_>>();
         for binding in self.custom_xml_bindings()? {
             if !item_ids.contains(&binding.store_item_id.to_ascii_lowercase()) {
@@ -1598,11 +1605,15 @@ impl Package {
     fn part_is_referenced(&self, target: &PackURI) -> bool {
         self.opc.rels().iter().any(|relationship| {
             !relationship.is_external()
-                && relationship.target_partname().is_ok_and(|part| &part == target)
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|part| &part == target)
         }) || self.opc.iter_parts().any(|part| {
             part.rels().iter().any(|relationship| {
                 !relationship.is_external()
-                    && relationship.target_partname().is_ok_and(|part| &part == target)
+                    && relationship
+                        .target_partname()
+                        .is_ok_and(|part| &part == target)
             })
         })
     }
@@ -1611,7 +1622,9 @@ impl Package {
     pub fn mail_merge_settings(&self) -> Result<Option<MailMergeSettings>> {
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(DocumentSettings::extract_from_part(&part)?.mail_merge().cloned())
+        Ok(DocumentSettings::extract_from_part(&part)?
+            .mail_merge()
+            .cloned())
     }
 
     /// Resolve a mail-merge relationship without opening or fetching its target.
@@ -1629,7 +1642,9 @@ impl Package {
             )));
         }
         if relationship.is_external() {
-            return Ok(MailMergeTarget::External(relationship.target_ref().to_string()));
+            return Ok(MailMergeTarget::External(
+                relationship.target_ref().to_string(),
+            ));
         }
         let target = relationship.target_partname()?;
         let target_part = self.opc.get_part(&target)?;
@@ -1672,9 +1687,13 @@ impl Package {
             )?;
             let id = relationship.id.clone();
             staged_relationships.push(relationship);
-            if let Some(part) = part { staged_parts.push(part); }
+            if let Some(part) = part {
+                staged_parts.push(part);
+            }
             Some(id)
-        } else { None };
+        } else {
+            None
+        };
         let header_id = if let Some(source) = header_source {
             let (relationship, part) = self.stage_mail_merge_source(
                 source,
@@ -1685,9 +1704,13 @@ impl Package {
             )?;
             let id = relationship.id.clone();
             staged_relationships.push(relationship);
-            if let Some(part) = part { staged_parts.push(part); }
+            if let Some(part) = part {
+                staged_parts.push(part);
+            }
             Some(id)
-        } else { None };
+        } else {
+            None
+        };
         let recipient_id = if let Some(recipients) = recipients {
             let xml = recipients.to_xml(conformance)?.into_bytes();
             let id = allocate_mail_merge_relationship_id("Recipients", &mut used_ids);
@@ -1705,7 +1728,9 @@ impl Package {
                 external: false,
             });
             Some(id)
-        } else { None };
+        } else {
+            None
+        };
         settings.assign_package_relationships(data_id, header_id, recipient_id);
         let patched = patch_mail_merge(&snapshot.xml, Some(&settings), conformance)?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
@@ -1715,7 +1740,9 @@ impl Package {
             .filter(|relationship| is_mail_merge_relationship_type(relationship.reltype()))
             .map(|relationship| relationship.r_id().to_string())
             .collect::<Vec<_>>();
-        for id in old_ids { replacement.rels_mut().remove(&id); }
+        for id in old_ids {
+            replacement.rels_mut().remove(&id);
+        }
         for relationship in staged_relationships {
             replacement.rels_mut().add_relationship(
                 relationship.reltype,
@@ -1730,17 +1757,23 @@ impl Package {
         for part in staged_parts {
             let name = part.partname().clone();
             if let Err(error) = self.opc.try_add_part(Box::new(part)) {
-                for installed_name in installed { self.opc.remove_part(&installed_name); }
+                for installed_name in installed {
+                    self.opc.remove_part(&installed_name);
+                }
                 return Err(error.into());
             }
             installed.push(name);
         }
         if let Err(error) = self.commit_settings_part(&snapshot, replacement) {
-            for installed_name in installed { self.opc.remove_part(&installed_name); }
+            for installed_name in installed {
+                self.opc.remove_part(&installed_name);
+            }
             return Err(error);
         }
         for old_target in old_targets {
-            if !self.part_is_referenced(&old_target) { self.opc.remove_part(&old_target); }
+            if !self.part_is_referenced(&old_target) {
+                self.opc.remove_part(&old_target);
+            }
         }
         let _ = self.opc.clear_digital_signatures();
         Ok(())
@@ -1755,7 +1788,13 @@ impl Package {
         recipients: Option<MailMergeRecipients>,
         conformance: MailMergeConformance,
     ) -> Result<()> {
-        self.set_mail_merge(settings, data_source, header_source, recipients, conformance)
+        self.set_mail_merge(
+            settings,
+            data_source,
+            header_source,
+            recipients,
+            conformance,
+        )
     }
 
     /// Replace recipient inclusion flags while retaining inert source targets and settings.
@@ -1788,15 +1827,14 @@ impl Package {
     pub fn clear_mail_merge(&mut self) -> Result<bool> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        if DocumentSettings::extract_from_part(&original)?.mail_merge().is_none() {
+        if DocumentSettings::extract_from_part(&original)?
+            .mail_merge()
+            .is_none()
+        {
             return Ok(false);
         }
         let old_targets = self.mail_merge_internal_targets(&snapshot)?;
-        let patched = patch_mail_merge(
-            &snapshot.xml,
-            None,
-            MailMergeConformance::Transitional,
-        )?;
+        let patched = patch_mail_merge(&snapshot.xml, None, MailMergeConformance::Transitional)?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
         let ids = replacement
             .rels()
@@ -1804,11 +1842,15 @@ impl Package {
             .filter(|relationship| is_mail_merge_relationship_type(relationship.reltype()))
             .map(|relationship| relationship.r_id().to_string())
             .collect::<Vec<_>>();
-        for id in ids { replacement.rels_mut().remove(&id); }
+        for id in ids {
+            replacement.rels_mut().remove(&id);
+        }
         DocumentSettings::extract_from_part(&replacement)?;
         self.commit_settings_part(&snapshot, replacement)?;
         for old_target in old_targets {
-            if !self.part_is_referenced(&old_target) { self.opc.remove_part(&old_target); }
+            if !self.part_is_referenced(&old_target) {
+                self.opc.remove_part(&old_target);
+            }
         }
         let _ = self.opc.clear_digital_signatures();
         Ok(true)
@@ -1827,24 +1869,34 @@ impl Package {
         match source {
             MailMergeSource::External(uri) => {
                 validate_mail_merge_external_uri(&uri)?;
-                Ok((StoredRelationship {
-                    reltype: mail_merge_relationship_type(conformance, relationship_suffix),
-                    target: uri,
-                    id,
-                    external: true,
-                }, None))
+                Ok((
+                    StoredRelationship {
+                        reltype: mail_merge_relationship_type(conformance, relationship_suffix),
+                        target: uri,
+                        id,
+                        external: true,
+                    },
+                    None,
+                ))
             },
-            MailMergeSource::Internal { bytes, content_type, extension } => {
+            MailMergeSource::Internal {
+                bytes,
+                content_type,
+                extension,
+            } => {
                 validate_mail_merge_internal_source(&bytes, &content_type, &extension)?;
                 let uri = self.allocate_mail_merge_part_name(label, &extension)?;
                 let target = uri.relative_ref(settings_target.base_uri());
                 let part = BlobPart::new(uri, content_type, bytes);
-                Ok((StoredRelationship {
-                    reltype: mail_merge_relationship_type(conformance, relationship_suffix),
-                    target,
-                    id,
-                    external: false,
-                }, Some(part)))
+                Ok((
+                    StoredRelationship {
+                        reltype: mail_merge_relationship_type(conformance, relationship_suffix),
+                        target,
+                        id,
+                        external: false,
+                    },
+                    Some(part),
+                ))
             },
         }
     }
@@ -1854,7 +1906,10 @@ impl Package {
             let candidate = PackURI::new(format!("/word/mailMerge/{stem}{number}.{extension}"))
                 .map_err(OoxmlError::InvalidUri)?;
             if self.opc.iter_parts().all(|part| {
-                !part.partname().as_str().eq_ignore_ascii_case(candidate.as_str())
+                !part
+                    .partname()
+                    .as_str()
+                    .eq_ignore_ascii_case(candidate.as_str())
             }) {
                 return Ok(candidate);
             }
@@ -1863,11 +1918,14 @@ impl Package {
     }
 
     fn mail_merge_internal_targets(&self, snapshot: &SettingsPartSnapshot) -> Result<Vec<PackURI>> {
-        let Ok(part) = self.opc.get_part(&snapshot.target) else { return Ok(Vec::new()); };
+        let Ok(part) = self.opc.get_part(&snapshot.target) else {
+            return Ok(Vec::new());
+        };
         part.rels()
             .iter()
             .filter(|relationship| {
-                is_mail_merge_relationship_type(relationship.reltype()) && !relationship.is_external()
+                is_mail_merge_relationship_type(relationship.reltype())
+                    && !relationship.is_external()
             })
             .map(|relationship| relationship.target_partname().map_err(Into::into))
             .collect()
@@ -1927,11 +1985,8 @@ impl Package {
             .attached_template()
             .map(|template| template.relationship_id().to_owned());
 
-        let mut replacement = settings_part_from_snapshot(
-            &snapshot,
-            snapshot.xml.clone(),
-            old_id.as_deref(),
-        );
+        let mut replacement =
+            settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), old_id.as_deref());
         let relationship_id = if let Some(id) = old_id {
             replacement.rels_mut().add_relationship(
                 ATTACHED_TEMPLATE_RELATIONSHIP.to_owned(),
@@ -2070,8 +2125,7 @@ impl Package {
 
     /// Load the typed glossary/building-block document, if present.
     pub fn glossary_document(&self) -> Result<Option<GlossaryDocument>> {
-        load_from_package(&self.opc)
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
+        load_from_package(&self.opc).map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
     }
 
     /// Load the glossary together with its owned auxiliary relationship graph.
@@ -2083,14 +2137,11 @@ impl Package {
     /// Atomically install or replace a glossary while preserving its existing graph.
     pub fn set_glossary_document(&mut self, document: GlossaryDocument) -> Result<()> {
         let mut package = self.glossary_package()?.unwrap_or_else(|| {
-            let strict = self
-                .opc
-                .main_document_part()
-                .is_ok_and(|part| {
-                    std::str::from_utf8(part.blob()).is_ok_and(|xml| {
-                        xml.contains("http://purl.oclc.org/ooxml/wordprocessingml/main")
-                    })
-                });
+            let strict = self.opc.main_document_part().is_ok_and(|part| {
+                std::str::from_utf8(part.blob()).is_ok_and(|xml| {
+                    xml.contains("http://purl.oclc.org/ooxml/wordprocessingml/main")
+                })
+            });
             GlossaryPackage::new(GlossaryDocument::default(), strict)
         });
         package.document = document;
@@ -2164,8 +2215,9 @@ impl Package {
         self.update_glossary_document(|document| {
             document
                 .update_entry(index, |entry| {
-                    update.take().expect("glossary update closure called once")(entry)
-                        .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
+                    update.take().expect("glossary update closure called once")(entry).map_err(
+                        |error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>,
+                    )
                 })
                 .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))
         })
@@ -2294,7 +2346,11 @@ impl Package {
                     mutable_doc.collect_explicit_section_header_footer_relationships()?;
                 let mut planned_section_parts = Vec::new();
                 for (index, (header, part)) in section_header_footer_parts.into_iter().enumerate() {
-                    let stem = if header { "headerSection" } else { "footerSection" };
+                    let stem = if header {
+                        "headerSection"
+                    } else {
+                        "footerSection"
+                    };
                     let filename = format!("{stem}{}.xml", index + 1);
                     let uri = PackURI::new(format!("/word/{filename}"))
                         .map_err(|error| OoxmlError::InvalidUri(error.to_string()))?;
@@ -2498,7 +2554,11 @@ impl Package {
                     for (partname, content_type, xml) in [
                         (&data_name, ct::DML_DIAGRAM_DATA, parts.data_xml),
                         (&layout_name, ct::DML_DIAGRAM_LAYOUT, parts.layout_xml),
-                        (&quick_style_name, ct::DML_DIAGRAM_STYLE, parts.quick_style_xml),
+                        (
+                            &quick_style_name,
+                            ct::DML_DIAGRAM_STYLE,
+                            parts.quick_style_xml,
+                        ),
                         (&colors_name, ct::DML_DIAGRAM_COLORS, parts.colors_xml),
                     ] {
                         let uri = PackURI::new(partname)
@@ -2510,8 +2570,7 @@ impl Package {
                         )));
                     }
                     let rel_ids = crate::docx::writer::smartart::SmartArtRelIds {
-                        data: temp_part
-                            .relate_to(&data_name, crate::diagrams::DIAGRAM_DATA_REL),
+                        data: temp_part.relate_to(&data_name, crate::diagrams::DIAGRAM_DATA_REL),
                         layout: temp_part
                             .relate_to(&layout_name, crate::diagrams::DIAGRAM_LAYOUT_REL),
                         quick_style: temp_part
@@ -2596,25 +2655,24 @@ impl Package {
 
                     // Store the watermark image as an ordinary media part,
                     // shared by all three headers.
-                    let image_media_name = if let Some(image_watermark) =
-                        mutable_doc.image_watermark.as_ref()
-                    {
-                        let media_name = format!(
-                            "/word/media/watermarkImage1.{}",
-                            image_watermark.format().extension()
-                        );
-                        let media_uri = PackURI::new(&media_name).map_err(|e| {
-                            OoxmlError::InvalidUri(format!("watermark image URI: {}", e))
-                        })?;
-                        self.opc.add_part(Box::new(BlobPart::new(
-                            media_uri,
-                            image_watermark.format().mime_type().to_string(),
-                            image_watermark.data().to_vec(),
-                        )));
-                        Some(media_name)
-                    } else {
-                        None
-                    };
+                    let image_media_name =
+                        if let Some(image_watermark) = mutable_doc.image_watermark.as_ref() {
+                            let media_name = format!(
+                                "/word/media/watermarkImage1.{}",
+                                image_watermark.format().extension()
+                            );
+                            let media_uri = PackURI::new(&media_name).map_err(|e| {
+                                OoxmlError::InvalidUri(format!("watermark image URI: {}", e))
+                            })?;
+                            self.opc.add_part(Box::new(BlobPart::new(
+                                media_uri,
+                                image_watermark.format().mime_type().to_string(),
+                                image_watermark.data().to_vec(),
+                            )));
+                            Some(media_name)
+                        } else {
+                            None
+                        };
 
                     // Create three headers (default, first, even) with watermark
                     let header_types = [
@@ -2630,14 +2688,10 @@ impl Package {
                             watermark_xml.push_str(&wm.to_header_xml((idx + 1) as u32)?);
                         }
 
-                        let header_uri = PackURI::new(*header_uri_path).map_err(|e| {
-                            OoxmlError::InvalidUri(format!("header URI: {}", e))
-                        })?;
-                        let mut header_part = BlobPart::new(
-                            header_uri,
-                            ct::WML_HEADER.to_string(),
-                            Vec::new(),
-                        );
+                        let header_uri = PackURI::new(*header_uri_path)
+                            .map_err(|e| OoxmlError::InvalidUri(format!("header URI: {}", e)))?;
+                        let mut header_part =
+                            BlobPart::new(header_uri, ct::WML_HEADER.to_string(), Vec::new());
 
                         // The image watermark references the media part
                         // through a relationship owned by this header part.
@@ -2645,9 +2699,8 @@ impl Package {
                             mutable_doc.image_watermark.as_ref(),
                             image_media_name.as_deref(),
                         ) {
-                            let media_target = media_name
-                                .strip_prefix("/word/")
-                                .unwrap_or(media_name);
+                            let media_target =
+                                media_name.strip_prefix("/word/").unwrap_or(media_name);
                             let rel_id = header_part.relate_to(media_target, rt::IMAGE);
                             watermark_xml.push_str(
                                 &image_watermark.to_header_xml((idx + 1) as u32, &rel_id)?,
@@ -2701,7 +2754,11 @@ impl Package {
 
                 // Step 4: Update the document part with final XML and relationships
                 for (header, part, uri, _) in planned_section_parts {
-                    let content_type = if header { ct::WML_HEADER } else { ct::WML_FOOTER };
+                    let content_type = if header {
+                        ct::WML_HEADER
+                    } else {
+                        ct::WML_FOOTER
+                    };
                     self.opc.add_part(Box::new(BlobPart::new(
                         uri,
                         content_type.to_string(),
@@ -2999,7 +3056,10 @@ impl Package {
         let document = self.opc.main_document_part()?;
         let document_uri = document.partname().clone();
         let mut matches = document.rels().iter().filter(|relationship| {
-            matches!(relationship.reltype(), rt::SETTINGS | STRICT_SETTINGS_RELATIONSHIP)
+            matches!(
+                relationship.reltype(),
+                rt::SETTINGS | STRICT_SETTINGS_RELATIONSHIP
+            )
         });
         let relationship = matches.next();
         if matches.next().is_some() {
@@ -3288,11 +3348,7 @@ fn settings_part_from_snapshot(
 ) -> litchi_opc::part::BlobPart {
     use litchi_opc::part::{BlobPart, Part};
 
-    let mut part = BlobPart::new(
-        snapshot.target.clone(),
-        snapshot.content_type.clone(),
-        xml,
-    );
+    let mut part = BlobPart::new(snapshot.target.clone(), snapshot.content_type.clone(), xml);
     for relationship in &snapshot.relationships {
         if omitted_relationship_id == Some(relationship.id.as_str()) {
             continue;
@@ -3311,25 +3367,21 @@ fn is_mail_merge_relationship_type(value: &str) -> bool {
     ["mailMergeSource", "mailMergeHeaderSource", "recipientData"]
         .iter()
         .any(|suffix| {
-            value == format!(
-                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/{suffix}"
-            ) || value == format!(
-                "http://purl.oclc.org/ooxml/officeDocument/relationships/{suffix}"
-            )
+            value
+                == format!(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/{suffix}"
+                )
+                || value
+                    == format!("http://purl.oclc.org/ooxml/officeDocument/relationships/{suffix}")
         })
 }
 
-fn mail_merge_relationship_type(
-    conformance: MailMergeConformance,
-    suffix: &str,
-) -> String {
+fn mail_merge_relationship_type(conformance: MailMergeConformance, suffix: &str) -> String {
     let base = match conformance {
         MailMergeConformance::Transitional => {
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
         },
-        MailMergeConformance::Strict => {
-            "http://purl.oclc.org/ooxml/officeDocument/relationships"
-        },
+        MailMergeConformance::Strict => "http://purl.oclc.org/ooxml/officeDocument/relationships",
     };
     format!("{base}/{suffix}")
 }
@@ -3451,10 +3503,9 @@ mod tests {
     fn saves_and_reopens_inline_and_display_office_math() {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let inline = crate::docx::OfficeMath::text("x + y");
-        let display = crate::docx::OfficeMath::from_xml(
-            "<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>",
-        )
-        .unwrap();
+        let display =
+            crate::docx::OfficeMath::from_xml("<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>")
+                .unwrap();
         let mut package = Package::new().unwrap();
         {
             let document = package.document_mut().unwrap();
@@ -3467,18 +3518,13 @@ mod tests {
 
         let reopened = Package::open(file.path()).unwrap();
         let document_uri = PackURI::new("/word/document.xml").unwrap();
-        let document_xml = std::str::from_utf8(
-            reopened
-                .opc
-                .get_part(&document_uri)
-                .unwrap()
-                .blob(),
-        )
-        .unwrap();
+        let document_xml =
+            std::str::from_utf8(reopened.opc.get_part(&document_uri).unwrap().blob()).unwrap();
         let document_opening = &document_xml[..document_xml.find("><w:body>").unwrap()];
-        assert!(document_opening.contains(
-            "xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\""
-        ));
+        assert!(
+            document_opening
+                .contains("xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\"")
+        );
         let paragraphs = reopened.document().unwrap().paragraphs().unwrap();
         assert_eq!(paragraphs[0].inline_office_math().unwrap(), vec![inline]);
         assert_eq!(paragraphs[1].display_office_math().unwrap(), vec![display]);
@@ -3953,12 +3999,12 @@ mod tests {
                 (r#"=SUM(ABOVE) \* MERGEFORMAT"#, "42"),
                 (r#"STYLEREF "Heading 1" \n \p"#, "1 above"),
             ] {
-                document.add_paragraph().add_field(
-                    crate::docx::writer::MutableField::with_result(
+                document
+                    .add_paragraph()
+                    .add_field(crate::docx::writer::MutableField::with_result(
                         instruction.to_string(),
                         cached_result.to_string(),
-                    ),
-                );
+                    ));
             }
         }
         package.save(file.path()).unwrap();
@@ -4016,12 +4062,12 @@ mod tests {
                 (r#"FTNREF FootnoteTarget \p \f"#, "1 above"),
                 (r#"NOTEREF EndnoteTarget \p \f"#, "i above"),
             ] {
-                document.add_paragraph().add_field(
-                    crate::docx::writer::MutableField::with_result(
+                document
+                    .add_paragraph()
+                    .add_field(crate::docx::writer::MutableField::with_result(
                         instruction.to_string(),
                         cached_result.to_string(),
-                    ),
-                );
+                    ));
             }
         }
         package.save(file.path()).unwrap();
@@ -4106,12 +4152,12 @@ mod tests {
                 (r#"EQ \f(1,2)"#, "1/2"),
                 ("EQ", ""),
             ] {
-                document.add_paragraph().add_field(
-                    crate::docx::writer::MutableField::with_result(
+                document
+                    .add_paragraph()
+                    .add_field(crate::docx::writer::MutableField::with_result(
                         instruction.to_string(),
                         cached_result.to_string(),
-                    ),
-                );
+                    ));
             }
         }
         package.save(file.path()).unwrap();
@@ -4141,12 +4187,12 @@ mod tests {
                 ),
                 (r#"HYPERLINK \l "JumpTarget""#, "cached internal link"),
             ] {
-                document.add_paragraph().add_field(
-                    crate::docx::writer::MutableField::with_result(
+                document
+                    .add_paragraph()
+                    .add_field(crate::docx::writer::MutableField::with_result(
                         instruction.to_string(),
                         cached_result.to_string(),
-                    ),
-                );
+                    ));
             }
         }
         package.save(file.path()).unwrap();
@@ -4157,7 +4203,10 @@ mod tests {
         let fields = document.hyperlink_fields().unwrap();
         assert_eq!(document.hyperlink_field_count().unwrap(), 2);
         assert_eq!(fields.len(), 2);
-        assert_eq!(fields[0].external_target(), Some("https://example.test/a b"));
+        assert_eq!(
+            fields[0].external_target(),
+            Some("https://example.test/a b")
+        );
         assert_eq!(fields[0].bookmark(), Some("_Toc1"));
         assert_eq!(fields[0].screen_tip(), Some("Stored tip"));
         assert_eq!(fields[0].target_frame(), Some("_blank"));
@@ -4239,19 +4288,25 @@ mod tests {
                 ("ADDIN opaque-add-in-data", "cached add-in"),
                 ("CONTROL opaque-control-data", "cached control"),
                 ("HTMLCONTROL opaque-html-data", "cached HTML control"),
-                (r#"GLOSSARY "Legacy Clause" \* MERGEFORMAT"#, "cached glossary"),
-                (r#"AUTOTEXT "Reusable Clause" \q opaque"#, "cached auto text"),
+                (
+                    r#"GLOSSARY "Legacy Clause" \* MERGEFORMAT"#,
+                    "cached glossary",
+                ),
+                (
+                    r#"AUTOTEXT "Reusable Clause" \q opaque"#,
+                    "cached auto text",
+                ),
                 (
                     r#"AUTOTEXTLIST "Choose a name" \s "Name Style" \t "Select one""#,
                     "cached auto text list",
                 ),
             ] {
-                document.add_paragraph().add_field(
-                    crate::docx::writer::MutableField::with_result(
+                document
+                    .add_paragraph()
+                    .add_field(crate::docx::writer::MutableField::with_result(
                         instruction.to_string(),
                         cached_result.to_string(),
-                    ),
-                );
+                    ));
             }
         }
         package.save(file.path()).unwrap();
@@ -4274,21 +4329,33 @@ mod tests {
             active_content[2].kind(),
             crate::docx::ActiveContentFieldKind::HtmlControl
         );
-        assert_eq!(active_content[2].cached_result(), Some("cached HTML control"));
+        assert_eq!(
+            active_content[2].cached_result(),
+            Some("cached HTML control")
+        );
 
         let auto_text = document.auto_text_fields().unwrap();
         assert_eq!(document.auto_text_field_count().unwrap(), 2);
         assert_eq!(auto_text.len(), 2);
-        assert_eq!(auto_text[0].kind(), crate::docx::AutoTextFieldKind::Glossary);
+        assert_eq!(
+            auto_text[0].kind(),
+            crate::docx::AutoTextFieldKind::Glossary
+        );
         assert_eq!(auto_text[0].entry_name(), "Legacy Clause");
-        assert_eq!(auto_text[1].kind(), crate::docx::AutoTextFieldKind::AutoText);
+        assert_eq!(
+            auto_text[1].kind(),
+            crate::docx::AutoTextFieldKind::AutoText
+        );
         assert_eq!(auto_text[1].entry_name(), "Reusable Clause");
 
         let auto_text_lists = document.auto_text_list_fields().unwrap();
         assert_eq!(document.auto_text_list_field_count().unwrap(), 1);
         assert_eq!(auto_text_lists.len(), 1);
         assert_eq!(auto_text_lists[0].display_text(), Some("Choose a name"));
-        assert_eq!(auto_text_lists[0].cached_result(), Some("cached auto text list"));
+        assert_eq!(
+            auto_text_lists[0].cached_result(),
+            Some("cached auto text list")
+        );
     }
 
     #[test]
@@ -4563,7 +4630,10 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].entry(), "Topic");
         assert_eq!(entries[0].entry_identifier().unwrap(), Some("topics"));
-        assert_eq!(entries[0].page_range_bookmark().unwrap(), Some("TopicRange"));
+        assert_eq!(
+            entries[0].page_range_bookmark().unwrap(),
+            Some("TopicRange")
+        );
         assert!(entries[0].is_bold());
     }
 
@@ -4862,11 +4932,7 @@ mod tests {
         package.save(file.path()).unwrap();
         let mut reopened = Package::open(file.path()).unwrap();
         assert_eq!(
-            reopened
-                .attached_template()
-                .unwrap()
-                .unwrap()
-                .target_uri(),
+            reopened.attached_template().unwrap().unwrap().target_uri(),
             "https://example.test/New.dotx?a=1&b=2"
         );
         let removed = reopened.remove_attached_template().unwrap().unwrap();
@@ -4874,10 +4940,12 @@ mod tests {
         assert!(reopened.attached_template().unwrap().is_none());
         let part = reopened.opc.get_part(&settings_uri).unwrap();
         assert!(!String::from_utf8_lossy(part.blob()).contains("attachedTemplate"));
-        assert!(!part
-            .rels()
-            .iter()
-            .any(|relationship| is_attached_template_relationship(relationship.reltype())));
+        assert!(
+            !part
+                .rels()
+                .iter()
+                .any(|relationship| is_attached_template_relationship(relationship.reltype()))
+        );
     }
 
     #[test]
@@ -4898,7 +4966,9 @@ mod tests {
             .unwrap();
         let part = package.opc.get_part(&settings_uri).unwrap();
         let xml = String::from_utf8_lossy(part.blob());
-        assert!(xml.contains(r#"<!--keep--><q:zoom q:percent="137"/><x:opaque><![CDATA[a < b]]></x:opaque>"#));
+        assert!(xml.contains(
+            r#"<!--keep--><q:zoom q:percent="137"/><x:opaque><![CDATA[a < b]]></x:opaque>"#
+        ));
         let unrelated = part.rels().get("customRelationship").unwrap();
         assert_eq!(unrelated.reltype(), "urn:unrelated");
         assert_eq!(unrelated.target_ref(), "https://example.test/keep?a=1&b=2");
@@ -4930,17 +5000,21 @@ mod tests {
         let relationship = part.rels().get("arbitrary-id").unwrap();
         assert_eq!(relationship.reltype(), ATTACHED_TEMPLATE_RELATIONSHIP);
         assert!(relationship.is_external());
-        assert!(String::from_utf8_lossy(part.blob())
-            .contains(r#"<s:attachedTemplate rel:id="arbitrary-id"/>"#));
+        assert!(
+            String::from_utf8_lossy(part.blob())
+                .contains(r#"<s:attachedTemplate rel:id="arbitrary-id"/>"#)
+        );
     }
 
     #[test]
     fn attached_template_failures_are_atomic() {
         let mut invalid_target = Package::new().unwrap();
         let before = settings_state(&invalid_target);
-        assert!(invalid_target
-            .set_attached_template_uri("file:///bad path.dotx")
-            .is_err());
+        assert!(
+            invalid_target
+                .set_attached_template_uri("file:///bad path.dotx")
+                .is_err()
+        );
         assert_eq!(settings_state(&invalid_target), before);
 
         let mut malformed = Package::new().unwrap();
@@ -4960,9 +5034,11 @@ mod tests {
                 true,
             );
         let before = settings_state(&malformed);
-        assert!(malformed
-            .set_attached_template_uri("file:///replacement.dotx")
-            .is_err());
+        assert!(
+            malformed
+                .set_attached_template_uri("file:///replacement.dotx")
+                .is_err()
+        );
         assert_eq!(settings_state(&malformed), before);
         assert!(malformed.remove_attached_template().is_err());
         assert_eq!(settings_state(&malformed), before);
@@ -4992,13 +5068,15 @@ mod tests {
         assert_eq!(attached.relationship_id(), relationship_id);
         assert_eq!(attached.target_uri(), "file:///templates/Protected.dotx");
         let settings_uri = PackURI::new("/word/settings.xml").unwrap();
-        assert!(package
-            .opc
-            .get_part(&settings_uri)
-            .unwrap()
-            .rels()
-            .get(&relationship_id)
-            .is_some());
+        assert!(
+            package
+                .opc
+                .get_part(&settings_uri)
+                .unwrap()
+                .rels()
+                .get(&relationship_id)
+                .is_some()
+        );
     }
 
     #[test]
@@ -5025,7 +5103,12 @@ mod tests {
         package.save(file.path()).unwrap();
 
         let mut reopened = Package::open(file.path()).unwrap();
-        let variables = reopened.document().unwrap().document_variables().unwrap().unwrap();
+        let variables = reopened
+            .document()
+            .unwrap()
+            .document_variables()
+            .unwrap()
+            .unwrap();
         assert_eq!(variables.get("Company & Team"), Some("updated"));
         assert_eq!(variables.get("second"), Some("two"));
         assert_eq!(
@@ -5035,10 +5118,10 @@ mod tests {
         assert_eq!(reopened.clear_document_variables().unwrap(), 1);
         assert!(reopened.document_variables().unwrap().unwrap().is_empty());
         let settings_uri = PackURI::new("/word/settings.xml").unwrap();
-        assert!(!String::from_utf8_lossy(
-            reopened.opc.get_part(&settings_uri).unwrap().blob()
-        )
-        .contains("docVars"));
+        assert!(
+            !String::from_utf8_lossy(reopened.opc.get_part(&settings_uri).unwrap().blob())
+                .contains("docVars")
+        );
     }
 
     #[test]
@@ -5103,9 +5186,11 @@ mod tests {
         let before = settings_state(&package);
         assert!(package.set_document_variable("", "invalid").is_err());
         assert_eq!(settings_state(&package), before);
-        assert!(package
-            .set_document_variable("too-long", "x".repeat(65_281))
-            .is_err());
+        assert!(
+            package
+                .set_document_variable("too-long", "x".repeat(65_281))
+                .is_err()
+        );
         assert_eq!(settings_state(&package), before);
 
         let settings_uri = PackURI::new("/word/settings.xml").unwrap();

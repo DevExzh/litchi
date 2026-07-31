@@ -49,7 +49,7 @@ pub struct HeaderFooter {
 impl HeaderFooter {
     fn semantic_xml(&self) -> Result<Arc<Vec<u8>>> {
         Ok(
-            match crate::common::mce::process_ooxml(self.xml_bytes.as_slice())? {
+            match litchi_ooxml_common::mce::process_ooxml(self.xml_bytes.as_slice())? {
                 std::borrow::Cow::Borrowed(_) => Arc::clone(&self.xml_bytes),
                 std::borrow::Cow::Owned(xml) => Arc::new(xml),
             },

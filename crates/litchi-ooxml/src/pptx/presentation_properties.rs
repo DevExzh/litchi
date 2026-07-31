@@ -188,7 +188,7 @@ impl PresentationProperties {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation properties exceed 8 MiB"));
         }
-        let processed = crate::common::mce::process_ooxml(xml)?;
+        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if processed.len() > MAX_BYTES {
             return Err(invalid("processed presentation properties exceed 8 MiB"));
         }
@@ -1647,7 +1647,8 @@ mod tests {
                 .map(|i| {
                     PresentationPropertyExtension::Unknown(OpaquePresentationExtension {
                         uri: format!("urn:vendor:{i}"),
-                        xml: format!(r#"<p:ext xmlns:p="{P_NS}" uri="urn:vendor:{i}"/>"#).into_bytes(),
+                        xml: format!(r#"<p:ext xmlns:p="{P_NS}" uri="urn:vendor:{i}"/>"#)
+                            .into_bytes(),
                     })
                 })
                 .collect(),

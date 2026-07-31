@@ -25,9 +25,9 @@ use quick_xml::reader::NsReader;
 use crate::common::xml::{decode_xml_reference, is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::relationship_attribute_value;
+use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::shape_geometry::XlsxCustomGeometry;
 use crate::xlsx::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
-use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::worksheet::WorksheetInfo;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, Part};
@@ -984,7 +984,7 @@ pub fn parse_drawing_shapes(xml: &str) -> Result<Option<Vec<XlsxAnchoredObject>>
     if xml.len() > MAX_DRAWING_PART_BYTES {
         return Err(limit("drawing part bytes"));
     }
-    let xml = crate::common::mce::process_str(xml)?;
+    let xml = litchi_ooxml_common::mce::process_str(xml)?;
     Parser::parse(xml.as_ref())
 }
 
@@ -1006,7 +1006,10 @@ pub fn load_shapes(package: &OpcPackage) -> Result<Vec<XlsxWorksheetShapes>> {
 }
 
 /// Load the shape inventory of one worksheet, addressed by sheet name.
-pub fn load_worksheet_shapes(package: &OpcPackage, sheet_name: &str) -> Result<XlsxWorksheetShapes> {
+pub fn load_worksheet_shapes(
+    package: &OpcPackage,
+    sheet_name: &str,
+) -> Result<XlsxWorksheetShapes> {
     let workbook_part = package.main_document_part()?;
     let sheets = parse_workbook_sheets(workbook_part.blob())?;
     let sheet = sheets
@@ -1063,8 +1066,9 @@ impl Marker {
                 .column
                 .ok_or_else(|| invalid(format!("{description} is missing its column")))?,
             column_offset: XlsxEmu(
-                self.column_offset
-                    .ok_or_else(|| invalid(format!("{description} is missing its column offset")))?,
+                self.column_offset.ok_or_else(|| {
+                    invalid(format!("{description} is missing its column offset"))
+                })?,
             ),
             row: self
                 .row
@@ -1165,15 +1169,15 @@ impl ObjectBuilder {
                 custom_geometry: self.custom_geometry,
                 text_body,
             })),
-            BuilderKind::Connection => Some(XlsxDrawingObject::ConnectionShape(
-                XlsxConnectionShape {
+            BuilderKind::Connection => {
+                Some(XlsxDrawingObject::ConnectionShape(XlsxConnectionShape {
                     non_visual: self.non_visual,
                     preset: self.preset,
                     start: self.start,
                     end: self.end,
                     text_body,
-                },
-            )),
+                }))
+            },
             BuilderKind::Group => Some(XlsxDrawingObject::Group(XlsxShapeGroup {
                 non_visual: self.non_visual,
                 transform: self.saw_transform.then_some(self.transform),
@@ -1181,12 +1185,10 @@ impl ObjectBuilder {
             })),
             // Graphic frames only surface when they host a legacy OLE object;
             // chart frames are covered by the chart support.
-            BuilderKind::GraphicFrame => self
-                .ole_object
-                .map(|mut ole_object| {
-                    ole_object.non_visual = self.non_visual;
-                    XlsxDrawingObject::OleObject(ole_object)
-                }),
+            BuilderKind::GraphicFrame => self.ole_object.map(|mut ole_object| {
+                ole_object.non_visual = self.non_visual;
+                XlsxDrawingObject::OleObject(ole_object)
+            }),
         }
     }
 }
@@ -1239,18 +1241,20 @@ impl Parser {
                     return Ok(Some(parser.objects));
                 },
                 Event::Start(element) => {
-                    let parent = *stack.last().ok_or_else(|| invalid("missing drawing root"))?;
-                    let context =
-                        parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    let parent = *stack
+                        .last()
+                        .ok_or_else(|| invalid("missing drawing root"))?;
+                    let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
                     stack.push(context);
                     if stack.len() > MAX_XML_DEPTH {
                         return Err(limit("drawing XML depth"));
                     }
                 },
                 Event::Empty(element) => {
-                    let parent = *stack.last().ok_or_else(|| invalid("missing drawing root"))?;
-                    let context =
-                        parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    let parent = *stack
+                        .last()
+                        .ok_or_else(|| invalid("missing drawing root"))?;
+                    let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
                     parser.finish(context)?;
                 },
                 Event::Text(text) => {
@@ -1477,7 +1481,13 @@ impl Parser {
                 return self.open_geometry_child(geometry_parent, local, element, decoder);
             },
             // Objects nest only inside groups.
-            Context::Object if xdr && self.builders.last().is_some_and(|b| b.kind == BuilderKind::Group) => {
+            Context::Object
+                if xdr
+                    && self
+                        .builders
+                        .last()
+                        .is_some_and(|b| b.kind == BuilderKind::Group) =>
+            {
                 match local {
                     b"sp" => return self.open_object(BuilderKind::Shape),
                     b"grpSp" => return self.open_object(BuilderKind::Group),
@@ -1494,7 +1504,8 @@ impl Parser {
                     let builder = self.builder_mut()?;
                     builder.non_visual.id = unqualified_attribute_value(element, b"id", decoder)?
                         .and_then(|value| value.parse().ok());
-                    builder.non_visual.name = unqualified_attribute_value(element, b"name", decoder)?;
+                    builder.non_visual.name =
+                        unqualified_attribute_value(element, b"name", decoder)?;
                     builder.non_visual.description =
                         unqualified_attribute_value(element, b"descr", decoder)?;
                     builder.non_visual.hidden =
@@ -1512,10 +1523,11 @@ impl Parser {
                     builder.text_body.in_text_body = true;
                     return Ok(Context::TextBody);
                 },
-                b"oleObject" if self
-                    .builders
-                    .last()
-                    .is_some_and(|b| b.kind == BuilderKind::GraphicFrame) =>
+                b"oleObject"
+                    if self
+                        .builders
+                        .last()
+                        .is_some_and(|b| b.kind == BuilderKind::GraphicFrame) =>
                 {
                     let builder = self.builder_mut()?;
                     if builder.ole_object.is_some() {
@@ -1525,7 +1537,11 @@ impl Parser {
                         program_id: unqualified_attribute_value(element, b"progId", decoder)?,
                         shape_id: unqualified_attribute_value(element, b"shapeId", decoder)?
                             .and_then(|value| value.parse().ok()),
-                        data_or_view_aspect: unqualified_attribute_value(element, b"dvAspect", decoder)?,
+                        data_or_view_aspect: unqualified_attribute_value(
+                            element,
+                            b"dvAspect",
+                            decoder,
+                        )?,
                         auto_load: bool_attribute(element, b"autoLoad", decoder)?,
                         relationship_id: relationship_attribute_value(
                             element, b"id", decoder, resolver,
@@ -1633,7 +1649,9 @@ impl Parser {
     fn open_custom_geometry(&mut self) -> Result<Context> {
         let builder = self.builder_mut()?;
         if builder.custom_geometry.is_some() || builder.geometry_builder.is_some() {
-            return Err(invalid("drawing shape contains duplicate custom geometries"));
+            return Err(invalid(
+                "drawing shape contains duplicate custom geometries",
+            ));
         }
         builder.geometry_builder = Some(CustomGeometryBuilder::new());
         Ok(Context::CustomGeometry(GeometryElement::CustomGeometry))
@@ -1995,8 +2013,8 @@ fn load_sheet_shapes(
         if drawing_part.blob().len() > MAX_DRAWING_PART_BYTES {
             return Err(limit("drawing part bytes"));
         }
-        let drawing_xml =
-            std::str::from_utf8(drawing_part.blob()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let drawing_xml = std::str::from_utf8(drawing_part.blob())
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
         let Some(anchored) = parse_drawing_shapes(drawing_xml)? else {
             continue;
         };
@@ -2033,8 +2051,12 @@ fn is_on(value: &str) -> bool {
 }
 
 fn emu_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<i64> {
-    let value = unqualified_attribute_value(element, name, decoder)?
-        .ok_or_else(|| invalid(format!("drawing coordinate is missing '{}'", String::from_utf8_lossy(name))))?;
+    let value = unqualified_attribute_value(element, name, decoder)?.ok_or_else(|| {
+        invalid(format!(
+            "drawing coordinate is missing '{}'",
+            String::from_utf8_lossy(name)
+        ))
+    })?;
     value
         .parse()
         .map_err(|_| invalid(format!("invalid drawing coordinate value '{value}'")))
@@ -2053,11 +2075,7 @@ fn required_u32_attribute(
         .map_err(|_| invalid(format!("invalid {description} '{value}'")))
 }
 
-fn bool_attribute(
-    element: &BytesStart<'_>,
-    name: &[u8],
-    decoder: Decoder,
-) -> Result<Option<bool>> {
+fn bool_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<bool>> {
     Ok(unqualified_attribute_value(element, name, decoder)?.map(|value| is_on(&value)))
 }
 
@@ -2098,8 +2116,8 @@ fn limit(name: &str) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_opc::PackURI;
     use litchi_opc::BlobPart;
+    use litchi_opc::PackURI;
 
     const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
     const STRICT_XDR: &str = "http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
@@ -2303,7 +2321,9 @@ mod tests {
              <a:chOff x=\"5\" y=\"6\"/><a:chExt cx=\"7\" cy=\"8\"/></a:xfrm></xdr:grpSpPr>\
              {inner}{nested_group}</xdr:grpSp>"
         );
-        let objects = parse_drawing_shapes(&drawing(&two_cell_anchor(&group))).unwrap().unwrap();
+        let objects = parse_drawing_shapes(&drawing(&two_cell_anchor(&group)))
+            .unwrap()
+            .unwrap();
         let XlsxDrawingObject::Group(group) = &objects[0].object else {
             panic!("expected a group");
         };
@@ -2324,19 +2344,18 @@ mod tests {
         assert!(nested.non_visual.locked);
         assert!(nested.transform.is_none());
         assert_eq!(nested.children.len(), 1);
-        assert_eq!(
-            nested.non_visual.name.as_deref(),
-            Some("Nested")
-        );
+        assert_eq!(nested.non_visual.name.as_deref(), Some("Nested"));
     }
 
     #[test]
     fn skips_pictures_and_charts_but_keeps_ole_objects() {
         let picture = "<xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"50\" name=\"Logo\"/></xdr:nvPicPr>\
             <xdr:blipFill><a:blip r:embed=\"rId9\"/></xdr:blipFill></xdr:pic>";
-        let chart = &format!("<xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id=\"51\" name=\"Chart\"/>\
+        let chart = &format!(
+            "<xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id=\"51\" name=\"Chart\"/>\
             </xdr:nvGraphicFramePr><a:graphic><a:graphicData>\
-            <c:chart xmlns:c=\"{C}\" r:id=\"rId8\"/></a:graphicData></a:graphic></xdr:graphicFrame>");
+            <c:chart xmlns:c=\"{C}\" r:id=\"rId8\"/></a:graphicData></a:graphic></xdr:graphicFrame>"
+        );
         let ole = "<xdr:graphicFrame><xdr:nvGraphicFramePr><xdr:cNvPr id=\"52\" name=\"Object\"/>\
             </xdr:nvGraphicFramePr><a:graphic><a:graphicData>\
             <xdr:oleObject progId=\"Excel.Sheet.12\" shapeId=\"1027\" dvAspect=\"DVASPECT_ICON\" \
@@ -2392,7 +2411,10 @@ mod tests {
         assert_eq!(shape.text_body.as_ref().unwrap().text(), "S");
         // ECMA-376 default body properties apply when a:bodyPr is empty.
         let properties = &shape.text_body.as_ref().unwrap().body_properties;
-        assert_eq!(properties.insets.left, XlsxEmu(DEFAULT_HORIZONTAL_INSET_EMU));
+        assert_eq!(
+            properties.insets.left,
+            XlsxEmu(DEFAULT_HORIZONTAL_INSET_EMU)
+        );
         assert_eq!(properties.column_count, 1);
     }
 
@@ -2404,7 +2426,12 @@ mod tests {
             Vec::<XlsxAnchoredObject>::new()
         );
         let empty_root = format!("<xdr:wsDr xmlns:xdr=\"{XDR}\"/>");
-        assert!(parse_drawing_shapes(&empty_root).unwrap().unwrap().is_empty());
+        assert!(
+            parse_drawing_shapes(&empty_root)
+                .unwrap()
+                .unwrap()
+                .is_empty()
+        );
         assert!(parse_drawing_shapes("<other/>").unwrap().is_none());
     }
 
@@ -2517,7 +2544,12 @@ mod tests {
         let all = load_shapes(&package).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].worksheet_name, "Data");
-        assert!(load_worksheet_shapes(&package, "Empty").unwrap().objects.is_empty());
+        assert!(
+            load_worksheet_shapes(&package, "Empty")
+                .unwrap()
+                .objects
+                .is_empty()
+        );
         assert!(load_worksheet_shapes(&package, "Missing").is_err());
     }
 

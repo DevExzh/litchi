@@ -1,8 +1,8 @@
 //! SpreadsheetML worksheet Printer Settings references and inert DEVMODE parts.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::page_setup::parse_complete_worksheet_page_setup;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
@@ -388,9 +388,7 @@ fn worksheet_conformance(xml: &[u8]) -> Result<PrinterSettingsConformance> {
                     ResolveResult::Bound(Namespace(value)) if value == SML.as_bytes() => {
                         Ok(PrinterSettingsConformance::Transitional)
                     },
-                    ResolveResult::Bound(Namespace(value))
-                        if value == STRICT_SML.as_bytes() =>
-                    {
+                    ResolveResult::Bound(Namespace(value)) if value == STRICT_SML.as_bytes() => {
                         Ok(PrinterSettingsConformance::Strict)
                     },
                     _ => Err(invalid("unsupported worksheet namespace")),

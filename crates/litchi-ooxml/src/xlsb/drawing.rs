@@ -242,7 +242,7 @@ fn parse_drawing_part_xml(xml_bytes: &[u8]) -> Result<XlsbDrawing> {
     }
     let xml = std::str::from_utf8(xml_bytes)
         .map_err(|error| invalid(format!("drawing part is not UTF-8: {error}")))?;
-    let xml = crate::common::mce::process_str(xml)?;
+    let xml = litchi_ooxml_common::mce::process_str(xml)?;
     Parser::parse(xml.as_ref())
 }
 
@@ -392,8 +392,7 @@ impl PendingObject {
             };
             self.non_visual.name =
                 unqualified_attribute_value(element, b"name", decoder)?.unwrap_or_default();
-            self.non_visual.description =
-                unqualified_attribute_value(element, b"descr", decoder)?;
+            self.non_visual.description = unqualified_attribute_value(element, b"descr", decoder)?;
             return Ok(());
         }
         if self.kind == ObjectKind::Picture

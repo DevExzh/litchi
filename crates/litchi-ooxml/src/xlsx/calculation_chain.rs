@@ -254,7 +254,7 @@ impl CalculationChain {
 
 /// Parse an isolated Calculation Chain part. Formula text is never evaluated.
 pub fn parse_calculation_chain(xml: &[u8]) -> Result<CalculationChain> {
-    let processed = crate::common::mce::process_ooxml(xml)
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)
         .map_err(|error| invalid(format!("calculation-chain MCE error: {error}")))?;
     let bytes = processed.as_ref();
     let mut reader = NsReader::from_reader(bytes);
@@ -472,7 +472,7 @@ fn load_calculation_chain_with_conformance_for_workbook(
     validate_calculation_chain_part_set(package, Some(&relationship.part_name))?;
     validate_calculation_chain_part(package, &relationship.part_name)?;
     let part = package.get_part(&relationship.part_name)?;
-    let xml = crate::common::mce::process_part(part)?;
+    let xml = litchi_ooxml_common::mce::process_part(part)?;
     Ok(Some((
         parse_calculation_chain(xml.as_ref())?,
         relationship.conformance,

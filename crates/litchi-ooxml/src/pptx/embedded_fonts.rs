@@ -1,7 +1,7 @@
 //! Typed PresentationML embedded-font references and inert OPC resources.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -687,8 +687,7 @@ pub fn store_embedded_fonts(
     };
     let updated_xml = patch_font_list(presentation.blob(), &fragment, conformance)?;
     let staged = parse_presentation(&updated_xml)?;
-    if staged.conformance != conformance
-        || staged.value.unwrap_or_default() != metadata_only(value)
+    if staged.conformance != conformance || staged.value.unwrap_or_default() != metadata_only(value)
     {
         return Err(invalid("staged embedded-font XML did not round-trip"));
     }
@@ -701,7 +700,11 @@ pub fn store_embedded_fonts(
         .fonts
         .iter()
         .flat_map(|font| font.faces.iter())
-        .filter_map(|face| face.resource.as_ref().map(|resource| resource.part_name.clone()))
+        .filter_map(|face| {
+            face.resource
+                .as_ref()
+                .map(|resource| resource.part_name.clone())
+        })
         .collect::<HashSet<_>>();
     let mut relationship_ids = HashSet::new();
     let mut resources = HashMap::<String, (String, Vec<u8>)>::new();
@@ -750,16 +753,14 @@ pub fn store_embedded_fonts(
         let uri = PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?;
         if let Ok(part) = package.get_part(&uri) {
             if part.content_type() != content_type {
-                return Err(invalid(format!(
-                    "font part '{uri}' content type collision"
-                )));
+                return Err(invalid(format!("font part '{uri}' content type collision")));
             }
             if !part.rels().is_empty() {
-                return Err(invalid(format!("font part '{uri}' has outbound relationships")));
+                return Err(invalid(format!(
+                    "font part '{uri}' has outbound relationships"
+                )));
             }
-            if part.blob() != data
-                && !old_part_names.contains(part_name)
-            {
+            if part.blob() != data && !old_part_names.contains(part_name) {
                 return Err(invalid(format!("font part '{uri}' data collision")));
             }
             if part.blob() != data
@@ -777,9 +778,9 @@ pub fn store_embedded_fonts(
         }
     }
 
-    package
-        .clear_digital_signatures()
-        .map_err(|error| OoxmlError::Other(format!("cannot invalidate package signatures: {error}")))?;
+    package.clear_digital_signatures().map_err(|error| {
+        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
+    })?;
     let existing_font_relationships = package
         .get_part(&presentation_name)?
         .rels()
@@ -812,7 +813,9 @@ pub fn store_embedded_fonts(
             package.add_part(Box::new(BlobPart::new(uri, content_type, data)));
         }
     }
-    package.get_part_mut(&presentation_name)?.set_blob(updated_xml);
+    package
+        .get_part_mut(&presentation_name)?
+        .set_blob(updated_xml);
     let retained = relationships
         .iter()
         .map(|(uri, _)| uri.to_string())
@@ -926,7 +929,9 @@ pub fn reorder_embedded_fonts(
         .map(|typeface| typeface.to_lowercase())
         .collect::<HashSet<_>>();
     if expected != actual || ordered_typefaces.len() != value.fonts.len() {
-        return Err(invalid("embedded-font reorder is not a typeface permutation"));
+        return Err(invalid(
+            "embedded-font reorder is not a typeface permutation",
+        ));
     }
     value.fonts = ordered_typefaces
         .iter()
@@ -1343,13 +1348,21 @@ fn metadata_only(value: &PresentationEmbeddedFonts) -> PresentationEmbeddedFonts
 }
 
 fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> Result<bool> {
-    for relationship in package.rels().iter().filter(|relationship| !relationship.is_external()) {
+    for relationship in package
+        .rels()
+        .iter()
+        .filter(|relationship| !relationship.is_external())
+    {
         if relationship.target_partname()? == *target {
             return Ok(true);
         }
     }
     for part in package.iter_parts() {
-        for relationship in part.rels().iter().filter(|relationship| !relationship.is_external()) {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
             if relationship.target_partname()? == *target {
                 return Ok(true);
             }
@@ -1364,13 +1377,21 @@ fn has_inbound_outside_relationships(
     presentation: &PackURI,
     replaced_relationships: &HashSet<String>,
 ) -> Result<bool> {
-    for relationship in package.rels().iter().filter(|relationship| !relationship.is_external()) {
+    for relationship in package
+        .rels()
+        .iter()
+        .filter(|relationship| !relationship.is_external())
+    {
         if relationship.target_partname()? == *target {
             return Ok(true);
         }
     }
     for part in package.iter_parts() {
-        for relationship in part.rels().iter().filter(|relationship| !relationship.is_external()) {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
             if relationship.target_partname()? == *target
                 && (part.partname() != presentation
                     || !replaced_relationships.contains(relationship.r_id()))
@@ -1388,7 +1409,9 @@ fn parse_font_key(value: &str) -> Result<[u8; 16]> {
         .and_then(|value| value.strip_suffix('}'))
         .unwrap_or(value);
     if value.len() != 36
-        || ![8, 13, 18, 23].iter().all(|offset| value.as_bytes()[*offset] == b'-')
+        || ![8, 13, 18, 23]
+            .iter()
+            .all(|offset| value.as_bytes()[*offset] == b'-')
     {
         return Err(invalid("font key must be a GUID"));
     }
@@ -1469,9 +1492,9 @@ fn validate_relationship_id(value: &str) -> Result<()> {
 }
 fn resolved_namespace(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
-            .map_err(xml_error)?
-            .to_owned()),
+        ResolveResult::Bound(Namespace(value)) => {
+            Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+        },
         ResolveResult::Unbound => Ok(String::new()),
         ResolveResult::Unknown(prefix) => Err(invalid(format!(
             "unbound namespace prefix '{}'",
@@ -1780,7 +1803,11 @@ mod tests {
         assert!(obfuscate_embedded_font_data(&mut [0; 31], key).is_err());
         assert!(obfuscate_embedded_font_data(&mut [0; 32], "bad").is_err());
 
-        assert!(EmbeddedFontLicensing::from_fs_type(0).unwrap().installable());
+        assert!(
+            EmbeddedFontLicensing::from_fs_type(0)
+                .unwrap()
+                .installable()
+        );
         let editable = EmbeddedFontLicensing::from_fs_type(0x0108).unwrap();
         assert!(editable.editable && editable.no_subsetting && !editable.installable());
         assert!(EmbeddedFontLicensing::from_fs_type(0x0006).is_err());
@@ -1795,7 +1822,10 @@ mod tests {
         let marker = memchr::memmem::find(original, b"<p:defaultTextStyle").unwrap();
         let mut xml = original.to_vec();
         xml.splice(marker..marker, b"<!--font-preserve-->".iter().copied());
-        package.get_part_mut(&presentation_uri).unwrap().set_blob(xml);
+        package
+            .get_part_mut(&presentation_uri)
+            .unwrap()
+            .set_blob(xml);
 
         let generated = EmbeddedFont {
             typeface: "Generated".into(),
@@ -1818,30 +1848,32 @@ mod tests {
             EmbeddedFontConformance::Transitional,
         )
         .unwrap();
-        let found = find_embedded_font(&package, "generated")
-            .unwrap()
-            .unwrap();
+        let found = find_embedded_font(&package, "generated").unwrap().unwrap();
         assert_eq!(found.faces[0].relationship_id, "rIdFont1");
         assert_eq!(
             found.faces[0].resource.as_ref().unwrap().part_name,
             "/ppt/fonts/font1.fntdata"
         );
-        assert!(package
-            .get_part(&presentation_uri)
-            .unwrap()
-            .blob()
-            .windows(b"<!--font-preserve-->".len())
-            .any(|window| window == b"<!--font-preserve-->"));
+        assert!(
+            package
+                .get_part(&presentation_uri)
+                .unwrap()
+                .blob()
+                .windows(b"<!--font-preserve-->".len())
+                .any(|window| window == b"<!--font-preserve-->")
+        );
 
         let before = package.get_part(&presentation_uri).unwrap().blob().to_vec();
         let parts = package.part_count();
         let duplicate = found.clone();
-        assert!(add_embedded_font(
-            &mut package,
-            duplicate,
-            EmbeddedFontConformance::Transitional
-        )
-        .is_err());
+        assert!(
+            add_embedded_font(
+                &mut package,
+                duplicate,
+                EmbeddedFontConformance::Transitional
+            )
+            .is_err()
+        );
         assert_eq!(package.get_part(&presentation_uri).unwrap().blob(), before);
         assert_eq!(package.part_count(), parts);
 
@@ -1856,12 +1888,14 @@ mod tests {
         )
         .unwrap();
         assert!(find_embedded_font(&package, "Renamed").unwrap().is_some());
-        assert!(remove_embedded_font(
-            &mut package,
-            "Renamed",
-            EmbeddedFontConformance::Transitional
-        )
-        .unwrap());
+        assert!(
+            remove_embedded_font(
+                &mut package,
+                "Renamed",
+                EmbeddedFontConformance::Transitional
+            )
+            .unwrap()
+        );
         assert!(load_embedded_fonts(&package).unwrap().is_none());
     }
 
@@ -1899,27 +1933,21 @@ mod tests {
                 },
             ],
         };
-        store_embedded_fonts(
-            &mut package,
-            &graph,
-            EmbeddedFontConformance::Transitional,
-        )
-        .unwrap();
+        store_embedded_fonts(&mut package, &graph, EmbeddedFontConformance::Transitional).unwrap();
         assert_eq!(
             load_embedded_fonts(&package).unwrap().unwrap().fonts.len(),
             2
         );
-        remove_embedded_font(
-            &mut package,
-            "First",
-            EmbeddedFontConformance::Transitional,
-        )
-        .unwrap();
+        remove_embedded_font(&mut package, "First", EmbeddedFontConformance::Transitional).unwrap();
         let font_uri = PackURI::new("/ppt/fonts/shared.fntdata").unwrap();
         assert!(package.contains_part(&font_uri));
 
         let owner_uri = PackURI::new("/ppt/unknown-owner.bin").unwrap();
-        let mut owner = BlobPart::new(owner_uri.clone(), "application/octet-stream".into(), vec![1]);
+        let mut owner = BlobPart::new(
+            owner_uri.clone(),
+            "application/octet-stream".into(),
+            vec![1],
+        );
         owner.rels_mut().add_relationship(
             "urn:shared-resource".into(),
             "fonts/shared.fntdata".into(),

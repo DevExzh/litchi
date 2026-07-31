@@ -259,7 +259,7 @@ pub fn parse_pivot_chart_binding(xml: &[u8]) -> Result<Option<PivotChartBinding>
     if xml.len() > MAX_CHART_PART_BYTES {
         return Err(limit("chart part bytes"));
     }
-    let xml = crate::common::mce::process_ooxml(xml)?;
+    let xml = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut state = BindingState::default();
     let mut stack: Vec<Context> = Vec::new();

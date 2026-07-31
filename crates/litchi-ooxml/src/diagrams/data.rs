@@ -6,9 +6,9 @@
 //! links them. This parser reads both the transitional and the ISO Strict
 //! `drawingml/diagram` namespaces and treats everything as inert metadata.
 
-use crate::common::mce::process_str;
 use crate::diagrams::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DiagramNode};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_str;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -252,7 +252,10 @@ impl DiagramDataModel {
                     if text_depth == Some(depth) {
                         text_depth = None;
                     }
-                    if open_point.as_ref().is_some_and(|(start, _)| *start == depth) {
+                    if open_point
+                        .as_ref()
+                        .is_some_and(|(start, _)| *start == depth)
+                    {
                         let local = local_name_end(&element)?;
                         if local != "pt" {
                             return Err(invalid("unbalanced diagram point"));
@@ -320,13 +323,7 @@ impl DiagramDataModel {
             entries.sort_by_key(|(ord, _)| *ord);
         }
         let mut visiting = HashSet::new();
-        build_children(
-            root.model_id.as_str(),
-            0,
-            &points,
-            &children,
-            &mut visiting,
-        )
+        build_children(root.model_id.as_str(), 0, &points, &children, &mut visiting)
     }
 
     /// All text content of the diagram, one line per content node.

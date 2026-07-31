@@ -4,8 +4,8 @@
 //! retrieves schemas, performs validation against a schema, runs transforms,
 //! resolves external entities, or interprets application-specific payloads.
 
-use crate::common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::part::XmlPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::{BytesStart, Event};

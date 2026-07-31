@@ -6,8 +6,8 @@
 use super::modern_comments::{
     ModernCommentNamespaceDeclaration, ModernCommentPart, load_modern_comments,
 };
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -863,8 +863,12 @@ pub fn find_modern_comment_author(
     package: &OpcPackage,
     author_id: &str,
 ) -> Result<Option<ModernCommentAuthor>> {
-    Ok(load_modern_comment_authors(package)?
-        .and_then(|part| part.authors.authors.into_iter().find(|author| author.id == author_id)))
+    Ok(load_modern_comment_authors(package)?.and_then(|part| {
+        part.authors
+            .authors
+            .into_iter()
+            .find(|author| author.id == author_id)
+    }))
 }
 
 /// Add a modern comment author, allocating a collision-safe part and relationship if needed.
@@ -878,7 +882,10 @@ pub fn add_modern_comment_author(
         .as_ref()
         .is_some_and(|part| part.authors.authors.iter().any(|item| item.id == author.id))
     {
-        return Err(invalid(format!("duplicate modern comment author ID {}", author.id)));
+        return Err(invalid(format!(
+            "duplicate modern comment author ID {}",
+            author.id
+        )));
     }
 
     if let Some(mut part) = graph.authors.take() {
@@ -930,8 +937,15 @@ where
     F: FnOnce(&mut ModernCommentAuthor),
 {
     let graph = load_modern_comment_graph(package)?;
-    let Some(mut part) = graph.authors.clone() else { return Ok(false); };
-    let Some(author) = part.authors.authors.iter_mut().find(|item| item.id == author_id) else {
+    let Some(mut part) = graph.authors.clone() else {
+        return Ok(false);
+    };
+    let Some(author) = part
+        .authors
+        .authors
+        .iter_mut()
+        .find(|item| item.id == author_id)
+    else {
         return Ok(false);
     };
     update(author);
@@ -957,12 +971,21 @@ pub fn replace_modern_comment_author(
 /// Remove an unreferenced modern comment author.
 pub fn remove_modern_comment_author(package: &mut OpcPackage, author_id: &str) -> Result<bool> {
     let graph = load_modern_comment_graph(package)?;
-    let Some(mut part) = graph.authors.clone() else { return Ok(false); };
-    let Some(index) = part.authors.authors.iter().position(|author| author.id == author_id) else {
+    let Some(mut part) = graph.authors.clone() else {
+        return Ok(false);
+    };
+    let Some(index) = part
+        .authors
+        .authors
+        .iter()
+        .position(|author| author.id == author_id)
+    else {
         return Ok(false);
     };
     if modern_author_is_referenced(&graph.comments, author_id) {
-        return Err(invalid(format!("modern comment author {author_id} is still referenced")));
+        return Err(invalid(format!(
+            "modern comment author {author_id} is still referenced"
+        )));
     }
     part.authors.authors.remove(index);
     if !part.authors.authors.is_empty() {
@@ -990,7 +1013,9 @@ pub fn reorder_modern_comment_authors(
 ) -> Result<Vec<ModernCommentAuthor>> {
     let graph = load_modern_comment_graph(package)?;
     let Some(mut part) = graph.authors.clone() else {
-        if ordered_author_ids.is_empty() { return Ok(Vec::new()); }
+        if ordered_author_ids.is_empty() {
+            return Ok(Vec::new());
+        }
         return Err(invalid("modern comment author part is missing"));
     };
     if ordered_author_ids.len() != part.authors.authors.len() {
@@ -1004,9 +1029,11 @@ pub fn reorder_modern_comment_authors(
     }
     let mut ordered = Vec::with_capacity(ordered_author_ids.len());
     for id in ordered_author_ids {
-        let author = remaining
-            .remove(id)
-            .ok_or_else(|| invalid(format!("unknown or duplicate modern comment author ID {id}")))?;
+        let author = remaining.remove(id).ok_or_else(|| {
+            invalid(format!(
+                "unknown or duplicate modern comment author ID {id}"
+            ))
+        })?;
         ordered.push(author);
     }
     if !remaining.is_empty() {
@@ -1032,17 +1059,28 @@ fn commit_modern_comment_authors(
 }
 
 fn modern_author_is_referenced(comments: &[ModernCommentPart], author_id: &str) -> bool {
-    comments.iter().any(|part| part.comments.comments.iter().any(|comment| {
-        comment.author_id == author_id
-            || comment.assigned_to.as_ref().is_some_and(|ids| ids.iter().any(|id| id == author_id))
-            || comment.replies.iter().any(|reply| reply.author_id == author_id)
-    }))
+    comments.iter().any(|part| {
+        part.comments.comments.iter().any(|comment| {
+            comment.author_id == author_id
+                || comment
+                    .assigned_to
+                    .as_ref()
+                    .is_some_and(|ids| ids.iter().any(|id| id == author_id))
+                || comment
+                    .replies
+                    .iter()
+                    .any(|reply| reply.author_id == author_id)
+        })
+    })
 }
 
 fn next_modern_author_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(format!("/ppt/authors/author{suffix}.xml")).map_err(invalid)?;
-        if package.get_part(&candidate).is_err() { return Ok(candidate); }
+        let candidate =
+            PackURI::new(format!("/ppt/authors/author{suffix}.xml")).map_err(invalid)?;
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
     }
     Err(invalid("no free modern comment author part name"))
 }
@@ -1054,18 +1092,26 @@ fn next_modern_author_relationship_id(
     let relationships = package.get_part(presentation_name)?.rels();
     for suffix in 1..=65_537u32 {
         let candidate = format!("rIdModernAuthors{suffix}");
-        if relationships.get(&candidate).is_none() { return Ok(candidate); }
+        if relationships.get(&candidate).is_none() {
+            return Ok(candidate);
+        }
     }
     Err(invalid("no free modern comment author relationship ID"))
 }
 
 fn modern_author_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.iter_parts().any(|part| part.rels().iter().any(|relationship| {
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|name| name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
         !relationship.is_external()
-            && relationship.target_partname().is_ok_and(|name| name == *target)
-    })) || package.rels().iter().any(|relationship| {
-        !relationship.is_external()
-            && relationship.target_partname().is_ok_and(|name| name == *target)
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
     })
 }
 

@@ -6,6 +6,7 @@ pub type Result<T> = std::result::Result<T, OoxmlError>;
 
 /// Error types for OOXML operations.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum OoxmlError {
     /// OPC package error
     #[error("OPC error: {0}")]
@@ -30,8 +31,13 @@ pub enum OoxmlError {
     /// Invalid format
     #[error("Invalid format: {0}")]
     InvalidFormat(String),
+
+    /// Shared DrawingML parsing error.
+    #[error("DrawingML error: {0}")]
+    Drawing(#[from] litchi_drawingml::DrawingError),
+
     #[error("markup compatibility error: {0}")]
-    MarkupCompatibility(#[from] crate::common::mce::MceError),
+    MarkupCompatibility(#[from] litchi_ooxml_common::MceError),
 
     /// IO error
     #[error("IO error: {0}")]
@@ -44,6 +50,14 @@ pub enum OoxmlError {
     /// Invalid URI
     #[error("Invalid URI: {0}")]
     InvalidUri(String),
+
+    /// The requested legacy mutation path cannot preserve an opened artifact.
+    #[error("unsafe {format} edit '{operation}' rejected: {reason}")]
+    UnsafeEdit {
+        format: &'static str,
+        operation: &'static str,
+        reason: &'static str,
+    },
 
     /// Generic error
     #[error("{0}")]
@@ -77,10 +91,18 @@ impl From<OoxmlError> for litchi_core::Error {
             },
             OoxmlError::InvalidRelationship(s) => litchi_core::Error::Other(s),
             OoxmlError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
+            OoxmlError::Drawing(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::MarkupCompatibility(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),
             OoxmlError::IoError(e) => litchi_core::Error::Io(e),
             OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),
+            OoxmlError::UnsafeEdit {
+                format,
+                operation,
+                reason,
+            } => litchi_core::Error::Unsupported(format!(
+                "safe {format} operation '{operation}' is unavailable: {reason}"
+            )),
             OoxmlError::Other(s) => litchi_core::Error::Other(s),
         }
     }

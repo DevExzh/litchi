@@ -435,7 +435,7 @@ impl Parser {
 }
 
 pub(crate) fn parse_drawing_xml(xml: &str) -> Result<Option<ParsedDrawing>> {
-    let xml = crate::common::mce::process_str(xml)?;
+    let xml = litchi_ooxml_common::mce::process_str(xml)?;
     Parser::parse(xml.as_ref())
 }
 

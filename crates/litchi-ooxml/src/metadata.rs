@@ -472,8 +472,8 @@ fn parse_datetime(value: &str) -> Result<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::DocumentProperties;
     use chrono::{Datelike, Timelike};
+    use litchi_ooxml_common::DocumentProperties;
     use litchi_opc::{PackURI, part::BlobPart};
 
     fn package_with_core(path: &str, content_type: &str, xml: &[u8]) -> OpcPackage {

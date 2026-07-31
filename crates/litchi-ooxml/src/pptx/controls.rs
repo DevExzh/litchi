@@ -12,10 +12,10 @@
 //! executes a macro, or follows an external relationship.
 
 use crate::common::xml::unqualified_attribute_value;
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
 use crate::xlsx::active_x::ActiveXDescriptor;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::encoding::Decoder;
@@ -326,8 +326,7 @@ fn scan_controls(xml_bytes: &[u8], limits: &mut ControlLoadLimits) -> Result<Vec
                 if depth == 1 {
                     validate_slide_root(&namespace, element.name(), saw_root)?;
                     saw_root = true;
-                } else if depth == 2
-                    && is_presentationml_name(&namespace, element.name(), b"cSld")
+                } else if depth == 2 && is_presentationml_name(&namespace, element.name(), b"cSld")
                 {
                     common_slide_data_depth = Some(depth);
                 } else if common_slide_data_depth == Some(depth - 1)
@@ -416,9 +415,7 @@ fn scan_controls(xml_bytes: &[u8], limits: &mut ControlLoadLimits) -> Result<Vec
                     || container_depth.is_some()
                     || open_control_depth.is_some()
                 {
-                    return Err(invalid(
-                        "unterminated or missing PresentationML slide root",
-                    ));
+                    return Err(invalid("unterminated or missing PresentationML slide root"));
                 }
                 break;
             },

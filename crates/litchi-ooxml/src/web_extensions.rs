@@ -4,8 +4,8 @@
 //! intentionally does not locate add-ins, contact catalog providers, load
 //! manifests, resolve linked content, or execute scripts/custom functions.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;

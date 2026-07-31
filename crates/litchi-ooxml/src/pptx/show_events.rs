@@ -5,9 +5,9 @@
 //! executes a recorded action.
 
 use crate::common::xml::unqualified_attribute_value;
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
 use quick_xml::encoding::Decoder;
@@ -677,7 +677,9 @@ pub fn store_slide_show_events(
     events: &[PptxSlideShowEventDraft],
 ) -> Result<()> {
     if events.is_empty() {
-        return Err(invalid("slide-show event storage requires at least one event"));
+        return Err(invalid(
+            "slide-show event storage requires at least one event",
+        ));
     }
     if events.len() > MAX_SHOW_EVENTS {
         return Err(limit("slide-show event count"));
@@ -726,7 +728,8 @@ pub fn store_slide_show_events(
 
     let updated = crate::pptx::slide_patch::insert_extension_fragment(slide.blob(), &fragment)?;
     // Self-check: the patched slide must read back through discovery.
-    let probe = litchi_opc::BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
+    let probe =
+        litchi_opc::BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
     let discovered = load_slide_show_events(0, &probe, &mut ShowEventLoadLimits::default())?;
     if discovered.len() != events.len() {
         return Err(invalid(
@@ -736,7 +739,6 @@ pub fn store_slide_show_events(
     package.get_part_mut(slide_name)?.set_blob(updated);
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -1,8 +1,8 @@
 //! Immutable XLSX worksheet phonetic-properties read model.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::is_spreadsheetml_name;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -112,10 +112,12 @@ pub fn parse_worksheet_phonetic_properties(
             Event::Start(element) => parser.start(&namespace, &element, decoder, &resolver)?,
             Event::Empty(element) => parser.empty(&namespace, &element, decoder, &resolver)?,
             Event::End(element) => parser.end(element.local_name().as_ref())?,
-            Event::Text(text) if parser.parent() == Context::PhoneticProperties
-                && !text.decode().map_err(xml_error)?.trim().is_empty() => {
-                    return Err(invalid("unexpected text in worksheet phoneticPr"));
-                },
+            Event::Text(text)
+                if parser.parent() == Context::PhoneticProperties
+                    && !text.decode().map_err(xml_error)?.trim().is_empty() =>
+            {
+                return Err(invalid("unexpected text in worksheet phoneticPr"));
+            },
             Event::CData(_) if parser.parent() == Context::PhoneticProperties => {
                 return Err(invalid("unexpected CDATA in worksheet phoneticPr"));
             },

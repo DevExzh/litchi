@@ -36,12 +36,11 @@
 //! ```
 pub mod api;
 pub mod charts;
-pub mod common;
+mod common;
 pub mod custom_properties;
 pub mod custom_xml_data;
 pub mod diagrams;
 pub mod docx;
-pub mod drawings;
 pub mod embedded_object;
 pub mod error;
 pub mod metadata;
@@ -68,14 +67,13 @@ pub mod fonts;
 
 // Re-export commonly used types from OPC layer
 pub use opc::{
-    CanonicalizationMethod, CertificateTrust, DigitalSignatureError,
-    DigitalSignatureVerification, EmbeddedCertificate, OpcPackage, PackURI, PackageSigner,
-    ReferenceVerification, Sha1Policy, SignatureAlgorithm, SignatureVerificationPolicy,
-    VerificationStatus,
+    CanonicalizationMethod, CertificateTrust, DigitalSignatureError, DigitalSignatureVerification,
+    EmbeddedCertificate, OpcPackage, PackURI, PackageSigner, ReferenceVerification, Sha1Policy,
+    SignatureAlgorithm, SignatureVerificationPolicy, VerificationStatus,
 };
 
 // Re-export common utilities
-pub use common::{
+pub use litchi_ooxml_common::{
     DocumentProperties, ExpandedName, MceCapabilities, MceError, MceLimits, MceOutput, MceReport,
     process_markup_compatibility,
 };

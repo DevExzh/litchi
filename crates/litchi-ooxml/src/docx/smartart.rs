@@ -13,14 +13,14 @@
 //! supported. Everything is treated as inert metadata: layout algorithms and
 //! style bodies are never interpreted.
 
-use crate::common::mce::process_ooxml;
 use crate::diagrams::{
-    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
-    DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DiagramDataModel, DiagramDefinition, DiagramNode,
-    DiagramType, MS_DIAGRAM_DRAWING_REL, STRICT_DIAGRAM_COLORS_REL, STRICT_DIAGRAM_DATA_REL,
+    DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
+    DIAGRAM_QUICK_STYLE_REL, DiagramDataModel, DiagramDefinition, DiagramNode, DiagramType,
+    MS_DIAGRAM_DRAWING_REL, STRICT_DIAGRAM_COLORS_REL, STRICT_DIAGRAM_DATA_REL,
     STRICT_DIAGRAM_LAYOUT_REL, STRICT_DIAGRAM_QUICK_STYLE_REL,
 };
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::Part;
 use litchi_opc::{OpcPackage, PackURI};
@@ -371,7 +371,9 @@ fn resolve_part(
     if part.blob().len() > MAX_PART_XML {
         return Err(limit("diagram part XML bytes"));
     }
-    let xml = std::str::from_utf8(part.blob()).map_err(xml_error)?.to_owned();
+    let xml = std::str::from_utf8(part.blob())
+        .map_err(xml_error)?
+        .to_owned();
     Ok((name, xml))
 }
 
@@ -426,7 +428,8 @@ fn scan_document_xml(
                     }
                     root = true;
                 } else if namespace == conformance.a() && local == "graphicData" {
-                    let is_diagram = attribute(&element, "uri")?.as_deref() == Some(conformance.dgm());
+                    let is_diagram =
+                        attribute(&element, "uri")?.as_deref() == Some(conformance.dgm());
                     if is_diagram {
                         frames.push((depth, None));
                     }
@@ -435,9 +438,7 @@ fn scan_document_xml(
                         return Err(invalid("SmartArt relIds is outside diagram graphicData"));
                     };
                     if frame.1.is_some() {
-                        return Err(invalid(
-                            "SmartArt graphicData has multiple relIds children",
-                        ));
+                        return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
                     frame.1 = Some(rel_ids(&reader, &element, conformance)?);
                 }
@@ -466,9 +467,7 @@ fn scan_document_xml(
                         return Err(invalid("SmartArt relIds is outside diagram graphicData"));
                     };
                     if frame.1.is_some() {
-                        return Err(invalid(
-                            "SmartArt graphicData has multiple relIds children",
-                        ));
+                        return Err(invalid("SmartArt graphicData has multiple relIds children"));
                     }
                     frame.1 = Some(rel_ids(&reader, &element, conformance)?);
                 }
@@ -476,9 +475,9 @@ fn scan_document_xml(
             Event::End(_) => {
                 if frames.last().is_some_and(|frame| frame.0 == depth) {
                     let (_, anchor) = frames.pop().expect("frame checked above");
-                    anchors.push(anchor.ok_or_else(|| {
-                        invalid("SmartArt graphicData lacks relIds child")
-                    })?);
+                    anchors.push(
+                        anchor.ok_or_else(|| invalid("SmartArt graphicData lacks relIds child"))?,
+                    );
                 }
                 if depth == 0 {
                     return Err(invalid("unexpected document XML closing element"));
@@ -550,7 +549,10 @@ fn attribute(element: &BytesStart<'_>, name: &str) -> Result<Option<String>> {
     Ok(None)
 }
 
-fn relationship_target(part: &dyn Part, relationship: &litchi_opc::Relationship) -> Result<PackURI> {
+fn relationship_target(
+    part: &dyn Part,
+    relationship: &litchi_opc::Relationship,
+) -> Result<PackURI> {
     if relationship.is_external() {
         return Err(invalid("external relationship is rejected"));
     }
@@ -560,9 +562,7 @@ fn relationship_target(part: &dyn Part, relationship: &litchi_opc::Relationship)
 
 fn validate_part_path(uri: &PackURI, label: &str) -> Result<()> {
     let Some(rest) = uri.as_str().strip_prefix(DIAGRAM_PART_PREFIX) else {
-        return Err(invalid(format!(
-            "{label} is outside {DIAGRAM_PART_PREFIX}"
-        )));
+        return Err(invalid(format!("{label} is outside {DIAGRAM_PART_PREFIX}")));
     };
     if rest.is_empty() || rest.contains('/') || !rest.to_ascii_lowercase().ends_with(".xml") {
         return Err(invalid(format!("invalid {label} path or suffix")));
@@ -673,11 +673,16 @@ mod tests {
             conformance.r(),
             conformance.dgm()
         );
-        let mut document = BlobPart::new(name.clone(), DOCUMENT_CT.into(), document_xml.into_bytes());
+        let mut document =
+            BlobPart::new(name.clone(), DOCUMENT_CT.into(), document_xml.into_bytes());
         for (id, reltype, target) in [
             ("rIdDm", conformance.data_rel(), "diagrams/data1.xml"),
             ("rIdLo", conformance.layout_rel(), "diagrams/layout1.xml"),
-            ("rIdQs", conformance.quick_style_rel(), "diagrams/quickStyle1.xml"),
+            (
+                "rIdQs",
+                conformance.quick_style_rel(),
+                "diagrams/quickStyle1.xml",
+            ),
             ("rIdCs", conformance.colors_rel(), "diagrams/colors1.xml"),
             (
                 "rIdDrawing",
@@ -781,12 +786,7 @@ mod tests {
             Some("/word/diagrams/drawing1.xml")
         );
         assert_eq!(
-            smart_art
-                .layout
-                .as_ref()
-                .unwrap()
-                .unique_id
-                .as_deref(),
+            smart_art.layout.as_ref().unwrap().unique_id.as_deref(),
             Some("urn:microsoft.com/office/officeart/2005/8/layout/cycle2")
         );
     }

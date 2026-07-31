@@ -32,14 +32,13 @@ fixedbitset   = "0.5"
 flate2        = { version = "1", features = ["zlib-rs"], default-features = false }
 font-kit      = "0.14"
 hmac          = "0.13"
-pbkdf2        = "0.13"
-p256          = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
 image         = { version = "0.25", features = ["default-formats", "rayon"] }
 itoa          = "1.0"
 litchi           = { version = "0.0.1", path = "crates/litchi" }
 litchi-cfb       = { version = "0.0.1", path = "crates/litchi-cfb" }
 # Path deps to internal crates.
 litchi-core      = { version = "0.0.1", path = "crates/litchi-core" }
+litchi-drawingml = { version = "0.0.1", path = "crates/litchi-drawingml" }
 litchi-eval      = { version = "0.0.1", path = "crates/litchi-eval" }
 litchi-fonts     = { version = "0.0.1", path = "crates/litchi-fonts" }
 litchi-formula   = { version = "0.0.1", path = "crates/litchi-formula" }
@@ -49,13 +48,19 @@ litchi-markdown  = { version = "0.0.1", path = "crates/litchi-markdown" }
 litchi-odf       = { version = "0.0.1", path = "crates/litchi-odf" }
 litchi-ole       = { version = "0.0.1", path = "crates/litchi-ole" }
 litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
+litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
 litchi-opc       = { version = "0.0.1", path = "crates/litchi-opc" }
 litchi-rtf       = { version = "0.0.1", path = "crates/litchi-rtf" }
-memchr        = "2.7"
+litchi-sheet     = { version = "0.0.1", path = "crates/litchi-sheet" }
+litchi-slide     = { version = "0.0.1", path = "crates/litchi-slide" }
+litchi-word      = { version = "0.0.1", path = "crates/litchi-word" }
 md-5          = { version = "0.11", features = ["zeroize"] }
+memchr        = "2.7"
 num-complex   = "0.4"
 once_cell     = "1"
+p256          = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
 parking_lot   = { version = "0.12", features = ["hardware-lock-elision"] }
+pbkdf2        = "0.13"
 phf           = { version = "0.14", features = ["macros"] }
 plist         = "1"
 prost         = { version = "0.14", features = ["derive"] }
@@ -68,22 +73,20 @@ rc4           = { version = "0.2", features = ["zeroize"] }
 reqwest       = { version = "0.13", features = ["json"] }
 roaring       = "0"
 rowan         = "0.16"
+rsa           = { version = "0.9", features = ["sha1", "sha2"] }
 ryu           = "1.0"
 serde         = { version = "1", features = ["derive"] }
 serde-saphyr  = "0"
 sha1          = { version = "0.11", features = ["zeroize"] }
-sha2          = "0.11"
 sha1_legacy   = { package = "sha1", version = "0.10" }
+sha2          = "0.11"
 sha2_legacy   = { package = "sha2", version = "0.10" }
-rsa           = { version = "0.9", features = ["sha1", "sha2"] }
 signature     = "2.2"
-x509-cert     = { version = "0.2", features = ["pem"] }
-subtle        = "2"
-zeroize       = "1"
 smallvec      = "1.15"
 snap          = "1"
 soapberry-zip    = { path = "crates/soapberry-zip" }
 statrs        = "0.18"
+subtle        = "2"
 sxd-document  = "0.3"
 sxd-xpath     = "0.4"
 
@@ -94,9 +97,11 @@ thiserror     = "2.0"
 tokio         = { version = "1", features = ["full"] }
 url           = "2.5"
 urlencoding   = "2.1"
+x509-cert     = { version = "0.2", features = ["pem"] }
 xml-minifier     = { path = "crates/xml-minifier" }
 zerocopy      = { version = "0.8", features = ["std"] }
 zerocopy-derive = "0.8"
+zeroize       = "1"
 
 [profile.release]
 lto = true

@@ -75,7 +75,7 @@ impl PresentationExtendedGuides {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation guides exceed 8 MiB"));
         }
-        let processed = crate::common::mce::process_ooxml(xml)?;
+        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if processed.len() > MAX_BYTES {
             return Err(invalid("processed presentation guides exceed 8 MiB"));
         }
@@ -596,7 +596,8 @@ fn optional_attr(node: &Node, local: &str) -> Result<Option<String>> {
             && value.replace(attribute.value.clone()).is_some()
         {
             return Err(invalid(format!("duplicate attribute '{local}'")));
-        }    }
+        }
+    }
     Ok(value)
 }
 

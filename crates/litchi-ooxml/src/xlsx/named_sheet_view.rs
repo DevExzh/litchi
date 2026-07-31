@@ -1,12 +1,12 @@
 //! Typed, inert reader and package writer for MS-XLSX Named Sheet Views.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::Cell;
 use crate::xlsx::auto_filter::{
     AutoFilterDefinition, FilterColumnDefinition, parse_auto_filter, write_auto_filter_fragment,
 };
 use crate::xlsx::sort::{SortBy, SortMethod};
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships};
 use quick_xml::encoding::Decoder;
@@ -2373,17 +2373,18 @@ fn validate_fragment_content(content_xml: &[u8]) -> Result<usize> {
                     .checked_sub(1)
                     .ok_or_else(|| invalid("invalid extension XML nesting"))?;
             },
-            Event::Text(text) if depth == 1
-                && !text
-                    .decode()
-                    .map_err(xml_error)?
-                    .chars()
-                    .all(char::is_whitespace)
-                => {
-                    return Err(invalid(
-                        "authored XML fragment must contain XML markup, not text",
-                    ));
-                },
+            Event::Text(text)
+                if depth == 1
+                    && !text
+                        .decode()
+                        .map_err(xml_error)?
+                        .chars()
+                        .all(char::is_whitespace) =>
+            {
+                return Err(invalid(
+                    "authored XML fragment must contain XML markup, not text",
+                ));
+            },
             Event::CData(_) if depth == 1 => {
                 return Err(invalid("authored XML fragment must not contain root CDATA"));
             },

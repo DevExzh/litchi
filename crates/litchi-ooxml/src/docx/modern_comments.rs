@@ -4,9 +4,9 @@
 //! `comments.xml`. No presence service, identity provider, or external content
 //! is contacted by this module.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use chrono::DateTime;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::part::XmlPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::{BytesStart, Event};

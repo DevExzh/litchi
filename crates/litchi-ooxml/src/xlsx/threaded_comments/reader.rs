@@ -12,9 +12,8 @@ use quick_xml::reader::NsReader;
 
 use super::person::{Mention, Person, PersonList};
 use super::{
-    MAX_THREADED_COMMENTS, MAX_THREADED_MENTIONS, MAX_THREADED_PART_BYTES,
-    MAX_THREADED_PERSONS, MAX_THREADED_TEXT_UTF16, ThreadedComment, ThreadedComments,
-    validate_threaded_timestamp,
+    MAX_THREADED_COMMENTS, MAX_THREADED_MENTIONS, MAX_THREADED_PART_BYTES, MAX_THREADED_PERSONS,
+    MAX_THREADED_TEXT_UTF16, ThreadedComment, ThreadedComments, validate_threaded_timestamp,
 };
 use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::xlsx::Cell;
@@ -33,7 +32,7 @@ pub fn read_persons(package: &OpcPackage) -> SheetResult<Option<PersonList>> {
     if persons_part.blob().len() > MAX_THREADED_PART_BYTES {
         return Err("persons part exceeds the configured resource bound".into());
     }
-    let bytes = crate::common::mce::process_part(persons_part)?;
+    let bytes = litchi_ooxml_common::mce::process_part(persons_part)?;
     let xml = std::str::from_utf8(bytes.as_ref())?;
     let persons = parse_person_list(xml)?;
     if persons.persons.len() > MAX_THREADED_PERSONS {
@@ -65,18 +64,25 @@ pub fn read_threaded_comments(
     if comments_part.blob().len() > MAX_THREADED_PART_BYTES {
         return Err("threaded-comments part exceeds the configured resource bound".into());
     }
-    let bytes = crate::common::mce::process_part(comments_part)?;
+    let bytes = litchi_ooxml_common::mce::process_part(comments_part)?;
     let xml = std::str::from_utf8(bytes.as_ref())?;
     let comments = parse_threaded_comments(xml)?;
     if comments.comments.len() > MAX_THREADED_COMMENTS {
         return Err("threaded-comments part contains too many comments".into());
     }
-    let mentions = comments.comments.iter().map(|comment| comment.mentions.len()).sum::<usize>();
+    let mentions = comments
+        .comments
+        .iter()
+        .map(|comment| comment.mentions.len())
+        .sum::<usize>();
     if mentions > MAX_THREADED_MENTIONS {
         return Err("threaded-comments part contains too many mentions".into());
     }
     if comments.comments.iter().any(|comment| {
-        comment.text.as_deref().is_some_and(|text| text.encode_utf16().count() > MAX_THREADED_TEXT_UTF16)
+        comment
+            .text
+            .as_deref()
+            .is_some_and(|text| text.encode_utf16().count() > MAX_THREADED_TEXT_UTF16)
     }) {
         return Err("threaded-comment text exceeds the configured resource bound".into());
     }

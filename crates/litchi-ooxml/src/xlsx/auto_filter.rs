@@ -1,8 +1,8 @@
 //! Immutable static worksheet auto-filter and sort-state read model.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::sort::{SortBy, SortMethod};
+use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::Writer;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -1529,10 +1529,9 @@ fn push_sort(s: &mut (usize, SortBuilder), e: &BytesStart<'_>, d: Decoder) -> Re
             return Err(invalid("color sort requires dxfId"));
         },
         SortBy::Icon if icon.is_none() => return Err(invalid("icon sort requires iconSet")),
-        SortBy::Icon
-            if icon_id.is_some_and(|v| v >= icon.unwrap().cardinality()) => {
-                return Err(invalid("sort iconId exceeds icon-set cardinality"));
-            },
+        SortBy::Icon if icon_id.is_some_and(|v| v >= icon.unwrap().cardinality()) => {
+            return Err(invalid("sort iconId exceeds icon-set cardinality"));
+        },
         _ => {},
     }
     let custom = optional_attr(e, b"customList", d)?;

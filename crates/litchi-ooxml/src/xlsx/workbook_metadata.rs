@@ -4,8 +4,8 @@
 //! references. Extension payloads are bounded, inert XML. MDX/OLAP metadata
 //! and metadata string stores are deliberately outside this bounded family.
 
-use crate::common::mce::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::OpcPackage;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};

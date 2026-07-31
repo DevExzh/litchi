@@ -1,0 +1,12 @@
+[package]
+name = "litchi-word"
+description = "Format-neutral Word-processing vocabulary for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-core = { workspace = true }

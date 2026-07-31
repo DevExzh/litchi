@@ -11,8 +11,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::common::mce::process_str;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_str;
 
 const TRANSITIONAL_MAIN: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -257,7 +257,12 @@ pub fn write_worksheet_cell_watches(
         )));
     }
     let mut xml = String::new();
-    write!(xml, "<cellWatches xmlns=\"{}\">", conformance.main_namespace()).unwrap();
+    write!(
+        xml,
+        "<cellWatches xmlns=\"{}\">",
+        conformance.main_namespace()
+    )
+    .unwrap();
     for reference in &value.references {
         xml.push_str("<cellWatch r=\"");
         xml.push_str(reference.as_str());
@@ -381,7 +386,9 @@ mod tests {
             r#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main">"#,
             r#"<cellWatches><cellWatch r="B2"/></cellWatches></worksheet>"#,
         );
-        let value = parse_worksheet_cell_watches(xml.as_bytes()).unwrap().unwrap();
+        let value = parse_worksheet_cell_watches(xml.as_bytes())
+            .unwrap()
+            .unwrap();
         assert_eq!(value.references()[0].as_str(), "B2");
     }
 

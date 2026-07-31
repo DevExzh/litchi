@@ -244,7 +244,7 @@ impl PresentationProtection {
     /// Parse protection settings from presentation properties XML.
     pub fn parse_xml(xml: &str) -> Result<Self> {
         let mut protection = Self::new();
-        let xml = crate::common::mce::process_str(xml)?;
+        let xml = litchi_ooxml_common::mce::process_str(xml)?;
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 

@@ -1,11 +1,11 @@
 //! Typed SpreadsheetML chartsheets and their inert workbook/drawing/chart package graph.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::printer_settings::{
     MAX_SETTINGS_BYTES, PRINTER_CT, PRINTER_REL, PrinterSettingsResource, STRICT_PRINTER_REL,
     is_printer_relationship, validate_printer_settings_uri, validate_settings_bytes,
 };
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
@@ -3314,10 +3314,12 @@ fn insert_workbook_entry(
             Event::Start(element) => {
                 let core = matches!(namespace, ResolveResult::Bound(Namespace(v)) if v == conformance.sml().as_bytes());
                 depth += 1;
-                if core && element.local_name().as_ref() == b"sheets"
-                    && sheets_depth.replace(depth).is_some() {
-                        return Err(invalid("workbook has multiple sheets collections"));
-                    }
+                if core
+                    && element.local_name().as_ref() == b"sheets"
+                    && sheets_depth.replace(depth).is_some()
+                {
+                    return Err(invalid("workbook has multiple sheets collections"));
+                }
             },
             Event::Empty(element) if element.local_name().as_ref() == b"sheets" => {
                 return Err(invalid("cannot insert into empty sheets collection"));
@@ -4148,9 +4150,9 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
-            .map_err(xml_error)?
-            .to_owned()),
+        ResolveResult::Bound(Namespace(value)) => {
+            Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+        },
         ResolveResult::Unbound => Ok(String::new()),
         ResolveResult::Unknown(prefix) => Err(invalid(format!(
             "unbound XML prefix '{}'",
@@ -4569,7 +4571,8 @@ mod tests {
             )
         };
         for body in [
-            "<a:graphicData uri=\"urn:wrong\"><cx:chart r:id=\"rId1\"/></a:graphicData>".to_string(),
+            "<a:graphicData uri=\"urn:wrong\"><cx:chart r:id=\"rId1\"/></a:graphicData>"
+                .to_string(),
             format!("<a:graphicData uri=\"{CHART_EX}\"><cx:chart/></a:graphicData>"),
             format!(
                 "<a:graphicData uri=\"{CHART_EX}\"><cx:chart r:id=\"rId1\"/><cx:chart r:id=\"rId2\"/></a:graphicData>"

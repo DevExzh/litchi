@@ -72,7 +72,7 @@ impl<'a> ThemePart<'a> {
     /// println!("Theme name: {}", theme.name);
     /// ```
     pub fn theme(&self) -> Result<Theme> {
-        let xml = crate::common::mce::process_ooxml(self.xml_bytes())?;
+        let xml = litchi_ooxml_common::mce::process_ooxml(self.xml_bytes())?;
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut theme = Theme {
             name: String::new(),

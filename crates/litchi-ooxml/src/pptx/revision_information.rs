@@ -3,9 +3,9 @@
 //! Revision extension payloads are retained as XML and never interpreted or
 //! used to resolve relationships.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

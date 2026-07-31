@@ -99,7 +99,7 @@ impl VolatileDependencies {
         if xml.len() > MAX_PART_BYTES {
             return Err(invalid("volatile-dependencies part exceeds 8 MiB"));
         }
-        let processed = crate::common::mce::process_ooxml(xml)?;
+        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if processed.len() > MAX_PART_BYTES {
             return Err(invalid(
                 "processed volatile-dependencies part exceeds 8 MiB",
@@ -616,14 +616,7 @@ fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
                 e,
                 decoder,
             )?,
-            Event::Empty(e) => empty(
-                &stack,
-                &mut types,
-                &mut extension,
-                &namespace,
-                e,
-                decoder,
-            )?,
+            Event::Empty(e) => empty(&stack, &mut types, &mut extension, &namespace, e, decoder)?,
             Event::Text(t) => push_text(
                 &mut types,
                 stack.last().copied(),
@@ -862,10 +855,9 @@ fn add_reference(
 }
 fn push_text(types: &mut [TypeBuilder], ctx: Option<Context>, text: &str) -> Result<()> {
     match ctx {
-        Some(Context::Value(t, m, p)) => append(
-            types[t].mains[m].topics[p].value.as_mut().unwrap(),
-            text,
-        ),
+        Some(Context::Value(t, m, p)) => {
+            append(types[t].mains[m].topics[p].value.as_mut().unwrap(), text)
+        },
         Some(Context::Subtopic(t, m, p)) => append(
             types[t].mains[m].topics[p].subtopics.last_mut().unwrap(),
             text,

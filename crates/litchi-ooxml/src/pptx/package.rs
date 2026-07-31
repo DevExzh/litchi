@@ -1,5 +1,3 @@
-/// Package implementation for PowerPoint presentations.
-use crate::common::DocumentProperties;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::{PptxChart, PptxTagList, Presentation};
@@ -17,6 +15,8 @@ use crate::web_extensions::{
     OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
     remove_web_extension_task_panes, store_web_extension_task_panes,
 };
+/// Package implementation for PowerPoint presentations.
+use litchi_ooxml_common::DocumentProperties;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -293,6 +293,18 @@ impl Package {
         }
         opc.add_part(Box::new(theme_part));
 
+        // Notes masters require their own theme part. Sharing the slide-master
+        // theme makes desktop PowerPoint repair the package by creating this
+        // second part and repointing the notes master.
+        let notes_theme_partname = PackURI::new("/ppt/theme/theme2.xml")
+            .map_err(|e| OoxmlError::InvalidUri(format!("notes theme partname: {e}")))?;
+        let notes_theme_part = BlobPart::new(
+            notes_theme_partname,
+            ct::OFC_THEME.to_string(),
+            template::default_theme_xml().as_bytes().to_vec(),
+        );
+        opc.add_part(Box::new(notes_theme_part));
+
         // Create tableStyles.xml
         let table_styles_partname = PackURI::new("/ppt/tableStyles.xml")
             .map_err(|e| OoxmlError::InvalidUri(format!("tableStyles partname: {}", e)))?;
@@ -349,7 +361,7 @@ impl Package {
         );
 
         // Add relationship from notesMaster to theme
-        notes_master_part.relate_to("../theme/theme1.xml", rt::THEME);
+        notes_master_part.relate_to("../theme/theme2.xml", rt::THEME);
 
         // Add relationship from presentation to notesMaster and retain its
         // relationship ID in the required presentation-root reference.
@@ -368,9 +380,7 @@ impl Package {
                 ))
             })?;
             let xml = std::str::from_utf8(presentation.blob()).map_err(|error| {
-                OoxmlError::InvalidFormat(format!(
-                    "default presentation XML is not UTF-8: {error}"
-                ))
+                OoxmlError::InvalidFormat(format!("default presentation XML is not UTF-8: {error}"))
             })?;
             let marker = "</p:sldMasterIdLst>";
             let replacement = format!(
@@ -1077,12 +1087,11 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn presentation_mut(&mut self) -> Result<&mut MutablePresentation> {
-        // If we don't have a mutable presentation, create one
-        if self.mutable_pres.is_none() {
-            self.mutable_pres = Some(MutablePresentation::new());
-        }
-
-        Ok(self.mutable_pres.as_mut().unwrap())
+        self.mutable_pres.as_mut().ok_or(OoxmlError::UnsafeEdit {
+            format: "PPTX",
+            operation: "presentation_mut",
+            reason: "the legacy writer cannot hydrate an existing presentation losslessly",
+        })
     }
 
     /// Get a reference to the presentation properties.
@@ -1529,11 +1538,8 @@ impl Package {
         };
 
         // Create a temporary presentation part to manage relationships
-        let mut temp_pres_part = BlobPart::new(
-            pres_uri.clone(),
-            presentation_content_type,
-            Vec::new(),
-        );
+        let mut temp_pres_part =
+            BlobPart::new(pres_uri.clone(), presentation_content_type, Vec::new());
 
         // Add relationship to slideMaster (this should be rId1)
         temp_pres_part.relate_to("slideMasters/slideMaster1.xml", rt::SLIDE_MASTER);
@@ -1787,15 +1793,16 @@ impl Package {
         // Create custom handout master if one is set
         // We need to get the relationship ID BEFORE generating the presentation XML
         let handout_rel_id = if let Some(handout_master) = pres.handout_master() {
-            // Create theme2.xml for handout master (required - handout needs its own theme)
-            let theme2_uri = PackURI::new("/ppt/theme/theme2.xml")
-                .map_err(|e| OoxmlError::InvalidUri(format!("theme2 URI: {}", e)))?;
-            let theme2_part = BlobPart::new(
-                theme2_uri,
+            // Notes and authored masters may already own additional themes;
+            // allocate from the actual graph instead of assuming theme3.xml.
+            let handout_theme_uri = crate::pptx::theme::next_theme_part_uri(&self.opc)?;
+            let handout_theme_target = format!("../theme/{}", handout_theme_uri.filename());
+            let handout_theme_part = BlobPart::new(
+                handout_theme_uri,
                 ct::OFC_THEME.to_string(),
                 template::default_theme_xml().as_bytes().to_vec(),
             );
-            self.opc.add_part(Box::new(theme2_part));
+            self.opc.add_part(Box::new(handout_theme_part));
 
             let handout_uri = PackURI::new("/ppt/handoutMasters/handoutMaster1.xml")
                 .map_err(|e| OoxmlError::InvalidUri(format!("handoutMaster URI: {}", e)))?;
@@ -1807,8 +1814,8 @@ impl Package {
                 handout_master.to_xml().into_bytes(),
             );
 
-            // Add relationship from handoutMaster to its own theme (theme2.xml)
-            handout_part.relate_to("../theme/theme2.xml", rt::THEME);
+            // Add relationship from handoutMaster to its own theme.
+            handout_part.relate_to(&handout_theme_target, rt::THEME);
 
             // Add relationship from presentation to handoutMaster and capture the ID
             let rel_id =

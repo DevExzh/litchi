@@ -215,7 +215,7 @@ impl SparklineGroup {
 pub(crate) fn parse_sparkline_groups_from_worksheet_xml(
     content: &str,
 ) -> SheetResult<Vec<SparklineGroup>> {
-    let content = crate::common::mce::process_str(content)?;
+    let content = litchi_ooxml_common::mce::process_str(content)?;
     SparklineParser::parse(content.as_ref())
 }
 

@@ -5,10 +5,10 @@
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
+use quick_xml::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
-use quick_xml::Decoder;
 
 const MAX_DOCUMENT_VARIABLES: usize = 4096;
 const MAX_DOCUMENT_VARIABLE_XML_BYTES: usize = 8 * 1024 * 1024;
@@ -164,7 +164,7 @@ impl DocumentVariables {
                 "settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
             )));
         }
-        let xml = crate::common::mce::process_part(part)?;
+        let xml = litchi_ooxml_common::mce::process_part(part)?;
         Self::extract_from_xml(xml.as_ref())
     }
 
@@ -214,12 +214,7 @@ impl DocumentVariables {
                         && is_wordprocessing_namespace(&namespace)
                         && element.local_name().as_ref() == b"docVar"
                     {
-                        push_parsed_variable(
-                            &mut variables,
-                            &element,
-                            decoder,
-                            &resolver,
-                        )?;
+                        push_parsed_variable(&mut variables, &element, decoder, &resolver)?;
                         open_doc_var_depth = Some(depth);
                     } else if is_wordprocessing_namespace(&namespace)
                         && matches!(element.local_name().as_ref(), b"docVars" | b"docVar")
@@ -227,9 +222,7 @@ impl DocumentVariables {
                         return Err(OoxmlError::InvalidFormat(
                             "misplaced or nested document-variable element".into(),
                         ));
-                    } else if doc_vars_depth.is_some()
-                        && is_wordprocessing_namespace(&namespace)
-                    {
+                    } else if doc_vars_depth.is_some() && is_wordprocessing_namespace(&namespace) {
                         return Err(OoxmlError::InvalidFormat(
                             "unexpected WordprocessingML child in docVars".into(),
                         ));
@@ -258,21 +251,14 @@ impl DocumentVariables {
                         && is_wordprocessing_namespace(&namespace)
                         && element.local_name().as_ref() == b"docVar"
                     {
-                        push_parsed_variable(
-                            &mut variables,
-                            &element,
-                            decoder,
-                            &resolver,
-                        )?;
+                        push_parsed_variable(&mut variables, &element, decoder, &resolver)?;
                     } else if is_wordprocessing_namespace(&namespace)
                         && matches!(element.local_name().as_ref(), b"docVars" | b"docVar")
                     {
                         return Err(OoxmlError::InvalidFormat(
                             "misplaced or nested document-variable element".into(),
                         ));
-                    } else if doc_vars_depth.is_some()
-                        && is_wordprocessing_namespace(&namespace)
-                    {
+                    } else if doc_vars_depth.is_some() && is_wordprocessing_namespace(&namespace) {
                         return Err(OoxmlError::InvalidFormat(
                             "unexpected WordprocessingML child in docVars".into(),
                         ));
@@ -286,17 +272,12 @@ impl DocumentVariables {
                         doc_vars_depth = None;
                     }
                     depth = depth.checked_sub(1).ok_or_else(|| {
-                        OoxmlError::InvalidFormat(
-                            "invalid document-variable XML nesting".into(),
-                        )
+                        OoxmlError::InvalidFormat("invalid document-variable XML nesting".into())
                     })?;
                 },
                 Event::Text(text)
                     if (open_doc_var_depth.is_some() || doc_vars_depth == Some(depth))
-                        && text
-                            .as_ref()
-                            .iter()
-                            .any(|byte| !byte.is_ascii_whitespace()) =>
+                        && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
                 {
                     return Err(OoxmlError::InvalidFormat(
                         "document-variable elements cannot contain text".into(),
@@ -304,10 +285,7 @@ impl DocumentVariables {
                 },
                 Event::CData(text)
                     if (open_doc_var_depth.is_some() || doc_vars_depth == Some(depth))
-                        && text
-                            .as_ref()
-                            .iter()
-                            .any(|byte| !byte.is_ascii_whitespace()) =>
+                        && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) =>
                 {
                     return Err(OoxmlError::InvalidFormat(
                         "document-variable elements cannot contain text".into(),
@@ -434,7 +412,10 @@ mod tests {
         let mut variables = DocumentVariables::new();
         assert_eq!(variables.insert("first", "A&B").unwrap(), None);
         assert_eq!(variables.insert("second", "<two>").unwrap(), None);
-        assert_eq!(variables.insert("first", "updated").unwrap(), Some("A&B".into()));
+        assert_eq!(
+            variables.insert("first", "updated").unwrap(),
+            Some("A&B".into())
+        );
         assert_eq!(variables.names(), vec!["first", "second"]);
         assert_eq!(variables.remove("second"), Some("<two>".into()));
         assert_eq!(

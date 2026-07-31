@@ -490,7 +490,7 @@ impl SharedStrings {
 
     /// Parse shared strings from `xl/sharedStrings.xml`.
     pub fn parse(content: &str) -> SheetResult<Self> {
-        let content = crate::common::mce::process_str(content)
+        let content = litchi_ooxml_common::mce::process_str(content)
             .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
         SharedStringParser::parse(content.as_ref())
             .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)

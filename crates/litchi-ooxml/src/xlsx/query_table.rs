@@ -4,14 +4,14 @@
 //! This module deliberately treats the referenced connection as an inert numeric
 //! identifier: it never opens a URL, runs a command, or evaluates a formula.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
+use litchi_opc::part::BlobPart;
+use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
-use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI};
 
 pub const QUERY_TABLE_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml";
@@ -358,12 +358,24 @@ impl QueryTableField {
             extension_attributes: Vec::new(),
         }
     }
-    pub fn set_name(&mut self, value: Option<String>) { self.name = value; }
-    pub fn set_data_bound(&mut self, value: Option<bool>) { self.data_bound = value; }
-    pub fn set_row_numbers(&mut self, value: Option<bool>) { self.row_numbers = value; }
-    pub fn set_fill_formulas(&mut self, value: Option<bool>) { self.fill_formulas = value; }
-    pub fn set_clipped(&mut self, value: Option<bool>) { self.clipped = value; }
-    pub fn set_table_column_id(&mut self, value: Option<u32>) { self.table_column_id = value; }
+    pub fn set_name(&mut self, value: Option<String>) {
+        self.name = value;
+    }
+    pub fn set_data_bound(&mut self, value: Option<bool>) {
+        self.data_bound = value;
+    }
+    pub fn set_row_numbers(&mut self, value: Option<bool>) {
+        self.row_numbers = value;
+    }
+    pub fn set_fill_formulas(&mut self, value: Option<bool>) {
+        self.fill_formulas = value;
+    }
+    pub fn set_clipped(&mut self, value: Option<bool>) {
+        self.clipped = value;
+    }
+    pub fn set_table_column_id(&mut self, value: Option<u32>) {
+        self.table_column_id = value;
+    }
     pub fn id(&self) -> u32 {
         self.id
     }
@@ -436,19 +448,39 @@ impl QueryTableRefresh {
             extension_attributes: Vec::new(),
         }
     }
-    pub fn fields_mut(&mut self) -> &mut Vec<QueryTableField> { &mut self.fields }
-    pub fn add_field(&mut self, field: QueryTableField) { self.fields.push(field); }
-    pub fn deleted_fields_mut(&mut self) -> &mut Option<Vec<String>> { &mut self.deleted_fields }
+    pub fn fields_mut(&mut self) -> &mut Vec<QueryTableField> {
+        &mut self.fields
+    }
+    pub fn add_field(&mut self, field: QueryTableField) {
+        self.fields.push(field);
+    }
+    pub fn deleted_fields_mut(&mut self) -> &mut Option<Vec<String>> {
+        &mut self.deleted_fields
+    }
     pub fn add_deleted_field(&mut self, name: String) {
         self.deleted_fields.get_or_insert_with(Vec::new).push(name);
     }
-    pub fn set_preserve_sort_filter_layout(&mut self, value: Option<bool>) { self.preserve_sort_filter_layout = value; }
-    pub fn set_field_id_wrapped(&mut self, value: Option<bool>) { self.field_id_wrapped = value; }
-    pub fn set_headers_in_last_refresh(&mut self, value: Option<bool>) { self.headers_in_last_refresh = value; }
-    pub fn set_minimum_version(&mut self, value: Option<u8>) { self.minimum_version = value; }
-    pub fn set_next_id(&mut self, value: Option<u32>) { self.next_id = value; }
-    pub fn set_unbound_columns_left(&mut self, value: Option<u32>) { self.unbound_columns_left = value; }
-    pub fn set_unbound_columns_right(&mut self, value: Option<u32>) { self.unbound_columns_right = value; }
+    pub fn set_preserve_sort_filter_layout(&mut self, value: Option<bool>) {
+        self.preserve_sort_filter_layout = value;
+    }
+    pub fn set_field_id_wrapped(&mut self, value: Option<bool>) {
+        self.field_id_wrapped = value;
+    }
+    pub fn set_headers_in_last_refresh(&mut self, value: Option<bool>) {
+        self.headers_in_last_refresh = value;
+    }
+    pub fn set_minimum_version(&mut self, value: Option<u8>) {
+        self.minimum_version = value;
+    }
+    pub fn set_next_id(&mut self, value: Option<u32>) {
+        self.next_id = value;
+    }
+    pub fn set_unbound_columns_left(&mut self, value: Option<u32>) {
+        self.unbound_columns_left = value;
+    }
+    pub fn set_unbound_columns_right(&mut self, value: Option<u32>) {
+        self.unbound_columns_right = value;
+    }
     pub fn preserve_sort_filter_layout(&self) -> Option<bool> {
         self.preserve_sort_filter_layout
     }
@@ -554,23 +586,57 @@ impl QueryTable {
             extension_attributes: Vec::new(),
         }
     }
-    pub fn set_name(&mut self, value: String) { self.name = value; }
-    pub fn set_connection_id(&mut self, value: u32) { self.connection_id = value; }
-    pub fn set_headers(&mut self, value: Option<bool>) { self.headers = value; }
-    pub fn set_row_numbers(&mut self, value: Option<bool>) { self.row_numbers = value; }
-    pub fn set_disable_refresh(&mut self, value: Option<bool>) { self.disable_refresh = value; }
-    pub fn set_background_refresh(&mut self, value: Option<bool>) { self.background_refresh = value; }
-    pub fn set_first_background_refresh(&mut self, value: Option<bool>) { self.first_background_refresh = value; }
-    pub fn set_refresh_on_load(&mut self, value: Option<bool>) { self.refresh_on_load = value; }
-    pub fn set_grow_shrink_type(&mut self, value: Option<QueryTableGrowShrinkType>) { self.grow_shrink_type = value; }
-    pub fn set_fill_formulas(&mut self, value: Option<bool>) { self.fill_formulas = value; }
-    pub fn set_remove_data_on_save(&mut self, value: Option<bool>) { self.remove_data_on_save = value; }
-    pub fn set_disable_edit(&mut self, value: Option<bool>) { self.disable_edit = value; }
-    pub fn set_preserve_formatting(&mut self, value: Option<bool>) { self.preserve_formatting = value; }
-    pub fn set_adjust_column_width(&mut self, value: Option<bool>) { self.adjust_column_width = value; }
-    pub fn set_intermediate(&mut self, value: Option<bool>) { self.intermediate = value; }
-    pub fn set_refresh(&mut self, value: Option<QueryTableRefresh>) { self.refresh = value; }
-    pub fn refresh_mut(&mut self) -> Option<&mut QueryTableRefresh> { self.refresh.as_mut() }
+    pub fn set_name(&mut self, value: String) {
+        self.name = value;
+    }
+    pub fn set_connection_id(&mut self, value: u32) {
+        self.connection_id = value;
+    }
+    pub fn set_headers(&mut self, value: Option<bool>) {
+        self.headers = value;
+    }
+    pub fn set_row_numbers(&mut self, value: Option<bool>) {
+        self.row_numbers = value;
+    }
+    pub fn set_disable_refresh(&mut self, value: Option<bool>) {
+        self.disable_refresh = value;
+    }
+    pub fn set_background_refresh(&mut self, value: Option<bool>) {
+        self.background_refresh = value;
+    }
+    pub fn set_first_background_refresh(&mut self, value: Option<bool>) {
+        self.first_background_refresh = value;
+    }
+    pub fn set_refresh_on_load(&mut self, value: Option<bool>) {
+        self.refresh_on_load = value;
+    }
+    pub fn set_grow_shrink_type(&mut self, value: Option<QueryTableGrowShrinkType>) {
+        self.grow_shrink_type = value;
+    }
+    pub fn set_fill_formulas(&mut self, value: Option<bool>) {
+        self.fill_formulas = value;
+    }
+    pub fn set_remove_data_on_save(&mut self, value: Option<bool>) {
+        self.remove_data_on_save = value;
+    }
+    pub fn set_disable_edit(&mut self, value: Option<bool>) {
+        self.disable_edit = value;
+    }
+    pub fn set_preserve_formatting(&mut self, value: Option<bool>) {
+        self.preserve_formatting = value;
+    }
+    pub fn set_adjust_column_width(&mut self, value: Option<bool>) {
+        self.adjust_column_width = value;
+    }
+    pub fn set_intermediate(&mut self, value: Option<bool>) {
+        self.intermediate = value;
+    }
+    pub fn set_refresh(&mut self, value: Option<QueryTableRefresh>) {
+        self.refresh = value;
+    }
+    pub fn refresh_mut(&mut self) -> Option<&mut QueryTableRefresh> {
+        self.refresh.as_mut()
+    }
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -1830,12 +1896,15 @@ pub fn add_worksheet_query_table(
         QUERY_TABLE_CONTENT_TYPE.into(),
         xml,
     )))?;
-    package.get_part_mut(worksheet_part)?.rels_mut().add_relationship(
-        relationship_type.into(),
-        target,
-        relationship_id.clone(),
-        false,
-    );
+    package
+        .get_part_mut(worksheet_part)?
+        .rels_mut()
+        .add_relationship(
+            relationship_type.into(),
+            target,
+            relationship_id.clone(),
+            false,
+        );
     let _ = package.clear_digital_signatures();
     Ok(WorksheetQueryTable::new(
         relationship_id,
@@ -1887,7 +1956,8 @@ pub fn remove_worksheet_query_table(
     worksheet_part: &PackURI,
     relationship_id: &str,
 ) -> Result<bool> {
-    let Some(existing) = find_worksheet_query_table(package, worksheet_part, relationship_id)? else {
+    let Some(existing) = find_worksheet_query_table(package, worksheet_part, relationship_id)?
+    else {
         return Ok(false);
     };
     let part_name = PackURI::new(existing.part_name()).map_err(invalid)?;
@@ -1910,13 +1980,18 @@ pub fn reorder_worksheet_query_tables(
 ) -> Result<Vec<WorksheetQueryTable>> {
     let existing = load_worksheet_query_tables(package, worksheet_part)?;
     if existing.len() != ordered_relationship_ids.len() {
-        return Err(invalid("query-table reorder must contain every relationship"));
+        return Err(invalid(
+            "query-table reorder must contain every relationship",
+        ));
     }
     let existing_ids = existing
         .iter()
         .map(|item| item.relationship_id.clone())
         .collect::<HashSet<_>>();
-    let ordered_ids = ordered_relationship_ids.iter().cloned().collect::<HashSet<_>>();
+    let ordered_ids = ordered_relationship_ids
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
     if existing_ids != ordered_ids || ordered_ids.len() != ordered_relationship_ids.len() {
         return Err(invalid("query-table reorder is not a permutation"));
     }
@@ -1951,7 +2026,11 @@ pub fn reorder_worksheet_query_tables(
             id.clone(),
             false,
         );
-        result.push(WorksheetQueryTable::new(id, item.part_name, item.query_table));
+        result.push(WorksheetQueryTable::new(
+            id,
+            item.part_name,
+            item.query_table,
+        ));
     }
     let _ = package.clear_digital_signatures();
     Ok(result)
@@ -1976,8 +2055,8 @@ fn validate_query_table_connection(package: &OpcPackage, connection_id: u32) -> 
 
 fn next_query_table_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(format!("/xl/queryTables/queryTable{suffix}.xml"))
-            .map_err(invalid)?;
+        let candidate =
+            PackURI::new(format!("/xl/queryTables/queryTable{suffix}.xml")).map_err(invalid)?;
         if package.get_part(&candidate).is_err() {
             return Ok(candidate);
         }
@@ -2003,11 +2082,15 @@ fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
     package.iter_parts().any(|part| {
         part.rels().iter().any(|relationship| {
             !relationship.is_external()
-                && relationship.target_partname().is_ok_and(|name| name == *target)
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|name| name == *target)
         })
     }) || package.rels().iter().any(|relationship| {
         !relationship.is_external()
-            && relationship.target_partname().is_ok_and(|name| name == *target)
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
     })
 }
 

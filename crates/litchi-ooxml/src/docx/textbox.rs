@@ -17,20 +17,19 @@
 //! Everything is treated as inert metadata: linked OLE objects, scripts, and
 //! style bodies are never interpreted or followed.
 
-use crate::common::mce::process_ooxml;
-use crate::common::xml::{
-    decode_xml_reference, is_drawingml_name, unqualified_attribute_value,
-};
+use crate::common::xml::{decode_xml_reference, is_drawingml_name, unqualified_attribute_value};
 use crate::docx::drawing::ShapeType;
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 const WPS_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordprocessingShape";
-const WP_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+const WP_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
 const STRICT_WP_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing";
 const VML_NAMESPACE: &[u8] = b"urn:schemas-microsoft-com:vml";
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
@@ -523,7 +522,9 @@ impl ShapeBuilder {
         if !self.saw_content && !self.saw_body_pr && !self.legacy_word_art {
             return None;
         }
-        let warped = self.warp.is_some_and(|warp| warp != TextWarpPreset::NoShape);
+        let warped = self
+            .warp
+            .is_some_and(|warp| warp != TextWarpPreset::NoShape);
         let styled = self.text_fill || self.text_outline || self.text_effects;
         let word_art = if warped || self.from_word_art || self.legacy_word_art || styled {
             Some(WordArt {
@@ -590,28 +591,14 @@ fn parse_text_boxes(xml: &[u8]) -> Result<Vec<DocxTextBox>> {
                 if nodes > MAX_NODES || depth > MAX_DEPTH {
                     return Err(limit("XML structure"));
                 }
-                handle_element(
-                    &namespace,
-                    &element,
-                    decoder,
-                    &resolver,
-                    &mut stack,
-                    false,
-                )?;
+                handle_element(&namespace, &element, decoder, &resolver, &mut stack, false)?;
             },
             Event::Empty(element) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| limit("XML structure"))?;
                 if nodes > MAX_NODES {
                     return Err(limit("XML structure"));
                 }
-                handle_element(
-                    &namespace,
-                    &element,
-                    decoder,
-                    &resolver,
-                    &mut stack,
-                    true,
-                )?;
+                handle_element(&namespace, &element, decoder, &resolver, &mut stack, true)?;
             },
             Event::Text(text) => {
                 if let Some(builder) = stack.last_mut()
@@ -802,7 +789,8 @@ fn handle_element(
             },
             _ => {},
         }
-    } else if is_namespace(namespace, WP_NAMESPACE) || is_namespace(namespace, STRICT_WP_NAMESPACE) {
+    } else if is_namespace(namespace, WP_NAMESPACE) || is_namespace(namespace, STRICT_WP_NAMESPACE)
+    {
         if let Some(builder) = stack.last_mut() {
             match local {
                 b"inline" => builder.anchor = TextBoxAnchor::Inline,

@@ -1,7 +1,7 @@
 //! Bounded, inert classic-chart graphs owned by a DOCX main document.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};

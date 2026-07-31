@@ -214,13 +214,33 @@ pub struct MailMergeFieldMap {
 }
 
 impl MailMergeFieldMap {
-    pub fn new() -> Self { Self::default() }
-    pub fn set_mapping_type(&mut self, value: Option<MailMergeFieldMappingType>) -> &mut Self { self.mapping_type = value; self }
-    pub fn set_name(&mut self, value: Option<String>) -> &mut Self { self.name = value; self }
-    pub fn set_mapped_name(&mut self, value: Option<String>) -> &mut Self { self.mapped_name = value; self }
-    pub fn set_column(&mut self, value: Option<i32>) -> &mut Self { self.column = value; self }
-    pub fn set_language_id(&mut self, value: Option<String>) -> &mut Self { self.language_id = value; self }
-    pub fn set_dynamic_address(&mut self, value: bool) -> &mut Self { self.dynamic_address = value; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn set_mapping_type(&mut self, value: Option<MailMergeFieldMappingType>) -> &mut Self {
+        self.mapping_type = value;
+        self
+    }
+    pub fn set_name(&mut self, value: Option<String>) -> &mut Self {
+        self.name = value;
+        self
+    }
+    pub fn set_mapped_name(&mut self, value: Option<String>) -> &mut Self {
+        self.mapped_name = value;
+        self
+    }
+    pub fn set_column(&mut self, value: Option<i32>) -> &mut Self {
+        self.column = value;
+        self
+    }
+    pub fn set_language_id(&mut self, value: Option<String>) -> &mut Self {
+        self.language_id = value;
+        self
+    }
+    pub fn set_dynamic_address(&mut self, value: bool) -> &mut Self {
+        self.dynamic_address = value;
+        self
+    }
     pub fn mapping_type(&self) -> Option<MailMergeFieldMappingType> {
         self.mapping_type
     }
@@ -254,14 +274,36 @@ pub struct MailMergeDataSourceObject {
 }
 
 impl MailMergeDataSourceObject {
-    pub fn new() -> Self { Self::default() }
-    pub fn set_udl(&mut self, value: Option<String>) -> &mut Self { self.udl = value; self }
-    pub fn set_table(&mut self, value: Option<String>) -> &mut Self { self.table = value; self }
-    pub fn set_column_delimiter(&mut self, value: Option<i32>) -> &mut Self { self.column_delimiter = value; self }
-    pub fn set_source_type(&mut self, value: Option<String>) -> &mut Self { self.source_type = value; self }
-    pub fn set_first_row_header(&mut self, value: bool) -> &mut Self { self.first_row_header = value; self }
-    pub fn field_maps_mut(&mut self) -> &mut Vec<MailMergeFieldMap> { &mut self.field_maps }
-    pub fn add_field_map(&mut self, value: MailMergeFieldMap) -> &mut Self { self.field_maps.push(value); self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn set_udl(&mut self, value: Option<String>) -> &mut Self {
+        self.udl = value;
+        self
+    }
+    pub fn set_table(&mut self, value: Option<String>) -> &mut Self {
+        self.table = value;
+        self
+    }
+    pub fn set_column_delimiter(&mut self, value: Option<i32>) -> &mut Self {
+        self.column_delimiter = value;
+        self
+    }
+    pub fn set_source_type(&mut self, value: Option<String>) -> &mut Self {
+        self.source_type = value;
+        self
+    }
+    pub fn set_first_row_header(&mut self, value: bool) -> &mut Self {
+        self.first_row_header = value;
+        self
+    }
+    pub fn field_maps_mut(&mut self) -> &mut Vec<MailMergeFieldMap> {
+        &mut self.field_maps
+    }
+    pub fn add_field_map(&mut self, value: MailMergeFieldMap) -> &mut Self {
+        self.field_maps.push(value);
+        self
+    }
     pub fn udl(&self) -> Option<&str> {
         self.udl.as_deref()
     }
@@ -333,21 +375,65 @@ impl Default for MailMergeSettings {
 }
 
 impl MailMergeSettings {
-    pub fn new() -> Self { Self::default() }
-    pub fn set_main_document_type(&mut self, value: MailMergeMainDocumentType) -> &mut Self { self.main_document_type = value; self }
-    pub fn set_link_to_query(&mut self, value: bool) -> &mut Self { self.link_to_query = value; self }
-    pub fn set_data_type(&mut self, value: Option<MailMergeDataType>) -> &mut Self { self.data_type = value; self }
-    pub fn set_connect_string(&mut self, value: Option<String>) -> &mut Self { self.connect_string = value; self }
-    pub fn set_query(&mut self, value: Option<String>) -> &mut Self { self.query = value; self }
-    pub fn set_do_not_suppress_blank_lines(&mut self, value: bool) -> &mut Self { self.do_not_suppress_blank_lines = value; self }
-    pub fn set_destination(&mut self, value: MailMergeDestination) -> &mut Self { self.destination = value; self }
-    pub fn set_address_field_name(&mut self, value: Option<String>) -> &mut Self { self.address_field_name = value; self }
-    pub fn set_mail_subject(&mut self, value: Option<String>) -> &mut Self { self.mail_subject = value; self }
-    pub fn set_mail_as_attachment(&mut self, value: bool) -> &mut Self { self.mail_as_attachment = value; self }
-    pub fn set_view_merged_data(&mut self, value: bool) -> &mut Self { self.view_merged_data = value; self }
-    pub fn set_active_record(&mut self, value: i32) -> &mut Self { self.active_record = value; self }
-    pub fn set_check_errors(&mut self, value: i32) -> &mut Self { self.check_errors = value; self }
-    pub fn set_odso(&mut self, value: Option<MailMergeDataSourceObject>) -> &mut Self { self.odso = value; self }
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn set_main_document_type(&mut self, value: MailMergeMainDocumentType) -> &mut Self {
+        self.main_document_type = value;
+        self
+    }
+    pub fn set_link_to_query(&mut self, value: bool) -> &mut Self {
+        self.link_to_query = value;
+        self
+    }
+    pub fn set_data_type(&mut self, value: Option<MailMergeDataType>) -> &mut Self {
+        self.data_type = value;
+        self
+    }
+    pub fn set_connect_string(&mut self, value: Option<String>) -> &mut Self {
+        self.connect_string = value;
+        self
+    }
+    pub fn set_query(&mut self, value: Option<String>) -> &mut Self {
+        self.query = value;
+        self
+    }
+    pub fn set_do_not_suppress_blank_lines(&mut self, value: bool) -> &mut Self {
+        self.do_not_suppress_blank_lines = value;
+        self
+    }
+    pub fn set_destination(&mut self, value: MailMergeDestination) -> &mut Self {
+        self.destination = value;
+        self
+    }
+    pub fn set_address_field_name(&mut self, value: Option<String>) -> &mut Self {
+        self.address_field_name = value;
+        self
+    }
+    pub fn set_mail_subject(&mut self, value: Option<String>) -> &mut Self {
+        self.mail_subject = value;
+        self
+    }
+    pub fn set_mail_as_attachment(&mut self, value: bool) -> &mut Self {
+        self.mail_as_attachment = value;
+        self
+    }
+    pub fn set_view_merged_data(&mut self, value: bool) -> &mut Self {
+        self.view_merged_data = value;
+        self
+    }
+    pub fn set_active_record(&mut self, value: i32) -> &mut Self {
+        self.active_record = value;
+        self
+    }
+    pub fn set_check_errors(&mut self, value: i32) -> &mut Self {
+        self.check_errors = value;
+        self
+    }
+    pub fn set_odso(&mut self, value: Option<MailMergeDataSourceObject>) -> &mut Self {
+        self.odso = value;
+        self
+    }
 
     pub(crate) fn assign_package_relationships(
         &mut self,
@@ -484,11 +570,24 @@ pub struct MailMergeRecipient {
 
 impl MailMergeRecipient {
     pub fn new(active: bool, column: Option<i32>, unique_tag: Option<Vec<u8>>) -> Self {
-        Self { active, column, unique_tag }
+        Self {
+            active,
+            column,
+            unique_tag,
+        }
     }
-    pub fn set_active(&mut self, value: bool) -> &mut Self { self.active = value; self }
-    pub fn set_column(&mut self, value: Option<i32>) -> &mut Self { self.column = value; self }
-    pub fn set_unique_tag(&mut self, value: Option<Vec<u8>>) -> &mut Self { self.unique_tag = value; self }
+    pub fn set_active(&mut self, value: bool) -> &mut Self {
+        self.active = value;
+        self
+    }
+    pub fn set_column(&mut self, value: Option<i32>) -> &mut Self {
+        self.column = value;
+        self
+    }
+    pub fn set_unique_tag(&mut self, value: Option<Vec<u8>>) -> &mut Self {
+        self.unique_tag = value;
+        self
+    }
     pub fn active(&self) -> bool {
         self.active
     }
@@ -506,12 +605,16 @@ pub struct MailMergeRecipients {
 }
 
 impl MailMergeRecipients {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn recipients(&self) -> &[MailMergeRecipient] {
         &self.recipients
     }
 
-    pub fn recipients_mut(&mut self) -> &mut Vec<MailMergeRecipient> { &mut self.recipients }
+    pub fn recipients_mut(&mut self) -> &mut Vec<MailMergeRecipient> {
+        &mut self.recipients
+    }
     pub fn add_recipient(&mut self, recipient: MailMergeRecipient) -> Result<&mut Self> {
         if self.recipients.len() >= MAX_RECIPIENTS {
             return Err(invalid("too many mail-merge recipients"));
@@ -520,12 +623,17 @@ impl MailMergeRecipients {
         Ok(self)
     }
     pub fn set_recipient_active(&mut self, index: usize, active: bool) -> Result<()> {
-        let recipient = self.recipients.get_mut(index).ok_or_else(|| invalid(format!("recipient index {index} is out of range")))?;
+        let recipient = self
+            .recipients
+            .get_mut(index)
+            .ok_or_else(|| invalid(format!("recipient index {index} is out of range")))?;
         recipient.active = active;
         Ok(())
     }
 
-    pub(crate) fn content_type() -> &'static str { RECIPIENT_CONTENT_TYPE }
+    pub(crate) fn content_type() -> &'static str {
+        RECIPIENT_CONTENT_TYPE
+    }
 
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
         if part.content_type() != RECIPIENT_CONTENT_TYPE {
@@ -539,7 +647,7 @@ impl MailMergeRecipients {
                 "mail-merge recipient-data part cannot have relationships",
             ));
         }
-        let xml = crate::common::mce::process_part(part)?;
+        let xml = litchi_ooxml_common::mce::process_part(part)?;
         Self::extract_from_xml(xml.as_ref())
     }
 
@@ -1216,7 +1324,7 @@ impl Node {
 // match guards on purpose; guards cannot use `?`.
 #[allow(clippy::collapsible_match)]
 fn parse_tree(xml: &[u8]) -> Result<Node> {
-    let processed = crate::common::mce::process_ooxml(xml)
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml)
         .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);

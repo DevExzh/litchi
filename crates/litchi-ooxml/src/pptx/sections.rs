@@ -154,7 +154,11 @@ impl SectionList {
         }
         self.sections = ordered_ids
             .iter()
-            .map(|id| self.get_by_id(id).expect("permutation was validated").clone())
+            .map(|id| {
+                self.get_by_id(id)
+                    .expect("permutation was validated")
+                    .clone()
+            })
             .collect();
         Ok(())
     }
@@ -195,7 +199,7 @@ impl SectionList {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation sections exceed 8 MiB"));
         }
-        let processed = crate::common::mce::process_ooxml(xml)?;
+        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if processed.len() > MAX_BYTES {
             return Err(invalid("processed presentation sections exceed 8 MiB"));
         }

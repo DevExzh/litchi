@@ -1,9 +1,9 @@
 //! Immutable static XLSX worksheet-view read model.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::Cell;
 use crate::xlsx::namespace::{is_spreadsheetml_name, relationship_attribute_value};
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;

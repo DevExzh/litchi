@@ -3,7 +3,6 @@
 //! This module provides the concrete implementation of the Workbook trait
 //! for Excel (.xlsx) files using the Office Open XML format.
 
-use crate::common::DocumentProperties;
 use crate::pivot::PivotTable;
 use crate::ribbonx::{
     RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
@@ -72,6 +71,7 @@ use crate::xlsx::{Cell, SharedStrings, Styles};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
+use litchi_ooxml_common::DocumentProperties;
 use litchi_opc::{OpcPackage, PackURI};
 use std::collections::{HashMap, HashSet};
 
@@ -206,6 +206,9 @@ pub struct Workbook {
     styles: Styles,
     /// Mutable workbook data for writing (cached)
     mutable_data: Option<MutableWorkbookData>,
+    /// Whether the writer model originated from deterministic fresh creation.
+    /// Opened workbooks must not be rebuilt through the empty legacy writer.
+    writer_is_fresh: bool,
     /// Document properties (metadata)
     properties: DocumentProperties,
     /// Whether the workbook uses the 1904 date system
@@ -623,6 +626,7 @@ impl Workbook {
 
         let mut workbook = Self::new(package)?;
         workbook.mutable_data = Some(MutableWorkbookData::new());
+        workbook.writer_is_fresh = true;
         Ok(workbook)
     }
 
@@ -654,6 +658,7 @@ impl Workbook {
             shared_strings: SharedStrings::new(),
             styles: Styles::new(),
             mutable_data: None,
+            writer_is_fresh: false,
             properties: DocumentProperties::new(),
             is_1904_date_system: false,
             calculation_properties: None,
@@ -1606,11 +1611,14 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn worksheet_mut(&mut self, index: usize) -> SheetResult<&mut MutableWorksheet> {
-        if self.mutable_data.is_none() {
-            self.mutable_data = Some(MutableWorkbookData::new());
-        }
-
-        self.mutable_data.as_mut().unwrap().worksheet_mut(index)
+        let data = self.mutable_data.as_mut().ok_or_else(|| {
+            Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation: "worksheet_mut",
+                reason: "the legacy writer cannot hydrate an existing workbook losslessly",
+            }) as Box<dyn std::error::Error + Send + Sync>
+        })?;
+        data.worksheet_mut(index)
     }
 
     /// Return typed protection metadata, including any queued mutation.
@@ -1760,7 +1768,8 @@ impl Workbook {
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
-        parse_worksheet_web_extension_bindings(part.blob())}
+        parse_worksheet_web_extension_bindings(part.blob())
+    }
 
     /// Atomically replace all Office Add-in range bindings on one worksheet.
     ///
@@ -2223,6 +2232,14 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> SheetResult<()> {
+        if self.mutable_data.is_some() && !self.writer_is_fresh {
+            return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation: "save",
+                reason: "an opened workbook was routed through the empty legacy writer model",
+            }));
+        }
+
         // If we have mutable data, update the workbook parts
         let should_update = self
             .mutable_data
@@ -2318,9 +2335,7 @@ impl Workbook {
                             preview.part_uri = next_active_x_part_uri(
                                 &self.package,
                                 "/xl/media",
-                                &format!(
-                                    "litchiControl{worksheet_index}_{control_index}Preview"
-                                ),
+                                &format!("litchiControl{worksheet_index}_{control_index}Preview"),
                                 "img",
                             )?;
                             let id =
@@ -2623,8 +2638,7 @@ impl Workbook {
     /// ECMA-376 §18.3.1.12); anything under the writer-owned naming
     /// schemes without live backing is dropped.
     fn remove_stale_sheet_parts(&mut self, data: &MutableWorkbookData) {
-        let worksheet_ids: HashSet<u32> =
-            data.worksheets.iter().map(|ws| ws.sheet_id()).collect();
+        let worksheet_ids: HashSet<u32> = data.worksheets.iter().map(|ws| ws.sheet_id()).collect();
         let all_sheet_ids: HashSet<u32> = worksheet_ids
             .iter()
             .copied()
@@ -2637,7 +2651,12 @@ impl Workbook {
             .iter_parts()
             .map(|part| part.partname().clone())
             .filter(|uri| {
-                is_stale_sheet_part(uri.as_str(), &worksheet_ids, &all_sheet_ids, chartsheet_count)
+                is_stale_sheet_part(
+                    uri.as_str(),
+                    &worksheet_ids,
+                    &all_sheet_ids,
+                    chartsheet_count,
+                )
             })
             .collect();
         for uri in stale {
@@ -2653,11 +2672,7 @@ impl Workbook {
         validate_workbook_tables(data)?;
         self.remove_stale_sheet_parts(data);
 
-        let (
-            preserved_main_content_type,
-            preserved_vba_target,
-            preserved_external_relationships,
-        ) = {
+        let (preserved_main_content_type, preserved_vba_target, preserved_external_relationships) = {
             let workbook_part = self.package.get_part(&self.workbook_uri)?;
             discover_vba_project(&self.package, workbook_part)?;
             let mut vba_projects = workbook_part
@@ -2674,11 +2689,11 @@ impl Workbook {
             if vba_projects.next().is_some() {
                 return Err("workbook has multiple VBA Project relationships".into());
             }
-            let external_relationships = self.external_links
-                .iter()
-                .map(|link| {
-                    let relationship =
-                        workbook_part
+            let external_relationships =
+                self.external_links
+                    .iter()
+                    .map(|link| {
+                        let relationship = workbook_part
                             .rels()
                             .get(&link.relationship_id)
                             .ok_or_else(|| {
@@ -2687,14 +2702,14 @@ impl Workbook {
                                     link.relationship_id
                                 )
                             })?;
-                    Ok((
-                        relationship.reltype().to_string(),
-                        relationship.target_ref().to_string(),
-                        relationship.r_id().to_string(),
-                        relationship.is_external(),
-                    ))
-                })
-                .collect::<SheetResult<Vec<_>>>()?;
+                        Ok((
+                            relationship.reltype().to_string(),
+                            relationship.target_ref().to_string(),
+                            relationship.r_id().to_string(),
+                            relationship.is_external(),
+                        ))
+                    })
+                    .collect::<SheetResult<Vec<_>>>()?;
             (
                 workbook_part.content_type().to_string(),
                 preserved_vba_target,
@@ -4289,13 +4304,8 @@ mod tests {
     fn saves_and_reloads_complete_typed_workbook_protection() {
         let mut protection = WorkbookProtectionMetadata::new();
         protection.set_workbook_verifier(Some(ProtectionPasswordVerifier::Strong(
-            StrongProtectionPasswordVerifier::new(
-                "SHA-512",
-                vec![1, 2, 3],
-                vec![4, 5, 6],
-                100_000,
-            )
-            .unwrap(),
+            StrongProtectionPasswordVerifier::new("SHA-512", vec![1, 2, 3], vec![4, 5, 6], 100_000)
+                .unwrap(),
         )));
         protection.set_revisions_verifier(Some(ProtectionPasswordVerifier::Legacy(0x00AF)));
         protection.set_structure_locked(true);

@@ -6,8 +6,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 
 use super::namespace::relationship_attribute_value;
 

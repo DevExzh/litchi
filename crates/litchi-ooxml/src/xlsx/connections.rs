@@ -187,7 +187,10 @@ impl std::fmt::Debug for DatabaseProperties {
             .debug_struct("DatabaseProperties")
             .field("connection", &"[REDACTED]")
             .field("command", &self.command.as_ref().map(|_| "[REDACTED]"))
-            .field("server_command", &self.server_command.as_ref().map(|_| "[REDACTED]"))
+            .field(
+                "server_command",
+                &self.server_command.as_ref().map(|_| "[REDACTED]"),
+            )
             .field("command_type", &self.command_type)
             .finish()
     }
@@ -211,7 +214,10 @@ impl std::fmt::Debug for TextImportProperties {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("TextImportProperties")
-            .field("source_file", &self.source_file.as_ref().map(|_| "[REDACTED]"))
+            .field(
+                "source_file",
+                &self.source_file.as_ref().map(|_| "[REDACTED]"),
+            )
             .field("file_type", &self.file_type)
             .field("code_page", &self.code_page)
             .field("first_row", &self.first_row)
@@ -241,9 +247,15 @@ impl std::fmt::Debug for Connection {
             .field("name", &self.name)
             .field("connection_type", &self.connection_type)
             .field("credentials", &self.credentials)
-            .field("source_file", &self.source_file.as_ref().map(|_| "[REDACTED]"))
+            .field(
+                "source_file",
+                &self.source_file.as_ref().map(|_| "[REDACTED]"),
+            )
             .field("odc_file", &self.odc_file.as_ref().map(|_| "[REDACTED]"))
-            .field("single_sign_on_id", &self.single_sign_on_id.as_ref().map(|_| "[REDACTED]"))
+            .field(
+                "single_sign_on_id",
+                &self.single_sign_on_id.as_ref().map(|_| "[REDACTED]"),
+            )
             .field("database", &self.database)
             .field("web", &self.web)
             .field("text", &self.text)
@@ -257,7 +269,7 @@ impl Connections {
         if xml.len() > MAX {
             return Err(invalid("connections part exceeds 16 MiB"));
         }
-        let x = crate::common::mce::process_ooxml(xml)?;
+        let x = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if x.len() > MAX {
             return Err(invalid("processed connections part exceeds 16 MiB"));
         }
@@ -282,12 +294,17 @@ impl Connections {
 
 impl Connections {
     pub fn find(&self, id: u32) -> Option<&Connection> {
-        self.connections.iter().find(|connection| connection.id == id)
+        self.connections
+            .iter()
+            .find(|connection| connection.id == id)
     }
 
     pub fn add(&mut self, connection: Connection) -> Result<()> {
         if self.find(connection.id).is_some() {
-            return Err(invalid(format!("duplicate connection ID {}", connection.id)));
+            return Err(invalid(format!(
+                "duplicate connection ID {}",
+                connection.id
+            )));
         }
         self.connections.push(connection);
         validate(self)
@@ -314,7 +331,11 @@ impl Connections {
     }
 
     pub fn remove(&mut self, id: u32) -> Result<bool> {
-        let Some(offset) = self.connections.iter().position(|connection| connection.id == id) else {
+        let Some(offset) = self
+            .connections
+            .iter()
+            .position(|connection| connection.id == id)
+        else {
             return Ok(false);
         };
         self.connections.remove(offset);
@@ -325,7 +346,11 @@ impl Connections {
         if ordered_ids.len() != self.connections.len() {
             return Err(invalid("connection reorder must contain every ID"));
         }
-        let expected = self.connections.iter().map(|item| item.id).collect::<HashSet<_>>();
+        let expected = self
+            .connections
+            .iter()
+            .map(|item| item.id)
+            .collect::<HashSet<_>>();
         let actual = ordered_ids.iter().copied().collect::<HashSet<_>>();
         if expected != actual || actual.len() != ordered_ids.len() {
             return Err(invalid("connection reorder is not a permutation"));
@@ -339,11 +364,7 @@ impl Connections {
 }
 
 /// Store the complete inert connection set and validate every query-table reference first.
-pub fn store_in_package(
-    package: &mut OpcPackage,
-    value: &Connections,
-    strict: bool,
-) -> Result<()> {
+pub fn store_in_package(package: &mut OpcPackage, value: &Connections, strict: bool) -> Result<()> {
     let xml = value.to_xml(strict)?;
     validate_query_table_connection_ids(package, value)?;
     let workbook_name = package.main_document_part()?.partname().clone();
@@ -353,15 +374,18 @@ pub fn store_in_package(
             .rels()
             .iter()
             .filter(|relationship| matches!(relationship.reltype(), REL | STRICT_REL));
-        let first = found.next().map(|relationship| {
-            if relationship.is_external() {
-                return Err(invalid("connections relationship cannot be external"));
-            }
-            Ok((
-                relationship.r_id().to_string(),
-                relationship.target_partname()?,
-            ))
-        }).transpose()?;
+        let first = found
+            .next()
+            .map(|relationship| {
+                if relationship.is_external() {
+                    return Err(invalid("connections relationship cannot be external"));
+                }
+                Ok((
+                    relationship.r_id().to_string(),
+                    relationship.target_partname()?,
+                ))
+            })
+            .transpose()?;
         if found.next().is_some() {
             return Err(invalid("workbook has multiple connections relationships"));
         }
@@ -370,7 +394,9 @@ pub fn store_in_package(
     if let Some((_, part_name)) = existing {
         let part = package.get_part(&part_name)?;
         if part.content_type() != CT {
-            return Err(invalid("existing connections part has invalid content type"));
+            return Err(invalid(
+                "existing connections part has invalid content type",
+            ));
         }
         package.get_part_mut(&part_name)?.set_blob(xml);
     } else {
@@ -381,20 +407,28 @@ pub fn store_in_package(
             CT.into(),
             xml,
         )))?;
-        package.get_part_mut(&workbook_name)?.rels_mut().add_relationship(
-            if strict { STRICT_REL } else { REL }.into(),
-            part_name.relative_ref(workbook_name.base_uri()),
-            relationship_id,
-            false,
-        );
+        package
+            .get_part_mut(&workbook_name)?
+            .rels_mut()
+            .add_relationship(
+                if strict { STRICT_REL } else { REL }.into(),
+                part_name.relative_ref(workbook_name.base_uri()),
+                relationship_id,
+                false,
+            );
     }
     let _ = package.clear_digital_signatures();
     Ok(())
 }
 
 pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
-    if package.iter_parts().any(|part| part.content_type() == crate::xlsx::query_table::QUERY_TABLE_CONTENT_TYPE) {
-        return Err(invalid("cannot remove connections while query-table parts remain"));
+    if package
+        .iter_parts()
+        .any(|part| part.content_type() == crate::xlsx::query_table::QUERY_TABLE_CONTENT_TYPE)
+    {
+        return Err(invalid(
+            "cannot remove connections while query-table parts remain",
+        ));
     }
     let workbook_name = package.main_document_part()?.partname().clone();
     let relationship = package
@@ -408,8 +442,13 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
                 .map(|part_name| (relationship.r_id().to_string(), part_name))
         })
         .transpose()?;
-    let Some((relationship_id, part_name)) = relationship else { return Ok(false); };
-    package.get_part_mut(&workbook_name)?.rels_mut().remove(&relationship_id);
+    let Some((relationship_id, part_name)) = relationship else {
+        return Ok(false);
+    };
+    package
+        .get_part_mut(&workbook_name)?
+        .rels_mut()
+        .remove(&relationship_id);
     if !package_part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
@@ -418,8 +457,15 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
 }
 
 fn validate_query_table_connection_ids(package: &OpcPackage, value: &Connections) -> Result<()> {
-    let ids = value.connections.iter().map(|connection| connection.id).collect::<HashSet<_>>();
-    for part in package.iter_parts().filter(|part| part.content_type() == crate::xlsx::query_table::QUERY_TABLE_CONTENT_TYPE) {
+    let ids = value
+        .connections
+        .iter()
+        .map(|connection| connection.id)
+        .collect::<HashSet<_>>();
+    for part in package
+        .iter_parts()
+        .filter(|part| part.content_type() == crate::xlsx::query_table::QUERY_TABLE_CONTENT_TYPE)
+    {
         let table = crate::xlsx::query_table::parse_query_table(part.blob())?;
         if !ids.contains(&table.connection_id()) {
             return Err(invalid(format!(
@@ -434,9 +480,15 @@ fn validate_query_table_connection_ids(package: &OpcPackage, value: &Connections
 
 fn next_connections_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 0..=65_536u32 {
-        let name = if suffix == 0 { "/xl/connections.xml".into() } else { format!("/xl/connections{suffix}.xml") };
+        let name = if suffix == 0 {
+            "/xl/connections.xml".into()
+        } else {
+            format!("/xl/connections{suffix}.xml")
+        };
         let candidate = PackURI::new(&name)?;
-        if package.get_part(&candidate).is_err() { return Ok(candidate); }
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
     }
     Err(invalid("no free connections part name"))
 }
@@ -445,16 +497,26 @@ fn next_connections_relationship_id(package: &OpcPackage, workbook: &PackURI) ->
     let relationships = package.get_part(workbook)?.rels();
     for suffix in 1..=65_537u32 {
         let candidate = format!("rIdConnections{suffix}");
-        if relationships.get(&candidate).is_none() { return Ok(candidate); }
+        if relationships.get(&candidate).is_none() {
+            return Ok(candidate);
+        }
     }
     Err(invalid("no free connections relationship ID"))
 }
 
 fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.iter_parts().any(|part| part.rels().iter().any(|relationship| {
-        !relationship.is_external() && relationship.target_partname().is_ok_and(|name| name == *target)
-    })) || package.rels().iter().any(|relationship| {
-        !relationship.is_external() && relationship.target_partname().is_ok_and(|name| name == *target)
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|name| name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
     })
 }
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<Connections>> {

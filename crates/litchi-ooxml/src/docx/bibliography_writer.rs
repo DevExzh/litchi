@@ -412,7 +412,10 @@ pub(crate) fn add_source_xml(
     source: &BibliographySourceBuilder,
 ) -> Result<String> {
     let mut root = parse_xml_tree(store_xml)?;
-    if store_tags(&root).iter().any(|tag| tag.as_str() == source.tag()) {
+    if store_tags(&root)
+        .iter()
+        .any(|tag| tag.as_str() == source.tag())
+    {
         return Err(invalid(format!(
             "bibliography tag '{}' already exists in the source store",
             source.tag()
@@ -563,7 +566,10 @@ fn write_element(
         write!(xml, r#" xmlns:b="{store_namespace}""#)
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
-    if !in_store && !is_root && let Some(namespace) = &node.namespace {
+    if !in_store
+        && !is_root
+        && let Some(namespace) = &node.namespace
+    {
         write!(xml, r#" xmlns="{}""#, escape_xml(namespace))
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
@@ -593,9 +599,9 @@ fn write_element(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::ExpandedName;
     use crate::custom_xml_data::{CustomXmlDataItem, CustomXmlDataProperties};
     use crate::docx::bibliography::discover_bibliography_source_stores;
+    use litchi_ooxml_common::ExpandedName;
     use litchi_opc::PackURI;
 
     fn item(xml: &[u8], namespace: &str, local_name: &str) -> CustomXmlDataItem {
@@ -720,23 +726,21 @@ mod tests {
     #[test]
     fn add_remove_replace_preserve_store_content() {
         let initial = new_store_xml(&[built()]).unwrap();
-        let second = BibliographySourceBuilder::new(
-            BibliographySourceKind::JournalArticle,
-            "Smith2025",
-        )
-        .unwrap()
-        .journal_name("Journal of Tests")
-        .unwrap()
-        .volume("12")
-        .unwrap()
-        .issue("3")
-        .unwrap()
-        .pages("10-20")
-        .unwrap()
-        .url("https://example.invalid/article")
-        .unwrap()
-        .corporate_author("Research Group")
-        .unwrap();
+        let second =
+            BibliographySourceBuilder::new(BibliographySourceKind::JournalArticle, "Smith2025")
+                .unwrap()
+                .journal_name("Journal of Tests")
+                .unwrap()
+                .volume("12")
+                .unwrap()
+                .issue("3")
+                .unwrap()
+                .pages("10-20")
+                .unwrap()
+                .url("https://example.invalid/article")
+                .unwrap()
+                .corporate_author("Research Group")
+                .unwrap();
 
         // Add.
         let added = add_source_xml(initial.as_bytes(), &second).unwrap();
@@ -787,27 +791,24 @@ mod tests {
         let item_id = package.add_bibliography_source(built()).unwrap();
         package
             .add_bibliography_source(
-                BibliographySourceBuilder::new(
-                    BibliographySourceKind::JournalArticle,
-                    "Smith2025",
-                )
-                .unwrap()
-                .title("Testing in Practice")
-                .unwrap()
-                .journal_name("Journal of Tests")
-                .unwrap()
-                .year("2025")
-                .unwrap()
-                .volume("12")
-                .unwrap()
-                .issue("3")
-                .unwrap()
-                .pages("10-20")
-                .unwrap()
-                .url("https://example.invalid/article")
-                .unwrap()
-                .corporate_author("Research Group")
-                .unwrap(),
+                BibliographySourceBuilder::new(BibliographySourceKind::JournalArticle, "Smith2025")
+                    .unwrap()
+                    .title("Testing in Practice")
+                    .unwrap()
+                    .journal_name("Journal of Tests")
+                    .unwrap()
+                    .year("2025")
+                    .unwrap()
+                    .volume("12")
+                    .unwrap()
+                    .issue("3")
+                    .unwrap()
+                    .pages("10-20")
+                    .unwrap()
+                    .url("https://example.invalid/article")
+                    .unwrap()
+                    .corporate_author("Research Group")
+                    .unwrap(),
             )
             .unwrap();
         package.save(file.path()).unwrap();
@@ -845,7 +846,10 @@ mod tests {
         assert_eq!(second.value(&["Volume"]), Some("12"));
         assert_eq!(second.value(&["Issue"]), Some("3"));
         assert_eq!(second.value(&["Pages"]), Some("10-20"));
-        assert_eq!(second.value(&["URL"]), Some("https://example.invalid/article"));
+        assert_eq!(
+            second.value(&["URL"]),
+            Some("https://example.invalid/article")
+        );
         assert_eq!(
             second.value(&["Author", "Author", "Corporate"]),
             Some("Research Group")
@@ -901,8 +905,7 @@ mod tests {
         use crate::docx::Package;
         use tempfile::NamedTempFile;
 
-        const FIXTURE: &[u8] =
-            include_bytes!("../../../../test-data/ooxml/docx/footnotes.docx");
+        const FIXTURE: &[u8] = include_bytes!("../../../../test-data/ooxml/docx/footnotes.docx");
 
         let original = Package::from_reader(std::io::Cursor::new(FIXTURE)).unwrap();
         let stores = original.bibliography_source_stores().unwrap();

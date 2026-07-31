@@ -389,7 +389,7 @@ impl Numbering {
     }
 
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        let xml = crate::common::mce::process_part(part)?;
+        let xml = litchi_ooxml_common::mce::process_part(part)?;
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut result = Self::new();
         let mut abstract_num: Option<PendingAbstract> = None;
@@ -1176,8 +1176,14 @@ mod tests {
     fn parses_picture_bullet_without_image() {
         let value = parse(br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numPicBullet w:numPicBulletId="0"><w:pict/></w:numPicBullet><w:numPicBullet w:numPicBulletId="2"/></w:numbering>"#).unwrap();
         assert_eq!(value.picture_bullets().len(), 2);
-        assert_eq!(value.get_picture_bullet(0).unwrap().image_relationship_id(), None);
-        assert_eq!(value.get_picture_bullet(2).unwrap().image_relationship_id(), None);
+        assert_eq!(
+            value.get_picture_bullet(0).unwrap().image_relationship_id(),
+            None
+        );
+        assert_eq!(
+            value.get_picture_bullet(2).unwrap().image_relationship_id(),
+            None
+        );
     }
 
     #[test]
@@ -1212,7 +1218,11 @@ mod tests {
             .find(|level| level.picture_bullet_id.is_some())
             .expect("fixture level references a picture bullet");
         assert_eq!(level.picture_bullet_id, Some(0));
-        assert!(numbering.get_picture_bullet(level.picture_bullet_id.unwrap()).is_some());
+        assert!(
+            numbering
+                .get_picture_bullet(level.picture_bullet_id.unwrap())
+                .is_some()
+        );
     }
 
     #[test]

@@ -3,9 +3,9 @@
 //! Imported moniker, DrawingML text-body, and extension payloads are retained
 //! as XML and are never interpreted or used to resolve relationships.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -1289,7 +1289,12 @@ pub fn find_modern_comment(
     Ok(load_modern_comments(package)?
         .into_iter()
         .find(|part| part.slide_part_name == slide_part_name.to_string())
-        .and_then(|part| part.comments.comments.into_iter().find(|comment| comment.id == comment_id)))
+        .and_then(|part| {
+            part.comments
+                .comments
+                .into_iter()
+                .find(|comment| comment.id == comment_id)
+        }))
 }
 
 /// Add a modern comment to a slide, creating a collision-safe part when necessary.
@@ -1361,13 +1366,17 @@ where
     let Some(part_index) = parts
         .iter()
         .position(|part| part.slide_part_name == slide_part_name.to_string())
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     let Some(comment_index) = parts[part_index]
         .comments
         .comments
         .iter()
         .position(|comment| comment.id == comment_id)
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     let reply_ids_before: Vec<String> = parts[part_index].comments.comments[comment_index]
         .replies
         .iter()
@@ -1421,13 +1430,17 @@ pub fn remove_modern_comment(
     let Some(part_index) = parts
         .iter()
         .position(|part| part.slide_part_name == slide_part_name.to_string())
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     let Some(comment_index) = parts[part_index]
         .comments
         .comments
         .iter()
         .position(|comment| comment.id == comment_id)
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     parts[part_index].comments.comments.remove(comment_index);
     if !parts[part_index].comments.comments.is_empty() {
         let staged = parts[part_index].clone();
@@ -1460,7 +1473,9 @@ pub fn reorder_modern_comments(
         .iter()
         .position(|part| part.slide_part_name == slide_part_name.to_string())
     else {
-        if ordered_comment_ids.is_empty() { return Ok(Vec::new()); }
+        if ordered_comment_ids.is_empty() {
+            return Ok(Vec::new());
+        }
         return Err(invalid("modern comment part is missing for slide"));
     };
     if ordered_comment_ids.len() != parts[part_index].comments.comments.len() {
@@ -1495,8 +1510,14 @@ pub fn find_modern_comment_reply(
     comment_id: &str,
     reply_id: &str,
 ) -> Result<Option<ModernCommentReply>> {
-    Ok(find_modern_comment(package, slide_part_name, comment_id)?
-        .and_then(|comment| comment.replies.into_iter().find(|reply| reply.id == reply_id)))
+    Ok(
+        find_modern_comment(package, slide_part_name, comment_id)?.and_then(|comment| {
+            comment
+                .replies
+                .into_iter()
+                .find(|reply| reply.id == reply_id)
+        }),
+    )
 }
 
 /// Add a reply to a modern comment thread.
@@ -1509,7 +1530,9 @@ pub fn add_modern_comment_reply(
     let reply_id = reply.id.clone();
     let parts = load_modern_comments(package)?;
     if modern_id_exists(&parts, &reply_id) {
-        return Err(invalid(format!("duplicate modern comment or reply ID {reply_id}")));
+        return Err(invalid(format!(
+            "duplicate modern comment or reply ID {reply_id}"
+        )));
     }
     update_modern_comment(package, slide_part_name, comment_id, move |comment| {
         comment.reply_list_present = true;
@@ -1534,12 +1557,20 @@ where
     let mut update = Some(update);
     let mut found = false;
     let result = update_modern_comment(package, slide_part_name, comment_id, |comment| {
-        if let Some(reply) = comment.replies.iter_mut().find(|reply| reply.id == reply_id) {
-            if let Some(update) = update.take() { update(reply); }
+        if let Some(reply) = comment
+            .replies
+            .iter_mut()
+            .find(|reply| reply.id == reply_id)
+        {
+            if let Some(update) = update.take() {
+                update(reply);
+            }
             found = true;
         }
     })?;
-    if !result || !found { return Ok(false); }
+    if !result || !found {
+        return Ok(false);
+    }
     Ok(true)
 }
 
@@ -1554,9 +1585,15 @@ pub fn replace_modern_comment_reply(
     if replacement.id != reply_id {
         return Err(invalid("replacement modern reply ID must match"));
     }
-    update_modern_comment_reply(package, slide_part_name, comment_id, reply_id, move |reply| {
-        *reply = replacement;
-    })
+    update_modern_comment_reply(
+        package,
+        slide_part_name,
+        comment_id,
+        reply_id,
+        move |reply| {
+            *reply = replacement;
+        },
+    )
 }
 
 /// Remove a reply from a modern comment thread.
@@ -1571,7 +1608,11 @@ pub fn remove_modern_comment_reply(
     }
     let mut found = false;
     let result = update_modern_comment(package, slide_part_name, comment_id, |comment| {
-        if let Some(index) = comment.replies.iter().position(|reply| reply.id == reply_id) {
+        if let Some(index) = comment
+            .replies
+            .iter()
+            .position(|reply| reply.id == reply_id)
+        {
             comment.replies.remove(index);
             found = true;
         }
@@ -1607,17 +1648,28 @@ fn validate_modern_comment_graph_for_mutation(
 
 fn ensure_modern_comment_id_is_free(parts: &[ModernCommentPart], id: &str) -> Result<()> {
     if modern_id_exists(parts, id) {
-        Err(invalid(format!("duplicate modern comment or reply ID {id}")))
+        Err(invalid(format!(
+            "duplicate modern comment or reply ID {id}"
+        )))
     } else {
         Ok(())
     }
 }
 
-fn ensure_modern_reply_ids_are_free(parts: &[ModernCommentPart], comment: &ModernComment) -> Result<()> {
+fn ensure_modern_reply_ids_are_free(
+    parts: &[ModernCommentPart],
+    comment: &ModernComment,
+) -> Result<()> {
     let mut ids = std::collections::HashSet::new();
     for reply in &comment.replies {
-        if reply.id == comment.id || !ids.insert(reply.id.clone()) || modern_id_exists(parts, &reply.id) {
-            return Err(invalid(format!("duplicate modern comment or reply ID {}", reply.id)));
+        if reply.id == comment.id
+            || !ids.insert(reply.id.clone())
+            || modern_id_exists(parts, &reply.id)
+        {
+            return Err(invalid(format!(
+                "duplicate modern comment or reply ID {}",
+                reply.id
+            )));
         }
     }
     Ok(())
@@ -1628,11 +1680,17 @@ fn ensure_all_modern_ids_are_unique(parts: &[ModernCommentPart]) -> Result<()> {
     for part in parts {
         for comment in &part.comments.comments {
             if !ids.insert(comment.id.clone()) {
-                return Err(invalid(format!("duplicate modern comment or reply ID {}", comment.id)));
+                return Err(invalid(format!(
+                    "duplicate modern comment or reply ID {}",
+                    comment.id
+                )));
             }
             for reply in &comment.replies {
                 if !ids.insert(reply.id.clone()) {
-                    return Err(invalid(format!("duplicate modern comment or reply ID {}", reply.id)));
+                    return Err(invalid(format!(
+                        "duplicate modern comment or reply ID {}",
+                        reply.id
+                    )));
                 }
             }
         }
@@ -1641,16 +1699,21 @@ fn ensure_all_modern_ids_are_unique(parts: &[ModernCommentPart]) -> Result<()> {
 }
 
 fn modern_id_exists(parts: &[ModernCommentPart], id: &str) -> bool {
-    parts.iter().any(|part| part.comments.comments.iter().any(|comment| {
-        comment.id == id || comment.replies.iter().any(|reply| reply.id == id)
-    }))
+    parts.iter().any(|part| {
+        part.comments
+            .comments
+            .iter()
+            .any(|comment| comment.id == id || comment.replies.iter().any(|reply| reply.id == id))
+    })
 }
 
 fn next_modern_comment_part_name(package: &OpcPackage) -> Result<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(format!("/ppt/comments/modernComment{suffix}.xml"))
-            .map_err(invalid)?;
-        if package.get_part(&candidate).is_err() { return Ok(candidate); }
+        let candidate =
+            PackURI::new(format!("/ppt/comments/modernComment{suffix}.xml")).map_err(invalid)?;
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
     }
     Err(invalid("no free modern comment part name"))
 }
@@ -1662,18 +1725,26 @@ fn next_modern_comment_relationship_id(
     let relationships = package.get_part(slide_part_name)?.rels();
     for suffix in 1..=65_537u32 {
         let candidate = format!("rIdModernComments{suffix}");
-        if relationships.get(&candidate).is_none() { return Ok(candidate); }
+        if relationships.get(&candidate).is_none() {
+            return Ok(candidate);
+        }
     }
     Err(invalid("no free modern comment relationship ID"))
 }
 
 fn modern_comment_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.iter_parts().any(|part| part.rels().iter().any(|relationship| {
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|name| name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
         !relationship.is_external()
-            && relationship.target_partname().is_ok_and(|name| name == *target)
-    })) || package.rels().iter().any(|relationship| {
-        !relationship.is_external()
-            && relationship.target_partname().is_ok_and(|name| name == *target)
+            && relationship
+                .target_partname()
+                .is_ok_and(|name| name == *target)
     })
 }
 

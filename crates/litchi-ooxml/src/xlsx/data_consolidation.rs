@@ -7,8 +7,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::common::mce::process_str;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_str;
 
 const TRANSITIONAL_MAIN: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -43,8 +43,7 @@ impl WorksheetDataConsolidationConformance {
 }
 
 /// Mathematical aggregator selected by `ST_DataConsolidateFunction`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WorksheetDataConsolidationFunction {
     Average,
     Count,
@@ -96,7 +95,6 @@ impl WorksheetDataConsolidationFunction {
         }
     }
 }
-
 
 /// A validated A1 cell or rectangular range reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -340,18 +338,18 @@ pub fn parse_worksheet_data_consolidation(
                 if matches!(
                     scopes.last(),
                     Some(Scope::Consolidate | Scope::DataRefs | Scope::DataRef)
-                ) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                => {
-                    return Err(invalid("dataConsolidate family cannot contain text"));
-                },
+                ) && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("dataConsolidate family cannot contain text"));
+            },
             Event::CData(text)
                 if matches!(
                     scopes.last(),
                     Some(Scope::Consolidate | Scope::DataRefs | Scope::DataRef)
-                ) && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                => {
-                    return Err(invalid("dataConsolidate family cannot contain CDATA"));
-                },
+                ) && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid("dataConsolidate family cannot contain CDATA"));
+            },
             Event::DocType(_) => {
                 return Err(invalid("worksheet XML cannot contain a document type"));
             },

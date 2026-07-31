@@ -52,62 +52,62 @@ impl DocumentProperties {
     }
 
     /// Set the document title.
-    pub fn title(mut self, title: &str) -> Self {
-        self.title = Some(title.to_string());
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
         self
     }
 
     /// Set the document subject.
-    pub fn subject(mut self, subject: &str) -> Self {
-        self.subject = Some(subject.to_string());
+    pub fn subject(mut self, subject: impl Into<String>) -> Self {
+        self.subject = Some(subject.into());
         self
     }
 
     /// Set the document creator/author.
-    pub fn creator(mut self, creator: &str) -> Self {
-        self.creator = Some(creator.to_string());
+    pub fn creator(mut self, creator: impl Into<String>) -> Self {
+        self.creator = Some(creator.into());
         self
     }
 
     /// Set the document keywords.
-    pub fn keywords(mut self, keywords: &str) -> Self {
-        self.keywords = Some(keywords.to_string());
+    pub fn keywords(mut self, keywords: impl Into<String>) -> Self {
+        self.keywords = Some(keywords.into());
         self
     }
 
     /// Set the document description.
-    pub fn description(mut self, description: &str) -> Self {
-        self.description = Some(description.to_string());
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
         self
     }
 
     /// Set the stable document identifier.
-    pub fn identifier(mut self, identifier: &str) -> Self {
-        self.identifier = Some(identifier.to_string());
+    pub fn identifier(mut self, identifier: impl Into<String>) -> Self {
+        self.identifier = Some(identifier.into());
         self
     }
 
     /// Set who last modified the document.
-    pub fn last_modified_by(mut self, name: &str) -> Self {
-        self.last_modified_by = Some(name.to_string());
+    pub fn last_modified_by(mut self, name: impl Into<String>) -> Self {
+        self.last_modified_by = Some(name.into());
         self
     }
 
     /// Set the document category.
-    pub fn category(mut self, category: &str) -> Self {
-        self.category = Some(category.to_string());
+    pub fn category(mut self, category: impl Into<String>) -> Self {
+        self.category = Some(category.into());
         self
     }
 
     /// Set the content status.
-    pub fn content_status(mut self, status: &str) -> Self {
-        self.content_status = Some(status.to_string());
+    pub fn content_status(mut self, status: impl Into<String>) -> Self {
+        self.content_status = Some(status.into());
         self
     }
 
     /// Set the core content type descriptor.
-    pub fn content_type(mut self, content_type: &str) -> Self {
-        self.content_type = Some(content_type.to_string());
+    pub fn content_type(mut self, content_type: impl Into<String>) -> Self {
+        self.content_type = Some(content_type.into());
         self
     }
 
@@ -118,14 +118,14 @@ impl DocumentProperties {
     }
 
     /// Set the document version.
-    pub fn version(mut self, version: &str) -> Self {
-        self.version = Some(version.to_string());
+    pub fn version(mut self, version: impl Into<String>) -> Self {
+        self.version = Some(version.into());
         self
     }
 
     /// Set the document language.
-    pub fn language(mut self, language: &str) -> Self {
-        self.language = Some(language.to_string());
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
         self
     }
 

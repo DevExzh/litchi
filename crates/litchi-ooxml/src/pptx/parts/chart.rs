@@ -100,7 +100,7 @@ impl<'a> ChartPart<'a> {
     /// println!("Chart type: {:?}", info.chart_type);
     /// ```
     pub fn chart_info(&self) -> Result<ChartInfo> {
-        let xml = crate::common::mce::process_ooxml(self.xml_bytes())?;
+        let xml = litchi_ooxml_common::mce::process_ooxml(self.xml_bytes())?;
         let mut reader = NsReader::from_reader(xml.as_ref());
 
         let mut state = ChartScanState::new();

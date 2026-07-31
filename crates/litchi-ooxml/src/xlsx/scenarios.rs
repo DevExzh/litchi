@@ -11,8 +11,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::common::mce::process_str;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_str;
 
 const TRANSITIONAL_MAIN: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -513,9 +513,7 @@ fn parse_scenarios_attributes(
         }
         let text = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| {
-                invalid(format!("invalid scenarios attribute value: {error}"))
-            })?;
+            .map_err(|error| invalid(format!("invalid scenarios attribute value: {error}")))?;
         match local.as_ref() {
             b"current" => set_once(
                 &mut value.current,
@@ -604,16 +602,10 @@ fn parse_input_cell_attributes(
         }
         let text = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| {
-                invalid(format!("invalid inputCells attribute value: {error}"))
-            })?
+            .map_err(|error| invalid(format!("invalid inputCells attribute value: {error}")))?
             .into_owned();
         match local.as_ref() {
-            b"r" => set_once(
-                &mut reference,
-                ScenarioCellReference::new(text)?,
-                "r",
-            )?,
+            b"r" => set_once(&mut reference, ScenarioCellReference::new(text)?, "r")?,
             b"deleted" => set_once(&mut deleted, parse_bool(&text, "deleted")?, "deleted")?,
             b"undone" => set_once(&mut undone, parse_bool(&text, "undone")?, "undone")?,
             b"val" => set_once(
@@ -824,7 +816,9 @@ fn validate_cell_reference(value: &str, name: &str) -> Result<()> {
         column = column * 26 + u32::from(byte.to_ascii_uppercase() - b'A' + 1);
     }
     if column == 0 || column > MAX_COLUMN {
-        return Err(invalid(format!("{name} column is out of range in '{value}'")));
+        return Err(invalid(format!(
+            "{name} column is out of range in '{value}'"
+        )));
     }
     if bytes.get(index) == Some(&b'$') {
         index += 1;
@@ -840,9 +834,7 @@ fn validate_cell_reference(value: &str, name: &str) -> Result<()> {
         .parse::<u32>()
         .map_err(|_| invalid(format!("invalid {name} row in '{value}'")))?;
     if row == 0 || row > MAX_ROW {
-        return Err(invalid(format!(
-            "{name} row is out of range in '{value}'"
-        )));
+        return Err(invalid(format!("{name} row is out of range in '{value}'")));
     }
     Ok(())
 }
@@ -940,10 +932,12 @@ mod tests {
         }
         assert!(parse("<scenarios><scenario name=\"s\"/></scenarios><scenarios><scenario name=\"t\"/></scenarios>").is_err());
         let long_name = "x".repeat(MAX_XSTRING_CHARS + 1);
-        assert!(parse(&format!(
-            r#"<scenarios><scenario name="{long_name}"/></scenarios>"#
-        ))
-        .is_err());
+        assert!(
+            parse(&format!(
+                r#"<scenarios><scenario name="{long_name}"/></scenarios>"#
+            ))
+            .is_err()
+        );
     }
 
     #[test]
@@ -957,12 +951,9 @@ mod tests {
             .with_comment("Q1 <plan> & \"notes\"")
             .unwrap()
             .with_input_cells(vec![
-                WorksheetScenarioInputCell::new(
-                    ScenarioCellReference::new("A1").unwrap(),
-                    "10",
-                )
-                .unwrap()
-                .with_number_format_id(14),
+                WorksheetScenarioInputCell::new(ScenarioCellReference::new("A1").unwrap(), "10")
+                    .unwrap()
+                    .with_number_format_id(14),
                 WorksheetScenarioInputCell::new(
                     ScenarioCellReference::new("$B$2").unwrap(),
                     "hold",

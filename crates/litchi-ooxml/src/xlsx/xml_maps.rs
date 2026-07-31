@@ -91,7 +91,7 @@ impl XmlMapInfo {
         if xml.len() > MAX_PART_BYTES {
             return Err(invalid("custom XML maps part exceeds 32 MiB"));
         }
-        let processed = crate::common::mce::process_ooxml(xml)?;
+        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if processed.len() > MAX_PART_BYTES {
             return Err(invalid("processed custom XML maps part exceeds 32 MiB"));
         }
@@ -927,10 +927,9 @@ fn validate_opaque(xml: &[u8]) -> Result<()> {
                     return Err(invalid("opaque XML depth limit exceeded"));
                 }
             },
-            Ok(Event::Empty(_))
-                if depth == 0 => {
-                    roots += 1;
-                },
+            Ok(Event::Empty(_)) if depth == 0 => {
+                roots += 1;
+            },
             Ok(Event::End(_)) => {
                 depth = depth
                     .checked_sub(1)

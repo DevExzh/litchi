@@ -1,14 +1,14 @@
 //! WordprocessingML glossary documents (building blocks / AutoText).
 
 use litchi_core::sheet::Result;
-use litchi_opc::{OpcPackage, PackURI};
 use litchi_opc::part::{BlobPart, Part};
-use std::collections::{HashMap, HashSet, VecDeque};
+use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
     events::{BytesStart, Event},
 };
+use std::collections::{HashMap, HashSet, VecDeque};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const WS: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -16,7 +16,8 @@ const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relations
 const RS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 pub(crate) const REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument";
-pub(crate) const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/glossaryDocument";
+pub(crate) const STRICT_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/glossaryDocument";
 pub(crate) const CT: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml";
 const MAX: usize = 32 * 1024 * 1024;
@@ -133,7 +134,7 @@ impl GlossaryDocument {
         if xml.len() > MAX {
             return Err(invalid("glossary document exceeds 32 MiB"));
         }
-        let x = crate::common::mce::process_ooxml(xml)?;
+        let x = litchi_ooxml_common::mce::process_ooxml(xml)?;
         if x.len() > MAX {
             return Err(invalid("processed glossary document exceeds 32 MiB"));
         }
@@ -188,7 +189,9 @@ impl GlossaryDocument {
 
     pub fn replace_entry(&mut self, index: usize, entry: GlossaryEntry) -> Result<GlossaryEntry> {
         if index >= self.entries.len() {
-            return Err(invalid(format!("glossary entry index {index} is out of bounds")));
+            return Err(invalid(format!(
+                "glossary entry index {index} is out of bounds"
+            )));
         }
         let mut staged = self.clone();
         let previous = std::mem::replace(&mut staged.entries[index], entry);
@@ -202,7 +205,9 @@ impl GlossaryDocument {
         F: FnOnce(&mut GlossaryEntry) -> Result<()>,
     {
         if index >= self.entries.len() {
-            return Err(invalid(format!("glossary entry index {index} is out of bounds")));
+            return Err(invalid(format!(
+                "glossary entry index {index} is out of bounds"
+            )));
         }
         let mut staged = self.clone();
         update(&mut staged.entries[index])?;
@@ -213,7 +218,9 @@ impl GlossaryDocument {
 
     pub fn remove_entry(&mut self, index: usize) -> Result<GlossaryEntry> {
         if index >= self.entries.len() {
-            return Err(invalid(format!("glossary entry index {index} is out of bounds")));
+            return Err(invalid(format!(
+                "glossary entry index {index} is out of bounds"
+            )));
         }
         Ok(self.entries.remove(index))
     }
@@ -393,7 +400,9 @@ pub fn store_in_package(package: &mut OpcPackage, value: GlossaryPackage) -> Res
         let mut part = BlobPart::new(uri.clone(), auxiliary.content_type, auxiliary.data);
         add_relationships(&mut part, &auxiliary.relationships)?;
         if staged.insert(uri.clone(), part).is_some() {
-            return Err(invalid(format!("duplicate glossary auxiliary part '{uri}'")));
+            return Err(invalid(format!(
+                "duplicate glossary auxiliary part '{uri}'"
+            )));
         }
     }
 
@@ -405,7 +414,9 @@ pub fn store_in_package(package: &mut OpcPackage, value: GlossaryPackage) -> Res
     };
     for uri in staged.keys().chain(std::iter::once(&root_uri)) {
         if package.get_part(uri).is_ok() && !old_owned.contains(uri) {
-            return Err(invalid(format!("glossary part '{uri}' collides with an existing part")));
+            return Err(invalid(format!(
+                "glossary part '{uri}' collides with an existing part"
+            )));
         }
     }
 
@@ -582,10 +593,14 @@ fn validate_staged_targets(
     staged: &HashMap<PackURI, BlobPart>,
     old_owned: &HashSet<PackURI>,
 ) -> Result<()> {
-    for part in std::iter::once(root as &dyn Part)
-        .chain(staged.values().map(|part| part as &dyn Part))
+    for part in
+        std::iter::once(root as &dyn Part).chain(staged.values().map(|part| part as &dyn Part))
     {
-        for relationship in part.rels().iter().filter(|relationship| !relationship.is_external()) {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
             let target = relationship.target_partname()?;
             if target == *root.partname() || staged.contains_key(&target) {
                 continue;
@@ -610,7 +625,11 @@ fn glossary_owned_parts(package: &OpcPackage, root: &PackURI) -> Result<HashSet<
             continue;
         }
         let part = package.get_part(&uri)?;
-        for relationship in part.rels().iter().filter(|relationship| !relationship.is_external()) {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
             let target = relationship.target_partname()?;
             if target.as_str().starts_with("/word/glossary/") {
                 queue.push_back(target);
@@ -864,8 +883,7 @@ fn parse_properties(n: &Node) -> Result<DocPartProperties> {
                 if out.name.is_some() {
                     return Err(invalid("duplicate building-block name"));
                 }
-                let value = wattr_get(c, "val")?
-                    .ok_or_else(|| invalid("missing w:val"))?;
+                let value = wattr_get(c, "val")?.ok_or_else(|| invalid("missing w:val"))?;
                 bounded(&value)?;
                 out.name = Some(DocPartName {
                     value,
@@ -1058,13 +1076,10 @@ fn valid_guid(value: &str) -> bool {
         .and_then(|value| value.strip_suffix('}'))
         .unwrap_or(value);
     value.len() == 36
-        && value
-            .bytes()
-            .enumerate()
-            .all(|(index, byte)| match index {
-                8 | 13 | 18 | 23 => byte == b'-',
-                _ => byte.is_ascii_hexdigit(),
-            })
+        && value.bytes().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => byte == b'-',
+            _ => byte.is_ascii_hexdigit(),
+        })
 }
 fn opaque(x: &mut String, b: &[u8], strict: bool) -> Result<()> {
     parse_dom(b)?;

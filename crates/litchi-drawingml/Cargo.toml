@@ -1,0 +1,13 @@
+[package]
+name = "litchi-drawingml"
+description = "Shared DrawingML primitives for Litchi Office formats."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+quick-xml = { workspace = true }
+thiserror = { workspace = true }

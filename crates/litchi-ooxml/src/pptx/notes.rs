@@ -1,7 +1,7 @@
 //! Bounded, inert PresentationML notes-slide and notes-master package graphs.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
@@ -868,9 +868,9 @@ fn checked_add(left: usize, right: usize, label: &str) -> Result<usize> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
-            .map_err(xml_error)?
-            .to_owned()),
+        ResolveResult::Bound(Namespace(value)) => {
+            Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+        },
         ResolveResult::Unbound => Ok(String::new()),
         ResolveResult::Unknown(prefix) => Err(invalid(format!(
             "unbound XML prefix '{}'",

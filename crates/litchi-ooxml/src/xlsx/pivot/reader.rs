@@ -107,7 +107,7 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
             let cache = pivot_caches
                 .get(expected_cache_id)
                 .ok_or("resolved pivot cache is missing")?;
-            let bytes = crate::common::mce::process_part(table_part)?;
+            let bytes = litchi_ooxml_common::mce::process_part(table_part)?;
             let xml = std::str::from_utf8(bytes.as_ref())?;
 
             let mut table = parse_pivot_table_definition_with_cache(
@@ -180,7 +180,7 @@ fn resolve_workbook_pivot_caches(
             cache_part.content_type(),
             ct::SML_PIVOT_CACHE_DEFINITION,
         )?;
-        let bytes = crate::common::mce::process_part(cache_part)?;
+        let bytes = litchi_ooxml_common::mce::process_part(cache_part)?;
         let xml = std::str::from_utf8(bytes.as_ref())?;
         let mut definition = read_pivot_cache_definition(xml)?.ok_or_else(|| {
             format!("pivot-cache part '{cache_uri}' has no pivotCacheDefinition root")
@@ -241,7 +241,7 @@ fn validate_pivot_cache_relationships(
             records_part.content_type(),
             ct::SML_PIVOT_CACHE_RECORDS,
         )?;
-        let bytes = crate::common::mce::process_part(records_part)?;
+        let bytes = litchi_ooxml_common::mce::process_part(records_part)?;
         let records_xml = std::str::from_utf8(bytes.as_ref())?;
         validate_pivot_cache_records(
             records_xml,

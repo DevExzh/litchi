@@ -1,11 +1,11 @@
 //! Read-only SpreadsheetML external-workbook link metadata and cached values.
 
-use crate::common::external_link_rels::{
-    EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, is_external_workbook_relationship,
-};
 use crate::common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::{is_spreadsheetml_name, relationship_attribute_value};
+use litchi_ooxml_common::external_link::{
+    EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, is_external_workbook_relationship,
+};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{PackURI, Part};
@@ -1370,7 +1370,7 @@ pub(crate) fn load_external_link(
 }
 
 fn parse_external_link(xml: &[u8]) -> Result<ParsedKind> {
-    let xml = crate::common::mce::process_ooxml(xml)?;
+    let xml = litchi_ooxml_common::mce::process_ooxml(xml)?;
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut parser = Parser::new();
     let mut stack = Vec::new();
@@ -1978,7 +1978,7 @@ mod tests {
         let mut workbook =
             crate::xlsx::Workbook::new(litchi_opc::OpcPackage::from_bytes(FIXTURE).unwrap())
                 .unwrap();
-        workbook.define_name("Unrelated", "1");
+        workbook.properties_mut().title = Some("Unrelated edit".to_owned());
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("external-link-roundtrip.xlsx");
         workbook.save(&path).unwrap();

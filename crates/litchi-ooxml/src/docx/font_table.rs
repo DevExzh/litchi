@@ -1,7 +1,7 @@
 //! Typed WordprocessingML font tables and inert embedded-font resources.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, XmlPart};
 use quick_xml::{XmlVersion, events::Event, reader::Reader};
 use std::collections::{HashMap, HashSet};
@@ -715,11 +715,14 @@ pub fn store_font_table(
         next_font_table_part_name(package)
             .expect("the bounded part-name allocation was preflighted")
     });
-    let table_relationship_id = old_table_relationship_id
-        .clone()
-        .unwrap_or_else(|| next_named_relationship_id(package.get_part(&main_name).unwrap(), "rIdFontTable"));
+    let table_relationship_id = old_table_relationship_id.clone().unwrap_or_else(|| {
+        next_named_relationship_id(package.get_part(&main_name).unwrap(), "rIdFontTable")
+    });
     if let Some(existing) = &old_table_name {
-        let replaced = old_table_relationship_id.iter().cloned().collect::<HashSet<_>>();
+        let replaced = old_table_relationship_id
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
         if has_inbound_outside_relationships(package, existing, &main_name, &replaced)? {
             return Err(invalid(format!(
                 "shared font-table part '{existing}' cannot be overwritten"
@@ -748,7 +751,11 @@ pub fn store_font_table(
         .fonts
         .iter()
         .flat_map(|font| font.embedded_fonts.iter())
-        .filter_map(|font| font.resource.as_ref().map(|resource| resource.part_name.clone()))
+        .filter_map(|font| {
+            font.resource
+                .as_ref()
+                .map(|resource| resource.part_name.clone())
+        })
         .collect::<HashSet<_>>();
     let old_part_uris = old_part_names
         .iter()
@@ -807,25 +814,20 @@ pub fn store_font_table(
         let uri = PackURI::new(part_name).map_err(OoxmlError::InvalidUri)?;
         if let Ok(part) = package.get_part(&uri) {
             if part.content_type() != content_type {
-                return Err(invalid(format!(
-                    "font part '{uri}' content type collision"
-                )));
+                return Err(invalid(format!("font part '{uri}' content type collision")));
             }
             if !part.rels().is_empty() {
-                return Err(invalid(format!("font part '{uri}' has outbound relationships")));
+                return Err(invalid(format!(
+                    "font part '{uri}' has outbound relationships"
+                )));
             }
             if part.blob() != data && !old_part_names.contains(part_name) {
                 return Err(invalid(format!("font part '{uri}' data collision")));
             }
             if part.blob() != data
                 && old_table_name.as_ref().is_some_and(|table| {
-                    has_inbound_outside_relationships(
-                        package,
-                        &uri,
-                        table,
-                        &old_relationship_ids,
-                    )
-                    .unwrap_or(true)
+                    has_inbound_outside_relationships(package, &uri, table, &old_relationship_ids)
+                        .unwrap_or(true)
                 })
             {
                 return Err(invalid(format!(
@@ -844,9 +846,9 @@ pub fn store_font_table(
                 .map_err(OoxmlError::InvalidUri)
         })
         .collect::<Result<Vec<_>>>()?;
-    package
-        .clear_digital_signatures()
-        .map_err(|error| OoxmlError::Other(format!("cannot invalidate package signatures: {error}")))?;
+    package.clear_digital_signatures().map_err(|error| {
+        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
+    })?;
 
     for (uri, content_type, data) in resource_parts {
         if let Ok(part) = package.get_part_mut(&uri) {
@@ -946,7 +948,8 @@ pub fn update_font(
     mut replacement: Font,
     conformance: FontTableConformance,
 ) -> Result<()> {
-    let mut table = load_font_table(package)?.ok_or_else(|| invalid("document has no font table"))?;
+    let mut table =
+        load_font_table(package)?.ok_or_else(|| invalid("document has no font table"))?;
     let offset = unique_font_offset(&table.fonts, name)?
         .ok_or_else(|| invalid(format!("font '{name}' was not found")))?;
     table.fonts.remove(offset);
@@ -985,7 +988,8 @@ pub fn reorder_fonts(
     ordered_names: &[String],
     conformance: FontTableConformance,
 ) -> Result<()> {
-    let mut table = load_font_table(package)?.ok_or_else(|| invalid("document has no font table"))?;
+    let mut table =
+        load_font_table(package)?.ok_or_else(|| invalid("document has no font table"))?;
     let expected = table
         .fonts
         .iter()
@@ -1070,14 +1074,12 @@ fn allocate_font_identifiers(
     let mut relationship_ids = table_name
         .as_ref()
         .map(|name| {
-            package
-                .get_part(name)
-                .map(|part| {
-                    part.rels()
-                        .iter()
-                        .map(|relationship| relationship.r_id().to_owned())
-                        .collect::<HashSet<_>>()
-                })
+            package.get_part(name).map(|part| {
+                part.rels()
+                    .iter()
+                    .map(|relationship| relationship.r_id().to_owned())
+                    .collect::<HashSet<_>>()
+            })
         })
         .transpose()?
         .unwrap_or_default();
@@ -1194,7 +1196,9 @@ fn validate_font_table_relationship_sources(package: &OpcPackage, main: &PackURI
         .iter()
         .any(|relationship| is_font_table_relationship(relationship.reltype()))
     {
-        return Err(invalid("package root cannot source a font-table relationship"));
+        return Err(invalid(
+            "package root cannot source a font-table relationship",
+        ));
     }
     for part in package.iter_parts() {
         if part.partname() != main
@@ -1283,13 +1287,21 @@ fn reject_orphan_font_parts(package: &OpcPackage, targets: &HashSet<String>) -> 
 }
 
 fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> Result<bool> {
-    for relationship in package.rels().iter().filter(|relationship| !relationship.is_external()) {
+    for relationship in package
+        .rels()
+        .iter()
+        .filter(|relationship| !relationship.is_external())
+    {
         if relationship.target_partname()? == *target {
             return Ok(true);
         }
     }
     for part in package.iter_parts() {
-        for relationship in part.rels().iter().filter(|relationship| !relationship.is_external()) {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
             if relationship.target_partname()? == *target {
                 return Ok(true);
             }
@@ -1304,13 +1316,21 @@ fn has_inbound_outside_relationships(
     table: &PackURI,
     replaced_relationships: &HashSet<String>,
 ) -> Result<bool> {
-    for relationship in package.rels().iter().filter(|relationship| !relationship.is_external()) {
+    for relationship in package
+        .rels()
+        .iter()
+        .filter(|relationship| !relationship.is_external())
+    {
         if relationship.target_partname()? == *target {
             return Ok(true);
         }
     }
     for part in package.iter_parts() {
-        for relationship in part.rels().iter().filter(|relationship| !relationship.is_external()) {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
             if relationship.target_partname()? == *target
                 && (part.partname() != table
                     || !replaced_relationships.contains(relationship.r_id()))
@@ -1323,11 +1343,19 @@ fn has_inbound_outside_relationships(
 }
 
 fn validate_all_internal_relationship_targets(package: &OpcPackage) -> Result<()> {
-    for relationship in package.rels().iter().filter(|relationship| !relationship.is_external()) {
+    for relationship in package
+        .rels()
+        .iter()
+        .filter(|relationship| !relationship.is_external())
+    {
         relationship.target_partname()?;
     }
     for part in package.iter_parts() {
-        for relationship in part.rels().iter().filter(|relationship| !relationship.is_external()) {
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| !relationship.is_external())
+        {
             relationship.target_partname()?;
         }
     }
@@ -1406,7 +1434,9 @@ fn validate_table_value(value: &FontTable, require_resources: bool) -> Result<()
         }
         for embedded in &font.embedded_fonts {
             if embedded.relationship_id.is_empty() || embedded.relationship_id.len() > MAX_TEXT {
-                return Err(invalid("embedded-font relationship ID is empty or too long"));
+                return Err(invalid(
+                    "embedded-font relationship ID is empty or too long",
+                ));
             }
             if let Some(key) = &embedded.font_key {
                 font_key(key)?;
@@ -1446,7 +1476,9 @@ fn validate_table_value(value: &FontTable, require_resources: bool) -> Result<()
 fn validate_font_name(value: &str, kind: &str) -> Result<()> {
     let count = value.chars().count();
     if !(1..=31).contains(&count) {
-        Err(invalid(format!("{kind} must contain 1 through 31 characters")))
+        Err(invalid(format!(
+            "{kind} must contain 1 through 31 characters"
+        )))
     } else {
         Ok(())
     }
@@ -2205,9 +2237,10 @@ mod tests {
     #[test]
     fn real_poi_embedded_resources_are_inert() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let p =
-            crate::docx::Package::open(root.join("test-data/poi/test-data/document/saut_page.docx"))
-                .unwrap();
+        let p = crate::docx::Package::open(
+            root.join("test-data/poi/test-data/document/saut_page.docx"),
+        )
+        .unwrap();
         let t = p.font_table().unwrap().unwrap();
         assert_eq!(t.fonts().len(), 7);
         let e: Vec<_> = t.fonts().iter().flat_map(Font::embedded_fonts).collect();
@@ -2239,7 +2272,11 @@ mod tests {
         assert!(obfuscate_embedded_font_data(&mut [0; 31], key).is_err());
         assert!(obfuscate_embedded_font_data(&mut [0; 32], "bad").is_err());
 
-        assert!(EmbeddedFontLicensing::from_fs_type(0).unwrap().installable());
+        assert!(
+            EmbeddedFontLicensing::from_fs_type(0)
+                .unwrap()
+                .installable()
+        );
         let editable = EmbeddedFontLicensing::from_fs_type(0x0108).unwrap();
         assert!(editable.editable && editable.no_subsetting);
         assert!(EmbeddedFontLicensing::from_fs_type(0x0006).is_err());
@@ -2265,10 +2302,8 @@ mod tests {
         );
 
         let key = "{00112233-4455-6677-8899-AABBCCDDEEFF}";
-        let resource = EmbeddedFontResource::new(
-            "/word/fonts/shared.odttf",
-            (0u8..64).collect::<Vec<_>>(),
-        );
+        let resource =
+            EmbeddedFontResource::new("/word/fonts/shared.odttf", (0u8..64).collect::<Vec<_>>());
         let mut first = Font::new("Alpha")
             .with_alternate_name("Alpha Alt")
             .with_panose([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -2288,30 +2323,24 @@ mod tests {
         let mut table = FontTable::new();
         table
             .namespaces_mut()
-            .push(FontTableExtensionAttribute::new("xmlns:x", "urn:test-fonts"));
+            .push(FontTableExtensionAttribute::new(
+                "xmlns:x",
+                "urn:test-fonts",
+            ));
         table.fonts_mut().push(first);
-        store_font_table(
-            &mut package,
-            &table,
-            FontTableConformance::Transitional,
-        )
-        .unwrap();
+        store_font_table(&mut package, &table, FontTableConformance::Transitional).unwrap();
 
         add_font(
             &mut package,
             Font::new("Beta").with_embedded_font(
-                EmbeddedFont::new(EmbeddedFontStyle::Regular, resource)
-                    .with_font_key(key),
+                EmbeddedFont::new(EmbeddedFontStyle::Regular, resource).with_font_key(key),
             ),
             FontTableConformance::Transitional,
         )
         .unwrap();
         let loaded = load_font_table(&package).unwrap().unwrap();
         assert_eq!(loaded.fonts().len(), 2);
-        assert_eq!(
-            loaded.fonts()[0].extension_attributes()[0].value(),
-            "kept"
-        );
+        assert_eq!(loaded.fonts()[0].extension_attributes()[0].value(), "kept");
         let relationships = loaded
             .fonts()
             .iter()
@@ -2335,12 +2364,7 @@ mod tests {
             FontTableConformance::Transitional,
         )
         .unwrap();
-        assert!(remove_font(
-            &mut package,
-            "Alpha",
-            FontTableConformance::Transitional
-        )
-        .unwrap());
+        assert!(remove_font(&mut package, "Alpha", FontTableConformance::Transitional).unwrap());
         let shared = PackURI::new("/word/fonts/shared.odttf").unwrap();
         assert!(package.get_part(&shared).is_ok());
         assert!(find_font(&package, "beta").unwrap().is_some());

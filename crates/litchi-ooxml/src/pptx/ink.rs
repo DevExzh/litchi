@@ -4,9 +4,9 @@
 //! modified, or executed. This module only validates the declared OPC graph
 //! and exposes small structural counts from the persisted InkML XML.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
@@ -483,7 +483,12 @@ pub fn store_slide_ink_annotation(
     package
         .get_part_mut(slide_name)?
         .rels_mut()
-        .add_relationship(rt::CUSTOM_XML.into(), target, relationship_id.clone(), false);
+        .add_relationship(
+            rt::CUSTOM_XML.into(),
+            target,
+            relationship_id.clone(),
+            false,
+        );
     Ok(StoredInkAnnotation {
         relationship_id,
         part_name,
@@ -494,7 +499,8 @@ pub fn store_slide_ink_annotation(
 fn allocate_ink_part_name(package: &OpcPackage) -> Result<PackURI> {
     const MAX_INK_PART_INDEX: u32 = 1_000_000;
     for index in 1..MAX_INK_PART_INDEX {
-        let uri = PackURI::new(format!("/ppt/ink/ink{index}.xml")).map_err(OoxmlError::InvalidUri)?;
+        let uri =
+            PackURI::new(format!("/ppt/ink/ink{index}.xml")).map_err(OoxmlError::InvalidUri)?;
         if package.get_part(&uri).is_err() {
             return Ok(uri);
         }
@@ -543,7 +549,9 @@ fn contains_strict_root(xml: &[u8], strict: &[u8]) -> Result<bool> {
         match reader.read_event().map_err(xml_error)? {
             Event::Start(element) | Event::Empty(element) => {
                 let (namespace, _) = reader.resolver().resolve_element(element.name());
-                return Ok(matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == strict));
+                return Ok(
+                    matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == strict),
+                );
             },
             Event::Eof => return Err(invalid("slide XML has no root element")),
             _ => {},
@@ -569,7 +577,9 @@ fn insert_content_part(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
-                depth = depth.checked_add(1).ok_or_else(|| limit("slide XML depth"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| limit("slide XML depth"))?;
                 if depth > MAX_XML_DEPTH {
                     return Err(limit("slide XML depth"));
                 }
@@ -698,8 +708,7 @@ mod tests {
 
         // The read-side inventory discovers the stored annotation.
         let mut limits = InkLoadLimits::default();
-        let annotations =
-            load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
+        let annotations = load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
         assert_eq!(annotations.len(), 1);
         assert_eq!(annotations[0].relationship_id(), "rId1");
         assert_eq!(annotations[0].part_name(), &stored.part_name);
@@ -712,8 +721,7 @@ mod tests {
         assert_eq!(stored2.part_name.as_str(), "/ppt/ink/ink2.xml");
         let slide = package.get_part(&slide_name).unwrap();
         let mut limits = InkLoadLimits::default();
-        let annotations =
-            load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
+        let annotations = load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
         assert_eq!(annotations.len(), 2);
     }
 
@@ -727,10 +735,11 @@ mod tests {
         let slide = package.get_part(&slide_name).unwrap();
         let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
         assert!(xml.contains("xmlns:p=\"http://purl.oclc.org/ooxml/presentationml/main\""));
-        assert!(xml.contains("xmlns:r=\"http://purl.oclc.org/ooxml/officeDocument/relationships\""));
+        assert!(
+            xml.contains("xmlns:r=\"http://purl.oclc.org/ooxml/officeDocument/relationships\"")
+        );
         let mut limits = InkLoadLimits::default();
-        let annotations =
-            load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
+        let annotations = load_slide_ink_annotations(&package, 0, slide, &mut limits).unwrap();
         assert_eq!(annotations.len(), 1);
         assert_eq!(annotations[0].part_name(), &stored.part_name);
     }

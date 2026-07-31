@@ -204,7 +204,7 @@ impl<'a> CommentsPart<'a> {
     /// }
     /// ```
     pub fn comments(&self) -> Result<Vec<Comment>> {
-        let xml = crate::common::mce::process_ooxml(self.xml_bytes())?;
+        let xml = litchi_ooxml_common::mce::process_ooxml(self.xml_bytes())?;
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut comments = Vec::new();
         let mut pending: Option<PendingComment> = None;
@@ -494,7 +494,7 @@ impl<'a> CommentAuthorsPart<'a> {
     /// }
     /// ```
     pub fn authors(&self) -> Result<Vec<CommentAuthor>> {
-        let xml = crate::common::mce::process_ooxml(self.xml_bytes())?;
+        let xml = litchi_ooxml_common::mce::process_ooxml(self.xml_bytes())?;
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut authors = Vec::new();
         let mut depth = 0usize;

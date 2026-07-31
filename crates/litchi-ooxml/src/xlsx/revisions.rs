@@ -3,9 +3,9 @@
 //! Revision payload formulas, rich text, and formatting are data only. They
 //! are never calculated, executed, or used to retrieve external resources.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -996,9 +996,7 @@ fn make_node(
             {
                 RevisionAttributeNamespace::Relationships
             },
-            ResolveResult::Bound(Namespace(v))
-                if v == b"http://www.w3.org/XML/1998/namespace" =>
-            {
+            ResolveResult::Bound(Namespace(v)) if v == b"http://www.w3.org/XML/1998/namespace" => {
                 RevisionAttributeNamespace::Xml
             },
             _ => return Err(invalid("revision attribute has unsupported namespace")),
@@ -1321,9 +1319,7 @@ fn bounded(v: &str) -> Result<()> {
 }
 fn ns_text(v: &ResolveResult<'_>) -> Result<String> {
     match v {
-        ResolveResult::Bound(Namespace(v)) => {
-            Ok(std::str::from_utf8(v).map_err(xml_error)?.into())
-        },
+        ResolveResult::Bound(Namespace(v)) => Ok(std::str::from_utf8(v).map_err(xml_error)?.into()),
         _ => Err(invalid("unbound revision element namespace")),
     }
 }

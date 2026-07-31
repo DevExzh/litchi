@@ -379,7 +379,7 @@ fn required_u32(
 }
 
 pub(crate) fn parse_comments_xml(content: &str) -> SheetResult<HashMap<String, Comment>> {
-    let content = crate::common::mce::process_str(content)?;
+    let content = litchi_ooxml_common::mce::process_str(content)?;
     CommentParser::parse(content.as_ref())
 }
 

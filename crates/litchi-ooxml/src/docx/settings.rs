@@ -11,11 +11,11 @@ use crate::docx::numbering::NumberFormat;
 use crate::docx::variables::DocumentVariables;
 use crate::error::{OoxmlError, Result};
 use litchi_opc::part::Part;
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
-use quick_xml::XmlVersion;
 use std::ops::Range;
 
 const TRANSITIONAL_RELATIONSHIPS_NAMESPACE: &[u8] =
@@ -952,7 +952,7 @@ impl DocumentSettings {
     ///
     /// A DocumentSettings object
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        let xml = crate::common::mce::process_part(part)?;
+        let xml = litchi_ooxml_common::mce::process_part(part)?;
         let mut settings = Self::extract_from_xml(xml.as_ref())?;
         validate_mail_merge_relationships(part, settings.mail_merge.as_ref())?;
         validate_attached_template_relationship(part, &mut settings)?;
@@ -994,9 +994,17 @@ impl DocumentSettings {
                             {
                                 pending_group = Some(group);
                             } else {
-                                parse_setting(&element, decoder, &resolver, &mut settings, &mut seen)?;
+                                parse_setting(
+                                    &element,
+                                    decoder,
+                                    &resolver,
+                                    &mut settings,
+                                    &mut seen,
+                                )?;
                             }
-                        } else if depth == 3 && let Some(group) = pending_group.as_mut() {
+                        } else if depth == 3
+                            && let Some(group) = pending_group.as_mut()
+                        {
                             parse_group_child(group, &element, decoder, &resolver)?;
                         }
                     }
@@ -1015,15 +1023,25 @@ impl DocumentSettings {
                             {
                                 finish_settings_group(&mut settings, group)?;
                             } else {
-                                parse_setting(&element, decoder, &resolver, &mut settings, &mut seen)?;
+                                parse_setting(
+                                    &element,
+                                    decoder,
+                                    &resolver,
+                                    &mut settings,
+                                    &mut seen,
+                                )?;
                             }
-                        } else if child_depth == 3 && let Some(group) = pending_group.as_mut() {
+                        } else if child_depth == 3
+                            && let Some(group) = pending_group.as_mut()
+                        {
                             parse_group_child(group, &element, decoder, &resolver)?;
                         }
                     }
                 },
                 Event::End(_) => {
-                    if depth == 2 && let Some(group) = pending_group.take() {
+                    if depth == 2
+                        && let Some(group) = pending_group.take()
+                    {
                         finish_settings_group(&mut settings, group)?;
                     }
                     depth = depth.checked_sub(1).ok_or_else(|| {
@@ -1161,7 +1179,13 @@ fn parse_group_child(
                         resolver,
                         "compatSetting name",
                     )?,
-                    uri: required_attribute(element, b"uri", decoder, resolver, "compatSetting URI")?,
+                    uri: required_attribute(
+                        element,
+                        b"uri",
+                        decoder,
+                        resolver,
+                        "compatSetting URI",
+                    )?,
                     value: required_attribute(
                         element,
                         b"val",
@@ -1310,9 +1334,7 @@ fn parse_setting(
             }
             let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
                 .ok_or_else(|| {
-                    OoxmlError::InvalidFormat(
-                        "attachedTemplate relationship ID is required".into(),
-                    )
+                    OoxmlError::InvalidFormat("attachedTemplate relationship ID is required".into())
                 })?;
             if relationship_id.is_empty() {
                 return Err(OoxmlError::InvalidFormat(
@@ -1391,9 +1413,12 @@ fn parse_setting(
             }
             let mut mapping = ColorSchemeMapping::new();
             for slot in ColorSchemeSlot::ALL {
-                if let Some(value) =
-                    word_attribute_value(element, slot.attribute_name().as_bytes(), decoder, resolver)?
-                {
+                if let Some(value) = word_attribute_value(
+                    element,
+                    slot.attribute_name().as_bytes(),
+                    decoder,
+                    resolver,
+                )? {
                     mapping.set(slot, ColorSchemeIndex::from_xml(&value)?);
                 }
             }
@@ -1550,10 +1575,12 @@ pub(crate) fn patch_mail_merge(
     }
     if let Some(range) = layout.root_empty_range {
         let root = &xml[range.clone()];
-        let slash = root.windows(2).rposition(|window| window == b"/>").ok_or_else(|| {
-            OoxmlError::InvalidFormat("invalid empty settings root".into())
-        })?;
-        let mut output = Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
+        let slash = root
+            .windows(2)
+            .rposition(|window| window == b"/>")
+            .ok_or_else(|| OoxmlError::InvalidFormat("invalid empty settings root".into()))?;
+        let mut output =
+            Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(&root[..slash]);
         output.push(b'>');
@@ -1564,9 +1591,12 @@ pub(crate) fn patch_mail_merge(
         output.extend_from_slice(&xml[range.end..]);
         return Ok(output);
     }
-    let insert_at = layout.mail_merge_insert_at.or(layout.root_end).ok_or_else(|| {
-        OoxmlError::InvalidFormat("settings root has no mailMerge insertion point".into())
-    })?;
+    let insert_at = layout
+        .mail_merge_insert_at
+        .or(layout.root_end)
+        .ok_or_else(|| {
+            OoxmlError::InvalidFormat("settings root has no mailMerge insertion point".into())
+        })?;
     let mut output = Vec::with_capacity(xml.len() + replacement.len());
     output.extend_from_slice(&xml[..insert_at]);
     output.extend_from_slice(replacement.as_bytes());
@@ -1603,9 +1633,8 @@ pub(crate) fn patch_document_variables(
             .windows(2)
             .rposition(|window| window == b"/>")
             .ok_or_else(|| OoxmlError::InvalidFormat("invalid empty settings root".into()))?;
-        let mut output = Vec::with_capacity(
-            xml.len() + replacement.len() + layout.root_qname.len() + 4,
-        );
+        let mut output =
+            Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(&root[..slash]);
         output.push(b'>');
@@ -1655,7 +1684,8 @@ pub(crate) fn patch_attached_template(
             .windows(2)
             .rposition(|window| window == b"/>")
             .ok_or_else(|| OoxmlError::InvalidFormat("invalid empty settings root".into()))?;
-        let mut output = Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
+        let mut output =
+            Vec::with_capacity(xml.len() + replacement.len() + layout.root_qname.len() + 4);
         output.extend_from_slice(&xml[..range.start]);
         output.extend_from_slice(&root[..slash]);
         output.push(b'>');
@@ -1800,13 +1830,19 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 }
             },
             Event::End(_) => {
-                if depth == 2 && let Some(start) = attached_start.take() {
+                if depth == 2
+                    && let Some(start) = attached_start.take()
+                {
                     attached_template_range = Some(start..event_end);
                 }
-                if depth == 2 && let Some(start) = doc_vars_start.take() {
+                if depth == 2
+                    && let Some(start) = doc_vars_start.take()
+                {
                     doc_vars_range = Some(start..event_end);
                 }
-                if depth == 2 && let Some(start) = mail_merge_start.take() {
+                if depth == 2
+                    && let Some(start) = mail_merge_start.take()
+                {
                     mail_merge_range = Some(start..event_end);
                 }
                 if depth == 1 {
@@ -1889,10 +1925,7 @@ fn is_after_doc_vars(local_name: &[u8]) -> bool {
     )
 }
 
-fn document_variables_element(
-    layout: &SettingsXmlLayout,
-    variables: &DocumentVariables,
-) -> String {
+fn document_variables_element(layout: &SettingsXmlLayout, variables: &DocumentVariables) -> String {
     let prefix = layout
         .word_prefix
         .as_deref()
@@ -2126,14 +2159,15 @@ mod tests {
         assert!(!settings.compatibility_options()[1].is_enabled());
         assert_eq!(settings.compatibility_settings().len(), 2);
         let mode = settings
-            .compatibility_setting(
-                COMPATIBILITY_MODE_SETTING_NAME,
-                COMPATIBILITY_SETTING_URI,
-            )
+            .compatibility_setting(COMPATIBILITY_MODE_SETTING_NAME, COMPATIBILITY_SETTING_URI)
             .unwrap();
         assert_eq!(mode.value(), "14");
         assert_eq!(settings.compatibility_mode(), Some(14));
-        assert!(settings.compatibility_setting("missing", COMPATIBILITY_SETTING_URI).is_none());
+        assert!(
+            settings
+                .compatibility_setting("missing", COMPATIBILITY_SETTING_URI)
+                .is_none()
+        );
     }
 
     #[test]
@@ -2170,10 +2204,7 @@ mod tests {
         assert_eq!(footnotes.position(), Some(&NotePosition::PageBottom));
         assert_eq!(footnotes.format(), Some(&NumberFormat::LowerRoman));
         assert_eq!(footnotes.start(), Some(2));
-        assert_eq!(
-            footnotes.restart(),
-            Some(NoteNumberingRestart::EachPage)
-        );
+        assert_eq!(footnotes.restart(), Some(NoteNumberingRestart::EachPage));
 
         let endnotes = settings.endnote_properties().unwrap();
         assert_eq!(endnotes.position(), Some(&NotePosition::DocumentEnd));
@@ -2347,10 +2378,7 @@ mod tests {
             .set_bidi(None)
             .unwrap();
         assert!(languages.set_latin(Some(String::new())).is_err());
-        assert_eq!(
-            languages.to_xml("w"),
-            r#"<w:themeFontLang w:val="fr-FR"/>"#
-        );
+        assert_eq!(languages.to_xml("w"), r#"<w:themeFontLang w:val="fr-FR"/>"#);
 
         let mut mapping = ColorSchemeMapping::new();
         assert!(mapping.is_empty());
@@ -2389,7 +2417,9 @@ mod tests {
         assert!(reject(br#"<w:defaultTabStop w:val="wide"/>"#).is_err());
         assert!(reject(br#"<w:defaultTabStop w:val="-720"/>"#).is_err());
         assert!(reject(br#"<w:defaultTabStop w:val="99999999999999999999"/>"#).is_err());
-        assert!(reject(br#"<w:defaultTabStop w:val="720"/><w:defaultTabStop w:val="720"/>"#).is_err());
+        assert!(
+            reject(br#"<w:defaultTabStop w:val="720"/><w:defaultTabStop w:val="720"/>"#).is_err()
+        );
         assert!(reject(br#"<w:themeFontLang w:val=""/>"#).is_err());
         assert!(reject(br#"<w:themeFontLang w:eastAsia="ja&#0;-JP"/>"#).is_err());
         assert!(reject(br#"<w:themeFontLang w:val="en-US"/><w:themeFontLang/>"#).is_err());
@@ -2436,12 +2466,7 @@ mod tests {
         }
     }
 
-    fn attached_template_part(
-        xml: &[u8],
-        reltype: &str,
-        target: &str,
-        external: bool,
-    ) -> BlobPart {
+    fn attached_template_part(xml: &[u8], reltype: &str, target: &str, external: bool) -> BlobPart {
         let mut part = BlobPart::new(
             PackURI::new("/word/settings.xml").unwrap(),
             litchi_opc::constants::content_type::WML_SETTINGS.to_owned(),
@@ -2498,12 +2523,8 @@ mod tests {
 
         let wrong_type = attached_template_part(xml, "urn:wrong", "file:///a.dotx", true);
         assert!(DocumentSettings::extract_from_part(&wrong_type).is_err());
-        let internal = attached_template_part(
-            xml,
-            ATTACHED_TEMPLATE_RELATIONSHIP,
-            "template.dotx",
-            false,
-        );
+        let internal =
+            attached_template_part(xml, ATTACHED_TEMPLATE_RELATIONSHIP, "template.dotx", false);
         assert!(DocumentSettings::extract_from_part(&internal).is_err());
         let whitespace = attached_template_part(
             xml,
@@ -2513,12 +2534,8 @@ mod tests {
         );
         assert!(DocumentSettings::extract_from_part(&whitespace).is_err());
 
-        let mut duplicate = attached_template_part(
-            xml,
-            ATTACHED_TEMPLATE_RELATIONSHIP,
-            "file:///a.dotx",
-            true,
-        );
+        let mut duplicate =
+            attached_template_part(xml, ATTACHED_TEMPLATE_RELATIONSHIP, "file:///a.dotx", true);
         duplicate.rels_mut().add_relationship(
             STRICT_ATTACHED_TEMPLATE_RELATIONSHIP.to_owned(),
             "file:///b.dotx".to_owned(),
@@ -2538,7 +2555,8 @@ mod tests {
         );
 
         let empty = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"/>"#;
-        let inserted = String::from_utf8(patch_attached_template(empty, Some("rId7")).unwrap()).unwrap();
+        let inserted =
+            String::from_utf8(patch_attached_template(empty, Some("rId7")).unwrap()).unwrap();
         assert_eq!(
             inserted,
             r#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:attachedTemplate r:id="rId7" xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"/></s:settings>"#
@@ -2551,17 +2569,17 @@ mod tests {
         let mut variables = DocumentVariables::new();
         variables.insert("Company & Team", "A < B").unwrap();
         variables.insert("empty", "").unwrap();
-        let patched = String::from_utf8(patch_document_variables(xml, &variables).unwrap()).unwrap();
+        let patched =
+            String::from_utf8(patch_document_variables(xml, &variables).unwrap()).unwrap();
         assert_eq!(
             patched,
             r#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><!--before--><q:compat/><q:docVars><q:docVar q:name="Company &amp; Team" q:val="A &lt; B"/><q:docVar q:name="empty" q:val=""/></q:docVars><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#
         );
 
         variables.clear();
-        let removed = String::from_utf8(
-            patch_document_variables(patched.as_bytes(), &variables).unwrap(),
-        )
-        .unwrap();
+        let removed =
+            String::from_utf8(patch_document_variables(patched.as_bytes(), &variables).unwrap())
+                .unwrap();
         assert_eq!(
             removed,
             r#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><!--before--><q:compat/><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#

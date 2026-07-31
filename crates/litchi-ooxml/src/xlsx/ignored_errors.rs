@@ -1,8 +1,8 @@
 //! Immutable XLSX worksheet ignored-error read model.
 
-use crate::common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::is_spreadsheetml_name;
+use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -155,10 +155,10 @@ pub fn parse_worksheet_ignored_errors(xml: &[u8]) -> Result<Option<WorksheetIgno
                 if matches!(
                     parser.parent(),
                     Context::Collection | Context::IgnoredError | Context::ExtensionList
-                ) && !text.decode().map_err(xml_error)?.trim().is_empty()
-                => {
-                    return Err(invalid("unexpected text in ignoredErrors"));
-                },
+                ) && !text.decode().map_err(xml_error)?.trim().is_empty() =>
+            {
+                return Err(invalid("unexpected text in ignoredErrors"));
+            },
             Event::CData(_)
                 if matches!(
                     parser.parent(),

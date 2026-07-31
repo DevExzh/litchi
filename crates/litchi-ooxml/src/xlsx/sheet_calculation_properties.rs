@@ -12,8 +12,8 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
-use crate::common::mce::process_str;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_str;
 
 const TRANSITIONAL_MAIN: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -182,9 +182,7 @@ fn parse_sheet_calc_pr_attributes(
         }
         let text = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| {
-                invalid(format!("invalid sheetCalcPr attribute value: {error}"))
-            })?;
+            .map_err(|error| invalid(format!("invalid sheetCalcPr attribute value: {error}")))?;
         if full_calc_on_load.is_some() {
             return Err(invalid("duplicate sheetCalcPr fullCalcOnLoad attribute"));
         }
@@ -271,7 +269,12 @@ mod tests {
                 .unwrap()
                 .full_calc_on_load()
         );
-        assert!(!parse("<sheetCalcPr/>").unwrap().unwrap().full_calc_on_load());
+        assert!(
+            !parse("<sheetCalcPr/>")
+                .unwrap()
+                .unwrap()
+                .full_calc_on_load()
+        );
         assert!(parse("<sheetData/>").unwrap().is_none());
     }
 
@@ -311,8 +314,7 @@ mod tests {
                 WorksheetSheetCalculationPropertiesConformance::Transitional,
                 WorksheetSheetCalculationPropertiesConformance::Strict,
             ] {
-                let fragment =
-                    write_worksheet_sheet_calculation_properties(&expected, conformance);
+                let fragment = write_worksheet_sheet_calculation_properties(&expected, conformance);
                 let document = format!(r#"<worksheet xmlns="{NS}">{fragment}</worksheet>"#);
                 let parsed = parse_worksheet_sheet_calculation_properties(document.as_bytes())
                     .unwrap()

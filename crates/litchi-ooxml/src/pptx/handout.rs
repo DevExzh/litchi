@@ -176,7 +176,7 @@ impl HandoutMaster {
     /// Parse handout master XML.
     pub fn parse_xml(xml: &str) -> Result<Self> {
         let mut master = Self::default();
-        let xml = crate::common::mce::process_str(xml)?;
+        let xml = litchi_ooxml_common::mce::process_str(xml)?;
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 

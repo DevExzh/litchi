@@ -457,11 +457,7 @@ fn xml_node(
     })
 }
 
-fn append_xml_node(
-    node: XmlNode,
-    stack: &mut [XmlNode],
-    root: &mut Option<XmlNode>,
-) -> Result<()> {
+fn append_xml_node(node: XmlNode, stack: &mut [XmlNode], root: &mut Option<XmlNode>) -> Result<()> {
     if let Some(parent) = stack.last_mut() {
         parent.children.push(node);
     } else if root.replace(node).is_some() {
@@ -511,8 +507,8 @@ pub(crate) fn invalid(message: impl Into<String>) -> OoxmlError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::ExpandedName;
     use crate::custom_xml_data::CustomXmlDataProperties;
+    use litchi_ooxml_common::ExpandedName;
 
     fn item(xml: &[u8], namespace: &str, local_name: &str) -> CustomXmlDataItem {
         CustomXmlDataItem {

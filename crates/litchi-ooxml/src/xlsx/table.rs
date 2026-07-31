@@ -696,7 +696,7 @@ impl TableParser {
 }
 
 pub fn parse_table_xml(xml: &str) -> SheetResult<Option<Table>> {
-    let xml = crate::common::mce::process_str(xml)?;
+    let xml = litchi_ooxml_common::mce::process_str(xml)?;
     TableParser::parse(xml.as_ref())
 }
 

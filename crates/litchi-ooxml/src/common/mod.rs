@@ -1,12 +1,3 @@
-//! Common OOXML functionality shared across formats.
+//! Format-adapter helpers awaiting extraction into focused crates.
 
-pub(crate) mod external_link_rels;
-pub mod mce;
-pub mod properties;
 pub(crate) mod xml;
-
-pub use mce::{
-    ExpandedName, MceCapabilities, MceError, MceLimits, MceOutput, MceReport,
-    process_markup_compatibility,
-};
-pub use properties::DocumentProperties;

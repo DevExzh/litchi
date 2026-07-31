@@ -3,8 +3,8 @@
 //! Tag values are exposed as inert strings. Embedded XML, paths, or commands
 //! contained in a value are never parsed or executed.
 
-use crate::common::mce::process_ooxml;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{OpcPackage, Part};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};

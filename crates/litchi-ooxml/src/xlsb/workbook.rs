@@ -1,6 +1,5 @@
 //! Workbook implementation for XLSB files
 
-use crate::common::external_link_rels::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use crate::xlsb::XlsbCell;
 use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
@@ -29,6 +28,7 @@ use crate::xlsb::vba_project::{
 use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
+use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
 use std::cmp::Reverse;

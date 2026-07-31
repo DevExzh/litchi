@@ -675,7 +675,7 @@ impl<'a> PresentationPart<'a> {
     /// let pres_part = PresentationPart::from_part(opc_part)?;
     /// ```
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml = match crate::common::mce::process_ooxml(part.blob())? {
+        let xml = match litchi_ooxml_common::mce::process_ooxml(part.blob())? {
             std::borrow::Cow::Borrowed(_) => part.blob_arc(),
             std::borrow::Cow::Owned(v) => Arc::new(v),
         };
@@ -1185,8 +1185,9 @@ impl PresentationInfo {
                     "duplicate PowerPoint modification verifier".to_string(),
                 ));
             }
-            self.modification_verifier =
-                Some(PresentationModificationVerifier::from_element(element, decoder)?);
+            self.modification_verifier = Some(PresentationModificationVerifier::from_element(
+                element, decoder,
+            )?);
         } else if parent == PresentationContext::CustomerDataList
             && is_presentationml_name(namespace, element.name(), b"custData")
         {
@@ -1228,8 +1229,12 @@ impl PresentationInfo {
                     "duplicate PowerPoint smart-tags reference".to_string(),
                 ));
             }
-            self.smart_tags_relationship_id =
-                Some(required_relationship_id(element, decoder, resolver, "smart tags")?);
+            self.smart_tags_relationship_id = Some(required_relationship_id(
+                element,
+                decoder,
+                resolver,
+                "smart tags",
+            )?);
         } else if parent == PresentationContext::DefaultTextStyle {
             self.observe_default_text_style_child(namespace, element)?;
         } else if parent == PresentationContext::SlideList
@@ -1657,7 +1662,10 @@ mod tests {
                 conformance="strict"></p:presentation>"#
         );
         let blob = part(xml);
-        let metadata = PresentationPart::from_part(&blob).unwrap().metadata().unwrap();
+        let metadata = PresentationPart::from_part(&blob)
+            .unwrap()
+            .metadata()
+            .unwrap();
         assert_eq!(metadata.server_zoom(), 87_500);
         assert_eq!(metadata.first_slide_number(), -3);
         assert!(!metadata.shows_special_placeholders_on_title_slide());
@@ -1673,7 +1681,10 @@ mod tests {
 
         let defaults = format!(r#"<p:presentation xmlns:p="{P}"></p:presentation>"#);
         let blob = part(defaults);
-        let metadata = PresentationPart::from_part(&blob).unwrap().metadata().unwrap();
+        let metadata = PresentationPart::from_part(&blob)
+            .unwrap()
+            .metadata()
+            .unwrap();
         assert_eq!(metadata, PresentationMetadata::default());
         assert_eq!(
             metadata.conformance(),
@@ -1685,20 +1696,25 @@ mod tests {
     fn presentation_root_metadata_rejects_invalid_attributes() {
         let cases = [
             format!(r#"<p:presentation xmlns:p="{P}" serverZoom="invalid"></p:presentation>"#),
-            format!(r#"<p:presentation xmlns:p="{P}" firstSlideNum="2147483648"></p:presentation>"#),
+            format!(
+                r#"<p:presentation xmlns:p="{P}" firstSlideNum="2147483648"></p:presentation>"#
+            ),
             format!(r#"<p:presentation xmlns:p="{P}" rtl="sometimes"></p:presentation>"#),
             format!(r#"<p:presentation xmlns:p="{P}" bookmarkIdSeed="0"></p:presentation>"#),
             format!(
                 r#"<p:presentation xmlns:p="{P}" bookmarkIdSeed="2147483648"></p:presentation>"#
             ),
-            format!(
-                r#"<p:presentation xmlns:p="{P}" conformance="future"></p:presentation>"#
-            ),
+            format!(r#"<p:presentation xmlns:p="{P}" conformance="future"></p:presentation>"#),
             format!(r#"<p:presentation xmlns:p="{P}" rtl="1" rtl="0"></p:presentation>"#),
         ];
         for xml in cases {
             let blob = part(xml);
-            assert!(PresentationPart::from_part(&blob).unwrap().metadata().is_err());
+            assert!(
+                PresentationPart::from_part(&blob)
+                    .unwrap()
+                    .metadata()
+                    .is_err()
+            );
         }
     }
 
@@ -1806,7 +1822,10 @@ mod tests {
             .unwrap();
         assert!(photo_album.is_black_and_white());
         assert!(photo_album.shows_captions());
-        assert_eq!(photo_album.layout(), PhotoAlbumLayout::FourPicturesWithTitle);
+        assert_eq!(
+            photo_album.layout(),
+            PhotoAlbumLayout::FourPicturesWithTitle
+        );
         assert_eq!(photo_album.frame(), PhotoAlbumFrame::CenterShadow);
 
         let strict = r#"<x:presentation xmlns:x="http://purl.oclc.org/ooxml/presentationml/main">
@@ -2038,9 +2057,7 @@ mod tests {
     #[test]
     fn rejects_malformed_smart_tags_references() {
         let cases = [
-            format!(
-                r#"<p:presentation xmlns:p="{P}"><p:smartTags/></p:presentation>"#
-            ),
+            format!(r#"<p:presentation xmlns:p="{P}"><p:smartTags/></p:presentation>"#),
             format!(
                 r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:smartTags r:id=""/></p:presentation>"#
             ),
