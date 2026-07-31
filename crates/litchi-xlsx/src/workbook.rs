@@ -4,7 +4,7 @@ mod edit;
 
 pub use edit::{
     ActiveTab, Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, Edit, JoinError,
-    JoinFailure, Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
+    JoinFailure, NewSheet, Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
 };
 
 use std::collections::HashMap;

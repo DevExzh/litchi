@@ -1,10 +1,10 @@
 //! Isolated worksheet transactions, disjoint joins, and source-checked patches.
 
-use std::collections::{BTreeMap, HashMap, btree_map::Entry};
+use std::collections::{BTreeMap, HashMap, HashSet, btree_map::Entry};
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationship, TargetMode};
 use litchi_sheet::{At, Cell as Address, Column as ColumnIndex, ColumnAt, Row as RowIndex, RowAt};
 
 use super::{Sheet, SheetKind, SheetSelector, Visibility, Workbook};
@@ -13,6 +13,7 @@ use crate::error::{EditBlock, Error, Result, TabEditBlock, invalid};
 use crate::raw;
 use crate::raw::worksheet::edit::{Action, ColumnAction, Payload, Plan, RowAction, StyleEffect};
 use crate::sheet::Name;
+use crate::style::StyleLineage;
 use crate::{Style, StyleKey, StyleState};
 
 /// Cell state recorded before or after one semantic change.
@@ -165,6 +166,20 @@ impl RowState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Change {
+    /// A worksheet was added at a checked logical position.
+    Create {
+        sheet: Box<str>,
+        position: usize,
+        visibility: Visibility,
+    },
+    /// A worksheet was removed at a checked logical position.
+    ///
+    /// This is currently emitted by inverse patches for [`Self::Create`].
+    Remove {
+        sheet: Box<str>,
+        position: usize,
+        visibility: Visibility,
+    },
     Rename {
         position: usize,
         before: Box<str>,
@@ -208,6 +223,7 @@ pub enum Change {
 impl Change {
     pub fn sheet(&self) -> &str {
         match self {
+            Self::Create { sheet, .. } | Self::Remove { sheet, .. } => sheet,
             Self::Rename { after, .. } => after,
             Self::Active { after, .. } => after.name(),
             Self::Move { sheet, .. }
@@ -222,7 +238,9 @@ impl Change {
     pub fn moved(&self) -> Option<(usize, usize)> {
         match self {
             Self::Move { from, to, .. } => Some((*from, *to)),
-            Self::Rename { .. }
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
@@ -239,7 +257,9 @@ impl Change {
                 before,
                 after,
             } => Some((*position, before, after)),
-            Self::Move { .. }
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
@@ -252,7 +272,9 @@ impl Change {
     pub fn active(&self) -> Option<(&ActiveTab, &ActiveTab)> {
         match self {
             Self::Active { before, after } => Some((before, after)),
-            Self::Rename { .. }
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
             | Self::Move { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
@@ -270,7 +292,9 @@ impl Change {
                 after,
                 ..
             } => Some((*position, before, after)),
-            Self::Rename { .. }
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Cell { .. }
@@ -288,7 +312,9 @@ impl Change {
                 after,
                 ..
             } => Some((*address, before, after)),
-            Self::Rename { .. }
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
@@ -303,7 +329,9 @@ impl Change {
             Self::Row {
                 row, before, after, ..
             } => Some((*row, *before, *after)),
-            Self::Rename { .. }
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
@@ -321,7 +349,9 @@ impl Change {
                 after,
                 ..
             } => Some((*column, *before, *after)),
-            Self::Rename { .. }
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
@@ -330,8 +360,46 @@ impl Change {
         }
     }
 
+    /// Added worksheet identity when this is a structural create.
+    pub fn created(&self) -> Option<(usize, &str)> {
+        match self {
+            Self::Create {
+                sheet, position, ..
+            } => Some((*position, sheet)),
+            _ => None,
+        }
+    }
+
+    /// Removed worksheet identity when this is a structural delete or inverse.
+    pub fn removed(&self) -> Option<(usize, &str)> {
+        match self {
+            Self::Remove {
+                sheet, position, ..
+            } => Some((*position, sheet)),
+            _ => None,
+        }
+    }
+
     fn inverse(&self) -> Self {
         match self {
+            Self::Create {
+                sheet,
+                position,
+                visibility,
+            } => Self::Remove {
+                sheet: sheet.clone(),
+                position: *position,
+                visibility: visibility.clone(),
+            },
+            Self::Remove {
+                sheet,
+                position,
+                visibility,
+            } => Self::Create {
+                sheet: sheet.clone(),
+                position: *position,
+                visibility: visibility.clone(),
+            },
             Self::Rename {
                 position,
                 before,
@@ -594,7 +662,7 @@ pub enum JoinFailure {
 /// Recoverable join failure that returns ownership of the rejected edit.
 pub struct JoinError {
     failure: JoinFailure,
-    rejected: Edit,
+    rejected: Box<Edit>,
 }
 
 impl fmt::Debug for JoinError {
@@ -628,12 +696,12 @@ impl JoinError {
 
     /// Recover the edit that was not merged.
     pub fn into_rejected(self) -> Edit {
-        self.rejected
+        *self.rejected
     }
 
     /// Recover both the structured reason and rejected edit.
     pub fn into_parts(self) -> (JoinFailure, Edit) {
-        (self.failure, self.rejected)
+        (self.failure, *self.rejected)
     }
 }
 
@@ -970,6 +1038,16 @@ impl TabAction {
     }
 }
 
+#[derive(Debug)]
+struct CreatedSheet {
+    name: Name,
+    position: usize,
+    sheet_id: u32,
+    relationship_id: String,
+    visibility: TabAction,
+    graph: GraphChange,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct MoveIntent {
     sheet: usize,
@@ -981,6 +1059,18 @@ struct MoveIntent {
 struct OrderPlan {
     positions: Vec<usize>,
     moves: Vec<MoveIntent>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Target {
+    Base(usize),
+    Added(usize),
+}
+
+#[derive(Debug)]
+struct Added {
+    name: Name,
+    actions: SheetActions,
 }
 
 impl OrderPlan {
@@ -997,9 +1087,10 @@ impl OrderPlan {
 #[derive(Debug)]
 pub struct Edit {
     base: Workbook,
-    active: Option<usize>,
+    active: Option<Target>,
     order: Option<OrderPlan>,
     sheets: BTreeMap<usize, SheetActions>,
+    added: Vec<Added>,
 }
 
 impl Edit {
@@ -1010,6 +1101,55 @@ impl Edit {
             active: None,
             order: None,
             sheets: BTreeMap::new(),
+            added: Vec::new(),
+        })
+    }
+
+    /// Append a validated worksheet and borrow its transaction-local editor.
+    ///
+    /// The returned handle can populate cells and properties before the one
+    /// atomic commit. Native sheet IDs, relationship IDs, and part names are
+    /// allocated deterministically at commit and never enter the public API.
+    pub fn add<T>(&mut self, name: T) -> Result<NewSheet<'_>>
+    where
+        T: TryInto<Name>,
+        Error: From<T::Error>,
+    {
+        let name = name.try_into().map_err(Error::from)?;
+        let position = self
+            .base
+            .len()
+            .checked_add(self.added.len())
+            .ok_or_else(|| invalid("worksheet position overflow"))?;
+        if position >= raw::catalog_edit::MAX_SHEETS {
+            return Err(Error::TabEditBlocked {
+                sheet: name.as_str().to_owned(),
+                position,
+                reason: TabEditBlock::SheetLimit,
+            });
+        }
+        self.added
+            .try_reserve(1)
+            .map_err(|error| invalid(format!("cannot reserve worksheet creation: {error}")))?;
+        self.added.push(Added {
+            name,
+            actions: SheetActions::default(),
+        });
+        let index = self
+            .added
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| invalid("worksheet creation index underflow"))?;
+        let added = self
+            .added
+            .last_mut()
+            .ok_or_else(|| invalid("worksheet creation plan disappeared"))?;
+        Ok(NewSheet {
+            added,
+            active: &mut self.active,
+            style_lineage: &self.base.inner.style_lineage,
+            index,
+            position,
         })
     }
 
@@ -1108,7 +1248,7 @@ impl Edit {
     }
 
     pub fn len(&self) -> usize {
-        self.sheets.values().fold(
+        let existing = self.sheets.values().fold(
             usize::from(self.active.is_some()).saturating_add(
                 self.order
                     .as_ref()
@@ -1116,7 +1256,13 @@ impl Edit {
                     .map_or(0, |order| order.moves.len()),
             ),
             |len, actions| len.saturating_add(actions.len()),
-        )
+        );
+        self.added.iter().fold(existing, |len, added| {
+            len.saturating_add(1)
+                .saturating_add(added.actions.cells.len())
+                .saturating_add(added.actions.rows.len())
+                .saturating_add(added.actions.columns.len())
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -1126,6 +1272,7 @@ impl Edit {
                 .as_ref()
                 .is_none_or(|order| !order.is_effective())
             && self.sheets.values().all(SheetActions::is_empty)
+            && self.added.is_empty()
     }
 
     /// Join an independently prepared edit when every effect is disjoint.
@@ -1137,19 +1284,23 @@ impl Edit {
         if !Arc::ptr_eq(&self.base.inner, &other.base.inner) {
             return Err(JoinError {
                 failure: JoinFailure::DifferentSnapshot,
-                rejected: other,
+                rejected: Box::new(other),
             });
         }
         let conflicts = self.conflicts_with(&other);
         if !conflicts.is_empty() {
             return Err(JoinError {
                 failure: JoinFailure::Overlap(conflicts),
-                rejected: other,
+                rejected: Box::new(other),
             });
         }
 
+        let added_offset = self.added.len();
         if self.active.is_none() {
-            self.active = other.active;
+            self.active = other.active.map(|target| match target {
+                Target::Base(position) => Target::Base(position),
+                Target::Added(index) => Target::Added(added_offset.saturating_add(index)),
+            });
         }
         if self
             .order
@@ -1186,6 +1337,7 @@ impl Edit {
                 },
             }
         }
+        self.added.extend(other.added);
         Ok(self)
     }
 
@@ -1203,6 +1355,7 @@ impl Edit {
             active: requested_active,
             order: requested_order,
             mut sheets,
+            added,
         } = self;
         let mut changes = Vec::new();
         let mut parts = Vec::new();
@@ -1233,9 +1386,28 @@ impl Edit {
             .iter()
             .map(|(position, name)| (*position, name))
             .collect::<HashMap<_, _>>();
+        let final_len = base
+            .inner
+            .sheets
+            .len()
+            .checked_add(added.len())
+            .ok_or_else(|| invalid("final worksheet count overflow"))?;
+        if final_len > raw::catalog_edit::MAX_SHEETS {
+            let first = added
+                .first()
+                .ok_or_else(|| invalid("worksheet limit exceeded without a creation"))?;
+            return Err(Error::TabEditBlocked {
+                sheet: first.name.as_str().to_owned(),
+                position: base.inner.sheets.len(),
+                reason: TabEditBlock::SheetLimit,
+            });
+        }
+        if let Some(first) = added.first() {
+            ensure_reorder_supported(&base, first.name.as_str(), base.inner.sheets.len())?;
+        }
         let mut final_names = HashMap::<&str, usize>::new();
         final_names
-            .try_reserve(base.inner.sheets.len())
+            .try_reserve(final_len)
             .map_err(|error| invalid(format!("cannot reserve final sheet-name index: {error}")))?;
         for (position, data) in base.inner.sheets.iter().enumerate() {
             let (name, key) = rename_by_position
@@ -1246,6 +1418,21 @@ impl Edit {
             if let Some(first) = final_names.insert(key, position) {
                 return Err(Error::SheetNameConflict {
                     name: name.to_owned(),
+                    first,
+                    second: position,
+                });
+            }
+        }
+        for (index, created) in added.iter().enumerate() {
+            let position = base
+                .inner
+                .sheets
+                .len()
+                .checked_add(index)
+                .ok_or_else(|| invalid("created worksheet position overflow"))?;
+            if let Some(first) = final_names.insert(created.name.identity_key(), position) {
+                return Err(Error::SheetNameConflict {
+                    name: created.name.as_str().to_owned(),
                     first,
                     second: position,
                 });
@@ -1307,7 +1494,7 @@ impl Edit {
             effective_tabs.push((*position, action));
         }
 
-        let final_is_visible = |position: usize| {
+        let final_base_is_visible = |position: usize| {
             sheets
                 .get(&position)
                 .and_then(|requested| requested.visibility)
@@ -1321,7 +1508,17 @@ impl Edit {
                     |action| action == TabAction::Show,
                 )
         };
-        if !effective_tabs.is_empty() && !(0..base.inner.sheets.len()).any(&final_is_visible) {
+        let added_is_visible = |index: usize| {
+            added.get(index).is_some_and(|sheet| {
+                sheet
+                    .actions
+                    .visibility
+                    .is_none_or(|action| action == TabAction::Show)
+            })
+        };
+        let any_visible = (0..base.inner.sheets.len()).any(&final_base_is_visible)
+            || (0..added.len()).any(added_is_visible);
+        if !effective_tabs.is_empty() && !any_visible {
             let (position, _) = effective_tabs
                 .iter()
                 .find(|(_, action)| *action != TabAction::Show)
@@ -1344,7 +1541,7 @@ impl Edit {
                 .as_ref()
                 .map_or(position, |order| order.positions[position])
         };
-        let final_position = |identity: usize| {
+        let final_base_position = |identity: usize| {
             effective_order.as_ref().map_or_else(
                 || (identity < base.inner.sheets.len()).then_some(identity),
                 |order| {
@@ -1355,31 +1552,53 @@ impl Edit {
                 },
             )
         };
+        let final_position = |target: Target| match target {
+            Target::Base(identity) => final_base_position(identity),
+            Target::Added(index) => base.inner.sheets.len().checked_add(index),
+        };
+        let final_is_visible = |target: Target| match target {
+            Target::Base(position) => final_base_is_visible(position),
+            Target::Added(index) => added_is_visible(index),
+        };
 
         let current_active = base.inner.active_sheet;
-        let final_active = if let Some(identity) = requested_active {
-            let data = base
-                .inner
-                .sheets
-                .get(identity)
-                .ok_or_else(|| invalid("requested active tab disappeared during edit"))?;
-            if !final_is_visible(identity) {
+        let current_target = current_active.map(Target::Base);
+        let final_active = if let Some(target) = requested_active {
+            let (name, position) = match target {
+                Target::Base(identity) => {
+                    let data =
+                        base.inner.sheets.get(identity).ok_or_else(|| {
+                            invalid("requested active tab disappeared during edit")
+                        })?;
+                    (data.name.as_str(), identity)
+                },
+                Target::Added(index) => {
+                    let data = added.get(index).ok_or_else(|| {
+                        invalid("requested new active tab disappeared during edit")
+                    })?;
+                    (
+                        data.name.as_str(),
+                        base.inner.sheets.len().saturating_add(index),
+                    )
+                },
+            };
+            if !final_is_visible(target) {
                 return Err(Error::TabEditBlocked {
-                    sheet: data.name.clone(),
-                    position: identity,
+                    sheet: name.to_owned(),
+                    position,
                     reason: TabEditBlock::NotVisible,
                 });
             }
-            Some(identity)
-        } else if effective_tabs.is_empty() || current_active.is_some_and(final_is_visible) {
-            current_active
+            Some(target)
+        } else if effective_tabs.is_empty() || current_target.is_some_and(final_is_visible) {
+            current_target
         } else {
             let len = base.inner.sheets.len();
             if len == 0 {
                 None
             } else {
                 current_active
-                    .and_then(final_position)
+                    .and_then(final_base_position)
                     .and_then(|current_position| {
                         let remaining = len - current_position;
                         (1..=len)
@@ -1391,12 +1610,19 @@ impl Edit {
                                 }
                             })
                             .map(order_at)
-                            .find(|identity| final_is_visible(*identity))
+                            .find(|identity| final_base_is_visible(*identity))
+                            .map(Target::Base)
                     })
                     .or_else(|| {
                         (0..len)
                             .map(order_at)
-                            .find(|identity| final_is_visible(*identity))
+                            .find(|identity| final_base_is_visible(*identity))
+                            .map(Target::Base)
+                    })
+                    .or_else(|| {
+                        (0..added.len())
+                            .find(|index| added_is_visible(*index))
+                            .map(Target::Added)
                     })
             }
         };
@@ -1404,15 +1630,19 @@ impl Edit {
         if let Some(position) = final_active_position
             && position > raw::catalog_edit::MAX_ACTIVE_TAB
         {
-            let identity =
+            let target =
                 final_active.ok_or_else(|| invalid("active position has no sheet identity"))?;
-            let data = base
-                .inner
-                .sheets
-                .get(identity)
-                .ok_or_else(|| invalid("replacement active tab disappeared during edit"))?;
+            let name = match target {
+                Target::Base(identity) => base
+                    .inner
+                    .sheets
+                    .get(identity)
+                    .map(|sheet| sheet.name.as_str()),
+                Target::Added(index) => added.get(index).map(|sheet| sheet.name.as_str()),
+            }
+            .ok_or_else(|| invalid("replacement active tab disappeared during edit"))?;
             return Err(Error::TabEditBlocked {
-                sheet: data.name.clone(),
+                sheet: name.to_owned(),
                 position,
                 reason: TabEditBlock::ActiveTabLimit,
             });
@@ -1423,16 +1653,23 @@ impl Edit {
             .transpose()?;
         let active_after = final_active
             .zip(final_active_position)
-            .map(|(identity, position)| {
-                active_tab_at(
+            .map(|(target, position)| match target {
+                Target::Base(identity) => active_tab_at(
                     &base,
                     identity,
                     position,
                     rename_by_position.get(&identity).map(|name| name.as_str()),
-                )
+                ),
+                Target::Added(index) => added
+                    .get(index)
+                    .map(|sheet| ActiveTab {
+                        name: sheet.name.as_str().into(),
+                        position,
+                    })
+                    .ok_or_else(|| invalid("new active tab disappeared during patch creation")),
             })
             .transpose()?;
-        let active_change = (current_active.map(|identity| (identity, identity))
+        let active_change = (current_target.zip(current_active)
             != final_active.zip(final_active_position))
         .then_some(final_active_position)
         .flatten();
@@ -1565,7 +1802,9 @@ impl Edit {
             base.inner.validate_styles(&parsed)?;
             for change in &changes[change_start..] {
                 match change {
-                    Change::Rename { .. }
+                    Change::Create { .. }
+                    | Change::Remove { .. }
+                    | Change::Rename { .. }
                     | Change::Move { .. }
                     | Change::Active { .. }
                     | Change::Visibility { .. } => {},
@@ -1616,7 +1855,19 @@ impl Edit {
             });
         }
 
-        if final_active != current_active {
+        let active_added = match final_active {
+            Some(Target::Added(index)) => Some(index),
+            Some(Target::Base(_)) | None => None,
+        };
+        let mut created = create_sheets(
+            &base,
+            added,
+            active_added,
+            &mut changes,
+            &mut needs_recalculation,
+        )?;
+
+        if final_active != current_target {
             if let Some(old_active) = current_active {
                 let data =
                     base.inner.sheets.get(old_active).ok_or_else(|| {
@@ -1642,28 +1893,30 @@ impl Edit {
             }
             let new_active = final_active
                 .ok_or_else(|| invalid("active tab disappeared during selection rewrite"))?;
-            let data = base
-                .inner
-                .sheets
-                .get(new_active)
-                .ok_or_else(|| invalid("new active sheet disappeared during tab edit"))?;
-            if data.kind == SheetKind::Unknown {
-                return Err(Error::TabEditBlocked {
-                    sheet: data.name.clone(),
-                    position: new_active,
-                    reason: TabEditBlock::MarkupCompatibility,
-                });
+            if let Target::Base(new_active) = new_active {
+                let data = base
+                    .inner
+                    .sheets
+                    .get(new_active)
+                    .ok_or_else(|| invalid("new active sheet disappeared during tab edit"))?;
+                if data.kind == SheetKind::Unknown {
+                    return Err(Error::TabEditBlocked {
+                        sheet: data.name.clone(),
+                        position: new_active,
+                        reason: TabEditBlock::MarkupCompatibility,
+                    });
+                }
+                compose_part(&mut parts, &base, &data.part_uri, |content| {
+                    raw::sheet_view_edit::rewrite(
+                        content,
+                        true,
+                        raw::sheet_view_edit::Context {
+                            sheet: &data.name,
+                            position: final_active_position.unwrap_or(new_active),
+                        },
+                    )
+                })?;
             }
-            compose_part(&mut parts, &base, &data.part_uri, |content| {
-                raw::sheet_view_edit::rewrite(
-                    content,
-                    true,
-                    raw::sheet_view_edit::Context {
-                        sheet: &data.name,
-                        position: final_active_position.unwrap_or(new_active),
-                    },
-                )
-            })?;
         }
 
         let reference_renames = effective_renames
@@ -1727,6 +1980,70 @@ impl Edit {
                     )
                 })?;
             }
+            for created_sheet in &mut created {
+                let part_name = created_sheet.graph.part.partname().to_string();
+                if let Some(after) = raw::reference_edit::rewrite(
+                    created_sheet.graph.part.blob(),
+                    &reference_renames,
+                    raw::reference_edit::Context {
+                        sheet: &sheet.name,
+                        position: *position,
+                        part: &part_name,
+                        sheet_titles: &[],
+                    },
+                )? {
+                    created_sheet.graph.part.set_blob(after);
+                }
+                let parsed = raw::worksheet::parse(created_sheet.graph.part.blob(), || {
+                    base.inner.shared_strings()
+                })?;
+                base.inner.validate_styles(&parsed)?;
+                for change in &mut changes {
+                    if let Change::Cell {
+                        sheet,
+                        address,
+                        after,
+                        ..
+                    } = change
+                        && sheet.as_ref() == created_sheet.name.as_str()
+                    {
+                        *after = State::read(parsed.entry(*address), &base);
+                    }
+                }
+            }
+        }
+        if !created.is_empty() && effective_order.is_none() {
+            let existing_titles = base
+                .inner
+                .sheets
+                .iter()
+                .enumerate()
+                .map(|(position, sheet)| {
+                    rename_by_position
+                        .get(&position)
+                        .map_or(sheet.name.as_str(), |name| name.as_str())
+                })
+                .collect::<Vec<_>>();
+            let added_titles = created
+                .iter()
+                .map(|sheet| sheet.name.as_str())
+                .collect::<Vec<_>>();
+            let mut property_parts = base
+                .inner
+                .package
+                .iter_parts()
+                .filter(|part| {
+                    part.content_type()
+                        == litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES
+                })
+                .map(|part| part.partname().clone())
+                .collect::<Vec<_>>();
+            property_parts.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+            for uri in property_parts {
+                compose_part_optional(&mut parts, &base, &uri, |content| {
+                    raw::properties_edit::append_sheets(content, &existing_titles, &added_titles)
+                })?;
+            }
         }
 
         let style_guard = changes
@@ -1743,7 +2060,7 @@ impl Edit {
                 Ok::<_, Error>(StyleGuard { uri, content })
             })
             .transpose()?;
-        let graph = if needs_recalculation {
+        let calculation_graph = if needs_recalculation {
             calculation_chain_removal(&base)?
         } else {
             Vec::new()
@@ -1753,6 +2070,7 @@ impl Edit {
             || !effective_tabs.is_empty()
             || active_change.is_some()
             || effective_order.is_some()
+            || !created.is_empty()
             || needs_recalculation
         {
             let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
@@ -1779,18 +2097,24 @@ impl Edit {
             let workbook_input = referenced_workbook.as_deref().unwrap_or(&before);
             let active = active_change
                 .map(|position| {
-                    let identity = final_active.ok_or_else(|| {
+                    let target = final_active.ok_or_else(|| {
                         invalid("active-tab rewrite position has no sheet identity")
                     })?;
-                    let data = base.inner.sheets.get(identity).ok_or_else(|| {
-                        invalid("active-tab rewrite target disappeared during commit")
-                    })?;
-                    Ok::<_, Error>(raw::catalog_edit::Active {
-                        sheet: &data.name,
-                        position,
-                    })
+                    match target {
+                        Target::Base(identity) => {
+                            let data = base.inner.sheets.get(identity).ok_or_else(|| {
+                                invalid("active-tab rewrite target disappeared during commit")
+                            })?;
+                            Ok::<_, Error>(Some(raw::catalog_edit::Active {
+                                sheet: &data.name,
+                                position,
+                            }))
+                        },
+                        Target::Added(_) => Ok(None),
+                    }
                 })
-                .transpose()?;
+                .transpose()?
+                .flatten();
             let raw_order = effective_order
                 .as_ref()
                 .map(|order| {
@@ -1843,13 +2167,11 @@ impl Edit {
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
-            let mut after = if effective_renames.is_empty()
-                && effective_tabs.is_empty()
-                && active.is_none()
-                && raw_order.is_none()
-            {
-                raw::recalc::invalidate(workbook_input)?
-            } else {
+            let has_existing_catalog_edit = !effective_renames.is_empty()
+                || !effective_tabs.is_empty()
+                || active.is_some()
+                || raw_order.is_some();
+            let mut after = if has_existing_catalog_edit {
                 let tabs = effective_tabs
                     .iter()
                     .map(|(position, action)| {
@@ -1873,26 +2195,50 @@ impl Edit {
                         order: raw_order,
                     },
                 )?
+            } else {
+                workbook_input.to_vec()
             };
-            if needs_recalculation
-                && (!effective_renames.is_empty()
-                    || !effective_tabs.is_empty()
-                    || active.is_some()
-                    || effective_order.is_some())
+            for sheet in &created {
+                after = raw::catalog_edit::append(
+                    &after,
+                    raw::catalog_edit::Create {
+                        sheet: sheet.name.as_str(),
+                        position: sheet.position,
+                        sheet_id: sheet.sheet_id,
+                        relationship_id: &sheet.relationship_id,
+                        state: sheet.visibility.raw(),
+                    },
+                )?;
+            }
+            if active_change.is_some()
+                && let Some(Target::Added(index)) = final_active
             {
+                let sheet = created.get(index).ok_or_else(|| {
+                    invalid("new active worksheet disappeared during catalog rewrite")
+                })?;
+                after = raw::catalog_edit::rewrite(
+                    &after,
+                    raw::catalog_edit::Plan {
+                        tabs: Vec::new(),
+                        renames: Vec::new(),
+                        active: Some(raw::catalog_edit::Active {
+                            sheet: sheet.name.as_str(),
+                            position: sheet.position,
+                        }),
+                        order: None,
+                    },
+                )?;
+            }
+            if needs_recalculation {
                 after = raw::recalc::invalidate(&after)?;
             }
-            if !effective_renames.is_empty()
-                || !effective_tabs.is_empty()
-                || active.is_some()
-                || effective_order.is_some()
-            {
+            if has_existing_catalog_edit || !created.is_empty() || active_change.is_some() {
                 let catalog = raw::parse_catalog(&after)?;
                 if Some(catalog.active_sheet_index) != final_active_position {
                     return Err(invalid("workbook active-tab edit verification failed"));
                 }
                 for (identity, action) in &effective_tabs {
-                    let position = final_position(*identity).ok_or_else(|| {
+                    let position = final_position(Target::Base(*identity)).ok_or_else(|| {
                         invalid("visible tab disappeared from the final workbook order")
                     })?;
                     let actual = catalog
@@ -1911,7 +2257,7 @@ impl Edit {
                     }
                 }
                 for (identity, expected_name) in &effective_renames {
-                    let position = final_position(*identity).ok_or_else(|| {
+                    let position = final_position(Target::Base(*identity)).ok_or_else(|| {
                         invalid("renamed tab disappeared from the final workbook order")
                     })?;
                     let actual = catalog
@@ -1946,6 +2292,26 @@ impl Edit {
                     }
                     verify_defined_name_scopes(&base, &catalog, &order.positions)?;
                 }
+                if catalog.sheets.len() != final_len {
+                    return Err(invalid(
+                        "workbook creation verification has the wrong sheet count",
+                    ));
+                }
+                for sheet in &created {
+                    let actual = catalog.sheets.get(sheet.position).ok_or_else(|| {
+                        invalid("created worksheet disappeared during catalog verification")
+                    })?;
+                    if actual.name != sheet.name.as_str()
+                        || actual.relationship_id != sheet.relationship_id
+                        || actual.sheet_id != sheet.sheet_id
+                        || !raw_visibility_matches(&actual.visibility, sheet.visibility)
+                    {
+                        return Err(invalid(format!(
+                            "workbook creation verification failed at position {}",
+                            sheet.position
+                        )));
+                    }
+                }
             }
             if after.as_slice() != before.as_slice() {
                 parts.push(PartChange {
@@ -1955,6 +2321,13 @@ impl Edit {
                 });
             }
         }
+
+        let mut graph = Vec::new();
+        graph
+            .try_reserve(created.len().saturating_add(calculation_graph.len()))
+            .map_err(|error| invalid(format!("cannot reserve package graph changes: {error}")))?;
+        graph.extend(created.into_iter().map(|sheet| sheet.graph));
+        graph.extend(calculation_graph);
 
         if changes.is_empty() && parts.is_empty() && graph.is_empty() {
             return Ok(Commit {
@@ -1997,7 +2370,7 @@ impl Edit {
     }
 
     fn set_active(&mut self, position: usize) {
-        self.active = Some(position);
+        self.active = Some(Target::Base(position));
     }
 
     fn order_plan(&mut self) -> Result<&mut OrderPlan> {
@@ -2110,17 +2483,43 @@ impl Edit {
                 position,
             });
         }
-        if let (Some(position), Some(_)) = (self.active, other.active) {
-            let sheet = self
-                .base
-                .inner
-                .sheets
-                .get(position)
-                .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+        if let (Some(target), Some(_)) = (self.active, other.active) {
+            let (sheet, position) = self.target_context(target);
             conflicts.push(Conflict::Active {
                 sheet: sheet.into(),
                 position,
             });
+        }
+        for (left_index, left) in self.added.iter().enumerate() {
+            if other
+                .added
+                .iter()
+                .any(|right| right.name.identity_key() == left.name.identity_key())
+                || other.sheets.values().any(|actions| {
+                    actions
+                        .rename
+                        .as_ref()
+                        .is_some_and(|name| name.identity_key() == left.name.identity_key())
+                })
+            {
+                conflicts.push(Conflict::Name {
+                    sheet: left.name.as_str().into(),
+                    position: self.base.len().saturating_add(left_index),
+                });
+            }
+        }
+        for (right_index, right) in other.added.iter().enumerate() {
+            if self.sheets.values().any(|actions| {
+                actions
+                    .rename
+                    .as_ref()
+                    .is_some_and(|name| name.identity_key() == right.name.identity_key())
+            }) {
+                conflicts.push(Conflict::Name {
+                    sheet: right.name.as_str().into(),
+                    position: self.base.len().saturating_add(right_index),
+                });
+            }
         }
         for (position, left) in &self.sheets {
             let Some(right) = other.sheets.get(position) else {
@@ -2206,6 +2605,23 @@ impl Edit {
             conflicts: conflicts.into_boxed_slice(),
         }
     }
+
+    fn target_context(&self, target: Target) -> (&str, usize) {
+        match target {
+            Target::Base(position) => (
+                self.base
+                    .inner
+                    .sheets
+                    .get(position)
+                    .map_or("<missing sheet>", |sheet| sheet.name.as_str()),
+                position,
+            ),
+            Target::Added(index) => self.added.get(index).map_or(
+                ("<missing new sheet>", self.base.len().saturating_add(index)),
+                |sheet| (sheet.name.as_str(), self.base.len().saturating_add(index)),
+            ),
+        }
+    }
 }
 
 /// Transaction-scoped state editor for any workbook sheet tab.
@@ -2268,8 +2684,7 @@ impl SheetEdit<'_> {
     pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
         let row = at.into().resolve()?;
         Ok(RowEdit {
-            edit: &mut *self.edit,
-            position: self.position,
+            actions: self.edit.row_actions(self.position),
             row,
         })
     }
@@ -2278,8 +2693,7 @@ impl SheetEdit<'_> {
     pub fn column(&mut self, at: impl Into<ColumnAt>) -> Result<ColumnEdit<'_>> {
         let column = at.into().resolve()?;
         Ok(ColumnEdit {
-            edit: &mut *self.edit,
-            position: self.position,
+            actions: self.edit.column_actions(self.position),
             column,
         })
     }
@@ -2369,28 +2783,173 @@ impl SheetEdit<'_> {
     }
 }
 
+/// Borrowed editor for one worksheet being created by this transaction.
+///
+/// The handle owns no native Office identity and cannot outlive its edit.
+#[derive(Debug)]
+pub struct NewSheet<'a> {
+    added: &'a mut Added,
+    active: &'a mut Option<Target>,
+    style_lineage: &'a Arc<StyleLineage>,
+    index: usize,
+    position: usize,
+}
+
+impl NewSheet<'_> {
+    /// Checked zero-based position the appended worksheet will occupy.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Current validated developer-facing name in the pending transaction.
+    pub fn name(&self) -> &str {
+        self.added.name.as_str()
+    }
+
+    /// Replace the pending name without exposing a physical sheet identity.
+    pub fn rename<T>(&mut self, name: T) -> Result<&mut Self>
+    where
+        T: TryInto<Name>,
+        Error: From<T::Error>,
+    {
+        self.added.name = name.try_into().map_err(Error::from)?;
+        Ok(self)
+    }
+
+    /// Make the new visible worksheet active at commit.
+    pub fn activate(&mut self) -> &mut Self {
+        *self.active = Some(Target::Added(self.index));
+        self
+    }
+
+    /// Keep the new worksheet visible (the default).
+    pub fn show(&mut self) -> &mut Self {
+        self.added.actions.visibility = Some(TabAction::Show);
+        self
+    }
+
+    /// Create the worksheet hidden from the ordinary tab strip.
+    pub fn hide(&mut self) -> &mut Self {
+        self.added.actions.visibility = Some(TabAction::Hide);
+        self
+    }
+
+    /// Create the worksheet hidden from Excel's ordinary Unhide dialog.
+    pub fn very_hide(&mut self) -> &mut Self {
+        self.added.actions.visibility = Some(TabAction::VeryHide);
+        self
+    }
+
+    /// Select one checked row for short property-editing verbs.
+    pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
+        let row = at.into().resolve()?;
+        Ok(RowEdit {
+            actions: &mut self.added.actions.rows,
+            row,
+        })
+    }
+
+    /// Select one checked column for short property-editing verbs.
+    pub fn column(&mut self, at: impl Into<ColumnAt>) -> Result<ColumnEdit<'_>> {
+        let column = at.into().resolve()?;
+        Ok(ColumnEdit {
+            actions: &mut self.added.actions.columns,
+            column,
+        })
+    }
+
+    /// Create or replace a cell's primary value or formula.
+    pub fn set<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        content: impl Into<Content>,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        let content = content.into();
+        content.validate_for_write()?;
+        match self.added.actions.cells.entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::set(content));
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Set(content)),
+        }
+        Ok(self)
+    }
+
+    /// Clear pending primary content while retaining an explicit cell when a
+    /// previous operation in this transaction created it.
+    pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        let actions = &mut self.added.actions.cells;
+        let create = actions.get(&address).is_some_and(|action| {
+            matches!(action.payload(), Some(Payload::Set(_) | Payload::Clear))
+        });
+        match actions.entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::clear(create));
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_payload(if create {
+                Payload::Clear
+            } else {
+                Payload::ClearIfPresent
+            }),
+        }
+        Ok(self)
+    }
+
+    /// Apply an existing shared style without copying its formatting payload.
+    pub fn style<'a>(&mut self, at: impl Into<At<'a>>, style: &Style) -> Result<&mut Self> {
+        if !Arc::ptr_eq(self.style_lineage, &style.owner.style_lineage) {
+            return Err(Error::ForeignStyle);
+        }
+        let address = at.into().resolve()?;
+        let effect = StyleEffect::Set(style.raw());
+        match self.added.actions.cells.entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::style(style.raw()));
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_style(effect),
+        }
+        Ok(self)
+    }
+
+    /// Remove an explicit local style reference from the pending cell.
+    pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        match self.added.actions.cells.entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::reset_style());
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_style(StyleEffect::Reset),
+        }
+        Ok(self)
+    }
+
+    /// Remove the pending cell record without shifting surrounding cells.
+    pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        self.added.actions.cells.insert(address, Action::Remove);
+        Ok(self)
+    }
+}
+
 /// Transaction-scoped editor for one checked worksheet row.
 #[derive(Debug)]
 pub struct RowEdit<'a> {
-    edit: &'a mut Edit,
-    position: usize,
+    actions: &'a mut BTreeMap<RowIndex, RowAction>,
     row: RowIndex,
 }
 
 impl RowEdit<'_> {
     /// Hide this row while preserving all row and cell content.
     pub fn hide(&mut self) -> &mut Self {
-        self.edit
-            .row_actions(self.position)
-            .insert(self.row, RowAction::Hide);
+        self.actions.insert(self.row, RowAction::Hide);
         self
     }
 
     /// Show this row while preserving all row and cell content.
     pub fn show(&mut self) -> &mut Self {
-        self.edit
-            .row_actions(self.position)
-            .insert(self.row, RowAction::Show);
+        self.actions.insert(self.row, RowAction::Show);
         self
     }
 }
@@ -2398,8 +2957,7 @@ impl RowEdit<'_> {
 /// Transaction-scoped editor for one checked worksheet column.
 #[derive(Debug)]
 pub struct ColumnEdit<'a> {
-    edit: &'a mut Edit,
-    position: usize,
+    actions: &'a mut BTreeMap<ColumnIndex, ColumnAction>,
     column: ColumnIndex,
 }
 
@@ -2407,18 +2965,14 @@ impl ColumnEdit<'_> {
     /// Hide this column while preserving its other effective properties and
     /// every cell record.
     pub fn hide(&mut self) -> &mut Self {
-        self.edit
-            .column_actions(self.position)
-            .insert(self.column, ColumnAction::Hide);
+        self.actions.insert(self.column, ColumnAction::Hide);
         self
     }
 
     /// Show this column while preserving its other effective properties and
     /// every cell record.
     pub fn show(&mut self) -> &mut Self {
-        self.edit
-            .column_actions(self.position)
-            .insert(self.column, ColumnAction::Show);
+        self.actions.insert(self.column, ColumnAction::Show);
         self
     }
 }
@@ -2650,6 +3204,282 @@ fn ensure_unsigned(workbook: &Workbook) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+fn create_sheets(
+    workbook: &Workbook,
+    added: Vec<Added>,
+    active: Option<usize>,
+    changes: &mut Vec<Change>,
+    needs_recalculation: &mut bool,
+) -> Result<Vec<CreatedSheet>> {
+    if added.is_empty() {
+        return Ok(Vec::new());
+    }
+    let main = workbook
+        .inner
+        .package
+        .get_part(&workbook.inner.workbook_uri)?;
+    let dialect = raw::catalog_edit::dialect(main.blob())?;
+    let relationship_type = match dialect {
+        raw::catalog_edit::Dialect::Transitional => {
+            litchi_opc::constants::relationship_type::WORKSHEET
+        },
+        raw::catalog_edit::Dialect::Strict => {
+            litchi_opc::constants::relationship_type::STRICT_WORKSHEET
+        },
+    };
+    let namespace = dialect.worksheet_namespace();
+
+    let mut used_sheet_ids = HashSet::new();
+    used_sheet_ids
+        .try_reserve(workbook.inner.sheets.len().saturating_add(added.len()))
+        .map_err(|error| invalid(format!("cannot reserve native sheet-ID index: {error}")))?;
+    used_sheet_ids.extend(workbook.inner.sheets.iter().map(|sheet| sheet.native_id));
+
+    let mut used_relationship_ids = HashSet::<String>::new();
+    used_relationship_ids
+        .try_reserve(main.rels().len().saturating_add(added.len()))
+        .map_err(|error| invalid(format!("cannot reserve relationship-ID index: {error}")))?;
+    used_relationship_ids.extend(
+        main.rels()
+            .iter()
+            .map(|relationship| relationship.r_id().to_owned()),
+    );
+
+    let mut reserved_parts = Vec::<PackURI>::new();
+    reserved_parts
+        .try_reserve_exact(added.len())
+        .map_err(|error| invalid(format!("cannot reserve worksheet part names: {error}")))?;
+    let mut created = Vec::new();
+    created
+        .try_reserve_exact(added.len())
+        .map_err(|error| invalid(format!("cannot reserve worksheet graph changes: {error}")))?;
+
+    let mut next_sheet_id = 1u32;
+    let mut next_relationship_id = 1u32;
+    let mut next_part = 1u32;
+    for (index, added) in added.into_iter().enumerate() {
+        while used_sheet_ids.contains(&next_sheet_id) {
+            next_sheet_id = next_sheet_id
+                .checked_add(1)
+                .ok_or_else(|| invalid("native worksheet ID space is exhausted"))?;
+        }
+        if next_sheet_id > raw::catalog_edit::MAX_SHEET_ID {
+            return Err(invalid("native worksheet ID space is exhausted"));
+        }
+        let sheet_id = next_sheet_id;
+        used_sheet_ids.insert(sheet_id);
+        next_sheet_id = next_sheet_id.saturating_add(1);
+
+        let relationship_id = loop {
+            let candidate = format!("rId{next_relationship_id}");
+            next_relationship_id = next_relationship_id
+                .checked_add(1)
+                .ok_or_else(|| invalid("workbook relationship-ID space is exhausted"))?;
+            if used_relationship_ids.insert(candidate.clone()) {
+                break candidate;
+            }
+        };
+
+        let part_uri = loop {
+            let base_uri = workbook.inner.workbook_uri.base_uri();
+            let candidate_path = if base_uri == "/" {
+                format!("/worksheets/sheet{next_part}.xml")
+            } else {
+                format!("{base_uri}/worksheets/sheet{next_part}.xml")
+            };
+            let candidate = PackURI::new(candidate_path).map_err(invalid)?;
+            next_part = next_part
+                .checked_add(1)
+                .ok_or_else(|| invalid("worksheet part-name space is exhausted"))?;
+            if workbook
+                .inner
+                .package
+                .validate_new_part_name(&candidate)
+                .is_ok()
+                && !reserved_parts
+                    .iter()
+                    .any(|reserved| reserved.is_equivalent_to(&candidate))
+            {
+                reserved_parts.push(candidate.clone());
+                break candidate;
+            }
+        };
+
+        let position = workbook
+            .inner
+            .sheets
+            .len()
+            .checked_add(index)
+            .ok_or_else(|| invalid("created worksheet position overflow"))?;
+        let visibility = added.actions.visibility.unwrap_or(TabAction::Show);
+        let name = added.name;
+        changes.push(Change::Create {
+            sheet: name.as_str().into(),
+            position,
+            visibility: visibility.visibility(),
+        });
+
+        let SheetActions {
+            rename: _,
+            visibility: _,
+            cells,
+            rows,
+            columns,
+        } = added.actions;
+        let change_start = changes.len();
+        let mut effective_cells = BTreeMap::new();
+        for (address, action) in cells {
+            let before = State::Missing;
+            let after = State::after(None, &action, workbook);
+            if before == after {
+                continue;
+            }
+            *needs_recalculation |=
+                State::calculation_content(&before) != State::calculation_content(&after);
+            effective_cells.insert(address, action);
+            changes.push(Change::Cell {
+                sheet: name.as_str().into(),
+                address,
+                before,
+                after,
+            });
+        }
+        let mut effective_rows = BTreeMap::new();
+        for (row, action) in rows {
+            let before = RowState::Missing;
+            let after = RowState::after(None, action);
+            if before == after {
+                continue;
+            }
+            effective_rows.insert(row, action);
+            changes.push(Change::Row {
+                sheet: name.as_str().into(),
+                row,
+                before,
+                after,
+            });
+        }
+        let mut effective_columns = BTreeMap::new();
+        for (column, action) in columns {
+            let before = ColumnState::Missing;
+            let after = ColumnState::after(None, action);
+            if before == after {
+                continue;
+            }
+            effective_columns.insert(column, action);
+            changes.push(Change::Column {
+                sheet: name.as_str().into(),
+                column,
+                before,
+                after,
+            });
+        }
+
+        let template = format!(
+            concat!(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+                r#"<worksheet xmlns="{}"><dimension ref="A1"/><sheetData/></worksheet>"#
+            ),
+            namespace
+        )
+        .into_bytes();
+        let mut content = raw::worksheet::edit::rewrite(
+            &template,
+            name.as_str(),
+            Plan {
+                cells: effective_cells,
+                rows: effective_rows,
+                columns: effective_columns,
+            },
+        )?;
+        if active == Some(index) {
+            content = raw::sheet_view_edit::rewrite(
+                &content,
+                true,
+                raw::sheet_view_edit::Context {
+                    sheet: name.as_str(),
+                    position,
+                },
+            )?;
+        }
+        let parsed = raw::worksheet::parse(&content, || workbook.inner.shared_strings())?;
+        workbook.inner.validate_styles(&parsed)?;
+        for change in &changes[change_start..] {
+            match change {
+                Change::Cell {
+                    sheet,
+                    address,
+                    after,
+                    ..
+                } => {
+                    if State::read(parsed.entry(*address), workbook) != *after {
+                        return Err(invalid(format!(
+                            "new worksheet verification failed at {sheet}!{address}"
+                        )));
+                    }
+                },
+                Change::Row {
+                    sheet, row, after, ..
+                } => {
+                    if RowState::read(parsed.row_entry(*row)) != *after {
+                        return Err(invalid(format!(
+                            "new worksheet row verification failed at {sheet}!row {}",
+                            row.get()
+                        )));
+                    }
+                },
+                Change::Column {
+                    sheet,
+                    column,
+                    after,
+                    ..
+                } => {
+                    if ColumnState::read(parsed.column_entry(*column)) != *after {
+                        return Err(invalid(format!(
+                            "new worksheet column verification failed at {sheet}!column {}",
+                            column.get()
+                        )));
+                    }
+                },
+                Change::Create { .. }
+                | Change::Remove { .. }
+                | Change::Rename { .. }
+                | Change::Move { .. }
+                | Change::Active { .. }
+                | Change::Visibility { .. } => {},
+            }
+        }
+
+        let target_ref = part_uri.relative_ref(workbook.inner.workbook_uri.base_uri());
+        let relationship = Relationship::new_with_mode(
+            relationship_id.clone(),
+            relationship_type.to_owned(),
+            target_ref,
+            workbook.inner.workbook_uri.base_uri().to_owned(),
+            TargetMode::Internal,
+        );
+        let part = BlobPart::new(
+            part_uri,
+            litchi_opc::constants::content_type::SML_WORKSHEET.to_owned(),
+            content,
+        );
+        created.push(CreatedSheet {
+            name,
+            position,
+            sheet_id,
+            relationship_id,
+            visibility,
+            graph: GraphChange {
+                action: GraphAction::Add,
+                source: workbook.inner.workbook_uri.clone(),
+                relationship,
+                part: Box::new(part),
+            },
+        });
+    }
+    Ok(created)
 }
 
 fn calculation_chain_removal(workbook: &Workbook) -> Result<Vec<GraphChange>> {
@@ -3436,6 +4266,308 @@ mod tests {
             .expect("inverse rename");
         assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
         assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
+    }
+
+    #[test]
+    fn worksheet_add_is_atomic_populatable_active_and_reversible() {
+        let source = Workbook::new().expect("source workbook");
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        {
+            let mut sheet = edit.add(String::from("Summary")).expect("new sheet");
+            assert_eq!(sheet.name(), "Summary");
+            assert_eq!(sheet.position(), 1);
+            sheet
+                .set("A1", "created in one transaction")
+                .and_then(|sheet| sheet.set("B2", Formula::new("1+1").expect("checked formula")))
+                .expect("new cells");
+            sheet.row(3u32).expect("row").hide();
+            sheet.column(2u32).expect("column").hide();
+            sheet.activate();
+        }
+        let committed = edit.commit().expect("create commit");
+        assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
+        assert_eq!(
+            committed
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet1", "Summary"]
+        );
+        assert_eq!(
+            committed.workbook().active_sheet().expect("active").name(),
+            "Summary"
+        );
+        let summary = committed
+            .workbook()
+            .sheet("summary")
+            .expect("caseless lookup")
+            .expect("created sheet");
+        assert_eq!(summary.data.native_id, 2);
+        assert!(matches!(
+            summary.cell("A1").expect("A1"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "created in one transaction"
+        ));
+        assert!(matches!(
+            summary.cell("B2").expect("B2"),
+            Some(Cell::Formula(formula)) if formula.text() == "1+1"
+        ));
+        assert!(summary.row(3u32).expect("row").hidden());
+        assert!(summary.column(2u32).expect("column").hidden());
+        assert!(
+            committed
+                .patch()
+                .changes()
+                .iter()
+                .any(|change| { change.created() == Some((1, "Summary")) })
+        );
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse create");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored"),
+            source_bytes
+        );
+        let replayed = source.apply(committed.patch()).expect("forward replay");
+        assert!(
+            replayed
+                .workbook()
+                .sheet("Summary")
+                .expect("lookup")
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn worksheet_add_validates_names_visibility_and_parallel_joins() {
+        let source = Workbook::new().expect("source workbook");
+
+        let mut duplicate = source.edit().expect("duplicate edit");
+        duplicate.add("sheet1").expect("checked spelling");
+        assert!(matches!(
+            duplicate.commit(),
+            Err(Error::SheetNameConflict {
+                first: 0,
+                second: 1,
+                ..
+            })
+        ));
+
+        let mut hidden = source.edit().expect("hidden edit");
+        {
+            let mut sheet = hidden.add("Hidden").expect("new sheet");
+            sheet.hide().activate();
+        }
+        assert!(matches!(
+            hidden.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::NotVisible,
+                ..
+            })
+        ));
+
+        let mut replacement = source.edit().expect("replacement edit");
+        replacement
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("existing tab")
+            .hide();
+        replacement.add("Replacement").expect("visible replacement");
+        let replaced = replacement.commit().expect("replacement commit");
+        assert_eq!(
+            replaced.workbook().active_sheet().expect("active").name(),
+            "Replacement"
+        );
+        assert!(matches!(
+            replaced
+                .workbook()
+                .sheet("Sheet1")
+                .expect("lookup")
+                .expect("old tab")
+                .visibility(),
+            Visibility::Hidden
+        ));
+
+        let mut left = source.edit().expect("left");
+        left.add("North")
+            .expect("North")
+            .set("A1", 1_i32)
+            .expect("cell");
+        let mut right = source.edit().expect("right");
+        right
+            .add("South")
+            .expect("South")
+            .set("A1", 2_i32)
+            .expect("cell");
+        left.join(right).expect("disjoint appends join");
+        let joined = left.commit().expect("joined create");
+        assert_eq!(
+            joined
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet1", "North", "South"]
+        );
+
+        let mut one = source.edit().expect("one");
+        one.add("Résumé").expect("first name");
+        let mut two = source.edit().expect("two");
+        two.add("RE\u{301}SUME\u{301}").expect("equivalent name");
+        let error = one.join(two).expect_err("equivalent creations conflict");
+        assert!(error.conflicts().expect("conflicts").conflicts()[0].is_name());
+    }
+
+    #[test]
+    fn worksheet_add_closes_rename_formula_and_extended_property_dependencies() {
+        let source = rename_reference_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        edit.tab("Data")
+            .expect("lookup")
+            .expect("tab")
+            .rename("Input")
+            .expect("rename");
+        edit.add("New & Sheet")
+            .expect("new sheet")
+            .set(
+                "A1",
+                Formula::new("Data!A1").expect("source-snapshot formula"),
+            )
+            .expect("formula");
+        let committed = edit.commit().expect("composed structural commit");
+        let created = committed
+            .workbook()
+            .sheet("New & Sheet")
+            .expect("lookup")
+            .expect("created sheet");
+        assert!(matches!(
+            created.cell("A1").expect("formula"),
+            Some(Cell::Formula(formula)) if formula.text() == "Input!A1"
+        ));
+        let properties = part_text(committed.workbook(), "/docProps/app.xml");
+        assert!(properties.contains("size=\"4\""));
+        assert!(properties.contains(
+            "<vt:lpstr>Input</vt:lpstr><vt:lpstr>Calc</vt:lpstr><vt:lpstr>New &amp; Sheet</vt:lpstr><vt:lpstr>Input!Print_Area</vt:lpstr>"
+        ));
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored"),
+            source_bytes
+        );
+    }
+
+    #[test]
+    fn worksheet_add_preserves_optional_properties_during_a_simultaneous_reorder() {
+        let source = rename_reference_workbook();
+        let properties_before = part_text(&source, "/docProps/app.xml");
+        let mut edit = source.edit().expect("edit");
+        edit.move_before("Calc", "Data")
+            .expect("move")
+            .expect("both tabs");
+        edit.add("Tail").expect("new sheet");
+        let committed = edit.commit().expect("composed commit");
+        assert_eq!(
+            committed
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Calc", "Data", "Tail"]
+        );
+        assert_eq!(
+            part_text(committed.workbook(), "/docProps/app.xml"),
+            properties_before
+        );
+    }
+
+    #[test]
+    fn worksheet_add_allocates_strict_graph_identity_without_exposing_it() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut package = baseline.inner.package.clone();
+        let main = package
+            .get_part_mut(&baseline.inner.workbook_uri)
+            .expect("workbook part");
+        main.set_blob(
+            br#"<workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main" xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"><sheets><sheet name="Strict1" sheetId="7" r:id="tab"/></sheets></workbook>"#.to_vec(),
+        );
+        main.rels_mut().remove("rId1").expect("old worksheet rel");
+        main.rels_mut()
+            .try_add_relationship(
+                litchi_opc::constants::relationship_type::STRICT_WORKSHEET.to_owned(),
+                "worksheets/sheet1.xml".to_owned(),
+                "tab".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("strict worksheet rel");
+        package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("URI"))
+            .expect("worksheet")
+            .set_blob(
+                br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><sheetData/></worksheet>"#.to_vec(),
+            );
+        let source = Workbook::from_package(package).expect("strict source");
+        let mut edit = source.edit().expect("edit");
+        edit.add("Strict2").expect("new strict sheet");
+        let committed = edit.commit().expect("strict create");
+        let sheet = committed
+            .workbook()
+            .sheet("Strict2")
+            .expect("lookup")
+            .expect("created");
+        assert_eq!(sheet.data.native_id, 1);
+        assert_eq!(sheet.data.relationship_id, "rId1");
+        assert_eq!(sheet.data.part_uri.as_str(), "/xl/worksheets/sheet2.xml");
+        let main = committed
+            .workbook()
+            .inner
+            .package
+            .get_part(&committed.workbook().inner.workbook_uri)
+            .expect("workbook part");
+        assert_eq!(
+            main.rels()
+                .get(&sheet.data.relationship_id)
+                .expect("new relationship")
+                .reltype(),
+            litchi_opc::constants::relationship_type::STRICT_WORKSHEET
+        );
+        assert!(
+            part_text(committed.workbook(), sheet.data.part_uri.as_str())
+                .contains("http://purl.oclc.org/ooxml/spreadsheetml/main")
+        );
+    }
+
+    #[test]
+    fn worksheet_add_blocks_protected_and_compatibility_owned_catalogs() {
+        for xml in [
+            br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookProtection lockStructure="1"/><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#.as_slice(),
+            br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><mc:AlternateContent><mc:Choice Requires="x"><x:payload/></mc:Choice><mc:Fallback/></mc:AlternateContent></sheets></workbook>"#.as_slice(),
+        ] {
+            let baseline = Workbook::new().expect("baseline");
+            let mut package = baseline.inner.package.clone();
+            package
+                .get_part_mut(&baseline.inner.workbook_uri)
+                .expect("workbook")
+                .set_blob(xml.to_vec());
+            let source = Workbook::from_package(package).expect("source");
+            let mut edit = source.edit().expect("edit");
+            edit.add("Blocked").expect("plan");
+            assert!(matches!(
+                edit.commit(),
+                Err(Error::TabEditBlocked {
+                    reason: TabEditBlock::ProtectedWorkbook
+                        | TabEditBlock::MarkupCompatibility,
+                    ..
+                })
+            ));
+        }
     }
 
     #[test]

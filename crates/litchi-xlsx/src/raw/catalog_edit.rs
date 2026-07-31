@@ -15,10 +15,34 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result, TabEditBlock, invalid};
-use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
+use crate::raw::namespace::{
+    STRICT_SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
+};
 
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+/// `[MS-OE376]` section 2.1.622(c) requires `activeTab` in 0..=32,766.
 pub(crate) const MAX_ACTIVE_TAB: usize = 32_766;
+/// `[MS-OE376]` section 2.1.613(a) limits `<sheet>` to 32,767 occurrences.
+pub(crate) const MAX_SHEETS: usize = 32_767;
+/// `[MS-OE376]` section 2.1.612(b) requires `sheetId` in 1..=65,534.
+pub(crate) const MAX_SHEET_ID: u32 = 65_534;
+/// `[MS-OE376]` section 2.1.612(c) limits relationship IDs to 255 characters.
+const MAX_RELATIONSHIP_ID_CHARS: usize = 255;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Dialect {
+    Transitional,
+    Strict,
+}
+
+impl Dialect {
+    pub(crate) const fn worksheet_namespace(self) -> &'static str {
+        match self {
+            Self::Transitional => "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            Self::Strict => "http://purl.oclc.org/ooxml/spreadsheetml/main",
+        }
+    }
+}
 
 /// Recognized sheet states that are safe to author.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +87,16 @@ pub(crate) struct Rename<'a> {
 pub(crate) struct Active<'a> {
     pub(crate) sheet: &'a str,
     pub(crate) position: usize,
+}
+
+/// One physical catalog record synthesized below the semantic facade.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Create<'a> {
+    pub(crate) sheet: &'a str,
+    pub(crate) position: usize,
+    pub(crate) sheet_id: u32,
+    pub(crate) relationship_id: &'a str,
+    pub(crate) state: State,
 }
 
 /// Final relationship order plus semantic error context. Relationship IDs are
@@ -142,6 +176,8 @@ struct Container {
 
 #[derive(Debug)]
 struct Layout {
+    root: Tag,
+    dialect: Dialect,
     sheets: Container,
     sheet_slots: Box<[SheetSlot]>,
     book_views: Option<Container>,
@@ -181,6 +217,8 @@ struct Pending {
 #[derive(Debug, Default)]
 struct Scanner {
     root_seen: bool,
+    root: Option<Tag>,
+    dialect: Option<Dialect>,
     sheets: Option<Container>,
     pending_sheets: Option<Pending>,
     sheet_slots: Vec<SheetSlot>,
@@ -323,6 +361,137 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     }
     output.extend_from_slice(&content[cursor..]);
     Ok(output)
+}
+
+/// Append one checked sheet catalog entry while preserving every existing
+/// element byte. Positional dependencies do not move for an append; activation
+/// is intentionally handled by the ordinary view rewriter after insertion.
+pub(crate) fn append(content: &[u8], create: Create<'_>) -> Result<Vec<u8>> {
+    let layout = scan(content)?;
+    let context = Some((create.sheet, create.position));
+    if layout.protected {
+        return Err(block(context, TabEditBlock::ProtectedWorkbook));
+    }
+    if layout.sheets.payload || layout.alternate_dependencies || layout.alternate_content {
+        return Err(block(context, TabEditBlock::MarkupCompatibility));
+    }
+    if layout.sheet_slots.len() >= MAX_SHEETS {
+        return Err(block(context, TabEditBlock::SheetLimit));
+    }
+    if create.position != layout.sheet_slots.len() {
+        return Err(invalid("new worksheet position is not the catalog tail"));
+    }
+    if !(1..=MAX_SHEET_ID).contains(&create.sheet_id) {
+        return Err(invalid("new worksheet native sheet ID is out of range"));
+    }
+    if create.relationship_id.is_empty()
+        || create.relationship_id.chars().count() > MAX_RELATIONSHIP_ID_CHARS
+    {
+        return Err(invalid("new worksheet relationship ID is out of range"));
+    }
+    if layout
+        .sheet_slots
+        .iter()
+        .any(|sheet| sheet.relationship_id.as_ref() == create.relationship_id)
+    {
+        return Err(invalid(
+            "new worksheet relationship ID already exists in the catalog",
+        ));
+    }
+
+    let sheet_name = layout.sheet_slots.first().map_or_else(
+        || sibling_name(&layout.sheets.slot.tag.name, "sheet"),
+        |sheet| sheet.slot.tag.name.to_string(),
+    );
+    let relationship_name = layout
+        .sheet_slots
+        .first()
+        .and_then(relationship_attribute_name)
+        .map(str::to_owned)
+        .or_else(|| relationship_attribute_from_namespaces(&layout.root))
+        .or_else(|| relationship_attribute_from_namespaces(&layout.sheets.slot.tag))
+        .ok_or_else(|| block(context, TabEditBlock::MarkupCompatibility))?;
+    let tag = Tag {
+        name: sheet_name.into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    let mut created = Vec::new();
+    let mut attributes = vec![
+        ("name", create.sheet.to_owned()),
+        ("sheetId", create.sheet_id.to_string()),
+        (
+            relationship_name.as_str(),
+            create.relationship_id.to_owned(),
+        ),
+    ];
+    if let Some(state) = create.state.attribute() {
+        attributes.push(("state", state.to_owned()));
+    }
+    write_tag(&mut created, &tag, true, &[], &attributes);
+
+    if layout.sheets.slot.empty {
+        let mut replacement = Vec::new();
+        write_tag(&mut replacement, &layout.sheets.slot.tag, false, &[], &[]);
+        replacement.extend_from_slice(&created);
+        write_close(&mut replacement, &layout.sheets.slot.tag.name);
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(
+                content
+                    .len()
+                    .checked_sub(layout.sheets.slot.span.end - layout.sheets.slot.span.start)
+                    .and_then(|size| size.checked_add(replacement.len()))
+                    .ok_or_else(|| invalid("workbook append output size overflow"))?,
+            )
+            .map_err(|error| invalid(format!("cannot reserve workbook append output: {error}")))?;
+        output.extend_from_slice(&content[..layout.sheets.slot.span.start]);
+        output.extend_from_slice(&replacement);
+        output.extend_from_slice(&content[layout.sheets.slot.span.end..]);
+        return Ok(output);
+    }
+
+    let at = layout.sheets.slot.close_start;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(
+            content
+                .len()
+                .checked_add(created.len())
+                .ok_or_else(|| invalid("workbook append output size overflow"))?,
+        )
+        .map_err(|error| invalid(format!("cannot reserve workbook append output: {error}")))?;
+    output.extend_from_slice(&content[..at]);
+    output.extend_from_slice(&created);
+    output.extend_from_slice(&content[at..]);
+    Ok(output)
+}
+
+pub(crate) fn dialect(content: &[u8]) -> Result<Dialect> {
+    Ok(scan(content)?.dialect)
+}
+
+fn relationship_attribute_name(sheet: &SheetSlot) -> Option<&str> {
+    let mut found = sheet.slot.tag.attributes.iter().filter(|attribute| {
+        attribute.value.as_ref() == sheet.relationship_id.as_ref()
+            && attribute
+                .name
+                .rsplit_once(':')
+                .is_some_and(|(_, local)| local == "id")
+    });
+    let name = found.next()?.name.as_ref();
+    found.next().is_none().then_some(name)
+}
+
+fn relationship_attribute_from_namespaces(root: &Tag) -> Option<String> {
+    root.attributes.iter().find_map(|attribute| {
+        let prefix = attribute.name.strip_prefix("xmlns:")?;
+        matches!(
+            attribute.value.as_ref(),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                | "http://purl.oclc.org/ooxml/officeDocument/relationships"
+        )
+        .then(|| format!("{prefix}:id"))
+    })
 }
 
 fn validate_order(layout: &Layout, order: &Order<'_>) -> Result<OrderMap> {
@@ -789,6 +958,16 @@ impl Scanner {
                 return Err(invalid("workbook edit requires one SpreadsheetML root"));
             }
             self.root_seen = true;
+            self.root = Some(tag(element, decoder)?);
+            self.dialect = Some(
+                matches!(
+                    namespace,
+                    ResolveResult::Bound(Namespace(value))
+                        if *value == STRICT_SPREADSHEETML_NAMESPACE
+                )
+                .then_some(Dialect::Strict)
+                .unwrap_or(Dialect::Transitional),
+            );
             return Ok(Kind::Workbook);
         }
         self.observe_guard(parent, namespace, element, decoder, alternate_content)?;
@@ -1164,7 +1343,15 @@ impl Scanner {
         let sheets = self
             .sheets
             .ok_or_else(|| invalid("tab edits require a direct sheets element"))?;
+        let root = self
+            .root
+            .ok_or_else(|| invalid("workbook edit scan lost its root element"))?;
+        let dialect = self
+            .dialect
+            .ok_or_else(|| invalid("workbook edit scan lost its XML dialect"))?;
         Ok(Layout {
+            root,
+            dialect,
             sheets,
             sheet_slots: self.sheet_slots.into_boxed_slice(),
             book_views: self.book_views,
@@ -1721,5 +1908,77 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn append_preserves_existing_bytes_and_uses_the_document_prefixes() {
+        let source = format!(
+            r#"<?xml version="1.0"?><s:workbook xmlns:s="{S}" xmlns:rel="{R}" xmlns:x="urn:keep" x:exact="yes"><s:bookViews><s:workbookView activeTab="0"/></s:bookViews><s:sheets><s:sheet name="One" sheetId="7" rel:id="tab" x:keep="1"/></s:sheets><x:tail>opaque</x:tail></s:workbook>"#
+        );
+        let output = append(
+            source.as_bytes(),
+            Create {
+                sheet: "A&B",
+                position: 1,
+                sheet_id: 1,
+                relationship_id: "rId1",
+                state: State::Hidden,
+            },
+        )
+        .expect("append");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains(
+            r#"<s:sheet name="One" sheetId="7" rel:id="tab" x:keep="1"/><s:sheet name="A&amp;B" sheetId="1" rel:id="rId1" state="hidden"/>"#
+        ));
+        assert!(text.contains(r#"<x:tail>opaque</x:tail>"#));
+        assert!(text.contains(r#"<s:workbook xmlns:s="#));
+        let catalog = parse_catalog(&output).expect("catalog");
+        assert_eq!(catalog.sheets.len(), 2);
+        assert_eq!(catalog.sheets[1].name, "A&B");
+        assert!(matches!(catalog.sheets[1].visibility, Visibility::Hidden));
+    }
+
+    #[test]
+    fn append_expands_an_empty_sheet_container_from_root_namespaces() {
+        let source =
+            format!(r#"<s:workbook xmlns:s="{S}" xmlns:rel="{R}"><s:sheets/></s:workbook>"#);
+        let output = append(
+            source.as_bytes(),
+            Create {
+                sheet: "Only",
+                position: 0,
+                sheet_id: 9,
+                relationship_id: "new",
+                state: State::Visible,
+            },
+        )
+        .expect("append");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(
+            text.contains(
+                r#"<s:sheets><s:sheet name="Only" sheetId="9" rel:id="new"/></s:sheets>"#
+            )
+        );
+        assert_eq!(parse_catalog(&output).expect("catalog").sheets.len(), 1);
+    }
+
+    #[test]
+    fn append_expands_an_empty_sheet_container_with_a_local_relationship_prefix() {
+        let source =
+            format!(r#"<s:workbook xmlns:s="{S}"><s:sheets xmlns:rel="{R}"/></s:workbook>"#);
+        let output = append(
+            source.as_bytes(),
+            Create {
+                sheet: "Only",
+                position: 0,
+                sheet_id: 1,
+                relationship_id: "rId1",
+                state: State::Visible,
+            },
+        )
+        .expect("append");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains(r#"<s:sheet name="Only" sheetId="1" rel:id="rId1"/>"#));
+        assert_eq!(parse_catalog(&output).expect("catalog").sheets.len(), 1);
     }
 }

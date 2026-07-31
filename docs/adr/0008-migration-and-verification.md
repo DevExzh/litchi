@@ -653,18 +653,83 @@ rename/open/resave path on that Excel build. It does not certify every modeled
 reference carrier, name grammar edge, external-link behavior, signed or
 protected packages, macros, other Office applications, or other Office builds.
 
+The fifteenth slice adds transactional worksheet creation. The concise entry
+is `let mut sheet = edit.add(name)?`; the returned `NewSheet<'edit>` is a
+borrowed transaction-local capability, so it can immediately use the same
+short `set`, `clear`, `remove`, `style`, `row`, `column`, visibility, rename,
+and activation verbs as an existing worksheet without exposing a native
+`sheetId`, relationship ID, part URI, lock, or generic identity parameter.
+Names accept borrowed strings, owned strings, or prevalidated `sheet::Name`
+values. Creation is tail-only in this slice: existing reorder is applied first
+and new worksheets retain call order. Semantic before/after insertion remains
+future work rather than being approximated with a raw physical ID.
+
+Commit validates the final Unicode-caseless name set and the 32,767-sheet
+limit before graph mutation. The sheet-count, native-ID, relationship-ID, and
+active-tab bounds come from `[MS-OE376]` sections 2.1.612, 2.1.613, and
+2.1.622(c). Commit then allocates the lowest unused native sheet ID, workbook
+relationship ID, and non-conflicting worksheet part name at the low-level
+boundary. Allocation is deterministic, recognizes nonstandard IDs and gaps,
+and derives strict versus transitional worksheet namespaces and relationship
+types from the workbook root. `Change::Create`/`Change::Remove`
+carry only the developer name, checked position, and visibility; the latter is
+currently produced by inverse patches. The private graph delta owns the new
+part and relationship. Forward replay checks that both are absent; inverse
+replay checks their complete expected identity and bytes before removal.
+
+The new worksheet is built and edited before publication, then reparsed with
+the ordinary worksheet and shared-style validators. Formula-bearing creates
+invalidate calculation properties and remove one exclusively owned calculation
+chain through the same reversible graph transaction. Activating the new sheet
+updates the first workbook view, clears the prior sheet's selection, and emits
+the new sheet's selected view; creating a hidden active sheet is rejected by
+the final-state invariant. Simultaneous existing-sheet renames rewrite local
+references inside the newly created worksheet as well as existing parts.
+When existing tab order is unchanged, recognized extended properties insert
+new titles after the existing sheet-title prefix, update vector size and a
+standard Worksheet heading count, and retain named-range titles. A simultaneous
+reorder skips creation-metadata synchronization; absent another edit to that
+part, it remains byte-exact until an order-aware splice is implemented. Missing,
+stale, or nonstandard optional layouts are likewise preserved instead of
+guessed.
+
+Independent edits may append different names and populate their own new
+worksheets concurrently, then join in explicit join order. Unicode-equivalent
+new names, active-tab effects, and conflicting rename targets return the same
+structured conflict families as existing sheets. Tests cover one-transaction
+cell/formula/row/column creation, activation and hidden-state refusal, owned
+names, Unicode canonical collisions, disjoint joins, strict dialects, gapped
+native identity allocation, prefixed and empty sheet catalogs, protected and
+compatibility-owned catalogs, rename/formula composition, extended-property
+ordering, source immutability, source-checked forward replay, and byte-exact
+inverse restoration.
+
+Computer Use then exercised this exact slice in Microsoft Excel for Mac
+16.110.2 (build 16.110.26062818). Excel opened the Litchi-generated workbook
+without a repair or compatibility dialog, exposed all three expected tabs,
+made `Active Data` active, displayed `42` at A1, retained `Summary!A1`,
+calculated `Summary!B2` as `2`, and showed column C as hidden. Excel accepted
+`Excel resave marker` at `Summary!D2` and saved the workbook without warning.
+The resaved archive passed ZIP integrity validation, and the public `open`
+example recovered all three tabs, the active Summary tab, the A1 text, the
+`1+1` formula with cached value `2`, the D2 marker, hidden column C, and the
+numeric `42`. This certifies one local append/populate/column-hide/activate/open/
+edit/resave/reverse-read path on that Excel build. It does not certify insertion
+at arbitrary positions, worksheet deletion, every cell or style family, other
+Office builds, or performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement sheet add/delete, grouped-tab selection CRUD,
-workbook-protection unlocking, row/column properties beyond
+hints or implement sheet deletion, semantic before/after insertion, grouped-tab
+selection CRUD, workbook-protection unlocking, row/column properties beyond
 visibility, row and column insertion/deletion, shifting references,
-merge/group-formula edits,
-validation evaluation, shared-style definition editing or forking, named-style
-and row/column/theme resolution, rich text, dynamic arrays, patch serialization,
-full structured diagnostics, eviction/resource budgets, range/structural effect
-joins, three-way merge, raw-copy preservation of clean compressed entries,
-cancellation-aware save contexts, scratch planning, or output budgets. Those
-remain certification work; no allocation, latency, contention, or scaling
-conclusion follows from the functional tests.
+merge/group-formula edits, validation evaluation, shared-style definition
+editing or forking, named-style and row/column/theme resolution, rich text,
+dynamic arrays, patch serialization, full structured diagnostics,
+eviction/resource budgets, range/structural effect joins, three-way merge,
+raw-copy preservation of clean compressed entries, cancellation-aware save
+contexts, order-aware extended-property synchronization, scratch planning, or
+output budgets. Those remain certification work; no allocation, latency,
+contention, or scaling conclusion follows from the functional tests.
 
 ## Evidence levels
 

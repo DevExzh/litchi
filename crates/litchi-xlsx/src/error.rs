@@ -149,6 +149,7 @@ pub enum ColumnEditBlock {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TabEditBlock {
+    SheetLimit,
     LastVisibleTab,
     NotVisible,
     ActiveTabLimit,
@@ -182,6 +183,7 @@ impl std::fmt::Display for RenameBlock {
 impl std::fmt::Display for TabEditBlock {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
+            Self::SheetLimit => "the workbook has reached Office's worksheet limit",
             Self::LastVisibleTab => "the workbook must retain at least one visible tab",
             Self::NotVisible => "only a visible tab can be active",
             Self::ActiveTabLimit => "the tab position exceeds Office's active-tab limit",
