@@ -3,8 +3,8 @@
 mod edit;
 
 pub use edit::{
-    Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure,
-    Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
+    ActiveTab, Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, Edit, JoinError,
+    JoinFailure, Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
 };
 
 use std::collections::HashMap;
@@ -501,6 +501,11 @@ impl Sheet {
     /// Retained visibility state.
     pub fn visibility(&self) -> &Visibility {
         &self.data.visibility
+    }
+
+    /// Whether this is the active sheet in its immutable workbook snapshot.
+    pub fn is_active(&self) -> bool {
+        self.owner.active_sheet == Some(self.data.position)
     }
 
     /// Whether two handles belong to the same immutable workbook snapshot.

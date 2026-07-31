@@ -106,6 +106,25 @@ pub enum ColumnState {
     Stored { hidden: bool },
 }
 
+/// Semantic active-tab identity recorded in a patch without native Office IDs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActiveTab {
+    name: Box<str>,
+    position: usize,
+}
+
+impl ActiveTab {
+    /// Developer-facing sheet name at the source snapshot.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Checked zero-based workbook position at the source snapshot.
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+}
+
 impl ColumnState {
     fn read(value: Option<&crate::column::Stored>) -> Self {
         value.map_or(Self::Missing, |column| Self::Stored {
@@ -145,6 +164,10 @@ impl RowState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Change {
+    Active {
+        before: ActiveTab,
+        after: ActiveTab,
+    },
     Visibility {
         sheet: Box<str>,
         position: usize,
@@ -174,10 +197,22 @@ pub enum Change {
 impl Change {
     pub fn sheet(&self) -> &str {
         match self {
+            Self::Active { after, .. } => after.name(),
             Self::Visibility { sheet, .. }
             | Self::Cell { sheet, .. }
             | Self::Row { sheet, .. }
             | Self::Column { sheet, .. } => sheet,
+        }
+    }
+
+    /// Active-tab transition when this is a workbook-view change.
+    pub fn active(&self) -> Option<(&ActiveTab, &ActiveTab)> {
+        match self {
+            Self::Active { before, after } => Some((before, after)),
+            Self::Visibility { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. } => None,
         }
     }
 
@@ -190,7 +225,9 @@ impl Change {
                 after,
                 ..
             } => Some((*position, before, after)),
-            Self::Cell { .. } | Self::Row { .. } | Self::Column { .. } => None,
+            Self::Active { .. } | Self::Cell { .. } | Self::Row { .. } | Self::Column { .. } => {
+                None
+            },
         }
     }
 
@@ -203,7 +240,10 @@ impl Change {
                 after,
                 ..
             } => Some((*address, before, after)),
-            Self::Visibility { .. } | Self::Row { .. } | Self::Column { .. } => None,
+            Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Row { .. }
+            | Self::Column { .. } => None,
         }
     }
 
@@ -213,7 +253,10 @@ impl Change {
             Self::Row {
                 row, before, after, ..
             } => Some((*row, *before, *after)),
-            Self::Visibility { .. } | Self::Cell { .. } | Self::Column { .. } => None,
+            Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Cell { .. }
+            | Self::Column { .. } => None,
         }
     }
 
@@ -226,12 +269,19 @@ impl Change {
                 after,
                 ..
             } => Some((*column, *before, *after)),
-            Self::Visibility { .. } | Self::Cell { .. } | Self::Row { .. } => None,
+            Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. } => None,
         }
     }
 
     fn inverse(&self) -> Self {
         match self {
+            Self::Active { before, after } => Self::Active {
+                before: after.clone(),
+                after: before.clone(),
+            },
             Self::Visibility {
                 sheet,
                 position,
@@ -299,6 +349,10 @@ impl Change {
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Conflict {
+    Active {
+        sheet: Box<str>,
+        position: usize,
+    },
     Tab {
         sheet: Box<str>,
         position: usize,
@@ -324,7 +378,8 @@ impl Conflict {
     /// Developer-facing sheet name.
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Tab { sheet, .. }
+            Self::Active { sheet, .. }
+            | Self::Tab { sheet, .. }
             | Self::Cells { sheet, .. }
             | Self::Rows { sheet, .. }
             | Self::Columns { sheet, .. } => sheet,
@@ -334,7 +389,8 @@ impl Conflict {
     /// Checked zero-based sheet position in the shared base snapshot.
     pub fn position(&self) -> usize {
         match self {
-            Self::Tab { position, .. }
+            Self::Active { position, .. }
+            | Self::Tab { position, .. }
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
             | Self::Columns { position, .. } => *position,
@@ -346,11 +402,18 @@ impl Conflict {
         matches!(self, Self::Tab { .. })
     }
 
+    /// Whether both edits target the workbook's one active-tab facet.
+    pub const fn is_active(&self) -> bool {
+        matches!(self, Self::Active { .. })
+    }
+
     /// Deterministically ordered cells written by both edits, when applicable.
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
             Self::Cells { addresses, .. } => Some(addresses),
-            Self::Tab { .. } | Self::Rows { .. } | Self::Columns { .. } => None,
+            Self::Active { .. } | Self::Tab { .. } | Self::Rows { .. } | Self::Columns { .. } => {
+                None
+            },
         }
     }
 
@@ -358,7 +421,9 @@ impl Conflict {
     pub fn rows(&self) -> Option<&[RowIndex]> {
         match self {
             Self::Rows { rows, .. } => Some(rows),
-            Self::Tab { .. } | Self::Cells { .. } | Self::Columns { .. } => None,
+            Self::Active { .. } | Self::Tab { .. } | Self::Cells { .. } | Self::Columns { .. } => {
+                None
+            },
         }
     }
 
@@ -367,13 +432,13 @@ impl Conflict {
     pub fn columns(&self) -> Option<&[ColumnIndex]> {
         match self {
             Self::Columns { columns, .. } => Some(columns),
-            Self::Tab { .. } | Self::Cells { .. } | Self::Rows { .. } => None,
+            Self::Active { .. } | Self::Tab { .. } | Self::Cells { .. } | Self::Rows { .. } => None,
         }
     }
 
     fn len(&self) -> usize {
         match self {
-            Self::Tab { .. } => 1,
+            Self::Active { .. } | Self::Tab { .. } => 1,
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
@@ -388,12 +453,12 @@ pub struct ConflictSet {
 }
 
 impl ConflictSet {
-    /// Conflicts grouped in worksheet order.
+    /// Conflicts in deterministic workbook-effect and sheet order.
     pub fn conflicts(&self) -> &[Conflict] {
         &self.conflicts
     }
 
-    /// Number of overlapping effects across all worksheets.
+    /// Number of overlapping effects across the workbook.
     pub fn len(&self) -> usize {
         self.conflicts.iter().map(Conflict::len).sum()
     }
@@ -802,6 +867,7 @@ impl TabAction {
 #[derive(Debug)]
 pub struct Edit {
     base: Workbook,
+    active: Option<usize>,
     sheets: BTreeMap<usize, SheetActions>,
 }
 
@@ -810,6 +876,7 @@ impl Edit {
         ensure_unsigned(&base)?;
         Ok(Self {
             base,
+            active: None,
             sheets: BTreeMap::new(),
         })
     }
@@ -851,11 +918,15 @@ impl Edit {
     }
 
     pub fn len(&self) -> usize {
-        self.sheets.values().map(SheetActions::len).sum()
+        self.sheets
+            .values()
+            .fold(usize::from(self.active.is_some()), |len, actions| {
+                len.saturating_add(actions.len())
+            })
     }
 
     pub fn is_empty(&self) -> bool {
-        self.sheets.values().all(SheetActions::is_empty)
+        self.active.is_none() && self.sheets.values().all(SheetActions::is_empty)
     }
 
     /// Join an independently prepared edit when every effect is disjoint.
@@ -878,6 +949,9 @@ impl Edit {
             });
         }
 
+        if self.active.is_none() {
+            self.active = other.active;
+        }
         for (position, actions) in other.sheets {
             match self.sheets.entry(position) {
                 Entry::Vacant(entry) => {
@@ -915,7 +989,11 @@ impl Edit {
                 patch: Patch::default(),
             });
         }
-        let Self { base, sheets } = self;
+        let Self {
+            base,
+            active: requested_active,
+            sheets,
+        } = self;
         let mut changes = Vec::new();
         let mut parts = Vec::new();
         let mut needs_recalculation = false;
@@ -969,34 +1047,75 @@ impl Edit {
         }
 
         let current_active = base.inner.active_sheet;
-        let final_active =
-            if effective_tabs.is_empty() || current_active.is_some_and(final_is_visible) {
-                current_active
+        let final_active = if let Some(position) = requested_active {
+            let data = base
+                .inner
+                .sheets
+                .get(position)
+                .ok_or_else(|| invalid("requested active tab disappeared during edit"))?;
+            if position > raw::catalog_edit::MAX_ACTIVE_TAB {
+                return Err(Error::TabEditBlocked {
+                    sheet: data.name.clone(),
+                    position,
+                    reason: TabEditBlock::ActiveTabLimit,
+                });
+            }
+            if !final_is_visible(position) {
+                return Err(Error::TabEditBlocked {
+                    sheet: data.name.clone(),
+                    position,
+                    reason: TabEditBlock::NotVisible,
+                });
+            }
+            Some(position)
+        } else if effective_tabs.is_empty() || current_active.is_some_and(final_is_visible) {
+            current_active
+        } else {
+            let len = base.inner.sheets.len();
+            if len == 0 {
+                None
             } else {
-                let len = base.inner.sheets.len();
-                if len == 0 {
-                    None
-                } else {
-                    current_active
-                        .filter(|current| *current < len)
-                        .and_then(|current| {
-                            let remaining = len - current;
-                            (1..=len)
-                                .map(|offset| {
-                                    if offset >= remaining {
-                                        offset - remaining
-                                    } else {
-                                        current + offset
-                                    }
-                                })
-                                .find(|position| final_is_visible(*position))
-                        })
-                        .or_else(|| (0..len).find(|position| final_is_visible(*position)))
-                }
-            };
+                current_active
+                    .filter(|current| *current < len)
+                    .and_then(|current| {
+                        let remaining = len - current;
+                        (1..=len)
+                            .map(|offset| {
+                                if offset >= remaining {
+                                    offset - remaining
+                                } else {
+                                    current + offset
+                                }
+                            })
+                            .find(|position| final_is_visible(*position))
+                    })
+                    .or_else(|| (0..len).find(|position| final_is_visible(*position)))
+            }
+        };
         let active_change = (final_active != current_active)
             .then_some(final_active)
             .flatten();
+
+        if let Some(position) = active_change {
+            if position > raw::catalog_edit::MAX_ACTIVE_TAB {
+                let data = base
+                    .inner
+                    .sheets
+                    .get(position)
+                    .ok_or_else(|| invalid("replacement active tab disappeared during edit"))?;
+                return Err(Error::TabEditBlocked {
+                    sheet: data.name.clone(),
+                    position,
+                    reason: TabEditBlock::ActiveTabLimit,
+                });
+            }
+            let before = current_active
+                .map(|position| active_tab(&base, position))
+                .transpose()?
+                .ok_or_else(|| invalid("non-empty workbook has no source active tab"))?;
+            let after = active_tab(&base, position)?;
+            changes.push(Change::Active { before, after });
+        }
 
         for (position, action) in &effective_tabs {
             let data = base
@@ -1118,7 +1237,7 @@ impl Edit {
             base.inner.validate_styles(&parsed)?;
             for change in &changes[change_start..] {
                 match change {
-                    Change::Visibility { .. } => {},
+                    Change::Active { .. } | Change::Visibility { .. } => {},
                     Change::Cell {
                         sheet,
                         address,
@@ -1234,10 +1353,21 @@ impl Edit {
             Vec::new()
         };
 
-        if !effective_tabs.is_empty() || needs_recalculation {
+        if !effective_tabs.is_empty() || active_change.is_some() || needs_recalculation {
             let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
             let before = workbook_part.blob_arc();
-            let mut after = if effective_tabs.is_empty() {
+            let active = active_change
+                .map(|position| {
+                    let data = base.inner.sheets.get(position).ok_or_else(|| {
+                        invalid("active-tab rewrite target disappeared during commit")
+                    })?;
+                    Ok::<_, Error>(raw::catalog_edit::Active {
+                        sheet: &data.name,
+                        position,
+                    })
+                })
+                .transpose()?;
+            let mut after = if effective_tabs.is_empty() && active.is_none() {
                 raw::recalc::invalidate(&before)?
             } else {
                 let tabs = effective_tabs
@@ -1254,18 +1384,12 @@ impl Edit {
                         })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                raw::catalog_edit::rewrite(
-                    &before,
-                    raw::catalog_edit::Plan {
-                        tabs,
-                        active: active_change,
-                    },
-                )?
+                raw::catalog_edit::rewrite(&before, raw::catalog_edit::Plan { tabs, active })?
             };
-            if needs_recalculation && !effective_tabs.is_empty() {
+            if needs_recalculation && (!effective_tabs.is_empty() || active.is_some()) {
                 after = raw::recalc::invalidate(&after)?;
             }
-            if !effective_tabs.is_empty() {
+            if !effective_tabs.is_empty() || active.is_some() {
                 let catalog = raw::parse_catalog(&after)?;
                 if Some(catalog.active_sheet_index) != final_active {
                     return Err(invalid("workbook active-tab edit verification failed"));
@@ -1332,6 +1456,10 @@ impl Edit {
         self.sheets.entry(position).or_default().visibility = Some(action);
     }
 
+    fn set_active(&mut self, position: usize) {
+        self.active = Some(position);
+    }
+
     fn row_actions(&mut self, position: usize) -> &mut BTreeMap<RowIndex, RowAction> {
         &mut self.sheets.entry(position).or_default().rows
     }
@@ -1342,6 +1470,18 @@ impl Edit {
 
     fn conflicts_with(&self, other: &Self) -> ConflictSet {
         let mut conflicts = Vec::new();
+        if let (Some(position), Some(_)) = (self.active, other.active) {
+            let sheet = self
+                .base
+                .inner
+                .sheets
+                .get(position)
+                .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+            conflicts.push(Conflict::Active {
+                sheet: sheet.into(),
+                position,
+            });
+        }
         for (position, left) in &self.sheets {
             let Some(right) = other.sheets.get(position) else {
                 continue;
@@ -1422,7 +1562,7 @@ impl Edit {
     }
 }
 
-/// Transaction-scoped visibility editor for any workbook sheet tab.
+/// Transaction-scoped state editor for any workbook sheet tab.
 #[derive(Debug)]
 pub struct TabEdit<'a> {
     edit: &'a mut Edit,
@@ -1430,6 +1570,13 @@ pub struct TabEdit<'a> {
 }
 
 impl TabEdit<'_> {
+    /// Make this the active tab while preserving unrelated grouped selections.
+    /// The tab must be visible in the transaction's final state.
+    pub fn activate(&mut self) -> &mut Self {
+        self.edit.set_active(self.position);
+        self
+    }
+
     /// Make this tab visible.
     pub fn show(&mut self) -> &mut Self {
         self.edit.set_visibility(self.position, TabAction::Show);
@@ -1623,6 +1770,18 @@ fn raw_visibility_matches(value: &raw::Visibility, action: TabAction) -> bool {
             | (raw::Visibility::Hidden, TabAction::Hide)
             | (raw::Visibility::VeryHidden, TabAction::VeryHide)
     )
+}
+
+fn active_tab(workbook: &Workbook, position: usize) -> Result<ActiveTab> {
+    let sheet = workbook
+        .inner
+        .sheets
+        .get(position)
+        .ok_or_else(|| invalid("active tab points outside the workbook catalog"))?;
+    Ok(ActiveTab {
+        name: sheet.name.clone().into_boxed_str(),
+        position,
+    })
 }
 
 fn compose_part(
@@ -2073,9 +2232,14 @@ mod tests {
             .expect("tab")
             .hide();
         let hidden = edit.commit().expect("hide active tab");
-        assert_eq!(hidden.patch().len(), 1);
+        assert_eq!(hidden.patch().len(), 2);
+        let (before, after) = hidden.patch().changes()[0]
+            .active()
+            .expect("implicit active relocation");
+        assert_eq!((before.name(), before.position()), ("Sheet1", 0));
+        assert_eq!((after.name(), after.position()), ("Sheet2", 1));
         assert!(matches!(
-            hidden.patch().changes()[0],
+            hidden.patch().changes()[1],
             Change::Visibility {
                 position: 0,
                 before: Visibility::Visible,
@@ -2098,6 +2262,14 @@ mod tests {
                 .active_sheet()
                 .map(|sheet| sheet.name().to_owned()),
             Some("Sheet2".to_owned())
+        );
+        assert!(
+            hidden
+                .workbook()
+                .sheet("Sheet2")
+                .expect("lookup")
+                .expect("sheet")
+                .is_active()
         );
 
         let restored = hidden
@@ -2144,6 +2316,209 @@ mod tests {
         let mut no_op = source.edit().expect("no-op edit");
         no_op.tab(0usize).expect("lookup").expect("tab").show();
         assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+    }
+
+    #[test]
+    fn active_tab_is_selector_first_reversible_and_composable() {
+        for kind in [SheetKind::Worksheet, SheetKind::Chart] {
+            let source = two_sheet_workbook(kind);
+            let source_bytes = source.to_bytes().expect("source bytes");
+            assert!(
+                source
+                    .sheet("Sheet1")
+                    .expect("lookup")
+                    .expect("first tab")
+                    .is_active()
+            );
+            assert!(
+                !source
+                    .sheet(1usize)
+                    .expect("lookup")
+                    .expect("second tab")
+                    .is_active()
+            );
+
+            let mut edit = source.edit().expect("edit");
+            edit.tab(1usize)
+                .expect("position lookup")
+                .expect("tab")
+                .activate();
+            assert_eq!(edit.len(), 1);
+            let committed = edit.commit().expect("activate");
+            assert_eq!(committed.patch().len(), 1);
+            let (before, after) = committed.patch().changes()[0]
+                .active()
+                .expect("active change");
+            assert_eq!((before.name(), before.position()), ("Sheet1", 0));
+            assert_eq!((after.name(), after.position()), ("Sheet2", 1));
+            let active = committed.workbook().active_sheet().expect("active sheet");
+            assert_eq!(active.name(), "Sheet2");
+            assert_eq!(active.kind(), kind);
+            assert!(active.is_active());
+            assert_eq!(
+                committed
+                    .workbook()
+                    .apply(&committed.patch().inverse())
+                    .expect("inverse")
+                    .workbook()
+                    .to_bytes()
+                    .expect("restored bytes"),
+                source_bytes
+            );
+
+            let mut no_op = committed.workbook().edit().expect("no-op edit");
+            no_op
+                .tab("Sheet2")
+                .expect("lookup")
+                .expect("tab")
+                .activate();
+            assert!(no_op.commit().expect("no-op commit").patch().is_empty());
+        }
+
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut cell = source.edit().expect("cell edit");
+        cell.sheet("Sheet2")
+            .expect("lookup")
+            .expect("worksheet")
+            .set("A1", "active payload")
+            .expect("cell");
+        let mut active = source.edit().expect("active edit");
+        active
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        cell.join(active).expect("orthogonal join");
+        let committed = cell.commit().expect("joined commit");
+        assert_eq!(committed.patch().len(), 2);
+        assert_eq!(
+            committed
+                .patch()
+                .parts
+                .iter()
+                .filter(|part| part.uri == source.inner.sheets[1].part_uri)
+                .count(),
+            1
+        );
+        let active = committed.workbook().active_sheet().expect("active sheet");
+        assert_eq!(active.name(), "Sheet2");
+        assert!(matches!(
+            active.cell("A1").expect("cell"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "active payload"
+        ));
+
+        let mut replaced = source.edit().expect("replacement edit");
+        replaced
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        replaced
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        assert_eq!(replaced.len(), 1);
+        assert!(
+            replaced
+                .commit()
+                .expect("last activation wins")
+                .patch()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn active_tab_requires_final_visibility_and_conflicts_globally() {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut hide = source.edit().expect("hide edit");
+        hide.tab("Sheet2").expect("lookup").expect("tab").hide();
+        let hidden = hide.commit().expect("hidden source");
+
+        let mut blocked = hidden.workbook().edit().expect("blocked edit");
+        blocked
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        assert!(matches!(
+            blocked.commit(),
+            Err(Error::TabEditBlocked {
+                sheet,
+                position: 1,
+                reason: TabEditBlock::NotVisible,
+            }) if sheet == "Sheet2"
+        ));
+
+        let mut repaired = hidden.workbook().edit().expect("repair edit");
+        repaired
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .show()
+            .activate();
+        let repaired = repaired.commit().expect("show and activate");
+        let active = repaired.workbook().active_sheet().expect("active sheet");
+        assert_eq!(active.name(), "Sheet2");
+        assert!(active.visibility().is_visible());
+        assert_eq!(repaired.patch().len(), 2);
+
+        let mut contradictory = source.edit().expect("contradictory edit");
+        contradictory
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .activate()
+            .very_hide();
+        assert!(matches!(
+            contradictory.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::NotVisible,
+                ..
+            })
+        ));
+
+        let mut left = source.edit().expect("left");
+        left.tab("Sheet2").expect("lookup").expect("tab").activate();
+        let mut right = source.edit().expect("right");
+        right
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        let error = left.join(right).expect_err("active-tab intents are global");
+        let conflicts = error.conflicts().expect("active conflict");
+        assert_eq!(conflicts.len(), 1);
+        assert!(conflicts.conflicts()[0].is_active());
+        assert_eq!(conflicts.conflicts()[0].sheet(), "Sheet2");
+
+        let mut active = source.edit().expect("active");
+        active
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        let mut visibility = source.edit().expect("visibility");
+        visibility
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .hide();
+        active.join(visibility).expect("orthogonal facets");
+        let committed = active.commit().expect("joined commit");
+        assert_eq!(
+            committed.workbook().active_sheet().expect("active").name(),
+            "Sheet2"
+        );
+        assert_eq!(
+            committed
+                .workbook()
+                .sheet("Sheet1")
+                .expect("lookup")
+                .expect("sheet")
+                .visibility(),
+            &Visibility::Hidden
+        );
     }
 
     #[test]
@@ -2295,6 +2670,24 @@ mod tests {
                 ..
             })
         ));
+
+        let mut activation = protected.edit().expect("activation edit");
+        activation
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        let activated = activation
+            .commit()
+            .expect("structure protection permits selection");
+        assert_eq!(
+            activated
+                .workbook()
+                .active_sheet()
+                .expect("active sheet")
+                .name(),
+            "Sheet2"
+        );
     }
 
     #[test]

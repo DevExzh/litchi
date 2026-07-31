@@ -15,7 +15,7 @@ use crate::error::{Error, Result, TabEditBlock, invalid};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
 
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const MAX_ACTIVE_TAB: usize = 32_766;
+pub(crate) const MAX_ACTIVE_TAB: usize = 32_766;
 
 /// Recognized sheet states that are safe to author.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,13 +45,21 @@ pub(crate) struct Tab<'a> {
     pub(crate) state: State,
 }
 
+/// Semantic active-tab target. The physical workbook view remains private to
+/// this low-level boundary.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Active<'a> {
+    pub(crate) sheet: &'a str,
+    pub(crate) position: usize,
+}
+
 /// Move-only workbook rewrite plan.
 #[derive(Debug)]
 pub(crate) struct Plan<'a> {
     pub(crate) tabs: Vec<Tab<'a>>,
     /// A replacement for the first workbook view's active tab. `None` leaves
     /// every workbook view byte-exact.
-    pub(crate) active: Option<usize>,
+    pub(crate) active: Option<Active<'a>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -155,13 +163,19 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     }
     let layout = scan(content)?;
     let first = plan.tabs.first().copied();
-    if layout.protected {
-        return Err(block(first, TabEditBlock::ProtectedWorkbook));
+    if layout.protected && !plan.tabs.is_empty() {
+        return Err(block(
+            first.map(|tab| (tab.sheet, tab.position)),
+            TabEditBlock::ProtectedWorkbook,
+        ));
     }
-    if plan.active.is_some_and(|active| active > MAX_ACTIVE_TAB) {
-        return Err(invalid(format!(
-            "workbook active tab exceeds the Office limit {MAX_ACTIVE_TAB}"
-        )));
+    if let Some(active) = plan.active
+        && active.position > MAX_ACTIVE_TAB
+    {
+        return Err(block(
+            Some((active.sheet, active.position)),
+            TabEditBlock::ActiveTabLimit,
+        ));
     }
 
     let mut replacements = Vec::new();
@@ -199,7 +213,12 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     }
 
     if let Some(active) = plan.active {
-        replacements.push(active_replacement(content, &layout, active, first)?);
+        replacements.push(active_replacement(
+            content,
+            &layout,
+            active.position,
+            Some((active.sheet, active.position)),
+        )?);
     }
     replacements.sort_unstable_by_key(|replacement| replacement.span.start);
     if replacements
@@ -231,12 +250,12 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn block(tab: Option<Tab<'_>>, reason: TabEditBlock) -> Error {
-    tab.map_or_else(
+fn block(context: Option<(&str, usize)>, reason: TabEditBlock) -> Error {
+    context.map_or_else(
         || invalid("active-tab rewrite has no associated tab change"),
-        |tab| Error::TabEditBlocked {
-            sheet: tab.sheet.to_owned(),
-            position: tab.position,
+        |(sheet, position)| Error::TabEditBlocked {
+            sheet: sheet.to_owned(),
+            position,
             reason,
         },
     )
@@ -246,7 +265,7 @@ fn active_replacement(
     source: &[u8],
     layout: &Layout,
     active: usize,
-    tab: Option<Tab<'_>>,
+    context: Option<(&str, usize)>,
 ) -> Result<Replacement> {
     let appended = [("activeTab", active.to_string())];
     if let Some(view) = &layout.workbook_view {
@@ -256,11 +275,11 @@ fn active_replacement(
         });
     }
     if layout.alternate_content {
-        return Err(block(tab, TabEditBlock::MarkupCompatibility));
+        return Err(block(context, TabEditBlock::MarkupCompatibility));
     }
     if let Some(book_views) = &layout.book_views {
         if book_views.payload {
-            return Err(block(tab, TabEditBlock::MarkupCompatibility));
+            return Err(block(context, TabEditBlock::MarkupCompatibility));
         }
         let name = sibling_name(&book_views.slot.tag.name, "workbookView");
         let view = Tag {
@@ -762,7 +781,13 @@ mod tests {
     const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
     fn plan<'a>(tabs: Vec<Tab<'a>>, active: Option<usize>) -> Plan<'a> {
-        Plan { tabs, active }
+        Plan {
+            tabs,
+            active: active.map(|position| Active {
+                sheet: "Active",
+                position,
+            }),
+        }
     }
 
     #[test]
@@ -878,6 +903,14 @@ mod tests {
                 ..
             })
         ));
+        let activated = rewrite(protected.as_bytes(), plan(Vec::new(), Some(0)))
+            .expect("structure protection permits active-tab selection");
+        assert_eq!(
+            parse_catalog(&activated)
+                .expect("protected catalog")
+                .active_sheet_index,
+            0
+        );
 
         let mce = format!(
             r#"<workbook xmlns="{S}" xmlns:r="{R}" xmlns:mc="{mce}"><mc:AlternateContent><mc:Fallback/></mc:AlternateContent><sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets></workbook>"#,
@@ -926,6 +959,14 @@ mod tests {
                 ..
             })
         ));
+        assert!(matches!(
+            rewrite(source.as_bytes(), plan(Vec::new(), Some(1))),
+            Err(Error::TabEditBlocked {
+                sheet,
+                position: 1,
+                reason: TabEditBlock::MarkupCompatibility,
+            }) if sheet == "Active"
+        ));
     }
 
     #[test]
@@ -950,6 +991,30 @@ mod tests {
                 reason: TabEditBlock::MarkupCompatibility,
                 ..
             })
+        ));
+    }
+
+    #[test]
+    fn active_tab_limit_is_a_typed_block() {
+        let source = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="One" sheetId="1" r:id="r1"/></sheets></workbook>"#
+        );
+        assert!(matches!(
+            rewrite(
+                source.as_bytes(),
+                Plan {
+                    tabs: Vec::new(),
+                    active: Some(Active {
+                        sheet: "Too Far",
+                        position: MAX_ACTIVE_TAB + 1,
+                    }),
+                }
+            ),
+            Err(Error::TabEditBlocked {
+                sheet,
+                position,
+                reason: TabEditBlock::ActiveTabLimit,
+            }) if sheet == "Too Far" && position == MAX_ACTIVE_TAB + 1
         ));
     }
 }

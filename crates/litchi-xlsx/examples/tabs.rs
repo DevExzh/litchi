@@ -4,20 +4,14 @@ use std::io;
 
 use litchi_xlsx::Workbook;
 
+const USAGE: &str = "usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <show|hide|very-hide|activate|show-activate>";
+
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
-    let input = args
-        .next()
-        .ok_or("usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <show|hide|very-hide>")?;
-    let output = args
-        .next()
-        .ok_or("usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <show|hide|very-hide>")?;
-    let name = args
-        .next()
-        .ok_or("usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <show|hide|very-hide>")?;
-    let operation = args
-        .next()
-        .ok_or("usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <show|hide|very-hide>")?;
+    let input = args.next().ok_or(USAGE)?;
+    let output = args.next().ok_or(USAGE)?;
+    let name = args.next().ok_or(USAGE)?;
+    let operation = args.next().ok_or(USAGE)?;
 
     let source = Workbook::open(&input)?;
     let mut edit = source.edit()?;
@@ -37,6 +31,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         "very-hide" => {
             tab.very_hide();
         },
+        "activate" => {
+            tab.activate();
+        },
+        "show-activate" => {
+            tab.show().activate();
+        },
         other => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -53,9 +53,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "edited tab disappeared"))?;
     committed.workbook().save(&output)?;
     println!(
-        "saved {} semantic change(s); {name} is {:?}",
+        "saved {} semantic change(s); {name} is {:?}, active={}",
         committed.patch().len(),
-        tab.visibility()
+        tab.visibility(),
+        tab.is_active()
     );
     Ok(())
 }

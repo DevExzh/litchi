@@ -123,6 +123,8 @@ pub enum ColumnEditBlock {
 #[non_exhaustive]
 pub enum TabEditBlock {
     LastVisibleTab,
+    NotVisible,
+    ActiveTabLimit,
     ProtectedWorkbook,
     MarkupCompatibility,
 }
@@ -131,6 +133,8 @@ impl std::fmt::Display for TabEditBlock {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
             Self::LastVisibleTab => "the workbook must retain at least one visible tab",
+            Self::NotVisible => "only a visible tab can be active",
+            Self::ActiveTabLimit => "the tab position exceeds Office's active-tab limit",
             Self::ProtectedWorkbook => "the workbook structure is protected",
             Self::MarkupCompatibility => {
                 "the effective workbook catalog contains unmodeled compatibility markup"

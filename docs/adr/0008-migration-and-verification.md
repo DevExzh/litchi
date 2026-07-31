@@ -405,10 +405,10 @@ implements the SpreadsheetML rule documented by Microsoft's
 a singly selected sheet's `tabSelected` state should agree with
 `activeTab`; multiple tabs may be selected, but only one is active.
 
-Workbook structure protection returns a typed block. Effective sheets without
-a direct editable slot, or selection/view insertion beside an unmodeled
-compatibility alternative, also return a typed block rather than allowing a
-lossy rewrite. Unrelated compatibility content remains exact; a
+Visibility mutation under workbook structure protection returns a typed block.
+Effective sheets without a direct editable slot, or selection/view insertion
+beside an unmodeled compatibility alternative, also return a typed block rather
+than allowing a lossy rewrite. Unrelated compatibility content remains exact; a
 structure-protection element nested in such content is still detected
 conservatively. The final workbook catalog and every rewritten per-sheet view
 are reparsed to verify requested visibility, active position, and selection
@@ -452,9 +452,66 @@ paths on the tested Excel build. It does not certify grouped-selection
 preservation under every visibility transition, protected-workbook unlocking,
 other sheet kinds in native Office, or other Office builds.
 
+The twelfth slice makes active-sheet selection an explicit semantic operation
+instead of leaving it only as a visibility side effect. The same selector-first
+proxy now supports `edit.tab(name_or_position)?.activate()`, and `Sheet::is_active`
+answers the common read query without exposing `activeTab` or requiring handle
+comparison. Activation applies to every recognized sheet kind. It is a
+workbook-global transaction facet: a later call in one mutable transaction
+replaces the earlier intent, while two independently prepared activation
+intents conflict and return the rejected edit. Activation remains orthogonal
+to cell, row, column, and visibility effects, so independently prepared work
+can join when those facets do not overlap.
+
+The transaction validates the requested target against the complete final
+visibility plan before changing bytes. Hidden, very-hidden, and unknown-state
+targets return `TabEditBlock::NotVisible`; callers can intentionally repair and
+activate one in the same concise operation with `tab.show().activate()`. An
+explicit target takes precedence over the automatic relocation used when an
+active tab is hidden, but cannot override the invariant that an active tab is
+visible. Positions outside Office's checked `0..=32_766` `activeTab` range in
+`[MS-OE376]` section 2.1.622 return the typed `ActiveTabLimit` block. Structure
+protection still blocks hide/show
+because those mutate workbook structure, but it does not block selection of an
+already visible sheet; this matches Microsoft's description of protected
+structure in the [`Workbook.Protect`](https://learn.microsoft.com/en-us/office/vba/api/excel.workbook.protect)
+and [`Workbook.ProtectStructure`](https://learn.microsoft.com/en-us/office/vba/api/excel.workbook.protectstructure)
+references.
+
+An effective activation reuses the same lossless workbook-view and sheet-view
+rewriters, including prefix preservation, schema-ordered insertion,
+compatibility blocking, reparsing, and exact inverse bytes. It clears the old
+active sheet's view-zero selection and selects the new active sheet while
+leaving unrelated selected tabs untouched; `activate` therefore does not
+silently destroy a producer-authored grouped selection. `Change::Active`
+records compact `ActiveTab` values with semantic names and checked positions,
+including visibility-driven relocation, so patches no longer hide that
+secondary effect. A workbook-part delta composes activation with visibility
+and recalculation, and a sheet-part delta composes selection with simultaneous
+cell edits. Regression tests cover name/numeric lookup, worksheet and chart
+tabs, no-op filtering, last-call replacement, hidden-target refusal,
+show-and-activate repair, contradictory plans, protected workbooks, global
+activation conflicts, orthogonal joins, composed part counts, typed Office
+bounds, semantic patch inspection, and byte-exact inversion.
+
+Computer Use verification exercised both public operations in Microsoft Excel
+for Mac 16.110.2 (build 16.110.26062818). An active-only output derived from an
+Excel-authored two-worksheet workbook opened with Sheet1 selected, both tabs
+visible, no repair or compatibility prompt, and no grouped-workbook marker.
+After entering `Active Sheet1 survived Excel` in C1 and saving in Excel, the
+public reader still reported Sheet1 active and returned that value. A
+`show().activate()` output derived from an Excel-resaved workbook whose Sheet2
+was very hidden likewise opened without a prompt, showed both tabs, and
+selected only Sheet2. After entering `Shown and active survived Excel` in A1
+and saving, the public reader reported Sheet2 visible and active and returned
+the value. Both Excel-resaved packages passed ZIP integrity checks. This native
+evidence covers ordinary worksheets and the first workbook view on this one
+macOS build; it does not certify chart sheets, multi-view windows, or grouped
+selection editing across Office versions.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement sheet add/delete/rename/reorder, direct active-tab
-selection, workbook-protection unlocking, row/column properties beyond
+hints or implement sheet add/delete/rename/reorder, grouped-tab selection CRUD,
+workbook-protection unlocking, row/column properties beyond
 visibility, row and column insertion/deletion, shifting references,
 merge/group-formula edits,
 validation evaluation, shared-style definition editing or forking, named-style

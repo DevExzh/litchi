@@ -24,7 +24,7 @@ pub use litchi_sheet::{
 pub use row::{Row, Rows};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use workbook::{
-    Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, DateSystem, Edit, Flavor,
-    JoinError, JoinFailure, Patch, RowEdit, RowState, Sheet, SheetEdit, SheetKind, SheetSelector,
-    State, TabEdit, Visibility, Workbook,
+    ActiveTab, Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, DateSystem, Edit,
+    Flavor, JoinError, JoinFailure, Patch, RowEdit, RowState, Sheet, SheetEdit, SheetKind,
+    SheetSelector, State, TabEdit, Visibility, Workbook,
 };
