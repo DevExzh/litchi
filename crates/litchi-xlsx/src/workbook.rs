@@ -3,14 +3,17 @@
 use std::convert::Infallible;
 use std::io::Read;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Selector;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
+use litchi_sheet::{At, Rect};
 
+use crate::cell::{Store, Text};
 use crate::error::{Error, Result, invalid};
 use crate::raw;
+use crate::{Cell, Cells};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -109,6 +112,8 @@ struct SheetData {
     name: String,
     kind: SheetKind,
     visibility: Visibility,
+    part_uri: PackURI,
+    cells: OnceLock<Store>,
     #[allow(dead_code)]
     native_id: u32,
     #[allow(dead_code)]
@@ -120,6 +125,8 @@ struct Inner {
     package: OpcPackage,
     #[allow(dead_code)]
     workbook_uri: PackURI,
+    shared_strings_uri: Option<PackURI>,
+    shared_strings: OnceLock<Box<[Text]>>,
     flavor: Flavor,
     date_system: DateSystem,
     active_sheet: Option<usize>,
@@ -206,7 +213,7 @@ impl Workbook {
     /// Build a snapshot from a validated OPC package without exposing it in
     /// ordinary sheet APIs.
     pub fn from_package(package: OpcPackage) -> Result<Self> {
-        let (workbook_uri, flavor, catalog, sheet_kinds) = {
+        let (workbook_uri, flavor, catalog, sheet_parts, shared_strings_uri) = {
             let workbook = package.main_document_part()?;
             let flavor = Flavor::from_content_type(workbook.content_type()).ok_or_else(|| {
                 invalid(format!(
@@ -216,8 +223,15 @@ impl Workbook {
                 ))
             })?;
             let catalog = raw::parse_catalog(workbook.blob())?;
-            let sheet_kinds = validate_sheet_graph(&package, workbook, &catalog.sheets)?;
-            (workbook.partname().clone(), flavor, catalog, sheet_kinds)
+            let sheet_parts = validate_sheet_graph(&package, workbook, &catalog.sheets)?;
+            let shared_strings_uri = validate_shared_strings(&package, workbook)?;
+            (
+                workbook.partname().clone(),
+                flavor,
+                catalog,
+                sheet_parts,
+                shared_strings_uri,
+            )
         };
 
         let active_sheet = if catalog.sheets.is_empty() {
@@ -228,14 +242,16 @@ impl Workbook {
         let sheets = catalog
             .sheets
             .into_iter()
-            .zip(sheet_kinds)
+            .zip(sheet_parts)
             .enumerate()
-            .map(|(position, (sheet, kind))| {
+            .map(|(position, (sheet, part))| {
                 Arc::new(SheetData {
                     position,
                     name: sheet.name,
-                    kind,
+                    kind: part.kind,
                     visibility: sheet.visibility.into(),
+                    part_uri: part.uri,
+                    cells: OnceLock::new(),
                     native_id: sheet.sheet_id,
                     relationship_id: sheet.relationship_id,
                 })
@@ -247,6 +263,8 @@ impl Workbook {
             inner: Arc::new(Inner {
                 package,
                 workbook_uri,
+                shared_strings_uri,
+                shared_strings: OnceLock::new(),
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
                     DateSystem::Excel1904
@@ -388,14 +406,77 @@ impl Sheet {
     pub fn same_workbook(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.owner, &other.owner)
     }
+
+    /// Look up a cell by raw zero-based `(row, column)` or a checked [`crate::Address`].
+    ///
+    /// `None` means no cell record is stored. [`Cell::Empty`] means a record is
+    /// present but has no primary payload.
+    pub fn cell<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<&Cell>> {
+        let address = at.into().resolve()?;
+        Ok(self.store()?.get(address))
+    }
+
+    /// Lazily traverse only stored cells inside a checked half-open range.
+    pub fn cells(&self, range: Rect) -> Result<Cells<'_>> {
+        Ok(self.store()?.cells(range))
+    }
+
+    /// Bounding rectangle of stored cell records, distinct from declared,
+    /// formatted, and content extents.
+    pub fn stored_extent(&self) -> Result<Option<Rect>> {
+        Ok(self.store()?.extent())
+    }
+
+    fn store(&self) -> Result<&Store> {
+        if self.data.kind != SheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        if let Some(store) = self.data.cells.get() {
+            return Ok(store);
+        }
+
+        let part = self.owner.package.get_part(&self.data.part_uri)?;
+        let parsed = raw::worksheet::parse(part.blob(), || self.owner.shared_strings())?;
+        let _ = self.data.cells.set(parsed);
+        self.data
+            .cells
+            .get()
+            .ok_or_else(|| invalid("worksheet cache initialization did not publish a value"))
+    }
+}
+
+impl Inner {
+    fn shared_strings(&self) -> Result<Option<&[Text]>> {
+        let Some(uri) = self.shared_strings_uri.as_ref() else {
+            return Ok(None);
+        };
+        if let Some(strings) = self.shared_strings.get() {
+            return Ok(Some(strings));
+        }
+
+        let part = self.package.get_part(uri)?;
+        let parsed = raw::strings::parse(part.blob())?;
+        let _ = self.shared_strings.set(parsed);
+        self.shared_strings
+            .get()
+            .map(|strings| Some(strings.as_ref()))
+            .ok_or_else(|| invalid("shared-string cache initialization did not publish a value"))
+    }
+}
+
+struct SheetPart {
+    kind: SheetKind,
+    uri: PackURI,
 }
 
 fn validate_sheet_graph(
     package: &OpcPackage,
     workbook: &dyn Part,
     sheets: &[raw::Sheet],
-) -> Result<Vec<SheetKind>> {
-    let mut kinds = Vec::with_capacity(sheets.len());
+) -> Result<Vec<SheetPart>> {
+    let mut parts = Vec::with_capacity(sheets.len());
     for sheet in sheets {
         let relationship = workbook.rels().get(&sheet.relationship_id).ok_or_else(|| {
             invalid(format!(
@@ -424,9 +505,37 @@ fn validate_sheet_graph(
             MACROSHEET_REL | INTL_MACROSHEET_REL => SheetKind::Macro,
             _ => SheetKind::Unknown,
         };
-        kinds.push(kind);
+        parts.push(SheetPart { kind, uri: target });
     }
-    Ok(kinds)
+    Ok(parts)
+}
+
+fn validate_shared_strings(package: &OpcPackage, workbook: &dyn Part) -> Result<Option<PackURI>> {
+    let mut found = None;
+    for relationship in workbook.rels().iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::SHARED_STRINGS | rt::STRICT_SHARED_STRINGS
+        )
+    }) {
+        if found.is_some() {
+            return Err(invalid("workbook has multiple shared-string relationships"));
+        }
+        if relationship.is_external() {
+            return Err(invalid("shared-string relationship cannot be external"));
+        }
+        let uri = relationship.target_partname()?;
+        let part = package.get_part(&uri)?;
+        if part.content_type() != ct::SML_SHARED_STRINGS {
+            return Err(invalid(format!(
+                "shared-string part has content type '{}', expected '{}'",
+                part.content_type(),
+                ct::SML_SHARED_STRINGS
+            )));
+        }
+        found = Some(uri);
+    }
+    Ok(found)
 }
 
 fn require_content_type(sheet: &raw::Sheet, actual: &str, expected: &str) -> Result<()> {
@@ -442,6 +551,8 @@ fn require_content_type(sheet: &raw::Sheet, actual: &str, expected: &str) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cell::Value;
+    use crate::formula::Cache;
 
     #[test]
     fn new_workbook_is_deterministic_and_selector_first() {
@@ -559,12 +670,189 @@ mod tests {
         });
     }
 
+    #[test]
+    fn cell_facade_is_sparse_exact_and_non_mutating() {
+        let workbook = Workbook::from_package(package_with_cells()).expect("valid workbook");
+        let bytes_before = workbook.to_bytes().expect("serialize before lazy read");
+        let sheet = workbook.sheet("data").expect("lookup").expect("present");
+
+        assert!(matches!(
+            sheet.cell("A1").expect("cell lookup"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "Office & Litchi"
+        ));
+        assert!(sheet.cell((0, 1)).expect("missing lookup").is_none());
+        assert!(matches!(
+            sheet.cell((1, 2)).expect("number lookup"),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "-0.000"
+        ));
+        let Some(Cell::Formula(formula)) = sheet.cell((2, 1)).expect("formula lookup") else {
+            panic!("expected formula cell")
+        };
+        assert_eq!(formula.text(), "C2*2");
+        assert!(matches!(
+            formula.cached().map(Cache::value),
+            Some(Value::Number(number)) if number.as_str() == "0"
+        ));
+        assert!(matches!(
+            sheet.cell((4, 3)).expect("empty lookup"),
+            Some(Cell::Empty)
+        ));
+        assert!(matches!(
+            sheet.cell((litchi_sheet::ROWS, 0)),
+            Err(Error::Coordinate(_))
+        ));
+
+        let range = Rect::at(0, 1, 4, 4).expect("valid range");
+        let addresses = sheet
+            .cells(range)
+            .expect("sparse traversal")
+            .map(|(address, _)| (address.row().get(), address.column().get()))
+            .collect::<Vec<_>>();
+        assert_eq!(addresses, [(1, 2), (2, 1)]);
+        assert_eq!(
+            sheet.stored_extent().expect("extent").map(Rect::end),
+            Some((5, 4))
+        );
+        assert_eq!(
+            workbook.to_bytes().expect("serialize after lazy read"),
+            bytes_before
+        );
+    }
+
+    #[test]
+    fn concurrent_first_cell_read_publishes_one_safe_snapshot() {
+        let workbook = Workbook::from_package(package_with_cells()).expect("valid workbook");
+        let barrier = Arc::new(std::sync::Barrier::new(8));
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                let workbook = workbook.clone();
+                let barrier = Arc::clone(&barrier);
+                scope.spawn(move || {
+                    barrier.wait();
+                    let sheet = workbook.sheet("Data").expect("lookup").expect("present");
+                    assert!(matches!(
+                        sheet.cell((0, 0)).expect("cell lookup"),
+                        Some(Cell::Value(Value::Text(text))) if text.as_str() == "Office & Litchi"
+                    ));
+                });
+            }
+        });
+    }
+
+    #[test]
+    fn worksheet_operations_reject_other_sheet_kinds_without_parsing_them() {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").expect("valid URI");
+        let chart_uri = PackURI::new("/xl/chartsheets/sheet1.xml").expect("valid URI");
+        let mut workbook = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.into(),
+            br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Chart" sheetId="1" r:id="rId1"/></sheets></workbook>"#.to_vec(),
+        );
+        workbook
+            .rels_mut()
+            .try_add_relationship(
+                CHARTSHEET_REL.into(),
+                "chartsheets/sheet1.xml".into(),
+                "rId1".into(),
+                TargetMode::Internal,
+            )
+            .expect("chart relationship");
+        package.add_part(Box::new(workbook));
+        package.add_part(Box::new(BlobPart::new(
+            chart_uri,
+            CHARTSHEET_CONTENT_TYPE.into(),
+            b"not parsed by a worksheet operation".to_vec(),
+        )));
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+
+        let workbook = Workbook::from_package(package).expect("valid chart graph");
+        let chart = workbook.sheet("Chart").expect("lookup").expect("present");
+        assert!(matches!(
+            chart.cell((0, 0)),
+            Err(Error::NotWorksheet { .. })
+        ));
+    }
+
+    #[test]
+    fn poi_and_libreoffice_shared_formula_oracles_match() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let cases = [
+            (
+                root.join("test-data/poi/test-data/spreadsheet/shared_formulas.xlsx"),
+                (40, 0),
+                "B41",
+            ),
+            (
+                root.join(
+                    "test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx",
+                ),
+                (18, 1),
+                "A19*10",
+            ),
+        ];
+        for (path, address, expected) in cases {
+            if !path.exists() {
+                continue;
+            }
+            let workbook = Workbook::open(path).expect("corpus workbook");
+            let sheet = workbook.sheet(0usize).expect("lookup").expect("present");
+            let Some(Cell::Formula(formula)) = sheet.cell(address).expect("formula lookup") else {
+                panic!("expected formula at {address:?}")
+            };
+            assert_eq!(formula.text(), expected);
+        }
+    }
+
     fn package_with_workbook(xml: &[u8]) -> OpcPackage {
         let mut package = OpcPackage::new();
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/workbook.xml").expect("valid URI"),
             ct::SML_SHEET_MAIN.into(),
             xml.to_vec(),
+        )));
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        package
+    }
+
+    fn package_with_cells() -> OpcPackage {
+        let mut package = OpcPackage::new();
+        let workbook_uri = PackURI::new("/xl/workbook.xml").expect("valid URI");
+        let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").expect("valid URI");
+        let strings_uri = PackURI::new("/xl/sharedStrings.xml").expect("valid URI");
+        let mut workbook = BlobPart::new(
+            workbook_uri,
+            ct::SML_SHEET_MAIN.into(),
+            br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>"#.to_vec(),
+        );
+        workbook
+            .rels_mut()
+            .try_add_relationship(
+                rt::WORKSHEET.into(),
+                "worksheets/sheet1.xml".into(),
+                "rId1".into(),
+                TargetMode::Internal,
+            )
+            .expect("worksheet relationship");
+        workbook
+            .rels_mut()
+            .try_add_relationship(
+                rt::SHARED_STRINGS.into(),
+                "sharedStrings.xml".into(),
+                "rId2".into(),
+                TargetMode::Internal,
+            )
+            .expect("shared-string relationship");
+        package.add_part(Box::new(workbook));
+        package.add_part(Box::new(BlobPart::new(
+            worksheet_uri,
+            ct::SML_WORKSHEET.into(),
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row><row r="2"><c r="C2"><v>-0.000</v></c></row><row r="3"><c r="B3"><f>C2*2</f><v>0</v></c></row><row r="5"><c r="D5" s="2"/></row></sheetData></worksheet>"#.to_vec(),
+        )));
+        package.add_part(Box::new(BlobPart::new(
+            strings_uri,
+            ct::SML_SHARED_STRINGS.into(),
+            br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><r><t>Office &amp; </t></r><r><t>Litchi</t></r></si></sst>"#.to_vec(),
         )));
         package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
         package

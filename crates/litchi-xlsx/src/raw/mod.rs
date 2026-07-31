@@ -3,7 +3,10 @@
 //! Relationship IDs and native sheet IDs are deliberately isolated here.
 
 mod catalog;
+mod formula;
 pub mod namespace;
+pub(crate) mod strings;
+pub(crate) mod worksheet;
 
 pub use catalog::{parse_catalog, parse_sheet};
 

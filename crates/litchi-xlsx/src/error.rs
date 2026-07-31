@@ -18,12 +18,18 @@ pub enum Error {
     /// Shared OOXML decoding failed.
     #[error("OOXML decoding error: {0}")]
     Xml(#[from] litchi_ooxml_common::XmlError),
+    /// A spreadsheet coordinate lies outside its typed domain.
+    #[error(transparent)]
+    Coordinate(#[from] litchi_sheet::CoordinateError),
     /// An XLSX structural invariant is invalid.
     #[error("invalid XLSX structure: {0}")]
     Invalid(String),
     /// A requested name matches more than one sheet.
     #[error("sheet name '{name}' is ambiguous ({matches} matches)")]
     AmbiguousSheetName { name: String, matches: usize },
+    /// A worksheet-only operation targeted another sheet kind.
+    #[error("sheet '{sheet}' is not a worksheet")]
+    NotWorksheet { sheet: String },
     /// A selector variant is not supported by this API version.
     #[error("unsupported sheet selector")]
     UnsupportedSelector,

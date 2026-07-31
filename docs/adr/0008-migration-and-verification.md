@@ -42,8 +42,38 @@ parser now lives there, while the migration host contains only conversions to
 its legacy internal records. `litchi-xlsx::Workbook` is an immutable `Send +
 Sync` snapshot with lifetime-free sheet handles, content-derived flavor, a
 deterministic one-visible-sheet baseline, and selector-first `Result<Option<_>>`
-lookup by name or checked zero-based position. This is the first XLSX vertical
-slice; cell loading and lossless edit/patch commits remain migration work.
+lookup by name or checked zero-based position. This was the first XLSX vertical
+slice; lossless edit/patch commits remain migration work.
+
+The third implementation slice adds the first semantic worksheet read path.
+`litchi-sheet` rows, columns, and addresses now have checked constructors and
+cannot represent coordinates outside the modern spreadsheet grid. A half-open
+`Rect` stores its exclusive boundary separately, so it can cover the final row
+and column without admitting a sentinel as a valid cell. Borrowed A1 lookup such
+as `sheet.cell("A1")` is the semantic main entry; raw zero-based `(row, column)`
+tuples remain convenient, and reusable checked `Address` values avoid repeated
+validation in hot loops. Lookup returns `Result<Option<&Cell>>`: absence is
+distinct from an explicitly stored `Cell::Empty`, and no `Index` implementation
+converts a miss into a panic.
+
+Worksheet payloads load on first use into hidden thread-safe snapshot caches.
+The parser streams into a row-major compact sparse slice, resolves shared
+strings through cheaply cloned immutable text, expands shared-formula storage
+records, retains exact numeric lexical forms, and keeps formula cache origin and
+freshness separate. Sparse `cells(range)` traversal and stored extent are now
+implemented; declared/content/formatted extents, rich-text formatting, merge
+coverage, dynamic-array spill states, shared-style handles, dense budgeted
+grids, editable transactions, cache eviction, and operation budgets remain
+open, as does replacing remaining parser `Invalid` messages with the full
+structured context taxonomy. The current non-evicting cache is therefore a safe
+migration step, not the weighted-cache design promised by ADR 0005.
+
+The parser's Office-profile limits follow the checked-in `[MS-OE376]`
+conformance notes: row and column grid bounds, non-decreasing row order, cell
+style indexes through 65,490, one-based cell/value metadata indexes below 2³¹,
+32,767-character cell and shared-string limits, bounded shared-string run/count
+hints, required shared-formula indexes, and a false formula `bx` flag. Advisory
+shared-string counts size allocations but never override the parsed items.
 
 ## Evidence levels
 
@@ -93,9 +123,20 @@ only the intended `theme1.xml` and distinct notes `theme2.xml` theme parts.
 Desktop Excel verification on macOS opened the deterministic workbook emitted
 by the second slice without a repair or compatibility dialog. Excel accepted an
 edit to cell A1 and saved the workbook; the Office-resaved archive passed ZIP
-integrity checks and `litchi_xlsx::Workbook` reverse-read its `Sheet1` catalog
-entry as a worksheet. This evidence certifies the minimal package and catalog
-round trip only; it does not certify cell CRUD, which is not part of this slice.
+integrity checks. After the third slice, the public sparse cell facade
+reverse-read A1 from that same Office-resaved artifact as the exact text
+`"Office round trip"`. This certifies minimal-package creation, one native Excel
+edit/resave, catalog recovery, shared-string resolution, and semantic readback
+for that cell. It does not certify Litchi-authored cell create/update/clear/remove
+or general Excel compatibility.
+
+The worksheet parser also matches checked-in Apache POI and LibreOffice shared-
+formula fixtures, including translated follower expressions and stored cached
+results. Synthetic tests cover missing versus explicit empty cells, grid-bound
+rejection, malformed shared-formula groups, exact numeric lexemes, sparse range
+order, read-only serialization stability, and concurrent first access. These
+are read-path regression gates, not performance evidence; allocation, latency,
+contention, and scaling claims still require the measurement work in ADR 0005.
 
 ## Quality gates
 
