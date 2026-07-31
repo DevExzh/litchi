@@ -509,8 +509,77 @@ evidence covers ordinary worksheets and the first workbook view on this one
 macOS build; it does not certify chart sheets, multi-view windows, or grouped
 selection editing across Office versions.
 
+The thirteenth slice adds lossless workbook-tab reordering. Semantic anchors
+are the ordinary entry points: `edit.move_before(sheet, anchor)?` and
+`edit.move_after(sheet, anchor)?` accept the same name-or-position selectors as
+reads, return `Option` for a missing source or anchor, and apply to every
+recognized sheet kind. `edit.move_to(sheet, position)?` retains checked raw
+zero-based positioning for import and algorithmic workflows. Multiple moves in
+one transaction operate on the pending order, retain their semantic sequence,
+and can cancel to an empty patch. No native `sheetId` or relationship ID enters
+the public API.
+
+Order is one workbook-global conflict facet because independently prepared
+permutations can change each other's anchor meaning. It remains orthogonal to
+activation, visibility, and worksheet payload/property facets, so those edits
+can be prepared concurrently and joined. Each effective operation yields a
+`Change::Move` with its semantic sheet name and checked before/after positions.
+Inverse patches reverse dependent operation, part, and graph-delta order before
+swapping each effect, making multi-move undo exact rather than relying on
+commutativity. Planning allocates one compact identity permutation lazily,
+moves identities in place, and borrows names and physical relationship IDs only
+inside the low-level rewrite boundary.
+
+The physical rewrite moves each complete `sheet` element without rebuilding or
+copying any sheet part. In the same single workbook-part delta it remaps
+`activeTab` and `firstSheet` for every direct `workbookView`, including omitted
+zero defaults and Office's `4294967286` `firstSheet` sentinel, and remaps every
+direct sheet-local `definedName@localSheetId`. These positional fields follow
+the checked-in `[MS-OE376]` workbook-view and defined-name notes and the
+Open XML SDK references for
+[`WorkbookView.FirstSheet`](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.workbookview.firstsheet?view=openxml-3.0.1)
+and
+[`DefinedName.LocalSheetId`](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.definedname.localsheetid?view=openxml-3.0.1).
+In contrast,
+`customWorkbookView@activeSheetId` remains exact because Microsoft defines it
+as the native `sheetId`, not a workbook-order position; see the
+[`CustomWorkbookView` reference](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.customworkbookview?view=openxml-3.0.1).
+The active semantic identity is preserved across an ordinary reorder while its
+reported position changes. An explicit activation still wins, including the
+case where old and new active sheets occupy the same numeric position after a
+swap, and only an identity change rewrites per-sheet selection bits.
+
+Structure protection, revision-header tracking, unknown direct catalog/view/
+defined-name payloads, compatibility alternatives that can own an order
+dependency, invalid secondary-window positions, and active positions outside
+Office's range produce typed blocks before bytes change. Unrelated direct
+workbook `AlternateContent`, including Excel's `x15ac:absPath`, stays byte-exact
+and does not prevent an otherwise modeled reorder. The rewriter validates a
+full permutation with O(n) hash indexes, reserves mappings and output capacity
+explicitly, reparses the effective catalog, and verifies relationship order,
+visibility, active position, defined-name count/content, and every remapped
+scope before publishing. Tests cover semantic and numeric selectors, all
+source/destination pairs in a three-tab workbook, multi-move sequences,
+cancellation and conflict-free composition after cancellation, worksheets and
+chart sheets, local/global names, multiple views and default/sentinel fields,
+same-position active-identity replacement, composed cell/visibility/activation
+changes, global conflicts, protection, revision tracking, affected and
+unrelated compatibility payloads, and byte-exact inversion.
+
+Computer Use verification opened a Litchi-reordered, Excel-authored workbook
+in Microsoft Excel for Mac 16.110.2 (build 16.110.26062818). Excel displayed
+Sheet2 as the selected first tab and Sheet1 as the second tab without a repair,
+compatibility, or grouped-workbook warning. After entering
+`Reordered first survived Excel` in Sheet2 A1 and saving, the package passed a
+ZIP integrity check and the public Litchi reader reported Sheet2 visible and
+active at position zero, returned the new value, and preserved Sheet1's three
+text cells and hidden middle column at position one. This native evidence
+covers two ordinary worksheets, one workbook view, one reorder, and one macOS
+Excel build; it does not certify chart sheets, local defined names, multiple
+views, every markup-compatibility alternative, or other Office builds.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement sheet add/delete/rename/reorder, grouped-tab selection CRUD,
+hints or implement sheet add/delete/rename, grouped-tab selection CRUD,
 workbook-protection unlocking, row/column properties beyond
 visibility, row and column insertion/deletion, shifting references,
 merge/group-formula edits,

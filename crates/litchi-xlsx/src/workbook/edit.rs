@@ -119,7 +119,7 @@ impl ActiveTab {
         &self.name
     }
 
-    /// Checked zero-based workbook position at the source snapshot.
+    /// Checked zero-based workbook position in the corresponding patch state.
     pub const fn position(&self) -> usize {
         self.position
     }
@@ -164,6 +164,11 @@ impl RowState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Change {
+    Move {
+        sheet: Box<str>,
+        from: usize,
+        to: usize,
+    },
     Active {
         before: ActiveTab,
         after: ActiveTab,
@@ -198,10 +203,23 @@ impl Change {
     pub fn sheet(&self) -> &str {
         match self {
             Self::Active { after, .. } => after.name(),
-            Self::Visibility { sheet, .. }
+            Self::Move { sheet, .. }
+            | Self::Visibility { sheet, .. }
             | Self::Cell { sheet, .. }
             | Self::Row { sheet, .. }
             | Self::Column { sheet, .. } => sheet,
+        }
+    }
+
+    /// Ordered source/destination positions when this is a tab move.
+    pub fn moved(&self) -> Option<(usize, usize)> {
+        match self {
+            Self::Move { from, to, .. } => Some((*from, *to)),
+            Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. } => None,
         }
     }
 
@@ -209,7 +227,8 @@ impl Change {
     pub fn active(&self) -> Option<(&ActiveTab, &ActiveTab)> {
         match self {
             Self::Active { before, after } => Some((before, after)),
-            Self::Visibility { .. }
+            Self::Move { .. }
+            | Self::Visibility { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -225,9 +244,11 @@ impl Change {
                 after,
                 ..
             } => Some((*position, before, after)),
-            Self::Active { .. } | Self::Cell { .. } | Self::Row { .. } | Self::Column { .. } => {
-                None
-            },
+            Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. } => None,
         }
     }
 
@@ -240,7 +261,8 @@ impl Change {
                 after,
                 ..
             } => Some((*address, before, after)),
-            Self::Active { .. }
+            Self::Move { .. }
+            | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -253,7 +275,8 @@ impl Change {
             Self::Row {
                 row, before, after, ..
             } => Some((*row, *before, *after)),
-            Self::Active { .. }
+            Self::Move { .. }
+            | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
             | Self::Column { .. } => None,
@@ -269,7 +292,8 @@ impl Change {
                 after,
                 ..
             } => Some((*column, *before, *after)),
-            Self::Active { .. }
+            Self::Move { .. }
+            | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Cell { .. }
             | Self::Row { .. } => None,
@@ -278,6 +302,11 @@ impl Change {
 
     fn inverse(&self) -> Self {
         match self {
+            Self::Move { sheet, from, to } => Self::Move {
+                sheet: sheet.clone(),
+                from: *to,
+                to: *from,
+            },
             Self::Active { before, after } => Self::Active {
                 before: after.clone(),
                 after: before.clone(),
@@ -349,6 +378,10 @@ impl Change {
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Conflict {
+    Order {
+        sheet: Box<str>,
+        position: usize,
+    },
     Active {
         sheet: Box<str>,
         position: usize,
@@ -378,7 +411,8 @@ impl Conflict {
     /// Developer-facing sheet name.
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Active { sheet, .. }
+            Self::Order { sheet, .. }
+            | Self::Active { sheet, .. }
             | Self::Tab { sheet, .. }
             | Self::Cells { sheet, .. }
             | Self::Rows { sheet, .. }
@@ -389,7 +423,8 @@ impl Conflict {
     /// Checked zero-based sheet position in the shared base snapshot.
     pub fn position(&self) -> usize {
         match self {
-            Self::Active { position, .. }
+            Self::Order { position, .. }
+            | Self::Active { position, .. }
             | Self::Tab { position, .. }
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
@@ -407,13 +442,20 @@ impl Conflict {
         matches!(self, Self::Active { .. })
     }
 
+    /// Whether both edits target the workbook's one tab-order facet.
+    pub const fn is_order(&self) -> bool {
+        matches!(self, Self::Order { .. })
+    }
+
     /// Deterministically ordered cells written by both edits, when applicable.
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
             Self::Cells { addresses, .. } => Some(addresses),
-            Self::Active { .. } | Self::Tab { .. } | Self::Rows { .. } | Self::Columns { .. } => {
-                None
-            },
+            Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. } => None,
         }
     }
 
@@ -421,9 +463,11 @@ impl Conflict {
     pub fn rows(&self) -> Option<&[RowIndex]> {
         match self {
             Self::Rows { rows, .. } => Some(rows),
-            Self::Active { .. } | Self::Tab { .. } | Self::Cells { .. } | Self::Columns { .. } => {
-                None
-            },
+            Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Cells { .. }
+            | Self::Columns { .. } => None,
         }
     }
 
@@ -432,13 +476,17 @@ impl Conflict {
     pub fn columns(&self) -> Option<&[ColumnIndex]> {
         match self {
             Self::Columns { columns, .. } => Some(columns),
-            Self::Active { .. } | Self::Tab { .. } | Self::Cells { .. } | Self::Rows { .. } => None,
+            Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. } => None,
         }
     }
 
     fn len(&self) -> usize {
         match self {
-            Self::Active { .. } | Self::Tab { .. } => 1,
+            Self::Order { .. } | Self::Active { .. } | Self::Tab { .. } => 1,
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
@@ -647,12 +695,14 @@ impl Patch {
             changes: self
                 .changes
                 .iter()
+                .rev()
                 .map(Change::inverse)
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             parts: self
                 .parts
                 .iter()
+                .rev()
                 .map(|part| PartChange {
                     uri: part.uri.clone(),
                     before: Arc::clone(&part.after),
@@ -663,6 +713,7 @@ impl Patch {
             graph: self
                 .graph
                 .iter()
+                .rev()
                 .map(|change| GraphChange {
                     action: match change.action {
                         GraphAction::Add => GraphAction::Remove,
@@ -863,11 +914,35 @@ impl TabAction {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct MoveIntent {
+    sheet: usize,
+    from: usize,
+    to: usize,
+}
+
+#[derive(Debug)]
+struct OrderPlan {
+    positions: Vec<usize>,
+    moves: Vec<MoveIntent>,
+}
+
+impl OrderPlan {
+    fn is_effective(&self) -> bool {
+        self.positions
+            .iter()
+            .copied()
+            .enumerate()
+            .any(|(position, identity)| position != identity)
+    }
+}
+
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
 #[derive(Debug)]
 pub struct Edit {
     base: Workbook,
     active: Option<usize>,
+    order: Option<OrderPlan>,
     sheets: BTreeMap<usize, SheetActions>,
 }
 
@@ -877,6 +952,7 @@ impl Edit {
         Ok(Self {
             base,
             active: None,
+            order: None,
             sheets: BTreeMap::new(),
         })
     }
@@ -917,16 +993,83 @@ impl Edit {
         }))
     }
 
+    /// Move one tab immediately before another by semantic selector.
+    ///
+    /// `Ok(None)` means either selector did not resolve in the source
+    /// snapshot. Names are the ordinary entry point; checked numeric selectors
+    /// remain available for import and positional workflows.
+    pub fn move_before<'a, 'b>(
+        &mut self,
+        sheet: impl Into<SheetSelector<'a>>,
+        anchor: impl Into<SheetSelector<'b>>,
+    ) -> Result<Option<&mut Self>> {
+        let Some(sheet) = self.base.sheet(sheet)? else {
+            return Ok(None);
+        };
+        let Some(anchor) = self.base.sheet(anchor)? else {
+            return Ok(None);
+        };
+        self.move_relative(sheet.position(), anchor.position(), false)?;
+        Ok(Some(self))
+    }
+
+    /// Move one tab immediately after another by semantic selector.
+    ///
+    /// `Ok(None)` means either selector did not resolve in the source snapshot.
+    pub fn move_after<'a, 'b>(
+        &mut self,
+        sheet: impl Into<SheetSelector<'a>>,
+        anchor: impl Into<SheetSelector<'b>>,
+    ) -> Result<Option<&mut Self>> {
+        let Some(sheet) = self.base.sheet(sheet)? else {
+            return Ok(None);
+        };
+        let Some(anchor) = self.base.sheet(anchor)? else {
+            return Ok(None);
+        };
+        self.move_relative(sheet.position(), anchor.position(), true)?;
+        Ok(Some(self))
+    }
+
+    /// Move a selected tab to a checked zero-based final position.
+    ///
+    /// `Ok(None)` means the source selector or destination position does not
+    /// exist. Prefer [`Self::move_before`] and [`Self::move_after`] when a
+    /// stable semantic anchor is available.
+    pub fn move_to<'a>(
+        &mut self,
+        sheet: impl Into<SheetSelector<'a>>,
+        position: usize,
+    ) -> Result<Option<&mut Self>> {
+        let Some(sheet) = self.base.sheet(sheet)? else {
+            return Ok(None);
+        };
+        if position >= self.base.len() {
+            return Ok(None);
+        }
+        self.move_position(sheet.position(), position)?;
+        Ok(Some(self))
+    }
+
     pub fn len(&self) -> usize {
-        self.sheets
-            .values()
-            .fold(usize::from(self.active.is_some()), |len, actions| {
-                len.saturating_add(actions.len())
-            })
+        self.sheets.values().fold(
+            usize::from(self.active.is_some()).saturating_add(
+                self.order
+                    .as_ref()
+                    .filter(|order| order.is_effective())
+                    .map_or(0, |order| order.moves.len()),
+            ),
+            |len, actions| len.saturating_add(actions.len()),
+        )
     }
 
     pub fn is_empty(&self) -> bool {
-        self.active.is_none() && self.sheets.values().all(SheetActions::is_empty)
+        self.active.is_none()
+            && self
+                .order
+                .as_ref()
+                .is_none_or(|order| !order.is_effective())
+            && self.sheets.values().all(SheetActions::is_empty)
     }
 
     /// Join an independently prepared edit when every effect is disjoint.
@@ -951,6 +1094,13 @@ impl Edit {
 
         if self.active.is_none() {
             self.active = other.active;
+        }
+        if self
+            .order
+            .as_ref()
+            .is_none_or(|order| !order.is_effective())
+        {
+            self.order = other.order;
         }
         for (position, actions) in other.sheets {
             match self.sheets.entry(position) {
@@ -992,11 +1142,39 @@ impl Edit {
         let Self {
             base,
             active: requested_active,
+            order: requested_order,
             sheets,
         } = self;
         let mut changes = Vec::new();
         let mut parts = Vec::new();
         let mut needs_recalculation = false;
+
+        let effective_order = requested_order.filter(OrderPlan::is_effective);
+        if let Some(order) = &effective_order {
+            validate_order_plan(order, base.inner.sheets.len())?;
+            let first = order
+                .moves
+                .first()
+                .ok_or_else(|| invalid("effective tab order has no semantic move"))?;
+            let data = base
+                .inner
+                .sheets
+                .get(first.sheet)
+                .ok_or_else(|| invalid("moved tab disappeared during edit"))?;
+            ensure_reorder_supported(&base, &data.name, first.from)?;
+            for moved in &order.moves {
+                let data = base
+                    .inner
+                    .sheets
+                    .get(moved.sheet)
+                    .ok_or_else(|| invalid("moved tab disappeared during patch creation"))?;
+                changes.push(Change::Move {
+                    sheet: data.name.clone().into_boxed_str(),
+                    from: moved.from,
+                    to: moved.to,
+                });
+            }
+        }
 
         let mut effective_tabs = Vec::new();
         for (position, requested) in &sheets {
@@ -1046,28 +1224,38 @@ impl Edit {
             });
         }
 
+        let order_at = |position: usize| {
+            effective_order
+                .as_ref()
+                .map_or(position, |order| order.positions[position])
+        };
+        let final_position = |identity: usize| {
+            effective_order.as_ref().map_or_else(
+                || (identity < base.inner.sheets.len()).then_some(identity),
+                |order| {
+                    order
+                        .positions
+                        .iter()
+                        .position(|candidate| *candidate == identity)
+                },
+            )
+        };
+
         let current_active = base.inner.active_sheet;
-        let final_active = if let Some(position) = requested_active {
+        let final_active = if let Some(identity) = requested_active {
             let data = base
                 .inner
                 .sheets
-                .get(position)
+                .get(identity)
                 .ok_or_else(|| invalid("requested active tab disappeared during edit"))?;
-            if position > raw::catalog_edit::MAX_ACTIVE_TAB {
+            if !final_is_visible(identity) {
                 return Err(Error::TabEditBlocked {
                     sheet: data.name.clone(),
-                    position,
-                    reason: TabEditBlock::ActiveTabLimit,
-                });
-            }
-            if !final_is_visible(position) {
-                return Err(Error::TabEditBlocked {
-                    sheet: data.name.clone(),
-                    position,
+                    position: identity,
                     reason: TabEditBlock::NotVisible,
                 });
             }
-            Some(position)
+            Some(identity)
         } else if effective_tabs.is_empty() || current_active.is_some_and(final_is_visible) {
             current_active
         } else {
@@ -1076,44 +1264,60 @@ impl Edit {
                 None
             } else {
                 current_active
-                    .filter(|current| *current < len)
-                    .and_then(|current| {
-                        let remaining = len - current;
+                    .and_then(final_position)
+                    .and_then(|current_position| {
+                        let remaining = len - current_position;
                         (1..=len)
                             .map(|offset| {
                                 if offset >= remaining {
                                     offset - remaining
                                 } else {
-                                    current + offset
+                                    current_position + offset
                                 }
                             })
-                            .find(|position| final_is_visible(*position))
+                            .map(order_at)
+                            .find(|identity| final_is_visible(*identity))
                     })
-                    .or_else(|| (0..len).find(|position| final_is_visible(*position)))
+                    .or_else(|| {
+                        (0..len)
+                            .map(order_at)
+                            .find(|identity| final_is_visible(*identity))
+                    })
             }
         };
-        let active_change = (final_active != current_active)
-            .then_some(final_active)
-            .flatten();
+        let final_active_position = final_active.and_then(final_position);
+        if let Some(position) = final_active_position
+            && position > raw::catalog_edit::MAX_ACTIVE_TAB
+        {
+            let identity =
+                final_active.ok_or_else(|| invalid("active position has no sheet identity"))?;
+            let data = base
+                .inner
+                .sheets
+                .get(identity)
+                .ok_or_else(|| invalid("replacement active tab disappeared during edit"))?;
+            return Err(Error::TabEditBlocked {
+                sheet: data.name.clone(),
+                position,
+                reason: TabEditBlock::ActiveTabLimit,
+            });
+        }
 
-        if let Some(position) = active_change {
-            if position > raw::catalog_edit::MAX_ACTIVE_TAB {
-                let data = base
-                    .inner
-                    .sheets
-                    .get(position)
-                    .ok_or_else(|| invalid("replacement active tab disappeared during edit"))?;
-                return Err(Error::TabEditBlocked {
-                    sheet: data.name.clone(),
-                    position,
-                    reason: TabEditBlock::ActiveTabLimit,
-                });
-            }
-            let before = current_active
-                .map(|position| active_tab(&base, position))
-                .transpose()?
+        let active_before = current_active
+            .map(|identity| active_tab_at(&base, identity, identity))
+            .transpose()?;
+        let active_after = final_active
+            .zip(final_active_position)
+            .map(|(identity, position)| active_tab_at(&base, identity, position))
+            .transpose()?;
+        let active_change = (active_before != active_after)
+            .then_some(final_active_position)
+            .flatten();
+        if active_change.is_some() {
+            let before = active_before
                 .ok_or_else(|| invalid("non-empty workbook has no source active tab"))?;
-            let after = active_tab(&base, position)?;
+            let after = active_after
+                .ok_or_else(|| invalid("non-empty workbook has no final active tab"))?;
             changes.push(Change::Active { before, after });
         }
 
@@ -1237,7 +1441,7 @@ impl Edit {
             base.inner.validate_styles(&parsed)?;
             for change in &changes[change_start..] {
                 match change {
-                    Change::Active { .. } | Change::Visibility { .. } => {},
+                    Change::Move { .. } | Change::Active { .. } | Change::Visibility { .. } => {},
                     Change::Cell {
                         sheet,
                         address,
@@ -1285,7 +1489,7 @@ impl Edit {
             });
         }
 
-        if let Some(new_active) = active_change {
+        if final_active != current_active {
             if let Some(old_active) = current_active {
                 let data =
                     base.inner.sheets.get(old_active).ok_or_else(|| {
@@ -1309,6 +1513,8 @@ impl Edit {
                     )
                 })?;
             }
+            let new_active = final_active
+                .ok_or_else(|| invalid("active tab disappeared during selection rewrite"))?;
             let data = base
                 .inner
                 .sheets
@@ -1327,7 +1533,7 @@ impl Edit {
                     true,
                     raw::sheet_view_edit::Context {
                         sheet: &data.name,
-                        position: new_active,
+                        position: final_active_position.unwrap_or(new_active),
                     },
                 )
             })?;
@@ -1353,12 +1559,19 @@ impl Edit {
             Vec::new()
         };
 
-        if !effective_tabs.is_empty() || active_change.is_some() || needs_recalculation {
+        if !effective_tabs.is_empty()
+            || active_change.is_some()
+            || effective_order.is_some()
+            || needs_recalculation
+        {
             let workbook_part = base.inner.package.get_part(&base.inner.workbook_uri)?;
             let before = workbook_part.blob_arc();
             let active = active_change
                 .map(|position| {
-                    let data = base.inner.sheets.get(position).ok_or_else(|| {
+                    let identity = final_active.ok_or_else(|| {
+                        invalid("active-tab rewrite position has no sheet identity")
+                    })?;
+                    let data = base.inner.sheets.get(identity).ok_or_else(|| {
                         invalid("active-tab rewrite target disappeared during commit")
                     })?;
                     Ok::<_, Error>(raw::catalog_edit::Active {
@@ -1367,7 +1580,45 @@ impl Edit {
                     })
                 })
                 .transpose()?;
-            let mut after = if effective_tabs.is_empty() && active.is_none() {
+            let raw_order = effective_order
+                .as_ref()
+                .map(|order| {
+                    let moved = order
+                        .moves
+                        .first()
+                        .ok_or_else(|| invalid("effective tab order lost its move context"))?;
+                    let data =
+                        base.inner.sheets.get(moved.sheet).ok_or_else(|| {
+                            invalid("tab reorder context disappeared during commit")
+                        })?;
+                    let relationship_ids = order
+                        .positions
+                        .iter()
+                        .map(|identity| {
+                            base.inner
+                                .sheets
+                                .get(*identity)
+                                .map(|sheet| sheet.relationship_id.as_str())
+                                .ok_or_else(|| {
+                                    invalid("tab reorder target disappeared during commit")
+                                })
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    Ok::<_, Error>(raw::catalog_edit::Order {
+                        sheet: &data.name,
+                        position: moved.from,
+                        relationship_ids,
+                        local_scopes: base
+                            .inner
+                            .defined_names
+                            .iter()
+                            .filter(|name| name.local_sheet_id.is_some())
+                            .count(),
+                    })
+                })
+                .transpose()?;
+            let mut after = if effective_tabs.is_empty() && active.is_none() && raw_order.is_none()
+            {
                 raw::recalc::invalidate(&before)?
             } else {
                 let tabs = effective_tabs
@@ -1384,31 +1635,60 @@ impl Edit {
                         })
                     })
                     .collect::<Result<Vec<_>>>()?;
-                raw::catalog_edit::rewrite(&before, raw::catalog_edit::Plan { tabs, active })?
+                raw::catalog_edit::rewrite(
+                    &before,
+                    raw::catalog_edit::Plan {
+                        tabs,
+                        active,
+                        order: raw_order,
+                    },
+                )?
             };
-            if needs_recalculation && (!effective_tabs.is_empty() || active.is_some()) {
+            if needs_recalculation
+                && (!effective_tabs.is_empty() || active.is_some() || effective_order.is_some())
+            {
                 after = raw::recalc::invalidate(&after)?;
             }
-            if !effective_tabs.is_empty() || active.is_some() {
+            if !effective_tabs.is_empty() || active.is_some() || effective_order.is_some() {
                 let catalog = raw::parse_catalog(&after)?;
-                if Some(catalog.active_sheet_index) != final_active {
+                if Some(catalog.active_sheet_index) != final_active_position {
                     return Err(invalid("workbook active-tab edit verification failed"));
                 }
-                for (position, action) in &effective_tabs {
+                for (identity, action) in &effective_tabs {
+                    let position = final_position(*identity).ok_or_else(|| {
+                        invalid("visible tab disappeared from the final workbook order")
+                    })?;
                     let actual = catalog
                         .sheets
-                        .get(*position)
+                        .get(position)
                         .ok_or_else(|| invalid("workbook tab edit verification lost a sheet"))?;
                     if !raw_visibility_matches(&actual.visibility, *action) {
                         let sheet = base
                             .inner
                             .sheets
-                            .get(*position)
+                            .get(*identity)
                             .map_or("<missing sheet>", |sheet| sheet.name.as_str());
                         return Err(invalid(format!(
                             "workbook tab visibility verification failed at {sheet}"
                         )));
                     }
+                }
+                if let Some(order) = &effective_order {
+                    for (position, identity) in order.positions.iter().copied().enumerate() {
+                        let expected = base.inner.sheets.get(identity).ok_or_else(|| {
+                            invalid("ordered tab disappeared during workbook verification")
+                        })?;
+                        let actual = catalog
+                            .sheets
+                            .get(position)
+                            .ok_or_else(|| invalid("workbook reorder verification lost a sheet"))?;
+                        if actual.relationship_id != expected.relationship_id {
+                            return Err(invalid(format!(
+                                "workbook reorder verification failed at position {position}"
+                            )));
+                        }
+                    }
+                    verify_defined_name_scopes(&base, &catalog, &order.positions)?;
                 }
             }
             if after.as_slice() != before.as_slice() {
@@ -1460,6 +1740,92 @@ impl Edit {
         self.active = Some(position);
     }
 
+    fn order_plan(&mut self) -> Result<&mut OrderPlan> {
+        if self.order.is_none() {
+            let len = self.base.inner.sheets.len();
+            let mut positions = Vec::new();
+            positions
+                .try_reserve_exact(len)
+                .map_err(|error| invalid(format!("cannot reserve tab-order plan: {error}")))?;
+            positions.extend(0..len);
+            self.order = Some(OrderPlan {
+                positions,
+                moves: Vec::new(),
+            });
+        }
+        self.order
+            .as_mut()
+            .ok_or_else(|| invalid("tab-order plan initialization failed"))
+    }
+
+    fn move_position(&mut self, identity: usize, to: usize) -> Result<()> {
+        let order = self.order_plan()?;
+        if to >= order.positions.len() {
+            return Err(invalid("tab move destination exceeds the workbook order"));
+        }
+        let from = order
+            .positions
+            .iter()
+            .position(|candidate| *candidate == identity)
+            .ok_or_else(|| invalid("selected tab disappeared from the pending order"))?;
+        if from == to {
+            return Ok(());
+        }
+        order
+            .moves
+            .try_reserve(1)
+            .map_err(|error| invalid(format!("cannot reserve tab move: {error}")))?;
+        let identity = order.positions.remove(from);
+        order.positions.insert(to, identity);
+        order.moves.push(MoveIntent {
+            sheet: identity,
+            from,
+            to,
+        });
+        Ok(())
+    }
+
+    fn move_relative(&mut self, identity: usize, anchor: usize, after: bool) -> Result<()> {
+        if identity == anchor {
+            return Ok(());
+        }
+        let order = self.order_plan()?;
+        let from = order
+            .positions
+            .iter()
+            .position(|candidate| *candidate == identity)
+            .ok_or_else(|| invalid("selected tab disappeared from the pending order"))?;
+        if !order.positions.contains(&anchor) {
+            return Err(invalid("anchor tab disappeared from the pending order"));
+        }
+        order
+            .moves
+            .try_reserve(1)
+            .map_err(|error| invalid(format!("cannot reserve tab move: {error}")))?;
+        let identity = order.positions.remove(from);
+        let anchor = order
+            .positions
+            .iter()
+            .position(|candidate| *candidate == anchor)
+            .ok_or_else(|| invalid("anchor tab disappeared during reorder"))?;
+        let to = if after {
+            anchor
+                .checked_add(1)
+                .ok_or_else(|| invalid("tab move position overflow"))?
+        } else {
+            anchor
+        };
+        order.positions.insert(to, identity);
+        if from != to {
+            order.moves.push(MoveIntent {
+                sheet: identity,
+                from,
+                to,
+            });
+        }
+        Ok(())
+    }
+
     fn row_actions(&mut self, position: usize) -> &mut BTreeMap<RowIndex, RowAction> {
         &mut self.sheets.entry(position).or_default().rows
     }
@@ -1470,6 +1836,20 @@ impl Edit {
 
     fn conflicts_with(&self, other: &Self) -> ConflictSet {
         let mut conflicts = Vec::new();
+        if let (Some(left), Some(_)) = (
+            self.order.as_ref().filter(|order| order.is_effective()),
+            other.order.as_ref().filter(|order| order.is_effective()),
+        ) {
+            let moved = left.moves.first();
+            let position = moved.map_or(0, |moved| moved.from);
+            let sheet = moved
+                .and_then(|moved| self.base.inner.sheets.get(moved.sheet))
+                .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+            conflicts.push(Conflict::Order {
+                sheet: sheet.into(),
+                position,
+            });
+        }
         if let (Some(position), Some(_)) = (self.active, other.active) {
             let sheet = self
                 .base
@@ -1772,16 +2152,145 @@ fn raw_visibility_matches(value: &raw::Visibility, action: TabAction) -> bool {
     )
 }
 
-fn active_tab(workbook: &Workbook, position: usize) -> Result<ActiveTab> {
+fn active_tab_at(workbook: &Workbook, identity: usize, position: usize) -> Result<ActiveTab> {
     let sheet = workbook
         .inner
         .sheets
-        .get(position)
+        .get(identity)
         .ok_or_else(|| invalid("active tab points outside the workbook catalog"))?;
     Ok(ActiveTab {
         name: sheet.name.clone().into_boxed_str(),
         position,
     })
+}
+
+fn validate_order_plan(order: &OrderPlan, len: usize) -> Result<()> {
+    if order.positions.len() != len {
+        return Err(invalid("tab-order plan has the wrong number of sheets"));
+    }
+    let mut seen = Vec::new();
+    seen.try_reserve_exact(len)
+        .map_err(|error| invalid(format!("cannot reserve tab-order validation: {error}")))?;
+    seen.resize(len, false);
+    for identity in &order.positions {
+        let Some(slot) = seen.get_mut(*identity) else {
+            return Err(invalid("tab-order plan contains an out-of-range identity"));
+        };
+        if *slot {
+            return Err(invalid("tab-order plan is not a permutation"));
+        }
+        *slot = true;
+    }
+
+    let mut replay = Vec::new();
+    replay
+        .try_reserve_exact(len)
+        .map_err(|error| invalid(format!("cannot reserve tab-move replay: {error}")))?;
+    replay.extend(0..len);
+    for moved in &order.moves {
+        if moved.from >= replay.len() || moved.to >= replay.len() {
+            return Err(invalid("tab move contains an out-of-range position"));
+        }
+        if replay[moved.from] != moved.sheet {
+            return Err(invalid("tab move source does not match the pending order"));
+        }
+        let identity = replay.remove(moved.from);
+        replay.insert(moved.to, identity);
+    }
+    if replay != order.positions {
+        return Err(invalid("tab moves do not produce the pending final order"));
+    }
+    Ok(())
+}
+
+fn ensure_reorder_supported(workbook: &Workbook, sheet: &str, position: usize) -> Result<()> {
+    let main = workbook
+        .inner
+        .package
+        .get_part(&workbook.inner.workbook_uri)?;
+    if main
+        .rels()
+        .iter()
+        .any(|relationship| relationship.reltype().ends_with("/revisionHeaders"))
+    {
+        return Err(Error::TabEditBlocked {
+            sheet: sheet.to_owned(),
+            position,
+            reason: TabEditBlock::TrackedWorkbook,
+        });
+    }
+    Ok(())
+}
+
+fn verify_defined_name_scopes(
+    workbook: &Workbook,
+    catalog: &raw::Catalog,
+    order: &[usize],
+) -> Result<()> {
+    if catalog.defined_names.len() != workbook.inner.defined_names.len() {
+        return Err(invalid(
+            "workbook reorder changed the effective defined-name count",
+        ));
+    }
+    let mut old_to_new = Vec::new();
+    old_to_new
+        .try_reserve_exact(order.len())
+        .map_err(|error| invalid(format!("cannot reserve defined-name scope map: {error}")))?;
+    old_to_new.resize(order.len(), 0usize);
+    for (new, old) in order.iter().copied().enumerate() {
+        let slot = old_to_new
+            .get_mut(old)
+            .ok_or_else(|| invalid("defined-name scope map has an invalid sheet identity"))?;
+        *slot = new;
+    }
+    for (before, after) in workbook
+        .inner
+        .defined_names
+        .iter()
+        .zip(&catalog.defined_names)
+    {
+        let expected_scope = match before.local_sheet_id {
+            None => None,
+            Some(scope) => {
+                let scope = usize::try_from(scope)
+                    .map_err(|_| invalid("defined-name scope does not fit usize"))?;
+                let mapped = old_to_new
+                    .get(scope)
+                    .copied()
+                    .ok_or_else(|| invalid("defined-name scope cannot be remapped"))?;
+                Some(
+                    u32::try_from(mapped)
+                        .map_err(|_| invalid("remapped defined-name scope does not fit u32"))?,
+                )
+            },
+        };
+        if after.local_sheet_id != expected_scope || !same_defined_name_except_scope(before, after)
+        {
+            return Err(invalid(format!(
+                "workbook reorder changed defined name '{}' unexpectedly",
+                before.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn same_defined_name_except_scope(left: &raw::DefinedName, right: &raw::DefinedName) -> bool {
+    left.name == right.name
+        && left.reference == right.reference
+        && left.comment == right.comment
+        && left.custom_menu == right.custom_menu
+        && left.description == right.description
+        && left.help == right.help
+        && left.status_bar == right.status_bar
+        && left.shortcut_key == right.shortcut_key
+        && left.hidden == right.hidden
+        && left.function == right.function
+        && left.vb_procedure == right.vb_procedure
+        && left.xlm == right.xlm
+        && left.function_group_id == right.function_group_id
+        && left.publish_to_server == right.publish_to_server
+        && left.workbook_parameter == right.workbook_parameter
 }
 
 fn compose_part(
@@ -2519,6 +3028,394 @@ mod tests {
                 .visibility(),
             &Visibility::Hidden
         );
+    }
+
+    #[test]
+    fn tab_reorder_is_selector_first_dependency_aware_and_reversible() {
+        let source = three_sheet_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        assert!(
+            edit.move_before("Sheet3", "Sheet1")
+                .expect("move lookup")
+                .is_some()
+        );
+        assert_eq!(edit.len(), 1);
+        let committed = edit.commit().expect("reorder");
+        assert_eq!(
+            committed
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet3", "Sheet1", "Sheet2"]
+        );
+        assert_eq!(
+            committed
+                .workbook()
+                .active_sheet()
+                .expect("active sheet")
+                .name(),
+            "Sheet2"
+        );
+        assert_eq!(
+            committed
+                .workbook()
+                .active_sheet()
+                .expect("active sheet")
+                .position(),
+            2
+        );
+        assert!(matches!(
+            committed
+                .workbook()
+                .sheet("Sheet3")
+                .expect("lookup")
+                .expect("Sheet3")
+                .cell("A1")
+                .expect("cell"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "three"
+        ));
+        assert_eq!(
+            committed
+                .workbook()
+                .defined_names()
+                .iter()
+                .map(|name| (name.name.as_str(), name.local_sheet_id))
+                .collect::<Vec<_>>(),
+            [
+                ("FirstLocal", Some(1)),
+                ("ThirdLocal", Some(0)),
+                ("Global", None),
+            ]
+        );
+        assert_eq!(committed.patch().len(), 2);
+        assert_eq!(committed.patch().changes()[0].sheet(), "Sheet3");
+        assert_eq!(committed.patch().changes()[0].moved(), Some((2, 0)));
+        let (before, after) = committed.patch().changes()[1]
+            .active()
+            .expect("active position remap");
+        assert_eq!((before.name(), before.position()), ("Sheet2", 1));
+        assert_eq!((after.name(), after.position()), ("Sheet2", 2));
+
+        let inverse = committed.patch().inverse();
+        assert_eq!(inverse.changes()[1].moved(), Some((0, 2)));
+        let restored = committed
+            .workbook()
+            .apply(&inverse)
+            .expect("inverse reorder");
+        assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+        assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
+
+        let chart_source = two_sheet_workbook(SheetKind::Chart);
+        let chart_bytes = chart_source.to_bytes().expect("chart source bytes");
+        let mut chart_edit = chart_source.edit().expect("chart edit");
+        chart_edit
+            .move_before("Sheet2", "Sheet1")
+            .expect("chart lookup")
+            .expect("chart tabs");
+        let chart = chart_edit.commit().expect("chart reorder");
+        let first = chart
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("tab");
+        assert_eq!((first.name(), first.kind()), ("Sheet2", SheetKind::Chart));
+        assert_eq!(
+            chart
+                .workbook()
+                .apply(&chart.patch().inverse())
+                .expect("chart inverse")
+                .workbook()
+                .to_bytes()
+                .expect("chart bytes"),
+            chart_bytes
+        );
+    }
+
+    #[test]
+    fn tab_reorder_composes_with_other_facets_and_conflicts_globally() {
+        let source = three_sheet_workbook();
+        let mut order = source.edit().expect("order");
+        order
+            .move_before("Sheet3", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        let mut active = source.edit().expect("active");
+        active
+            .tab("Sheet3")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        let mut visibility = source.edit().expect("visibility");
+        visibility
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("tab")
+            .hide();
+        let mut cell = source.edit().expect("cell");
+        cell.sheet("Sheet3")
+            .expect("lookup")
+            .expect("sheet")
+            .set("B1", "moved payload")
+            .expect("cell");
+        order.join(active).expect("order and active");
+        order.join(visibility).expect("order and visibility");
+        order.join(cell).expect("order and cell");
+        let committed = order.commit().expect("composed reorder");
+        let active = committed.workbook().active_sheet().expect("active");
+        assert_eq!((active.name(), active.position()), ("Sheet3", 0));
+        assert_eq!(
+            committed
+                .workbook()
+                .sheet("Sheet1")
+                .expect("lookup")
+                .expect("sheet")
+                .visibility(),
+            &Visibility::Hidden
+        );
+        assert!(matches!(
+            active.cell("B1").expect("cell"),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "moved payload"
+        ));
+        assert_eq!(
+            committed
+                .patch()
+                .parts
+                .iter()
+                .filter(|part| part.uri == source.inner.workbook_uri)
+                .count(),
+            1
+        );
+        assert_eq!(
+            committed
+                .patch()
+                .parts
+                .iter()
+                .filter(|part| part.uri == source.inner.sheets[2].part_uri)
+                .count(),
+            1
+        );
+
+        let mut left = source.edit().expect("left order");
+        left.move_before("Sheet3", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        let mut right = source.edit().expect("right order");
+        right
+            .move_after("Sheet1", "Sheet2")
+            .expect("lookup")
+            .expect("tabs");
+        let error = left.join(right).expect_err("order is one global facet");
+        let conflicts = error.conflicts().expect("order conflict");
+        assert_eq!(conflicts.len(), 1);
+        assert!(conflicts.conflicts()[0].is_order());
+
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut same_position = source.edit().expect("same-position edit");
+        same_position
+            .move_before("Sheet2", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        same_position
+            .tab("Sheet2")
+            .expect("lookup")
+            .expect("tab")
+            .activate();
+        let committed = same_position
+            .commit()
+            .expect("active identity changes at the same position");
+        let active = committed.workbook().active_sheet().expect("active");
+        assert_eq!((active.name(), active.position()), ("Sheet2", 0));
+        let active_change = committed
+            .patch()
+            .changes()
+            .iter()
+            .find_map(Change::active)
+            .expect("semantic active change");
+        assert_eq!(active_change.0.position(), 0);
+        assert_eq!(active_change.1.position(), 0);
+        assert_eq!(active_change.0.name(), "Sheet1");
+        assert_eq!(active_change.1.name(), "Sheet2");
+    }
+
+    #[test]
+    fn numeric_tab_moves_are_checked_and_all_positions_round_trip() {
+        for from in 0..3usize {
+            for to in 0..3usize {
+                let source = three_sheet_workbook();
+                let source_bytes = source.to_bytes().expect("source bytes");
+                let mut expected = vec!["Sheet1", "Sheet2", "Sheet3"];
+                let moved = expected.remove(from);
+                expected.insert(to, moved);
+                let mut edit = source.edit().expect("edit");
+                assert!(edit.move_to(from, to).expect("lookup").is_some());
+                let committed = edit.commit().expect("move");
+                assert_eq!(
+                    committed
+                        .workbook()
+                        .sheets()
+                        .map(|sheet| sheet.name().to_owned())
+                        .collect::<Vec<_>>(),
+                    expected.into_iter().map(str::to_owned).collect::<Vec<_>>()
+                );
+                let restored = committed
+                    .workbook()
+                    .apply(&committed.patch().inverse())
+                    .expect("inverse");
+                assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+            }
+        }
+
+        let source = three_sheet_workbook();
+        let mut missing = source.edit().expect("missing edit");
+        assert!(
+            missing
+                .move_before("Absent", "Sheet1")
+                .expect("lookup")
+                .is_none()
+        );
+        assert!(missing.move_to("Sheet1", 3).expect("bounds").is_none());
+        assert!(missing.commit().expect("no-op").patch().is_empty());
+
+        let mut cancelled = source.edit().expect("cancelled edit");
+        cancelled
+            .move_before("Sheet3", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        cancelled
+            .move_after("Sheet3", "Sheet2")
+            .expect("lookup")
+            .expect("tabs");
+        assert!(cancelled.is_empty());
+        assert_eq!(cancelled.len(), 0);
+        assert!(cancelled.commit().expect("cancelled").patch().is_empty());
+
+        let mut cancelled = source.edit().expect("cancelled join edit");
+        cancelled
+            .move_before("Sheet3", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        cancelled
+            .move_after("Sheet3", "Sheet2")
+            .expect("lookup")
+            .expect("tabs");
+        let mut effective = source.edit().expect("effective join edit");
+        effective
+            .move_before("Sheet2", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        cancelled
+            .join(effective)
+            .expect("cancelled order has no conflict");
+        let joined = cancelled.commit().expect("joined order");
+        assert_eq!(
+            joined
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet2", "Sheet1", "Sheet3"]
+        );
+
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut sequence = source.edit().expect("sequence edit");
+        sequence
+            .move_before("Sheet3", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        sequence
+            .move_after("Sheet1", "Sheet2")
+            .expect("lookup")
+            .expect("tabs");
+        let sequence = sequence.commit().expect("move sequence");
+        assert_eq!(
+            sequence
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet3", "Sheet2", "Sheet1"]
+        );
+        assert_eq!(sequence.patch().len(), 2);
+        assert_eq!(sequence.patch().changes()[0].moved(), Some((2, 0)));
+        assert_eq!(sequence.patch().changes()[1].moved(), Some((1, 2)));
+        let inverse = sequence.patch().inverse();
+        assert_eq!(inverse.changes()[0].moved(), Some((2, 1)));
+        assert_eq!(inverse.changes()[1].moved(), Some((0, 2)));
+        assert_eq!(
+            sequence
+                .workbook()
+                .apply(&inverse)
+                .expect("sequence inverse")
+                .workbook()
+                .to_bytes()
+                .expect("restored bytes"),
+            source_bytes
+        );
+    }
+
+    #[test]
+    fn tab_reorder_blocks_protection_and_revision_tracking() {
+        let source = three_sheet_workbook();
+        let mut package = source.inner.package.clone();
+        let workbook = package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook");
+        let xml = std::str::from_utf8(workbook.blob())
+            .expect("UTF-8")
+            .replace(
+                "<bookViews>",
+                "<workbookProtection lockStructure=\"1\"/><bookViews>",
+            );
+        workbook.set_blob(xml.into_bytes());
+        let protected = Workbook::from_package(package).expect("protected workbook");
+        let mut edit = protected.edit().expect("edit");
+        edit.move_before("Sheet3", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::ProtectedWorkbook,
+                ..
+            })
+        ));
+
+        let mut package = source.inner.package.clone();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/revisions/revisionHeaders1.xml").expect("revision URI"),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml"
+                    .to_owned(),
+                br#"<headers xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+                    .to_vec(),
+            )))
+            .expect("revision part");
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook")
+            .rels_mut()
+            .try_add_relationship(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders"
+                    .to_owned(),
+                "revisions/revisionHeaders1.xml".to_owned(),
+                "rIdRevisionHeaders".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("revision relationship");
+        let tracked = Workbook::from_package(package).expect("tracked workbook");
+        let mut edit = tracked.edit().expect("edit");
+        edit.move_before("Sheet3", "Sheet1")
+            .expect("lookup")
+            .expect("tabs");
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::TrackedWorkbook,
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -3412,6 +4309,48 @@ mod tests {
             )))
             .expect("second sheet part");
         Workbook::from_package(package).expect("two-sheet workbook")
+    }
+
+    fn three_sheet_workbook() -> Workbook {
+        let source = two_sheet_workbook(SheetKind::Worksheet);
+        let mut package = source.inner.package.clone();
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook part")
+            .set_blob(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="1" firstSheet="0"/><workbookView activeTab="2" firstSheet="1"/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="Sheet2" sheetId="2" r:id="rIdTab2"/><sheet name="Sheet3" sheetId="3" r:id="rIdTab3"/></sheets><definedNames><definedName name="FirstLocal" localSheetId="0">Sheet1!$A$1</definedName><definedName name="ThirdLocal" localSheetId="2">Sheet3!$A$1</definedName><definedName name="Global">1</definedName></definedNames></workbook>"#.to_vec(),
+            );
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook part")
+            .rels_mut()
+            .try_add_relationship(
+                litchi_opc::constants::relationship_type::WORKSHEET.to_owned(),
+                "worksheets/sheet3.xml".to_owned(),
+                "rIdTab3".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("third sheet relationship");
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/worksheets/sheet3.xml").expect("third sheet URI"),
+                litchi_opc::constants::content_type::SML_WORKSHEET.to_owned(),
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>three</t></is></c></row></sheetData></worksheet>"#.to_vec(),
+            )))
+            .expect("third sheet part");
+        package
+            .get_part_mut(&source.inner.sheets[0].part_uri)
+            .expect("first sheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>one</t></is></c></row></sheetData></worksheet>"#.to_vec(),
+            );
+        package
+            .get_part_mut(&source.inner.sheets[1].part_uri)
+            .expect("second sheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>two</t></is></c></row></sheetData></worksheet>"#.to_vec(),
+            );
+        Workbook::from_package(package).expect("three-sheet workbook")
     }
 
     fn active_second_sheet_workbook(second_kind: SheetKind) -> Workbook {

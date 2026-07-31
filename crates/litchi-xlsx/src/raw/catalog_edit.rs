@@ -1,7 +1,10 @@
-//! Narrow, lossless surgery for workbook sheet-tab properties.
+//! Narrow, lossless surgery for the workbook sheet catalog.
 //!
-//! Only directly modeled `sheet/@state` and the first workbook view's
-//! `activeTab` are regenerated. All untouched workbook bytes remain exact.
+//! Only directly modeled sheet state/order, positional workbook-view fields,
+//! and sheet-local defined-name scopes are regenerated. All untouched workbook
+//! bytes remain exact.
+
+use std::collections::{HashMap, HashSet};
 
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
@@ -53,13 +56,26 @@ pub(crate) struct Active<'a> {
     pub(crate) position: usize,
 }
 
+/// Final relationship order plus semantic error context. Relationship IDs are
+/// borrowed only inside this physical rewrite boundary.
+#[derive(Debug)]
+pub(crate) struct Order<'a> {
+    pub(crate) sheet: &'a str,
+    pub(crate) position: usize,
+    pub(crate) relationship_ids: Vec<&'a str>,
+    pub(crate) local_scopes: usize,
+}
+
 /// Move-only workbook rewrite plan.
 #[derive(Debug)]
 pub(crate) struct Plan<'a> {
     pub(crate) tabs: Vec<Tab<'a>>,
     /// A replacement for the first workbook view's active tab. `None` leaves
-    /// every workbook view byte-exact.
+    /// its active sheet unchanged unless an order edit remaps its position.
     pub(crate) active: Option<Active<'a>>,
+    /// Final sheet relationship order. `None` leaves order-dependent fields
+    /// byte-exact.
+    pub(crate) order: Option<Order<'a>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -96,6 +112,19 @@ struct SheetSlot {
 }
 
 #[derive(Debug)]
+struct ViewSlot {
+    slot: Slot,
+    active: Option<usize>,
+    first: Option<u32>,
+}
+
+#[derive(Debug)]
+struct DefinedNameSlot {
+    slot: Slot,
+    local_sheet_id: Option<usize>,
+}
+
+#[derive(Debug)]
 struct Container {
     slot: Slot,
     payload: bool,
@@ -106,9 +135,12 @@ struct Layout {
     sheets: Container,
     sheet_slots: Box<[SheetSlot]>,
     book_views: Option<Container>,
-    workbook_view: Option<Slot>,
+    workbook_views: Box<[ViewSlot]>,
+    defined_names: Option<Container>,
+    defined_name_slots: Box<[DefinedNameSlot]>,
     protected: bool,
     alternate_content: bool,
+    alternate_dependencies: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,12 +150,15 @@ enum Kind {
     Sheet,
     BookViews,
     WorkbookView,
+    DefinedNames,
+    DefinedName,
     Other,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct Frame {
     kind: Kind,
+    alternate_content: bool,
 }
 
 #[derive(Debug)]
@@ -140,13 +175,20 @@ struct Scanner {
     pending_sheets: Option<Pending>,
     sheet_slots: Vec<SheetSlot>,
     pending_sheet: Option<(Pending, Box<str>)>,
+    sheets_payload: bool,
     book_views: Option<Container>,
     pending_book_views: Option<Pending>,
-    workbook_view: Option<Slot>,
-    pending_workbook_view: Option<Pending>,
+    workbook_views: Vec<ViewSlot>,
+    pending_workbook_view: Option<(Pending, Option<usize>, Option<u32>)>,
     book_views_payload: bool,
+    defined_names: Option<Container>,
+    pending_defined_names: Option<Pending>,
+    defined_name_slots: Vec<DefinedNameSlot>,
+    pending_defined_name: Option<(Pending, Option<usize>)>,
+    defined_names_payload: bool,
     protected: bool,
     alternate_content: bool,
+    alternate_dependencies: bool,
 }
 
 #[derive(Debug)]
@@ -155,21 +197,34 @@ struct Replacement {
     bytes: Vec<u8>,
 }
 
-/// Rewrite recognized tab states and, when requested, the active workbook
-/// view. The caller reparses and verifies the semantic result before publish.
+const FIRST_SHEET_SENTINEL: u32 = 4_294_967_286;
+
+struct OrderMap {
+    old_to_new: Vec<usize>,
+    new_to_old: Vec<usize>,
+}
+
+/// Rewrite recognized tab state/order and their positional dependencies. The
+/// caller reparses and verifies the semantic result before publish.
 pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
-    if plan.tabs.is_empty() && plan.active.is_none() {
+    if plan.tabs.is_empty() && plan.active.is_none() && plan.order.is_none() {
         return Ok(content.to_vec());
     }
     let layout = scan(content)?;
-    let first = plan.tabs.first().copied();
-    if layout.protected && !plan.tabs.is_empty() {
-        return Err(block(
-            first.map(|tab| (tab.sheet, tab.position)),
-            TabEditBlock::ProtectedWorkbook,
-        ));
+    let Plan {
+        tabs,
+        active,
+        order,
+    } = plan;
+    let first = tabs.first().copied();
+    let order_context = order.as_ref().map(|order| (order.sheet, order.position));
+    let context = order_context
+        .or_else(|| active.map(|active| (active.sheet, active.position)))
+        .or_else(|| first.map(|tab| (tab.sheet, tab.position)));
+    if layout.protected && (!tabs.is_empty() || order.is_some()) {
+        return Err(block(context, TabEditBlock::ProtectedWorkbook));
     }
-    if let Some(active) = plan.active
+    if let Some(active) = active
         && active.position > MAX_ACTIVE_TAB
     {
         return Err(block(
@@ -178,41 +233,39 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
         ));
     }
 
+    let order_map = order
+        .as_ref()
+        .map(|order| validate_order(&layout, order))
+        .transpose()?;
+
     let mut replacements = Vec::new();
     replacements
-        .try_reserve(plan.tabs.len().saturating_add(1))
+        .try_reserve(
+            tabs.len()
+                .saturating_add(order_map.as_ref().map_or(0, |_| layout.sheet_slots.len()))
+                .saturating_add(layout.workbook_views.len())
+                .saturating_add(layout.defined_name_slots.len()),
+        )
         .map_err(|error| invalid(format!("cannot reserve workbook edit plan: {error}")))?;
-    for requested in plan.tabs {
-        let mut matches = layout
-            .sheet_slots
-            .iter()
-            .filter(|slot| slot.relationship_id.as_ref() == requested.relationship_id);
-        let Some(found) = matches.next() else {
-            return Err(Error::TabEditBlocked {
-                sheet: requested.sheet.to_owned(),
-                position: requested.position,
-                reason: TabEditBlock::MarkupCompatibility,
-            });
-        };
-        if matches.next().is_some() {
-            return Err(invalid(format!(
-                "duplicate direct workbook sheet relationship '{}' during edit",
-                requested.relationship_id
-            )));
-        }
-        let appended = requested
-            .state
-            .attribute()
-            .map(|value| ("state", value.to_owned()))
-            .into_iter()
-            .collect::<Vec<_>>();
-        replacements.push(Replacement {
-            span: found.slot.span,
-            bytes: rewrite_slot(content, &found.slot, &["state"], &appended),
-        });
-    }
+    sheet_replacements(
+        content,
+        &layout,
+        &tabs,
+        order_map.as_ref(),
+        &mut replacements,
+    )?;
 
-    if let Some(active) = plan.active {
+    if let Some(order_map) = order_map.as_ref() {
+        view_replacements(
+            content,
+            &layout,
+            order_map,
+            active,
+            context,
+            &mut replacements,
+        )?;
+        defined_name_replacements(content, &layout, order_map, &mut replacements)?;
+    } else if let Some(active) = active {
         replacements.push(active_replacement(
             content,
             &layout,
@@ -250,9 +303,272 @@ pub(crate) fn rewrite(content: &[u8], plan: Plan<'_>) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+fn validate_order(layout: &Layout, order: &Order<'_>) -> Result<OrderMap> {
+    let context = Some((order.sheet, order.position));
+    if layout.sheets.payload
+        || layout
+            .book_views
+            .as_ref()
+            .is_some_and(|views| views.payload)
+        || layout
+            .defined_names
+            .as_ref()
+            .is_some_and(|names| names.payload)
+    {
+        return Err(block(context, TabEditBlock::MarkupCompatibility));
+    }
+    if layout.alternate_dependencies
+        || (layout.alternate_content && layout.workbook_views.is_empty())
+        || layout
+            .defined_name_slots
+            .iter()
+            .filter(|name| name.local_sheet_id.is_some())
+            .count()
+            != order.local_scopes
+    {
+        return Err(block(context, TabEditBlock::MarkupCompatibility));
+    }
+    if order.relationship_ids.len() != layout.sheet_slots.len() {
+        return Err(block(context, TabEditBlock::MarkupCompatibility));
+    }
+
+    let mut direct = HashMap::new();
+    direct
+        .try_reserve(layout.sheet_slots.len())
+        .map_err(|error| invalid(format!("cannot reserve sheet-order index: {error}")))?;
+    for (old, slot) in layout.sheet_slots.iter().enumerate() {
+        if direct.insert(slot.relationship_id.as_ref(), old).is_some() {
+            return Err(invalid(format!(
+                "duplicate direct workbook sheet relationship '{}' during reorder",
+                slot.relationship_id
+            )));
+        }
+    }
+
+    let mut seen = HashSet::new();
+    seen.try_reserve(order.relationship_ids.len())
+        .map_err(|error| invalid(format!("cannot reserve sheet-order validation: {error}")))?;
+    let mut old_to_new = Vec::new();
+    old_to_new
+        .try_reserve_exact(order.relationship_ids.len())
+        .map_err(|error| {
+            invalid(format!(
+                "cannot reserve reverse sheet-order mapping: {error}"
+            ))
+        })?;
+    old_to_new.resize(order.relationship_ids.len(), 0usize);
+    let mut new_to_old = Vec::new();
+    new_to_old
+        .try_reserve_exact(order.relationship_ids.len())
+        .map_err(|error| invalid(format!("cannot reserve sheet-order mapping: {error}")))?;
+    for (new, relationship_id) in order.relationship_ids.iter().copied().enumerate() {
+        if !seen.insert(relationship_id) {
+            return Err(invalid(format!(
+                "sheet reorder repeats relationship '{relationship_id}'"
+            )));
+        }
+        let Some(&old) = direct.get(relationship_id) else {
+            return Err(block(context, TabEditBlock::MarkupCompatibility));
+        };
+        old_to_new[old] = new;
+        new_to_old.push(old);
+    }
+    Ok(OrderMap {
+        old_to_new,
+        new_to_old,
+    })
+}
+
+fn sheet_replacements(
+    source: &[u8],
+    layout: &Layout,
+    tabs: &[Tab<'_>],
+    order: Option<&OrderMap>,
+    replacements: &mut Vec<Replacement>,
+) -> Result<()> {
+    let mut states = HashMap::new();
+    states
+        .try_reserve(tabs.len())
+        .map_err(|error| invalid(format!("cannot reserve tab-state index: {error}")))?;
+    for tab in tabs {
+        if states.insert(tab.relationship_id, *tab).is_some() {
+            return Err(invalid(format!(
+                "duplicate tab state for relationship '{}'",
+                tab.relationship_id
+            )));
+        }
+    }
+
+    if let Some(order) = order {
+        for (new, old) in order.new_to_old.iter().copied().enumerate() {
+            let destination = &layout.sheet_slots[new];
+            let selected = &layout.sheet_slots[old];
+            let state = states.remove(selected.relationship_id.as_ref());
+            if new == old && state.is_none() {
+                continue;
+            }
+            let bytes = state.map_or_else(
+                || source[selected.slot.span.start..selected.slot.span.end].to_vec(),
+                |tab| state_replacement(source, &selected.slot, tab.state),
+            );
+            replacements.push(Replacement {
+                span: destination.slot.span,
+                bytes,
+            });
+        }
+    } else {
+        for tab in tabs {
+            let mut matches = layout
+                .sheet_slots
+                .iter()
+                .filter(|slot| slot.relationship_id.as_ref() == tab.relationship_id);
+            let Some(found) = matches.next() else {
+                return Err(Error::TabEditBlocked {
+                    sheet: tab.sheet.to_owned(),
+                    position: tab.position,
+                    reason: TabEditBlock::MarkupCompatibility,
+                });
+            };
+            if matches.next().is_some() {
+                return Err(invalid(format!(
+                    "duplicate direct workbook sheet relationship '{}' during edit",
+                    tab.relationship_id
+                )));
+            }
+            states.remove(tab.relationship_id);
+            replacements.push(Replacement {
+                span: found.slot.span,
+                bytes: state_replacement(source, &found.slot, tab.state),
+            });
+        }
+    }
+    if let Some(tab) = states.values().next() {
+        return Err(Error::TabEditBlocked {
+            sheet: tab.sheet.to_owned(),
+            position: tab.position,
+            reason: TabEditBlock::MarkupCompatibility,
+        });
+    }
+    Ok(())
+}
+
+fn state_replacement(source: &[u8], slot: &Slot, state: State) -> Vec<u8> {
+    let appended = state
+        .attribute()
+        .map(|value| ("state", value.to_owned()))
+        .into_iter()
+        .collect::<Vec<_>>();
+    rewrite_slot(source, slot, &["state"], &appended)
+}
+
+fn view_replacements(
+    source: &[u8],
+    layout: &Layout,
+    order: &OrderMap,
+    active: Option<Active<'_>>,
+    context: Option<(&str, usize)>,
+    replacements: &mut Vec<Replacement>,
+) -> Result<()> {
+    if layout.workbook_views.is_empty() {
+        if let Some(active) = active {
+            replacements.push(active_replacement(
+                source,
+                layout,
+                active.position,
+                context,
+            )?);
+        }
+        return Ok(());
+    }
+    for (index, view) in layout.workbook_views.iter().enumerate() {
+        let old_active = view.active.unwrap_or(0);
+        let Some(&mapped_active) = order.old_to_new.get(old_active) else {
+            return Err(block(context, TabEditBlock::ViewIndex));
+        };
+        let desired_active = if index == 0 {
+            active.map_or(mapped_active, |active| active.position)
+        } else {
+            mapped_active
+        };
+        if desired_active > MAX_ACTIVE_TAB {
+            return Err(block(context, TabEditBlock::ActiveTabLimit));
+        }
+
+        let old_first = view.first.unwrap_or(0);
+        let desired_first = if old_first == FIRST_SHEET_SENTINEL {
+            old_first
+        } else {
+            let old =
+                usize::try_from(old_first).map_err(|_| block(context, TabEditBlock::ViewIndex))?;
+            let mapped = order
+                .old_to_new
+                .get(old)
+                .copied()
+                .ok_or_else(|| block(context, TabEditBlock::ViewIndex))?;
+            u32::try_from(mapped).map_err(|_| block(context, TabEditBlock::ViewIndex))?
+        };
+
+        let active_changed = view
+            .active
+            .map_or(desired_active != 0, |old| old != desired_active);
+        let first_changed = view
+            .first
+            .map_or(desired_first != 0, |old| old != desired_first);
+        if !active_changed && !first_changed {
+            continue;
+        }
+        let mut removed = Vec::new();
+        let mut appended = Vec::new();
+        if active_changed {
+            removed.push("activeTab");
+            appended.push(("activeTab", desired_active.to_string()));
+        }
+        if first_changed {
+            removed.push("firstSheet");
+            appended.push(("firstSheet", desired_first.to_string()));
+        }
+        replacements.push(Replacement {
+            span: view.slot.span,
+            bytes: rewrite_slot(source, &view.slot, &removed, &appended),
+        });
+    }
+    Ok(())
+}
+
+fn defined_name_replacements(
+    source: &[u8],
+    layout: &Layout,
+    order: &OrderMap,
+    replacements: &mut Vec<Replacement>,
+) -> Result<()> {
+    for name in &layout.defined_name_slots {
+        let Some(old) = name.local_sheet_id else {
+            continue;
+        };
+        let Some(&new) = order.old_to_new.get(old) else {
+            return Err(invalid(
+                "defined-name scope exceeds the workbook sheet order during reorder",
+            ));
+        };
+        if old == new {
+            continue;
+        }
+        replacements.push(Replacement {
+            span: name.slot.span,
+            bytes: rewrite_slot(
+                source,
+                &name.slot,
+                &["localSheetId"],
+                &[("localSheetId", new.to_string())],
+            ),
+        });
+    }
+    Ok(())
+}
+
 fn block(context: Option<(&str, usize)>, reason: TabEditBlock) -> Error {
     context.map_or_else(
-        || invalid("active-tab rewrite has no associated tab change"),
+        || invalid("workbook catalog rewrite has no associated tab change"),
         |(sheet, position)| Error::TabEditBlocked {
             sheet: sheet.to_owned(),
             position,
@@ -268,10 +584,10 @@ fn active_replacement(
     context: Option<(&str, usize)>,
 ) -> Result<Replacement> {
     let appended = [("activeTab", active.to_string())];
-    if let Some(view) = &layout.workbook_view {
+    if let Some(view) = layout.workbook_views.first() {
         return Ok(Replacement {
-            span: view.span,
-            bytes: rewrite_slot(source, view, &["activeTab"], &appended),
+            span: view.slot.span,
+            bytes: rewrite_slot(source, &view.slot, &["activeTab"], &appended),
         });
     }
     if layout.alternate_content {
@@ -358,28 +674,39 @@ fn scan(content: &[u8]) -> Result<Layout> {
         match event {
             Event::Start(element) => {
                 let parent = stack.last().map(|frame| frame.kind);
+                let alternate_content = stack.last().is_some_and(|frame| frame.alternate_content)
+                    || is_mce_name(&namespace, &element, b"AlternateContent");
                 let kind = scanner.start(
                     parent,
                     &namespace,
                     &element,
                     decoder,
                     &resolver,
+                    alternate_content,
                     event_start,
                     event_end,
                 )?;
-                stack.push(Frame { kind });
+                stack.push(Frame {
+                    kind,
+                    alternate_content,
+                });
             },
-            Event::Empty(element) => scanner.empty(
-                stack.last().map(|frame| frame.kind),
-                &namespace,
-                &element,
-                decoder,
-                &resolver,
-                Span {
-                    start: event_start,
-                    end: event_end,
-                },
-            )?,
+            Event::Empty(element) => {
+                let alternate_content = stack.last().is_some_and(|frame| frame.alternate_content)
+                    || is_mce_name(&namespace, &element, b"AlternateContent");
+                scanner.empty(
+                    stack.last().map(|frame| frame.kind),
+                    &namespace,
+                    &element,
+                    decoder,
+                    &resolver,
+                    alternate_content,
+                    Span {
+                        start: event_start,
+                        end: event_end,
+                    },
+                )?;
+            },
             Event::End(_) => {
                 let frame = stack
                     .pop()
@@ -405,6 +732,7 @@ impl Scanner {
         element: &BytesStart<'_>,
         decoder: Decoder,
         resolver: &NamespaceResolver,
+        alternate_content: bool,
         start: usize,
         end: usize,
     ) -> Result<Kind> {
@@ -415,7 +743,7 @@ impl Scanner {
             self.root_seen = true;
             return Ok(Kind::Workbook);
         }
-        self.observe_guard(parent, namespace, element, decoder)?;
+        self.observe_guard(parent, namespace, element, decoder, alternate_content)?;
         if parent == Some(Kind::Workbook)
             && is_spreadsheetml_name(namespace, element.name(), b"sheets")
         {
@@ -462,18 +790,60 @@ impl Scanner {
         if parent == Some(Kind::BookViews)
             && is_spreadsheetml_name(namespace, element.name(), b"workbookView")
         {
-            if self.workbook_view.is_none() && self.pending_workbook_view.is_none() {
-                self.pending_workbook_view = Some(Pending {
+            if self.pending_workbook_view.is_some() {
+                return Err(invalid("nested direct workbookView element during edit"));
+            }
+            self.pending_workbook_view = Some((
+                Pending {
                     start,
                     tag_end: end,
                     tag: tag(element, decoder)?,
-                });
-                return Ok(Kind::WorkbookView);
+                },
+                optional_usize(element, b"activeTab", decoder, "workbook activeTab")?,
+                optional_u32(element, b"firstSheet", decoder, "workbook firstSheet")?,
+            ));
+            return Ok(Kind::WorkbookView);
+        }
+        if parent == Some(Kind::Workbook)
+            && is_spreadsheetml_name(namespace, element.name(), b"definedNames")
+        {
+            if self.defined_names.is_some() || self.pending_defined_names.is_some() {
+                return Err(invalid("duplicate direct definedNames element during edit"));
             }
-            return Ok(Kind::Other);
+            self.pending_defined_names = Some(Pending {
+                start,
+                tag_end: end,
+                tag: tag(element, decoder)?,
+            });
+            return Ok(Kind::DefinedNames);
+        }
+        if parent == Some(Kind::DefinedNames)
+            && is_spreadsheetml_name(namespace, element.name(), b"definedName")
+        {
+            if self.pending_defined_name.is_some() {
+                return Err(invalid("nested direct definedName element during edit"));
+            }
+            self.pending_defined_name = Some((
+                Pending {
+                    start,
+                    tag_end: end,
+                    tag: tag(element, decoder)?,
+                },
+                optional_usize(
+                    element,
+                    b"localSheetId",
+                    decoder,
+                    "defined name localSheetId",
+                )?,
+            ));
+            return Ok(Kind::DefinedName);
         }
         if parent == Some(Kind::BookViews) {
             self.book_views_payload = true;
+        } else if parent == Some(Kind::Sheets) {
+            self.sheets_payload = true;
+        } else if parent == Some(Kind::DefinedNames) {
+            self.defined_names_payload = true;
         }
         Ok(Kind::Other)
     }
@@ -486,9 +856,10 @@ impl Scanner {
         element: &BytesStart<'_>,
         decoder: Decoder,
         resolver: &NamespaceResolver,
+        alternate_content: bool,
         span: Span,
     ) -> Result<()> {
-        self.observe_guard(parent, namespace, element, decoder)?;
+        self.observe_guard(parent, namespace, element, decoder, alternate_content)?;
         if parent == Some(Kind::Workbook)
             && is_spreadsheetml_name(namespace, element.name(), b"sheets")
         {
@@ -537,17 +908,57 @@ impl Scanner {
         } else if parent == Some(Kind::BookViews)
             && is_spreadsheetml_name(namespace, element.name(), b"workbookView")
         {
-            if self.workbook_view.is_none() && self.pending_workbook_view.is_none() {
-                self.workbook_view = Some(Slot {
+            self.workbook_views.push(ViewSlot {
+                slot: Slot {
                     span,
                     tag_end: span.end,
                     close_start: span.end,
                     tag: tag(element, decoder)?,
                     empty: true,
-                });
+                },
+                active: optional_usize(element, b"activeTab", decoder, "workbook activeTab")?,
+                first: optional_u32(element, b"firstSheet", decoder, "workbook firstSheet")?,
+            });
+        } else if parent == Some(Kind::Workbook)
+            && is_spreadsheetml_name(namespace, element.name(), b"definedNames")
+        {
+            if self.defined_names.is_some() || self.pending_defined_names.is_some() {
+                return Err(invalid("duplicate direct definedNames element during edit"));
             }
+            self.defined_names = Some(Container {
+                slot: Slot {
+                    span,
+                    tag_end: span.end,
+                    close_start: span.end,
+                    tag: tag(element, decoder)?,
+                    empty: true,
+                },
+                payload: false,
+            });
+        } else if parent == Some(Kind::DefinedNames)
+            && is_spreadsheetml_name(namespace, element.name(), b"definedName")
+        {
+            self.defined_name_slots.push(DefinedNameSlot {
+                slot: Slot {
+                    span,
+                    tag_end: span.end,
+                    close_start: span.end,
+                    tag: tag(element, decoder)?,
+                    empty: true,
+                },
+                local_sheet_id: optional_usize(
+                    element,
+                    b"localSheetId",
+                    decoder,
+                    "defined name localSheetId",
+                )?,
+            });
         } else if parent == Some(Kind::BookViews) {
             self.book_views_payload = true;
+        } else if parent == Some(Kind::Sheets) {
+            self.sheets_payload = true;
+        } else if parent == Some(Kind::DefinedNames) {
+            self.defined_names_payload = true;
         }
         Ok(())
     }
@@ -558,14 +969,20 @@ impl Scanner {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
         decoder: Decoder,
+        alternate_content: bool,
     ) -> Result<()> {
         if is_spreadsheetml_name(namespace, element.name(), b"workbookProtection") {
             self.protected |= optional_bool(element, b"lockStructure", decoder)?.unwrap_or(false);
         }
-        if matches!(parent, Some(Kind::Workbook | Kind::BookViews))
-            && is_mce_name(namespace, element, b"AlternateContent")
+        if matches!(
+            parent,
+            Some(Kind::Workbook | Kind::Sheets | Kind::BookViews | Kind::DefinedNames)
+        ) && is_mce_name(namespace, element, b"AlternateContent")
         {
             self.alternate_content = true;
+        }
+        if alternate_content && is_order_dependency_name(namespace, element) {
+            self.alternate_dependencies = true;
         }
         Ok(())
     }
@@ -607,23 +1024,27 @@ impl Scanner {
                         tag: pending.tag,
                         empty: false,
                     },
-                    payload: false,
+                    payload: self.sheets_payload,
                 });
             },
             Kind::WorkbookView => {
-                let pending = self
+                let (pending, active, first) = self
                     .pending_workbook_view
                     .take()
                     .ok_or_else(|| invalid("workbookView close without edit state"))?;
-                self.workbook_view = Some(Slot {
-                    span: Span {
-                        start: pending.start,
-                        end,
+                self.workbook_views.push(ViewSlot {
+                    slot: Slot {
+                        span: Span {
+                            start: pending.start,
+                            end,
+                        },
+                        tag_end: pending.tag_end,
+                        close_start,
+                        tag: pending.tag,
+                        empty: false,
                     },
-                    tag_end: pending.tag_end,
-                    close_start,
-                    tag: pending.tag,
-                    empty: false,
+                    active,
+                    first,
                 });
             },
             Kind::BookViews => {
@@ -645,6 +1066,44 @@ impl Scanner {
                     payload: self.book_views_payload,
                 });
             },
+            Kind::DefinedName => {
+                let (pending, local_sheet_id) = self
+                    .pending_defined_name
+                    .take()
+                    .ok_or_else(|| invalid("definedName close without edit state"))?;
+                self.defined_name_slots.push(DefinedNameSlot {
+                    slot: Slot {
+                        span: Span {
+                            start: pending.start,
+                            end,
+                        },
+                        tag_end: pending.tag_end,
+                        close_start,
+                        tag: pending.tag,
+                        empty: false,
+                    },
+                    local_sheet_id,
+                });
+            },
+            Kind::DefinedNames => {
+                let pending = self
+                    .pending_defined_names
+                    .take()
+                    .ok_or_else(|| invalid("definedNames close without edit state"))?;
+                self.defined_names = Some(Container {
+                    slot: Slot {
+                        span: Span {
+                            start: pending.start,
+                            end,
+                        },
+                        tag_end: pending.tag_end,
+                        close_start,
+                        tag: pending.tag,
+                        empty: false,
+                    },
+                    payload: self.defined_names_payload,
+                });
+            },
             _ => {},
         }
         Ok(())
@@ -661,9 +1120,12 @@ impl Scanner {
             sheets,
             sheet_slots: self.sheet_slots.into_boxed_slice(),
             book_views: self.book_views,
-            workbook_view: self.workbook_view,
+            workbook_views: self.workbook_views.into_boxed_slice(),
+            defined_names: self.defined_names,
+            defined_name_slots: self.defined_name_slots.into_boxed_slice(),
             protected: self.protected,
             alternate_content: self.alternate_content,
+            alternate_dependencies: self.alternate_dependencies,
         })
     }
 }
@@ -687,6 +1149,35 @@ fn optional_bool(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Res
             _ => Err(invalid(format!(
                 "invalid workbook protection boolean '{value}' during edit"
             ))),
+        })
+        .transpose()
+}
+
+fn optional_u32(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<u32>> {
+    unqualified_attribute_value(element, name, decoder)?
+        .map(|value| {
+            value
+                .parse::<u32>()
+                .map_err(|_| invalid(format!("invalid {description} '{value}' during edit")))
+        })
+        .transpose()
+}
+
+fn optional_usize(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<usize>> {
+    optional_u32(element, name, decoder, description)?
+        .map(|value| {
+            usize::try_from(value)
+                .map_err(|_| invalid(format!("{description} does not fit usize during edit")))
         })
         .transpose()
 }
@@ -767,6 +1258,19 @@ fn is_mce_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE)
 }
 
+fn is_order_dependency_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> bool {
+    [
+        b"sheets".as_slice(),
+        b"sheet".as_slice(),
+        b"bookViews".as_slice(),
+        b"workbookView".as_slice(),
+        b"definedNames".as_slice(),
+        b"definedName".as_slice(),
+    ]
+    .iter()
+    .any(|local| is_spreadsheetml_name(namespace, element.name(), local))
+}
+
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
         .map_err(|_| invalid("workbook XML position does not fit usize"))
@@ -787,6 +1291,7 @@ mod tests {
                 sheet: "Active",
                 position,
             }),
+            order: None,
         }
     }
 
@@ -1008,6 +1513,7 @@ mod tests {
                         sheet: "Too Far",
                         position: MAX_ACTIVE_TAB + 1,
                     }),
+                    order: None,
                 }
             ),
             Err(Error::TabEditBlocked {
@@ -1015,6 +1521,119 @@ mod tests {
                 position,
                 reason: TabEditBlock::ActiveTabLimit,
             }) if sheet == "Too Far" && position == MAX_ACTIVE_TAB + 1
+        ));
+    }
+
+    #[test]
+    fn reorders_losslessly_and_remaps_every_positional_dependency() {
+        let source = format!(
+            r#"<?xml version="1.0"?><x:workbook xmlns:x="{S}" xmlns:r="{R}" xmlns:z="urn:future" xmlns:mc="{mce}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" mc:Ignorable="x15"><mc:AlternateContent><mc:Choice Requires="x15"><x15ac:absPath url="/exact/" xmlns:x15ac="http://schemas.microsoft.com/office/spreadsheetml/2010/11/ac"/></mc:Choice></mc:AlternateContent><x:bookViews><x:workbookView activeTab="2" firstSheet="1" z:keep="view-one"/><x:workbookView activeTab="0" firstSheet="{FIRST_SHEET_SENTINEL}" z:keep="view-two"/><x:workbookView z:keep="defaults"/></x:bookViews><x:sheets><x:sheet name="One" sheetId="10" r:id="r1" z:keep="one"/><x:sheet name="Two" sheetId="20" r:id="r2"/><x:sheet name="Three" sheetId="30" state="hidden" r:id="r3"/></x:sheets><x:definedNames><x:definedName name="OneLocal" localSheetId="0">One!$A$1</x:definedName><x:definedName name="ThreeLocal" localSheetId="2">Three!$A$1</x:definedName><x:definedName name="Global">1</x:definedName></x:definedNames><x:customWorkbookViews><x:customWorkbookView name="Exact" guid="{{00000000-0000-0000-0000-000000000001}}" activeSheetId="30"/></x:customWorkbookViews></x:workbook>"#,
+            mce = String::from_utf8_lossy(MCE)
+        );
+        let output = rewrite(
+            source.as_bytes(),
+            Plan {
+                tabs: vec![Tab {
+                    sheet: "Two",
+                    position: 1,
+                    relationship_id: "r2",
+                    state: State::VeryHidden,
+                }],
+                active: None,
+                order: Some(Order {
+                    sheet: "Three",
+                    position: 2,
+                    relationship_ids: vec!["r3", "r1", "r2"],
+                    local_scopes: 2,
+                }),
+            },
+        )
+        .expect("reorder");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        let three = text.find("name=\"Three\"").expect("Three");
+        let one = text.find("name=\"One\"").expect("One");
+        let two = text.find("name=\"Two\"").expect("Two");
+        assert!(three < one && one < two);
+        assert!(text.contains(r#"name="One" sheetId="10" r:id="r1" z:keep="one""#));
+        assert!(text.contains(r#"name="Two" sheetId="20" r:id="r2" state="veryHidden""#));
+        assert!(text.contains(r#"z:keep="view-one" activeTab="0" firstSheet="2""#));
+        assert!(text.contains(&format!(
+            r#"firstSheet="{FIRST_SHEET_SENTINEL}" z:keep="view-two" activeTab="1""#
+        )));
+        assert!(text.contains(r#"z:keep="defaults" activeTab="1" firstSheet="1""#));
+        assert!(text.contains(r#"name="OneLocal" localSheetId="1""#));
+        assert!(text.contains(r#"name="ThreeLocal" localSheetId="0""#));
+        assert!(text.contains(r#"activeSheetId="30""#));
+        assert!(text.contains(r#"<x15ac:absPath url="/exact/""#));
+        let catalog = parse_catalog(&output).expect("catalog");
+        assert_eq!(catalog.active_sheet_index, 0);
+        assert_eq!(
+            catalog
+                .sheets
+                .iter()
+                .map(|sheet| sheet.name.as_str())
+                .collect::<Vec<_>>(),
+            ["Three", "One", "Two"]
+        );
+        assert_eq!(catalog.defined_names[0].local_sheet_id, Some(1));
+        assert_eq!(catalog.defined_names[1].local_sheet_id, Some(0));
+    }
+
+    #[test]
+    fn reorder_blocks_unmodeled_catalogs_and_invalid_secondary_views() {
+        let order = || Order {
+            sheet: "Two",
+            position: 1,
+            relationship_ids: vec!["r2", "r1"],
+            local_scopes: 0,
+        };
+        for source in [
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="One" sheetId="1" r:id="r1"/><future/><sheet name="Two" sheetId="2" r:id="r2"/></sheets></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><bookViews><workbookView/><future/></bookViews><sheets><sheet name="One" sheetId="1" r:id="r1"/><sheet name="Two" sheetId="2" r:id="r2"/></sheets></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="One" sheetId="1" r:id="r1"/><sheet name="Two" sheetId="2" r:id="r2"/></sheets><definedNames><future/></definedNames></workbook>"#
+            ),
+            format!(
+                r#"<workbook xmlns="{S}" xmlns:r="{R}" xmlns:mc="{mce}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" mc:Ignorable="x15"><mc:AlternateContent><mc:Choice Requires="x15"><bookViews><workbookView activeTab="1"/></bookViews></mc:Choice></mc:AlternateContent><bookViews><workbookView/></bookViews><sheets><sheet name="One" sheetId="1" r:id="r1"/><sheet name="Two" sheetId="2" r:id="r2"/></sheets></workbook>"#,
+                mce = String::from_utf8_lossy(MCE)
+            ),
+        ] {
+            assert!(matches!(
+                rewrite(
+                    source.as_bytes(),
+                    Plan {
+                        tabs: Vec::new(),
+                        active: None,
+                        order: Some(order()),
+                    }
+                ),
+                Err(Error::TabEditBlocked {
+                    reason: TabEditBlock::MarkupCompatibility,
+                    ..
+                })
+            ));
+        }
+
+        let invalid_view = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}"><bookViews><workbookView/><workbookView activeTab="9"/></bookViews><sheets><sheet name="One" sheetId="1" r:id="r1"/><sheet name="Two" sheetId="2" r:id="r2"/></sheets></workbook>"#
+        );
+        assert!(matches!(
+            rewrite(
+                invalid_view.as_bytes(),
+                Plan {
+                    tabs: Vec::new(),
+                    active: None,
+                    order: Some(order()),
+                }
+            ),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::ViewIndex,
+                ..
+            })
         ));
     }
 }

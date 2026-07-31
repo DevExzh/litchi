@@ -118,13 +118,15 @@ pub enum ColumnEditBlock {
     MarkupCompatibility,
 }
 
-/// Why the workbook tab editor refused a visibility mutation.
+/// Why the workbook tab editor refused a state or ordering mutation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TabEditBlock {
     LastVisibleTab,
     NotVisible,
     ActiveTabLimit,
+    ViewIndex,
+    TrackedWorkbook,
     ProtectedWorkbook,
     MarkupCompatibility,
 }
@@ -135,6 +137,8 @@ impl std::fmt::Display for TabEditBlock {
             Self::LastVisibleTab => "the workbook must retain at least one visible tab",
             Self::NotVisible => "only a visible tab can be active",
             Self::ActiveTabLimit => "the tab position exceeds Office's active-tab limit",
+            Self::ViewIndex => "a workbook view contains an invalid sheet position",
+            Self::TrackedWorkbook => "tracked workbooks require revision-aware tab reordering",
             Self::ProtectedWorkbook => "the workbook structure is protected",
             Self::MarkupCompatibility => {
                 "the effective workbook catalog contains unmodeled compatibility markup"
