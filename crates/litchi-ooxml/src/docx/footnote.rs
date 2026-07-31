@@ -304,6 +304,7 @@ mod tests {
     use std::sync::Arc;
 
     /// Simple mock Part for testing
+    #[derive(Clone)]
     struct MockPart {
         blob: Vec<u8>,
     }

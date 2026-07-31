@@ -75,6 +75,50 @@ style indexes through 65,490, one-based cell/value metadata indexes below 2³¹,
 hints, required shared-formula indexes, and a false formula `bx` flag. Advisory
 shared-string counts size allocations but never override the parsed items.
 
+The fourth implementation slice adds transactional ordinary-cell writes to the
+new `litchi-xlsx` crate. `Workbook::edit()` creates isolated state and
+`Edit::sheet(selector)` retains the checked name/position lookup contract.
+`SheetEdit` exposes the short verbs `set`, `clear`, and `remove`; dropping an
+edit rolls it back, while `commit` validates every rewritten worksheet before
+publishing a new immutable workbook. The source snapshot is never changed.
+Plain strings remain inert text, formulas require an explicit checked
+`Formula`, floating-point numbers reject non-finite values, and `t="d"` values
+use a checked `Date` type that retains the original ISO 8601 lexical form.
+`clear` retains the cell record and local metadata; `remove` deletes that
+record without shifting surrounding cells. Clearing a cell created earlier in
+the same transaction therefore produces an explicit empty record, while
+clearing a missing source cell is a no-op.
+
+The transaction structurally clones the OPC graph while sharing clean part
+payloads through immutable `Arc` storage. It rewrites only affected worksheet
+rows and cells, preserving untouched bytes plus touched-cell styles, metadata,
+unknown attributes, and unrelated children. It deliberately refuses edits
+whose semantics are not yet proven: signed packages, protected sheets, cells
+covered by data validation or a merged-cell follower, multi-cell formula
+groups, markup-compatibility-controlled sheet data, and unknown cell payloads
+except explicit removal. Literal SpreadsheetML escape sequences and XML control
+characters are encoded without changing their text meaning.
+
+Successful commits return semantic before/after changes and an in-memory
+source-checked reversible patch. Private part deltas share their byte owners;
+application checks expected source bytes and relationship state before
+mutation. It retains exact changed-part bytes and relationship fields, but does
+not claim byte-identical ZIP containers. Cell
+edits remove an existing calculation-chain relationship and part, set
+calculation properties for a full refresh, and retain the removed graph in the
+inverse patch. The boolean spellings used for calculation properties follow
+the Office compatibility notes in `[MS-OE376]` §2.1.599. This is intentionally
+not yet the format-independent deterministic patch wire representation required
+by ADR 0003.
+
+This slice does not yet update the worksheet `dimension` hint or implement row
+and column insertion/deletion, shifting references, merge/group-formula edits,
+validation evaluation, style/resource editing, rich text, dynamic arrays,
+patch serialization, full structured diagnostics, eviction/resource budgets,
+concurrent subedit merging, or the container-level raw-copy/atomic-replacement
+save pipeline. Those remain certification work; no allocation, latency,
+contention, or scaling conclusion follows from the functional tests.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:
@@ -129,6 +173,27 @@ reverse-read A1 from that same Office-resaved artifact as the exact text
 edit/resave, catalog recovery, shared-string resolution, and semantic readback
 for that cell. It does not certify Litchi-authored cell create/update/clear/remove
 or general Excel compatibility.
+
+For the fourth slice, desktop Excel on macOS opened a Litchi-authored workbook
+containing text at A1, the number 42 at B2, the formula `=B2*2` at C3, and an
+explicit empty D4 without a repair or compatibility dialog. Excel reported the
+used range as A1:D4. The current Excel session was configured for manual
+calculation, so verification explicitly pressed F9; C3 then displayed 84 while
+the formula bar retained `=B2*2`. Excel resave normalized the unstyled empty D4
+away, materialized the formula cache as 84, and added producer-owned theme,
+style, shared-string, and calculation-chain parts. This is reviewed producer
+normalization, not evidence that an explicit empty record survives an Office
+round trip.
+
+Litchi reverse-read that Office-resaved artifact with the expected A1, B2, and
+C3 semantics, edited it again, removed the stale calculation chain, and
+preserved the unrelated Office-added parts. Excel then opened this
+second-generation artifact without repair, again reported A1:D4, retained the
+exact C3 formula, and produced 84 after F9. Together these checks certify this
+ordinary-cell set/clear/remove slice on the tested macOS Excel build, including
+one Office-resave/re-edit cycle. They do not certify other spreadsheet CRUD
+families, automatic calculation under a manual application setting, Windows
+Office, older Office versions, or performance.
 
 The worksheet parser also matches checked-in Apache POI and LibreOffice shared-
 formula fixtures, including translated follower expressions and stored cached

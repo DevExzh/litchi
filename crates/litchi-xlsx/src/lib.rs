@@ -11,7 +11,11 @@ pub mod formula;
 pub mod raw;
 mod workbook;
 
-pub use cell::{Cell, Cells};
-pub use error::{Error, Result};
+pub use cell::{Cell, Cells, Content, Date, ErrorValue, Number, Text, Value};
+pub use error::{EditBlock, Error, Result};
+pub use formula::Formula;
 pub use litchi_sheet::{At, Cell as Address, Column, Rect, Row};
-pub use workbook::{DateSystem, Flavor, Sheet, SheetKind, SheetSelector, Visibility, Workbook};
+pub use workbook::{
+    Change, Commit, DateSystem, Edit, Flavor, Patch, Sheet, SheetEdit, SheetKind, SheetSelector,
+    State, Visibility, Workbook,
+};

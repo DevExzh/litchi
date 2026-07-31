@@ -12,12 +12,37 @@ use quick_xml::{Reader, XmlVersion};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Object-safe cloning support for package parts.
+///
+/// This is public only because it is a supertrait of [`Part`]. Concrete part
+/// users implement [`Clone`]; the blanket implementation supplies the erased
+/// clone operation.
+#[doc(hidden)]
+pub trait PartClone {
+    fn clone_part(&self) -> Box<dyn Part + Send + Sync>;
+}
+
+impl<T> PartClone for T
+where
+    T: Part + Clone + 'static,
+{
+    fn clone_part(&self) -> Box<dyn Part + Send + Sync> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Part + Send + Sync> {
+    fn clone(&self) -> Self {
+        self.clone_part()
+    }
+}
+
 /// Trait representing a part in an OPC package.
 ///
 /// Parts are the fundamental units of content in an OPC package. Each part
 /// has a unique partname (PackURI), a content type, and may have relationships
 /// to other parts.
-pub trait Part: Send + Sync {
+pub trait Part: PartClone + Send + Sync {
     /// Get the partname of this part.
     fn partname(&self) -> &PackURI;
 
@@ -51,6 +76,18 @@ pub trait Part: Send + Sync {
     ///
     /// This allows for modification of part content.
     fn set_blob(&mut self, blob: Vec<u8>);
+
+    /// Replace content with an already shared immutable allocation.
+    ///
+    /// Custom part implementations need not override this method; the default
+    /// may copy when the allocation has other owners. Built-in parts adopt the
+    /// allocation directly.
+    fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
+        match Arc::try_unwrap(blob) {
+            Ok(blob) => self.set_blob(blob),
+            Err(blob) => self.set_blob(blob.as_ref().clone()),
+        }
+    }
 
     /// Get the relationships for this part.
     fn rels(&self) -> &Relationships;
@@ -100,7 +137,7 @@ pub trait Part: Send + Sync {
 /// This is the default part type for non-XML content. It stores the
 /// content as a byte vector and manages relationships. Uses Arc for
 /// efficient sharing of blob data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlobPart {
     /// The partname (URI) of this part
     partname: PackURI,
@@ -164,6 +201,10 @@ impl Part for BlobPart {
         self.blob = Arc::new(blob);
     }
 
+    fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
+        self.blob = blob;
+    }
+
     fn rels(&self) -> &Relationships {
         &self.rels
     }
@@ -196,6 +237,20 @@ pub struct XmlPart {
     /// Cached parsed elements (optional, for frequently accessed data)
     /// Maps element paths to their string values for quick lookup
     element_cache: HashMap<String, String>,
+}
+
+impl Clone for XmlPart {
+    fn clone(&self) -> Self {
+        Self {
+            partname: self.partname.clone(),
+            content_type: self.content_type.clone(),
+            xml_bytes: Arc::clone(&self.xml_bytes),
+            rels: self.rels.clone(),
+            // Parsed lookups are disposable derived state. Cloning them would
+            // inflate edit snapshots without preserving additional semantics.
+            element_cache: HashMap::new(),
+        }
+    }
 }
 
 impl XmlPart {
@@ -357,6 +412,11 @@ impl Part for XmlPart {
     fn set_blob(&mut self, blob: Vec<u8>) {
         self.xml_bytes = Arc::new(blob);
         // Clear cache when blob is updated
+        self.element_cache.clear();
+    }
+
+    fn set_blob_shared(&mut self, blob: Arc<Vec<u8>>) {
+        self.xml_bytes = blob;
         self.element_cache.clear();
     }
 

@@ -235,6 +235,9 @@ pub mod relationship_type {
     /// ISO/IEC 29500 Strict main-document relationship type.
     pub const STRICT_OFFICE_DOCUMENT: &str =
         "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument";
+    /// OPC package digital-signature origin relationship.
+    pub const DIGITAL_SIGNATURE_ORIGIN: &str =
+        "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin";
 
     // Document parts
     pub const COMMENTS: &str =
@@ -268,6 +271,10 @@ pub mod relationship_type {
     /// ISO/IEC 29500 Strict shared-strings relationship type.
     pub const STRICT_SHARED_STRINGS: &str =
         "http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings";
+    pub const CALC_CHAIN: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain";
+    pub const STRICT_CALC_CHAIN: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/calcChain";
     pub const EXTERNAL_LINK: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink";
     pub const STRICT_EXTERNAL_LINK: &str =

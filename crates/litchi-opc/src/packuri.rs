@@ -441,7 +441,7 @@ impl AsRef<str> for PackURI {
 /// The package pseudo-partname, representing the package itself
 pub const PACKAGE_URI: &str = "/";
 
-/// The URI for the [Content_Types].xml part
+/// The URI for the `[Content_Types].xml` part.
 pub const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
 
 #[cfg(test)]

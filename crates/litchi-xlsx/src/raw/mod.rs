@@ -5,6 +5,7 @@
 mod catalog;
 mod formula;
 pub mod namespace;
+pub(crate) mod recalc;
 pub(crate) mod strings;
 pub(crate) mod worksheet;
 

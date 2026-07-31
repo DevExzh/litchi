@@ -2,6 +2,8 @@
 
 use thiserror::Error;
 
+use litchi_sheet::Cell as Address;
+
 /// Result of an XLSX operation.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -30,9 +32,48 @@ pub enum Error {
     /// A worksheet-only operation targeted another sheet kind.
     #[error("sheet '{sheet}' is not a worksheet")]
     NotWorksheet { sheet: String },
+    /// A safe edit requires a capability or dependency-aware operation that
+    /// this transaction does not have.
+    #[error("cannot edit {address} on sheet '{sheet}': {reason}")]
+    EditBlocked {
+        sheet: String,
+        address: Address,
+        reason: EditBlock,
+    },
+    /// Editing would invalidate an OPC digital signature.
+    #[error("signed workbooks require explicit signature stripping before editing")]
+    Signed,
+    /// A patch expected different source bytes and was not applied.
+    #[error("patch conflict in '{part}': target content differs from the expected state")]
+    PatchConflict { part: String },
     /// A selector variant is not supported by this API version.
     #[error("unsupported sheet selector")]
     UnsupportedSelector,
+}
+
+/// Why the ordinary cell editor refused a mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EditBlock {
+    ProtectedSheet,
+    CoveredMerge,
+    GroupFormula,
+    DataValidation,
+    UnknownCell,
+    MarkupCompatibility,
+}
+
+impl std::fmt::Display for EditBlock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::ProtectedSheet => "the worksheet is protected",
+            Self::CoveredMerge => "the cell is covered by a merged range",
+            Self::GroupFormula => "the cell belongs to a range-scoped formula",
+            Self::DataValidation => "the cell has a validation rule that is not evaluated",
+            Self::UnknownCell => "the existing cell encoding is not safely editable",
+            Self::MarkupCompatibility => "the cell contains an unmodeled extension payload",
+        })
+    }
 }
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {

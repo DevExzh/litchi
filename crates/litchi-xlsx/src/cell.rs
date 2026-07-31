@@ -4,10 +4,13 @@ use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use litchi_sheet::{Cell as Address, Column, Rect};
 
 use crate::error::{Result, invalid};
-use crate::formula::Formula;
+use crate::formula::{Formula, Kind};
+
+const MAX_CELL_CHARACTERS: usize = 32_767;
 
 /// The stored state of one cell record.
 ///
@@ -36,9 +39,191 @@ pub enum Value {
     /// Numeric lexical form, retained without format-based coercion.
     Number(Number),
     Text(Text),
-    /// ISO 8601 lexical form from a `t="d"` cell.
-    Date(Text),
+    /// Checked ISO 8601 lexical form from a `t="d"` cell.
+    Date(Date),
     Error(ErrorValue),
+}
+
+impl Value {
+    /// Construct inert plain text.
+    pub fn text(value: impl Into<Text>) -> Self {
+        Self::Text(value.into())
+    }
+
+    /// Construct an explicitly typed, checked ISO 8601 date lexical value.
+    pub fn date(value: impl Into<Text>) -> Result<Self> {
+        Date::new(value).map(Self::Date)
+    }
+
+    pub(crate) fn validate_for_write(&self) -> Result<()> {
+        let text = match self {
+            Self::Error(ErrorValue::Unknown(_)) => {
+                return Err(invalid(
+                    "unrecognized worksheet error values cannot be authored",
+                ));
+            },
+            Self::Text(text) => Some(text),
+            Self::Date(date) => Some(&date.0),
+            Self::Bool(_) | Self::Number(_) | Self::Error(_) => None,
+        };
+        if text.is_some_and(|text| text.chars().count() > MAX_CELL_CHARACTERS) {
+            return Err(invalid(format!(
+                "cell text exceeds {MAX_CELL_CHARACTERS} characters"
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// A checked ISO 8601 lexical value for a SpreadsheetML date cell.
+///
+/// The original lexical form is retained so a read/write cycle does not
+/// silently normalize producer data.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Date(Text);
+
+impl Date {
+    /// Validate and retain an ISO 8601 date or date-time lexical form.
+    pub fn new(value: impl Into<Text>) -> Result<Self> {
+        let value = value.into();
+        let lexical = value.as_str();
+        let valid = NaiveDate::parse_from_str(lexical, "%Y-%m-%d").is_ok()
+            || NaiveDateTime::parse_from_str(lexical, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
+            || DateTime::parse_from_rfc3339(lexical).is_ok();
+        if !valid {
+            return Err(invalid(format!(
+                "invalid ISO 8601 worksheet date '{lexical}'"
+            )));
+        }
+        Ok(Self(value))
+    }
+
+    /// Exact stored lexical form.
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl Deref for Date {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl AsRef<str> for Date {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Debug for Date {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_tuple("Date").field(&self.0).finish()
+    }
+}
+
+impl fmt::Display for Date {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
+impl From<Number> for Value {
+    fn from(value: Number) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl From<Text> for Value {
+    fn from(value: Text) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Self::Text(value.into())
+    }
+}
+
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Self::Text(value.into())
+    }
+}
+
+macro_rules! exact_integer_value {
+    ($($integer:ty),+ $(,)?) => {
+        $(
+            impl From<$integer> for Value {
+                fn from(value: $integer) -> Self {
+                    Self::Number(Number(value.to_string().into_boxed_str()))
+                }
+            }
+        )+
+    };
+}
+
+exact_integer_value!(i8, i16, i32, u8, u16, u32);
+
+/// Primary payload accepted by [`crate::SheetEdit::set`].
+///
+/// Plain strings are always inert text. Formula interpretation requires an
+/// explicit checked [`Formula`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Content {
+    Value(Value),
+    Formula(Formula),
+}
+
+impl Content {
+    pub(crate) fn validate_for_write(&self) -> Result<()> {
+        match self {
+            Self::Value(value) => value.validate_for_write(),
+            Self::Formula(formula)
+                if matches!(formula.kind(), Kind::Scalar) && formula.cached().is_none() =>
+            {
+                Ok(())
+            },
+            Self::Formula(formula) if formula.cached().is_some() => Err(invalid(
+                "writing a stored formula cache requires an explicit cache policy",
+            )),
+            Self::Formula(_) => Err(invalid(
+                "array and data-table formulas require a range-scoped editor",
+            )),
+        }
+    }
+
+    pub(crate) fn as_cell(&self) -> Cell {
+        match self {
+            Self::Value(value) => Cell::Value(value.clone()),
+            Self::Formula(formula) => Cell::Formula(formula.clone()),
+        }
+    }
+}
+
+impl From<Formula> for Content {
+    fn from(value: Formula) -> Self {
+        Self::Formula(value)
+    }
+}
+
+impl<T> From<T> for Content
+where
+    Value: From<T>,
+{
+    fn from(value: T) -> Self {
+        Self::Value(Value::from(value))
+    }
 }
 
 /// An exact SpreadsheetML number.
@@ -74,6 +259,25 @@ impl Number {
             .parse()
             .ok()
             .filter(|value: &f64| value.is_finite())
+    }
+}
+
+impl TryFrom<f64> for Number {
+    type Error = crate::Error;
+
+    fn try_from(value: f64) -> Result<Self> {
+        if !value.is_finite() {
+            return Err(invalid("spreadsheet numbers must be finite"));
+        }
+        Self::new(value.to_string())
+    }
+}
+
+impl TryFrom<f32> for Number {
+    type Error = crate::Error;
+
+    fn try_from(value: f32) -> Result<Self> {
+        Self::try_from(f64::from(value))
     }
 }
 
@@ -180,6 +384,26 @@ impl ErrorValue {
             "#BLOCKED!" => Self::Blocked,
             "#CONNECT!" => Self::Connect,
             other => Self::Unknown(other.into()),
+        }
+    }
+
+    /// Spreadsheet lexical form.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Null => "#NULL!",
+            Self::DivZero => "#DIV/0!",
+            Self::Value => "#VALUE!",
+            Self::Ref => "#REF!",
+            Self::Name => "#NAME?",
+            Self::Num => "#NUM!",
+            Self::NotAvailable => "#N/A",
+            Self::GettingData => "#GETTING_DATA",
+            Self::Spill => "#SPILL!",
+            Self::Calc => "#CALC!",
+            Self::Field => "#FIELD!",
+            Self::Blocked => "#BLOCKED!",
+            Self::Connect => "#CONNECT!",
+            Self::Unknown(value) => value,
         }
     }
 }
@@ -341,5 +565,36 @@ mod tests {
         assert_eq!(number.as_f64(), Some(-0.0));
         assert!(Number::new("NaN").is_err());
         assert!(Number::new("not a number").is_err());
+        assert!(Number::try_from(f64::INFINITY).is_err());
+    }
+
+    #[test]
+    fn edit_content_keeps_text_inert_and_formulas_explicit() {
+        assert!(matches!(
+            Content::from("=SUM(A1:A3)"),
+            Content::Value(Value::Text(text)) if text.as_str() == "=SUM(A1:A3)"
+        ));
+        assert!(matches!(
+            Content::from(42_i32),
+            Content::Value(Value::Number(number)) if number.as_str() == "42"
+        ));
+        assert!(matches!(
+            Content::from(Formula::new("SUM(A1:A3)").expect("formula")),
+            Content::Formula(_)
+        ));
+    }
+
+    #[test]
+    fn dates_are_checked_and_keep_their_lexical_form() {
+        let date = Date::new("2026-07-31T12:34:56.250-07:00").expect("date");
+        assert_eq!(date.as_str(), "2026-07-31T12:34:56.250-07:00");
+        assert!(Date::new("2026-02-29").is_err());
+        assert!(Value::date("not a date").is_err());
+    }
+
+    #[test]
+    fn producer_unknown_error_values_are_read_only() {
+        let content = Content::Value(Value::Error(ErrorValue::Unknown("#VENDOR!".into())));
+        assert!(content.validate_for_write().is_err());
     }
 }

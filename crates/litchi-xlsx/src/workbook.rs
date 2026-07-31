@@ -1,5 +1,9 @@
 //! Immutable workbook snapshots and selector-first sheet lookup.
 
+mod edit;
+
+pub use edit::{Change, Commit, Edit, Patch, SheetEdit, State};
+
 use std::convert::Infallible;
 use std::io::Read;
 use std::path::Path;
@@ -196,7 +200,7 @@ impl Workbook {
 
     /// Move bytes into the XLSX parser.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = OpcPackage::from_bytes(&bytes)?;
+        let package = OpcPackage::from_vec(bytes)?;
         Self::from_package(package)
     }
 
@@ -371,6 +375,16 @@ impl Workbook {
     /// Serialize the immutable package snapshot to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         Ok(PackageWriter::to_bytes(&self.inner.package)?)
+    }
+
+    /// Start an isolated semantic transaction over this immutable snapshot.
+    pub fn edit(&self) -> Result<Edit> {
+        Edit::new(self.clone())
+    }
+
+    /// Apply a reversible patch after checking every expected source part.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        patch.apply_to(self)
     }
 }
 

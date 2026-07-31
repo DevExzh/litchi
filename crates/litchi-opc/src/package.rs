@@ -30,6 +30,7 @@ pub struct SaveOptions {
 /// OpcPackage represents an Open Packaging Convention package in memory,
 /// providing access to parts, relationships, and package-level operations.
 /// Uses efficient data structures and minimal cloning for best performance.
+#[derive(Clone)]
 pub struct OpcPackage {
     /// Package-level relationships
     rels: Relationships,
@@ -121,6 +122,16 @@ impl OpcPackage {
     /// * `reader` - A reader that implements Read
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
         let owned_reader = OwnedPhysPkgReader::from_reader(reader)?;
+        let phys_reader = owned_reader.reader()?;
+        let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
+        Self::unmarshal(pkg_reader)
+    }
+
+    /// Move an owned ZIP archive into the package reader.
+    ///
+    /// This avoids copying the archive buffer before parts are decompressed.
+    pub fn from_vec(data: Vec<u8>) -> Result<Self> {
+        let owned_reader = OwnedPhysPkgReader::from_bytes(data)?;
         let phys_reader = owned_reader.reader()?;
         let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
         Self::unmarshal(pkg_reader)
@@ -332,6 +343,15 @@ impl OpcPackage {
         &mut self.rels
     }
 
+    /// Whether the package declares an OPC digital-signature origin.
+    ///
+    /// This is a cheap capability check, not cryptographic verification.
+    pub fn has_digital_signatures(&self) -> bool {
+        self.rels.iter().any(|relationship| {
+            relationship.reltype() == relationship_type::DIGITAL_SIGNATURE_ORIGIN
+        })
+    }
+
     /// Discover and verify OPC digital signatures without evaluating certificate trust.
     pub fn verify_digital_signatures(
         &self,
@@ -526,6 +546,7 @@ mod tests {
     use crate::part::BlobPart;
     use soapberry_zip::office::StreamingArchiveWriter;
     use std::io::Cursor;
+    use std::sync::Arc;
 
     fn create_minimal_docx() -> Vec<u8> {
         let mut writer = StreamingArchiveWriter::new();
@@ -574,6 +595,12 @@ mod tests {
         let cursor = Cursor::new(zip_data);
         let pkg = OpcPackage::from_reader(cursor).unwrap();
 
+        assert!(pkg.part_count() > 0);
+    }
+
+    #[test]
+    fn moves_owned_archive_into_package_reader() {
+        let pkg = OpcPackage::from_vec(create_minimal_docx()).unwrap();
         assert!(pkg.part_count() > 0);
     }
 
@@ -643,5 +670,35 @@ mod tests {
             assert_eq!(package.part_count(), 1);
             assert_eq!(package.get_part(&original_uri).unwrap().blob(), b"original");
         }
+    }
+
+    #[test]
+    fn package_clone_shares_clean_payloads_and_detaches_mutation() {
+        let uri = PackURI::new("/custom/data.bin").unwrap();
+        let mut source = OpcPackage::new();
+        source
+            .try_add_part(Box::new(BlobPart::new(
+                uri.clone(),
+                "application/octet-stream".to_string(),
+                b"source".to_vec(),
+            )))
+            .unwrap();
+
+        let source_blob = source.get_part(&uri).unwrap().blob_arc();
+        let mut edited = source.clone();
+        let edited_blob = edited.get_part(&uri).unwrap().blob_arc();
+        assert!(Arc::ptr_eq(&source_blob, &edited_blob));
+
+        let replacement = Arc::new(b"edited".to_vec());
+        edited
+            .get_part_mut(&uri)
+            .unwrap()
+            .set_blob_shared(Arc::clone(&replacement));
+        assert_eq!(source.get_part(&uri).unwrap().blob(), b"source");
+        assert_eq!(edited.get_part(&uri).unwrap().blob(), b"edited");
+        assert!(Arc::ptr_eq(
+            &edited.get_part(&uri).unwrap().blob_arc(),
+            &replacement
+        ));
     }
 }

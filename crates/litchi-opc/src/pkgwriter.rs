@@ -1,7 +1,7 @@
 //! Package writer for OPC packages.
 //!
 //! This module provides functionality to serialize and write OPC packages to disk,
-//! including writing the [Content_Types].xml, relationships, and all parts.
+//! including writing `[Content_Types].xml`, relationships, and all parts.
 use crate::constants::content_type as ct;
 use crate::content_type::ContentType;
 use crate::error::Result;
@@ -15,7 +15,7 @@ use std::path::Path;
 /// Package writer that serializes an OPC package to a ZIP file.
 ///
 /// This is the main entry point for saving packages. It handles writing:
-/// - [Content_Types].xml
+/// - `[Content_Types].xml`
 /// - _rels/.rels (package relationships)
 /// - All parts and their relationships
 ///

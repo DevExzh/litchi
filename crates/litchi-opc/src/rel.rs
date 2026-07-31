@@ -212,7 +212,7 @@ pub(crate) fn relationship_target_components(
 ///
 /// Uses a HashMap for O(1) lookup by relationship ID while maintaining
 /// efficient memory usage by storing references rather than cloning data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Relationships {
     /// Base URI for resolving relative references
     base_uri: String,

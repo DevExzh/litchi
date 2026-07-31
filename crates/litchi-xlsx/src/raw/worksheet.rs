@@ -1,5 +1,7 @@
 //! Namespace-aware streaming parser for sparse worksheet cell data.
 
+pub(crate) mod edit;
+
 use std::collections::{HashMap, HashSet};
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
@@ -12,7 +14,7 @@ use quick_xml::reader::NsReader;
 use super::formula::{Range as FormulaRange, translate};
 use super::namespace::is_spreadsheetml_name;
 use super::strings::decode_spreadsheet_text;
-use crate::cell::{Cell, ErrorValue, Number, Store, Stored, Text, Unknown, Value};
+use crate::cell::{Cell, Date, ErrorValue, Number, Store, Stored, Text, Unknown, Value};
 use crate::error::{Result, invalid};
 use crate::formula::{Cache, Formula, Kind};
 
@@ -705,7 +707,7 @@ fn parse_value(
             }
             Ok(Some(Value::Text(value.into())))
         },
-        Some("d") => Ok(Some(Value::Date(value.into()))),
+        Some("d") => Date::new(value).map(Value::Date).map(Some),
         Some("s") => {
             let index = value
                 .trim()
@@ -1031,6 +1033,20 @@ mod tests {
             r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><f>=1+1</f><v>2</v></c></row></sheetData></worksheet>"#
         );
         assert!(parse(marked.as_bytes(), || Ok(None)).is_err());
+    }
+
+    #[test]
+    fn validates_typed_date_cells_without_normalizing_the_lexeme() {
+        let valid = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="d"><v>2026-07-31T12:34:56.250-07:00</v></c></row></sheetData></worksheet>"#;
+        let store = parse(valid, || Ok(None)).expect("valid date cell");
+        assert!(matches!(
+            store.get(Address::from_a1("A1").expect("address")),
+            Some(Cell::Value(Value::Date(date)))
+                if date.as_str() == "2026-07-31T12:34:56.250-07:00"
+        ));
+
+        let invalid = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="d"><v>2026-02-29</v></c></row></sheetData></worksheet>"#;
+        assert!(parse(invalid, || Ok(None)).is_err());
     }
 
     #[test]

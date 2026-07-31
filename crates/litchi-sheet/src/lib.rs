@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 use std::borrow::Cow;
+use std::fmt;
 
 use litchi_core::Selector;
 use thiserror::Error;
@@ -206,6 +207,12 @@ impl TryFrom<(u32, u32)> for Cell {
 
     fn try_from((row, column): (u32, u32)) -> Result<Self, Self::Error> {
         Self::at(row, column)
+    }
+}
+
+impl fmt::Display for Cell {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.a1())
     }
 }
 

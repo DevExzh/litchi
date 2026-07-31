@@ -84,7 +84,7 @@ impl OwnedPhysPkgReader {
         self.reader()?.blob_for(pack_uri)
     }
 
-    /// Get the [Content_Types].xml content.
+    /// Get the `[Content_Types].xml` content.
     #[inline]
     pub fn content_types_xml(&self) -> Result<Vec<u8>> {
         self.reader()?.content_types_xml()
@@ -164,7 +164,7 @@ impl<'data> PhysPkgReader<'data> {
             .map_err(|_| OpcError::PartNotFound(pack_uri.to_string()))
     }
 
-    /// Get the [Content_Types].xml content.
+    /// Get the `[Content_Types].xml` content.
     ///
     /// This is a required part of every OPC package that maps parts to content types.
     pub fn content_types_xml(&self) -> Result<Vec<u8>> {

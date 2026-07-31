@@ -326,6 +326,33 @@ pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
     Ok(decoded)
 }
 
+/// Encode XML-illegal control characters and protect literal `_xHHHH_`
+/// sequences from SpreadsheetML's second decoding layer.
+pub(crate) fn encode_spreadsheet_text(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for (at, character) in value.char_indices() {
+        if character == '_'
+            && value
+                .as_bytes()
+                .get(at..at.saturating_add(7))
+                .is_some_and(|bytes| spreadsheet_escape_at(bytes, 0).is_some())
+        {
+            encoded.push_str("_x005F_");
+            continue;
+        }
+        if matches!(character, '\u{9}' | '\u{A}' | '\u{D}') || character >= '\u{20}' {
+            encoded.push(character);
+            continue;
+        }
+        let mut units = [0; 2];
+        for unit in character.encode_utf16(&mut units) {
+            use std::fmt::Write as _;
+            let _ = write!(encoded, "_x{unit:04X}_");
+        }
+    }
+    encoded
+}
+
 fn spreadsheet_escape_at(bytes: &[u8], index: usize) -> Option<(u16, usize)> {
     let escape = bytes.get(index..index.checked_add(7)?)?;
     if escape[0] != b'_' || escape[1] != b'x' || escape[6] != b'_' {
@@ -375,5 +402,16 @@ mod tests {
         assert!(decode_spreadsheet_text("_xD83D_").is_err());
         let excessive = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="2147483648"/>"#;
         assert!(parse(excessive).is_err());
+    }
+
+    #[test]
+    fn text_encoding_round_trips_controls_and_literal_escape_syntax() {
+        let original = "literal _x0041_\u{1} and 😀";
+        let encoded = encode_spreadsheet_text(original);
+        assert_eq!(encoded, "literal _x005F_x0041__x0001_ and 😀");
+        assert_eq!(
+            decode_spreadsheet_text(&encoded).expect("decode encoded text"),
+            original
+        );
     }
 }
