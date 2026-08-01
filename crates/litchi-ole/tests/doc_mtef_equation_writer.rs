@@ -1,10 +1,10 @@
+use litchi_ole::OleFile;
+use litchi_ole::doc::embedded_object::{Info, Limits};
 use litchi_ole::doc::writer::{DocPicture, DocWriter};
 use litchi_ole::doc::{
     DocEmbeddedObjectEditor, DocMtefEquationWriteOptions, EQUATION_3_CLSID, MtefEquation, Package,
 };
-use litchi_ole::{
-    LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectLimits, OleFile,
-};
+use litchi_ole_common::object::{Editor, Format};
 use std::io::Cursor;
 
 const MINIMAL_MTEF_HEX: &str =
@@ -47,8 +47,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     let equation = MtefEquation::from_mtef_payload(payload.clone()).unwrap();
     assert_eq!(equation.mtef_payload(), payload);
     let preview = DocPicture::new(preview_png()).unwrap();
-    let mut editor =
-        DocEmbeddedObjectEditor::open(base_doc(), LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = DocEmbeddedObjectEditor::open(base_doc(), Limits::default()).unwrap();
     let reference = editor
         .add_mtef_equation(DocMtefEquationWriteOptions::new(314_159, equation, preview))
         .unwrap();
@@ -77,21 +76,16 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     assert!(ole.exists(&["ObjectPool", "_314159", "\u{1}Ole"]));
     assert!(ole.exists(&["ObjectPool", "_314159", "\u{3}ObjInfo"]));
 
-    let objects = LegacyOfficeObjectEditor::open(
-        &bytes,
-        LegacyOfficeObjectFormat::Doc,
-        LegacyOfficeObjectLimits::default(),
-    )
-    .unwrap();
-    let object = objects.objects().find("_314159").unwrap();
-    assert_eq!(object.internal_storage_reference, Some(314_159));
+    let objects = Editor::open(bytes.clone(), Format::Doc, Limits::default()).unwrap();
+    let object = objects.objects().get("_314159").unwrap();
+    assert_eq!(object.storage_ref, Some(314_159));
     assert_eq!(object.prog_id.as_deref(), Some("Equation.3"));
-    assert_eq!(object.comp_obj.as_ref().unwrap().clsid, storage.clsid);
-    let descriptor = object.doc_descriptor.unwrap();
+    assert_eq!(object.metadata.as_ref().unwrap().clsid, storage.clsid);
+    let descriptor = Info::of(object).unwrap().unwrap();
     assert!(descriptor.recompose_on_resize);
     assert!(descriptor.view_object);
     assert_eq!(descriptor.clipboard_format, 3);
-    let mut nested = OleFile::open(Cursor::new(object.compound_file.clone())).unwrap();
+    let mut nested = OleFile::open(Cursor::new(object.compound.clone())).unwrap();
     assert_eq!(
         nested.root_entry().unwrap().clsid,
         "0002CE02-0000-0000-C000-000000000046"
@@ -103,8 +97,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
             .equation_native()
     );
 
-    let reopened =
-        DocEmbeddedObjectEditor::open(bytes.clone(), LegacyOfficeObjectLimits::default()).unwrap();
+    let reopened = DocEmbeddedObjectEditor::open(bytes.clone(), Limits::default()).unwrap();
     assert_eq!(
         reopened
             .objects()

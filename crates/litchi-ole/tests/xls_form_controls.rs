@@ -1,9 +1,10 @@
+use litchi_ole::xls::ole_object::Limits;
 use litchi_ole::xls::{
     XlsCheckState, XlsDropDownStyle, XlsEditBoxValidation, XlsFormControl, XlsFtCmo, XlsFtPictFmla,
     XlsFtPioGrbit, XlsListBehaviorClass, XlsListSelectionType, XlsObjSubrecord, XlsObjectType,
     XlsOleObjectEditor, XlsOleObjectRecord,
 };
-use litchi_ole::{LegacyOfficeObjectLimits, OleFile, OleWriter};
+use litchi_ole::{OleFile, OleWriter};
 use std::io::Cursor;
 
 const OBJ: u16 = 0x005D;
@@ -492,8 +493,7 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
     let ole = ole_object(1, 42).to_record_bytes().unwrap();
     let bytes = xls(&[ole, checkbox.clone(), radio], &[42]);
 
-    let editor =
-        XlsOleObjectEditor::new(bytes.clone(), LegacyOfficeObjectLimits::default()).unwrap();
+    let editor = XlsOleObjectEditor::new(bytes.clone(), Limits::default()).unwrap();
     assert_eq!(editor.objects(0).unwrap().len(), 1);
     let controls = editor.form_controls(0).unwrap();
     assert_eq!(controls.len(), 2);
@@ -508,7 +508,7 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
 
     // Rewriting the workbook for an unrelated OLE edit keeps the form
     // control Obj records byte-identical.
-    let mut editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
     editor.remove(0, 1).unwrap();
     let bytes = editor.finish().unwrap();
     let mut ole_file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
@@ -519,7 +519,7 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
             .any(|window| window == checkbox)
     );
 
-    let editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
+    let editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
     let controls = editor.form_controls(0).unwrap();
     assert_eq!(controls.len(), 2);
     assert_eq!(

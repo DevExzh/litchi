@@ -3,4 +3,5 @@
 #![forbid(unsafe_code)]
 
 pub mod custom_xml_data;
+pub mod object;
 pub mod smart_tags;

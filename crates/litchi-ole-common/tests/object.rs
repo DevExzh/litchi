@@ -1,7 +1,5 @@
-use litchi_ole::{
-    LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectKind,
-    LegacyOfficeObjectLimits, OleFile, OleWriter, discover_legacy_office_objects,
-};
+use litchi_cfb::{OleFile, OleWriter};
+use litchi_ole_common::object::{Editor, Format, Kind, Limits, discover};
 use std::io::Cursor;
 
 fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
@@ -18,7 +16,7 @@ fn ansi(value: &str, output: &mut Vec<u8>) {
     output.push(0);
 }
 
-fn comp_obj(user_type: &str, prog_id: &str) -> Vec<u8> {
+fn metadata(user_type: &str, prog_id: &str) -> Vec<u8> {
     let mut output = vec![0; 28];
     output[12..28].copy_from_slice(&[
         0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
@@ -30,7 +28,7 @@ fn comp_obj(user_type: &str, prog_id: &str) -> Vec<u8> {
     output
 }
 
-fn native_package(command: &str, payload: &[u8]) -> Vec<u8> {
+fn native(command: &str, payload: &[u8]) -> Vec<u8> {
     let mut body = Vec::new();
     body.extend_from_slice(&2u16.to_le_bytes());
     body.extend_from_slice(b"report.txt\0");
@@ -46,8 +44,8 @@ fn native_package(command: &str, payload: &[u8]) -> Vec<u8> {
 }
 
 fn doc_with_object(obj_info: &[u8]) -> Vec<u8> {
-    let comp_obj = comp_obj("Package", "Package");
-    let native = native_package("do-not-run", b"opaque native bytes");
+    let metadata = metadata("Package", "Package");
+    let native = native("do-not-run", b"opaque native bytes");
     write_cfb(|writer| {
         writer
             .create_stream(&["WordDocument"], b"unknown-records")
@@ -57,7 +55,7 @@ fn doc_with_object(obj_info: &[u8]) -> Vec<u8> {
             .create_stream(&["ObjectPool", "_42", "\u{3}ObjInfo"], obj_info)
             .unwrap();
         writer
-            .create_stream(&["ObjectPool", "_42", "\u{1}CompObj"], &comp_obj)
+            .create_stream(&["ObjectPool", "_42", "\u{1}CompObj"], &metadata)
             .unwrap();
         writer
             .create_stream(&["ObjectPool", "_42", "\u{1}Ole10Native"], &native)
@@ -72,89 +70,63 @@ fn doc_with_object(obj_info: &[u8]) -> Vec<u8> {
 fn discovers_doc_object_metadata_and_keeps_native_content_inert() {
     let bytes = doc_with_object(&[0x40, 0x00, 0x02, 0x00]);
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
-    let objects = discover_legacy_office_objects(
-        &mut ole,
-        LegacyOfficeObjectFormat::Doc,
-        LegacyOfficeObjectLimits::default(),
-    )
-    .unwrap();
-    let object = objects.find("_42").unwrap();
-    assert_eq!(object.internal_storage_reference, Some(42));
-    assert_eq!(object.kind, LegacyOfficeObjectKind::Embedded);
+    let objects = discover(&mut ole, Format::Doc, Limits::default()).unwrap();
+    let object = objects.get("_42").unwrap();
+    assert_eq!(object.storage_ref, Some(42));
+    assert_eq!(object.kind, Kind::Embedded);
     assert_eq!(object.prog_id.as_deref(), Some("Package"));
     assert_eq!(object.display_name.as_deref(), Some("Package"));
-    assert!(object.doc_descriptor.unwrap().display_as_icon);
+    assert_eq!(object.host.as_deref(), Some(&[0x40, 0x00, 0x02, 0x00][..]));
+    assert_eq!(object.native.as_ref().unwrap().command, "do-not-run");
     assert_eq!(
-        object.native_package.as_ref().unwrap().command,
-        "do-not-run"
-    );
-    assert_eq!(
-        object.native_package.as_ref().unwrap().data,
+        object.native.as_ref().unwrap().data.as_ref(),
         b"opaque native bytes"
     );
     assert_eq!(object.previews.len(), 1);
-    assert!(object.compound_file.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
+    assert!(object.compound.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
+    assert_eq!(objects.at(0).map(|value| value.id.as_str()), Some("_42"));
 }
 
 #[test]
 fn discovers_xls_link_without_resolving_it() {
-    let comp_obj = comp_obj("Linked Worksheet", "Excel.Sheet.8");
+    let metadata = metadata("Linked Worksheet", "Excel.Sheet.8");
     let bytes = write_cfb(|writer| {
         writer.create_stream(&["Workbook"], b"opaque-biff").unwrap();
         writer.create_storage(&["LNK0000002A"]).unwrap();
         writer
-            .create_stream(&["LNK0000002A", "\u{1}CompObj"], &comp_obj)
+            .create_stream(&["LNK0000002A", "\u{1}CompObj"], &metadata)
             .unwrap();
     });
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
-    let objects = discover_legacy_office_objects(
-        &mut ole,
-        LegacyOfficeObjectFormat::Xls,
-        LegacyOfficeObjectLimits::default(),
-    )
-    .unwrap();
-    let object = objects.find("LNK0000002A").unwrap();
-    assert_eq!(object.internal_storage_reference, Some(42));
-    assert_eq!(object.kind, LegacyOfficeObjectKind::Linked);
+    let objects = discover(&mut ole, Format::Xls, Limits::default()).unwrap();
+    let object = objects.get("LNK0000002A").unwrap();
+    assert_eq!(object.storage_ref, Some(42));
+    assert_eq!(object.kind, Kind::Linked);
     assert_eq!(object.prog_id.as_deref(), Some("Excel.Sheet.8"));
-    assert_eq!(object.link_metadata.as_deref(), Some("Linked Worksheet"));
+    assert_eq!(object.link.as_deref(), Some("Linked Worksheet"));
 }
 
 #[test]
-fn rejects_malformed_doc_descriptor_and_resource_exhaustion() {
+fn rejects_malformed_host_and_resource_exhaustion() {
     let malformed = doc_with_object(&[0x00, 0x04, 0x00, 0x00]);
     let mut ole = OleFile::open(Cursor::new(malformed)).unwrap();
-    assert!(
-        discover_legacy_office_objects(
-            &mut ole,
-            LegacyOfficeObjectFormat::Doc,
-            LegacyOfficeObjectLimits::default(),
-        )
-        .is_err()
-    );
+    assert!(discover(&mut ole, Format::Doc, Limits::default(),).is_err());
 
     let valid = doc_with_object(&[0, 0, 0, 0]);
     let mut ole = OleFile::open(Cursor::new(valid)).unwrap();
-    let limits = LegacyOfficeObjectLimits {
+    let limits = Limits {
         max_stream_size: 4,
-        ..LegacyOfficeObjectLimits::default()
+        ..Limits::default()
     };
-    assert!(
-        discover_legacy_office_objects(&mut ole, LegacyOfficeObjectFormat::Doc, limits,).is_err()
-    );
+    assert!(discover(&mut ole, Format::Doc, limits,).is_err());
 }
 
 #[test]
 fn collection_mutations_are_atomic_and_validate_ids() {
     let bytes = doc_with_object(&[0, 0, 0, 0]);
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
-    let mut objects = discover_legacy_office_objects(
-        &mut ole,
-        LegacyOfficeObjectFormat::Doc,
-        LegacyOfficeObjectLimits::default(),
-    )
-    .unwrap();
-    let duplicate = objects.find("_42").unwrap().clone();
+    let mut objects = discover(&mut ole, Format::Doc, Limits::default()).unwrap();
+    let duplicate = objects.get("_42").unwrap().clone();
     assert!(objects.add(duplicate).is_err());
     assert_eq!(objects.as_slice().len(), 1);
     assert!(
@@ -165,28 +137,23 @@ fn collection_mutations_are_atomic_and_validate_ids() {
             })
             .is_err()
     );
-    assert!(objects.find("_42").is_some());
+    assert!(objects.get("_42").is_some());
     assert!(objects.reorder(&["missing".to_string()]).is_err());
 }
 
 #[test]
 fn targeted_replace_preserves_unrelated_streams_and_reference() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let replacement_comp_obj = comp_obj("Worksheet", "Excel.Sheet.8");
+    let replacement_metadata = metadata("Worksheet", "Excel.Sheet.8");
     let replacement = write_cfb(|writer| {
         writer
-            .create_stream(&["\u{1}CompObj"], &replacement_comp_obj)
+            .create_stream(&["\u{1}CompObj"], &replacement_metadata)
             .unwrap();
         writer
             .create_stream(&["CONTENTS"], b"new inert workbook bytes")
             .unwrap();
     });
-    let mut editor = LegacyOfficeObjectEditor::open(
-        &original,
-        LegacyOfficeObjectFormat::Doc,
-        LegacyOfficeObjectLimits::default(),
-    )
-    .unwrap();
+    let mut editor = Editor::open(original, Format::Doc, Limits::default()).unwrap();
     editor.replace("_42", replacement).unwrap();
     assert!(editor.is_changed());
     let output = editor.finish().unwrap();
@@ -199,14 +166,9 @@ fn targeted_replace_preserves_unrelated_streams_and_reference() {
         ole.open_stream(&["ObjectPool", "_42", "CONTENTS"]).unwrap(),
         b"new inert workbook bytes"
     );
-    let objects = discover_legacy_office_objects(
-        &mut ole,
-        LegacyOfficeObjectFormat::Doc,
-        LegacyOfficeObjectLimits::default(),
-    )
-    .unwrap();
+    let objects = discover(&mut ole, Format::Doc, Limits::default()).unwrap();
     assert_eq!(
-        objects.find("_42").unwrap().prog_id.as_deref(),
+        objects.get("_42").unwrap().prog_id.as_deref(),
         Some("Excel.Sheet.8")
     );
 }
@@ -214,14 +176,11 @@ fn targeted_replace_preserves_unrelated_streams_and_reference() {
 #[test]
 fn no_op_editor_round_trip_preserves_stream_payloads() {
     let original = doc_with_object(&[0, 0, 0, 0]);
-    let editor = LegacyOfficeObjectEditor::open(
-        &original,
-        LegacyOfficeObjectFormat::Doc,
-        LegacyOfficeObjectLimits::default(),
-    )
-    .unwrap();
+    let expected = original.clone();
+    let editor = Editor::open(original, Format::Doc, Limits::default()).unwrap();
     assert!(!editor.is_changed());
     let output = editor.finish().unwrap();
+    assert_eq!(output, expected);
     let mut ole = OleFile::open(Cursor::new(output)).unwrap();
     assert_eq!(
         ole.open_stream(&["WordDocument"]).unwrap(),
@@ -230,6 +189,6 @@ fn no_op_editor_round_trip_preserves_stream_payloads() {
     assert_eq!(
         ole.open_stream(&["ObjectPool", "_42", "\u{1}Ole10Native"])
             .unwrap(),
-        native_package("do-not-run", b"opaque native bytes")
+        native("do-not-run", b"opaque native bytes")
     );
 }

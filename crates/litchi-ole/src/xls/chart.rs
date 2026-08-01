@@ -5,7 +5,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::{LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectLimits};
+use litchi_ole_common::object::{
+    Editor as ObjectEditor, Format as ObjectFormat, Limits as ObjectLimits,
+};
 
 use super::{XlsError, XlsResult};
 
@@ -506,7 +508,7 @@ struct StoredChart {
 /// Transactional editor for existing BIFF8 chart substreams.
 #[derive(Clone)]
 pub struct XlsChartEditor {
-    package: LegacyOfficeObjectEditor,
+    package: ObjectEditor,
     workbook_path: Vec<String>,
     workbook: Vec<u8>,
     limits: XlsChartLimits,
@@ -516,18 +518,14 @@ pub struct XlsChartEditor {
 impl XlsChartEditor {
     pub fn open(bytes: Vec<u8>, limits: XlsChartLimits) -> XlsResult<Self> {
         validate_limits(limits)?;
-        let package = LegacyOfficeObjectEditor::open(
-            &bytes,
-            LegacyOfficeObjectFormat::Xls,
-            LegacyOfficeObjectLimits::default(),
-        )?;
+        let package = ObjectEditor::open(bytes, ObjectFormat::Xls, ObjectLimits::default())?;
         let workbook_path = [vec!["Workbook".into()], vec!["Book".into()]]
             .into_iter()
-            .find(|path| package.package_stream(path).is_some())
+            .find(|path| package.stream(path).is_some())
             .ok_or_else(|| XlsError::InvalidData("Workbook stream not found".into()))?;
         let workbook = package
-            .package_stream(&workbook_path)
-            .expect("selected stream")
+            .stream(&workbook_path)
+            .ok_or_else(|| XlsError::InvalidData("selected Workbook stream disappeared".into()))?
             .to_vec();
         if workbook.len() > limits.max_workbook_bytes {
             return invalid(CHART, "Workbook stream exceeds chart editor limit");
@@ -615,9 +613,12 @@ impl XlsChartEditor {
         }
         validate_sheet_name(&name)?;
         chart.validate(sheets.len() + 1, self.limits)?;
-        for value in
-            ranges(&self.workbook[..sheets.iter().map(|value| value.start).min().unwrap()])?
-        {
+        let globals_end = sheets
+            .iter()
+            .map(|value| value.start)
+            .min()
+            .map_or(self.workbook.len(), |value| value);
+        for value in ranges(&self.workbook[..globals_end])? {
             if value.kind == BOUNDSHEET
                 && bound_sheet_name(&self.workbook[value.body_start..value.body_end])?
                     .eq_ignore_ascii_case(&name)
@@ -766,7 +767,7 @@ impl XlsChartEditor {
             );
         }
         let mut package = self.package.clone();
-        package.replace_package_stream(&self.workbook_path, workbook.clone())?;
+        package.put_stream(&self.workbook_path, workbook.clone())?;
         self.package = package;
         self.workbook = workbook;
         self.charts = reparsed;
@@ -779,7 +780,7 @@ impl XlsChartEditor {
         }
         let charts = parse_workbook_charts(&workbook, self.limits)?;
         let mut package = self.package.clone();
-        package.replace_package_stream(&self.workbook_path, workbook.clone())?;
+        package.put_stream(&self.workbook_path, workbook.clone())?;
         self.package = package;
         self.workbook = workbook;
         self.charts = charts;
@@ -939,7 +940,12 @@ fn rewrite_chart_globals(
         }
         let rewritten = match value.kind {
             WINDOW1 => remap_window1(data, old_to_new)?,
-            RR_TAB_ID => write_rr_tab_ids(rr_ids.as_ref().expect("record supplied"), tabs)?,
+            RR_TAB_ID => write_rr_tab_ids(
+                rr_ids.as_ref().ok_or_else(|| {
+                    invalid_error(RR_TAB_ID, "RRTabId record inventory is missing")
+                })?,
+                tabs,
+            )?,
             SUP_BOOK if data.len() == 4 && u16_at(data, 2)? == 0x0401 => {
                 let mut value = data.to_vec();
                 value[..2].copy_from_slice(
@@ -1027,8 +1033,14 @@ fn remap_extern_sheet(
                 })
             })
             .collect::<XlsResult<Vec<_>>>()?;
-        let minimum = *mapped.iter().min().unwrap();
-        let maximum = *mapped.iter().max().unwrap();
+        let minimum = *mapped
+            .iter()
+            .min()
+            .ok_or_else(|| invalid_error(EXTERN_SHEET, "empty 3-D formula range"))?;
+        let maximum = *mapped
+            .iter()
+            .max()
+            .ok_or_else(|| invalid_error(EXTERN_SHEET, "empty 3-D formula range"))?;
         if maximum - minimum + 1 != mapped.len() {
             return invalid(
                 EXTERN_SHEET,
@@ -1325,12 +1337,13 @@ fn parse_chart(input: &[u8], sheet_count: usize, limits: XlsChartLimits) -> XlsR
             },
             SER_TO_CRT => {
                 exact(data, 2, SER_TO_CRT)?;
+                let index = current_series.ok_or_else(|| {
+                    invalid_error(SER_TO_CRT, "SerToCrt appears outside a Series")
+                })?;
                 chart
                     .series
-                    .get_mut(current_series.ok_or_else(|| {
-                        invalid_error(SER_TO_CRT, "SerToCrt appears outside a Series")
-                    })?)
-                    .expect("index established")
+                    .get_mut(index)
+                    .ok_or_else(|| invalid_error(SER_TO_CRT, "Series index is invalid"))?
                     .chart_group = u16_at(data, 0)?;
             },
             SERIES_TEXT => {
@@ -1411,12 +1424,12 @@ fn parse_chart(input: &[u8], sheet_count: usize, limits: XlsChartLimits) -> XlsR
             },
             VALUE_RANGE => {
                 exact(data, 42, VALUE_RANGE)?;
+                let axis = current_axis
+                    .ok_or_else(|| invalid_error(VALUE_RANGE, "ValueRange appears before Axis"))?;
                 chart
                     .axes
-                    .get_mut(current_axis.ok_or_else(|| {
-                        invalid_error(VALUE_RANGE, "ValueRange appears before Axis")
-                    })?)
-                    .unwrap()
+                    .get_mut(axis)
+                    .ok_or_else(|| invalid_error(VALUE_RANGE, "Axis index is invalid"))?
                     .scale = Some(XlsChartAxisScale {
                     minimum: f64_at(data, 0)?,
                     maximum: f64_at(data, 8)?,
@@ -1430,19 +1443,18 @@ fn parse_chart(input: &[u8], sheet_count: usize, limits: XlsChartLimits) -> XlsR
                 if data.len() < 26 {
                     return invalid(TICK, "Tick record is truncated");
                 }
+                let axis =
+                    current_axis.ok_or_else(|| invalid_error(TICK, "Tick appears before Axis"))?;
                 chart
                     .axes
-                    .get_mut(
-                        current_axis
-                            .ok_or_else(|| invalid_error(TICK, "Tick appears before Axis"))?,
-                    )
-                    .unwrap()
+                    .get_mut(axis)
+                    .ok_or_else(|| invalid_error(TICK, "Axis index is invalid"))?
                     .tick = Some(XlsChartTick {
                     major: data[0],
                     minor: data[1],
                     label_position: data[2],
                     background: data[3],
-                    color: data[4..8].try_into().unwrap(),
+                    color: array_at(data, 4)?,
                     flags: u16_at(data, 24)?,
                 });
             },
@@ -1457,7 +1469,10 @@ fn parse_chart(input: &[u8], sheet_count: usize, limits: XlsChartLimits) -> XlsR
                 };
                 let axis = current_axis
                     .ok_or_else(|| invalid_error(AXIS_LINE, "AxisLine appears before Axis"))?;
-                chart.axes[axis]
+                chart
+                    .axes
+                    .get_mut(axis)
+                    .ok_or_else(|| invalid_error(AXIS_LINE, "Axis index is invalid"))?
                     .lines
                     .push(XlsChartAxisLine { kind, format: None });
                 pending_axis_line = Some(axis);
@@ -1465,7 +1480,14 @@ fn parse_chart(input: &[u8], sheet_count: usize, limits: XlsChartLimits) -> XlsR
             LINE_FORMAT => {
                 let format = parse_line_format(data)?;
                 if let Some(axis) = pending_axis_line.take() {
-                    chart.axes[axis].lines.last_mut().unwrap().format = Some(format.clone());
+                    let line = chart
+                        .axes
+                        .get_mut(axis)
+                        .and_then(|axis| axis.lines.last_mut())
+                        .ok_or_else(|| {
+                            invalid_error(LINE_FORMAT, "pending axis line is missing")
+                        })?;
+                    line.format = Some(format.clone());
                 }
                 chart.formatting.push(XlsChartFormatting::Line(format));
             },
@@ -2139,7 +2161,11 @@ fn parse_chart_object(data: &[u8]) -> XlsResult<Option<u16>> {
             if len != 18 {
                 return invalid(OBJ, "FtCmo must contain 18 bytes");
             }
-            return Ok((u16_at(body, 0)? == 5).then(|| u16_at(body, 2).unwrap()));
+            return if u16_at(body, 0)? == 5 {
+                Ok(Some(u16_at(body, 2)?))
+            } else {
+                Ok(None)
+            };
         }
         offset = end;
     }
@@ -2178,7 +2204,7 @@ fn bof_body(kind: u16) -> Vec<u8> {
 fn parse_line_format(data: &[u8]) -> XlsResult<XlsChartLineFormat> {
     exact(data, 12, LINE_FORMAT)?;
     Ok(XlsChartLineFormat {
-        color: data[..4].try_into().unwrap(),
+        color: array_at(data, 0)?,
         pattern: u16_at(data, 4)?,
         weight: i16_at(data, 6)?,
         flags: u16_at(data, 8)?,
@@ -2196,8 +2222,8 @@ fn write_line(v: &XlsChartLineFormat) -> Vec<u8> {
 fn parse_area_format(data: &[u8]) -> XlsResult<XlsChartAreaFormat> {
     exact(data, 16, AREA_FORMAT)?;
     Ok(XlsChartAreaFormat {
-        foreground: data[..4].try_into().unwrap(),
-        background: data[4..8].try_into().unwrap(),
+        foreground: array_at(data, 0)?,
+        background: array_at(data, 4)?,
         pattern: u16_at(data, 8)?,
         flags: u16_at(data, 10)?,
         foreground_index: u16_at(data, 12)?,
@@ -2351,32 +2377,28 @@ fn exact(data: &[u8], len: usize, kind: u16) -> XlsResult<()> {
     Ok(())
 }
 fn u16_at(data: &[u8], o: usize) -> XlsResult<u16> {
-    data.get(o..o + 2)
-        .map(|v| u16::from_le_bytes([v[0], v[1]]))
-        .ok_or(XlsError::InvalidLength {
-            expected: o + 2,
-            found: data.len(),
-        })
+    Ok(u16::from_le_bytes(array_at(data, o)?))
 }
 fn i16_at(data: &[u8], o: usize) -> XlsResult<i16> {
     Ok(u16_at(data, o)? as i16)
 }
 fn u32_at(data: &[u8], o: usize) -> XlsResult<u32> {
-    data.get(o..o + 4)
-        .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
-        .ok_or(XlsError::InvalidLength {
-            expected: o + 4,
-            found: data.len(),
-        })
+    Ok(u32::from_le_bytes(array_at(data, o)?))
 }
 fn i32_at(data: &[u8], o: usize) -> XlsResult<i32> {
     Ok(u32_at(data, o)? as i32)
 }
 fn f64_at(data: &[u8], o: usize) -> XlsResult<f64> {
-    data.get(o..o + 8)
-        .map(|v| f64::from_le_bytes(v.try_into().unwrap()))
+    Ok(f64::from_le_bytes(array_at(data, o)?))
+}
+fn array_at<const N: usize>(data: &[u8], offset: usize) -> XlsResult<[u8; N]> {
+    let expected = offset
+        .checked_add(N)
+        .ok_or_else(|| XlsError::InvalidData("record field offset overflow".into()))?;
+    data.get(offset..expected)
+        .and_then(|bytes| bytes.try_into().ok())
         .ok_or(XlsError::InvalidLength {
-            expected: o + 8,
+            expected,
             found: data.len(),
         })
 }

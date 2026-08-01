@@ -47,6 +47,15 @@ expose the borrowed host payload records without interpreting them. Canonical
 types use their module context (`record::Record`, `prop::Props`,
 `shape::Shape`) instead of repeating an `Escher` or `OfficeArt` prefix.
 
+`litchi-ole-common::object` owns bounded, inert discovery of DOC/XLS object
+storage topology and transactional CFB stream/storage rewrites. It exposes
+contextual names such as `object::{Object, Objects, Editor, Limits}`. Semantic
+lookup (`Objects::get`) is the primary selector, while checked discovery-order
+lookup (`Objects::at`) remains available; neither selector panics. Concrete
+host metadata is not modeled in the common crate. Common objects retain those
+bytes opaquely, and the owning format crate provides the typed interpretation,
+such as `doc::embedded_object::Info` for `[MS-DOC]` `ObjInfo` flags.
+
 Additional focused crates are permitted where the responsibility is real:
 
 - `litchi-math` replaces the current equation-focused `litchi-formula` name.
@@ -54,6 +63,10 @@ Additional focused crates are permitted where the responsibility is real:
   calculation; it has no network or async-runtime dependency.
 - `litchi-crypto`, `litchi-sign`, and `litchi-vba` own shared inert security
   capabilities rather than creating OPC/OLE cross-dependencies.
+- `litchi-ograph` owns the neutral `[MS-OGRAPH]` chart model, record grammar,
+  and standalone compound-package codec. XLS owns workbook tab/Obj integration
+  and PPT owns presentation frames and embedded-object integration; PPT never
+  depends on the concrete XLS crate.
 - Runtime adapters such as `litchi-tokio` are separate optional crates.
 
 `litchi-crypto` owns bounded `[MS-OFFCRYPTO]` structures and transformations,

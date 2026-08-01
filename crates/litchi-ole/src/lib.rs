@@ -43,9 +43,6 @@ pub mod sprm_operations;
 #[allow(dead_code)]
 mod escher;
 
-/// Safe typed discovery and inert CFB replacement for legacy embedded objects.
-pub mod embedded_object;
-
 /// Legacy Word document (.doc) reader
 ///
 /// This module provides functionality to parse Microsoft Word documents
@@ -66,13 +63,6 @@ pub mod signature;
 /// This module provides functionality to parse Microsoft Excel spreadsheets
 /// in the legacy binary format (.xls files), which are OLE2-based files.
 pub mod xls;
-
-pub use embedded_object::{
-    CompObjMetadata, DocObjectDescriptor, LegacyOfficeEmbeddedObject, LegacyOfficeObjectCollection,
-    LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectKind,
-    LegacyOfficeObjectLimits, LegacyOfficePreview, LegacyOfficePreviewKind, OleNativePackage,
-    discover_legacy_office_objects,
-};
 
 pub use xls::{XlsError, XlsWorkbook};
 

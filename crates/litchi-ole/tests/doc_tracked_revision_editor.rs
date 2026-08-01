@@ -1,4 +1,4 @@
-use litchi_ole::LegacyOfficeObjectLimits;
+use litchi_ole::doc::tracked_revision::Limits;
 use litchi_ole::doc::writer::{CharacterFormatting, DocWriter, ParagraphFormatting, TextRevision};
 use litchi_ole::doc::{
     DocTrackedRevisionEditor, DocTrackedRevisionKind, DocTrackedRevisionMetadata, Package,
@@ -32,8 +32,7 @@ fn base_doc() -> Vec<u8> {
 
 #[test]
 fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
-    let mut editor =
-        DocTrackedRevisionEditor::open(base_doc(), LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
     assert!(editor.authors().contains(&"Existing".to_string()));
     let deletion = editor
         .revisions()
@@ -80,8 +79,7 @@ fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
 
 #[test]
 fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
-    let mut editor =
-        DocTrackedRevisionEditor::open(base_doc(), LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
     let deletion_index = editor
         .revisions()
         .unwrap()
@@ -113,8 +111,7 @@ fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
 
 #[test]
 fn shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair() {
-    let mut editor =
-        DocTrackedRevisionEditor::open(base_doc(), LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
     let metadata = DocTrackedRevisionMetadata::new("Mover").with_revision_save_id(0xAABBCCDD);
     editor
         .add(0, 4, DocTrackedRevisionKind::MoveFrom, metadata.clone())
@@ -137,8 +134,7 @@ fn shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair() {
 
 #[test]
 fn malformed_ranges_controls_and_failed_updates_roll_back() {
-    let mut editor =
-        DocTrackedRevisionEditor::open(base_doc(), LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = DocTrackedRevisionEditor::open(base_doc(), Limits::default()).unwrap();
     let before = editor.revisions().unwrap();
     assert!(
         editor
@@ -181,8 +177,7 @@ fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
     ];
     for path in fixtures {
         let original = std::fs::read(&path).unwrap();
-        match DocTrackedRevisionEditor::open(original.clone(), LegacyOfficeObjectLimits::default())
-        {
+        match DocTrackedRevisionEditor::open(original.clone(), Limits::default()) {
             Ok(editor) => {
                 let _ = editor.revisions().unwrap();
                 assert_eq!(std::fs::read(&path).unwrap(), original);

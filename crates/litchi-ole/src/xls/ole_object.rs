@@ -1,8 +1,10 @@
 //! Strict BIFF8 Obj/FtPictFmla parsing and transactional OLE-object editing.
 
 use super::{XlsError, XlsResult};
-use crate::{LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectLimits};
+use litchi_ole_common::object::{Editor as ObjectEditor, Format as ObjectFormat};
 use std::collections::{HashMap, HashSet};
+
+pub use litchi_ole_common::object::Limits;
 
 const OBJ: u16 = 0x005D;
 const TXO: u16 = 0x01B6;
@@ -759,7 +761,7 @@ impl XlsFormControl {
 
 #[derive(Clone)]
 pub struct XlsOleObjectEditor {
-    package: LegacyOfficeObjectEditor,
+    package: ObjectEditor,
     workbook_path: Vec<String>,
     workbook: Vec<u8>,
     sheets: Vec<Vec<XlsOleObjectRecord>>,
@@ -767,16 +769,15 @@ pub struct XlsOleObjectEditor {
 }
 
 impl XlsOleObjectEditor {
-    pub fn new(bytes: Vec<u8>, limits: LegacyOfficeObjectLimits) -> XlsResult<Self> {
-        let package =
-            LegacyOfficeObjectEditor::open(&bytes, LegacyOfficeObjectFormat::Xls, limits)?;
+    pub fn new(bytes: Vec<u8>, limits: Limits) -> XlsResult<Self> {
+        let package = ObjectEditor::open(bytes, ObjectFormat::Xls, limits)?;
         let workbook_path = [vec!["Workbook".into()], vec!["Book".into()]]
             .into_iter()
-            .find(|path| package.package_stream(path).is_some())
+            .find(|path| package.stream(path).is_some())
             .ok_or_else(|| XlsError::InvalidData("Workbook stream not found".into()))?;
         let workbook = package
-            .package_stream(&workbook_path)
-            .expect("selected stream")
+            .stream(&workbook_path)
+            .ok_or_else(|| XlsError::InvalidData("selected Workbook stream disappeared".into()))?
             .to_vec();
         let (sheets, form_controls) = parse_workbook(&workbook)?;
         Ok(Self {
@@ -828,9 +829,7 @@ impl XlsOleObjectEditor {
             .get_mut(worksheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet index {worksheet}")))?
             .push(object);
-        candidate
-            .package
-            .add_referenced_storage(&storage, compound_file)?;
+        candidate.package.add_storage(&storage, compound_file)?;
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -854,7 +853,7 @@ impl XlsOleObjectEditor {
                 .flatten()
                 .any(|value| value.storage_name().as_deref() == Some(&storage))
         {
-            candidate.package.remove_referenced_storage(&storage)?;
+            candidate.package.remove_storage(&storage)?;
         }
         candidate.commit()?;
         *self = candidate;
@@ -910,7 +909,7 @@ impl XlsOleObjectEditor {
         validate_objects(&self.sheets)?;
         let workbook = rewrite_workbook(&self.workbook, &self.sheets)?;
         self.package
-            .replace_package_stream(&self.workbook_path, workbook.clone())?;
+            .put_stream(&self.workbook_path, workbook.clone())?;
         self.workbook = workbook;
         Ok(())
     }
@@ -932,8 +931,8 @@ fn parse_formula(body: &[u8]) -> XlsResult<XlsFtPictFmla> {
     let (storage_position, control_buffer_size) = match tail.len() {
         0 => (None, None),
         8 => (
-            Some(u32::from_le_bytes(tail[..4].try_into().unwrap())),
-            Some(u32::from_le_bytes(tail[4..].try_into().unwrap())),
+            Some(u32_at(tail, 0).ok_or_else(|| invalid(OBJ, "storage position is truncated"))?),
+            Some(u32_at(tail, 4).ok_or_else(|| invalid(OBJ, "control buffer size is truncated"))?),
         ),
         _ => return Err(invalid(OBJ, "unsupported FtPictFmla trailing layout")),
     };
@@ -966,7 +965,8 @@ fn parse_subrecords(data: &[u8]) -> XlsResult<Vec<XlsObjSubrecord>> {
                 object_type: u16::from_le_bytes([body[0], body[1]]),
                 object_id: u16::from_le_bytes([body[2], body[3]]),
                 flags: u16::from_le_bytes([body[4], body[5]]),
-                reserved: body[6..18].try_into().expect("length checked"),
+                reserved: array_at(body, 6)
+                    .ok_or_else(|| invalid(OBJ, "FtCmo reserved bytes are truncated"))?,
             }),
             (FT_CMO, _) => return Err(invalid(OBJ, "FtCmo must contain 18 bytes")),
             (FT_CF, _) => XlsObjSubrecord::ClipboardFormat(body.to_vec()),
@@ -1011,9 +1011,16 @@ fn unknown(kind: u16, body: &[u8]) -> XlsObjSubrecord {
 }
 
 fn u16_at(data: &[u8], offset: usize) -> Option<u16> {
-    Some(u16::from_le_bytes(
-        data.get(offset..offset + 2)?.try_into().ok()?,
-    ))
+    Some(u16::from_le_bytes(array_at(data, offset)?))
+}
+
+fn u32_at(data: &[u8], offset: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(array_at(data, offset)?))
+}
+
+fn array_at<const N: usize>(data: &[u8], offset: usize) -> Option<[u8; N]> {
+    let end = offset.checked_add(N)?;
+    data.get(offset..end)?.try_into().ok()
 }
 
 fn bool_at(data: &[u8], offset: usize) -> Option<bool> {
@@ -1074,14 +1081,14 @@ fn parse_sbs(body: &[u8]) -> Option<XlsFtSbs> {
         return None;
     }
     Some(XlsFtSbs {
-        reserved: body[0..4].try_into().expect("length checked"),
-        value: i16::from_le_bytes(body[4..6].try_into().expect("length checked")),
-        minimum: i16::from_le_bytes(body[6..8].try_into().expect("length checked")),
-        maximum: i16::from_le_bytes(body[8..10].try_into().expect("length checked")),
-        increment: i16::from_le_bytes(body[10..12].try_into().expect("length checked")),
-        page_increment: i16::from_le_bytes(body[12..14].try_into().expect("length checked")),
+        reserved: array_at(body, 0)?,
+        value: i16::from_le_bytes(array_at(body, 4)?),
+        minimum: i16::from_le_bytes(array_at(body, 6)?),
+        maximum: i16::from_le_bytes(array_at(body, 8)?),
+        increment: i16::from_le_bytes(array_at(body, 10)?),
+        page_increment: i16::from_le_bytes(array_at(body, 12)?),
         horizontal: bool_at(body, 14)?,
-        scroll_width: i16::from_le_bytes(body[16..18].try_into().expect("length checked")),
+        scroll_width: i16::from_le_bytes(array_at(body, 16)?),
         flags: u16_at(body, 18)?,
     })
 }
@@ -1511,8 +1518,11 @@ fn bindings(input: &[u8]) -> XlsResult<(Vec<(usize, usize)>, Vec<(usize, bool)>)
             return Err(invalid(BOUNDSHEET, "BoundSheet is truncated"));
         }
         refs.push((
-            start + 4,
-            u32::from_le_bytes(body[..4].try_into().unwrap()) as usize,
+            start
+                .checked_add(4)
+                .ok_or_else(|| invalid(BOUNDSHEET, "record offset overflow"))?,
+            u32_at(body, 0).ok_or_else(|| invalid(BOUNDSHEET, "sheet offset is truncated"))?
+                as usize,
             body[5] == 0,
         ));
     }

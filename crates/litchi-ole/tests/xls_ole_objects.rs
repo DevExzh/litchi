@@ -1,7 +1,8 @@
+use litchi_ole::xls::ole_object::Limits;
 use litchi_ole::xls::{
     XlsFtCmo, XlsFtPictFmla, XlsFtPioGrbit, XlsObjSubrecord, XlsOleObjectEditor, XlsOleObjectRecord,
 };
-use litchi_ole::{LegacyOfficeObjectLimits, OleFile, OleWriter};
+use litchi_ole::{OleFile, OleWriter};
 use std::io::Cursor;
 
 fn record(kind: u16, body: &[u8]) -> Vec<u8> {
@@ -92,12 +93,12 @@ fn xls(objects: &[XlsOleObjectRecord], storages: &[u32]) -> Vec<u8> {
 #[test]
 fn removes_shared_storage_only_after_last_reference() {
     let bytes = xls(&[object(1, 42, 1), object(2, 42, 2)], &[42]);
-    let mut editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
     editor.remove(0, 1).unwrap();
     let bytes = editor.finish().unwrap();
     let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
     assert!(ole.exists(&["MBD0000002A"]));
-    let mut editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
     editor.remove(0, 2).unwrap();
     let bytes = editor.finish().unwrap();
     let ole = OleFile::open(Cursor::new(bytes)).unwrap();
@@ -107,14 +108,13 @@ fn removes_shared_storage_only_after_last_reference() {
 #[test]
 fn add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data() {
     let bytes = xls(&[object(1, 1, 0xA1)], &[1]);
-    let mut editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
     editor
         .add(0, object(2, 2, 0xB2), nested_cfb(b"second"))
         .unwrap();
     editor.reorder(0, &[2, 1]).unwrap();
     let bytes = editor.finish().unwrap();
-    let editor =
-        XlsOleObjectEditor::new(bytes.clone(), LegacyOfficeObjectLimits::default()).unwrap();
+    let editor = XlsOleObjectEditor::new(bytes.clone(), Limits::default()).unwrap();
     assert_eq!(
         editor
             .objects(0)
@@ -149,7 +149,7 @@ fn invalid_flags_and_reorder_are_atomic() {
     assert!(invalid_object.validate().is_err());
 
     let bytes = xls(&[object(1, 1, 1), object(2, 2, 2)], &[1, 2]);
-    let mut editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor = XlsOleObjectEditor::new(bytes, Limits::default()).unwrap();
     assert!(editor.reorder(0, &[1, 1]).is_err());
     assert_eq!(
         editor

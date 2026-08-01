@@ -301,7 +301,7 @@ mod pivot_editor;
 #[forbid(unsafe_code)]
 pub mod pivot_table;
 pub use pivot_editor::XlsPivotViewEditor;
-mod ole_object;
+pub mod ole_object;
 pub use ole_object::{
     XlsCheckState, XlsDropDownStyle, XlsEditBoxValidation, XlsFormControl, XlsFtCblsData, XlsFtCmo,
     XlsFtEdoData, XlsFtGboData, XlsFtLbsData, XlsFtPictFmla, XlsFtPioGrbit, XlsFtRboData, XlsFtSbs,

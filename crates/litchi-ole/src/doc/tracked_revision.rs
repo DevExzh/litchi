@@ -10,8 +10,10 @@ use crate::doc::parts::fkp::{ChpxFkp, PapxFkp, ParagraphHeight};
 use crate::doc::writer::ChpxFkpBuilder;
 use crate::sprm::parse_sprms;
 use crate::sprm_operations::*;
-use crate::{LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectLimits};
+use litchi_ole_common::object::{Editor as ObjectEditor, Format as ObjectFormat};
 use std::collections::{BTreeSet, HashMap};
+
+pub use litchi_ole_common::object::Limits;
 
 const FIB_CCP_TEXT: usize = 76;
 const FIB_FC_LCB: usize = 154;
@@ -130,7 +132,7 @@ struct CpTable {
 /// Atomic editor for tracked revisions in an existing binary DOC.
 #[derive(Clone)]
 pub struct DocTrackedRevisionEditor {
-    package: LegacyOfficeObjectEditor,
+    package: ObjectEditor,
     word_path: Vec<String>,
     table_path: Vec<String>,
     word: Vec<u8>,
@@ -145,12 +147,12 @@ pub struct DocTrackedRevisionEditor {
 }
 
 impl DocTrackedRevisionEditor {
-    pub fn open(bytes: Vec<u8>, limits: LegacyOfficeObjectLimits) -> Result<Self> {
-        let package = LegacyOfficeObjectEditor::open(&bytes, LegacyOfficeObjectFormat::Doc, limits)
-            .map_err(DocError::from)?;
+    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        let package =
+            ObjectEditor::open(bytes, ObjectFormat::Doc, limits).map_err(DocError::from)?;
         let word_path = vec!["WordDocument".to_string()];
         let word = package
-            .package_stream(&word_path)
+            .stream(&word_path)
             .ok_or_else(|| corrupted("WordDocument stream is missing"))?
             .to_vec();
         if word.len() < FIB_FC_LCB + (STTBFRMARK + 1) * 8 || u16_at(&word, 0)? != 0xA5EC {
@@ -171,7 +173,7 @@ impl DocTrackedRevisionEditor {
             .to_string(),
         ];
         let table = package
-            .package_stream(&table_path)
+            .stream(&table_path)
             .ok_or_else(|| corrupted("selected Table stream is missing"))?
             .to_vec();
         reject_protection(&word, &table)?;
@@ -855,10 +857,10 @@ impl DocTrackedRevisionEditor {
 
     fn commit(&mut self) -> Result<()> {
         self.package
-            .replace_package_stream(&self.word_path, self.word.clone())
+            .put_stream(&self.word_path, self.word.clone())
             .map_err(DocError::from)?;
         self.package
-            .replace_package_stream(&self.table_path, self.table.clone())
+            .put_stream(&self.table_path, self.table.clone())
             .map_err(DocError::from)?;
         self.changed = true;
         Ok(())
@@ -954,7 +956,7 @@ fn property_metadata(
         .get(author_index as usize)
         .ok_or_else(|| corrupted("property revision author exceeds SttbfRMark"))?
         .clone();
-    let raw = u32::from_le_bytes(operand[3..7].try_into().unwrap());
+    let raw = u32::from_le_bytes(array_at(operand, 3, "property revision timestamp")?);
     let timestamp = decode_dttm(raw)?;
     let rsid = (rsid_op != 0)
         .then(|| {
@@ -1098,7 +1100,9 @@ fn replace_papx_revision_sprms(
     let style = grp
         .get(..2)
         .ok_or_else(|| corrupted("PAPX style index is truncated"))?;
-    let body = grp.get(2..).unwrap();
+    let body = grp
+        .get(2..)
+        .ok_or_else(|| corrupted("PAPX body is truncated"))?;
     let mut output = style.to_vec();
     output.extend_from_slice(&retain_sprms(
         body,
@@ -1369,9 +1373,15 @@ fn build_papx_pages(runs: &[PapxRun]) -> Result<Vec<BuiltPapxPage>> {
             return Err(corrupted("one PAPX run cannot fit in an FKP"));
         }
         let subset = &runs[start..start + count];
+        let first = subset
+            .first()
+            .ok_or_else(|| corrupted("PAPX page has no runs"))?;
+        let last = subset
+            .last()
+            .ok_or_else(|| corrupted("PAPX page has no runs"))?;
         pages.push(BuiltPapxPage {
-            start: subset[0].start,
-            end: subset.last().unwrap().end,
+            start: first.start,
+            end: last.end,
             bytes: build_papx_page(subset)?,
         });
         start += count;
@@ -1518,7 +1528,11 @@ fn serialize_clx(pieces: &[RawPiece]) -> Result<Vec<u8>> {
     for p in pieces {
         out.extend_from_slice(&p.start.to_le_bytes());
     }
-    out.extend_from_slice(&pieces.last().unwrap().end.to_le_bytes());
+    let end = pieces
+        .last()
+        .ok_or_else(|| corrupted("piece table is empty"))?
+        .end;
+    out.extend_from_slice(&end.to_le_bytes());
     for p in pieces {
         out.extend_from_slice(&p.prefix);
         let raw = if p.unicode {
@@ -1718,7 +1732,7 @@ fn reject_protection(word: &[u8], table: &[u8]) -> Result<()> {
     }
     let protected = dop[6] & 0x10 != 0
         || dop[7] & (0x02 | 0x20 | 0x40) != 0
-        || i32::from_le_bytes(dop[78..82].try_into().unwrap()) != 0;
+        || i32::from_le_bytes(array_at(dop, 78, "DOP protection key")?) != 0;
     if protected {
         return Err(corrupted("protected DOC cannot be edited"));
     }
@@ -1919,20 +1933,27 @@ fn slice<'a>(data: &'a [u8], offset: u32, length: u32, name: &str) -> Result<&'a
         .ok_or_else(|| corrupted(format!("{name} exceeds stream")))
 }
 fn u16_at(data: &[u8], offset: usize) -> Result<u16> {
-    data.get(offset..offset + 2)
-        .map(|v| u16::from_le_bytes(v.try_into().unwrap()))
-        .ok_or_else(|| corrupted("truncated u16"))
+    Ok(u16::from_le_bytes(array_at(data, offset, "u16")?))
 }
 fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
-    data.get(offset..offset + 4)
-        .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
-        .ok_or_else(|| corrupted("truncated u32"))
+    Ok(u32::from_le_bytes(array_at(data, offset, "u32")?))
 }
 fn put_u32(data: &mut [u8], offset: usize, value: u32) -> Result<()> {
-    data.get_mut(offset..offset + 4)
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| corrupted("FIB field offset overflow"))?;
+    data.get_mut(offset..end)
         .ok_or_else(|| corrupted("truncated FIB field"))?
         .copy_from_slice(&value.to_le_bytes());
     Ok(())
+}
+fn array_at<const N: usize>(data: &[u8], offset: usize, name: &str) -> Result<[u8; N]> {
+    let end = offset
+        .checked_add(N)
+        .ok_or_else(|| corrupted(format!("{name} offset overflow")))?;
+    data.get(offset..end)
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| corrupted(format!("truncated {name}")))
 }
 fn align2(v: usize) -> Result<usize> {
     v.checked_add(1)

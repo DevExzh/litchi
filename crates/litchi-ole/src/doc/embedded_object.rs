@@ -6,7 +6,9 @@
 
 use super::package::{DocError, Result};
 use super::writer::ChpxFkpBuilder;
-use crate::{LegacyOfficeObjectEditor, LegacyOfficeObjectFormat, LegacyOfficeObjectLimits};
+use litchi_ole_common::object::{Editor as ObjectEditor, Format as ObjectFormat, Object};
+
+pub use litchi_ole_common::object::Limits;
 
 const FIB_CCP_TEXT: usize = 76;
 const FIB_FC_LCB: usize = 154;
@@ -20,6 +22,76 @@ const SPRM_C_F_OBJ: u16 = 0x0856;
 const MAX_PIECES: usize = 65_536;
 const MAX_FIELDS: usize = 65_536;
 const MAX_PICF: usize = 128 * 1024 * 1024;
+
+/// Typed MS-DOC `ObjInfo` metadata for an embedded-object storage.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Info {
+    pub default_handler: bool,
+    pub linked: bool,
+    pub display_as_icon: bool,
+    pub ole1: bool,
+    pub manual_update: bool,
+    pub recompose_on_resize: bool,
+    pub activex: bool,
+    pub stream_control: bool,
+    pub view_object: bool,
+    pub enhanced_metafile: bool,
+    pub queried_enhanced_metafile: bool,
+    pub stored_as_enhanced_metafile: bool,
+    pub clipboard_format: u16,
+}
+
+impl Info {
+    pub fn read(data: &[u8]) -> Result<Self> {
+        if data.len() != 4 && data.len() != 6 {
+            return Err(corrupted("ObjInfo ODT must be 4 or 6 bytes"));
+        }
+        let first = word(data, 0)?;
+        if first & ((1 << 10) | (1 << 11)) != 0 {
+            return Err(corrupted("ObjInfo reserved bits are set"));
+        }
+        let activex = first & (1 << 12) != 0;
+        let stream_control = first & (1 << 13) != 0;
+        if stream_control && !activex {
+            return Err(corrupted("ObjInfo stream control requires ActiveX"));
+        }
+        let second = if data.len() == 6 { word(data, 4)? } else { 0 };
+        if second & 2 != 0 {
+            return Err(corrupted("ObjInfo reserved extension bit is set"));
+        }
+        Ok(Self {
+            default_handler: first & (1 << 1) != 0,
+            linked: first & (1 << 4) != 0,
+            display_as_icon: first & (1 << 6) != 0,
+            ole1: first & (1 << 7) != 0,
+            manual_update: first & (1 << 8) != 0,
+            recompose_on_resize: first & (1 << 9) != 0,
+            activex,
+            stream_control,
+            view_object: first & (1 << 15) != 0,
+            enhanced_metafile: second & 1 != 0,
+            queried_enhanced_metafile: second & 4 != 0,
+            stored_as_enhanced_metafile: second & 8 != 0,
+            clipboard_format: word(data, 2)?,
+        })
+    }
+
+    /// Reads this metadata from a discovered common-layer object.
+    pub fn of(object: &Object) -> Result<Option<Self>> {
+        object.host.as_deref().map(Self::read).transpose()
+    }
+}
+
+fn word(data: &[u8], offset: usize) -> Result<u16> {
+    let end = offset
+        .checked_add(2)
+        .ok_or_else(|| corrupted("ObjInfo offset overflow"))?;
+    let bytes: [u8; 2] = data
+        .get(offset..end)
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| corrupted("ObjInfo is truncated"))?;
+    Ok(u16::from_le_bytes(bytes))
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DocEmbeddedObjectWriteOptions {
@@ -70,7 +142,7 @@ struct FieldMarker {
 
 #[derive(Clone)]
 pub struct DocEmbeddedObjectEditor {
-    package: LegacyOfficeObjectEditor,
+    package: ObjectEditor,
     word_path: Vec<String>,
     table_path: Vec<String>,
     data_path: Vec<String>,
@@ -84,12 +156,12 @@ pub struct DocEmbeddedObjectEditor {
 }
 
 impl DocEmbeddedObjectEditor {
-    pub fn open(bytes: Vec<u8>, limits: LegacyOfficeObjectLimits) -> Result<Self> {
-        let package = LegacyOfficeObjectEditor::open(&bytes, LegacyOfficeObjectFormat::Doc, limits)
-            .map_err(DocError::from)?;
+    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        let package =
+            ObjectEditor::open(bytes, ObjectFormat::Doc, limits).map_err(DocError::from)?;
         let word_path = vec!["WordDocument".to_string()];
         let word = package
-            .package_stream(&word_path)
+            .stream(&word_path)
             .ok_or_else(|| corrupted("WordDocument stream is missing"))?
             .to_vec();
         if word.len() < FIB_FC_LCB + (CLX + 1) * 8 || u16_at(&word, 0)? != 0xA5EC {
@@ -108,11 +180,11 @@ impl DocEmbeddedObjectEditor {
             .to_string(),
         ];
         let table = package
-            .package_stream(&table_path)
+            .stream(&table_path)
             .ok_or_else(|| corrupted("selected Table stream is missing"))?
             .to_vec();
         let data_path = vec!["Data".to_string()];
-        let data = package.package_stream(&data_path).unwrap_or(&[]).to_vec();
+        let data = package.stream(&data_path).unwrap_or(&[]).to_vec();
         let main_ccp = u32_at(&word, FIB_CCP_TEXT)?;
         let pieces = parse_clx(&word, &table)?;
         if pieces.last().is_none_or(|piece| piece.end < main_ccp) {
@@ -152,7 +224,7 @@ impl DocEmbeddedObjectEditor {
         validate_options(&options, self)?;
         let mut candidate = self.clone();
         let storage_name = format!("_{}", options.storage_id);
-        if candidate.package.objects().find(&storage_name).is_some() {
+        if candidate.package.objects().get(&storage_name).is_some() {
             return Err(corrupted("ObjectPool storage identifier already exists"));
         }
 
@@ -222,30 +294,26 @@ impl DocEmbeddedObjectEditor {
         put_u32(&mut candidate.word, 64, cb_mac)?;
         candidate
             .package
-            .replace_package_stream(&candidate.word_path, candidate.word.clone())
+            .put_stream(&candidate.word_path, candidate.word.clone())
             .map_err(DocError::from)?;
         candidate
             .package
-            .replace_package_stream(&candidate.table_path, candidate.table.clone())
+            .put_stream(&candidate.table_path, candidate.table.clone())
             .map_err(DocError::from)?;
-        if candidate
-            .package
-            .package_stream(&candidate.data_path)
-            .is_some()
-        {
+        if candidate.package.stream(&candidate.data_path).is_some() {
             candidate
                 .package
-                .replace_package_stream(&candidate.data_path, candidate.data.clone())
+                .put_stream(&candidate.data_path, candidate.data.clone())
                 .map_err(DocError::from)?;
         } else {
             candidate
                 .package
-                .add_package_stream(candidate.data_path.clone(), candidate.data.clone())
+                .add_stream(candidate.data_path.clone(), candidate.data.clone())
                 .map_err(DocError::from)?;
         }
         candidate
             .package
-            .add_referenced_storage(&storage_name, options.compound_file)
+            .add_storage(&storage_name, options.compound_file)
             .map_err(DocError::from)?;
         candidate.changed = true;
         *self = candidate;
@@ -299,15 +367,15 @@ impl DocEmbeddedObjectEditor {
         put_u32(&mut candidate.word, FIB_CCP_TEXT, candidate.main_ccp)?;
         candidate
             .package
-            .replace_package_stream(&candidate.word_path, candidate.word.clone())
+            .put_stream(&candidate.word_path, candidate.word.clone())
             .map_err(DocError::from)?;
         candidate
             .package
-            .replace_package_stream(&candidate.table_path, candidate.table.clone())
+            .put_stream(&candidate.table_path, candidate.table.clone())
             .map_err(DocError::from)?;
         candidate
             .package
-            .remove_referenced_storage(&object.storage_name)
+            .remove_storage(&object.storage_name)
             .map_err(DocError::from)?;
         candidate.changed = true;
         *self = candidate;
@@ -322,11 +390,18 @@ impl DocEmbeddedObjectEditor {
                 "reorder must contain every managed object exactly once",
             ));
         }
-        let first_cp = objects.first().unwrap().start_cp;
-        if objects.last().unwrap().end_cp + 1 != self.main_ccp
+        let first_cp = objects
+            .first()
+            .ok_or_else(|| corrupted("managed object list is empty"))?
+            .start_cp;
+        let suffix_end = objects
+            .last()
+            .and_then(|object| object.end_cp.checked_add(1))
+            .ok_or_else(|| corrupted("managed object CP overflow"))?;
+        if suffix_end != self.main_ccp
             || objects
                 .windows(2)
-                .any(|pair| pair[0].end_cp + 1 != pair[1].start_cp)
+                .any(|pair| pair[0].end_cp.checked_add(1) != Some(pair[1].start_cp))
         {
             return Err(corrupted(
                 "managed object fields are not a contiguous main-story suffix",
@@ -387,11 +462,11 @@ impl DocEmbeddedObjectEditor {
         candidate.append_table_replacements()?;
         candidate
             .package
-            .replace_package_stream(&candidate.word_path, candidate.word.clone())
+            .put_stream(&candidate.word_path, candidate.word.clone())
             .map_err(DocError::from)?;
         candidate
             .package
-            .replace_package_stream(&candidate.table_path, candidate.table.clone())
+            .put_stream(&candidate.table_path, candidate.table.clone())
             .map_err(DocError::from)?;
         candidate.changed = true;
         *self = candidate;
@@ -574,7 +649,11 @@ fn serialize_clx(pieces: &[RawPiece]) -> Result<Vec<u8>> {
     for piece in pieces {
         output.extend_from_slice(&piece.start.to_le_bytes());
     }
-    output.extend_from_slice(&pieces.last().expect("nonempty").end.to_le_bytes());
+    let end = pieces
+        .last()
+        .ok_or_else(|| corrupted("piece table is empty"))?
+        .end;
+    output.extend_from_slice(&end.to_le_bytes());
     for piece in pieces {
         output.extend_from_slice(&piece.pcd_prefix);
         let raw_fc = if piece.unicode {
@@ -622,7 +701,9 @@ fn parse_clx(word: &[u8], table: &[u8]) -> Result<Vec<RawPiece>> {
         {
             return Err(corrupted("piece CPs overlap or contain gaps"));
         }
-        let pcd = &pcds[index * 8..index * 8 + 8];
+        let pcd = pcds
+            .get(index * 8..index * 8 + 8)
+            .ok_or_else(|| corrupted("piece descriptor is truncated"))?;
         let raw_fc = u32_at(pcd, 2)?;
         let unicode = raw_fc & 0x4000_0000 == 0;
         let fc = if unicode {
@@ -644,8 +725,8 @@ fn parse_clx(word: &[u8], table: &[u8]) -> Result<Vec<RawPiece>> {
             end,
             fc,
             unicode,
-            pcd_prefix: pcd[..2].try_into().unwrap(),
-            prm: pcd[6..8].try_into().unwrap(),
+            pcd_prefix: array_at(pcd, 0, "piece descriptor prefix")?,
+            prm: array_at(pcd, 6, "piece descriptor PRM")?,
         });
     }
     if pieces.iter().any(|piece| piece.prm != [0, 0]) {
@@ -680,9 +761,7 @@ fn parse_fields(word: &[u8], table: &[u8], main_ccp: u32) -> Result<Vec<FieldMar
         }
         output.push(FieldMarker {
             cp,
-            descriptor: data[cp_bytes + index * 2..cp_bytes + index * 2 + 2]
-                .try_into()
-                .unwrap(),
+            descriptor: array_at(data, cp_bytes + index * 2, "field descriptor")?,
         });
     }
     Ok(output)
@@ -899,21 +978,29 @@ fn slice<'a>(data: &'a [u8], offset: u32, length: u32, name: &str) -> Result<&'a
         .ok_or_else(|| corrupted(format!("{name} exceeds stream")))
 }
 fn u16_at(data: &[u8], offset: usize) -> Result<u16> {
-    data.get(offset..offset + 2)
-        .map(|v| u16::from_le_bytes(v.try_into().unwrap()))
-        .ok_or_else(|| corrupted("truncated u16"))
+    Ok(u16::from_le_bytes(array_at(data, offset, "u16")?))
 }
 fn u32_at(data: &[u8], offset: usize) -> Result<u32> {
-    data.get(offset..offset + 4)
-        .map(|v| u32::from_le_bytes(v.try_into().unwrap()))
-        .ok_or_else(|| corrupted("truncated u32"))
+    Ok(u32::from_le_bytes(array_at(data, offset, "u32")?))
 }
 fn put_u32(data: &mut [u8], offset: usize, value: u32) -> Result<()> {
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| corrupted("FIB field offset overflow"))?;
     let slot = data
-        .get_mut(offset..offset + 4)
+        .get_mut(offset..end)
         .ok_or_else(|| corrupted("truncated FIB field"))?;
     slot.copy_from_slice(&value.to_le_bytes());
     Ok(())
+}
+
+fn array_at<const N: usize>(data: &[u8], offset: usize, name: &str) -> Result<[u8; N]> {
+    let end = offset
+        .checked_add(N)
+        .ok_or_else(|| corrupted(format!("{name} offset overflow")))?;
+    data.get(offset..end)
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| corrupted(format!("truncated {name}")))
 }
 fn align2(value: usize) -> Result<usize> {
     value

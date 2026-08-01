@@ -1295,6 +1295,56 @@ master-body placeholder records. The regenerated final artifact was reopened
 in desktop PowerPoint after this correction and rendered without a repair
 dialog.
 
+The twenty-sixth implementation slice moves generic legacy embedded-object
+discovery and CFB rewrite ownership from `litchi-ole` into
+`litchi-ole-common::object`. The migration host no longer declares the old
+module or re-exports a compatibility facade. DOC embedded-object and
+tracked-revision editors plus XLS object and chart editors consume the common
+crate directly. Public names are contextual and short (`Format`, `Kind`,
+`Object`, `Objects`, `Editor`, and `Limits`); `Objects::get` performs semantic
+identifier lookup and `Objects::at` offers a checked raw ordinal without using
+Rust's panic-defined indexing operator.
+
+The common object model keeps format-owned metadata as opaque immutable bytes.
+DOC alone exposes the typed `doc::embedded_object::Info` interpretation of its
+`ObjInfo` flags, so the common crate does not own a concrete Word semantic
+type. Large compound objects, native payloads, previews, and captured streams
+use shared immutable slices. Atomic collection edits clone only the object
+being edited, and editor snapshots share large buffers instead of copying the
+whole container. `Editor::open` consumes the caller's `Vec<u8>`; consuming a
+clean, uniquely owned editor returns that input allocation and exact byte
+sequence instead of rerendering it. Changed output still uses a validated full
+CFB render. This is
+a structural reduction in avoidable copies, not a throughput or allocation
+claim; those require the ADR 0005 measurement gates.
+
+Checked parsing replaced the remaining assertion-based conversions in the
+touched common, DOC object/revision, XLS object, and production XLS chart
+paths. Offset arithmetic, array conversion, axis/series lookup, object records,
+and empty-range invariants now return format errors rather than calling
+`unwrap`, `expect`, or indexing an assumed element. Focused tests cover inert
+DOC/XLS discovery, atomic mutation, byte-exact clean finish, DOC embedded
+objects and revisions, XLS OLE objects and controls, and PPT/XLS chart
+integration. This dependency/API move does not change an authored Office
+artifact scenario, so it does not add a new desktop Office claim; the earlier
+Word, PowerPoint, and Excel Computer Use evidence remains the applicable native
+baseline.
+
+Parallel read-only closure audits establish the next compilation-safe order.
+The five shared OVBA modules move atomically from `litchi-cfb` into
+`litchi-vba`, after which OLE and OOXML consumers migrate directly and both old
+re-export facades are deleted. The minimum acyclic signature cut is
+`litchi-sign::cfb` over CFB plus the current OPC detached-signature engine; the
+final state must then invert the neutral XMLDSig engine out of OPC before OPC
+can depend on signing, otherwise the two crates would cycle. OfficeArt BLIP and
+FBSE grammar moves from image conversion into `litchi-odraw`, leaving codecs
+and rendering in `litchi-imgconv`. The PPT/XLS chart peer edge is removed by
+extracting the `[MS-OGRAPH]` model and compound chart codec into
+`litchi-ograph`; XLS retains workbook mutation and PPT retains frame/object
+integration. With signature, VBA, BLIP/image, and OGraph prerequisites below
+the hosts, the internally dense DOC, PPT, and XLS trees can move atomically into
+their concrete crates without compatibility monoliths.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection
