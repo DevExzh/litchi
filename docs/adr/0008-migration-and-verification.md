@@ -862,13 +862,67 @@ open/edit/resave/reverse-read path on that build. It does not certify every
 multi-anchor/reorder composition, optional metadata layout, other Office
 applications or builds, or performance.
 
+The eighteenth slice expands column CRUD from visibility into a typed,
+orthogonal property surface. The primary selector is now an A1 column label,
+so `sheet.column("B")?` and `edit.sheet("Sheet1")?.column("B")?` are the normal
+lookup and mutation paths. Checked `ColumnIndex` values and raw zero-based
+indexes remain available without exposing one-based SpreadsheetML `min`/`max`
+fields. `ColumnIndex::from_a1` accepts case-insensitive labels with an optional
+absolute marker and rejects malformed or out-of-grid values; `a1` produces the
+compact canonical label. Every selector remains fallible rather than using the
+panicking `Index` trait.
+
+`column::{Width, Outline, Props, State}` keeps the public names short and the
+wire invariants in types. Widths must be finite and inside `0..=255`; outlines
+must be inside `0..=7`. `Props` separates width, shared style, outline, hidden,
+best-fit, custom-width, phonetic, and collapsed state without publishing a
+physical style ID. `State` preserves the difference between an implicit column
+and a stored property record. Transactions expose `width`/`reset_width`,
+`hide`/`show`, `best_fit`/`fixed`, `outline`, `collapse`/`expand`, and
+`show_phonetic`/`hide_phonetic`. Inputs are checked before an action enters the
+plan. Independent facet writes to the same column can join, while two writes to
+one facet report a deterministic conflict. The accepted transaction moves the
+incoming action map; no public `Arc<RwLock<...>>` or last-writer-wins rule is
+introduced.
+
+Worksheet surgery finds the last effective physical owner of an edited column,
+splits only the necessary compact ranges, and changes only the selected
+attributes. It preserves unrelated known and unknown attributes, prefixes,
+children, and untouched bytes; default-only operations on implicit columns are
+no-ops, materializing operations create sparse records, and adjacent identical
+actions coalesce. Setting a width also establishes `customWidth`; resetting it
+removes both attributes. Complete before/after column states make patches
+reversible. A column carrying an explicit shared style also carries that
+resource's lineage and byte guard, so replay against a changed style table is
+rejected instead of reinterpreting an opaque key. Tests cover A1 and numeric
+selectors, checked bounds, every property facet, lossless splits, reset and
+inverse behavior, independent-facet joins, same-facet conflicts, shared-style
+replay/rebinding, and malformed input. These are functional and type checks,
+not allocation, latency, CPU, cache, or contention measurements.
+
+Computer Use exercised the exact public `columns` artifact in Microsoft Excel
+for Mac 16.110.2 (build 26062818), Office LTSC Standard for Mac 2024. Excel
+opened it without a repair or compatibility prompt, displayed B as a wide
+column, hid C, and interpreted D's level-one collapsed outline by omitting it
+and showing the outline expansion control before E. Excel's Column Width dialog
+reported `23.17` for the stored OOXML width `24`; this is the application's
+display-unit normalization, and the saved package retained `24`. Excel accepted
+`Excel column layout resave marker` at A2 and saved without warning. The resaved
+archive passed ZIP integrity validation. The public reader recovered the
+marker, B with width 24, C hidden with Excel-normalized width zero, D hidden
+with width zero/outline one/collapsed, and Excel's adjacent E collapse marker
+record. This certifies one local column-width/visibility/outline/open/edit/
+resave/reverse-read path on that build. It does not certify every producer
+normalization, column shared-style authoring, structural column shifts, other
+Office applications or builds, or performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection
-unlocking, row/column properties beyond visibility, row and column
-insertion/deletion, shifting references, merge/group-formula edits,
-dynamic-reference resolution, validation evaluation, shared-style definition
-editing or forking, named-style and row/column/theme resolution, rich text,
+unlocking, row properties beyond visibility, column shared-style retargeting,
+row and column insertion/deletion, shifting references, merge/group-formula
+edits, dynamic-reference resolution, validation evaluation, shared-style
+definition editing or forking, named-style and row/column/theme resolution, rich text,
 dynamic arrays, patch serialization, full structured diagnostics,
 eviction/resource budgets, range/structural effect joins, three-way merge,
 raw-copy preservation of clean compressed entries, cancellation-aware save

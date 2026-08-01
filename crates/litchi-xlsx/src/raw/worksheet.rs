@@ -430,10 +430,7 @@ impl Parser {
             "worksheet column outline level",
         )?
         .unwrap_or(0);
-        let outline_level = u8::try_from(outline_level)
-            .ok()
-            .filter(|level| *level <= 7)
-            .ok_or_else(|| invalid("worksheet column outline level exceeds 7"))?;
+        let outline = column::OutlineAt::from(outline_level).resolve()?;
         let mut flags = Flags::empty();
         for (attribute, flag, field) in [
             (b"hidden".as_slice(), Flags::HIDDEN, "hidden"),
@@ -461,7 +458,7 @@ impl Parser {
                 column::Properties {
                     width,
                     style,
-                    outline_level,
+                    outline,
                     flags,
                 },
             );
@@ -1199,7 +1196,7 @@ mod tests {
         assert!(b.best_fit());
         assert!(b.custom_width());
         assert!(b.phonetic());
-        assert_eq!(b.outline_level(), 2);
+        assert_eq!(b.outline().get(), 2);
         assert!(b.collapsed());
         assert_eq!(
             store.column_entry(b.index()).unwrap().properties.style,
@@ -1213,7 +1210,7 @@ mod tests {
         assert!(!c.best_fit());
         assert!(!c.custom_width());
         assert!(!c.phonetic());
-        assert_eq!(c.outline_level(), 0);
+        assert_eq!(c.outline(), column::Outline::NONE);
         assert!(!c.collapsed());
         assert_eq!(
             store.column_entry(c.index()).unwrap().properties.style,

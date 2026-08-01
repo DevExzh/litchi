@@ -3,8 +3,8 @@
 mod edit;
 
 pub use edit::{
-    ActiveTab, Change, ColumnEdit, ColumnState, Commit, Conflict, ConflictSet, Edit, JoinError,
-    JoinFailure, NewSheet, Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
+    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure,
+    NewSheet, Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
 };
 
 use std::collections::HashMap;
@@ -568,8 +568,9 @@ impl Sheet {
     }
 
     /// Borrow one checked logical column, including an implicit default
-    /// column. Raw inputs are zero-based and validated before lookup.
-    pub fn column(&self, at: impl Into<ColumnAt>) -> Result<Column<'_>> {
+    /// column. A1 labels such as `"B"` are the primary entry; raw inputs are
+    /// zero-based and validated before lookup.
+    pub fn column<'a>(&self, at: impl Into<ColumnAt<'a>>) -> Result<Column<'_>> {
         let index = at.into().resolve()?;
         Ok(self.store()?.column(index))
     }
@@ -585,7 +586,7 @@ impl Sheet {
     ///
     /// `None` means the logical column is implicit. [`LocalStyle::Default`]
     /// means an explicit record applies without a shared-style reference.
-    pub fn column_style(&self, at: impl Into<ColumnAt>) -> Result<Option<LocalStyle>> {
+    pub fn column_style<'a>(&self, at: impl Into<ColumnAt<'a>>) -> Result<Option<LocalStyle>> {
         let index = at.into().resolve()?;
         let Some(entry) = self.store()?.column_entry(index) else {
             return Ok(None);

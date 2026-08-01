@@ -35,8 +35,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             for row in sheet.rows()?.filter(|row| row.hidden()) {
                 println!("  hidden row: {}", row.index().get());
             }
-            for column in sheet.columns()?.filter(|column| column.hidden()) {
-                println!("  hidden column: {}", column.index().get());
+            for column in sheet.columns()? {
+                println!(
+                    "  column {} (index {}): hidden={}, width={:?}, outline={}, collapsed={}, best_fit={}, phonetic={}",
+                    column.index().a1(),
+                    column.index().get(),
+                    column.hidden(),
+                    column.width().map(litchi_xlsx::Width::get),
+                    column.outline().get(),
+                    column.collapsed(),
+                    column.best_fit(),
+                    column.phonetic(),
+                );
             }
         }
     }

@@ -17,7 +17,7 @@ use quick_xml::reader::NsReader;
 
 use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32};
 use crate::cell::{Content, Value};
-use crate::column::Assignments;
+use crate::column::{Assignments, Outline, Width};
 use crate::error::{ColumnEditBlock, EditBlock, Error, Result, RowEditBlock, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::strings::encode_spreadsheet_text;
@@ -177,16 +177,86 @@ pub(crate) enum RowAction {
     Show,
 }
 
-/// One explicit column-visibility effect.
+/// One checked width mutation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ColumnAction {
-    Hide,
-    Show,
+pub(crate) enum WidthEffect {
+    Set(Width),
+    Reset,
+}
+
+/// Orthogonal effects on one effective column-property record.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct ColumnAction {
+    pub(crate) hidden: Option<bool>,
+    pub(crate) width: Option<WidthEffect>,
+    pub(crate) best_fit: Option<bool>,
+    pub(crate) outline: Option<Outline>,
+    pub(crate) collapsed: Option<bool>,
+    pub(crate) phonetic: Option<bool>,
 }
 
 impl ColumnAction {
-    pub(crate) const fn hidden(self) -> bool {
-        matches!(self, Self::Hide)
+    #[cfg(test)]
+    pub(crate) const fn hide() -> Self {
+        Self {
+            hidden: Some(true),
+            width: None,
+            best_fit: None,
+            outline: None,
+            collapsed: None,
+            phonetic: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn show() -> Self {
+        Self {
+            hidden: Some(false),
+            width: None,
+            best_fit: None,
+            outline: None,
+            collapsed: None,
+            phonetic: None,
+        }
+    }
+
+    pub(crate) const fn materializes(self) -> bool {
+        matches!(self.hidden, Some(true))
+            || matches!(self.width, Some(WidthEffect::Set(_)))
+            || matches!(self.best_fit, Some(true))
+            || matches!(self.outline, Some(level) if level.get() != 0)
+            || matches!(self.collapsed, Some(true))
+            || matches!(self.phonetic, Some(true))
+    }
+
+    pub(crate) const fn overlaps(self, other: Self) -> bool {
+        (self.hidden.is_some() && other.hidden.is_some())
+            || (self.width.is_some() && other.width.is_some())
+            || (self.best_fit.is_some() && other.best_fit.is_some())
+            || (self.outline.is_some() && other.outline.is_some())
+            || (self.collapsed.is_some() && other.collapsed.is_some())
+            || (self.phonetic.is_some() && other.phonetic.is_some())
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        if self.hidden.is_none() {
+            self.hidden = other.hidden;
+        }
+        if self.width.is_none() {
+            self.width = other.width;
+        }
+        if self.best_fit.is_none() {
+            self.best_fit = other.best_fit;
+        }
+        if self.outline.is_none() {
+            self.outline = other.outline;
+        }
+        if self.collapsed.is_none() {
+            self.collapsed = other.collapsed;
+        }
+        if self.phonetic.is_none() {
+            self.phonetic = other.phonetic;
+        }
     }
 }
 
@@ -1414,7 +1484,7 @@ fn write_columns(
     for (column, action) in actions {
         if let Some(owner) = owners.get(column) {
             by_owner.entry(owner).or_default().insert(column, action);
-        } else if action.hidden() {
+        } else if action.materializes() {
             implicit.insert(column, action);
         }
     }
@@ -1503,23 +1573,19 @@ fn write_column_piece(
     stored: &ColumnSlot,
     piece: ColumnPiece,
 ) {
-    let (first, last, visibility) = match piece {
+    let (first, last, action) = match piece {
         ColumnPiece::Keep(first, last) => (first, last, None),
         ColumnPiece::Edit(first, last, action) => (first, last, Some(action)),
     };
+    let mut removed = vec!["min", "max"];
     let mut appended = vec![
         ("min", (first.get() + 1).to_string()),
         ("max", (last.get() + 1).to_string()),
     ];
-    if visibility.is_some_and(ColumnAction::hidden) {
-        appended.push(("hidden", "1".to_owned()));
+    if let Some(action) = action {
+        column_effect_attributes(action, &mut removed, &mut appended);
     }
-    let removed = if visibility.is_some() {
-        &["min", "max", "hidden"][..]
-    } else {
-        &["min", "max"][..]
-    };
-    write_tag(output, &stored.tag, stored.empty, removed, &appended);
+    write_tag(output, &stored.tag, stored.empty, &removed, &appended);
     if !stored.empty {
         output.extend_from_slice(&source[stored.tag_end..stored.close_start]);
         write_close(output, &stored.tag.name);
@@ -1531,7 +1597,7 @@ fn write_new_columns(
     sheet_data_name: &str,
     actions: BTreeMap<Column, ColumnAction>,
 ) {
-    if !actions.values().any(|action| action.hidden()) {
+    if !actions.values().any(|action| action.materializes()) {
         return;
     }
     let name = sibling_name(sheet_data_name, "cols");
@@ -1554,39 +1620,85 @@ fn write_column_actions(
         name: name.into_boxed_str(),
         attributes: Box::new([]),
     };
-    let mut pending: Option<(Column, Column)> = None;
+    let mut pending: Option<(Column, Column, ColumnAction)> = None;
     for (column, action) in actions {
-        if !action.hidden() {
+        if !action.materializes() {
             continue;
         }
         match pending {
-            Some((first, last)) if last.next() == Some(column) => {
-                pending = Some((first, column));
+            Some((first, last, previous)) if previous == action && last.next() == Some(column) => {
+                pending = Some((first, column, action));
             },
-            Some((first, last)) => {
-                write_hidden_column(output, &tag, first, last);
-                pending = Some((column, column));
+            Some((first, last, previous)) => {
+                write_new_column(output, &tag, first, last, previous);
+                pending = Some((column, column, action));
             },
-            None => pending = Some((column, column)),
+            None => pending = Some((column, column, action)),
         }
     }
-    if let Some((first, last)) = pending {
-        write_hidden_column(output, &tag, first, last);
+    if let Some((first, last, action)) = pending {
+        write_new_column(output, &tag, first, last, action);
     }
 }
 
-fn write_hidden_column(output: &mut Vec<u8>, tag: &Tag, first: Column, last: Column) {
-    write_tag(
-        output,
-        tag,
-        true,
-        &[],
-        &[
-            ("min", (first.get() + 1).to_string()),
-            ("max", (last.get() + 1).to_string()),
-            ("hidden", "1".to_owned()),
-        ],
-    );
+fn write_new_column(
+    output: &mut Vec<u8>,
+    tag: &Tag,
+    first: Column,
+    last: Column,
+    action: ColumnAction,
+) {
+    let mut removed = Vec::new();
+    let mut appended = vec![
+        ("min", (first.get() + 1).to_string()),
+        ("max", (last.get() + 1).to_string()),
+    ];
+    column_effect_attributes(action, &mut removed, &mut appended);
+    write_tag(output, tag, true, &removed, &appended);
+}
+
+fn column_effect_attributes(
+    action: ColumnAction,
+    removed: &mut Vec<&'static str>,
+    appended: &mut Vec<(&'static str, String)>,
+) {
+    if let Some(hidden) = action.hidden {
+        removed.push("hidden");
+        if hidden {
+            appended.push(("hidden", "1".to_owned()));
+        }
+    }
+    if let Some(width) = action.width {
+        removed.extend(["width", "customWidth"]);
+        if let WidthEffect::Set(width) = width {
+            appended.push(("width", width.get().to_string()));
+            appended.push(("customWidth", "1".to_owned()));
+        }
+    }
+    if let Some(best_fit) = action.best_fit {
+        removed.push("bestFit");
+        if best_fit {
+            appended.push(("bestFit", "1".to_owned()));
+        }
+    }
+    if let Some(outline) = action.outline {
+        removed.push("outlineLevel");
+        if outline != Outline::NONE {
+            appended.push(("outlineLevel", outline.get().to_string()));
+        }
+    }
+    if let Some(collapsed) = action.collapsed {
+        removed.push("collapsed");
+        if collapsed {
+            appended.push(("collapsed", "1".to_owned()));
+        }
+    }
+    if let Some(phonetic) = action.phonetic {
+        removed.push("phonetic");
+        if phonetic {
+            appended.push(("phonetic", "1".to_owned()));
+        }
+    }
 }
 
 fn write_sheet_data(
@@ -2245,9 +2357,9 @@ mod tests {
                 cells: BTreeMap::new(),
                 rows: BTreeMap::new(),
                 columns: BTreeMap::from([
-                    (Column::new(1).expect("B"), ColumnAction::Show),
-                    (Column::new(2).expect("C"), ColumnAction::Hide),
-                    (Column::new(4).expect("E"), ColumnAction::Hide),
+                    (Column::new(1).expect("B"), ColumnAction::show()),
+                    (Column::new(2).expect("C"), ColumnAction::hide()),
+                    (Column::new(4).expect("E"), ColumnAction::hide()),
                 ]),
             },
         )
@@ -2271,6 +2383,94 @@ mod tests {
     }
 
     #[test]
+    fn column_layout_facets_split_compactly_and_preserve_unedited_attributes() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:cols><x:col min="2" max="4" width="20" style="1" hidden="1" bestFit="1" customWidth="1" phonetic="1" outlineLevel="2" collapsed="1" z:keep="yes"/></x:cols><x:sheetData z:untouched="yes"/></x:worksheet>"#
+        );
+        let edited = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::new(),
+                columns: BTreeMap::from([
+                    (
+                        Column::new(1).expect("B"),
+                        ColumnAction {
+                            width: Some(WidthEffect::Reset),
+                            best_fit: Some(false),
+                            outline: Some(Outline::NONE),
+                            collapsed: Some(false),
+                            phonetic: Some(false),
+                            ..ColumnAction::default()
+                        },
+                    ),
+                    (
+                        Column::new(2).expect("C"),
+                        ColumnAction {
+                            hidden: Some(false),
+                            width: Some(WidthEffect::Set(Width::new(12.5).expect("width"))),
+                            outline: Some(Outline::new(3).expect("outline")),
+                            ..ColumnAction::default()
+                        },
+                    ),
+                    (
+                        Column::new(4).expect("E"),
+                        ColumnAction {
+                            width: Some(WidthEffect::Set(Width::new(15.0).expect("width"))),
+                            best_fit: Some(true),
+                            outline: Some(Outline::new(1).expect("outline")),
+                            collapsed: Some(true),
+                            phonetic: Some(true),
+                            ..ColumnAction::default()
+                        },
+                    ),
+                ]),
+            },
+        )
+        .expect("column layout rewrite");
+        let text = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(text.contains(r#"style="1" hidden="1" z:keep="yes" min="2" max="2""#));
+        assert!(text.contains(concat!(
+            r#"style="1" bestFit="1" phonetic="1" collapsed="1" z:keep="yes" "#,
+            r#"min="3" max="3" width="12.5" customWidth="1" outlineLevel="3""#
+        )));
+        assert!(text.contains(concat!(
+            r#"<x:col min="5" max="5" width="15" customWidth="1" bestFit="1" "#,
+            r#"outlineLevel="1" collapsed="1" phonetic="1"/>"#
+        )));
+        assert!(text.contains(r#"<x:sheetData z:untouched="yes"/>"#));
+
+        let store = worksheet::parse(&edited, || Ok(None)).expect("reparse layout");
+        let b = store.column(Column::new(1).expect("B"));
+        assert_eq!(b.width(), None);
+        assert!(b.hidden());
+        assert!(!b.best_fit());
+        assert_eq!(b.outline(), Outline::NONE);
+        assert!(!b.collapsed());
+        assert!(!b.phonetic());
+        assert_eq!(
+            store
+                .column_entry(b.index())
+                .map(|entry| entry.properties.style),
+            Some(Some(1))
+        );
+        let c = store.column(Column::new(2).expect("C"));
+        assert_eq!(c.width().map(Width::get), Some(12.5));
+        assert!(!c.hidden());
+        assert!(c.best_fit());
+        assert_eq!(c.outline().get(), 3);
+        assert!(c.collapsed());
+        assert!(c.phonetic());
+        let e = store.column(Column::new(4).expect("E"));
+        assert_eq!(e.width().map(Width::get), Some(15.0));
+        assert!(e.best_fit());
+        assert_eq!(e.outline().get(), 1);
+        assert!(e.collapsed());
+        assert!(e.phonetic());
+    }
+
+    #[test]
     fn column_visibility_inserts_sparse_cols_and_blocks_unsafe_splits() {
         let plain = format!(r#"<x:worksheet xmlns:x="{S}"><x:sheetData/></x:worksheet>"#);
         let inserted = rewrite(
@@ -2280,8 +2480,8 @@ mod tests {
                 cells: BTreeMap::new(),
                 rows: BTreeMap::new(),
                 columns: BTreeMap::from([
-                    (Column::new(1).expect("B"), ColumnAction::Hide),
-                    (Column::new(2).expect("C"), ColumnAction::Hide),
+                    (Column::new(1).expect("B"), ColumnAction::hide()),
+                    (Column::new(2).expect("C"), ColumnAction::hide()),
                 ]),
             },
         )
@@ -2302,7 +2502,7 @@ mod tests {
                 Plan {
                     cells: BTreeMap::new(),
                     rows: BTreeMap::new(),
-                    columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::Hide,)]),
+                    columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::hide(),)]),
                 },
             ),
             Err(Error::ColumnEditBlocked {
@@ -2321,7 +2521,7 @@ mod tests {
                 Plan {
                     cells: BTreeMap::new(),
                     rows: BTreeMap::new(),
-                    columns: BTreeMap::from([(Column::new(1).expect("B"), ColumnAction::Hide,)]),
+                    columns: BTreeMap::from([(Column::new(1).expect("B"), ColumnAction::hide(),)]),
                 },
             ),
             Err(Error::ColumnEditBlocked {
@@ -2340,7 +2540,7 @@ mod tests {
                 Plan {
                     cells: BTreeMap::new(),
                     rows: BTreeMap::new(),
-                    columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::Hide,)]),
+                    columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::hide(),)]),
                 },
             ),
             Err(Error::ColumnEditBlocked {

@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Row as RowIndex};
 
+use crate::column::{OutlineError, WidthError};
 use crate::sheet::NameError;
 use crate::workbook::JoinError;
 
@@ -29,6 +30,12 @@ pub enum Error {
     /// A spreadsheet range is empty, inverted, or outside its typed domain.
     #[error(transparent)]
     Range(#[from] litchi_sheet::RangeError),
+    /// A column width is non-finite or outside Office's checked domain.
+    #[error(transparent)]
+    ColumnWidth(#[from] WidthError),
+    /// A column outline level is outside Office's checked domain.
+    #[error(transparent)]
+    ColumnOutline(#[from] OutlineError),
     /// A worksheet name is outside Office's checked domain.
     #[error(transparent)]
     SheetName(#[from] NameError),

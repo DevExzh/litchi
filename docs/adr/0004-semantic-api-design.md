@@ -44,6 +44,26 @@ document format's identity semantics for equality and hashing; spreadsheet
 sheet names therefore use canonical, locale-independent Unicode caseless
 identity rather than process locale or ASCII-only comparison.
 
+Human-readable semantic selectors are the primary facade. Spreadsheet columns,
+for example, accept A1 labels such as `"B"`; reusable checked `Column` values and
+raw zero-based indexes remain concise secondary forms for import and numeric
+algorithms. Invalid syntax and out-of-grid coordinates are errors, while a
+missing catalog object is `None`; selectors return `Result` or
+`Result<Option<_>>`, never indexing panics. The same policy applies to cells,
+ranges, rows, sheets, and other developer-facing collections; native
+relationship IDs, part names, and physical style indexes stay below the facade.
+
+Properties with constrained wire domains use short types in focused modules.
+The XLSX column surface therefore uses `column::{Width, Outline, Props, State}`:
+`Width` admits only finite Office widths, `Outline` admits only supported
+levels, `Props` exposes independent read-only facets, and `State` distinguishes
+an implicit column from a stored property record. Shared format identity is a
+lineage-checked resource handle, not a public numeric ID. Mutation uses paired
+short verbs (`hide`/`show`, `best_fit`/`fixed`, `collapse`/`expand`) plus checked
+set/reset operations. Independently prepared edits may join when they touch
+different facets of one column; two writes to the same facet conflict rather
+than acquiring a public lock or choosing a last writer.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

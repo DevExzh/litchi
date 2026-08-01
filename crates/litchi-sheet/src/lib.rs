@@ -149,6 +149,50 @@ impl Column {
         self.0
     }
 
+    /// Parse one absolute or relative A1 column label.
+    pub fn from_a1(reference: &str) -> Result<Self, CoordinateError> {
+        let bytes = reference.as_bytes();
+        let start = usize::from(bytes.first() == Some(&b'$'));
+        if start == bytes.len() || !bytes[start..].iter().all(u8::is_ascii_alphabetic) {
+            return Err(CoordinateError::ColumnA1 {
+                reference: reference.into(),
+            });
+        }
+        let mut column = 0u32;
+        for byte in &bytes[start..] {
+            column = column
+                .checked_mul(26)
+                .and_then(|value| {
+                    value.checked_add(u32::from(byte.to_ascii_uppercase() - b'A' + 1))
+                })
+                .ok_or_else(|| CoordinateError::ColumnA1 {
+                    reference: reference.into(),
+                })?;
+        }
+        Self::new(
+            column
+                .checked_sub(1)
+                .ok_or_else(|| CoordinateError::ColumnA1 {
+                    reference: reference.into(),
+                })?,
+        )
+        .map_err(|_| CoordinateError::ColumnA1 {
+            reference: reference.into(),
+        })
+    }
+
+    /// Render this coordinate as an A1 column label.
+    pub fn a1(self) -> String {
+        let mut column = self.get() + 1;
+        let mut reversed = String::with_capacity(3);
+        while column != 0 {
+            column -= 1;
+            reversed.push(char::from(b'A' + (column % 26) as u8));
+            column /= 26;
+        }
+        reversed.chars().rev().collect()
+    }
+
     /// Next checked column, or `None` at the grid boundary.
     #[inline]
     pub const fn next(self) -> Option<Self> {
@@ -192,37 +236,59 @@ impl fmt::Display for Column {
 
 /// Convenient column input accepted by format facades.
 ///
-/// Raw indices are zero-based and checked when resolved. A reusable [`Column`]
-/// avoids repeated validation in hot paths.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// A1 labels such as `"B"` are the primary developer-facing form. Raw indices
+/// are zero-based and checked when resolved, while a reusable [`Column`] avoids
+/// repeated validation in hot paths.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ColumnAt {
+pub enum ColumnAt<'a> {
     /// A coordinate that has already been checked.
     Checked(Column),
     /// A raw zero-based index.
     Index(u32),
+    /// A borrowed or owned A1 column label.
+    A1(Cow<'a, str>),
 }
 
-impl ColumnAt {
+impl ColumnAt<'_> {
     /// Resolve this input into a checked column coordinate.
     #[inline]
-    pub const fn resolve(self) -> Result<Column, CoordinateError> {
+    pub fn resolve(self) -> Result<Column, CoordinateError> {
         match self {
             Self::Checked(column) => Ok(column),
             Self::Index(index) => Column::new(index),
+            Self::A1(reference) => Column::from_a1(&reference),
         }
     }
 }
 
-impl From<Column> for ColumnAt {
+impl<'a> From<Column> for ColumnAt<'a> {
     fn from(value: Column) -> Self {
         Self::Checked(value)
     }
 }
 
-impl From<u32> for ColumnAt {
+impl<'a> From<u32> for ColumnAt<'a> {
     fn from(value: u32) -> Self {
         Self::Index(value)
+    }
+}
+
+impl<'a> From<&'a str> for ColumnAt<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::A1(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<&'a String> for ColumnAt<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::A1(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<String> for ColumnAt<'a> {
+    fn from(value: String) -> Self {
+        Self::A1(Cow::Owned(value))
     }
 }
 
@@ -665,6 +731,9 @@ pub enum CoordinateError {
     /// The column lies outside `0..COLUMNS`.
     #[error("column {value} is outside the zero-based spreadsheet grid 0..{COLUMNS}")]
     Column { value: u32 },
+    /// The string is not one bounded A1 column label.
+    #[error("invalid or out-of-grid A1 column label '{reference}'")]
+    ColumnA1 { reference: String },
     /// The string is not one bounded A1 cell reference.
     #[error("invalid or out-of-grid A1 cell reference '{reference}'")]
     A1 { reference: String },
@@ -712,6 +781,8 @@ mod tests {
         assert_eq!(RowAt::from(Row::LAST).resolve(), Ok(Row::LAST));
         assert_eq!(ColumnAt::from(0).resolve(), Ok(Column::FIRST));
         assert_eq!(ColumnAt::from(Column::LAST).resolve(), Ok(Column::LAST));
+        assert_eq!(ColumnAt::from("B").resolve(), Column::new(1));
+        assert_eq!(ColumnAt::from("$xfd").resolve(), Ok(Column::LAST));
         assert!(matches!(
             RowAt::from(ROWS).resolve(),
             Err(CoordinateError::Row { .. })
@@ -742,6 +813,12 @@ mod tests {
         assert_eq!(Cell::from_a1("aa42").map(Cell::a1).as_deref(), Ok("AA42"));
         for invalid in ["", "A", "1", "A0", "XFE1", "A1048577", "A1:B2"] {
             assert!(Cell::from_a1(invalid).is_err(), "accepted {invalid}");
+        }
+
+        assert_eq!(Column::from_a1("aa").map(Column::a1).as_deref(), Ok("AA"));
+        assert_eq!(Column::from_a1("$XFD"), Ok(Column::LAST));
+        for invalid in ["", "$", "1", "A1", "XFE", "A:B"] {
+            assert!(Column::from_a1(invalid).is_err(), "accepted {invalid}");
         }
     }
 

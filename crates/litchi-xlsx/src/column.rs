@@ -2,8 +2,10 @@
 
 use bitflags::bitflags;
 use litchi_sheet::{COLUMNS, Column as Index};
+use thiserror::Error;
 
 use crate::error::{Result, invalid};
+use crate::style::StyleState;
 
 /// Checked SpreadsheetML column width in character units.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -11,19 +13,162 @@ pub struct Width(u64);
 
 impl Width {
     /// Validate the Office column-width range `0..=255`.
-    pub fn new(value: f64) -> Result<Self> {
-        if !value.is_finite() || !(0.0..=255.0).contains(&value) {
-            return Err(invalid(format!(
-                "column width {value} is outside the Office range 0..=255"
-            )));
+    pub const fn new(value: f64) -> std::result::Result<Self, WidthError> {
+        if !(value >= 0.0 && value <= 255.0) {
+            return Err(WidthError { value });
         }
         let normalized = if value == 0.0 { 0.0 } else { value };
         Ok(Self(normalized.to_bits()))
     }
 
     /// Return the width in SpreadsheetML character units.
-    pub fn get(self) -> f64 {
+    pub const fn get(self) -> f64 {
         f64::from_bits(self.0)
+    }
+}
+
+/// Invalid SpreadsheetML column width.
+#[derive(Debug, Clone, Copy, PartialEq, Error)]
+#[error("column width {value} is outside the finite Office range 0..=255")]
+pub struct WidthError {
+    value: f64,
+}
+
+impl WidthError {
+    /// Rejected numeric value.
+    pub const fn value(self) -> f64 {
+        self.value
+    }
+}
+
+/// Convenient checked-or-raw input for [`Width`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub enum WidthAt {
+    /// A width that has already been checked.
+    Checked(Width),
+    /// A raw width validated when resolved.
+    Value(f64),
+}
+
+impl WidthAt {
+    /// Resolve this input into a checked width.
+    pub const fn resolve(self) -> std::result::Result<Width, WidthError> {
+        match self {
+            Self::Checked(width) => Ok(width),
+            Self::Value(value) => Width::new(value),
+        }
+    }
+}
+
+impl From<Width> for WidthAt {
+    fn from(value: Width) -> Self {
+        Self::Checked(value)
+    }
+}
+
+impl From<f64> for WidthAt {
+    fn from(value: f64) -> Self {
+        Self::Value(value)
+    }
+}
+
+macro_rules! width_inputs {
+    ($($input:ty),+ $(,)?) => {
+        $(
+            impl From<$input> for WidthAt {
+                fn from(value: $input) -> Self {
+                    Self::Value(f64::from(value))
+                }
+            }
+        )+
+    };
+}
+
+width_inputs!(f32, u8, u16, u32, i8, i16, i32);
+
+/// Checked column outline level in Office's `0..=7` domain.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Outline(u8);
+
+impl Outline {
+    /// No outline grouping.
+    pub const NONE: Self = Self(0);
+
+    /// Validate one outline level.
+    pub const fn new(value: u8) -> std::result::Result<Self, OutlineError> {
+        if value <= 7 {
+            Ok(Self(value))
+        } else {
+            Err(OutlineError {
+                value: value as i64,
+            })
+        }
+    }
+
+    /// Return the checked numeric level.
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
+/// Invalid Office column outline level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error("column outline level {value} is outside the Office range 0..=7")]
+pub struct OutlineError {
+    value: i64,
+}
+
+impl OutlineError {
+    /// Rejected numeric value.
+    pub const fn value(self) -> i64 {
+        self.value
+    }
+}
+
+/// Convenient checked-or-raw input for [`Outline`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum OutlineAt {
+    /// A level that has already been checked.
+    Checked(Outline),
+    /// A raw level validated when resolved.
+    Level(i64),
+}
+
+impl OutlineAt {
+    /// Resolve this input into a checked outline level.
+    pub const fn resolve(self) -> std::result::Result<Outline, OutlineError> {
+        match self {
+            Self::Checked(level) => Ok(level),
+            Self::Level(value) if value < 0 || value > 7 => Err(OutlineError { value }),
+            Self::Level(value) => Outline::new(value as u8),
+        }
+    }
+}
+
+impl From<Outline> for OutlineAt {
+    fn from(value: Outline) -> Self {
+        Self::Checked(value)
+    }
+}
+
+impl From<u8> for OutlineAt {
+    fn from(value: u8) -> Self {
+        Self::Level(i64::from(value))
+    }
+}
+
+impl From<u32> for OutlineAt {
+    fn from(value: u32) -> Self {
+        Self::Level(i64::from(value))
+    }
+}
+
+impl From<i32> for OutlineAt {
+    fn from(value: i32) -> Self {
+        Self::Level(i64::from(value))
     }
 }
 
@@ -43,8 +188,91 @@ bitflags! {
 pub(crate) struct Properties {
     pub(crate) width: Option<Width>,
     pub(crate) style: Option<u32>,
-    pub(crate) outline_level: u8,
+    pub(crate) outline: Outline,
     pub(crate) flags: Flags,
+}
+
+/// Complete modeled state of one effective column-property record.
+///
+/// Physical shared-style indexes remain hidden behind [`StyleState`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Props {
+    pub(crate) width: Option<Width>,
+    pub(crate) style: StyleState,
+    pub(crate) outline: Outline,
+    pub(crate) flags: Flags,
+}
+
+impl Props {
+    /// Producer-stored width, if the record has one.
+    pub const fn width(&self) -> Option<Width> {
+        self.width
+    }
+
+    /// Exact local shared-style state without a physical style index.
+    pub const fn style(&self) -> &StyleState {
+        &self.style
+    }
+
+    /// Checked outline level.
+    pub const fn outline(&self) -> Outline {
+        self.outline
+    }
+
+    /// Whether the column is hidden.
+    pub const fn hidden(&self) -> bool {
+        self.flags.contains(Flags::HIDDEN)
+    }
+
+    /// Whether the producer marked the width as best-fit.
+    pub const fn best_fit(&self) -> bool {
+        self.flags.contains(Flags::BEST_FIT)
+    }
+
+    /// Whether the width is explicitly customized.
+    pub const fn custom_width(&self) -> bool {
+        self.flags.contains(Flags::CUSTOM_WIDTH)
+    }
+
+    /// Whether phonetic information is shown by default.
+    pub const fn phonetic(&self) -> bool {
+        self.flags.contains(Flags::PHONETIC)
+    }
+
+    /// Whether the outline is stored in its collapsed state.
+    pub const fn collapsed(&self) -> bool {
+        self.flags.contains(Flags::COLLAPSED)
+    }
+
+    pub(crate) fn rebind_style(&mut self, lineage: &std::sync::Arc<crate::style::StyleLineage>) {
+        self.style.rebind(lineage);
+    }
+
+    pub(crate) const fn uses_shared_style(&self) -> bool {
+        matches!(&self.style, StyleState::Shared(_))
+    }
+}
+
+/// Column-property record state captured before or after a patch change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum State {
+    /// No explicit column-property record applies.
+    Missing,
+    /// One complete effective record applies.
+    Stored(Props),
+}
+
+impl State {
+    pub(crate) fn rebind_style(&mut self, lineage: &std::sync::Arc<crate::style::StyleLineage>) {
+        if let Self::Stored(properties) = self {
+            properties.rebind_style(lineage);
+        }
+    }
+
+    pub(crate) const fn uses_shared_style(&self) -> bool {
+        matches!(self, Self::Stored(properties) if properties.uses_shared_style())
+    }
 }
 
 /// One disjoint effective SpreadsheetML column-property range.
@@ -130,11 +358,11 @@ impl<'a> Column<'a> {
         }
     }
 
-    /// Effective column outline level in `0..=7`.
-    pub const fn outline_level(self) -> u8 {
+    /// Effective checked column outline level.
+    pub const fn outline(self) -> Outline {
         match self.stored {
-            Some(column) => column.properties.outline_level,
-            None => 0,
+            Some(column) => column.properties.outline,
+            None => Outline::NONE,
         }
     }
 
@@ -440,17 +668,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn widths_and_outlines_are_checked_before_they_enter_layout_state() {
+        const WIDTH: std::result::Result<Width, WidthError> = Width::new(24.0);
+        const OUTLINE: std::result::Result<Outline, OutlineError> = OutlineAt::Level(2).resolve();
+        assert_eq!(WIDTH.map(Width::get), Ok(24.0));
+        assert_eq!(OUTLINE.map(Outline::get), Ok(2));
+        assert_eq!(Width::new(-0.0).map(Width::get), Ok(0.0));
+        assert_eq!(WidthAt::from(18.5).resolve().map(Width::get), Ok(18.5));
+        assert_eq!(WidthAt::from(24).resolve().map(Width::get), Ok(24.0));
+        assert!(Width::new(f64::NAN).is_err());
+        assert!(Width::new(f64::INFINITY).is_err());
+        assert!(Width::new(255.1).is_err());
+        assert_eq!(Outline::new(7).map(Outline::get), Ok(7));
+        assert_eq!(OutlineAt::from(3_i32).resolve().map(Outline::get), Ok(3));
+        assert_eq!(OutlineAt::from(-1_i32).resolve().unwrap_err().value(), -1);
+        assert_eq!(OutlineAt::from(8_u32).resolve().unwrap_err().value(), 8);
+    }
+
+    #[test]
     fn later_ranges_replace_the_complete_effective_column_record() {
         let hidden = Properties {
             width: Width::new(20.0).ok(),
             style: None,
-            outline_level: 0,
+            outline: Outline::NONE,
             flags: Flags::HIDDEN | Flags::CUSTOM_WIDTH,
         };
         let visible = Properties {
             width: Width::new(10.0).ok(),
             style: None,
-            outline_level: 0,
+            outline: Outline::NONE,
             flags: Flags::CUSTOM_WIDTH,
         };
         let mut assignments = Assignments::new().expect("interval map");

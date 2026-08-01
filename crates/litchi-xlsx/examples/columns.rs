@@ -9,18 +9,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut edit = source.edit()?;
     let mut sheet = edit.sheet("Sheet1")?.ok_or("missing Sheet1")?;
     sheet
-        .set("A1", "Visible left")?
-        .set("B1", "Hidden by Litchi")?
-        .set("C1", "Visible right")?;
-    sheet.column(1)?.hide();
+        .set("A1", "Default width")?
+        .set("B1", "Wide by Litchi")?
+        .set("C1", "Hidden by Litchi")?
+        .set("D1", "Outlined by Litchi")?;
+    sheet.column("B")?.width(24)?;
+    sheet.column("C")?.hide();
+    sheet.column("D")?.outline(1)?.collapse();
 
     let committed = edit.commit()?;
     let sheet = committed
         .workbook()
         .sheet("Sheet1")?
         .ok_or("missing committed Sheet1")?;
-    let column = sheet.column(1)?;
-    assert!(column.stored() && column.hidden());
+    let wide = sheet.column("B")?;
+    assert_eq!(wide.width().map(litchi_xlsx::Width::get), Some(24.0));
+    assert!(sheet.column("C")?.hidden());
+    let outlined = sheet.column("D")?;
+    assert_eq!(outlined.outline().get(), 1);
+    assert!(outlined.collapsed());
     committed.workbook().save(&output)?;
     println!(
         "saved {} semantic changes to {output}",
