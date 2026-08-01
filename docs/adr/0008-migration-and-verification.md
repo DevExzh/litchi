@@ -673,9 +673,10 @@ boundary. Allocation is deterministic, recognizes nonstandard IDs and gaps,
 and derives strict versus transitional worksheet namespaces and relationship
 types from the workbook root. `Change::Create`/`Change::Remove`
 carry only the developer name, checked position, and visibility; the latter is
-currently produced by inverse patches. The private graph delta owns the new
-part and relationship. Forward replay checks that both are absent; inverse
-replay checks their complete expected identity and bytes before removal.
+produced only by inverse patches in this slice. The private graph delta owns
+the new part and relationship. Forward replay checks that both are absent;
+inverse replay checks their complete expected identity and bytes before
+removal.
 
 The new worksheet is built and edited before publication, then reparsed with
 the ordinary worksheet and shared-style validators. Formula-bearing creates
@@ -718,13 +719,89 @@ edit/resave/reverse-read path on that Excel build. It does not certify insertion
 at arbitrary positions, worksheet deletion, every cell or style family, other
 Office builds, or performance.
 
+The sixteenth slice adds conservative transactional worksheet deletion. The
+selector-first entry is `edit.remove("Scratch")?`, returning
+`Result<Option<&mut Edit>>`; case-insensitive developer names remain the main
+path and checked zero-based positions remain available. It never exposes a
+native `sheetId`, relationship ID, or part URI. Multiple distinct removals can
+be collected directly or joined from independent edits. Removing the same
+sheet conflicts deterministically. This slice is deliberately worksheet-only,
+and it refuses deletion combined with creation, rename, reorder, activation,
+visibility, cell, row, or column mutation as `RemoveBlock::MixedEdit`. That
+typed boundary remains until name reuse, reference disposition, and mixed
+final-state semantics are represented rather than inferred.
+
+Commit proves that at least one sheet and one visible tab survive, preserves a
+retained active tab, or selects the nearest visible successor and then the
+nearest visible predecessor. It removes exact catalog slots; remaps
+`activeTab` and `firstSheet` in every modeled workbook view, including the
+special `firstSheet` sentinel; drops defined names scoped to removed sheets;
+shifts surviving local scopes; and removes an empty `definedNames` container.
+Recognized extended properties lose only the corresponding leading
+`TitlesOfParts` entries and receive corrected vector and standard Worksheet
+counts. Missing, stale, or producer-specific optional metadata remains
+byte-exact. Workbook protection, revision tracking, unknown catalog payload,
+and markup-compatibility-owned catalog state retain their existing typed
+refusals. A custom workbook view whose `activeSheetId` equals the removed
+native identity is a modeled incoming dependency, consistent with
+`[MS-OE376]` section 2.1.600(q), and is refused rather than left dangling.
+
+Dependency validation runs over the final planned bytes of every XML part
+reachable after detaching the selected worksheet relationships and the
+calculation chain. It includes reachable Custom XML rather than assuming that
+only `/xl` parts matter, while deliberately excluding external-link parts.
+All removal targets share one XML pass per retained part instead of reparsing
+the package graph once per target.
+Recognized direct references include local formula prefixes, implicit members
+of 3-D sheet spans, hyperlink locations, pivot and consolidation sources,
+embedded-object extents, and custom-workbook-view identities. Nonzero external
+workbook prefixes are not local dependencies. Runtime reference construction
+through `INDIRECT` or `EVALUATE`, unknown formula-like producer fields, and
+matching names under markup-compatibility choices produce distinct typed
+refusals. A VBA project blocks deletion because its dynamic sheet access cannot
+be proven safe, and any additional OPC relationship targeting the worksheet
+part blocks removal.
+
+The forward patch now records `Change::Remove`. Its private graph delta owns
+the exact worksheet part, its outgoing relationships, and the removed workbook
+relationship, so source-checked replay and inverse restoration do not copy the
+payload and can reproduce the original package bytes. OPC part-name checks use
+the required ASCII case-insensitive equivalence. Child resources reachable
+only from the removed worksheet are intentionally left as orphans; recursive
+resource disposal remains the separate explicit `gc` operation from ADR 0003.
+Formula-bearing state invalidates workbook calculation and removes one
+exclusively owned calculation chain through the same reversible transaction.
+The source snapshot remains immutable throughout planning and publication.
+
+Tests cover name and numeric selectors, missing lookup, active-tab relocation,
+multiple joined removals, exact forward replay and inverse bytes, static and
+3-D formulas, runtime indirection, Custom XML producer fields, custom workbook
+views, macro projects, extra incoming relationships, case-equivalent OPC
+targets, last-sheet and last-visible invariants, mixed-edit refusal, local-name
+scope rewrites, secondary workbook views, optional property synchronization,
+catalog compatibility blocks, and scanner dependency classes.
+
+Computer Use exercised the public `remove_sheet` example in Microsoft Excel
+for Mac 16.110.2 (build 16.110.26062818), Office LTSC Standard for Mac 2024.
+Excel opened the generated workbook without a repair or compatibility dialog,
+showed exactly `Sheet1` and `Results`, made `Results` active, and displayed the
+retained `A1` text and `B2` value. Excel accepted `Excel removal resave marker`
+at `Results!C3` and saved without warning. The resaved archive passed ZIP
+integrity validation, and the public `open` example recovered both tabs, the
+active Results identity, the original values, and the marker. This certifies
+one local remove/active-relocation/open/edit/resave/reverse-read path on that
+Excel build. It does not certify mixed deletion plans, non-worksheet tabs,
+recursive garbage collection, every dependency carrier, other Office builds,
+or performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement sheet deletion, semantic before/after insertion, grouped-tab
-selection CRUD, workbook-protection unlocking, row/column properties beyond
-visibility, row and column insertion/deletion, shifting references,
-merge/group-formula edits, validation evaluation, shared-style definition
-editing or forking, named-style and row/column/theme resolution, rich text,
-dynamic arrays, patch serialization, full structured diagnostics,
+hints or implement semantic before/after insertion, mixed deletion disposition,
+non-worksheet tab deletion, recursive garbage collection, grouped-tab selection
+CRUD, workbook-protection unlocking, row/column properties beyond visibility,
+row and column insertion/deletion, shifting references, merge/group-formula
+edits, dynamic-reference resolution, validation evaluation, shared-style
+definition editing or forking, named-style and row/column/theme resolution,
+rich text, dynamic arrays, patch serialization, full structured diagnostics,
 eviction/resource budgets, range/structural effect joins, three-way merge,
 raw-copy preservation of clean compressed entries, cancellation-aware save
 contexts, order-aware extended-property synchronization, scratch planning, or

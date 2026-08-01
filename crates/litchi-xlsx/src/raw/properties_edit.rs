@@ -1,4 +1,4 @@
-//! Lossless extended-properties synchronization for appended worksheets.
+//! Lossless extended-properties synchronization for worksheet structure.
 
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::decode_xml_reference;
@@ -64,6 +64,7 @@ struct Vector {
 #[derive(Debug)]
 struct Title {
     start: usize,
+    end: usize,
     tag: Tag,
     text: String,
 }
@@ -196,6 +197,114 @@ pub(crate) fn append_sheets(
     Ok(Some(output))
 }
 
+/// Remove selected worksheet titles from a standard title prefix.
+///
+/// Optional or producer-specific layouts are left byte-exact. The workbook
+/// catalog remains authoritative, so stale metadata never blocks deletion.
+pub(crate) fn remove_sheets(
+    content: &[u8],
+    existing: &[&str],
+    removed: &[usize],
+) -> Result<Option<Vec<u8>>> {
+    if removed.is_empty() {
+        return Ok(None);
+    }
+    if removed.windows(2).any(|pair| pair[0] >= pair[1])
+        || removed.iter().any(|position| *position >= existing.len())
+    {
+        return Err(invalid(
+            "extended-properties sheet removals must be unique, sorted, and in range",
+        ));
+    }
+    let (vector, titles, variants) = scan(content)?;
+    let Some(vector) = vector else {
+        return Ok(None);
+    };
+    if vector
+        .base_type
+        .as_deref()
+        .is_some_and(|value| value != "lpstr")
+        || vector.size.is_some_and(|size| size != titles.len())
+        || titles.len() < existing.len()
+        || !titles
+            .iter()
+            .take(existing.len())
+            .zip(existing)
+            .all(|(actual, expected)| actual.text == *expected)
+    {
+        return Ok(None);
+    }
+
+    let final_size = titles
+        .len()
+        .checked_sub(removed.len())
+        .ok_or_else(|| invalid("extended-properties title count underflow"))?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve(removed.len().saturating_add(2))
+        .map_err(|error| invalid(format!("cannot reserve property removals: {error}")))?;
+    replacements.push(Replacement {
+        start: vector.start,
+        end: vector.tag_end,
+        bytes: rewrite_tag(&vector.tag, "size", &final_size.to_string()),
+    });
+    for position in removed {
+        let title = titles
+            .get(*position)
+            .ok_or_else(|| invalid("extended-properties removal escaped checked titles"))?;
+        replacements.push(Replacement {
+            start: title.start,
+            end: title.end,
+            bytes: Vec::new(),
+        });
+    }
+    if let Some(count) = variants.windows(2).find_map(|pair| {
+        let label = pair[0].label.as_deref()?;
+        matches!(label, "Worksheet" | "Worksheets")
+            .then_some(pair[1].count)
+            .flatten()
+    }) && count.2 == existing.len()
+    {
+        replacements.push(Replacement {
+            start: count.0,
+            end: count.1,
+            bytes: existing
+                .len()
+                .checked_sub(removed.len())
+                .ok_or_else(|| invalid("extended-properties worksheet count underflow"))?
+                .to_string()
+                .into_bytes(),
+        });
+    }
+
+    replacements.sort_unstable_by_key(|replacement| (replacement.start, replacement.end));
+    if replacements
+        .windows(2)
+        .any(|pair| pair[0].end > pair[1].start)
+    {
+        return Err(invalid("overlapping extended-properties removals"));
+    }
+    let output_len = replacements
+        .iter()
+        .try_fold(content.len(), |size, replacement| {
+            size.checked_sub(replacement.end - replacement.start)?
+                .checked_add(replacement.bytes.len())
+        })
+        .ok_or_else(|| invalid("extended-properties removal size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|error| invalid(format!("cannot reserve extended properties: {error}")))?;
+    let mut cursor = 0usize;
+    for replacement in replacements {
+        output.extend_from_slice(&content[cursor..replacement.start]);
+        output.extend_from_slice(&replacement.bytes);
+        cursor = replacement.end;
+    }
+    output.extend_from_slice(&content[cursor..]);
+    Ok(Some(output))
+}
+
 fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
     let mut reader = NsReader::from_reader(content);
     let mut stack = Vec::<Frame>::new();
@@ -250,6 +359,7 @@ fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
                     Kind::TitleVector => return Ok((None, titles, variants)),
                     Kind::Title => titles.push(Title {
                         start,
+                        end,
                         tag: tag(&element, decoder)?,
                         text: String::new(),
                     }),
@@ -308,6 +418,7 @@ fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
                     },
                     Kind::Title if !frame.markup => titles.push(Title {
                         start: frame.start,
+                        end,
                         tag: frame
                             .tag
                             .ok_or_else(|| invalid("title lost its start tag"))?,
@@ -485,6 +596,31 @@ mod tests {
         let source = br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>Stale</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#;
         assert!(
             append_sheets(source, &["Actual"], &["New"])
+                .expect("scan")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn removes_sheet_titles_and_updates_standard_heading_count() {
+        let source = br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>3</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="4" baseType="lpstr"><vt:lpstr>One</vt:lpstr><vt:lpstr>Middle</vt:lpstr><vt:lpstr>Three</vt:lpstr><vt:lpstr>Named Range</vt:lpstr></vt:vector></TitlesOfParts><Company>keep</Company></Properties>"#;
+        let output = remove_sheets(source, &["One", "Middle", "Three"], &[1])
+            .expect("rewrite")
+            .expect("changed");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains("<vt:i4>2</vt:i4>"));
+        assert!(text.contains("size=\"3\""));
+        assert!(text.contains(
+            "<vt:lpstr>One</vt:lpstr><vt:lpstr>Three</vt:lpstr><vt:lpstr>Named Range</vt:lpstr>"
+        ));
+        assert!(text.contains("<Company>keep</Company>"));
+    }
+
+    #[test]
+    fn preserves_stale_sheet_titles_during_removal() {
+        let source = br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>Stale</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#;
+        assert!(
+            remove_sheets(source, &["Actual", "Two"], &[1])
                 .expect("scan")
                 .is_none()
         );

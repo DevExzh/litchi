@@ -99,6 +99,17 @@ pub(crate) struct Create<'a> {
     pub(crate) state: State,
 }
 
+/// Checked worksheet removals plus their final active-tab disposition.
+/// Relationship IDs stay confined to this physical catalog boundary.
+#[derive(Debug)]
+pub(crate) struct Remove<'a> {
+    pub(crate) sheet: &'a str,
+    pub(crate) position: usize,
+    pub(crate) relationship_ids: Vec<&'a str>,
+    pub(crate) active: Active<'a>,
+    pub(crate) local_scopes: usize,
+}
+
 /// Final relationship order plus semantic error context. Relationship IDs are
 /// borrowed only inside this physical rewrite boundary.
 #[derive(Debug)]
@@ -464,6 +475,246 @@ pub(crate) fn append(content: &[u8], create: Create<'_>) -> Result<Vec<u8>> {
     output.extend_from_slice(&created);
     output.extend_from_slice(&content[at..]);
     Ok(output)
+}
+
+/// Remove checked catalog records, remap every modeled positional dependency,
+/// and drop defined names whose local scope disappears.
+pub(crate) fn remove(content: &[u8], plan: Remove<'_>) -> Result<Vec<u8>> {
+    let layout = scan(content)?;
+    let context = Some((plan.sheet, plan.position));
+    if plan.relationship_ids.is_empty() {
+        return Ok(content.to_vec());
+    }
+    if layout.protected {
+        return Err(block(context, TabEditBlock::ProtectedWorkbook));
+    }
+    if layout.sheets.payload
+        || layout
+            .book_views
+            .as_ref()
+            .is_some_and(|views| views.payload)
+        || layout
+            .defined_names
+            .as_ref()
+            .is_some_and(|names| names.payload)
+        || layout.alternate_content
+        || layout.alternate_dependencies
+        || layout
+            .defined_name_slots
+            .iter()
+            .filter(|name| name.local_sheet_id.is_some())
+            .count()
+            != plan.local_scopes
+    {
+        return Err(block(context, TabEditBlock::MarkupCompatibility));
+    }
+
+    let mut removed = HashSet::new();
+    removed
+        .try_reserve(plan.relationship_ids.len())
+        .map_err(|error| invalid(format!("cannot reserve sheet-removal index: {error}")))?;
+    for relationship_id in &plan.relationship_ids {
+        if !removed.insert(*relationship_id) {
+            return Err(invalid(format!(
+                "sheet removal repeats relationship '{relationship_id}'"
+            )));
+        }
+    }
+    let mut old_to_new = Vec::new();
+    old_to_new
+        .try_reserve_exact(layout.sheet_slots.len())
+        .map_err(|error| invalid(format!("cannot reserve sheet-removal mapping: {error}")))?;
+    let mut next = 0usize;
+    for slot in &layout.sheet_slots {
+        if removed.remove(slot.relationship_id.as_ref()) {
+            old_to_new.push(None);
+        } else {
+            old_to_new.push(Some(next));
+            next = next
+                .checked_add(1)
+                .ok_or_else(|| invalid("retained worksheet count overflow"))?;
+        }
+    }
+    if let Some(relationship_id) = removed.iter().next() {
+        return Err(invalid(format!(
+            "removed worksheet relationship '{relationship_id}' is absent from the catalog"
+        )));
+    }
+    if next == 0 {
+        return Err(invalid("workbook catalog removal cannot leave zero sheets"));
+    }
+    if plan.active.position >= next {
+        return Err(invalid(
+            "replacement active tab exceeds the retained catalog",
+        ));
+    }
+
+    let removed_count = old_to_new
+        .iter()
+        .filter(|position| position.is_none())
+        .count();
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve(
+            removed_count
+                .saturating_add(layout.workbook_views.len().max(1))
+                .saturating_add(layout.defined_name_slots.len()),
+        )
+        .map_err(|error| invalid(format!("cannot reserve sheet removals: {error}")))?;
+    for (slot, mapped) in layout.sheet_slots.iter().zip(&old_to_new) {
+        if mapped.is_none() {
+            replacements.push(Replacement {
+                span: slot.slot.span,
+                bytes: Vec::new(),
+            });
+        }
+    }
+
+    if layout.workbook_views.is_empty() {
+        replacements.push(active_replacement(
+            content,
+            &layout,
+            plan.active.position,
+            context,
+        )?);
+    } else {
+        for (index, view) in layout.workbook_views.iter().enumerate() {
+            let old_active = view.active.unwrap_or(0);
+            let mapped_active = map_removed_position(&old_to_new, old_active, context)?;
+            let desired_active = if index == 0 {
+                plan.active.position
+            } else {
+                mapped_active
+            };
+            if desired_active > MAX_ACTIVE_TAB {
+                return Err(block(context, TabEditBlock::ActiveTabLimit));
+            }
+            let old_first = view.first.unwrap_or(0);
+            let desired_first = if old_first == FIRST_SHEET_SENTINEL {
+                old_first
+            } else {
+                let old = usize::try_from(old_first)
+                    .map_err(|_| block(context, TabEditBlock::ViewIndex))?;
+                u32::try_from(map_removed_position(&old_to_new, old, context)?)
+                    .map_err(|_| block(context, TabEditBlock::ViewIndex))?
+            };
+            let active_changed = view
+                .active
+                .map_or(desired_active != 0, |old| old != desired_active);
+            let first_changed = view
+                .first
+                .map_or(desired_first != 0, |old| old != desired_first);
+            if !active_changed && !first_changed {
+                continue;
+            }
+            let mut removed_attributes = Vec::new();
+            let mut appended = Vec::new();
+            if active_changed {
+                removed_attributes.push("activeTab");
+                appended.push(("activeTab", desired_active.to_string()));
+            }
+            if first_changed {
+                removed_attributes.push("firstSheet");
+                appended.push(("firstSheet", desired_first.to_string()));
+            }
+            replacements.push(Replacement {
+                span: view.slot.span,
+                bytes: rewrite_slot(content, &view.slot, &removed_attributes, &appended),
+            });
+        }
+    }
+
+    let removed_names = layout
+        .defined_name_slots
+        .iter()
+        .filter(|name| {
+            name.local_sheet_id
+                .and_then(|old| old_to_new.get(old))
+                .is_some_and(Option::is_none)
+        })
+        .count();
+    if removed_names != 0
+        && removed_names == layout.defined_name_slots.len()
+        && let Some(container) = &layout.defined_names
+    {
+        replacements.push(Replacement {
+            span: container.slot.span,
+            bytes: Vec::new(),
+        });
+    } else {
+        for name in &layout.defined_name_slots {
+            let Some(old) = name.local_sheet_id else {
+                continue;
+            };
+            let Some(mapped) = old_to_new.get(old) else {
+                return Err(invalid(
+                    "defined-name scope exceeds the workbook sheet catalog during removal",
+                ));
+            };
+            match mapped {
+                None => replacements.push(Replacement {
+                    span: name.slot.span,
+                    bytes: Vec::new(),
+                }),
+                Some(new) if *new != old => replacements.push(Replacement {
+                    span: name.slot.span,
+                    bytes: rewrite_slot(
+                        content,
+                        &name.slot,
+                        &["localSheetId"],
+                        &[("localSheetId", new.to_string())],
+                    ),
+                }),
+                Some(_) => {},
+            }
+        }
+    }
+
+    replacements.sort_unstable_by_key(|replacement| replacement.span.start);
+    if replacements
+        .windows(2)
+        .any(|pair| pair[0].span.end > pair[1].span.start)
+    {
+        return Err(invalid("overlapping workbook removal replacements"));
+    }
+    let output_len = replacements
+        .iter()
+        .try_fold(content.len(), |size, replacement| {
+            size.checked_sub(replacement.span.end - replacement.span.start)?
+                .checked_add(replacement.bytes.len())
+        })
+        .ok_or_else(|| invalid("workbook removal output size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|error| invalid(format!("cannot reserve workbook removal output: {error}")))?;
+    let mut cursor = 0usize;
+    for replacement in replacements {
+        output.extend_from_slice(&content[cursor..replacement.span.start]);
+        output.extend_from_slice(&replacement.bytes);
+        cursor = replacement.span.end;
+    }
+    output.extend_from_slice(&content[cursor..]);
+    Ok(output)
+}
+
+fn map_removed_position(
+    old_to_new: &[Option<usize>],
+    old: usize,
+    context: Option<(&str, usize)>,
+) -> Result<usize> {
+    let selected = old_to_new
+        .get(old)
+        .ok_or_else(|| block(context, TabEditBlock::ViewIndex))?;
+    if let Some(mapped) = selected {
+        return Ok(*mapped);
+    }
+    old_to_new
+        .iter()
+        .skip(old.saturating_add(1))
+        .find_map(|mapped| *mapped)
+        .or_else(|| old_to_new[..old].iter().rev().find_map(|mapped| *mapped))
+        .ok_or_else(|| block(context, TabEditBlock::ViewIndex))
 }
 
 pub(crate) fn dialect(content: &[u8]) -> Result<Dialect> {
@@ -1980,5 +2231,98 @@ mod tests {
         let text = std::str::from_utf8(&output).expect("UTF-8");
         assert!(text.contains(r#"<s:sheet name="Only" sheetId="1" rel:id="rId1"/>"#));
         assert_eq!(parse_catalog(&output).expect("catalog").sheets.len(), 1);
+    }
+
+    #[test]
+    fn removal_drops_slots_and_scopes_and_remaps_views_losslessly() {
+        let source = format!(
+            r#"<?xml version="1.0"?><s:workbook xmlns:s="{S}" xmlns:r="{R}" xmlns:k="urn:keep" k:root="exact"><s:bookViews><s:workbookView activeTab="1" firstSheet="1" k:v="first"/><s:workbookView activeTab="2" firstSheet="2" k:v="second"/></s:bookViews><s:sheets><s:sheet name="One" sheetId="7" r:id="r1" k:x="one"/><s:sheet name="Middle" sheetId="9" r:id="r2"/><s:sheet name="Three" sheetId="11" r:id="r3"/></s:sheets><s:definedNames><s:definedName name="OneLocal" localSheetId="0">One!A1</s:definedName><s:definedName name="MiddleLocal" localSheetId="1">Middle!A1</s:definedName><s:definedName name="ThreeLocal" localSheetId="2">Three!A1</s:definedName><s:definedName name="Global">1</s:definedName></s:definedNames><k:tail>opaque</k:tail></s:workbook>"#
+        );
+        let output = remove(
+            source.as_bytes(),
+            Remove {
+                sheet: "Middle",
+                position: 1,
+                relationship_ids: vec!["r2"],
+                active: Active {
+                    sheet: "Three",
+                    position: 1,
+                },
+                local_scopes: 3,
+            },
+        )
+        .expect("remove");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(!text.contains("name=\"Middle\""));
+        assert!(!text.contains("name=\"MiddleLocal\""));
+        assert!(text.contains(r#"name="One" sheetId="7" r:id="r1" k:x="one""#));
+        assert!(text.contains(r#"activeTab="1" firstSheet="1" k:v="first""#));
+        assert!(text.contains(r#"k:v="second" activeTab="1" firstSheet="1""#));
+        assert!(text.contains(r#"name="ThreeLocal" localSheetId="1""#));
+        assert!(text.contains("<k:tail>opaque</k:tail>"));
+        let catalog = parse_catalog(&output).expect("catalog");
+        assert_eq!(
+            catalog
+                .sheets
+                .iter()
+                .map(|sheet| sheet.name.as_str())
+                .collect::<Vec<_>>(),
+            ["One", "Three"]
+        );
+        assert_eq!(catalog.active_sheet_index, 1);
+        assert_eq!(catalog.defined_names.len(), 3);
+        assert_eq!(catalog.defined_names[1].local_sheet_id, Some(1));
+    }
+
+    #[test]
+    fn removal_drops_an_empty_defined_name_container() {
+        let source = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="One" sheetId="1" r:id="r1"/><sheet name="Two" sheetId="2" r:id="r2"/></sheets><definedNames><definedName name="Only" localSheetId="1">Two!A1</definedName></definedNames></workbook>"#
+        );
+        let output = remove(
+            source.as_bytes(),
+            Remove {
+                sheet: "Two",
+                position: 1,
+                relationship_ids: vec!["r2"],
+                active: Active {
+                    sheet: "One",
+                    position: 0,
+                },
+                local_scopes: 1,
+            },
+        )
+        .expect("remove");
+        assert!(
+            !std::str::from_utf8(&output)
+                .expect("UTF-8")
+                .contains("definedNames")
+        );
+    }
+
+    #[test]
+    fn removal_blocks_unmodeled_catalog_payloads() {
+        let source = format!(
+            r#"<workbook xmlns="{S}" xmlns:r="{R}"><sheets><sheet name="One" sheetId="1" r:id="r1"/><future/><sheet name="Two" sheetId="2" r:id="r2"/></sheets></workbook>"#
+        );
+        assert!(matches!(
+            remove(
+                source.as_bytes(),
+                Remove {
+                    sheet: "Two",
+                    position: 1,
+                    relationship_ids: vec!["r2"],
+                    active: Active {
+                        sheet: "One",
+                        position: 0,
+                    },
+                    local_scopes: 0,
+                }
+            ),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::MarkupCompatibility,
+                ..
+            })
+        ));
     }
 }

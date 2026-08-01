@@ -1,6 +1,6 @@
 //! Isolated worksheet transactions, disjoint joins, and source-checked patches.
 
-use std::collections::{BTreeMap, HashMap, HashSet, btree_map::Entry};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map::Entry};
 use std::fmt;
 use std::sync::Arc;
 
@@ -9,7 +9,7 @@ use litchi_sheet::{At, Cell as Address, Column as ColumnIndex, ColumnAt, Row as 
 
 use super::{Sheet, SheetKind, SheetSelector, Visibility, Workbook};
 use crate::cell::{Cell, Content, Stored};
-use crate::error::{EditBlock, Error, Result, TabEditBlock, invalid};
+use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, invalid};
 use crate::raw;
 use crate::raw::worksheet::edit::{Action, ColumnAction, Payload, Plan, RowAction, StyleEffect};
 use crate::sheet::Name;
@@ -173,8 +173,6 @@ pub enum Change {
         visibility: Visibility,
     },
     /// A worksheet was removed at a checked logical position.
-    ///
-    /// This is currently emitted by inverse patches for [`Self::Create`].
     Remove {
         sheet: Box<str>,
         position: usize,
@@ -485,6 +483,10 @@ impl Change {
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Conflict {
+    Remove {
+        sheet: Box<str>,
+        position: usize,
+    },
     Name {
         sheet: Box<str>,
         position: usize,
@@ -522,7 +524,8 @@ impl Conflict {
     /// Developer-facing sheet name.
     pub fn sheet(&self) -> &str {
         match self {
-            Self::Name { sheet, .. }
+            Self::Remove { sheet, .. }
+            | Self::Name { sheet, .. }
             | Self::Order { sheet, .. }
             | Self::Active { sheet, .. }
             | Self::Tab { sheet, .. }
@@ -535,7 +538,8 @@ impl Conflict {
     /// Checked zero-based sheet position in the shared base snapshot.
     pub fn position(&self) -> usize {
         match self {
-            Self::Name { position, .. }
+            Self::Remove { position, .. }
+            | Self::Name { position, .. }
             | Self::Order { position, .. }
             | Self::Active { position, .. }
             | Self::Tab { position, .. }
@@ -548,6 +552,11 @@ impl Conflict {
     /// Whether both edits target this sheet's catalog name.
     pub const fn is_name(&self) -> bool {
         matches!(self, Self::Name { .. })
+    }
+
+    /// Whether both edits remove or otherwise overlap one removed sheet.
+    pub const fn is_remove(&self) -> bool {
+        matches!(self, Self::Remove { .. })
     }
 
     /// Whether both edits target this sheet tab's visibility.
@@ -569,7 +578,8 @@ impl Conflict {
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
             Self::Cells { addresses, .. } => Some(addresses),
-            Self::Name { .. }
+            Self::Remove { .. }
+            | Self::Name { .. }
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
@@ -582,7 +592,8 @@ impl Conflict {
     pub fn rows(&self) -> Option<&[RowIndex]> {
         match self {
             Self::Rows { rows, .. } => Some(rows),
-            Self::Name { .. }
+            Self::Remove { .. }
+            | Self::Name { .. }
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
@@ -596,7 +607,8 @@ impl Conflict {
     pub fn columns(&self) -> Option<&[ColumnIndex]> {
         match self {
             Self::Columns { columns, .. } => Some(columns),
-            Self::Name { .. }
+            Self::Remove { .. }
+            | Self::Name { .. }
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
@@ -607,7 +619,11 @@ impl Conflict {
 
     fn len(&self) -> usize {
         match self {
-            Self::Name { .. } | Self::Order { .. } | Self::Active { .. } | Self::Tab { .. } => 1,
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. } => 1,
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
@@ -1091,6 +1107,7 @@ pub struct Edit {
     order: Option<OrderPlan>,
     sheets: BTreeMap<usize, SheetActions>,
     added: Vec<Added>,
+    removed: BTreeSet<usize>,
 }
 
 impl Edit {
@@ -1102,6 +1119,7 @@ impl Edit {
             order: None,
             sheets: BTreeMap::new(),
             added: Vec::new(),
+            removed: BTreeSet::new(),
         })
     }
 
@@ -1115,6 +1133,9 @@ impl Edit {
         T: TryInto<Name>,
         Error: From<T::Error>,
     {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
+        }
         let name = name.try_into().map_err(Error::from)?;
         let position = self
             .base
@@ -1158,6 +1179,9 @@ impl Edit {
         &'e mut self,
         selector: impl Into<SheetSelector<'s>>,
     ) -> Result<Option<SheetEdit<'e>>> {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
+        }
         let sheet = self.base.sheet(selector)?;
         let Some(sheet) = sheet else {
             return Ok(None);
@@ -1182,6 +1206,9 @@ impl Edit {
         &'e mut self,
         selector: impl Into<SheetSelector<'s>>,
     ) -> Result<Option<TabEdit<'e>>> {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
+        }
         let tab = self.base.sheet(selector)?;
         Ok(tab.map(|tab| TabEdit {
             edit: self,
@@ -1199,6 +1226,9 @@ impl Edit {
         sheet: impl Into<SheetSelector<'a>>,
         anchor: impl Into<SheetSelector<'b>>,
     ) -> Result<Option<&mut Self>> {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
+        }
         let Some(sheet) = self.base.sheet(sheet)? else {
             return Ok(None);
         };
@@ -1217,6 +1247,9 @@ impl Edit {
         sheet: impl Into<SheetSelector<'a>>,
         anchor: impl Into<SheetSelector<'b>>,
     ) -> Result<Option<&mut Self>> {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
+        }
         let Some(sheet) = self.base.sheet(sheet)? else {
             return Ok(None);
         };
@@ -1237,6 +1270,9 @@ impl Edit {
         sheet: impl Into<SheetSelector<'a>>,
         position: usize,
     ) -> Result<Option<&mut Self>> {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
+        }
         let Some(sheet) = self.base.sheet(sheet)? else {
             return Ok(None);
         };
@@ -1247,14 +1283,50 @@ impl Edit {
         Ok(Some(self))
     }
 
+    /// Remove a worksheet selected by its developer-facing name or checked
+    /// zero-based source position.
+    ///
+    /// `Ok(None)` means the selector did not resolve. The safe default refuses
+    /// live formulas, unmodeled producer references, VBA projects, additional
+    /// incoming relationships, and mixed mutation plans. Multiple independent
+    /// worksheet removals may be collected in one atomic transaction.
+    pub fn remove<'a>(
+        &mut self,
+        selector: impl Into<SheetSelector<'a>>,
+    ) -> Result<Option<&mut Self>> {
+        let Some(sheet) = self.base.sheet(selector)? else {
+            return Ok(None);
+        };
+        if sheet.kind() != SheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: sheet.name().to_owned(),
+            });
+        }
+        let position = sheet.position();
+        let name = sheet.name().to_owned();
+        if self.has_non_removal() {
+            return Err(Error::SheetRemoveBlocked {
+                sheet: name,
+                position,
+                part: "transaction".to_owned(),
+                reason: RemoveBlock::MixedEdit,
+            });
+        }
+        self.removed.insert(position);
+        Ok(Some(self))
+    }
+
     pub fn len(&self) -> usize {
         let existing = self.sheets.values().fold(
-            usize::from(self.active.is_some()).saturating_add(
-                self.order
-                    .as_ref()
-                    .filter(|order| order.is_effective())
-                    .map_or(0, |order| order.moves.len()),
-            ),
+            self.removed
+                .len()
+                .saturating_add(usize::from(self.active.is_some()))
+                .saturating_add(
+                    self.order
+                        .as_ref()
+                        .filter(|order| order.is_effective())
+                        .map_or(0, |order| order.moves.len()),
+                ),
             |len, actions| len.saturating_add(actions.len()),
         );
         self.added.iter().fold(existing, |len, added| {
@@ -1273,6 +1345,7 @@ impl Edit {
                 .is_none_or(|order| !order.is_effective())
             && self.sheets.values().all(SheetActions::is_empty)
             && self.added.is_empty()
+            && self.removed.is_empty()
     }
 
     /// Join an independently prepared edit when every effect is disjoint.
@@ -1338,6 +1411,7 @@ impl Edit {
             }
         }
         self.added.extend(other.added);
+        self.removed.extend(other.removed);
         Ok(self)
     }
 
@@ -1350,12 +1424,16 @@ impl Edit {
                 patch: Patch::default(),
             });
         }
+        if !self.removed.is_empty() {
+            return commit_removals(self);
+        }
         let Self {
             base,
             active: requested_active,
             order: requested_order,
             mut sheets,
             added,
+            removed: _,
         } = self;
         let mut changes = Vec::new();
         let mut parts = Vec::new();
@@ -2469,6 +2547,33 @@ impl Edit {
 
     fn conflicts_with(&self, other: &Self) -> ConflictSet {
         let mut conflicts = Vec::new();
+        let removal_conflict = self
+            .removed
+            .intersection(&other.removed)
+            .next()
+            .copied()
+            .or_else(|| {
+                (!self.removed.is_empty() && other.has_non_removal())
+                    .then(|| self.removed.iter().next().copied())
+                    .flatten()
+            })
+            .or_else(|| {
+                (!other.removed.is_empty() && self.has_non_removal())
+                    .then(|| other.removed.iter().next().copied())
+                    .flatten()
+            });
+        if let Some(position) = removal_conflict {
+            let sheet = self
+                .base
+                .inner
+                .sheets
+                .get(position)
+                .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+            conflicts.push(Conflict::Remove {
+                sheet: sheet.into(),
+                position,
+            });
+        }
         if let (Some(left), Some(_)) = (
             self.order.as_ref().filter(|order| order.is_effective()),
             other.order.as_ref().filter(|order| order.is_effective()),
@@ -2620,6 +2725,29 @@ impl Edit {
                 ("<missing new sheet>", self.base.len().saturating_add(index)),
                 |sheet| (sheet.name.as_str(), self.base.len().saturating_add(index)),
             ),
+        }
+    }
+
+    fn has_non_removal(&self) -> bool {
+        self.active.is_some()
+            || self.order.as_ref().is_some_and(OrderPlan::is_effective)
+            || self.sheets.values().any(|actions| !actions.is_empty())
+            || !self.added.is_empty()
+    }
+
+    fn remove_block(&self, reason: RemoveBlock, part: &str) -> Error {
+        let position = self.removed.iter().next().copied().unwrap_or(0);
+        let sheet = self
+            .base
+            .inner
+            .sheets
+            .get(position)
+            .map_or("<missing sheet>", |sheet| sheet.name.as_str());
+        Error::SheetRemoveBlocked {
+            sheet: sheet.to_owned(),
+            position,
+            part: part.to_owned(),
+            reason,
         }
     }
 }
@@ -2977,6 +3105,524 @@ impl ColumnEdit<'_> {
     }
 }
 
+fn commit_removals(edit: Edit) -> Result<Commit> {
+    if edit.has_non_removal() {
+        return Err(edit.remove_block(RemoveBlock::MixedEdit, "transaction"));
+    }
+    let Edit {
+        base,
+        active: _,
+        order: _,
+        sheets: _,
+        added: _,
+        removed,
+    } = edit;
+    let first_position = removed
+        .iter()
+        .next()
+        .copied()
+        .ok_or_else(|| invalid("worksheet removal plan is empty"))?;
+    let first_sheet = base
+        .inner
+        .sheets
+        .get(first_position)
+        .ok_or_else(|| invalid("removed worksheet position disappeared"))?;
+    let block = |reason, part: &str| Error::SheetRemoveBlocked {
+        sheet: first_sheet.name.clone(),
+        position: first_position,
+        part: part.to_owned(),
+        reason,
+    };
+    let retained_len = base
+        .inner
+        .sheets
+        .len()
+        .checked_sub(removed.len())
+        .ok_or_else(|| invalid("removed worksheet count exceeds the catalog"))?;
+    if retained_len == 0 {
+        return Err(block(
+            RemoveBlock::LastSheet,
+            base.inner.workbook_uri.as_str(),
+        ));
+    }
+    ensure_reorder_supported(&base, &first_sheet.name, first_position)?;
+
+    for position in &removed {
+        let sheet = base
+            .inner
+            .sheets
+            .get(*position)
+            .ok_or_else(|| invalid("removed worksheet position disappeared"))?;
+        if sheet.kind != SheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: sheet.name.clone(),
+            });
+        }
+    }
+
+    let main = base.inner.package.get_part(&base.inner.workbook_uri)?;
+    if let Some(relationship) = main.rels().iter().find(|relationship| {
+        relationship.reltype() == litchi_opc::constants::relationship_type::VBA_PROJECT
+    }) {
+        return Err(block(RemoveBlock::MacroProject, relationship.target_ref()));
+    }
+
+    let visible = base
+        .inner
+        .sheets
+        .iter()
+        .enumerate()
+        .filter(|(position, sheet)| {
+            !removed.contains(position) && sheet.visibility == Visibility::Visible
+        })
+        .map(|(position, _)| position)
+        .collect::<Vec<_>>();
+    if visible.is_empty() {
+        return Err(Error::TabEditBlocked {
+            sheet: first_sheet.name.clone(),
+            position: first_position,
+            reason: TabEditBlock::LastVisibleTab,
+        });
+    }
+    let current_active = base
+        .inner
+        .active_sheet
+        .ok_or_else(|| invalid("non-empty workbook has no active tab"))?;
+    let final_active_identity = if !removed.contains(&current_active)
+        && base
+            .inner
+            .sheets
+            .get(current_active)
+            .is_some_and(|sheet| sheet.visibility == Visibility::Visible)
+    {
+        current_active
+    } else {
+        visible
+            .iter()
+            .copied()
+            .find(|position| *position > current_active)
+            .or_else(|| {
+                visible
+                    .iter()
+                    .rev()
+                    .copied()
+                    .find(|position| *position < current_active)
+            })
+            .ok_or_else(|| invalid("replacement active worksheet disappeared"))?
+    };
+    let final_active_position = (0..final_active_identity)
+        .filter(|position| !removed.contains(position))
+        .count();
+    if final_active_position > raw::catalog_edit::MAX_ACTIVE_TAB {
+        let sheet = base
+            .inner
+            .sheets
+            .get(final_active_identity)
+            .ok_or_else(|| invalid("replacement active worksheet disappeared"))?;
+        return Err(Error::TabEditBlocked {
+            sheet: sheet.name.clone(),
+            position: final_active_position,
+            reason: TabEditBlock::ActiveTabLimit,
+        });
+    }
+    let active_sheet = base
+        .inner
+        .sheets
+        .get(final_active_identity)
+        .ok_or_else(|| invalid("replacement active worksheet disappeared"))?;
+
+    let removed_relationship_ids = removed
+        .iter()
+        .map(|position| {
+            base.inner
+                .sheets
+                .get(*position)
+                .map(|sheet| sheet.relationship_id.as_str())
+                .ok_or_else(|| invalid("removed worksheet relationship disappeared"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let local_scopes = base
+        .inner
+        .defined_names
+        .iter()
+        .filter(|name| name.local_sheet_id.is_some())
+        .count();
+    let before_workbook = main.blob_arc();
+    let mut after_workbook = raw::catalog_edit::remove(
+        &before_workbook,
+        raw::catalog_edit::Remove {
+            sheet: &first_sheet.name,
+            position: first_position,
+            relationship_ids: removed_relationship_ids.clone(),
+            active: raw::catalog_edit::Active {
+                sheet: &active_sheet.name,
+                position: final_active_position,
+            },
+            local_scopes,
+        },
+    )?;
+    after_workbook = raw::recalc::invalidate(&after_workbook)?;
+    let catalog = raw::parse_catalog(&after_workbook)?;
+    if catalog.sheets.len() != retained_len || catalog.active_sheet_index != final_active_position {
+        return Err(invalid("workbook worksheet-removal verification failed"));
+    }
+    let retained = base
+        .inner
+        .sheets
+        .iter()
+        .enumerate()
+        .filter(|(position, _)| !removed.contains(position));
+    for (actual, (_, expected)) in catalog.sheets.iter().zip(retained) {
+        if actual.relationship_id != expected.relationship_id || actual.name != expected.name {
+            return Err(invalid(
+                "workbook worksheet-removal verification changed a retained tab",
+            ));
+        }
+    }
+    verify_removed_defined_names(&base, &catalog, &removed)?;
+
+    let mut changes = Vec::new();
+    changes
+        .try_reserve(removed.len().saturating_add(1))
+        .map_err(|error| invalid(format!("cannot reserve worksheet-removal changes: {error}")))?;
+    for position in &removed {
+        let sheet = base
+            .inner
+            .sheets
+            .get(*position)
+            .ok_or_else(|| invalid("removed worksheet disappeared during patch creation"))?;
+        changes.push(Change::Remove {
+            sheet: sheet.name.clone().into_boxed_str(),
+            position: *position,
+            visibility: sheet.visibility.clone(),
+        });
+    }
+    let active_before = active_tab_at(&base, current_active, current_active, None)?;
+    let active_after = active_tab_at(&base, final_active_identity, final_active_position, None)?;
+    if active_before != active_after {
+        changes.push(Change::Active {
+            before: active_before,
+            after: active_after,
+        });
+    }
+
+    let mut parts = vec![PartChange {
+        uri: base.inner.workbook_uri.clone(),
+        before: before_workbook,
+        after: Arc::new(after_workbook),
+    }];
+    if final_active_identity != current_active {
+        if !removed.contains(&current_active) {
+            let old_active = base
+                .inner
+                .sheets
+                .get(current_active)
+                .ok_or_else(|| invalid("previous active worksheet disappeared"))?;
+            compose_part(&mut parts, &base, &old_active.part_uri, |content| {
+                raw::sheet_view_edit::rewrite(
+                    content,
+                    false,
+                    raw::sheet_view_edit::Context {
+                        sheet: &old_active.name,
+                        position: current_active,
+                    },
+                )
+            })?;
+        }
+        compose_part(&mut parts, &base, &active_sheet.part_uri, |content| {
+            raw::sheet_view_edit::rewrite(
+                content,
+                true,
+                raw::sheet_view_edit::Context {
+                    sheet: &active_sheet.name,
+                    position: final_active_position,
+                },
+            )
+        })?;
+    }
+
+    let existing_titles = base
+        .inner
+        .sheets
+        .iter()
+        .map(|sheet| sheet.name.as_str())
+        .collect::<Vec<_>>();
+    let removed_positions = removed.iter().copied().collect::<Vec<_>>();
+    let mut property_parts = base
+        .inner
+        .package
+        .iter_parts()
+        .filter(|part| {
+            part.content_type() == litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES
+        })
+        .map(|part| part.partname().clone())
+        .collect::<Vec<_>>();
+    property_parts.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+    for uri in property_parts {
+        compose_part_optional(&mut parts, &base, &uri, |content| {
+            raw::properties_edit::remove_sheets(content, &existing_titles, &removed_positions)
+        })?;
+    }
+
+    let mut graph = Vec::new();
+    graph
+        .try_reserve(removed.len().saturating_add(1))
+        .map_err(|error| invalid(format!("cannot reserve worksheet graph removals: {error}")))?;
+    for position in &removed {
+        let sheet = base
+            .inner
+            .sheets
+            .get(*position)
+            .ok_or_else(|| invalid("removed worksheet disappeared during graph planning"))?;
+        let relationship = main.rels().get(&sheet.relationship_id).ok_or_else(|| {
+            invalid(format!(
+                "worksheet '{}' relationship disappeared",
+                sheet.name
+            ))
+        })?;
+        if relationship.is_external()
+            || !relationship
+                .target_partname()?
+                .is_equivalent_to(&sheet.part_uri)
+        {
+            return Err(invalid(format!(
+                "worksheet '{}' relationship target changed",
+                sheet.name
+            )));
+        }
+        ensure_exclusive_sheet_incoming(
+            &base.inner.package,
+            &sheet.part_uri,
+            &base.inner.workbook_uri,
+            relationship.r_id(),
+            &sheet.name,
+            *position,
+        )?;
+        graph.push(GraphChange {
+            action: GraphAction::Remove,
+            source: base.inner.workbook_uri.clone(),
+            relationship: relationship.clone(),
+            part: base.inner.package.get_part(&sheet.part_uri)?.clone_part(),
+        });
+    }
+    graph.extend(calculation_chain_removal(&base)?);
+
+    let detached_workbook_relationships = graph
+        .iter()
+        .filter(|change| change.source == base.inner.workbook_uri)
+        .map(|change| change.relationship.r_id())
+        .collect::<Vec<_>>();
+    scan_removal_dependencies(&base, &parts, &removed, &detached_workbook_relationships)?;
+
+    let mut package = base.inner.package.clone();
+    for part in &parts {
+        package
+            .get_part_mut(&part.uri)?
+            .set_blob_shared(Arc::clone(&part.after));
+    }
+    for change in &graph {
+        change.validate(&package)?;
+        change.apply(&mut package)?;
+    }
+    let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
+    Ok(Commit {
+        workbook,
+        patch: Patch {
+            changes: changes.into_boxed_slice(),
+            parts: parts.into_boxed_slice(),
+            graph: graph.into_boxed_slice(),
+            style_guard: None,
+        },
+    })
+}
+
+fn verify_removed_defined_names(
+    workbook: &Workbook,
+    catalog: &raw::Catalog,
+    removed: &BTreeSet<usize>,
+) -> Result<()> {
+    let mut expected = Vec::new();
+    expected
+        .try_reserve_exact(workbook.inner.defined_names.len())
+        .map_err(|error| invalid(format!("cannot reserve defined-name verification: {error}")))?;
+    for name in &workbook.inner.defined_names {
+        let scope = name
+            .local_sheet_id
+            .map(|scope| {
+                usize::try_from(scope).map_err(|_| invalid("defined-name scope does not fit usize"))
+            })
+            .transpose()?;
+        if scope.is_some_and(|scope| removed.contains(&scope)) {
+            continue;
+        }
+        let mapped = scope.map(|scope| {
+            u32::try_from(
+                (0..scope)
+                    .filter(|position| !removed.contains(position))
+                    .count(),
+            )
+            .map_err(|_| invalid("remapped defined-name scope does not fit u32"))
+        });
+        expected.push((name, mapped.transpose()?));
+    }
+    if expected.len() != catalog.defined_names.len() {
+        return Err(invalid(
+            "workbook removal changed the effective defined-name count unexpectedly",
+        ));
+    }
+    for ((before, scope), after) in expected.into_iter().zip(&catalog.defined_names) {
+        if after.local_sheet_id != scope || !same_defined_name_except_scope(before, after) {
+            return Err(invalid(format!(
+                "workbook removal changed defined name '{}' unexpectedly",
+                before.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn ensure_exclusive_sheet_incoming(
+    package: &OpcPackage,
+    target: &PackURI,
+    expected_source: &PackURI,
+    expected_id: &str,
+    sheet: &str,
+    position: usize,
+) -> Result<()> {
+    let blocked = |part: &str| Error::SheetRemoveBlocked {
+        sheet: sheet.to_owned(),
+        position,
+        part: part.to_owned(),
+        reason: RemoveBlock::IncomingRelationship,
+    };
+    let targets = |relationship: &Relationship| -> Result<bool> {
+        if relationship.is_external() {
+            return Ok(false);
+        }
+        relationship
+            .target_partname()
+            .map(|candidate| candidate.as_str().eq_ignore_ascii_case(target.as_str()))
+            .map_err(Into::into)
+    };
+    for relationship in package.rels().iter() {
+        if targets(relationship)? {
+            return Err(blocked("/"));
+        }
+    }
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            if targets(relationship)?
+                && !(source.partname() == expected_source && relationship.r_id() == expected_id)
+            {
+                return Err(blocked(source.partname().as_str()));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn scan_removal_dependencies(
+    workbook: &Workbook,
+    parts: &[PartChange],
+    removed: &BTreeSet<usize>,
+    removed_relationship_ids: &[&str],
+) -> Result<()> {
+    let catalog = workbook
+        .inner
+        .sheets
+        .iter()
+        .map(|sheet| sheet.name.as_str())
+        .collect::<Vec<_>>();
+    let targets = removed
+        .iter()
+        .map(|position| {
+            let sheet =
+                workbook.inner.sheets.get(*position).ok_or_else(|| {
+                    invalid("removed worksheet disappeared during dependency scan")
+                })?;
+            Ok(raw::reference_scan::Sheet {
+                name: &sheet.name,
+                position: *position,
+                native_id: sheet.native_id,
+                catalog: &catalog,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let reachable = reachable_after_removal(workbook, removed_relationship_ids)?;
+    for uri in &reachable {
+        let part = workbook.inner.package.get_part(uri)?;
+        if !removal_reference_part(part) {
+            continue;
+        }
+        let content = parts
+            .iter()
+            .find(|change| &change.uri == uri)
+            .map_or(part.blob(), |change| change.after.as_slice());
+        let Some(hit) = raw::reference_scan::scan(content, &targets)? else {
+            continue;
+        };
+        let sheet = targets
+            .get(hit.target)
+            .ok_or_else(|| invalid("dependency scan returned an unknown removal target"))?;
+        let reason = match hit.dependency {
+            raw::reference_scan::Dependency::Modeled => RemoveBlock::IncomingReference,
+            raw::reference_scan::Dependency::Unmodeled => RemoveBlock::UnmodeledReference,
+            raw::reference_scan::Dependency::MarkupCompatibility => {
+                RemoveBlock::MarkupCompatibility
+            },
+        };
+        return Err(Error::SheetRemoveBlocked {
+            sheet: sheet.name.to_owned(),
+            position: sheet.position,
+            part: uri.to_string(),
+            reason,
+        });
+    }
+    Ok(())
+}
+
+fn reachable_after_removal(
+    workbook: &Workbook,
+    removed_relationship_ids: &[&str],
+) -> Result<Vec<PackURI>> {
+    let mut reachable = HashSet::<PackURI>::new();
+    reachable
+        .try_reserve(workbook.inner.package.part_count())
+        .map_err(|error| invalid(format!("cannot reserve reachable package graph: {error}")))?;
+    let mut pending = Vec::<PackURI>::new();
+    for relationship in workbook.inner.package.rels().iter() {
+        if !relationship.is_external() {
+            let target = relationship.target_partname()?;
+            let part = workbook.inner.package.get_part(&target)?;
+            pending.push(part.partname().clone());
+        }
+    }
+    while let Some(uri) = pending.pop() {
+        if !reachable.insert(uri.clone()) {
+            continue;
+        }
+        let part = workbook.inner.package.get_part(&uri)?;
+        for relationship in part.rels().iter() {
+            if uri == workbook.inner.workbook_uri
+                && removed_relationship_ids.contains(&relationship.r_id())
+            {
+                continue;
+            }
+            if relationship.is_external() {
+                continue;
+            }
+            let target = relationship.target_partname()?;
+            let target = workbook.inner.package.get_part(&target)?.partname().clone();
+            if !reachable.contains(&target) {
+                pending.push(target);
+            }
+        }
+    }
+    let mut reachable = reachable.into_iter().collect::<Vec<_>>();
+    reachable.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+    Ok(reachable)
+}
+
 fn raw_visibility_matches(value: &raw::Visibility, action: TabAction) -> bool {
     matches!(
         (value, action),
@@ -3194,8 +3840,21 @@ fn reference_part(part: &dyn Part) -> bool {
     }
     (uri.starts_with("/xl/")
         && (part.content_type().ends_with("+xml")
+            || part.content_type().ends_with("/xml")
             || part.content_type() == litchi_opc::constants::content_type::OFC_VML_DRAWING))
         || part.content_type() == litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES
+}
+
+fn removal_reference_part(part: &dyn Part) -> bool {
+    let uri = part.partname().as_str();
+    if uri.starts_with("/xl/externalLinks/")
+        || part.content_type() == litchi_opc::constants::content_type::SML_EXTERNAL_LINK
+    {
+        return false;
+    }
+    part.content_type().ends_with("+xml")
+        || part.content_type().ends_with("/xml")
+        || part.content_type() == litchi_opc::constants::content_type::OFC_VML_DRAWING
 }
 
 fn ensure_unsigned(workbook: &Workbook) -> Result<()> {
@@ -4568,6 +5227,405 @@ mod tests {
                 })
             ));
         }
+    }
+
+    #[test]
+    fn worksheet_remove_is_selector_first_active_relocating_and_reversible() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut create = baseline.edit().expect("create edit");
+        create
+            .add("Delete")
+            .expect("Delete")
+            .set("A1", "removed payload")
+            .expect("payload")
+            .activate();
+        create
+            .add("Keep")
+            .expect("Keep")
+            .set("A1", 42_i32)
+            .expect("retained payload");
+        let source = create.commit().expect("create source").into_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        assert_eq!(source.active_sheet().expect("active").name(), "Delete");
+
+        let mut edit = source.edit().expect("remove edit");
+        assert!(edit.remove("missing").expect("missing selector").is_none());
+        edit.remove("delete")
+            .expect("selector")
+            .expect("Delete worksheet");
+        assert_eq!(edit.len(), 1);
+        let committed = edit.commit().expect("remove commit");
+        assert_eq!(
+            committed
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet1", "Keep"]
+        );
+        assert_eq!(
+            committed.workbook().active_sheet().expect("active").name(),
+            "Keep"
+        );
+        assert!(
+            committed
+                .workbook()
+                .sheet("Delete")
+                .expect("lookup")
+                .is_none()
+        );
+        assert!(matches!(
+            committed.patch().changes().first(),
+            Some(Change::Remove {
+                sheet,
+                position: 1,
+                ..
+            }) if sheet.as_ref() == "Delete"
+        ));
+        assert!(
+            committed
+                .patch()
+                .changes()
+                .iter()
+                .any(|change| matches!(change, Change::Active { after, .. } if after.name() == "Keep" && after.position() == 1))
+        );
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse remove");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored"),
+            source_bytes
+        );
+        let replayed = source.apply(committed.patch()).expect("forward replay");
+        assert!(
+            replayed
+                .workbook()
+                .sheet("Delete")
+                .expect("lookup")
+                .is_none()
+        );
+
+        let mut activate_last = source.edit().expect("activate last");
+        activate_last
+            .tab("Keep")
+            .expect("lookup")
+            .expect("Keep")
+            .activate();
+        let active_last = activate_last
+            .commit()
+            .expect("active-last source")
+            .into_workbook();
+        let mut remove_last = active_last.edit().expect("remove last");
+        remove_last.remove("Keep").expect("lookup").expect("Keep");
+        assert_eq!(
+            remove_last
+                .commit()
+                .expect("remove last active")
+                .workbook()
+                .active_sheet()
+                .expect("replacement active")
+                .name(),
+            "Delete"
+        );
+    }
+
+    #[test]
+    fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut create = baseline.edit().expect("create edit");
+        create.add("Delete").expect("Delete");
+        create
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("Sheet1")
+            .set("A1", Formula::new("Delete!A1").expect("formula"))
+            .expect("formula cell");
+        let source = create.commit().expect("source").into_workbook();
+        let mut remove = source.edit().expect("remove edit");
+        remove.remove("Delete").expect("lookup").expect("Delete");
+        assert!(matches!(
+            remove.commit(),
+            Err(Error::SheetRemoveBlocked {
+                sheet,
+                reason: RemoveBlock::IncomingReference,
+                ..
+            }) if sheet == "Delete"
+        ));
+
+        let single = Workbook::new().expect("single");
+        let mut last = single.edit().expect("last edit");
+        last.remove(0usize).expect("lookup").expect("only sheet");
+        assert!(matches!(
+            last.commit(),
+            Err(Error::SheetRemoveBlocked {
+                reason: RemoveBlock::LastSheet,
+                ..
+            })
+        ));
+
+        let baseline = Workbook::new().expect("visibility baseline");
+        let mut create = baseline.edit().expect("visibility create");
+        create
+            .tab("Sheet1")
+            .expect("lookup")
+            .expect("Sheet1")
+            .hide();
+        create.add("Delete").expect("Delete").activate();
+        let visibility = create.commit().expect("visibility source").into_workbook();
+        let mut last_visible = visibility.edit().expect("last-visible edit");
+        last_visible
+            .remove("Delete")
+            .expect("lookup")
+            .expect("Delete");
+        assert!(matches!(
+            last_visible.commit(),
+            Err(Error::TabEditBlocked {
+                reason: TabEditBlock::LastVisibleTab,
+                ..
+            })
+        ));
+
+        let mut mixed = source.edit().expect("mixed edit");
+        mixed
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("Sheet1")
+            .set("B1", 1_i32)
+            .expect("cell edit");
+        assert!(matches!(
+            mixed.remove("Delete"),
+            Err(Error::SheetRemoveBlocked {
+                reason: RemoveBlock::MixedEdit,
+                ..
+            })
+        ));
+
+        let baseline = Workbook::new().expect("dynamic baseline");
+        let mut create = baseline.edit().expect("dynamic create");
+        create.add("Delete").expect("Delete");
+        create
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("Sheet1")
+            .set(
+                "A1",
+                Formula::new(r#"INDIRECT("Delete!A1")"#).expect("dynamic formula"),
+            )
+            .expect("dynamic cell");
+        let dynamic = create.commit().expect("dynamic source").into_workbook();
+        let mut remove = dynamic.edit().expect("dynamic removal");
+        remove.remove("Delete").expect("lookup").expect("Delete");
+        assert!(matches!(
+            remove.commit(),
+            Err(Error::SheetRemoveBlocked {
+                reason: RemoveBlock::UnmodeledReference,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn worksheet_remove_joins_disjoint_plans_and_blocks_unknown_dependencies() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut create = baseline.edit().expect("create edit");
+        create.add("North").expect("North");
+        create.add("South").expect("South");
+        let source = create.commit().expect("source").into_workbook();
+
+        let mut north = source.edit().expect("north edit");
+        north.remove("North").expect("lookup").expect("North");
+        let mut south = source.edit().expect("south edit");
+        south.remove(2usize).expect("lookup").expect("South");
+        north.join(south).expect("disjoint removals join");
+        let committed = north.commit().expect("joined removal");
+        assert_eq!(
+            committed
+                .workbook()
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
+            ["Sheet1"]
+        );
+
+        let mut package = source.inner.package.clone();
+        let custom_uri = PackURI::new("/customXml/item1.xml").expect("custom URI");
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                custom_uri,
+                "application/xml".to_owned(),
+                b"<root><futureFormulaCache>North!A1</futureFormulaCache></root>".to_vec(),
+            )))
+            .expect("custom part");
+        package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook")
+            .rels_mut()
+            .try_add_relationship(
+                "urn:litchi:test-custom".to_owned(),
+                "../customXml/item1.xml".to_owned(),
+                "customRef".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("custom relationship");
+        let unknown = Workbook::from_package(package).expect("unknown producer workbook");
+        let mut edit = unknown.edit().expect("remove edit");
+        edit.remove("North").expect("lookup").expect("North");
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::SheetRemoveBlocked {
+                reason: RemoveBlock::UnmodeledReference,
+                part,
+                ..
+            }) if part == "/customXml/item1.xml"
+        ));
+    }
+
+    #[test]
+    fn worksheet_remove_blocks_macro_projects_and_extra_incoming_relationships() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut create = baseline.edit().expect("create edit");
+        create.add("Delete").expect("Delete");
+        let source = create.commit().expect("source").into_workbook();
+
+        let mut macro_package = source.inner.package.clone();
+        macro_package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/vbaProject.bin").expect("VBA URI"),
+                litchi_opc::constants::content_type::OFC_VBA_PROJECT.to_owned(),
+                vec![0, 1, 2, 3],
+            )))
+            .expect("VBA part");
+        macro_package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook")
+            .rels_mut()
+            .try_add_relationship(
+                litchi_opc::constants::relationship_type::VBA_PROJECT.to_owned(),
+                "vbaProject.bin".to_owned(),
+                "vbaProject".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("VBA relationship");
+        let macro_book = Workbook::from_package(macro_package).expect("macro workbook");
+        let mut remove = macro_book.edit().expect("macro remove");
+        remove.remove("Delete").expect("lookup").expect("Delete");
+        assert!(matches!(
+            remove.commit(),
+            Err(Error::SheetRemoveBlocked {
+                reason: RemoveBlock::MacroProject,
+                ..
+            })
+        ));
+
+        let target = source
+            .inner
+            .sheets
+            .get(1)
+            .expect("Delete sheet")
+            .part_uri
+            .clone();
+        let mut incoming_package = source.inner.package.clone();
+        let mut referrer = BlobPart::new(
+            PackURI::new("/xl/custom.xml").expect("custom URI"),
+            "application/xml".to_owned(),
+            b"<custom/>".to_vec(),
+        );
+        referrer
+            .rels_mut()
+            .try_add_relationship(
+                "urn:litchi:test-incoming".to_owned(),
+                target.relative_ref("/xl"),
+                "sheetRef".to_owned(),
+                TargetMode::Internal,
+            )
+            .expect("incoming relationship");
+        incoming_package
+            .try_add_part(Box::new(referrer))
+            .expect("referrer part");
+        let incoming = Workbook::from_package(incoming_package).expect("incoming workbook");
+        let mut remove = incoming.edit().expect("incoming remove");
+        remove.remove("Delete").expect("lookup").expect("Delete");
+        assert!(matches!(
+            remove.commit(),
+            Err(Error::SheetRemoveBlocked {
+                reason: RemoveBlock::IncomingRelationship,
+                part,
+                ..
+            }) if part == "/xl/custom.xml"
+        ));
+    }
+
+    #[test]
+    fn worksheet_remove_blocks_custom_workbook_view_identity() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut create = baseline.edit().expect("create edit");
+        create.add("Delete").expect("Delete");
+        let source = create.commit().expect("source").into_workbook();
+        let native_id = source.inner.sheets[1].native_id;
+        let mut package = source.inner.package.clone();
+        let workbook = package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook");
+        let xml = std::str::from_utf8(workbook.blob())
+            .expect("workbook UTF-8")
+            .replace(
+                "</workbook>",
+                &format!(
+                    r#"<customWorkbookViews><customWorkbookView name="Delete view" guid="{{00000000-0000-0000-0000-000000000001}}" activeSheetId="{native_id}"/></customWorkbookViews></workbook>"#
+                ),
+            );
+        assert!(xml.contains("customWorkbookView"));
+        workbook.set_blob(xml.into_bytes());
+        let source = Workbook::from_package(package).expect("custom-view workbook");
+        let mut remove = source.edit().expect("remove edit");
+        remove.remove("Delete").expect("lookup").expect("Delete");
+        assert!(matches!(
+            remove.commit(),
+            Err(Error::SheetRemoveBlocked {
+                reason: RemoveBlock::IncomingReference,
+                part,
+                ..
+            }) if part == "/xl/workbook.xml"
+        ));
+    }
+
+    #[test]
+    fn worksheet_remove_accepts_case_equivalent_opc_targets() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut create = baseline.edit().expect("create edit");
+        create.add("Delete").expect("Delete");
+        let source = create.commit().expect("source").into_workbook();
+        let relationship_id = source.inner.sheets[1].relationship_id.clone();
+        let mut package = source.inner.package.clone();
+        let relationships = package
+            .get_part_mut(&source.inner.workbook_uri)
+            .expect("workbook")
+            .rels_mut();
+        let relationship = relationships
+            .remove(&relationship_id)
+            .expect("worksheet relationship");
+        relationships
+            .try_add_relationship(
+                relationship.reltype().to_owned(),
+                "worksheets/SHEET2.XML".to_owned(),
+                relationship_id,
+                TargetMode::Internal,
+            )
+            .expect("case-equivalent relationship");
+        let source = Workbook::from_package(package).expect("case-equivalent workbook");
+        let mut remove = source.edit().expect("remove edit");
+        remove.remove("Delete").expect("lookup").expect("Delete");
+        assert!(
+            remove
+                .commit()
+                .expect("case-equivalent removal")
+                .workbook()
+                .sheet("Delete")
+                .expect("lookup")
+                .is_none()
+        );
     }
 
     #[test]

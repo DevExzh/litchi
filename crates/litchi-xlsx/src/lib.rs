@@ -18,7 +18,7 @@ mod workbook;
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
 pub use column::{Column, Columns};
 pub use error::{
-    ColumnEditBlock, EditBlock, Error, RenameBlock, Result, RowEditBlock, TabEditBlock,
+    ColumnEditBlock, EditBlock, Error, RemoveBlock, RenameBlock, Result, RowEditBlock, TabEditBlock,
 };
 pub use formula::Formula;
 pub use litchi_sheet::{

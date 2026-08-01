@@ -67,5 +67,7 @@ an explicit resolver. Undo/redo is an explicit budgeted `History<T>`.
 the selected object and required references. `gc` is a separate planned
 reachability operation. Structural edits update unambiguous dependencies and
 return a disposition requirement when content or incoming references would be
-lost. Sanitization certification is available only when all prohibited content
-is proven absent.
+lost. Until a disposition is explicitly supplied, the safe facade returns a
+typed refusal instead of guessing whether to cascade, detach, retarget, or
+retain an orphan. Sanitization certification is available only when all
+prohibited content is proven absent.

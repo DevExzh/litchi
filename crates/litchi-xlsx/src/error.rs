@@ -92,6 +92,17 @@ pub enum Error {
         part: String,
         reason: RenameBlock,
     },
+    /// Removing a worksheet would discard a live dependency or cross a graph
+    /// boundary whose semantics are not modeled by the safe facade.
+    #[error(
+        "cannot remove tab at position {position} ('{sheet}') while processing '{part}': {reason}"
+    )]
+    SheetRemoveBlocked {
+        sheet: String,
+        position: usize,
+        part: String,
+        reason: RemoveBlock,
+    },
     /// Editing would invalidate an OPC digital signature.
     #[error("signed workbooks require explicit signature stripping before editing")]
     Signed,
@@ -165,6 +176,46 @@ pub enum TabEditBlock {
 pub enum RenameBlock {
     MarkupCompatibility,
     UnmodeledReference,
+}
+
+/// Why dependency-aware worksheet deletion refused to publish.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RemoveBlock {
+    /// A workbook must retain at least one sheet.
+    LastSheet,
+    /// Worksheet removal is not yet composable with another mutation plan.
+    MixedEdit,
+    /// A retained, modeled formula or field still names the sheet.
+    IncomingReference,
+    /// An unknown producer field may still name the sheet.
+    UnmodeledReference,
+    /// A dependency occurs under markup-compatibility choice semantics.
+    MarkupCompatibility,
+    /// Macro code can address worksheets dynamically and is not rewritten.
+    MacroProject,
+    /// Another OPC relationship still targets the worksheet part.
+    IncomingRelationship,
+}
+
+impl std::fmt::Display for RemoveBlock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::LastSheet => "a workbook must retain at least one sheet",
+            Self::MixedEdit => {
+                "worksheet removal cannot yet be combined with another mutation in one transaction"
+            },
+            Self::IncomingReference => "a retained modeled field still references the sheet",
+            Self::UnmodeledReference => "an unmodeled producer field may still reference the sheet",
+            Self::MarkupCompatibility => {
+                "a reference is controlled by markup-compatibility content"
+            },
+            Self::MacroProject => "a VBA project may address the sheet dynamically",
+            Self::IncomingRelationship => {
+                "another package relationship still targets the worksheet part"
+            },
+        })
+    }
 }
 
 impl std::fmt::Display for RenameBlock {

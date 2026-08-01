@@ -243,6 +243,167 @@ pub(super) fn rename_sheets(formula: &str, renames: &[Rename<'_>]) -> RenameResu
     }
 }
 
+/// Whether a formula-like value has a local sheet reference whose meaning
+/// depends on one checked sheet position.
+///
+/// Direct prefixes and local 3-D ranges are recognized. External workbook
+/// indexes and inert string or structured-reference text are excluded.
+pub(super) fn depends_on_sheet(
+    formula: &str,
+    target: &str,
+    target_position: usize,
+    sheets: &[&str],
+) -> bool {
+    if formula.is_empty() || target_position >= sheets.len() {
+        return false;
+    }
+    let bytes = formula.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if bytes[index] == b'"' {
+            index = quoted_string_end(bytes, index);
+            continue;
+        }
+        let candidate = if bytes[index] == b'\'' {
+            quoted_sheet_prefix_end(bytes, index).map(|end| (end, true))
+        } else if is_prefix_start(bytes, index) {
+            unquoted_sheet_prefix_end(bytes, index).map(|end| (end, false))
+        } else {
+            None
+        };
+        if let Some((end, quoted)) = candidate {
+            if prefix_depends_on_sheet(
+                &formula[index..end - 1],
+                quoted,
+                target,
+                target_position,
+                sheets,
+            ) {
+                return true;
+            }
+            index = end;
+            continue;
+        }
+        if bytes[index] == b'[' {
+            index = bracket_end(bytes, index);
+            continue;
+        }
+        let Some(character) = formula[index..].chars().next() else {
+            break;
+        };
+        index += character.len_utf8();
+    }
+    false
+}
+
+/// Whether formula evaluation can construct a reference from runtime text.
+///
+/// Static dependency analysis cannot prove which sheet these functions will
+/// address, so destructive callers must treat them as an unmodeled reference.
+pub(super) fn has_dynamic_reference(formula: &str) -> bool {
+    let bytes = formula.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if bytes[index] == b'"' {
+            index = quoted_string_end(bytes, index);
+            continue;
+        }
+        if bytes[index] == b'[' {
+            index = bracket_end(bytes, index);
+            continue;
+        }
+        if bytes[index].is_ascii_alphabetic() || matches!(bytes[index], b'_' | b'.') {
+            let start = index;
+            index += 1;
+            while bytes
+                .get(index)
+                .is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.'))
+            {
+                index += 1;
+            }
+            let function = formula[start..index].rsplit('.').next().unwrap_or_default();
+            let mut next = index;
+            while bytes.get(next).is_some_and(u8::is_ascii_whitespace) {
+                next += 1;
+            }
+            if bytes.get(next) == Some(&b'(')
+                && matches_ignore_ascii_case(function, &["INDIRECT", "EVALUATE"])
+            {
+                return true;
+            }
+            continue;
+        }
+        let Some(character) = formula[index..].chars().next() else {
+            break;
+        };
+        index += character.len_utf8();
+    }
+    false
+}
+
+fn matches_ignore_ascii_case(value: &str, expected: &[&str]) -> bool {
+    expected
+        .iter()
+        .any(|candidate| value.eq_ignore_ascii_case(candidate))
+}
+
+fn prefix_depends_on_sheet(
+    raw: &str,
+    quoted: bool,
+    target: &str,
+    target_position: usize,
+    sheets: &[&str],
+) -> bool {
+    let decoded;
+    let prefix = if quoted {
+        let Some(inner) = raw
+            .strip_prefix('\'')
+            .and_then(|value| value.strip_suffix('\''))
+        else {
+            return false;
+        };
+        decoded = if inner.contains("''") {
+            Cow::Owned(inner.replace("''", "'"))
+        } else {
+            Cow::Borrowed(inner)
+        };
+        decoded.as_ref()
+    } else {
+        raw
+    };
+    let Some((_, sheet_range)) = local_workbook_prefix(prefix) else {
+        return false;
+    };
+    let (first, last) = sheet_range
+        .split_once(':')
+        .map_or((sheet_range, None), |(first, last)| (first, Some(last)));
+    if first.is_empty()
+        || last.is_some_and(str::is_empty)
+        || last.is_some_and(|last| last.contains(':'))
+    {
+        return false;
+    }
+    if crate::sheet::equivalent(first, target)
+        || last.is_some_and(|last| crate::sheet::equivalent(last, target))
+    {
+        return true;
+    }
+    let Some(last) = last else {
+        return false;
+    };
+    let first_position = sheets
+        .iter()
+        .position(|candidate| crate::sheet::equivalent(candidate, first));
+    let last_position = sheets
+        .iter()
+        .position(|candidate| crate::sheet::equivalent(candidate, last));
+    let (Some(first_position), Some(last_position)) = (first_position, last_position) else {
+        return false;
+    };
+    (first_position.min(last_position)..=first_position.max(last_position))
+        .contains(&target_position)
+}
+
 fn quoted_sheet_prefix_end(bytes: &[u8], start: usize) -> Option<usize> {
     let mut index = start + 1;
     while index < bytes.len() {
@@ -656,6 +817,33 @@ mod tests {
             result.text.as_deref(),
             Some("'O''Brien 2026'!A1+'O''Brien 2026'!Named")
         );
+    }
+
+    #[test]
+    fn detects_direct_and_implicit_three_d_sheet_dependencies() {
+        let sheets = ["One", "Middle", "Three"];
+        assert!(depends_on_sheet("Middle!A1", "Middle", 1, &sheets));
+        assert!(depends_on_sheet("One:Three!A1", "Middle", 1, &sheets));
+        assert!(depends_on_sheet(
+            "'[0]One:Three'!Named",
+            "Middle",
+            1,
+            &sheets
+        ));
+        assert!(depends_on_sheet("[0]Middle!A1", "Middle", 1, &sheets));
+        assert!(!depends_on_sheet("One!A1", "Middle", 1, &sheets));
+        assert!(!depends_on_sheet("[1]Middle!A1", "Middle", 1, &sheets));
+        assert!(!depends_on_sheet(
+            r#"INDIRECT("Middle!A1")+Table1[[Middle!A1]]"#,
+            "Middle",
+            1,
+            &sheets
+        ));
+        assert!(has_dynamic_reference(r#"INDIRECT("Middle!A1")"#));
+        assert!(has_dynamic_reference(r#"_xlfn.EVALUATE ("Middle!A1")"#));
+        assert!(!has_dynamic_reference(
+            r#""INDIRECT(Middle!A1)"+Table1[INDIRECT()]"#
+        ));
     }
 
     #[test]
