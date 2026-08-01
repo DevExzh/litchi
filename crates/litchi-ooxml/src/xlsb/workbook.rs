@@ -22,7 +22,7 @@ use crate::xlsb::records::{XlsbRecord, XlsbRecordIter, record_types};
 use crate::xlsb::shared_strings::SharedString;
 use crate::xlsb::styles_table::{CellFormat, StylesTable};
 use crate::xlsb::vba_project::{
-    VbaProject, discover_vba_project, remove_vba_project as remove_workbook_vba_project,
+    VbaProject, discover_vba_project, remove_vba_project as clear_workbook_vba,
     store_vba_project as store_workbook_vba_project,
 };
 use crate::xlsb::worksheet::XlsbWorksheet;
@@ -146,39 +146,41 @@ impl XlsbWorkbook {
     /// This validates only the declared OPC relationship graph and content
     /// types. It does not inspect, parse, verify, or execute VBA project or
     /// signature bytes.
-    pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
+    pub fn vba(&self) -> crate::error::Result<Option<VbaProject>> {
         let workbook = self.package.main_document_part()?;
         discover_vba_project(&self.package, workbook)
     }
 
     /// Attach a cache-free, inert MS-OVBA project to this binary workbook.
-    pub fn set_vba_project(
+    pub fn set_vba(
         &mut self,
-        project: &crate::vba::VbaProjectBinary,
+        project: litchi_vba::build::Project,
     ) -> crate::error::Result<VbaProject> {
-        let payload = project
-            .to_cfb_bytes()
-            .map_err(|error| crate::error::OoxmlError::InvalidFormat(error.to_string()))?;
-        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+        self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
-    /// Attach an existing, validated `vbaProject.bin` without executing it.
+    /// Attach a cache-free project with explicit resource limits.
+    pub fn set_vba_with(
+        &mut self,
+        project: litchi_vba::build::Project,
+        limits: &litchi_vba::Limits,
+    ) -> crate::error::Result<VbaProject> {
+        self.put_vba(project.finish(limits)?)
+    }
+
+    /// Attach a prevalidated `vbaProject.bin` without executing it.
     ///
     /// Any existing legacy or Agile project signature is removed because
     /// replacing the signed project bytes invalidates it.
-    pub fn set_vba_project_bytes(
-        &mut self,
-        payload: Vec<u8>,
-        limits: &crate::vba::VbaLimits,
-    ) -> crate::error::Result<VbaProject> {
+    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> crate::error::Result<VbaProject> {
         let source = self.package.main_document_part()?.partname().clone();
-        store_workbook_vba_project(&mut self.package, &source, payload, limits)
+        store_workbook_vba_project(&mut self.package, &source, payload)
     }
 
     /// Remove the VBA project and all declared project-signature parts.
-    pub fn remove_vba_project(&mut self) -> crate::error::Result<bool> {
+    pub fn clear_vba(&mut self) -> crate::error::Result<bool> {
         let source = self.package.main_document_part()?.partname().clone();
-        remove_workbook_vba_project(&mut self.package, &source)
+        clear_workbook_vba(&mut self.package, &source)
     }
 
     /// Workbook and sheet-scoped defined names in `PtgName` index order.

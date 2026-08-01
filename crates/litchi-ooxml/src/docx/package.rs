@@ -30,7 +30,7 @@ use crate::docx::settings::{
 use crate::docx::variables::DocumentVariables;
 use crate::docx::vba_project::{
     VbaProject, VbaSupplementalData, discover_vba_project,
-    remove_vba_project as remove_vba_project_graph_from_document,
+    remove_vba_project as clear_vba_graph_from_document,
     store_vba_project as store_vba_project_in_document,
 };
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
@@ -633,50 +633,44 @@ impl Package {
     /// This validates only the declared OPC relationship graph and content
     /// types. It does not inspect, parse, decompress, or execute the binary
     /// VBA project or Word supplemental-data bytes.
-    pub fn vba_project(&self) -> Result<Option<VbaProject>> {
+    pub fn vba(&self) -> Result<Option<VbaProject>> {
         let document = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, document)
     }
 
     /// Attach a cache-free, inert MS-OVBA project with empty Word supplemental data.
-    pub fn set_vba_project(
-        &mut self,
-        project: &crate::vba::VbaProjectBinary,
-    ) -> Result<VbaProject> {
-        self.set_vba_project_with_supplemental_data(project, &VbaSupplementalData::new())
-    }
-
-    /// Attach a cache-free project and typed Word document-event/macro metadata.
-    pub fn set_vba_project_with_supplemental_data(
-        &mut self,
-        project: &crate::vba::VbaProjectBinary,
-        supplemental_data: &VbaSupplementalData,
-    ) -> Result<VbaProject> {
-        let payload = project
-            .to_cfb_bytes()
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?;
-        self.set_vba_project_bytes(
-            payload,
-            supplemental_data,
-            &crate::vba::VbaLimits::default(),
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
+        self.set_vba_with(
+            project,
+            &VbaSupplementalData::new(),
+            &litchi_vba::Limits::default(),
         )
     }
 
-    /// Attach an existing, validated `vbaProject.bin` and typed Word supplemental data.
-    pub fn set_vba_project_bytes(
+    /// Attach a cache-free project and typed Word document-event/macro metadata.
+    pub fn set_vba_with(
         &mut self,
-        payload: Vec<u8>,
+        project: litchi_vba::build::Project,
         supplemental_data: &VbaSupplementalData,
-        limits: &crate::vba::VbaLimits,
+        limits: &litchi_vba::Limits,
+    ) -> Result<VbaProject> {
+        self.put_vba(project.finish(limits)?, supplemental_data)
+    }
+
+    /// Attach a prevalidated `vbaProject.bin` and typed Word supplemental data.
+    pub fn put_vba(
+        &mut self,
+        payload: litchi_vba::Payload,
+        supplemental_data: &VbaSupplementalData,
     ) -> Result<VbaProject> {
         let source = self.opc.main_document_part()?.partname().clone();
-        store_vba_project_in_document(&mut self.opc, &source, payload, supplemental_data, limits)
+        store_vba_project_in_document(&mut self.opc, &source, payload, supplemental_data)
     }
 
     /// Remove the VBA project and supplemental-data graph and restore DOCX/DOTX type.
-    pub fn remove_vba_project(&mut self) -> Result<bool> {
+    pub fn clear_vba(&mut self) -> Result<bool> {
         let source = self.opc.main_document_part()?.partname().clone();
-        remove_vba_project_graph_from_document(&mut self.opc, &source)
+        clear_vba_graph_from_document(&mut self.opc, &source)
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.

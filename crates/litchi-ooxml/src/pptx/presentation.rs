@@ -560,7 +560,7 @@ impl<'a> Presentation<'a> {
     ///
     /// The project binary remains opaque and inert. This validates only its
     /// declared package relationship graph and content type.
-    pub fn vba_project(&self) -> Result<Option<crate::pptx::VbaProject>> {
+    pub fn vba(&self) -> Result<Option<crate::pptx::VbaProject>> {
         crate::pptx::vba_project::discover_vba_project(self.package, self.part.part())
     }
 

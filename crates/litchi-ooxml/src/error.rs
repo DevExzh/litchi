@@ -43,6 +43,10 @@ pub enum OoxmlError {
     #[error("OOXML decoding error: {0}")]
     CommonXml(#[from] litchi_ooxml_common::XmlError),
 
+    /// Bounded, inert VBA parsing or authoring error.
+    #[error("VBA error: {0}")]
+    Vba(#[from] litchi_vba::Error),
+
     /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -98,6 +102,7 @@ impl From<OoxmlError> for litchi_core::Error {
             OoxmlError::Drawing(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::MarkupCompatibility(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::CommonXml(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            OoxmlError::Vba(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),
             OoxmlError::IoError(e) => litchi_core::Error::Io(e),
             OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),

@@ -1,13 +1,11 @@
 //! Typed, inert MS-OVBA project authoring.
 
-use super::directory::{
-    DirectoryWriteModule, DirectoryWriteProject, encode_directory, encode_mbcs,
-};
-use super::{VbaError, VbaLimits, VbaModuleKind, check_limit, compress_container, invalid};
-use crate::OleWriter;
+use super::dir::{Kind as DirKind, WriteModule, WriteProject, encode_dir, encode_mbcs};
+use super::{Error, Limits, check_limit, codec, invalid};
+use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::encoding::codepage_to_encoding;
 use std::collections::HashSet;
-use std::io::Cursor;
+use std::io::{self, Cursor, Seek, SeekFrom, Write};
 
 const VBA_STORAGE_NAME: &str = "VBA";
 const DIR_STREAM_NAME: &str = "dir";
@@ -24,10 +22,11 @@ const MAX_VBA_IDENTIFIER_CHARACTERS: usize = 255;
 const DETERMINISTIC_OBFUSCATION_SEED: u8 = 0;
 const ENCRYPTION_VERSION: u8 = 2;
 const PROJECT_VERSION_COMPATIBLE_32: &str = "393222000";
+const CFB_HEADER_BYTES: usize = 512;
 
 /// Target platform stored in `PROJECTSYSKIND`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VbaPlatform {
+pub enum Platform {
     /// 16-bit Windows.
     Windows16,
     /// 32-bit Windows.
@@ -38,7 +37,7 @@ pub enum VbaPlatform {
     Windows64,
 }
 
-impl VbaPlatform {
+impl Platform {
     const fn system_kind(self) -> u32 {
         match self {
             Self::Windows16 => 0,
@@ -51,7 +50,7 @@ impl VbaPlatform {
 
 /// Project-level module category represented in the `PROJECT` stream.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VbaProjectModuleKind {
+pub enum Kind {
     /// A standard procedural module (`Module=`).
     Standard,
     /// A class module (`Class=`).
@@ -63,20 +62,20 @@ pub enum VbaProjectModuleKind {
     },
 }
 
-impl VbaProjectModuleKind {
-    const fn directory_kind(self) -> VbaModuleKind {
+impl Kind {
+    const fn directory_kind(self) -> DirKind {
         match self {
-            Self::Standard => VbaModuleKind::Procedural,
-            Self::Class | Self::Document { .. } => VbaModuleKind::DocumentClassOrDesigner,
+            Self::Standard => DirKind::Procedural,
+            Self::Class | Self::Document { .. } => DirKind::DocumentClassOrDesigner,
         }
     }
 }
 
 /// Canonical project Automation type-library identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct VbaProjectId([u8; 16]);
+pub struct Id([u8; 16]);
 
-impl VbaProjectId {
+impl Id {
     /// The all-zero project identifier.
     pub const NIL: Self = Self([0; 16]);
 
@@ -115,11 +114,11 @@ impl VbaProjectId {
 }
 
 /// One module to be written into an inert VBA project.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaModuleBuilder {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Module {
     name: String,
     stream_name: String,
-    kind: VbaProjectModuleKind,
+    kind: Kind,
     source_body: String,
     description: String,
     help_context: u32,
@@ -127,15 +126,15 @@ pub struct VbaModuleBuilder {
     private: bool,
 }
 
-impl VbaModuleBuilder {
+impl Module {
     /// Create a standard procedural module.
     pub fn standard(name: impl Into<String>, source_body: impl Into<String>) -> Self {
-        Self::new(name, source_body, VbaProjectModuleKind::Standard)
+        Self::new(name, source_body, Kind::Standard)
     }
 
     /// Create a class module.
     pub fn class(name: impl Into<String>, source_body: impl Into<String>) -> Self {
-        Self::new(name, source_body, VbaProjectModuleKind::Class)
+        Self::new(name, source_body, Kind::Class)
     }
 
     /// Create a document module.
@@ -147,17 +146,13 @@ impl VbaModuleBuilder {
         Self::new(
             name,
             source_body,
-            VbaProjectModuleKind::Document {
+            Kind::Document {
                 type_library_version,
             },
         )
     }
 
-    fn new(
-        name: impl Into<String>,
-        source_body: impl Into<String>,
-        kind: VbaProjectModuleKind,
-    ) -> Self {
+    fn new(name: impl Into<String>, source_body: impl Into<String>, kind: Kind) -> Self {
         let name = name.into();
         Self {
             stream_name: name.clone(),
@@ -172,19 +167,19 @@ impl VbaModuleBuilder {
     }
 
     /// Override the CFB stream name. By default it equals the module name.
-    pub fn with_stream_name(mut self, stream_name: impl Into<String>) -> Self {
+    pub fn stream_name(mut self, stream_name: impl Into<String>) -> Self {
         self.stream_name = stream_name.into();
         self
     }
 
     /// Set the module description.
-    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+    pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the module Help context identifier.
-    pub fn with_help_context(mut self, help_context: u32) -> Self {
+    pub fn help_context(mut self, help_context: u32) -> Self {
         self.help_context = help_context;
         self
     }
@@ -207,32 +202,32 @@ impl VbaModuleBuilder {
     }
 
     /// Project-level module category.
-    pub fn kind(&self) -> VbaProjectModuleKind {
+    pub fn kind(&self) -> Kind {
         self.kind
     }
 }
 
 /// Builder for a cache-free, inert MS-OVBA project.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaProjectBuilder {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Project {
     name: String,
-    project_id: VbaProjectId,
-    platform: VbaPlatform,
+    project_id: Id,
+    platform: Platform,
     code_page: u16,
     description: String,
     help_context: i32,
     version_major: u32,
     version_minor: u16,
-    modules: Vec<VbaModuleBuilder>,
+    modules: Vec<Module>,
 }
 
-impl VbaProjectBuilder {
+impl Project {
     /// Create a project with Windows-1252 text and 32-bit Windows metadata.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            project_id: VbaProjectId::NIL,
-            platform: VbaPlatform::Windows32,
+            project_id: Id::NIL,
+            platform: Platform::Windows32,
             code_page: DEFAULT_CODE_PAGE,
             description: String::new(),
             help_context: 0,
@@ -243,59 +238,58 @@ impl VbaProjectBuilder {
     }
 
     /// Set the project Automation type-library identifier.
-    pub fn with_project_id(mut self, project_id: VbaProjectId) -> Self {
+    pub fn id(mut self, project_id: Id) -> Self {
         self.project_id = project_id;
         self
     }
 
     /// Set the target platform.
-    pub fn with_platform(mut self, platform: VbaPlatform) -> Self {
+    pub fn platform(mut self, platform: Platform) -> Self {
         self.platform = platform;
         self
     }
 
     /// Set the MBCS code page used for project text and module source.
-    pub fn with_code_page(mut self, code_page: u16) -> Self {
+    pub fn code_page(mut self, code_page: u16) -> Self {
         self.code_page = code_page;
         self
     }
 
     /// Set the project description.
-    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+    pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the project Help context identifier.
-    pub fn with_help_context(mut self, help_context: i32) -> Self {
+    pub fn help_context(mut self, help_context: i32) -> Self {
         self.help_context = help_context;
         self
     }
 
     /// Set the project version mirrored into the `dir` stream.
-    pub fn with_version(mut self, major: u32, minor: u16) -> Self {
+    pub fn version(mut self, major: u32, minor: u16) -> Self {
         self.version_major = major;
         self.version_minor = minor;
         self
     }
 
-    /// Append a module in directory order.
-    pub fn add_module(&mut self, module: VbaModuleBuilder) -> &mut Self {
-        self.modules.push(module);
-        self
-    }
-
     /// Append a module and return the builder.
-    pub fn with_module(mut self, module: VbaModuleBuilder) -> Self {
+    pub fn module(mut self, module: Module) -> Self {
         self.modules.push(module);
         self
     }
 
     /// Serialize and validate the project without executing or compiling source.
-    pub fn build(&self, limits: &VbaLimits) -> Result<VbaProjectBinary, VbaError> {
+    pub fn finish(self, limits: &Limits) -> Result<Payload, Error> {
+        check_limit(
+            "standalone VBA CFB bytes",
+            CFB_HEADER_BYTES,
+            limits.max_cfb_bytes,
+        )?;
         check_limit("VBA module count", self.modules.len(), limits.max_modules)?;
         let encoding = codepage_to_encoding(u32::from(self.code_page))
-            .ok_or(VbaError::UnsupportedCodePage(self.code_page))?;
+            .ok_or(Error::UnsupportedCodePage(self.code_page))?;
         validate_project_name(&self.name)?;
         validate_quoted_text(&self.description, "VBA project description")?;
         let encoded_name = encode_mbcs(&self.name, encoding, "PROJECTNAME")?;
@@ -304,7 +298,7 @@ impl VbaProjectBuilder {
         }
         validate_project_modules(&self.modules)?;
 
-        let mut encoded_modules = Vec::with_capacity(self.modules.len());
+        let mut compressed_modules = Vec::with_capacity(self.modules.len());
         let mut total_source_bytes = 0usize;
         for module in &self.modules {
             let source = module_source(module);
@@ -317,17 +311,14 @@ impl VbaProjectBuilder {
                 total_source_bytes,
                 limits.max_total_source_bytes,
             )?;
-            let compressed_source = compress_container(&source, limits)?;
-            encoded_modules.push(EncodedModule {
-                stream_name: module.stream_name.clone(),
-                compressed_source,
-            });
+            let compressed_source = codec::encode(&source, limits)?;
+            compressed_modules.push(compressed_source);
         }
 
         let directory_modules: Vec<_> = self
             .modules
             .iter()
-            .map(|module| DirectoryWriteModule {
+            .map(|module| WriteModule {
                 name: &module.name,
                 stream_name: &module.stream_name,
                 description: &module.description,
@@ -337,8 +328,8 @@ impl VbaProjectBuilder {
                 private: module.private,
             })
             .collect();
-        let directory = encode_directory(
-            &DirectoryWriteProject {
+        let directory = encode_dir(
+            &WriteProject {
                 system_kind: self.platform.system_kind(),
                 code_page: self.code_page,
                 name: &self.name,
@@ -350,28 +341,132 @@ impl VbaProjectBuilder {
             },
             limits,
         )?;
-        let project_stream = encode_project_stream(self, encoding, limits)?;
+        let project_stream = encode_project_stream(&self, encoding, limits)?;
         let project_wm_stream = encode_project_wm_stream(&self.modules, encoding, limits)?;
 
-        Ok(VbaProjectBinary {
+        let modules = self
+            .modules
+            .into_iter()
+            .zip(compressed_modules)
+            .map(|(module, compressed_source)| EncodedModule {
+                stream_name: module.stream_name,
+                compressed_source,
+            })
+            .collect();
+        let streams = Streams {
             version_project_stream: version_project_stream(),
             directory_stream: directory,
             project_stream,
             project_wm_stream,
-            modules: encoded_modules,
+            modules,
+        };
+        let module_count = streams.modules.len();
+        let mut writer = OleWriter::new();
+        streams.write_into(&mut writer, &[])?;
+        drop(streams);
+
+        let mut output = BoundedCursor::new(limits.max_cfb_bytes);
+        if let Err(error) = writer.write_to(&mut output) {
+            if let Some(actual) = output.exceeded_actual() {
+                return Err(Error::LimitExceeded {
+                    limit: "standalone VBA CFB bytes",
+                    actual,
+                    maximum: limits.max_cfb_bytes,
+                });
+            }
+            return Err(error.into());
+        }
+        let bytes = output.into_inner();
+        check_limit(
+            "standalone VBA CFB bytes",
+            bytes.len(),
+            limits.max_cfb_bytes,
+        )?;
+        Ok(Payload {
+            bytes,
+            module_count,
         })
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+struct BoundedCursor {
+    inner: Cursor<Vec<u8>>,
+    maximum: usize,
+    exceeded_actual: Option<usize>,
+}
+
+impl BoundedCursor {
+    fn new(maximum: usize) -> Self {
+        Self {
+            inner: Cursor::new(Vec::new()),
+            maximum,
+            exceeded_actual: None,
+        }
+    }
+
+    fn exceeded_actual(&self) -> Option<usize> {
+        self.exceeded_actual
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.inner.into_inner()
+    }
+
+    fn reject_limit(&mut self, actual: u64) -> io::Error {
+        let actual = match usize::try_from(actual) {
+            Ok(actual) => actual,
+            Err(_) => self.maximum.saturating_add(1),
+        };
+        self.exceeded_actual = Some(
+            self.exceeded_actual
+                .map_or(actual, |previous| previous.max(actual)),
+        );
+        io::Error::other("standalone VBA CFB byte limit exceeded")
+    }
+
+    fn maximum_u64(&self) -> u64 {
+        u64::try_from(self.maximum).unwrap_or(u64::MAX)
+    }
+}
+
+impl Write for BoundedCursor {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let byte_count = match u64::try_from(bytes.len()) {
+            Ok(byte_count) => byte_count,
+            Err(_) => return Err(self.reject_limit(u64::MAX)),
+        };
+        let end = self.inner.position().saturating_add(byte_count);
+        if end > self.maximum_u64() {
+            return Err(self.reject_limit(end));
+        }
+        self.inner.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl Seek for BoundedCursor {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let previous = self.inner.position();
+        let next = self.inner.seek(position)?;
+        if next > self.maximum_u64() {
+            self.inner.set_position(previous);
+            return Err(self.reject_limit(next));
+        }
+        Ok(next)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 struct EncodedModule {
     stream_name: String,
     compressed_source: Vec<u8>,
 }
 
-/// Fully serialized streams for a cache-free, inert MS-OVBA project.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaProjectBinary {
+#[derive(Debug, PartialEq, Eq)]
+struct Streams {
     version_project_stream: Vec<u8>,
     directory_stream: Vec<u8>,
     project_stream: Vec<u8>,
@@ -379,23 +474,8 @@ pub struct VbaProjectBinary {
     modules: Vec<EncodedModule>,
 }
 
-impl VbaProjectBinary {
-    /// Number of module streams serialized into the project.
-    pub fn module_count(&self) -> usize {
-        self.modules.len()
-    }
-
-    /// Whether the project contains no standard, class, or document modules.
-    pub fn is_module_free(&self) -> bool {
-        self.modules.is_empty()
-    }
-
-    /// Write all project storages and streams into an existing CFB writer.
-    pub fn write_into(
-        &self,
-        writer: &mut OleWriter,
-        project_root_path: &[&str],
-    ) -> Result<(), VbaError> {
+impl Streams {
+    fn write_into(&self, writer: &mut OleWriter, project_root_path: &[&str]) -> Result<(), Error> {
         let mut vba_storage: Vec<String> = project_root_path
             .iter()
             .map(|component| (*component).to_owned())
@@ -427,45 +507,108 @@ impl VbaProjectBinary {
         }
         Ok(())
     }
+}
 
-    /// Build a standalone CFB payload suitable for an OOXML `vbaProject.bin`.
-    pub fn to_cfb_bytes(&self) -> Result<Vec<u8>, VbaError> {
-        let mut writer = OleWriter::new();
-        self.write_into(&mut writer, &[])?;
-        let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output)?;
-        Ok(output.into_inner())
+/// Owned, validated standalone CFB bytes for one inert MS-OVBA project.
+///
+/// The private representation is a validation capability: arbitrary bytes can
+/// enter only through [`Self::read`], while [`Project::finish`] constructs the
+/// same invariant directly.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Payload {
+    bytes: Vec<u8>,
+    module_count: usize,
+}
+
+impl Payload {
+    /// Consume and validate standalone CFB bytes without copying them.
+    pub fn read(bytes: Vec<u8>, limits: &Limits) -> Result<Self, Error> {
+        check_limit(
+            "standalone VBA CFB bytes",
+            bytes.len(),
+            limits.max_cfb_bytes,
+        )?;
+        let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
+        let project = crate::project::Project::open(&mut ole, &[], limits)?;
+        let module_count = project.modules().len();
+        Ok(Self {
+            bytes,
+            module_count,
+        })
     }
 
-    /// Compressed `dir` stream bytes.
-    pub fn directory_stream(&self) -> &[u8] {
-        &self.directory_stream
+    /// Borrow the exact validated standalone bytes.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
     }
 
-    /// Uncompressed `PROJECT` stream bytes.
-    pub fn project_stream(&self) -> &[u8] {
-        &self.project_stream
+    /// Move out the exact validated standalone bytes without copying them.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
     }
 
-    /// `PROJECTwm` module-name map bytes.
-    pub fn project_wm_stream(&self) -> &[u8] {
-        &self.project_wm_stream
+    /// Number of module streams declared and validated by the project.
+    pub fn module_count(&self) -> usize {
+        self.module_count
+    }
+
+    /// Whether the project contains no standard, class, or document modules.
+    pub fn is_module_free(&self) -> bool {
+        self.module_count == 0
+    }
+
+    /// Copy all payload streams into an existing CFB writer at a project root.
+    pub fn write_into(
+        &self,
+        writer: &mut OleWriter,
+        project_root_path: &[&str],
+    ) -> Result<(), Error> {
+        let mut source = OleFile::open(Cursor::new(self.bytes.as_slice()))?;
+        for source_path in source.list_streams() {
+            let is_vba_stream =
+                source_path.len() == 2 && source_path[0].eq_ignore_ascii_case(VBA_STORAGE_NAME);
+            if is_vba_stream
+                && source_path[1]
+                    .get(..6)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("__SRP_"))
+            {
+                continue;
+            }
+            let source_components: Vec<&str> = source_path.iter().map(String::as_str).collect();
+            let data = if is_vba_stream
+                && source_path[1].eq_ignore_ascii_case(VERSION_PROJECT_STREAM_NAME)
+            {
+                version_project_stream()
+            } else {
+                source.open_stream(&source_components)?
+            };
+            let mut target_path: Vec<String> = project_root_path
+                .iter()
+                .map(|component| (*component).to_owned())
+                .collect();
+            target_path.extend(source_path);
+            if target_path.len() > 1 {
+                create_storage(writer, &target_path[..target_path.len() - 1])?;
+            }
+            create_stream(writer, &target_path, &data)?;
+        }
+        Ok(())
     }
 }
 
-fn create_storage(writer: &mut OleWriter, path: &[String]) -> Result<(), VbaError> {
+fn create_storage(writer: &mut OleWriter, path: &[String]) -> Result<(), Error> {
     let components: Vec<&str> = path.iter().map(String::as_str).collect();
     writer.create_storage(&components)?;
     Ok(())
 }
 
-fn create_stream(writer: &mut OleWriter, path: &[String], data: &[u8]) -> Result<(), VbaError> {
+fn create_stream(writer: &mut OleWriter, path: &[String], data: &[u8]) -> Result<(), Error> {
     let components: Vec<&str> = path.iter().map(String::as_str).collect();
     writer.create_stream(&components, data)?;
     Ok(())
 }
 
-fn validate_project_name(name: &str) -> Result<(), VbaError> {
+fn validate_project_name(name: &str) -> Result<(), Error> {
     if name.is_empty() {
         return Err(invalid("VBA project name must not be empty"));
     }
@@ -483,7 +626,7 @@ fn validate_project_name(name: &str) -> Result<(), VbaError> {
     Ok(())
 }
 
-fn validate_project_modules(modules: &[VbaModuleBuilder]) -> Result<(), VbaError> {
+fn validate_project_modules(modules: &[Module]) -> Result<(), Error> {
     let mut names = HashSet::with_capacity(modules.len());
     let mut stream_names = HashSet::with_capacity(modules.len());
     for module in modules {
@@ -511,7 +654,7 @@ fn validate_project_modules(modules: &[VbaModuleBuilder]) -> Result<(), VbaError
     Ok(())
 }
 
-fn validate_module_identifier(name: &str) -> Result<(), VbaError> {
+fn validate_module_identifier(name: &str) -> Result<(), Error> {
     if name.chars().count() > MAX_VBA_IDENTIFIER_CHARACTERS {
         return Err(invalid(format!(
             "VBA module name exceeds {MAX_VBA_IDENTIFIER_CHARACTERS} characters"
@@ -534,7 +677,7 @@ fn validate_module_identifier(name: &str) -> Result<(), VbaError> {
     Ok(())
 }
 
-fn validate_stream_name(name: &str) -> Result<(), VbaError> {
+fn validate_stream_name(name: &str) -> Result<(), Error> {
     let code_units = name.encode_utf16().count();
     if code_units == 0 || code_units > MAX_CFB_NAME_CODE_UNITS {
         return Err(invalid(format!(
@@ -561,7 +704,7 @@ fn validate_stream_name(name: &str) -> Result<(), VbaError> {
     Ok(())
 }
 
-fn validate_quoted_text(value: &str, field: &'static str) -> Result<(), VbaError> {
+fn validate_quoted_text(value: &str, field: &'static str) -> Result<(), Error> {
     if value
         .chars()
         .any(|character| character == '"' || character.is_control())
@@ -573,7 +716,7 @@ fn validate_quoted_text(value: &str, field: &'static str) -> Result<(), VbaError
     Ok(())
 }
 
-fn module_source(module: &VbaModuleBuilder) -> String {
+fn module_source(module: &Module) -> String {
     let mut source = String::with_capacity(module.name.len() + module.source_body.len() + 32);
     source.push_str("Attribute VB_Name = \"");
     source.push_str(&module.name);
@@ -583,10 +726,10 @@ fn module_source(module: &VbaModuleBuilder) -> String {
 }
 
 fn encode_project_stream(
-    project: &VbaProjectBuilder,
+    project: &Project,
     encoding: &'static encoding_rs::Encoding,
-    limits: &VbaLimits,
-) -> Result<Vec<u8>, VbaError> {
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
     let project_id = project.project_id.braced_uppercase();
     let mut text = String::new();
     text.push_str("ID=\"");
@@ -594,9 +737,9 @@ fn encode_project_stream(
     text.push_str("\"\r\n");
     for module in &project.modules {
         match module.kind {
-            VbaProjectModuleKind::Standard => text.push_str("Module="),
-            VbaProjectModuleKind::Class => text.push_str("Class="),
-            VbaProjectModuleKind::Document {
+            Kind::Standard => text.push_str("Module="),
+            Kind::Class => text.push_str("Class="),
+            Kind::Document {
                 type_library_version,
             } => {
                 text.push_str("Document=");
@@ -625,9 +768,9 @@ fn encode_project_stream(
     text.push_str(PROJECT_VERSION_COMPATIBLE_32);
     text.push_str("\"\r\n");
 
-    let protection = encrypt_project_data(&[0; 4], &project_id);
-    let password = encrypt_project_data(&[0], &project_id);
-    let visibility = encrypt_project_data(&[0xff], &project_id);
+    let protection = encrypt_project_data(&[0; 4], &project_id)?;
+    let password = encrypt_project_data(&[0], &project_id)?;
+    let visibility = encrypt_project_data(&[0xff], &project_id)?;
     text.push_str("CMG=\"");
     push_upper_hex(&mut text, &protection);
     text.push_str("\"\r\nDPB=\"");
@@ -646,10 +789,10 @@ fn encode_project_stream(
 }
 
 fn encode_project_wm_stream(
-    modules: &[VbaModuleBuilder],
+    modules: &[Module],
     encoding: &'static encoding_rs::Encoding,
-    limits: &VbaLimits,
-) -> Result<Vec<u8>, VbaError> {
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
     let mut output = Vec::new();
     for module in modules {
         let encoded = encode_mbcs(&module.name, encoding, "PROJECTwm module name")?;
@@ -690,7 +833,7 @@ fn version_project_stream() -> Vec<u8> {
     output
 }
 
-fn encrypt_project_data(data: &[u8], project_id: &str) -> Vec<u8> {
+fn encrypt_project_data(data: &[u8], project_id: &str) -> Result<Vec<u8>, Error> {
     let seed = DETERMINISTIC_OBFUSCATION_SEED;
     let project_key = project_id
         .bytes()
@@ -704,7 +847,7 @@ fn encrypt_project_data(data: &[u8], project_id: &str) -> Vec<u8> {
     let mut encrypted_byte_1 = project_key_encrypted;
     let mut encrypted_byte_2 = version_encrypted;
     for byte in u32::try_from(data.len())
-        .expect("project encryption input is bounded")
+        .map_err(|_| invalid("PROJECT encryption input exceeds u32"))?
         .to_le_bytes()
         .into_iter()
         .chain(data.iter().copied())
@@ -715,7 +858,7 @@ fn encrypt_project_data(data: &[u8], project_id: &str) -> Vec<u8> {
         encrypted_byte_1 = encrypted;
         unencrypted_byte_1 = byte;
     }
-    output
+    Ok(output)
 }
 
 fn push_upper_hex(output: &mut String, bytes: &[u8]) {
@@ -730,51 +873,42 @@ fn push_upper_hex(output: &mut String, bytes: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::OleFile;
+    use litchi_cfb::OleFile;
 
-    fn sample_builder() -> VbaProjectBuilder {
-        let mut builder = VbaProjectBuilder::new("SampleProject")
-            .with_project_id(VbaProjectId::from_bytes([
+    fn sample_builder() -> Project {
+        Project::new("SampleProject")
+            .id(Id::from_bytes([
                 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc,
                 0xde, 0xf0,
             ]))
-            .with_description("Inert test project")
-            .with_version(7, 3);
-        builder
-            .add_module(
-                VbaModuleBuilder::standard("Module1", "Sub Main()\r\nEnd Sub\r\n")
+            .description("Inert test project")
+            .version(7, 3)
+            .module(
+                Module::standard("Module1", "Sub Main()\r\nEnd Sub\r\n")
                     .read_only(true)
                     .private(true),
             )
-            .add_module(VbaModuleBuilder::class(
-                "Class1",
-                "Private value As Long\r\n",
-            ))
-            .add_module(VbaModuleBuilder::document(
+            .module(Module::class("Class1", "Private value As Long\r\n"))
+            .module(Module::document(
                 "ThisDocument",
                 0x0001_0000,
                 "Private Sub Document_Open()\r\nEnd Sub\r\n",
-            ));
-        builder
+            ))
     }
 
     #[test]
     fn writes_complete_cache_free_project_and_reopens_every_module() {
-        let limits = VbaLimits::default();
-        let binary = sample_builder().build(&limits).unwrap();
+        let limits = Limits::default();
+        let binary = sample_builder().finish(&limits).unwrap();
         assert_eq!(binary.module_count(), 3);
         assert!(!binary.is_module_free());
         assert_eq!(
-            binary.version_project_stream,
-            [0xcc, 0x61, 0xff, 0xff, 0, 0, 0]
-        );
-        assert_eq!(
             binary,
-            sample_builder().build(&limits).unwrap(),
+            sample_builder().finish(&limits).unwrap(),
             "authoring must be deterministic"
         );
 
-        let bytes = binary.to_cfb_bytes().unwrap();
+        let bytes = binary.into_bytes();
         let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
         assert_eq!(
             ole.open_stream(&["VBA", VERSION_PROJECT_STREAM_NAME])
@@ -788,7 +922,7 @@ mod tests {
                 .all(|entry| !entry.name.starts_with("__SRP_"))
         );
 
-        let project = super::super::VbaProject::open(&mut ole, &[], &limits).unwrap();
+        let project = crate::project::Project::open(&mut ole, &[], &limits).unwrap();
         assert_eq!(project.name(), "SampleProject");
         assert_eq!(project.modules().len(), 3);
         assert_eq!(project.modules()[0].name(), "Module1");
@@ -801,7 +935,7 @@ mod tests {
         assert_eq!(project.modules()[1].name(), "Class1");
         assert_eq!(
             project.modules()[1].kind(),
-            VbaModuleKind::DocumentClassOrDesigner
+            DirKind::DocumentClassOrDesigner
         );
         assert_eq!(project.modules()[2].name(), "ThisDocument");
 
@@ -818,14 +952,14 @@ mod tests {
 
     #[test]
     fn writes_nested_legacy_project_and_non_ascii_codepage_text() {
-        let mut builder = VbaProjectBuilder::new("日本語")
-            .with_code_page(932)
-            .with_platform(VbaPlatform::Windows64);
-        builder.add_module(VbaModuleBuilder::standard(
-            "標準",
-            "Sub 挨拶()\r\nMsgBox \"こんにちは\"\r\nEnd Sub\r\n",
-        ));
-        let binary = builder.build(&VbaLimits::default()).unwrap();
+        let builder = Project::new("日本語")
+            .code_page(932)
+            .platform(Platform::Windows64)
+            .module(Module::standard(
+                "標準",
+                "Sub 挨拶()\r\nMsgBox \"こんにちは\"\r\nEnd Sub\r\n",
+            ));
+        let binary = builder.finish(&Limits::default()).unwrap();
 
         let mut writer = OleWriter::new();
         binary
@@ -836,7 +970,7 @@ mod tests {
         bytes.set_position(0);
         let mut ole = OleFile::open(bytes).unwrap();
         let project =
-            super::super::VbaProject::open(&mut ole, &["_VBA_PROJECT_CUR"], &VbaLimits::default())
+            crate::project::Project::open(&mut ole, &["_VBA_PROJECT_CUR"], &Limits::default())
                 .unwrap();
         assert_eq!(project.name(), "日本語");
         assert_eq!(project.code_page(), 932);
@@ -846,12 +980,12 @@ mod tests {
 
     #[test]
     fn project_wm_contains_ordered_mbcs_and_unicode_name_pairs() {
-        let limits = VbaLimits::default();
-        let mut builder = VbaProjectBuilder::new("Map").with_code_page(932);
-        builder
-            .add_module(VbaModuleBuilder::standard("標準", ""))
-            .add_module(VbaModuleBuilder::class("Class1", ""));
-        let binary = builder.build(&limits).unwrap();
+        let limits = Limits::default();
+        let builder = Project::new("Map")
+            .code_page(932)
+            .module(Module::standard("標準", ""))
+            .module(Module::class("Class1", ""));
+        let binary = builder.finish(&limits).unwrap();
         let encoding = codepage_to_encoding(932).unwrap();
         let mut expected = Vec::new();
         for name in ["標準", "Class1"] {
@@ -861,68 +995,136 @@ mod tests {
             expected.extend_from_slice(&0u16.to_le_bytes());
         }
         expected.extend_from_slice(&0u16.to_le_bytes());
-        assert_eq!(binary.project_wm_stream(), expected);
+        let mut ole = OleFile::open(Cursor::new(binary.bytes())).unwrap();
+        assert_eq!(
+            ole.open_stream(&[PROJECT_WM_STREAM_NAME]).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn payload_validation_and_extraction_preserve_the_input_allocation() {
+        let bytes = sample_builder()
+            .finish(&Limits::default())
+            .unwrap()
+            .into_bytes();
+        let expected = bytes.clone();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+
+        let payload = Payload::read(bytes, &Limits::default()).unwrap();
+        assert_eq!(payload.bytes().as_ptr(), pointer);
+        assert_eq!(payload.bytes.capacity(), capacity);
+        assert_eq!(payload.bytes(), expected);
+
+        let bytes = payload.into_bytes();
+        assert_eq!(bytes.as_ptr(), pointer);
+        assert_eq!(bytes.capacity(), capacity);
+        assert_eq!(bytes, expected);
+    }
+
+    #[test]
+    fn output_limit_stops_before_full_payload_allocation() {
+        for maximum in [0, CFB_HEADER_BYTES - 1] {
+            let limits = Limits {
+                max_cfb_bytes: maximum,
+                max_decompressed_stream_bytes: 0,
+                max_total_source_bytes: 0,
+                ..Limits::default()
+            };
+            assert!(matches!(
+                sample_builder().finish(&limits),
+                Err(Error::LimitExceeded {
+                    limit: "standalone VBA CFB bytes",
+                    actual: CFB_HEADER_BYTES,
+                    maximum: observed,
+                }) if observed == maximum
+            ));
+        }
+
+        let full_size = sample_builder()
+            .finish(&Limits::default())
+            .unwrap()
+            .bytes()
+            .len();
+        let maximum = full_size - 1;
+        let limits = Limits {
+            max_cfb_bytes: maximum,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            sample_builder().finish(&limits),
+            Err(Error::LimitExceeded {
+                limit: "standalone VBA CFB bytes",
+                actual,
+                maximum: observed,
+            }) if actual > observed && observed == maximum
+        ));
+
+        let mut output = BoundedCursor::new(8);
+        output.write_all(&[0; 8]).unwrap();
+        let capacity = output.inner.get_ref().capacity();
+        assert!(output.write_all(&[1]).is_err());
+        assert_eq!(output.inner.get_ref().len(), 8);
+        assert_eq!(output.inner.get_ref().capacity(), capacity);
+        assert_eq!(output.exceeded_actual(), Some(9));
     }
 
     #[test]
     fn rejects_invalid_names_codepages_text_and_resource_limits() {
-        let limits = VbaLimits::default();
-        let mut duplicate = VbaProjectBuilder::new("Project");
-        duplicate
-            .add_module(VbaModuleBuilder::standard("Module1", ""))
-            .add_module(VbaModuleBuilder::class("module1", ""));
-        assert!(duplicate.build(&limits).is_err());
+        let limits = Limits::default();
+        let duplicate = || {
+            Project::new("Project")
+                .module(Module::standard("Module1", ""))
+                .module(Module::class("module1", ""))
+        };
+        assert!(duplicate().finish(&limits).is_err());
 
-        let mut reserved = VbaProjectBuilder::new("Project");
-        reserved.add_module(VbaModuleBuilder::standard("Module1", "").with_stream_name("dir"));
-        assert!(reserved.build(&limits).is_err());
-        let mut cache_name = VbaProjectBuilder::new("Project");
-        cache_name
-            .add_module(VbaModuleBuilder::standard("Module1", "").with_stream_name("__SRP_0"));
-        assert!(cache_name.build(&limits).is_err());
+        let reserved =
+            Project::new("Project").module(Module::standard("Module1", "").stream_name("dir"));
+        assert!(reserved.finish(&limits).is_err());
+        let cache_name =
+            Project::new("Project").module(Module::standard("Module1", "").stream_name("__SRP_0"));
+        assert!(cache_name.finish(&limits).is_err());
 
-        let mut invalid_identifier = VbaProjectBuilder::new("Project");
-        invalid_identifier.add_module(VbaModuleBuilder::standard("1Module", ""));
-        assert!(invalid_identifier.build(&limits).is_err());
+        let invalid_identifier = Project::new("Project").module(Module::standard("1Module", ""));
+        assert!(invalid_identifier.finish(&limits).is_err());
 
         assert!(
-            VbaProjectBuilder::new("Project")
-                .with_description("invalid \"description")
-                .build(&limits)
+            Project::new("Project")
+                .description("invalid \"description")
+                .finish(&limits)
                 .is_err()
         );
-        let mut unrepresentable = VbaProjectBuilder::new("Project");
-        unrepresentable.add_module(VbaModuleBuilder::standard("Module1", "MsgBox \"🙂\""));
-        assert!(unrepresentable.build(&limits).is_err());
+        let unrepresentable =
+            Project::new("Project").module(Module::standard("Module1", "MsgBox \"🙂\""));
+        assert!(unrepresentable.finish(&limits).is_err());
         assert!(matches!(
-            VbaProjectBuilder::new("Project")
-                .with_code_page(42)
-                .build(&limits),
-            Err(VbaError::UnsupportedCodePage(42))
+            Project::new("Project").code_page(42).finish(&limits),
+            Err(Error::UnsupportedCodePage(42))
         ));
 
-        let no_modules = VbaLimits {
+        let no_modules = Limits {
             max_modules: 0,
             ..limits
         };
-        assert!(duplicate.build(&no_modules).is_err());
-        let no_source = VbaLimits {
+        assert!(duplicate().finish(&no_modules).is_err());
+        let no_source = Limits {
             max_total_source_bytes: 0,
             ..limits
         };
-        let mut one_module = VbaProjectBuilder::new("Project");
-        one_module.add_module(VbaModuleBuilder::standard("Module1", ""));
+        let one_module = Project::new("Project").module(Module::standard("Module1", ""));
         assert!(matches!(
-            one_module.build(&no_source),
-            Err(VbaError::LimitExceeded { .. })
+            one_module.finish(&no_source),
+            Err(Error::LimitExceeded { .. })
         ));
     }
 
     #[test]
     fn obfuscation_round_trips_the_unprotected_state_fields() {
-        let project_id = VbaProjectId::from_bytes([0xa5; 16]).braced_uppercase();
+        let project_id = Id::from_bytes([0xa5; 16]).braced_uppercase();
         for data in [&[0, 0, 0, 0][..], &[0][..], &[0xff][..]] {
-            let encrypted = encrypt_project_data(data, &project_id);
+            let encrypted = encrypt_project_data(data, &project_id).unwrap();
             assert_eq!(decrypt_project_data(&encrypted, &project_id), data);
         }
     }

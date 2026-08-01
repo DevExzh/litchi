@@ -1,9 +1,12 @@
-use litchi_ole::ovba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
 use litchi_ole::ppt::writer::{PptEncryptionProfile, PptWriter};
 use litchi_ole::ppt::{
     Package, PowerPointOleStorageCompression, PowerPointOleStorageKind,
     PowerPointVbaProjectCompression, PowerPointVbaProjectError, PowerPointVbaProjectLimits,
     PptOpenOptions,
+};
+use litchi_vba::{
+    Limits,
+    build::{Module, Project},
 };
 use std::io::Cursor;
 
@@ -20,24 +23,18 @@ fn compressed_complete_project_round_trips_as_inert_source() {
     writer
         .add_textbox(slide, 10, 20, 300, 40, "Macro-enabled presentation")
         .unwrap();
-    let project = VbaProjectBuilder::new("PresentationTools")
-        .with_module(VbaModuleBuilder::standard(
+    let project = Project::new("PresentationTools")
+        .module(Module::standard(
             "Module1",
             "Public Sub RefreshSlides()\r\nEnd Sub\r\n",
         ))
-        .with_module(VbaModuleBuilder::document(
+        .module(Module::document(
             "ThisPresentation",
             0,
             "Private Sub Presentation_Open()\r\nEnd Sub\r\n",
         ));
-    writer
-        .set_vba_project(
-            &project,
-            &VbaLimits::default(),
-            PowerPointVbaProjectCompression::Zlib,
-        )
-        .unwrap();
-    assert!(writer.has_vba_project());
+    writer.set_vba(project).unwrap();
+    assert!(writer.has_vba());
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
@@ -61,10 +58,7 @@ fn compressed_complete_project_round_trips_as_inert_source() {
         PowerPointOleStorageCompression::Zlib { .. }
     ));
 
-    let project = presentation
-        .vba_project(&PowerPointVbaProjectLimits::default())
-        .unwrap()
-        .unwrap();
+    let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "PresentationTools");
     assert_eq!(project.modules().len(), 2);
     assert_eq!(project.modules()[0].name(), "Module1");
@@ -87,11 +81,11 @@ fn compressed_complete_project_round_trips_as_inert_source() {
 fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
     let mut writer = PptWriter::new();
     writer.add_slide().unwrap();
+    let project = Project::new("EmptyPresentation")
+        .finish(&Limits::default())
+        .unwrap();
     writer
-        .enable_empty_vba_project(
-            "EmptyPresentation",
-            PowerPointVbaProjectCompression::Uncompressed,
-        )
+        .put_vba_with(project, PowerPointVbaProjectCompression::Uncompressed)
         .unwrap();
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
@@ -100,46 +94,35 @@ fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
     assert!(storage.has_macros());
     assert!(!storage.is_compressed());
     assert_eq!(storage.declared_uncompressed_len(), None);
-    let project = presentation
-        .vba_project(&PowerPointVbaProjectLimits::default())
-        .unwrap()
-        .unwrap();
+    let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "EmptyPresentation");
     assert!(project.modules().is_empty());
 
-    writer.clear_vba_project();
-    assert!(!writer.has_vba_project());
+    writer.clear_vba();
+    assert!(!writer.has_vba());
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let storage = presentation.vba_project_storage().unwrap().unwrap();
     assert!(!storage.has_macros());
     assert!(!storage.has_persisted_storage());
-    assert!(
-        presentation
-            .vba_project(&PowerPointVbaProjectLimits::default())
-            .unwrap()
-            .is_none()
-    );
+    assert!(presentation.vba().unwrap().is_none());
 }
 
 #[test]
 fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
     let mut writer = PptWriter::new();
     writer.add_slide().unwrap();
-    writer
-        .enable_empty_vba_project("ExistingProject", PowerPointVbaProjectCompression::Zlib)
-        .unwrap();
-    let replacement = VbaProjectBuilder::new("Replacement").with_module(
-        VbaModuleBuilder::standard("Module1", "Sub A()\r\nEnd Sub\r\n"),
-    );
-    let build_limits = VbaLimits {
+    writer.set_vba(Project::new("ExistingProject")).unwrap();
+    let replacement =
+        Project::new("Replacement").module(Module::standard("Module1", "Sub A()\r\nEnd Sub\r\n"));
+    let build_limits = Limits {
         max_modules: 0,
-        ..VbaLimits::default()
+        ..Limits::default()
     };
     assert!(
         writer
-            .set_vba_project(
-                &replacement,
+            .set_vba_with(
+                replacement,
                 &build_limits,
                 PowerPointVbaProjectCompression::Zlib,
             )
@@ -148,10 +131,7 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
-    let project = presentation
-        .vba_project(&PowerPointVbaProjectLimits::default())
-        .unwrap()
-        .unwrap();
+    let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "ExistingProject");
 
     let limits = PowerPointVbaProjectLimits {
@@ -159,7 +139,16 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
         ..PowerPointVbaProjectLimits::default()
     };
     assert!(matches!(
-        presentation.vba_project(&limits),
+        presentation.vba_with(&limits),
+        Err(PowerPointVbaProjectError::PowerPoint(_))
+    ));
+
+    let limits = PowerPointVbaProjectLimits {
+        max_stored_bytes: 0,
+        ..PowerPointVbaProjectLimits::default()
+    };
+    assert!(matches!(
+        presentation.vba_with(&limits),
         Err(PowerPointVbaProjectError::PowerPoint(_))
     ));
 }
@@ -168,16 +157,11 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
 fn project_remains_available_after_presentation_decryption() {
     let mut writer = PptWriter::new();
     writer.add_slide().unwrap();
-    let project = VbaProjectBuilder::new("EncryptedPresentation").with_module(
-        VbaModuleBuilder::standard("Module1", "Sub StoredOnly()\r\nEnd Sub\r\n"),
-    );
-    writer
-        .set_vba_project(
-            &project,
-            &VbaLimits::default(),
-            PowerPointVbaProjectCompression::Zlib,
-        )
-        .unwrap();
+    let project = Project::new("EncryptedPresentation").module(Module::standard(
+        "Module1",
+        "Sub StoredOnly()\r\nEnd Sub\r\n",
+    ));
+    writer.set_vba(project).unwrap();
     writer
         .set_password(
             "secret",
@@ -191,10 +175,7 @@ fn project_remains_available_after_presentation_decryption() {
             password: Some("secret"),
         })
         .unwrap();
-    let project = presentation
-        .vba_project(&PowerPointVbaProjectLimits::default())
-        .unwrap()
-        .unwrap();
+    let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "EncryptedPresentation");
     assert_eq!(project.modules()[0].name(), "Module1");
 }

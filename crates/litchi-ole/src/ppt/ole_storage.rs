@@ -3,6 +3,7 @@
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
+use std::borrow::Cow;
 use std::io::Read;
 
 const MAX_STORED_BYTES: usize = 128 * 1_048_576;
@@ -28,6 +29,174 @@ pub struct PowerPointOleStorage {
     pub compression: PowerPointOleStorageCompression,
     /// Raw uncompressed bytes, or raw zlib bytes without the four-byte size prefix.
     pub data: Vec<u8>,
+}
+
+/// A persisted-storage record borrowed directly from `PowerPoint Document`.
+///
+/// This view lets limit-sensitive readers validate both record lengths before
+/// allocating or copying the payload. In particular, uncompressed CFB bytes
+/// remain borrowed for the complete VBA parsing path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PowerPointOleStorageRef<'a> {
+    kind: PowerPointOleStorageKind,
+    compression: PowerPointOleStorageCompression,
+    data: &'a [u8],
+}
+
+/// Payload-free fields shared by owned and borrowed storage representations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PowerPointOleStorageMetadata {
+    pub(crate) kind: PowerPointOleStorageKind,
+    pub(crate) compression: PowerPointOleStorageCompression,
+    pub(crate) stored_payload_len: usize,
+    pub(crate) contains_data: bool,
+}
+
+impl<'a> PowerPointOleStorageRef<'a> {
+    /// Resolve one strict record directly from the presentation byte buffer.
+    pub(crate) fn parse_at(
+        document: &'a [u8],
+        offset: usize,
+        kind: PowerPointOleStorageKind,
+    ) -> Result<Self> {
+        let header_end = offset
+            .checked_add(8)
+            .ok_or_else(|| PptError::Corrupted("ExOleObjStg header offset overflows".into()))?;
+        let header: &[u8; 8] = document
+            .get(offset..header_end)
+            .and_then(|bytes| bytes.try_into().ok())
+            .ok_or_else(|| PptError::Corrupted("truncated ExOleObjStg header".into()))?;
+        let version_instance = u16::from_le_bytes([header[0], header[1]]);
+        let version = version_instance & 0x000f;
+        let instance = (version_instance >> 4) & 0x0fff;
+        let record_type = u16::from_le_bytes([header[2], header[3]]);
+        let stored_len = usize::try_from(u32::from_le_bytes([
+            header[4], header[5], header[6], header[7],
+        ]))
+        .map_err(|_| PptError::Corrupted("ExOleObjStg size exceeds usize".into()))?;
+        if version != 0 || record_type != PptRecordType::ExternalOleObjectStg.as_u16() {
+            return corrupted("persisted VBA storage is not a strict ExOleObjStg record");
+        }
+        if stored_len > MAX_STORED_BYTES {
+            return corrupted("ExOleObjStg exceeds 128 MiB stored data");
+        }
+        let payload_end = header_end
+            .checked_add(stored_len)
+            .ok_or_else(|| PptError::Corrupted("ExOleObjStg payload size overflows".into()))?;
+        let payload = document
+            .get(header_end..payload_end)
+            .ok_or_else(|| PptError::Corrupted("truncated ExOleObjStg payload".into()))?;
+        match instance {
+            0 => Ok(Self {
+                kind,
+                compression: PowerPointOleStorageCompression::Uncompressed,
+                data: payload,
+            }),
+            1 => {
+                let prefix: &[u8; 4] = payload
+                    .get(..4)
+                    .and_then(|bytes| bytes.try_into().ok())
+                    .ok_or_else(|| {
+                        PptError::Corrupted(
+                            "compressed ExOleObjStg is missing its size prefix".into(),
+                        )
+                    })?;
+                let uncompressed_len = u32::from_le_bytes(*prefix);
+                if uncompressed_len > MAX_DECLARED_BYTES {
+                    return corrupted("compressed ExOleObjStg declares more than 256 MiB");
+                }
+                Ok(Self {
+                    kind,
+                    compression: PowerPointOleStorageCompression::Zlib { uncompressed_len },
+                    data: payload.get(4..).ok_or_else(|| {
+                        PptError::Corrupted("compressed ExOleObjStg is missing its payload".into())
+                    })?,
+                })
+            },
+            _ => corrupted("ExOleObjStg has an invalid storage instance"),
+        }
+    }
+
+    pub(crate) fn metadata(self) -> PowerPointOleStorageMetadata {
+        let contains_data = match self.compression {
+            PowerPointOleStorageCompression::Uncompressed => !self.data.is_empty(),
+            PowerPointOleStorageCompression::Zlib { uncompressed_len } => uncompressed_len != 0,
+        };
+        PowerPointOleStorageMetadata {
+            kind: self.kind,
+            compression: self.compression,
+            stored_payload_len: self.data.len(),
+            contains_data,
+        }
+    }
+
+    /// Reject a caller-specific stored-size ceiling before payload allocation.
+    pub(crate) fn check_stored_limit(self, maximum: usize) -> Result<Self> {
+        if self.data.len() > maximum {
+            return corrupted(format!(
+                "VbaProjectStg stores {} bytes above the {maximum}-byte limit",
+                self.data.len()
+            ));
+        }
+        Ok(self)
+    }
+
+    /// Return bounded CFB bytes, borrowing the uncompressed representation.
+    pub(crate) fn decompressed_bytes(self, maximum: usize) -> Result<Cow<'a, [u8]>> {
+        match self.compression {
+            PowerPointOleStorageCompression::Uncompressed => {
+                if self.data.len() > maximum {
+                    return corrupted(format!(
+                        "uncompressed ExOleObjStg exceeds the {maximum}-byte output limit"
+                    ));
+                }
+                Ok(Cow::Borrowed(self.data))
+            },
+            PowerPointOleStorageCompression::Zlib { uncompressed_len } => {
+                let declared = usize::try_from(uncompressed_len).map_err(|_| {
+                    PptError::Corrupted(
+                        "compressed ExOleObjStg size does not fit in memory".to_string(),
+                    )
+                })?;
+                if declared > maximum {
+                    return corrupted(format!(
+                        "compressed ExOleObjStg declares {declared} bytes above the {maximum}-byte output limit"
+                    ));
+                }
+                let read_limit = maximum.checked_add(1).ok_or_else(|| {
+                    PptError::Corrupted("ExOleObjStg output limit overflows".to_string())
+                })?;
+                let read_limit = u64::try_from(read_limit).map_err(|_| {
+                    PptError::Corrupted("ExOleObjStg output limit exceeds u64".into())
+                })?;
+                let decoder = flate2::read::ZlibDecoder::new(self.data);
+                let mut limited = decoder.take(read_limit);
+                let mut output = Vec::with_capacity(declared.min(64 * 1024));
+                limited.read_to_end(&mut output).map_err(|error| {
+                    PptError::Corrupted(format!("invalid ExOleObjStg zlib payload: {error}"))
+                })?;
+                let decoder = limited.into_inner();
+                if output.len() > maximum {
+                    return corrupted(format!(
+                        "decompressed ExOleObjStg exceeds the {maximum}-byte output limit"
+                    ));
+                }
+                if output.len() != declared {
+                    return corrupted(format!(
+                        "ExOleObjStg decompressed to {} bytes instead of declared {declared}",
+                        output.len()
+                    ));
+                }
+                let stored_len = u64::try_from(self.data.len()).map_err(|_| {
+                    PptError::Corrupted("ExOleObjStg stored size exceeds u64".into())
+                })?;
+                if decoder.total_in() != stored_len {
+                    return corrupted("ExOleObjStg zlib payload has trailing bytes");
+                }
+                Ok(Cow::Owned(output))
+            },
+        }
+    }
 }
 
 impl PowerPointOleStorage {
@@ -58,15 +227,36 @@ impl PowerPointOleStorage {
             if record.data.len() < 4 {
                 return corrupted("compressed ExOleObjStg is missing its size prefix");
             }
-            let uncompressed_len =
-                u32::from_le_bytes(record.data[..4].try_into().expect("fixed slice"));
+            let prefix: [u8; 4] = record
+                .data
+                .get(..4)
+                .ok_or_else(|| {
+                    PptError::Corrupted(
+                        "compressed ExOleObjStg is missing its size prefix".to_string(),
+                    )
+                })?
+                .try_into()
+                .map_err(|_| {
+                    PptError::Corrupted(
+                        "compressed ExOleObjStg has an invalid size prefix".to_string(),
+                    )
+                })?;
+            let uncompressed_len = u32::from_le_bytes(prefix);
             if uncompressed_len > MAX_DECLARED_BYTES {
                 return corrupted("compressed ExOleObjStg declares more than 256 MiB");
             }
             Ok(Self {
                 kind,
                 compression: PowerPointOleStorageCompression::Zlib { uncompressed_len },
-                data: record.data[4..].to_vec(),
+                data: record
+                    .data
+                    .get(4..)
+                    .ok_or_else(|| {
+                        PptError::Corrupted(
+                            "compressed ExOleObjStg is missing its payload".to_string(),
+                        )
+                    })?
+                    .to_vec(),
             })
         } else {
             Ok(Self {
@@ -77,58 +267,32 @@ impl PowerPointOleStorage {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn metadata(&self) -> PowerPointOleStorageMetadata {
+        let contains_data = match self.compression {
+            PowerPointOleStorageCompression::Uncompressed => !self.data.is_empty(),
+            PowerPointOleStorageCompression::Zlib { uncompressed_len } => uncompressed_len != 0,
+        };
+        PowerPointOleStorageMetadata {
+            kind: self.kind,
+            compression: self.compression,
+            stored_payload_len: self.data.len(),
+            contains_data,
+        }
+    }
+
     /// Return the uncompressed structured-storage bytes with an explicit cap.
     ///
     /// Zlib streams must consume the complete stored payload and produce
     /// exactly the declared byte count. The returned CFB bytes are inert.
     pub fn decompressed_bytes(&self, maximum: usize) -> Result<Vec<u8>> {
-        match self.compression {
-            PowerPointOleStorageCompression::Uncompressed => {
-                if self.data.len() > maximum {
-                    return corrupted(format!(
-                        "uncompressed ExOleObjStg exceeds the {maximum}-byte output limit"
-                    ));
-                }
-                Ok(self.data.clone())
-            },
-            PowerPointOleStorageCompression::Zlib { uncompressed_len } => {
-                let declared = usize::try_from(uncompressed_len).map_err(|_| {
-                    PptError::Corrupted(
-                        "compressed ExOleObjStg size does not fit in memory".to_string(),
-                    )
-                })?;
-                if declared > maximum {
-                    return corrupted(format!(
-                        "compressed ExOleObjStg declares {declared} bytes above the {maximum}-byte output limit"
-                    ));
-                }
-                let read_limit = maximum.checked_add(1).ok_or_else(|| {
-                    PptError::Corrupted("ExOleObjStg output limit overflows".to_string())
-                })?;
-                let decoder = flate2::read::ZlibDecoder::new(self.data.as_slice());
-                let mut limited = decoder.take(u64::try_from(read_limit).unwrap_or(u64::MAX));
-                let mut output = Vec::with_capacity(declared.min(64 * 1024));
-                limited.read_to_end(&mut output).map_err(|error| {
-                    PptError::Corrupted(format!("invalid ExOleObjStg zlib payload: {error}"))
-                })?;
-                let decoder = limited.into_inner();
-                if output.len() > maximum {
-                    return corrupted(format!(
-                        "decompressed ExOleObjStg exceeds the {maximum}-byte output limit"
-                    ));
-                }
-                if output.len() != declared {
-                    return corrupted(format!(
-                        "ExOleObjStg decompressed to {} bytes instead of declared {declared}",
-                        output.len()
-                    ));
-                }
-                if decoder.total_in() != self.data.len() as u64 {
-                    return corrupted("ExOleObjStg zlib payload has trailing bytes");
-                }
-                Ok(output)
-            },
+        PowerPointOleStorageRef {
+            kind: self.kind,
+            compression: self.compression,
+            data: &self.data,
         }
+        .decompressed_bytes(maximum)
+        .map(Cow::into_owned)
     }
 
     pub fn to_record(&self) -> Result<PptRecord> {
@@ -233,6 +397,28 @@ mod tests {
             data: vec![0x78, 0x9c],
         };
         assert!(value.to_record_bytes().is_err());
+    }
+
+    #[test]
+    fn borrowed_storage_preflights_limits_and_keeps_uncompressed_cfb_borrowed() {
+        let value = PowerPointOleStorage {
+            kind: PowerPointOleStorageKind::VbaProject,
+            compression: PowerPointOleStorageCompression::Uncompressed,
+            data: b"borrowed compound bytes".to_vec(),
+        };
+        let record = value.to_record_bytes().unwrap();
+        let storage =
+            PowerPointOleStorageRef::parse_at(&record, 0, PowerPointOleStorageKind::VbaProject)
+                .unwrap();
+
+        assert!(storage.check_stored_limit(0).is_err());
+        let cfb = storage
+            .check_stored_limit(value.data.len())
+            .unwrap()
+            .decompressed_bytes(value.data.len())
+            .unwrap();
+        assert!(matches!(cfb, Cow::Borrowed(_)));
+        assert_eq!(cfb.as_ptr(), record[8..].as_ptr());
     }
 
     #[test]

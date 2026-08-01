@@ -695,8 +695,8 @@ They do not override the per-feature limits above.
 
 Macro-enabled OOXML variants (`.docm`, `.dotm`, `.xlsm`, `.xltm`, `.pptm`, `.ppsm`, and `.potm`)
 and macro-enabled XLSB workbooks validate their relationship graphs and expose bounded, typed,
-codepage-aware MS-OVBA project/module source through the shared CFB reader. VBA is never compiled,
-interpreted, or executed. The shared builder deterministically writes bounded, cache-free CFB
+codepage-aware MS-OVBA project/module source through the dedicated `litchi-vba` engine. VBA is never
+compiled, interpreted, or executed. The shared builder deterministically writes bounded, cache-free CFB
 projects with spec-shaped `_VBA_PROJECT`, compressed `dir`, `PROJECT`, `PROJECTwm`, and standard,
 class, or document module streams. Word, Excel XML, Excel binary, and PowerPoint packages can attach
 validated existing payloads or authored projects, preserve them across supported edits, and remove
@@ -739,6 +739,7 @@ The implementation and its tests are the source of truth for this matrix. Princi
 - OOXML shared/package features: `crates/litchi-opc/src/` and `crates/litchi-ooxml/src/`
 - DOCX, XLSX, XLSB, PPTX: `crates/litchi-ooxml/src/docx/`, `xlsx/`, `xlsb/`, and `pptx/`
 - OLE/CFB infrastructure: `crates/litchi-cfb/src/` and `crates/litchi-ole/src/`
+- Shared inert VBA codec and project model: `crates/litchi-vba/src/`
 - DOC, XLS, PPT: `crates/litchi-ole/src/doc/`, `xls/`, and `ppt/`
 - OpenDocument: `crates/litchi-odf/src/`
 - Rich Text Format: `crates/litchi-rtf/src/`

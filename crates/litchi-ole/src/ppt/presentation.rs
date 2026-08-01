@@ -12,7 +12,7 @@ use super::hyperlink::PowerPointHyperlinks;
 use super::main_master::PowerPoint12MainMasterMetadata;
 use super::non_zoom_view::PowerPointOutlineSorterViewInformation;
 use super::ole_object::PowerPointOleObjectCollection;
-use super::ole_storage::PowerPointOleStorage;
+use super::ole_storage::{PowerPointOleStorage, PowerPointOleStorageRef};
 /// High-performance Presentation API with zero-copy slide parsing.
 use super::package::{PptError, PptOpenOptions, Result};
 use super::parsers::PptRecordParser;
@@ -622,23 +622,12 @@ impl Presentation {
         let Some(info) = crate::ppt::PowerPointVbaInfo::parse_records(&records)? else {
             return Ok(None);
         };
-        let storage = if info.persist_id_ref == 0 {
-            None
-        } else {
-            let Some(storage) = self.ole_storage_as(
-                info.persist_id_ref,
-                crate::ppt::PowerPointOleStorageKind::VbaProject,
-            )?
-            else {
-                return Err(PptError::Corrupted(format!(
-                    "VBAInfoAtom persist ID {} has no storage record",
-                    info.persist_id_ref
-                )));
-            };
-            Some(storage)
-        };
-        crate::ppt::PowerPointVbaProjectStorage::from_info_and_storage(info, storage.as_ref())
-            .map(Some)
+        let storage = self.resolve_vba_storage(info)?;
+        crate::ppt::PowerPointVbaProjectStorage::from_info_and_metadata(
+            info,
+            storage.map(PowerPointOleStorageRef::metadata),
+        )
+        .map(Some)
     }
 
     /// Return validated inert `VBAInfoAtom` metadata for the document.
@@ -649,48 +638,84 @@ impl Presentation {
         Ok(self.vba_project_storage()?.map(|storage| storage.info()))
     }
 
-    /// Parse the embedded MS-OVBA project and expose inert module source.
+    /// Parse the embedded MS-OVBA project with safe default limits.
     ///
     /// The outer zlib stream, inner CFB, and MS-OVBA compressed containers are
-    /// all bounded by caller-supplied limits. Source is never compiled,
-    /// interpreted, or executed.
-    pub fn vba_project(
+    /// bounded, and source is never compiled, interpreted, or executed. Use
+    /// [`Self::vba_with`] to supply custom ceilings.
+    pub fn vba(
+        &self,
+    ) -> std::result::Result<
+        Option<litchi_vba::project::Project>,
+        crate::ppt::PowerPointVbaProjectError,
+    > {
+        self.vba_with(&crate::ppt::PowerPointVbaProjectLimits::default())
+    }
+
+    /// Parse the embedded MS-OVBA project with explicit resource limits.
+    ///
+    /// Stored and declared outer sizes are checked on a borrowed record view
+    /// before any VBA payload is copied or decompressed.
+    pub fn vba_with(
         &self,
         limits: &crate::ppt::PowerPointVbaProjectLimits,
-    ) -> std::result::Result<Option<crate::ovba::VbaProject>, crate::ppt::PowerPointVbaProjectError>
-    {
-        let Some(summary) = self.vba_project_storage()? else {
+    ) -> std::result::Result<
+        Option<litchi_vba::project::Project>,
+        crate::ppt::PowerPointVbaProjectError,
+    > {
+        let records = self.parser.find_records_ref();
+        let Some(info) = crate::ppt::PowerPointVbaInfo::parse_records(&records)? else {
             return Ok(None);
         };
+        let storage = self.resolve_vba_storage(info)?;
+        let summary = crate::ppt::PowerPointVbaProjectStorage::from_info_and_metadata(
+            info,
+            storage.map(PowerPointOleStorageRef::metadata),
+        )?;
         if !summary.has_persisted_storage() {
             return Ok(None);
         }
-        let storage = self
-            .ole_storage_as(
-                summary.persist_id_ref(),
-                crate::ppt::PowerPointOleStorageKind::VbaProject,
-            )?
+        let Some(storage) = storage else {
+            return Err(PptError::Corrupted(format!(
+                "VBAInfoAtom persist ID {} has no storage record",
+                summary.persist_id_ref()
+            ))
+            .into());
+        };
+        let storage = storage.check_stored_limit(limits.max_stored_bytes)?;
+        let cfb = storage.decompressed_bytes(limits.max_cfb_bytes)?;
+        let mut ole = OleFile::open(Cursor::new(cfb.as_ref()))
+            .map_err(litchi_vba::Error::from)
+            .map_err(crate::ppt::PowerPointVbaProjectError::from)?;
+        litchi_vba::project::Project::open(&mut ole, &[], &limits.project)
+            .map(Some)
+            .map_err(Into::into)
+    }
+
+    fn resolve_vba_storage(
+        &self,
+        info: crate::ppt::PowerPointVbaInfo,
+    ) -> Result<Option<PowerPointOleStorageRef<'_>>> {
+        if info.persist_id_ref == 0 {
+            return Ok(None);
+        }
+        let offset = self
+            .persist_mapping
+            .get_offset(info.persist_id_ref)
             .ok_or_else(|| {
                 PptError::Corrupted(format!(
                     "VBAInfoAtom persist ID {} has no storage record",
-                    summary.persist_id_ref()
+                    info.persist_id_ref
                 ))
             })?;
-        if storage.data.len() > limits.max_stored_bytes {
-            return Err(PptError::Corrupted(format!(
-                "VbaProjectStg stores {} bytes above the {}-byte limit",
-                storage.data.len(),
-                limits.max_stored_bytes
-            ))
-            .into());
-        }
-        let cfb = storage.decompressed_bytes(limits.max_cfb_bytes)?;
-        let mut ole = OleFile::open(Cursor::new(cfb))
-            .map_err(crate::ovba::VbaError::from)
-            .map_err(crate::ppt::PowerPointVbaProjectError::from)?;
-        crate::ovba::VbaProject::open(&mut ole, &[], &limits.project)
-            .map(Some)
-            .map_err(Into::into)
+        let offset = usize::try_from(offset)
+            .map_err(|_| PptError::Corrupted("VBA storage offset exceeds usize".to_string()))?;
+        PowerPointOleStorageRef::parse_at(
+            &self.powerpoint_document,
+            offset,
+            crate::ppt::PowerPointOleStorageKind::VbaProject,
+        )
+        .map(Some)
     }
 
     /// Return the PPT10 modify-password metadata without verifying it.

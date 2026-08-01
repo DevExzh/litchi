@@ -670,10 +670,10 @@ struct XlsFileSharing {
     password_hash: Option<u16>,
     user_name: String,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct XlsVbaWriteMetadata {
     pub workbook_code_name: String,
-    pub project: crate::ovba::VbaProjectBinary,
+    pub project: litchi_vba::Payload,
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct XlsCalculationSettings {
@@ -3592,55 +3592,57 @@ impl XlsWriter {
         Ok(())
     }
 
-    /// Enable a complete module-free VBA project without executable content.
-    ///
-    /// The project is serialized as a bounded, cache-free MS-OVBA storage. Its
-    /// BIFF globals include `ObNoMacros` because it contains no modules.
-    pub fn enable_empty_vba_project(&mut self, workbook_code_name: &str) -> XlsResult<()> {
-        crate::xls::vba::validate_code_name(workbook_code_name)?;
-        let project = crate::ovba::VbaProjectBuilder::new("VBAProject")
-            .build(&crate::ovba::VbaLimits::default())?;
-        self.vba_metadata = Some(XlsVbaWriteMetadata {
-            workbook_code_name: workbook_code_name.to_string(),
-            project,
-        });
-        Ok(())
+    /// Configure a complete inert VBA project with safe default limits.
+    pub fn set_vba(
+        &mut self,
+        workbook_code_name: &str,
+        project: litchi_vba::build::Project,
+    ) -> XlsResult<()> {
+        self.set_vba_with(workbook_code_name, project, &litchi_vba::Limits::default())
     }
 
-    /// Configure a complete inert VBA project from a bounded MS-OVBA builder.
+    /// Configure a complete inert VBA project using explicit resource limits.
     ///
     /// Module source is serialized but never compiled, interpreted, or run.
     /// Validation and serialization finish before the writer state is changed.
-    pub fn set_vba_project(
+    pub fn set_vba_with(
         &mut self,
         workbook_code_name: &str,
-        project: &crate::ovba::VbaProjectBuilder,
-        limits: &crate::ovba::VbaLimits,
+        project: litchi_vba::build::Project,
+        limits: &litchi_vba::Limits,
     ) -> XlsResult<()> {
         crate::xls::vba::validate_code_name(workbook_code_name)?;
-        let project = project.build(limits)?;
-        self.set_vba_project_binary(workbook_code_name, project)
+        let payload = project.finish(limits)?;
+        self.put_vba(workbook_code_name, payload)
     }
 
     /// Configure an already validated and serialized inert VBA project.
-    pub fn set_vba_project_binary(
+    ///
+    /// Import standalone CFB bytes through [`litchi_vba::Payload::read`] first.
+    pub fn put_vba(
         &mut self,
         workbook_code_name: &str,
-        project: crate::ovba::VbaProjectBinary,
+        payload: litchi_vba::Payload,
     ) -> XlsResult<()> {
         crate::xls::vba::validate_code_name(workbook_code_name)?;
         self.vba_metadata = Some(XlsVbaWriteMetadata {
             workbook_code_name: workbook_code_name.to_string(),
-            project,
+            project: payload,
         });
         Ok(())
     }
 
-    pub fn disable_vba_project_metadata(&mut self) {
+    /// Remove the configured project and all worksheet VBA code names.
+    pub fn clear_vba(&mut self) {
         self.vba_metadata = None;
         for worksheet in &mut self.worksheets {
             worksheet.vba_code_name = None;
         }
+    }
+
+    /// Whether a complete VBA project is configured for output.
+    pub fn has_vba(&self) -> bool {
+        self.vba_metadata.is_some()
     }
 
     /// Set a worksheet's tab color as a BIFF8 palette index (SHEETEXT

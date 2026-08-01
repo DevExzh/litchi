@@ -5,10 +5,14 @@
 //! bytes.
 
 use crate::error::{OoxmlError, Result};
-use crate::vba_package::{ensure_exclusive_inbound_reference, validate_vba_project_payload};
+use crate::vba_package::{
+    ensure_exclusive_inbound_reference, ensure_no_inbound_reference, read_project_part,
+};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
+use litchi_vba::{Limits, Payload, project::Project};
+use std::sync::Arc;
 
 const PROJECT_PART: &str = "/xl/vbaProject.bin";
 const PROJECT_TARGET: &str = "vbaProject.bin";
@@ -83,16 +87,17 @@ impl VbaProject {
         &self.signatures
     }
 
-    /// Parse the `vbaProject.bin` CFB payload as inert MS-OVBA source.
+    /// Parse the `vbaProject.bin` payload with default resource limits.
+    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
+        self.project_with(package, &Limits::default())
+    }
+
+    /// Parse the `vbaProject.bin` payload with explicit resource limits.
     ///
     /// Declared signature payloads remain separate opaque relationship
     /// metadata and are not treated as trust decisions.
-    pub fn read_project(
-        &self,
-        package: &OpcPackage,
-        limits: &crate::vba::VbaLimits,
-    ) -> std::result::Result<crate::vba::VbaProject, crate::vba::VbaError> {
-        crate::vba::read_project_part(package, &self.project_part_name, limits)
+    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+        read_project_part(package, &self.project_part_name, limits)
     }
 }
 
@@ -225,10 +230,28 @@ pub(crate) fn discover_vba_project(
 pub(crate) fn store_vba_project(
     package: &mut OpcPackage,
     source: &PackURI,
-    payload: Vec<u8>,
-    limits: &crate::vba::VbaLimits,
+    payload: Payload,
 ) -> Result<VbaProject> {
-    validate_vba_project_payload(&payload, limits)?;
+    store_vba_bytes(package, source, Arc::new(payload.into_bytes()))
+}
+
+/// Store bytes that were already validated by `litchi-vba`.
+pub(crate) fn store_vba_bytes(
+    package: &mut OpcPackage,
+    source: &PackURI,
+    payload: Arc<Vec<u8>>,
+) -> Result<VbaProject> {
+    let mut staged = package.clone();
+    let project = store_vba_bytes_in_place(&mut staged, source, payload)?;
+    *package = staged;
+    Ok(project)
+}
+
+fn store_vba_bytes_in_place(
+    package: &mut OpcPackage,
+    source: &PackURI,
+    payload: Arc<Vec<u8>>,
+) -> Result<VbaProject> {
     let existing = {
         let source_part = package.get_part(source)?;
         discover_vba_project(package, source_part)?
@@ -240,16 +263,19 @@ pub(crate) fn store_vba_project(
         .is_none_or(|project| project.project_part_name != canonical)
     {
         package.validate_new_part_name(&canonical)?;
+        ensure_no_inbound_reference(package, &canonical)?;
     }
 
     if let Some(project) = existing {
         remove_discovered_graph(package, &project)?;
     }
-    package.try_add_part(Box::new(BlobPart::new(
+    let mut part = BlobPart::new(
         canonical,
         content_type::OFC_VBA_PROJECT.to_string(),
-        payload,
-    )))?;
+        Vec::new(),
+    );
+    part.set_blob_shared(payload);
+    package.try_add_part(Box::new(part))?;
     package
         .get_part_mut(source)?
         .relate_to(PROJECT_TARGET, relationship_type::VBA_PROJECT);
@@ -274,13 +300,21 @@ pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> 
     let Some(project) = existing else {
         return Ok(false);
     };
-    remove_discovered_graph(package, &project)?;
+
+    let mut staged = package.clone();
+    remove_vba_project_in_place(&mut staged, &project)?;
+    *package = staged;
+    Ok(true)
+}
+
+fn remove_vba_project_in_place(package: &mut OpcPackage, project: &VbaProject) -> Result<()> {
+    remove_discovered_graph(package, project)?;
     package.clear_digital_signatures().map_err(|error| {
         OoxmlError::InvalidFormat(format!(
             "failed to clear signatures after removing an XLSB VBA project: {error}"
         ))
     })?;
-    Ok(true)
+    Ok(())
 }
 
 fn remove_discovered_graph(package: &mut OpcPackage, project: &VbaProject) -> Result<()> {
@@ -389,9 +423,9 @@ fn discover_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
     use crate::xlsb::{MutableXlsbWorksheet, XlsbWorkbook, XlsbWorkbookWriter};
     use litchi_opc::part::BlobPart;
+    use litchi_vba::{Limits, Payload, build};
     use std::io::Cursor;
 
     fn package_with_vba_project(
@@ -508,20 +542,17 @@ mod tests {
             .unwrap()
             .relate_to("vbaProject.bin", relationship_type::VBA_PROJECT);
 
-        let project = workbook.vba_project().unwrap().unwrap();
+        let project = workbook.vba().unwrap().unwrap();
         assert_eq!(project.source_part_name(), &workbook_name);
         assert!(project.relationship_id().starts_with("rId"));
         assert_eq!(project.project_part_name().as_str(), "/xl/vbaProject.bin");
     }
 
-    fn authored_project() -> crate::vba::VbaProjectBinary {
-        VbaProjectBuilder::new("BinaryWorkbookProject")
-            .with_module(VbaModuleBuilder::standard(
-                "Module1",
-                "Public Sub Hello()\r\nEnd Sub\r\n",
-            ))
-            .build(&VbaLimits::default())
-            .unwrap()
+    fn authored_project() -> build::Project {
+        build::Project::new("BinaryWorkbookProject").module(build::Module::standard(
+            "Module1",
+            "Public Sub Hello()\r\nEnd Sub\r\n",
+        ))
     }
 
     fn generated_workbook() -> XlsbWorkbook {
@@ -535,20 +566,18 @@ mod tests {
     #[test]
     fn parsed_workbook_stores_round_trips_and_removes_authored_project() {
         let mut workbook = generated_workbook();
-        workbook.set_vba_project(&authored_project()).unwrap();
+        workbook.set_vba(authored_project()).unwrap();
 
         let mut bytes = Cursor::new(Vec::new());
         workbook.save(&mut bytes).unwrap();
         let mut reopened = XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
-        let metadata = reopened.vba_project().unwrap().unwrap();
-        let parsed = metadata
-            .read_project(reopened.opc_package(), &VbaLimits::default())
-            .unwrap();
+        let metadata = reopened.vba().unwrap().unwrap();
+        let parsed = metadata.project(reopened.opc_package()).unwrap();
         assert_eq!(parsed.name(), "BinaryWorkbookProject");
         assert_eq!(parsed.modules().len(), 1);
 
-        assert!(reopened.remove_vba_project().unwrap());
-        assert!(reopened.vba_project().unwrap().is_none());
+        assert!(reopened.clear_vba().unwrap());
+        assert!(reopened.vba().unwrap().is_none());
         assert!(
             reopened
                 .opc_package()
@@ -561,26 +590,32 @@ mod tests {
     fn workbook_writer_attaches_validated_project() {
         let mut writer = XlsbWorkbookWriter::new();
         writer.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
-        writer.set_vba_project(&authored_project()).unwrap();
-        let mut bytes = Cursor::new(Vec::new());
-        writer.save(&mut bytes).unwrap();
+        let limits = Limits::default();
+        writer.put_vba(authored_project().finish(&limits).unwrap());
 
-        let workbook = XlsbWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
-        let metadata = workbook.vba_project().unwrap().unwrap();
-        assert_eq!(metadata.project_part_name().as_str(), PROJECT_PART);
-        assert_eq!(
-            metadata
-                .read_project(workbook.opc_package(), &VbaLimits::default())
-                .unwrap()
-                .name(),
-            "BinaryWorkbookProject"
-        );
+        let mut first = Cursor::new(Vec::new());
+        writer.save(&mut first).unwrap();
+        let mut second = Cursor::new(Vec::new());
+        writer.save(&mut second).unwrap();
+
+        for bytes in [first.into_inner(), second.into_inner()] {
+            let workbook = XlsbWorkbook::new(Cursor::new(bytes)).unwrap();
+            let metadata = workbook.vba().unwrap().unwrap();
+            assert_eq!(metadata.project_part_name().as_str(), PROJECT_PART);
+            assert_eq!(
+                metadata
+                    .project_with(workbook.opc_package(), &limits)
+                    .unwrap()
+                    .name(),
+                "BinaryWorkbookProject"
+            );
+        }
     }
 
     #[test]
     fn replacement_removes_stale_legacy_and_agile_signatures() {
         let mut workbook = generated_workbook();
-        workbook.set_vba_project(&authored_project()).unwrap();
+        workbook.set_vba(authored_project()).unwrap();
         let project_name = PackURI::new(PROJECT_PART).unwrap();
         let legacy_name = PackURI::new("/xl/vbaProjectSignature.bin").unwrap();
         let agile_name = PackURI::new("/xl/vbaProjectSignatureAgile.bin").unwrap();
@@ -606,20 +641,10 @@ mod tests {
                 b"opaque agile signature".to_vec(),
             )));
         }
-        assert_eq!(
-            workbook.vba_project().unwrap().unwrap().signatures().len(),
-            2
-        );
+        assert_eq!(workbook.vba().unwrap().unwrap().signatures().len(), 2);
 
-        workbook.set_vba_project(&authored_project()).unwrap();
-        assert!(
-            workbook
-                .vba_project()
-                .unwrap()
-                .unwrap()
-                .signatures()
-                .is_empty()
-        );
+        workbook.set_vba(authored_project()).unwrap();
+        assert!(workbook.vba().unwrap().unwrap().signatures().is_empty());
         assert!(workbook.opc_package().get_part(&legacy_name).is_err());
         assert!(workbook.opc_package().get_part(&agile_name).is_err());
     }
@@ -647,20 +672,16 @@ mod tests {
     #[test]
     fn rejects_invalid_and_orphan_project_data_without_mutation() {
         let mut workbook = generated_workbook();
-        assert!(
-            workbook
-                .set_vba_project_bytes(vec![0; 64], &VbaLimits::default())
-                .is_err()
-        );
-        assert!(workbook.vba_project().unwrap().is_none());
+        assert!(Payload::read(vec![0; 64], &Limits::default()).is_err());
+        assert!(workbook.vba().unwrap().is_none());
 
         workbook.opc_package_mut().add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/orphanSignature.bin").unwrap(),
             content_type::OFC_VBA_PROJECT_SIGNATURE.to_string(),
             b"orphan".to_vec(),
         )));
-        assert!(workbook.vba_project().is_err());
-        assert!(workbook.set_vba_project(&authored_project()).is_err());
+        assert!(workbook.vba().is_err());
+        assert!(workbook.set_vba(authored_project()).is_err());
         assert!(
             workbook
                 .opc_package()
@@ -670,10 +691,109 @@ mod tests {
     }
 
     #[test]
+    fn dangling_inbound_reference_to_canonical_project_is_rejected_atomically() {
+        let mut workbook = generated_workbook();
+        let source_name = workbook
+            .opc_package()
+            .main_document_part()
+            .unwrap()
+            .partname()
+            .clone();
+        let owner_name = PackURI::new("/xl/dangling.bin").unwrap();
+        let mut owner = BlobPart::new(
+            owner_name.clone(),
+            "application/octet-stream".to_string(),
+            b"preserve".to_vec(),
+        );
+        owner.relate_to("vbaProject.bin", "urn:test:dangling");
+        workbook.opc_package_mut().add_part(Box::new(owner));
+
+        let before_parts = workbook.opc_package().part_count();
+        let before_source_relationships = workbook
+            .opc_package()
+            .get_part(&source_name)
+            .unwrap()
+            .rels()
+            .len();
+        assert!(workbook.set_vba(authored_project()).is_err());
+
+        assert_eq!(workbook.opc_package().part_count(), before_parts);
+        assert!(
+            workbook
+                .opc_package()
+                .get_part(&PackURI::new(PROJECT_PART).unwrap())
+                .is_err()
+        );
+        assert_eq!(
+            workbook
+                .opc_package()
+                .get_part(&source_name)
+                .unwrap()
+                .rels()
+                .len(),
+            before_source_relationships
+        );
+        let owner = workbook.opc_package().get_part(&owner_name).unwrap();
+        assert_eq!(owner.blob(), b"preserve");
+        assert_eq!(owner.rels().len(), 1);
+        assert!(workbook.vba().unwrap().is_none());
+    }
+
+    #[test]
+    fn post_removal_name_conflict_rolls_back_existing_project() {
+        let mut workbook = generated_workbook();
+        workbook.set_vba(authored_project()).unwrap();
+        let metadata = workbook.vba().unwrap().unwrap();
+        let project_name = metadata.project_part_name().clone();
+        let relationship_id = metadata.relationship_id().to_string();
+        let original_payload = workbook
+            .opc_package()
+            .get_part(&project_name)
+            .unwrap()
+            .blob_arc();
+        let conflict_name = PackURI::new("/xl/vbaProject.bin/child.bin").unwrap();
+        workbook.opc_package_mut().add_part(Box::new(BlobPart::new(
+            conflict_name.clone(),
+            "application/octet-stream".to_string(),
+            b"conflict".to_vec(),
+        )));
+        let before_parts = workbook.opc_package().part_count();
+
+        let replacement = build::Project::new("ReplacementProject").module(
+            build::Module::standard("Module2", "Public Sub ReplaceMe()\r\nEnd Sub\r\n"),
+        );
+        assert!(workbook.set_vba(replacement).is_err());
+
+        assert_eq!(workbook.opc_package().part_count(), before_parts);
+        assert!(Arc::ptr_eq(
+            &workbook
+                .opc_package()
+                .get_part(&project_name)
+                .unwrap()
+                .blob_arc(),
+            &original_payload
+        ));
+        assert_eq!(
+            workbook
+                .opc_package()
+                .get_part(&conflict_name)
+                .unwrap()
+                .blob(),
+            b"conflict"
+        );
+        let preserved = workbook.vba().unwrap().unwrap();
+        assert_eq!(preserved.relationship_id(), relationship_id);
+        assert_eq!(
+            preserved.project(workbook.opc_package()).unwrap().name(),
+            "BinaryWorkbookProject"
+        );
+    }
+
+    #[test]
     fn canonical_name_conflict_preserves_an_existing_noncanonical_graph() {
         let mut workbook = generated_workbook();
-        workbook.set_vba_project(&authored_project()).unwrap();
-        let metadata = workbook.vba_project().unwrap().unwrap();
+        workbook.set_vba(authored_project()).unwrap();
+        let metadata = workbook.vba().unwrap().unwrap();
         let source_name = metadata.source_part_name().clone();
         let relationship_id = metadata.relationship_id().to_string();
         let canonical_name = metadata.project_part_name().clone();
@@ -708,8 +828,8 @@ mod tests {
             )));
         }
 
-        assert!(workbook.set_vba_project(&authored_project()).is_err());
-        let preserved = workbook.vba_project().unwrap().unwrap();
+        assert!(workbook.set_vba(authored_project()).is_err());
+        let preserved = workbook.vba().unwrap().unwrap();
         assert_eq!(preserved.project_part_name(), &custom_name);
         assert_eq!(
             workbook

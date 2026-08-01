@@ -1,6 +1,6 @@
 //! Typed parsing of the compressed MS-OVBA `dir` stream.
 
-use super::{VbaError, VbaLimits, check_limit, compress_container, decompress_container, invalid};
+use super::{Error, Limits, check_limit, codec, invalid};
 use encoding_rs::Encoding;
 use litchi_core::encoding::codepage_to_encoding;
 
@@ -42,7 +42,7 @@ const FIXED_U16_SIZE: u32 = 2;
 const DEFAULT_PROJECT_LCID: u32 = 0x0409;
 const WRITE_COOKIE: u16 = 0xffff;
 
-pub(crate) struct DirectoryWriteProject<'a> {
+pub(crate) struct WriteProject<'a> {
     pub(crate) system_kind: u32,
     pub(crate) code_page: u16,
     pub(crate) name: &'a str,
@@ -50,23 +50,20 @@ pub(crate) struct DirectoryWriteProject<'a> {
     pub(crate) help_context: u32,
     pub(crate) version_major: u32,
     pub(crate) version_minor: u16,
-    pub(crate) modules: &'a [DirectoryWriteModule<'a>],
+    pub(crate) modules: &'a [WriteModule<'a>],
 }
 
-pub(crate) struct DirectoryWriteModule<'a> {
+pub(crate) struct WriteModule<'a> {
     pub(crate) name: &'a str,
     pub(crate) stream_name: &'a str,
     pub(crate) description: &'a str,
     pub(crate) help_context: u32,
-    pub(crate) kind: VbaModuleKind,
+    pub(crate) kind: Kind,
     pub(crate) read_only: bool,
     pub(crate) private: bool,
 }
 
-pub(crate) fn encode_directory(
-    project: &DirectoryWriteProject<'_>,
-    limits: &VbaLimits,
-) -> Result<Vec<u8>, VbaError> {
+pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<Vec<u8>, Error> {
     check_limit(
         "VBA module count",
         project.modules.len(),
@@ -75,7 +72,7 @@ pub(crate) fn encode_directory(
     let module_count = u16::try_from(project.modules.len())
         .map_err(|_| invalid("VBA module count exceeds the dir-stream field"))?;
     let encoding = codepage_to_encoding(u32::from(project.code_page))
-        .ok_or(VbaError::UnsupportedCodePage(project.code_page))?;
+        .ok_or(Error::UnsupportedCodePage(project.code_page))?;
     let mut output = Vec::new();
 
     push_record(
@@ -156,15 +153,15 @@ pub(crate) fn encode_directory(
         output.len(),
         limits.max_decompressed_stream_bytes,
     )?;
-    compress_container(&output, limits)
+    codec::encode(&output, limits)
 }
 
 fn encode_module(
     output: &mut Vec<u8>,
-    module: &DirectoryWriteModule<'_>,
+    module: &WriteModule<'_>,
     encoding: &'static Encoding,
-    limits: &VbaLimits,
-) -> Result<(), VbaError> {
+    limits: &Limits,
+) -> Result<(), Error> {
     let name = encode_mbcs(module.name, encoding, "MODULENAME")?;
     push_record(output, MODULE_NAME_ID, &name)?;
     let unicode_name = encode_utf16(module.name, "MODULENAMEUNICODE")?;
@@ -197,8 +194,8 @@ fn encode_module(
     )?;
     push_record(output, MODULE_COOKIE_ID, &WRITE_COOKIE.to_le_bytes())?;
     let type_id = match module.kind {
-        VbaModuleKind::Procedural => MODULE_PROCEDURAL_ID,
-        VbaModuleKind::DocumentClassOrDesigner => MODULE_OTHER_ID,
+        Kind::Procedural => MODULE_PROCEDURAL_ID,
+        Kind::DocumentClassOrDesigner => MODULE_OTHER_ID,
     };
     output.extend_from_slice(&type_id.to_le_bytes());
     output.extend_from_slice(&0u32.to_le_bytes());
@@ -215,7 +212,7 @@ fn encode_module(
     Ok(())
 }
 
-fn push_record(output: &mut Vec<u8>, id: u16, value: &[u8]) -> Result<(), VbaError> {
+fn push_record(output: &mut Vec<u8>, id: u16, value: &[u8]) -> Result<(), Error> {
     let length =
         u32::try_from(value.len()).map_err(|_| invalid("dir-stream record length exceeds u32"))?;
     output.extend_from_slice(&id.to_le_bytes());
@@ -231,10 +228,10 @@ fn push_string_pair(
     reserved: u16,
     value: &str,
     encoding: &'static Encoding,
-    limits: &VbaLimits,
+    limits: &Limits,
     protocol_maximum: usize,
     field: &'static str,
-) -> Result<(), VbaError> {
+) -> Result<(), Error> {
     let mbcs = encode_mbcs(value, encoding, field)?;
     check_limit("VBA string bytes", mbcs.len(), limits.max_string_bytes)?;
     check_protocol_length(field, mbcs.len(), protocol_maximum)?;
@@ -253,10 +250,10 @@ fn push_mbcs_pair(
     reserved: u16,
     value: &str,
     encoding: &'static Encoding,
-    limits: &VbaLimits,
+    limits: &Limits,
     protocol_maximum: usize,
     field: &'static str,
-) -> Result<(), VbaError> {
+) -> Result<(), Error> {
     let mbcs = encode_mbcs(value, encoding, field)?;
     check_limit("VBA string bytes", mbcs.len(), limits.max_string_bytes)?;
     check_protocol_length(field, mbcs.len(), protocol_maximum)?;
@@ -265,7 +262,7 @@ fn push_mbcs_pair(
     push_length_prefixed(output, &mbcs)
 }
 
-fn push_length_prefixed(output: &mut Vec<u8>, value: &[u8]) -> Result<(), VbaError> {
+fn push_length_prefixed(output: &mut Vec<u8>, value: &[u8]) -> Result<(), Error> {
     let length =
         u32::try_from(value.len()).map_err(|_| invalid("dir-stream string length exceeds u32"))?;
     output.extend_from_slice(&length.to_le_bytes());
@@ -273,11 +270,7 @@ fn push_length_prefixed(output: &mut Vec<u8>, value: &[u8]) -> Result<(), VbaErr
     Ok(())
 }
 
-fn check_protocol_length(
-    field: &'static str,
-    actual: usize,
-    maximum: usize,
-) -> Result<(), VbaError> {
+fn check_protocol_length(field: &'static str, actual: usize, maximum: usize) -> Result<(), Error> {
     if actual > maximum {
         return Err(invalid(format!(
             "{field} length {actual} exceeds {maximum}"
@@ -290,7 +283,7 @@ pub(crate) fn encode_mbcs(
     value: &str,
     encoding: &'static Encoding,
     field: &'static str,
-) -> Result<Vec<u8>, VbaError> {
+) -> Result<Vec<u8>, Error> {
     if value.contains('\0') {
         return Err(invalid(format!("{field} contains a null character")));
     }
@@ -306,7 +299,7 @@ pub(crate) fn encode_mbcs(
     Ok(encoded.into_owned())
 }
 
-fn encode_utf16(value: &str, field: &'static str) -> Result<Vec<u8>, VbaError> {
+fn encode_utf16(value: &str, field: &'static str) -> Result<Vec<u8>, Error> {
     if value.contains('\0') {
         return Err(invalid(format!("{field} contains a null character")));
     }
@@ -314,17 +307,17 @@ fn encode_utf16(value: &str, field: &'static str) -> Result<Vec<u8>, VbaError> {
 }
 
 /// Parsed metadata from an MS-OVBA `dir` stream.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaDirectory {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Dir {
     code_page: u16,
     project_name: String,
-    modules: Vec<VbaModuleMetadata>,
+    modules: Vec<Module>,
 }
 
-impl VbaDirectory {
+impl Dir {
     /// Parse a complete compressed `dir` stream.
-    pub fn parse(compressed: &[u8], limits: &VbaLimits) -> Result<Self, VbaError> {
-        let decompressed = decompress_container(compressed, limits)?;
+    pub fn parse(compressed: &[u8], limits: &Limits) -> Result<Self, Error> {
+        let decompressed = codec::decode(compressed, limits)?;
         Self::parse_decompressed(&decompressed, limits)
     }
 
@@ -339,14 +332,14 @@ impl VbaDirectory {
     }
 
     /// Module metadata in directory order.
-    pub fn modules(&self) -> &[VbaModuleMetadata] {
+    pub fn modules(&self) -> &[Module] {
         &self.modules
     }
 
-    fn parse_decompressed(data: &[u8], limits: &VbaLimits) -> Result<Self, VbaError> {
+    fn parse_decompressed(data: &[u8], limits: &Limits) -> Result<Self, Error> {
         let (information_end, code_page, project_name) = parse_project_information(data, limits)?;
         let encoding = codepage_to_encoding(u32::from(code_page))
-            .ok_or(VbaError::UnsupportedCodePage(code_page))?;
+            .ok_or(Error::UnsupportedCodePage(code_page))?;
         let project_name = decode_mbcs(&project_name, encoding, "PROJECTNAME")?;
         let modules = find_modules(&data[information_end..], encoding, limits)?;
         Ok(Self {
@@ -359,7 +352,7 @@ impl VbaDirectory {
 
 /// Broad module category encoded by `MODULETYPE`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VbaModuleKind {
+pub enum Kind {
     /// Standard procedural module.
     Procedural,
     /// Document, class, or designer module.
@@ -367,17 +360,17 @@ pub enum VbaModuleKind {
 }
 
 /// Metadata locating one module's inert source stream.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaModuleMetadata {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Module {
     name: String,
     stream_name: String,
     text_offset: u32,
-    kind: VbaModuleKind,
+    kind: Kind,
     read_only: bool,
     private: bool,
 }
 
-impl VbaModuleMetadata {
+impl Module {
     /// VBA identifier for this module.
     pub fn name(&self) -> &str {
         &self.name
@@ -394,7 +387,7 @@ impl VbaModuleMetadata {
     }
 
     /// Broad module category from `MODULETYPE`.
-    pub fn kind(&self) -> VbaModuleKind {
+    pub fn kind(&self) -> Kind {
         self.kind
     }
 
@@ -409,10 +402,7 @@ impl VbaModuleMetadata {
     }
 }
 
-fn parse_project_information(
-    data: &[u8],
-    limits: &VbaLimits,
-) -> Result<(usize, u16, Vec<u8>), VbaError> {
+fn parse_project_information(data: &[u8], limits: &Limits) -> Result<(usize, u16, Vec<u8>), Error> {
     let mut reader = Reader::new(data, 0);
     reader.expect_sized_u32(PROJECT_SYS_KIND_ID, FIXED_U32_SIZE)?;
     if reader.read_u32()? > 3 {
@@ -436,8 +426,8 @@ fn parse_project_information(
     if project_name.is_empty() {
         return Err(invalid("PROJECTNAME must not be empty"));
     }
-    let encoding = codepage_to_encoding(u32::from(code_page))
-        .ok_or(VbaError::UnsupportedCodePage(code_page))?;
+    let encoding =
+        codepage_to_encoding(u32::from(code_page)).ok_or(Error::UnsupportedCodePage(code_page))?;
     decode_mbcs(&project_name, encoding, "PROJECTNAME")?;
 
     reader.expect_id(PROJECT_DOC_STRING_ID)?;
@@ -480,10 +470,10 @@ fn parse_project_information(
 impl<'a> Reader<'a> {
     fn length_prefixed_bounded(
         &mut self,
-        limits: &VbaLimits,
+        limits: &Limits,
         protocol_maximum: usize,
         field: &'static str,
-    ) -> Result<&'a [u8], VbaError> {
+    ) -> Result<&'a [u8], Error> {
         let value = self.length_prefixed(limits)?;
         if value.len() > protocol_maximum {
             return Err(invalid(format!(
@@ -498,8 +488,8 @@ impl<'a> Reader<'a> {
 fn find_modules(
     data: &[u8],
     encoding: &'static Encoding,
-    limits: &VbaLimits,
-) -> Result<Vec<VbaModuleMetadata>, VbaError> {
+    limits: &Limits,
+) -> Result<Vec<Module>, Error> {
     let mut last_error = None;
     for position in 0..data.len().saturating_sub(15) {
         if read_u16_at(data, position) != Some(PROJECT_MODULES_ID)
@@ -535,8 +525,8 @@ fn parse_modules(
     reader: &mut Reader<'_>,
     count: usize,
     encoding: &'static Encoding,
-    limits: &VbaLimits,
-) -> Result<Vec<VbaModuleMetadata>, VbaError> {
+    limits: &Limits,
+) -> Result<Vec<Module>, Error> {
     let mut modules = Vec::with_capacity(count);
     for _ in 0..count {
         reader.expect_id(MODULE_NAME_ID)?;
@@ -576,8 +566,8 @@ fn parse_modules(
         let _cookie = reader.read_u16()?;
 
         let kind = match reader.read_u16()? {
-            MODULE_PROCEDURAL_ID => VbaModuleKind::Procedural,
-            MODULE_OTHER_ID => VbaModuleKind::DocumentClassOrDesigner,
+            MODULE_PROCEDURAL_ID => Kind::Procedural,
+            MODULE_OTHER_ID => Kind::DocumentClassOrDesigner,
             id => return Err(invalid(format!("unexpected MODULETYPE id {id:#06x}"))),
         };
         reader.expect_u32(0, "MODULETYPE reserved value")?;
@@ -597,7 +587,7 @@ fn parse_modules(
         reader.expect_id(MODULE_TERMINATOR_ID)?;
         reader.expect_u32(0, "MODULE terminator reserved value")?;
 
-        modules.push(VbaModuleMetadata {
+        modules.push(Module {
             name,
             stream_name,
             text_offset,
@@ -613,7 +603,7 @@ fn decode_mbcs(
     bytes: &[u8],
     encoding: &'static Encoding,
     field: &'static str,
-) -> Result<String, VbaError> {
+) -> Result<String, Error> {
     if bytes.contains(&0) {
         return Err(invalid(format!("{field} contains a null byte")));
     }
@@ -626,7 +616,7 @@ fn decode_mbcs(
     Ok(decoded.into_owned())
 }
 
-fn decode_utf16(bytes: &[u8], field: &'static str) -> Result<String, VbaError> {
+fn decode_utf16(bytes: &[u8], field: &'static str) -> Result<String, Error> {
     if !bytes.len().is_multiple_of(2) {
         return Err(invalid(format!("{field} byte length is not even")));
     }
@@ -659,21 +649,21 @@ impl<'a> Reader<'a> {
         read_u16_at(self.data, self.position)
     }
 
-    fn read_u16(&mut self) -> Result<u16, VbaError> {
+    fn read_u16(&mut self) -> Result<u16, Error> {
         let value = read_u16_at(self.data, self.position)
             .ok_or_else(|| invalid("truncated 16-bit dir-stream field"))?;
         self.position += 2;
         Ok(value)
     }
 
-    fn read_u32(&mut self) -> Result<u32, VbaError> {
+    fn read_u32(&mut self) -> Result<u32, Error> {
         let value = read_u32_at(self.data, self.position)
             .ok_or_else(|| invalid("truncated 32-bit dir-stream field"))?;
         self.position += 4;
         Ok(value)
     }
 
-    fn read_bytes(&mut self, length: usize) -> Result<&'a [u8], VbaError> {
+    fn read_bytes(&mut self, length: usize) -> Result<&'a [u8], Error> {
         let end = self
             .position
             .checked_add(length)
@@ -686,7 +676,7 @@ impl<'a> Reader<'a> {
         Ok(value)
     }
 
-    fn expect_id(&mut self, expected: u16) -> Result<(), VbaError> {
+    fn expect_id(&mut self, expected: u16) -> Result<(), Error> {
         let actual = self.read_u16()?;
         if actual != expected {
             return Err(invalid(format!(
@@ -696,7 +686,7 @@ impl<'a> Reader<'a> {
         Ok(())
     }
 
-    fn expect_u32(&mut self, expected: u32, field: &'static str) -> Result<(), VbaError> {
+    fn expect_u32(&mut self, expected: u32, field: &'static str) -> Result<(), Error> {
         let actual = self.read_u32()?;
         if actual != expected {
             return Err(invalid(format!(
@@ -706,12 +696,12 @@ impl<'a> Reader<'a> {
         Ok(())
     }
 
-    fn expect_sized_u32(&mut self, id: u16, size: u32) -> Result<(), VbaError> {
+    fn expect_sized_u32(&mut self, id: u16, size: u32) -> Result<(), Error> {
         self.expect_id(id)?;
         self.expect_u32(size, "dir record size")
     }
 
-    fn length_prefixed(&mut self, limits: &VbaLimits) -> Result<&'a [u8], VbaError> {
+    fn length_prefixed(&mut self, limits: &Limits) -> Result<&'a [u8], Error> {
         let length = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid("dir-stream string length does not fit usize"))?;
         check_limit("VBA string bytes", length, limits.max_string_bytes)?;
@@ -723,8 +713,8 @@ impl<'a> Reader<'a> {
         encoding: &'static Encoding,
         reserved: u16,
         field: &'static str,
-        limits: &VbaLimits,
-    ) -> Result<String, VbaError> {
+        limits: &Limits,
+    ) -> Result<String, Error> {
         self.string_pair_bounded(encoding, reserved, field, limits, usize::MAX)
     }
 
@@ -733,9 +723,9 @@ impl<'a> Reader<'a> {
         encoding: &'static Encoding,
         reserved: u16,
         field: &'static str,
-        limits: &VbaLimits,
+        limits: &Limits,
         protocol_maximum: usize,
-    ) -> Result<String, VbaError> {
+    ) -> Result<String, Error> {
         let mbcs = decode_mbcs(
             self.length_prefixed_bounded(limits, protocol_maximum, field)?,
             encoding,
@@ -763,9 +753,9 @@ impl<'a> Reader<'a> {
         encoding: &'static Encoding,
         reserved: u16,
         field: &'static str,
-        limits: &VbaLimits,
+        limits: &Limits,
         protocol_maximum: usize,
-    ) -> Result<String, VbaError> {
+    ) -> Result<String, Error> {
         let first_bytes = self.length_prefixed_bounded(limits, protocol_maximum, field)?;
         let first = decode_mbcs(first_bytes, encoding, field)?;
         let actual_reserved = self.read_u16()?;
@@ -889,7 +879,7 @@ mod tests {
 
     #[test]
     fn parses_typed_module_directory() {
-        let directory = VbaDirectory::parse(&sample_dir(), &VbaLimits::default()).unwrap();
+        let directory = Dir::parse(&sample_dir(), &Limits::default()).unwrap();
         assert_eq!(directory.code_page(), 1252);
         assert_eq!(directory.project_name(), "Sample");
         assert_eq!(directory.modules().len(), 1);
@@ -897,29 +887,29 @@ mod tests {
         assert_eq!(module.name(), "Module1");
         assert_eq!(module.stream_name(), "Module1");
         assert_eq!(module.text_offset(), 12);
-        assert_eq!(module.kind(), VbaModuleKind::Procedural);
+        assert_eq!(module.kind(), Kind::Procedural);
         assert!(module.is_read_only());
         assert!(module.is_private());
     }
 
     #[test]
     fn rejects_module_count_over_limit() {
-        let limits = VbaLimits {
+        let limits = Limits {
             max_modules: 0,
-            ..VbaLimits::default()
+            ..Limits::default()
         };
         assert!(matches!(
-            VbaDirectory::parse(&sample_dir(), &limits),
-            Err(VbaError::LimitExceeded { .. })
+            Dir::parse(&sample_dir(), &limits),
+            Err(Error::LimitExceeded { .. })
         ));
     }
 
     #[test]
     fn rejects_missing_top_level_directory_terminator() {
-        let limits = VbaLimits::default();
-        let mut decompressed = decompress_container(&sample_dir(), &limits).unwrap();
+        let limits = Limits::default();
+        let mut decompressed = codec::decode(&sample_dir(), &limits).unwrap();
         decompressed.truncate(decompressed.len() - 6);
-        let malformed = compress_container(&decompressed, &limits).unwrap();
-        assert!(VbaDirectory::parse(&malformed, &limits).is_err());
+        let malformed = codec::encode(&decompressed, &limits).unwrap();
+        assert!(Dir::parse(&malformed, &limits).is_err());
     }
 }

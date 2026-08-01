@@ -5,10 +5,12 @@
 
 use crate::error::{OoxmlError, Result};
 use crate::vba_package::{
-    VbaPackageHost, remove_vba_project_graph, store_vba_project_graph, validate_vba_project_payload,
+    VbaPackageHost, read_project_part, remove_vba_project_graph, store_vba_project_graph,
 };
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_vba::{Limits, Payload, project::Project};
+use std::sync::Arc;
 
 /// Relationship metadata for the VBA project attached to a presentation.
 ///
@@ -37,13 +39,14 @@ impl VbaProject {
         &self.project_part_name
     }
 
-    /// Parse the `vbaProject.bin` CFB payload as inert MS-OVBA source.
-    pub fn read_project(
-        &self,
-        package: &OpcPackage,
-        limits: &crate::vba::VbaLimits,
-    ) -> std::result::Result<crate::vba::VbaProject, crate::vba::VbaError> {
-        crate::vba::read_project_part(package, &self.project_part_name, limits)
+    /// Parse the `vbaProject.bin` payload with default resource limits.
+    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
+        self.project_with(package, &Limits::default())
+    }
+
+    /// Parse the `vbaProject.bin` payload with explicit resource limits.
+    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+        read_project_part(package, &self.project_part_name, limits)
     }
 }
 
@@ -114,10 +117,9 @@ pub(crate) fn discover_vba_project(
 pub(crate) fn store_vba_project(
     package: &mut OpcPackage,
     source: &PackURI,
-    payload: Vec<u8>,
-    limits: &crate::vba::VbaLimits,
+    payload: Payload,
 ) -> Result<VbaProject> {
-    validate_vba_project_payload(&payload, limits)?;
+    let payload = Arc::new(payload.into_bytes());
     store_vba_project_graph(package, source, VbaPackageHost::PowerPoint, payload, None)?;
     let source = package.get_part(source)?;
     discover_vba_project(package, source)?.ok_or_else(|| {
@@ -133,8 +135,8 @@ pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> 
 mod tests {
     use super::*;
     use crate::pptx::Package;
-    use crate::vba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
     use litchi_opc::part::BlobPart;
+    use litchi_vba::{Limits, Payload, build};
 
     fn package_with_vba_project(
         main_content_type: &str,
@@ -190,7 +192,7 @@ mod tests {
     fn presentations_without_vba_projects_return_no_metadata() {
         let package = Package::new().unwrap();
 
-        assert!(package.vba_project().unwrap().is_none());
+        assert!(package.vba().unwrap().is_none());
     }
 
     #[test]
@@ -203,37 +205,31 @@ mod tests {
             let package =
                 Package::from_opc_package(package_with_vba_project(main_content_type, false))
                     .unwrap();
-            let project = package.vba_project().unwrap().unwrap();
+            let project = package.vba().unwrap().unwrap();
 
             assert_eq!(project.project_part_name().as_str(), "/ppt/vbaProject.bin");
             assert!(package.presentation().is_ok());
         }
     }
 
-    fn authored_project() -> crate::vba::VbaProjectBinary {
-        VbaProjectBuilder::new("PowerPointProject")
-            .with_module(VbaModuleBuilder::standard(
-                "Module1",
-                "Public Sub Hello()\r\nEnd Sub\r\n",
-            ))
-            .build(&VbaLimits::default())
-            .unwrap()
+    fn authored_project() -> build::Project {
+        build::Project::new("PowerPointProject").module(build::Module::standard(
+            "Module1",
+            "Public Sub Hello()\r\nEnd Sub\r\n",
+        ))
     }
 
     #[test]
     fn stores_and_preserves_project_across_presentation_materialization() {
         let file = tempfile::NamedTempFile::with_suffix(".pptm").unwrap();
         let mut package = Package::new().unwrap();
-        let project = authored_project();
-        package.set_vba_project(&project).unwrap();
+        package.set_vba(authored_project()).unwrap();
         package.presentation_mut().unwrap().add_slide().unwrap();
         package.save(file.path()).unwrap();
 
         let mut reopened = Package::open(file.path()).unwrap();
-        let metadata = reopened.vba_project().unwrap().unwrap();
-        let parsed = metadata
-            .read_project(reopened.opc_package(), &VbaLimits::default())
-            .unwrap();
+        let metadata = reopened.vba().unwrap().unwrap();
+        let parsed = metadata.project(reopened.opc_package()).unwrap();
         assert_eq!(parsed.name(), "PowerPointProject");
         assert_eq!(
             reopened
@@ -244,8 +240,8 @@ mod tests {
             content_type::PML_PRES_MACRO_MAIN
         );
 
-        assert!(reopened.remove_vba_project().unwrap());
-        assert!(reopened.vba_project().unwrap().is_none());
+        assert!(reopened.clear_vba().unwrap());
+        assert!(reopened.vba().unwrap().is_none());
         assert_eq!(
             reopened
                 .opc_package()
@@ -258,13 +254,9 @@ mod tests {
 
     #[test]
     fn rejects_invalid_project_before_mutating_presentation() {
-        let mut package = Package::new().unwrap();
-        assert!(
-            package
-                .set_vba_project_bytes(vec![0; 64], &VbaLimits::default())
-                .is_err()
-        );
-        assert!(package.vba_project().unwrap().is_none());
+        let package = Package::new().unwrap();
+        assert!(Payload::read(vec![0; 64], &Limits::default()).is_err());
+        assert!(package.vba().unwrap().is_none());
     }
 
     #[test]
@@ -293,7 +285,7 @@ mod tests {
                 .set_content_type(plain.to_string())
                 .unwrap();
 
-            package.set_vba_project(&authored_project()).unwrap();
+            package.set_vba(authored_project()).unwrap();
             assert_eq!(
                 package
                     .opc_package()
@@ -302,7 +294,7 @@ mod tests {
                     .content_type(),
                 macro_enabled
             );
-            package.remove_vba_project().unwrap();
+            package.clear_vba().unwrap();
             assert_eq!(
                 package
                     .opc_package()

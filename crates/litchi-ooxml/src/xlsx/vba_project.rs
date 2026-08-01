@@ -5,10 +5,12 @@
 
 use crate::error::{OoxmlError, Result};
 use crate::vba_package::{
-    VbaPackageHost, remove_vba_project_graph, store_vba_project_graph, validate_vba_project_payload,
+    VbaPackageHost, read_project_part, remove_vba_project_graph, store_vba_project_graph,
 };
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_vba::{Limits, Payload, project::Project};
+use std::sync::Arc;
 
 /// Relationship metadata for the VBA project attached to an Excel workbook.
 ///
@@ -37,13 +39,14 @@ impl VbaProject {
         &self.project_part_name
     }
 
-    /// Parse the `vbaProject.bin` CFB payload as inert MS-OVBA source.
-    pub fn read_project(
-        &self,
-        package: &OpcPackage,
-        limits: &crate::vba::VbaLimits,
-    ) -> std::result::Result<crate::vba::VbaProject, crate::vba::VbaError> {
-        crate::vba::read_project_part(package, &self.project_part_name, limits)
+    /// Parse the `vbaProject.bin` payload with default resource limits.
+    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
+        self.project_with(package, &Limits::default())
+    }
+
+    /// Parse the `vbaProject.bin` payload with explicit resource limits.
+    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+        read_project_part(package, &self.project_part_name, limits)
     }
 }
 
@@ -114,10 +117,9 @@ pub(crate) fn discover_vba_project(
 pub(crate) fn store_vba_project(
     package: &mut OpcPackage,
     source: &PackURI,
-    payload: Vec<u8>,
-    limits: &crate::vba::VbaLimits,
+    payload: Payload,
 ) -> Result<VbaProject> {
-    validate_vba_project_payload(&payload, limits)?;
+    let payload = Arc::new(payload.into_bytes());
     store_vba_project_graph(package, source, VbaPackageHost::Excel, payload, None)?;
     let source = package.get_part(source)?;
     discover_vba_project(package, source)?.ok_or_else(|| {
@@ -132,9 +134,9 @@ pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
     use crate::xlsx::Workbook;
     use litchi_opc::part::BlobPart;
+    use litchi_vba::{Limits, Payload, build};
 
     fn add_vba_project(workbook: &mut Workbook, add_forbidden_relationship: bool) {
         let workbook_name = workbook
@@ -166,7 +168,7 @@ mod tests {
         let mut workbook = Workbook::create().unwrap();
         add_vba_project(&mut workbook, false);
 
-        let project = workbook.vba_project().unwrap().unwrap();
+        let project = workbook.vba().unwrap().unwrap();
         assert_eq!(project.source_part_name().as_str(), "/xl/workbook.xml");
         assert!(project.relationship_id().starts_with("rId"));
         assert_eq!(project.project_part_name().as_str(), "/xl/vbaProject.bin");
@@ -177,33 +179,28 @@ mod tests {
         let mut workbook = Workbook::create().unwrap();
         add_vba_project(&mut workbook, true);
 
-        assert!(workbook.vba_project().is_err());
+        assert!(workbook.vba().is_err());
     }
 
     #[test]
     fn workbooks_without_vba_projects_return_no_metadata() {
         let workbook = Workbook::create().unwrap();
 
-        assert!(workbook.vba_project().unwrap().is_none());
+        assert!(workbook.vba().unwrap().is_none());
     }
 
-    fn authored_project() -> crate::vba::VbaProjectBinary {
-        VbaProjectBuilder::new("ExcelProject")
-            .with_module(VbaModuleBuilder::standard(
-                "Module1",
-                "Public Sub Hello()\r\nEnd Sub\r\n",
-            ))
-            .build(&VbaLimits::default())
-            .unwrap()
+    fn authored_project() -> build::Project {
+        build::Project::new("ExcelProject").module(build::Module::standard(
+            "Module1",
+            "Public Sub Hello()\r\nEnd Sub\r\n",
+        ))
     }
 
     #[test]
     fn stores_preserves_replaces_and_removes_authored_project() {
         let file = tempfile::NamedTempFile::with_suffix(".xlsm").unwrap();
         let mut workbook = Workbook::create().unwrap();
-        let project = authored_project();
-
-        let metadata = workbook.set_vba_project(&project).unwrap();
+        let metadata = workbook.set_vba(authored_project()).unwrap();
         assert_eq!(metadata.project_part_name().as_str(), "/xl/vbaProject.bin");
         assert_eq!(
             workbook
@@ -220,16 +217,29 @@ mod tests {
         workbook.save(file.path()).unwrap();
 
         let mut reopened = Workbook::open(file.path()).unwrap();
-        let metadata = reopened.vba_project().unwrap().unwrap();
-        let parsed = metadata
-            .read_project(reopened.opc_package(), &VbaLimits::default())
-            .unwrap();
+        let metadata = reopened.vba().unwrap().unwrap();
+        let parsed = metadata.project(reopened.opc_package()).unwrap();
         assert_eq!(parsed.name(), "ExcelProject");
         assert_eq!(parsed.modules().len(), 1);
 
-        reopened.set_vba_project(&project).unwrap();
-        assert!(reopened.remove_vba_project().unwrap());
-        assert!(reopened.vba_project().unwrap().is_none());
+        let too_small = Limits {
+            max_cfb_bytes: 0,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            metadata.project_with(reopened.opc_package(), &too_small),
+            Err(OoxmlError::Vba(litchi_vba::Error::LimitExceeded { .. }))
+        ));
+
+        let limits = Limits::default();
+        let imported = Payload::read(
+            authored_project().finish(&limits).unwrap().into_bytes(),
+            &limits,
+        )
+        .unwrap();
+        reopened.put_vba(imported).unwrap();
+        assert!(reopened.clear_vba().unwrap());
+        assert!(reopened.vba().unwrap().is_none());
         assert_eq!(
             reopened
                 .opc_package()
@@ -248,13 +258,9 @@ mod tests {
 
     #[test]
     fn rejects_invalid_project_before_mutating_workbook() {
-        let mut workbook = Workbook::create().unwrap();
-        assert!(
-            workbook
-                .set_vba_project_bytes(vec![0; 64], &VbaLimits::default())
-                .is_err()
-        );
-        assert!(workbook.vba_project().unwrap().is_none());
+        let workbook = Workbook::create().unwrap();
+        assert!(Payload::read(vec![0; 64], &Limits::default()).is_err());
+        assert!(workbook.vba().unwrap().is_none());
         assert_eq!(
             workbook
                 .opc_package()
@@ -275,12 +281,12 @@ mod tests {
             b"keep me".to_vec(),
         )));
 
-        assert!(workbook.set_vba_project(&authored_project()).is_err());
+        assert!(workbook.set_vba(authored_project()).is_err());
         assert_eq!(
             workbook.opc_package().get_part(&occupied).unwrap().blob(),
             b"keep me"
         );
-        assert!(workbook.vba_project().unwrap().is_none());
+        assert!(workbook.vba().unwrap().is_none());
         assert_eq!(
             workbook
                 .opc_package()
@@ -307,7 +313,7 @@ mod tests {
             .set_content_type(content_type::SML_TEMPLATE_MAIN.to_string())
             .unwrap();
 
-        workbook.set_vba_project(&authored_project()).unwrap();
+        workbook.set_vba(authored_project()).unwrap();
         assert_eq!(
             workbook
                 .opc_package()
@@ -316,7 +322,7 @@ mod tests {
                 .content_type(),
             content_type::SML_TEMPLATE_MACRO_MAIN
         );
-        workbook.remove_vba_project().unwrap();
+        workbook.clear_vba().unwrap();
         assert_eq!(
             workbook
                 .opc_package()

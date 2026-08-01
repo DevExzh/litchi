@@ -94,7 +94,7 @@ pub enum PptWriteError {
     /// OLE error
     Ole(crate::OleError),
     /// MS-OVBA project authoring error
-    Vba(crate::ovba::VbaError),
+    Vba(litchi_vba::Error),
 }
 
 /// Build a minimal, valid Current User stream referencing the given UserEditAtom offset.
@@ -203,8 +203,8 @@ impl From<crate::OleError> for PptWriteError {
     }
 }
 
-impl From<crate::ovba::VbaError> for PptWriteError {
-    fn from(err: crate::ovba::VbaError) -> Self {
+impl From<litchi_vba::Error> for PptWriteError {
+    fn from(err: litchi_vba::Error) -> Self {
         PptWriteError::Vba(err)
     }
 }
@@ -1020,40 +1020,45 @@ impl PptWriter {
         self.encryption.as_ref().map(|value| value.profile)
     }
 
-    /// Configure a complete module-free VBA project.
-    pub fn enable_empty_vba_project(
-        &mut self,
-        project_name: &str,
-        compression: crate::ppt::PowerPointVbaProjectCompression,
-    ) -> Result<(), PptWriteError> {
-        let project = crate::ovba::VbaProjectBuilder::new(project_name)
-            .build(&crate::ovba::VbaLimits::default())?;
-        self.set_vba_project_binary(project, compression)
+    /// Configure a complete inert VBA project with safe limits and zlib storage.
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), PptWriteError> {
+        self.set_vba_with(
+            project,
+            &litchi_vba::Limits::default(),
+            crate::ppt::PowerPointVbaProjectCompression::Zlib,
+        )
     }
 
-    /// Configure a complete inert VBA project using explicit MS-OVBA limits.
+    /// Configure a complete inert VBA project with explicit limits and storage.
     ///
     /// The inner CFB and optional outer zlib stream are fully serialized before
     /// writer state changes. Module source is never compiled or executed.
-    pub fn set_vba_project(
+    pub fn set_vba_with(
         &mut self,
-        project: &crate::ovba::VbaProjectBuilder,
-        limits: &crate::ovba::VbaLimits,
+        project: litchi_vba::build::Project,
+        limits: &litchi_vba::Limits,
         compression: crate::ppt::PowerPointVbaProjectCompression,
     ) -> Result<(), PptWriteError> {
-        let project = project.build(limits)?;
-        self.set_vba_project_binary(project, compression)
+        let payload = project.finish(limits)?;
+        self.put_vba_with(payload, compression)
     }
 
-    /// Configure an already validated inert VBA project.
-    pub fn set_vba_project_binary(
+    /// Configure an already validated inert VBA project using zlib storage.
+    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<(), PptWriteError> {
+        self.put_vba_with(payload, crate::ppt::PowerPointVbaProjectCompression::Zlib)
+    }
+
+    /// Configure an already validated inert VBA project with explicit storage.
+    ///
+    /// Import standalone CFB bytes through [`litchi_vba::Payload::read`] first.
+    pub fn put_vba_with(
         &mut self,
-        project: crate::ovba::VbaProjectBinary,
+        payload: litchi_vba::Payload,
         compression: crate::ppt::PowerPointVbaProjectCompression,
     ) -> Result<(), PptWriteError> {
         use std::io::Write;
 
-        let cfb = project.to_cfb_bytes()?;
+        let cfb = payload.into_bytes();
         let storage = match compression {
             crate::ppt::PowerPointVbaProjectCompression::Uncompressed => {
                 crate::ppt::PowerPointOleStorage {
@@ -1089,12 +1094,12 @@ impl PptWriter {
     }
 
     /// Remove the configured VBA project and its persisted metadata.
-    pub fn clear_vba_project(&mut self) {
+    pub fn clear_vba(&mut self) {
         self.vba_project = None;
     }
 
     /// Whether a complete VBA project is configured for output.
-    pub fn has_vba_project(&self) -> bool {
+    pub fn has_vba(&self) -> bool {
         self.vba_project.is_some()
     }
 

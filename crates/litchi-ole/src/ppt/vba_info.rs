@@ -2,8 +2,10 @@
 
 use crate::consts::PptRecordType;
 
+#[cfg(test)]
+use super::ole_storage::PowerPointOleStorage;
 use super::ole_storage::{
-    PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
+    PowerPointOleStorageCompression, PowerPointOleStorageKind, PowerPointOleStorageMetadata,
 };
 use super::package::{PptError, Result};
 use super::records::PptRecord;
@@ -29,7 +31,7 @@ pub struct PowerPointVbaProjectLimits {
     /// Maximum CFB bytes accepted after outer zlib decompression.
     pub max_cfb_bytes: usize,
     /// Limits applied while parsing the inner MS-OVBA project.
-    pub project: crate::ovba::VbaLimits,
+    pub project: litchi_vba::Limits,
 }
 
 impl Default for PowerPointVbaProjectLimits {
@@ -37,7 +39,7 @@ impl Default for PowerPointVbaProjectLimits {
         Self {
             max_stored_bytes: DEFAULT_MAX_STORED_PROJECT_BYTES,
             max_cfb_bytes: DEFAULT_MAX_PROJECT_CFB_BYTES,
-            project: crate::ovba::VbaLimits::default(),
+            project: litchi_vba::Limits::default(),
         }
     }
 }
@@ -48,7 +50,7 @@ pub enum PowerPointVbaProjectError {
     /// Invalid outer MS-PPT metadata, compression, or persistence.
     PowerPoint(PptError),
     /// Invalid inner CFB or MS-OVBA project data.
-    Vba(crate::ovba::VbaError),
+    Vba(litchi_vba::Error),
 }
 
 impl std::fmt::Display for PowerPointVbaProjectError {
@@ -75,8 +77,8 @@ impl From<PptError> for PowerPointVbaProjectError {
     }
 }
 
-impl From<crate::ovba::VbaError> for PowerPointVbaProjectError {
-    fn from(error: crate::ovba::VbaError) -> Self {
+impl From<litchi_vba::Error> for PowerPointVbaProjectError {
+    fn from(error: litchi_vba::Error) -> Self {
         Self::Vba(error)
     }
 }
@@ -84,7 +86,7 @@ impl From<crate::ovba::VbaError> for PowerPointVbaProjectError {
 /// Strictly validated metadata pointing at a persisted VBA project storage.
 ///
 /// Parsing this metadata never opens or executes the referenced project.
-/// [`crate::ppt::Presentation::vba_project`] provides a separate bounded,
+/// [`crate::ppt::Presentation::vba`] provides a separate bounded,
 /// inert parser for callers that need project and module source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PowerPointVbaInfo {
@@ -100,7 +102,7 @@ pub struct PowerPointVbaInfo {
 ///
 /// This descriptor does not expose or decompress the embedded payload.
 /// Callers can opt into bounded CFB/MS-OVBA parsing through
-/// [`crate::ppt::Presentation::vba_project`]. VBA is never executed.
+/// [`crate::ppt::Presentation::vba`]. VBA is never executed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PowerPointVbaProjectStorage {
     info: PowerPointVbaInfo,
@@ -109,9 +111,17 @@ pub struct PowerPointVbaProjectStorage {
 }
 
 impl PowerPointVbaProjectStorage {
+    #[cfg(test)]
     pub(crate) fn from_info_and_storage(
         info: PowerPointVbaInfo,
         storage: Option<&PowerPointOleStorage>,
+    ) -> Result<Self> {
+        Self::from_info_and_metadata(info, storage.map(PowerPointOleStorage::metadata))
+    }
+
+    pub(crate) fn from_info_and_metadata(
+        info: PowerPointVbaInfo,
+        storage: Option<PowerPointOleStorageMetadata>,
     ) -> Result<Self> {
         info.validate()?;
         if info.persist_id_ref == 0 && storage.is_some() {
@@ -133,22 +143,17 @@ impl PowerPointVbaProjectStorage {
                 info.persist_id_ref
             )));
         }
-        if let Some(storage) = storage {
-            let contains_data = match storage.compression {
-                PowerPointOleStorageCompression::Uncompressed => !storage.data.is_empty(),
-                PowerPointOleStorageCompression::Zlib { uncompressed_len } => uncompressed_len != 0,
-            };
-            if info.has_macros != contains_data {
-                return Err(PptError::Corrupted(
-                    "VBAInfoAtom fHasMacros disagrees with VbaProjectStg payload presence"
-                        .to_string(),
-                ));
-            }
+        if let Some(storage) = storage
+            && info.has_macros != storage.contains_data
+        {
+            return Err(PptError::Corrupted(
+                "VBAInfoAtom fHasMacros disagrees with VbaProjectStg payload presence".to_string(),
+            ));
         }
         Ok(Self {
             info,
             compression: storage.map(|storage| storage.compression),
-            stored_payload_len: storage.map(|storage| storage.data.len()),
+            stored_payload_len: storage.map(|storage| storage.stored_payload_len),
         })
     }
 
@@ -244,8 +249,8 @@ impl PowerPointVbaInfo {
                 "VBAInfoAtom has an invalid record header or size".to_string(),
             ));
         }
-        let persist_id_ref = u32::from_le_bytes(atom.data[0..4].try_into().unwrap());
-        let has_macros = match u32::from_le_bytes(atom.data[4..8].try_into().unwrap()) {
+        let persist_id_ref = read_vba_info_u32(&atom.data, 0, "persist ID")?;
+        let has_macros = match read_vba_info_u32(&atom.data, 4, "flags")? {
             0 => false,
             1 => true,
             _ => {
@@ -254,7 +259,7 @@ impl PowerPointVbaInfo {
                 ));
             },
         };
-        let runtime_version = u32::from_le_bytes(atom.data[8..12].try_into().unwrap());
+        let runtime_version = read_vba_info_u32(&atom.data, 8, "version")?;
         let result = Self {
             persist_id_ref,
             has_macros,
@@ -326,6 +331,18 @@ impl PowerPointVbaInfo {
         }
         Ok(())
     }
+}
+
+fn read_vba_info_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| PptError::Corrupted(format!("VBAInfoAtom {field} offset overflow")))?;
+    let bytes: [u8; 4] = data
+        .get(offset..end)
+        .ok_or_else(|| PptError::Corrupted(format!("truncated VBAInfoAtom {field}")))?
+        .try_into()
+        .map_err(|_| PptError::Corrupted(format!("invalid VBAInfoAtom {field} width")))?;
+    Ok(u32::from_le_bytes(bytes))
 }
 
 #[cfg(test)]

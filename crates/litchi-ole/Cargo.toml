@@ -28,6 +28,7 @@ litchi-imgconv  = { workspace = true, optional = true }
 litchi-odraw    = { workspace = true }
 litchi-ole-common = { workspace = true }
 litchi-opc      = { workspace = true }
+litchi-vba      = { workspace = true }
 md-5            = { workspace = true }
 once_cell       = { workspace = true }
 quick-xml       = { workspace = true }

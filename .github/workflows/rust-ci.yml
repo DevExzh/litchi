@@ -80,6 +80,7 @@ jobs:
           -p litchi-ooxml-common
           -p litchi-sheet
           -p litchi-slide
+          -p litchi-vba
           -p litchi-word
           -p litchi-xlsx
 

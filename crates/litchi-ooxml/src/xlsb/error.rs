@@ -44,6 +44,8 @@ pub enum XlsbError {
     UnsupportedFeature(String),
     /// Encoding error
     Encoding(String),
+    /// Bounded, inert VBA parsing or authoring error.
+    Vba(litchi_vba::Error),
     /// Wide string length error
     WideStringLength {
         /// Expected length
@@ -100,6 +102,7 @@ impl fmt::Display for XlsbError {
             XlsbError::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
             },
+            XlsbError::Vba(error) => write!(f, "VBA error: {error}"),
             XlsbError::WideStringLength { expected, actual } => {
                 write!(
                     f,
@@ -122,6 +125,7 @@ impl std::error::Error for XlsbError {
         match self {
             XlsbError::Io(e) => Some(e),
             XlsbError::Xml(e) => Some(e),
+            XlsbError::Vba(e) => Some(e),
             _ => None,
         }
     }
@@ -148,6 +152,12 @@ impl From<quick_xml::Error> for XlsbError {
 impl From<litchi_core::binary::BinaryError> for XlsbError {
     fn from(err: litchi_core::binary::BinaryError) -> Self {
         XlsbError::Encoding(err.to_string())
+    }
+}
+
+impl From<litchi_vba::Error> for XlsbError {
+    fn from(error: litchi_vba::Error) -> Self {
+        Self::Vba(error)
     }
 }
 
@@ -204,6 +214,7 @@ impl From<crate::error::OoxmlError> for XlsbError {
                 XlsbError::Encoding(err.to_string())
             },
             crate::error::OoxmlError::CommonXml(err) => XlsbError::Encoding(err.to_string()),
+            crate::error::OoxmlError::Vba(err) => XlsbError::Vba(err),
             crate::error::OoxmlError::UnsafeEdit {
                 format,
                 operation,

@@ -77,6 +77,10 @@
     "litchi-slide": [
       "litchi-core"
     ],
+    "litchi-vba": [
+      "litchi-cfb",
+      "litchi-core"
+    ],
     "litchi-word": [
       "litchi-core"
     ],
@@ -157,6 +161,20 @@
       "dependency": "litchi-crypto",
       "reason": "The legacy OLE monolith temporarily consumes the extracted shared Office cryptography capability.",
       "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-crypto, then delete the host."
+    },
+    {
+      "order": 28,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-vba",
+      "reason": "The legacy OLE migration host temporarily consumes the extracted inert VBA capability.",
+      "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-vba, then delete the host."
+    },
+    {
+      "order": 29,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-vba",
+      "reason": "The OOXML migration host temporarily consumes the extracted inert VBA capability.",
+      "exit": "Move DOCX, PPTX, XLSB, and XLSX into concrete crates that depend directly on litchi-vba, then delete the host."
     },
     {
       "order": 30,
@@ -266,6 +284,7 @@
     "litchi-ooxml-common",
     "litchi-sheet",
     "litchi-slide",
+    "litchi-vba",
     "litchi-word"
   ],
   "runtime_packages": [

@@ -24,7 +24,7 @@ pub enum XlsError {
     /// CFB (Compound File Binary) error
     Cfb(litchi_cfb::OleError),
     /// MS-OVBA project authoring or parsing error
-    Vba(litchi_cfb::ovba::VbaError),
+    Vba(litchi_vba::Error),
     /// Invalid BIFF record
     InvalidRecord {
         /// Record type
@@ -168,8 +168,8 @@ impl From<litchi_cfb::OleError> for XlsError {
     }
 }
 
-impl From<litchi_cfb::ovba::VbaError> for XlsError {
-    fn from(err: litchi_cfb::ovba::VbaError) -> Self {
+impl From<litchi_vba::Error> for XlsError {
+    fn from(err: litchi_vba::Error) -> Self {
         XlsError::Vba(err)
     }
 }

@@ -11,12 +11,7 @@ const PRESENTATION_XML: &[u8] =
 fn presentation_discovers_inert_vba_project_metadata() {
     let package = package_with_vba_project(false);
 
-    let project = package
-        .presentation()
-        .unwrap()
-        .vba_project()
-        .unwrap()
-        .unwrap();
+    let project = package.presentation().unwrap().vba().unwrap().unwrap();
     assert_eq!(project.source_part_name().as_str(), "/ppt/presentation.xml");
     assert_eq!(project.relationship_id(), "rIdVbaProject");
     assert_eq!(project.project_part_name().as_str(), "/ppt/vbaProject.bin");
@@ -27,7 +22,7 @@ fn presentation_rejects_external_vba_project_relationships() {
     let package = package_with_vba_project(true);
 
     assert!(matches!(
-        package.presentation().unwrap().vba_project(),
+        package.presentation().unwrap().vba(),
         Err(OoxmlError::InvalidFormat(message)) if message.contains("cannot be external")
     ));
 }

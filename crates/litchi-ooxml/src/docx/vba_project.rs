@@ -6,11 +6,13 @@
 
 use crate::error::{OoxmlError, Result};
 use crate::vba_package::{
-    VbaPackageHost, remove_vba_project_graph, store_vba_project_graph, validate_vba_project_payload,
+    VbaPackageHost, read_project_part, remove_vba_project_graph, store_vba_project_graph,
 };
 use litchi_core::xml::escape::escape_xml;
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
+use litchi_vba::{Limits, Payload, project::Project};
+use std::sync::Arc;
 
 const WORD_VBA_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2006/wordml";
 const MAX_MACRO_NAME_CHARACTERS: usize = 255;
@@ -262,17 +264,18 @@ impl VbaProject {
         &self.supplemental_data_part_name
     }
 
-    /// Parse the `vbaProject.bin` CFB payload as inert MS-OVBA source.
+    /// Parse the `vbaProject.bin` payload with default resource limits.
+    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
+        self.project_with(package, &Limits::default())
+    }
+
+    /// Parse the `vbaProject.bin` payload with explicit resource limits.
     ///
     /// The relationship graph remains independently inspectable through this
-    /// type. This method only decompresses and decodes source; it never
-    /// compiles, interprets, or executes VBA.
-    pub fn read_project(
-        &self,
-        package: &OpcPackage,
-        limits: &crate::vba::VbaLimits,
-    ) -> std::result::Result<crate::vba::VbaProject, crate::vba::VbaError> {
-        crate::vba::read_project_part(package, &self.project_part_name, limits)
+    /// type. Parsing only decompresses and decodes source; it never compiles,
+    /// interprets, or executes VBA.
+    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+        read_project_part(package, &self.project_part_name, limits)
     }
 }
 
@@ -400,11 +403,10 @@ pub(crate) fn discover_vba_project(
 pub(crate) fn store_vba_project(
     package: &mut OpcPackage,
     source: &PackURI,
-    payload: Vec<u8>,
+    payload: Payload,
     supplemental_data: &VbaSupplementalData,
-    limits: &crate::vba::VbaLimits,
 ) -> Result<VbaProject> {
-    validate_vba_project_payload(&payload, limits)?;
+    let payload = Arc::new(payload.into_bytes());
     let supplemental_xml = supplemental_data.to_xml()?;
     store_vba_project_graph(
         package,
@@ -445,8 +447,8 @@ fn validate_supplemental_string(value: &str, field: &str) -> Result<()> {
 mod tests {
     use super::*;
     use crate::docx::Package;
-    use crate::vba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
     use litchi_opc::part::BlobPart;
+    use litchi_vba::{Limits, Payload, build};
     use std::io::Cursor;
 
     fn package_with_vba_project(
@@ -515,7 +517,7 @@ mod tests {
     fn documents_without_vba_projects_return_no_metadata() {
         let package = Package::new().unwrap();
 
-        assert!(package.vba_project().unwrap().is_none());
+        assert!(package.vba().unwrap().is_none());
     }
 
     #[test]
@@ -527,21 +529,18 @@ mod tests {
             let package =
                 Package::from_opc_package(package_with_vba_project(main_content_type, true))
                     .unwrap();
-            let project = package.vba_project().unwrap().unwrap();
+            let project = package.vba().unwrap().unwrap();
 
             assert_eq!(project.project_part_name().as_str(), "/word/vbaProject.bin");
             assert!(package.document().is_ok());
         }
     }
 
-    fn authored_project() -> crate::vba::VbaProjectBinary {
-        VbaProjectBuilder::new("WordProject")
-            .with_module(VbaModuleBuilder::standard(
-                "Module1",
-                "Public Sub Hello()\r\nEnd Sub\r\n",
-            ))
-            .build(&VbaLimits::default())
-            .unwrap()
+    fn authored_project() -> build::Project {
+        build::Project::new("WordProject").module(build::Module::standard(
+            "Module1",
+            "Public Sub Hello()\r\nEnd Sub\r\n",
+        ))
     }
 
     #[test]
@@ -578,7 +577,7 @@ mod tests {
             .unwrap();
 
         package
-            .set_vba_project_with_supplemental_data(&project, &supplemental)
+            .set_vba_with(project, &supplemental, &Limits::default())
             .unwrap();
         package
             .document_mut()
@@ -589,10 +588,8 @@ mod tests {
 
         bytes.set_position(0);
         let mut reopened = Package::from_reader(bytes).unwrap();
-        let metadata = reopened.vba_project().unwrap().unwrap();
-        let parsed = metadata
-            .read_project(reopened.opc_package(), &VbaLimits::default())
-            .unwrap();
+        let metadata = reopened.vba().unwrap().unwrap();
+        let parsed = metadata.project(reopened.opc_package()).unwrap();
         assert_eq!(parsed.name(), "WordProject");
         assert_eq!(
             reopened
@@ -612,8 +609,8 @@ mod tests {
                 .contains("eventDocOpen")
         );
 
-        assert!(reopened.remove_vba_project().unwrap());
-        assert!(reopened.vba_project().unwrap().is_none());
+        assert!(reopened.clear_vba().unwrap());
+        assert!(reopened.vba().unwrap().is_none());
         assert_eq!(
             reopened
                 .opc_package()
@@ -635,17 +632,9 @@ mod tests {
         assert!(VbaMacroDescriptor::new("").is_err());
         assert!(VbaMacroDescriptor::new("bad\u{1}name").is_err());
 
-        let mut package = Package::new().unwrap();
-        assert!(
-            package
-                .set_vba_project_bytes(
-                    vec![0; 64],
-                    &VbaSupplementalData::new(),
-                    &VbaLimits::default(),
-                )
-                .is_err()
-        );
-        assert!(package.vba_project().unwrap().is_none());
+        let package = Package::new().unwrap();
+        assert!(Payload::read(vec![0; 64], &Limits::default()).is_err());
+        assert!(package.vba().unwrap().is_none());
         assert_eq!(
             package
                 .opc_package()
@@ -672,7 +661,7 @@ mod tests {
             .set_content_type(content_type::WML_TEMPLATE_MAIN.to_string())
             .unwrap();
 
-        package.set_vba_project(&authored_project()).unwrap();
+        package.set_vba(authored_project()).unwrap();
         assert_eq!(
             package
                 .opc_package()
@@ -681,7 +670,7 @@ mod tests {
                 .content_type(),
             content_type::WML_TEMPLATE_MACRO_MAIN
         );
-        package.remove_vba_project().unwrap();
+        package.clear_vba().unwrap();
         assert_eq!(
             package
                 .opc_package()

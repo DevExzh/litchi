@@ -1,0 +1,14 @@
+[package]
+name        = "litchi-vba"
+description = "Bounded, inert MS-OVBA parsing and authoring for the Litchi office-formats library."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+encoding_rs = { workspace = true }
+litchi-cfb  = { workspace = true }
+litchi-core = { workspace = true }

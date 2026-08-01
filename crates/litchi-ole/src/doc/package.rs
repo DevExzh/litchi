@@ -260,14 +260,21 @@ impl<R: Read + Seek> Package<R> {
         self.vba_project_storages().into_iter().next()
     }
 
-    /// Parse the optional MS-DOC VBA project and expose its inert source.
+    /// Parse the optional MS-DOC VBA project with safe default limits.
     ///
     /// Source is decompressed and decoded according to the project code page,
     /// but is never compiled, interpreted, or executed.
-    pub fn vba_project(
+    pub fn vba(
         &mut self,
-        limits: &crate::ovba::VbaLimits,
-    ) -> std::result::Result<Option<crate::ovba::VbaProject>, crate::ovba::VbaError> {
+    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
+        self.vba_with(&litchi_vba::Limits::default())
+    }
+
+    /// Parse the optional MS-DOC VBA project with explicit resource limits.
+    pub fn vba_with(
+        &mut self,
+        limits: &litchi_vba::Limits,
+    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
         let Some(storage) = self.vba_project_storage() else {
             return Ok(None);
         };
@@ -279,20 +286,7 @@ impl<R: Read + Seek> Package<R> {
             .iter()
             .map(String::as_str)
             .collect();
-        crate::ovba::VbaProject::open(&mut self.ole, &path, limits).map(Some)
-    }
-
-    /// Parse the optional MS-DOC VBA project as a compatibility collection.
-    ///
-    /// Source is decompressed and decoded according to the project code page,
-    /// but is never compiled, interpreted, or executed. Explicit limits are
-    /// applied before CFB streams are allocated and while compressed containers
-    /// expand.
-    pub fn vba_projects(
-        &mut self,
-        limits: &crate::ovba::VbaLimits,
-    ) -> std::result::Result<Vec<crate::ovba::VbaProject>, crate::ovba::VbaError> {
-        Ok(self.vba_project(limits)?.into_iter().collect())
+        litchi_vba::project::Project::open(&mut self.ole, &path, limits).map(Some)
     }
 
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.

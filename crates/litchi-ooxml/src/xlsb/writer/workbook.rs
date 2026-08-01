@@ -18,6 +18,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::io::{Seek, Write};
+use std::sync::Arc;
 
 const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
 
@@ -59,7 +60,7 @@ pub struct XlsbWorkbookWriter {
     connections: Option<crate::xlsb::connections::XlsbConnections>,
     external_links: Vec<crate::xlsb::formula::XlsbExternalLink>,
     pivot_caches: Vec<AuthoredPivotCache>,
-    vba_project: Option<(Vec<u8>, crate::vba::VbaLimits)>,
+    vba: Option<Arc<Vec<u8>>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -106,7 +107,7 @@ impl XlsbWorkbookWriter {
             connections: None,
             external_links: Vec::new(),
             pivot_caches: Vec::new(),
-            vba_project: None,
+            vba: None,
         }
     }
 
@@ -130,30 +131,29 @@ impl XlsbWorkbookWriter {
     }
 
     /// Attach a cache-free, inert MS-OVBA project to generated workbooks.
-    pub fn set_vba_project(
-        &mut self,
-        project: &crate::vba::VbaProjectBinary,
-    ) -> XlsbResult<&mut Self> {
-        let payload = project
-            .to_cfb_bytes()
-            .map_err(|error| XlsbError::Encoding(error.to_string()))?;
-        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> XlsbResult<&mut Self> {
+        self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
-    /// Attach an existing, bounded `vbaProject.bin` payload without executing it.
-    pub fn set_vba_project_bytes(
+    /// Attach a cache-free project with explicit resource limits.
+    pub fn set_vba_with(
         &mut self,
-        payload: Vec<u8>,
-        limits: &crate::vba::VbaLimits,
+        project: litchi_vba::build::Project,
+        limits: &litchi_vba::Limits,
     ) -> XlsbResult<&mut Self> {
-        crate::vba_package::validate_vba_project_payload(&payload, limits)?;
-        self.vba_project = Some((payload, *limits));
-        Ok(self)
+        let payload = project.finish(limits)?;
+        Ok(self.put_vba(payload))
+    }
+
+    /// Attach a prevalidated `vbaProject.bin` payload without executing it.
+    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> &mut Self {
+        self.vba = Some(Arc::new(payload.into_bytes()));
+        self
     }
 
     /// Remove the project scheduled for insertion into generated workbooks.
-    pub fn clear_vba_project(&mut self) -> bool {
-        self.vba_project.take().is_some()
+    pub fn clear_vba(&mut self) -> bool {
+        self.vba.take().is_some()
     }
 
     /// Add a worksheet to the workbook
@@ -363,12 +363,11 @@ impl XlsbWorkbookWriter {
             ));
         }
 
-        if let Some((payload, limits)) = &self.vba_project {
-            crate::xlsb::vba_project::store_vba_project(
+        if let Some(payload) = &self.vba {
+            crate::xlsb::vba_project::store_vba_bytes(
                 &mut package,
                 &PackURI::new("/xl/workbook.bin")?,
-                payload.clone(),
-                limits,
+                Arc::clone(payload),
             )?;
         }
 

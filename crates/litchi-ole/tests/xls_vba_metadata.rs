@@ -1,5 +1,8 @@
-use litchi_ole::ovba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
 use litchi_ole::xls::{XlsWorkbook, XlsWriter};
+use litchi_vba::{
+    Limits,
+    build::{Module, Project},
+};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -29,7 +32,10 @@ fn reads_macro_fixture_without_opening_project_streams() {
 fn empty_project_metadata_round_trips_as_non_executable() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Data").unwrap();
-    writer.enable_empty_vba_project("ThisWorkbook").unwrap();
+    let project = Project::new("VBAProject")
+        .finish(&Limits::default())
+        .unwrap();
+    writer.put_vba("ThisWorkbook", project).unwrap();
     writer
         .set_worksheet_vba_code_name(sheet, Some("DataSheet"))
         .unwrap();
@@ -49,10 +55,7 @@ fn empty_project_metadata_round_trips_as_non_executable() {
     let storage = workbook.vba_project_storage().unwrap();
     assert!(storage.is_structurally_complete());
     assert!(storage.candidate_module_stream_names().is_empty());
-    let project = workbook
-        .vba_project(&VbaLimits::default())
-        .unwrap()
-        .unwrap();
+    let project = workbook.vba().unwrap().unwrap();
     assert_eq!(project.name(), "VBAProject");
     assert!(project.modules().is_empty());
 }
@@ -61,19 +64,17 @@ fn empty_project_metadata_round_trips_as_non_executable() {
 fn complete_project_with_modules_round_trips_as_inert_source() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Data").unwrap();
-    let project = VbaProjectBuilder::new("Analytics")
-        .with_module(VbaModuleBuilder::standard(
+    let project = Project::new("Analytics")
+        .module(Module::standard(
             "Module1",
             "Public Sub RefreshReport()\r\nEnd Sub\r\n",
         ))
-        .with_module(VbaModuleBuilder::document(
+        .module(Module::document(
             "ThisWorkbook",
             0,
             "Private Sub Workbook_Open()\r\nEnd Sub\r\n",
         ));
-    writer
-        .set_vba_project("ThisWorkbook", &project, &VbaLimits::default())
-        .unwrap();
+    writer.set_vba("ThisWorkbook", project).unwrap();
     writer
         .set_worksheet_vba_code_name(sheet, Some("DataSheet"))
         .unwrap();
@@ -94,10 +95,7 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
         storage.candidate_module_stream_names(),
         ["Module1", "ThisWorkbook"]
     );
-    let project = workbook
-        .vba_project(&VbaLimits::default())
-        .unwrap()
-        .unwrap();
+    let project = workbook.vba().unwrap().unwrap();
     assert_eq!(project.name(), "Analytics");
     assert_eq!(project.modules().len(), 2);
     assert_eq!(project.modules()[0].name(), "Module1");
@@ -117,21 +115,43 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
 }
 
 #[test]
+fn configured_project_and_sheet_code_names_can_be_cleared() {
+    let mut writer = XlsWriter::new();
+    let sheet = writer.add_worksheet("Data").unwrap();
+    writer
+        .set_vba("ThisWorkbook", Project::new("VBAProject"))
+        .unwrap();
+    writer
+        .set_worksheet_vba_code_name(sheet, Some("DataSheet"))
+        .unwrap();
+    assert!(writer.has_vba());
+
+    writer.clear_vba();
+    assert!(!writer.has_vba());
+
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    assert!(!workbook.vba_metadata().has_project_storage());
+    assert_eq!(workbook.xls_worksheet(0).unwrap().vba_code_name(), None);
+}
+
+#[test]
 fn failed_project_build_does_not_replace_existing_configuration() {
     let mut writer = XlsWriter::new();
     writer.add_worksheet("Data").unwrap();
-    writer.enable_empty_vba_project("ExistingBook").unwrap();
-    let project = VbaProjectBuilder::new("TooMany").with_module(VbaModuleBuilder::standard(
-        "Module1",
-        "Sub A()\r\nEnd Sub\r\n",
-    ));
-    let limits = VbaLimits {
+    writer
+        .set_vba("ExistingBook", Project::new("VBAProject"))
+        .unwrap();
+    let project =
+        Project::new("TooMany").module(Module::standard("Module1", "Sub A()\r\nEnd Sub\r\n"));
+    let limits = Limits {
         max_modules: 0,
-        ..VbaLimits::default()
+        ..Limits::default()
     };
     assert!(
         writer
-            .set_vba_project("ReplacementBook", &project, &limits)
+            .set_vba_with("ReplacementBook", project, &limits)
             .is_err()
     );
 
@@ -154,8 +174,14 @@ fn writer_rejects_invalid_code_names_and_unscoped_sheet_names() {
             .set_worksheet_vba_code_name(sheet, Some("Sheet1"))
             .is_err()
     );
-    assert!(writer.enable_empty_vba_project("1Workbook").is_err());
-    writer.enable_empty_vba_project("ThisWorkbook").unwrap();
+    assert!(
+        writer
+            .set_vba("1Workbook", Project::new("VBAProject"))
+            .is_err()
+    );
+    writer
+        .set_vba("ThisWorkbook", Project::new("VBAProject"))
+        .unwrap();
     assert!(
         writer
             .set_worksheet_vba_code_name(sheet, Some("bad-name"))

@@ -3,7 +3,7 @@ use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::{PptxChart, PptxTagList, Presentation};
 use crate::pptx::show_events::PptxSlideShowEvent;
 use crate::pptx::vba_project::{
-    VbaProject, discover_vba_project, remove_vba_project as remove_presentation_vba_project,
+    VbaProject, discover_vba_project, remove_vba_project as clear_presentation_vba,
     store_vba_project as store_presentation_vba_project,
 };
 use crate::pptx::writer::MutablePresentation;
@@ -759,36 +759,35 @@ impl Package {
     /// This validates only the declared OPC relationship graph and content
     /// type. It does not inspect, parse, decompress, or execute the binary
     /// VBA project bytes.
-    pub fn vba_project(&self) -> Result<Option<VbaProject>> {
+    pub fn vba(&self) -> Result<Option<VbaProject>> {
         let presentation = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, presentation)
     }
 
     /// Attach a cache-free, inert MS-OVBA project and convert this package to PPTM/PPSM/POTM.
-    pub fn set_vba_project(
-        &mut self,
-        project: &crate::vba::VbaProjectBinary,
-    ) -> Result<VbaProject> {
-        let payload = project
-            .to_cfb_bytes()
-            .map_err(|error| OoxmlError::InvalidFormat(error.to_string()))?;
-        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
+        self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
-    /// Attach an existing, validated `vbaProject.bin` payload without executing it.
-    pub fn set_vba_project_bytes(
+    /// Attach a cache-free project with explicit resource limits.
+    pub fn set_vba_with(
         &mut self,
-        payload: Vec<u8>,
-        limits: &crate::vba::VbaLimits,
+        project: litchi_vba::build::Project,
+        limits: &litchi_vba::Limits,
     ) -> Result<VbaProject> {
+        self.put_vba(project.finish(limits)?)
+    }
+
+    /// Attach a prevalidated `vbaProject.bin` payload without executing it.
+    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<VbaProject> {
         let source = self.opc.main_document_part()?.partname().clone();
-        store_presentation_vba_project(&mut self.opc, &source, payload, limits)
+        store_presentation_vba_project(&mut self.opc, &source, payload)
     }
 
     /// Remove the VBA project graph and restore the corresponding non-macro main type.
-    pub fn remove_vba_project(&mut self) -> Result<bool> {
+    pub fn clear_vba(&mut self) -> Result<bool> {
         let source = self.opc.main_document_part()?.partname().clone();
-        remove_presentation_vba_project(&mut self.opc, &source)
+        clear_presentation_vba(&mut self.opc, &source)
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.

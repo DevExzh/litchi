@@ -43,7 +43,7 @@ use crate::xlsx::sheet_protection::{
     validate_worksheet_protection_metadata,
 };
 use crate::xlsx::vba_project::{
-    VbaProject, discover_vba_project, remove_vba_project as remove_workbook_vba_project,
+    VbaProject, discover_vba_project, remove_vba_project as clear_workbook_vba,
     store_vba_project as store_workbook_vba_project,
 };
 use crate::xlsx::volatile_dependencies::{
@@ -413,7 +413,7 @@ impl Workbook {
     /// This validates only the declared OPC relationship graph and content
     /// type. It does not inspect, parse, decompress, or execute the binary
     /// VBA project bytes.
-    pub fn vba_project(&self) -> crate::error::Result<Option<VbaProject>> {
+    pub fn vba(&self) -> crate::error::Result<Option<VbaProject>> {
         let workbook = self.package.get_part(&self.workbook_uri)?;
         discover_vba_project(&self.package, workbook)
     }
@@ -453,28 +453,30 @@ impl Workbook {
     }
 
     /// Attach a cache-free, inert MS-OVBA project and convert this package to XLSM/XLTM.
-    pub fn set_vba_project(
+    pub fn set_vba(
         &mut self,
-        project: &crate::vba::VbaProjectBinary,
+        project: litchi_vba::build::Project,
     ) -> crate::error::Result<VbaProject> {
-        let payload = project
-            .to_cfb_bytes()
-            .map_err(|error| crate::error::OoxmlError::InvalidFormat(error.to_string()))?;
-        self.set_vba_project_bytes(payload, &crate::vba::VbaLimits::default())
+        self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
-    /// Attach an existing, validated `vbaProject.bin` payload without executing it.
-    pub fn set_vba_project_bytes(
+    /// Attach a cache-free project with explicit resource limits.
+    pub fn set_vba_with(
         &mut self,
-        payload: Vec<u8>,
-        limits: &crate::vba::VbaLimits,
+        project: litchi_vba::build::Project,
+        limits: &litchi_vba::Limits,
     ) -> crate::error::Result<VbaProject> {
-        store_workbook_vba_project(&mut self.package, &self.workbook_uri, payload, limits)
+        self.put_vba(project.finish(limits)?)
+    }
+
+    /// Attach a prevalidated `vbaProject.bin` payload without executing it.
+    pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> crate::error::Result<VbaProject> {
+        store_workbook_vba_project(&mut self.package, &self.workbook_uri, payload)
     }
 
     /// Remove the VBA project graph and convert XLSM/XLTM content types back to XLSX/XLTX.
-    pub fn remove_vba_project(&mut self) -> crate::error::Result<bool> {
-        remove_workbook_vba_project(&mut self.package, &self.workbook_uri)
+    pub fn clear_vba(&mut self) -> crate::error::Result<bool> {
+        clear_workbook_vba(&mut self.package, &self.workbook_uri)
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.

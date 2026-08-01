@@ -1345,6 +1345,81 @@ integration. With signature, VBA, BLIP/image, and OGraph prerequisites below
 the hosts, the internally dense DOC, PPT, and XLS trees can move atomically into
 their concrete crates without compatibility monoliths.
 
+The twenty-seventh implementation slice performs the first of those cuts.
+All shared MS-OVBA compression, directory, project, and authoring code moves
+from `litchi-cfb` into the runtime-neutral `litchi-vba` crate. CFB is again only
+a compound-container layer; VBA depends downward on it and `litchi-core`, and
+owns no DOC, PPT, XLS, OPC, OOXML, executor, or async-runtime concern. Its public
+vocabulary is contextual rather than prefix-heavy: `codec`, `dir`, `project`,
+and `build` provide short `Dir`, `Module`, `Kind`, `Project`, `Text`, `Id`, and
+`Platform` names beneath their defining modules.
+
+`Payload` is the checked ownership boundary for a standalone project. Reading
+one consumes the caller's CFB bytes, validates the bounded project topology,
+and retains those bytes for move-based package attachment; arbitrary bytes
+cannot masquerade as a project through an infallible constructor. A detached
+`build::Project` is consumed by `finish`, so successful authoring yields the
+same validated capability without cloning a potentially large source tree.
+The emitted hierarchy includes the required root `PROJECT`, `VBA/dir`,
+`VBA/_VBA_PROJECT`, and one stream per declared module. The seven-byte
+`_VBA_PROJECT` header uses the specified reserved marker and cache-free write
+version; the optional `PROJECTwm` name map remains supported. Lower-level
+borrowing APIs remain available for legacy CFB hosts that must copy project
+streams into a larger compound file.
+
+Standalone authoring rejects a CFB ceiling smaller than the 512-byte compound
+header before encoding any project streams. Its final `Write + Seek` sink also
+checks every attempted growth against `max_cfb_bytes`, including sparse seeks,
+and reports a typed limit error without growing the output vector past the
+ceiling. Encoded intermediate streams are released before that final output
+allocation. This bounds the returned standalone buffer; it does not yet remove
+the internal stream copies and staging performed by `litchi-cfb::OleWriter`.
+That writer remains a measured follow-up rather than a zero-copy claim.
+
+DOC, PPT, XLS, DOCX, PPTX, XLSB, and XLSX integrations now depend directly on
+`litchi-vba`. The old `litchi-cfb::ovba`, `litchi-ole::ovba`, and
+`litchi-ooxml::vba` facades are deleted rather than retained as aliases.
+High-level mutation accepts typed builders or validated payloads through short,
+consuming verbs, validates before changing host state, and exposes checked read
+and clear operations without requiring raw project identifiers or lock-wrapper
+types. New and changed production parser/writer branches return typed errors
+rather than relying on `unwrap`, `expect`, or assertion-defined input
+invariants.
+
+OOXML project replacement and removal are transactions over a structurally
+cloned OPC graph whose large immutable part bodies remain `Arc`-shared. Before
+mutation, the implementation rejects canonical target names that already have
+dangling inbound relationships and validates that every existing project,
+supplemental-data, or signature part has only its declared owner. Any later
+part-name, content-type, relationship, or signature-cleanup error drops the
+staged graph and leaves the source package unchanged. A no-project clear
+returns before taking that snapshot. Regression tests cover dangling canonical
+targets, post-removal name conflicts, and a deliberately late content-type
+failure.
+
+The PowerPoint binary read path resolves `VbaProjectStg` once as a borrowed
+strict record view. It checks the persisted record length, caller stored-byte
+ceiling, and declared decompressed length before allocating; an uncompressed
+CFB remains borrowed through `OleFile::open`, while zlib output is bounded and
+must exactly match its declared length with no trailing input. This removes the
+previous repeated payload copies from the VBA path without claiming a measured
+latency or allocation result.
+
+This ownership and API extraction deliberately preserves the existing wire
+semantics and generated macro graphs. It therefore does not create a new native
+Microsoft Office artifact claim: the earlier desktop Word, PowerPoint, and
+Excel smoke evidence remains the applicable baseline. Native Office open,
+edit/resave, and reverse-read must be rerun when a later slice changes emitted
+project bytes or package relationships.
+
+The slice passes warning-denied workspace check, Clippy, and rustdoc gates with
+all targets and features enabled; the complete all-target workspace test run;
+and workspace doctests other than the `cdylib`-only Python package. Focused
+coverage includes 24 `litchi-vba` tests, the 2,504-test OLE library suite plus
+its DOC/PPT/XLS VBA integrations, and the 2,068-test OOXML library suite plus
+PPTX integration coverage. The dependency checker accepts 27 workspace crates
+and 65 internal dependency declarations, including the new downward VBA edges.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

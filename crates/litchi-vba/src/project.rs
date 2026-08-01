@@ -1,26 +1,27 @@
 //! CFB-backed loading of complete inert MS-OVBA projects.
 
-use super::{
-    VbaDirectory, VbaError, VbaLimits, VbaModuleKind, check_limit, decompress_container, invalid,
-};
-use crate::OleFile;
+use super::dir::{Dir, Kind};
+use super::{Error, Limits, check_limit, codec, invalid};
 use encoding_rs::Encoding;
+use litchi_cfb::{OleError, OleFile};
 use litchi_core::encoding::codepage_to_encoding;
 use std::io::{Read, Seek};
 
 const VBA_STORAGE_NAME: &str = "VBA";
 const DIR_STREAM_NAME: &str = "dir";
 const PROJECT_STREAM_NAME: &str = "PROJECT";
+const VERSION_PROJECT_STREAM_NAME: &str = "_VBA_PROJECT";
+const VERSION_PROJECT_HEADER_BYTES: usize = 7;
 
 /// Raw and decoded text from an MS-OVBA stream.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaText {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Text {
     raw: Vec<u8>,
     text: String,
     had_decode_errors: bool,
 }
 
-impl VbaText {
+impl Text {
     /// Original bytes after decompression, before character decoding.
     pub fn raw(&self) -> &[u8] {
         &self.raw
@@ -48,18 +49,18 @@ impl VbaText {
 }
 
 /// One inert VBA module and its typed directory metadata.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaModule {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Module {
     name: String,
     stream_name: String,
     text_offset: u32,
-    kind: VbaModuleKind,
+    kind: Kind,
     read_only: bool,
     private: bool,
-    source: VbaText,
+    source: Text,
 }
 
-impl VbaModule {
+impl Module {
     /// VBA identifier for this module.
     pub fn name(&self) -> &str {
         &self.name
@@ -76,7 +77,7 @@ impl VbaModule {
     }
 
     /// Broad module category from the `dir` stream.
-    pub fn kind(&self) -> VbaModuleKind {
+    pub fn kind(&self) -> Kind {
         self.kind
     }
 
@@ -91,22 +92,22 @@ impl VbaModule {
     }
 
     /// Decompressed, inert module source.
-    pub fn source(&self) -> &VbaText {
+    pub fn source(&self) -> &Text {
         &self.source
     }
 }
 
 /// A complete inert VBA project loaded from a CFB project-root storage.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VbaProject {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Project {
     project_root_path: Vec<String>,
     code_page: u16,
     name: String,
-    project_properties: VbaText,
-    modules: Vec<VbaModule>,
+    project_properties: Text,
+    modules: Vec<Module>,
 }
 
-impl VbaProject {
+impl Project {
     /// Load an MS-OVBA project rooted at `project_root_path`.
     ///
     /// For an OOXML `vbaProject.bin` part, the project root is normally the
@@ -116,19 +117,29 @@ impl VbaProject {
     pub fn open<R: Read + Seek>(
         ole: &mut OleFile<R>,
         project_root_path: &[&str],
-        limits: &VbaLimits,
-    ) -> Result<Self, VbaError> {
+        limits: &Limits,
+    ) -> Result<Self, Error> {
+        let mut version_path = project_root_path.to_vec();
+        version_path.extend([VBA_STORAGE_NAME, VERSION_PROJECT_STREAM_NAME]);
+        let version_stream =
+            read_limited_stream(ole, &version_path, limits.max_compressed_stream_bytes)?;
+        if version_stream.len() < VERSION_PROJECT_HEADER_BYTES {
+            return Err(invalid(
+                "_VBA_PROJECT stream is shorter than its seven-byte header",
+            ));
+        }
+
         let mut dir_path = project_root_path.to_vec();
         dir_path.extend([VBA_STORAGE_NAME, DIR_STREAM_NAME]);
         let compressed_dir =
             read_limited_stream(ole, &dir_path, limits.max_compressed_stream_bytes)?;
-        let directory = VbaDirectory::parse(&compressed_dir, limits)?;
+        let directory = Dir::parse(&compressed_dir, limits)?;
         let encoding = codepage_to_encoding(u32::from(directory.code_page()))
-            .ok_or(VbaError::UnsupportedCodePage(directory.code_page()))?;
+            .ok_or(Error::UnsupportedCodePage(directory.code_page()))?;
 
         let mut project_path = project_root_path.to_vec();
         project_path.push(PROJECT_STREAM_NAME);
-        let project_properties = VbaText::decode(
+        let project_properties = Text::decode(
             read_limited_stream(ole, &project_path, limits.max_decompressed_stream_bytes)?,
             encoding,
         );
@@ -150,7 +161,7 @@ impl VbaProject {
                     stream.len()
                 ))
             })?;
-            let source_bytes = decompress_container(compressed_source, limits)?;
+            let source_bytes = codec::decode(compressed_source, limits)?;
             total_source_bytes = total_source_bytes
                 .checked_add(source_bytes.len())
                 .ok_or_else(|| invalid("aggregate VBA source size overflow"))?;
@@ -159,14 +170,14 @@ impl VbaProject {
                 total_source_bytes,
                 limits.max_total_source_bytes,
             )?;
-            modules.push(VbaModule {
+            modules.push(Module {
                 name: metadata.name().to_owned(),
                 stream_name: metadata.stream_name().to_owned(),
                 text_offset: metadata.text_offset(),
                 kind: metadata.kind(),
                 read_only: metadata.is_read_only(),
                 private: metadata.is_private(),
-                source: VbaText::decode(source_bytes, encoding),
+                source: Text::decode(source_bytes, encoding),
             });
         }
 
@@ -198,12 +209,12 @@ impl VbaProject {
     }
 
     /// Decoded text of the uncompressed `PROJECT` stream.
-    pub fn project_properties(&self) -> &VbaText {
+    pub fn project_properties(&self) -> &Text {
         &self.project_properties
     }
 
     /// Modules in `dir`-stream order.
-    pub fn modules(&self) -> &[VbaModule] {
+    pub fn modules(&self) -> &[Module] {
         &self.modules
     }
 }
@@ -212,7 +223,7 @@ fn read_limited_stream<R: Read + Seek>(
     ole: &mut OleFile<R>,
     path: &[&str],
     maximum: usize,
-) -> Result<Vec<u8>, VbaError> {
+) -> Result<Vec<u8>, Error> {
     let (parent, stream_name) = path
         .split_last()
         .map(|(last, parent)| (parent, *last))
@@ -221,7 +232,7 @@ fn read_limited_stream<R: Read + Seek>(
         .list_directory_entries(parent)?
         .into_iter()
         .find(|entry| entry.name.eq_ignore_ascii_case(stream_name))
-        .ok_or(crate::OleError::StreamNotFound)?;
+        .ok_or(OleError::StreamNotFound)?;
     let size =
         usize::try_from(entry.size).map_err(|_| invalid("VBA stream size does not fit usize"))?;
     check_limit("VBA CFB stream bytes", size, maximum)?;
@@ -233,7 +244,7 @@ fn read_limited_stream<R: Read + Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::OleWriter;
+    use litchi_cfb::OleWriter;
     use std::io::Cursor;
 
     fn push_record(bytes: &mut Vec<u8>, id: u16, value: &[u8]) {
@@ -327,7 +338,7 @@ mod tests {
         cursor.set_position(0);
 
         let mut ole = OleFile::open(cursor).unwrap();
-        let project = VbaProject::open(&mut ole, &[], &VbaLimits::default()).unwrap();
+        let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         assert_eq!(project.name(), "Sample");
         assert_eq!(project.code_page(), 1252);
         assert_eq!(project.modules().len(), 1);
@@ -362,6 +373,49 @@ mod tests {
         writer.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
         let mut ole = OleFile::open(cursor).unwrap();
-        assert!(VbaProject::open(&mut ole, &[], &VbaLimits::default()).is_err());
+        assert!(Project::open(&mut ole, &[], &Limits::default()).is_err());
+    }
+
+    #[test]
+    fn version_stream_requires_header_but_ignores_header_values_and_cache() {
+        for version_stream in [None, Some(&[1, 2, 3, 4, 5, 6][..])] {
+            let mut writer = OleWriter::new();
+            if let Some(version_stream) = version_stream {
+                writer
+                    .create_stream(&["VBA", "_VBA_PROJECT"], version_stream)
+                    .unwrap();
+            }
+            let mut cursor = Cursor::new(Vec::new());
+            writer.write_to(&mut cursor).unwrap();
+            cursor.set_position(0);
+            let mut ole = OleFile::open(cursor).unwrap();
+            assert!(Project::open(&mut ole, &[], &Limits::default()).is_err());
+        }
+
+        let source = b"Attribute VB_Name = \"Module1\"\r\n";
+        let mut module_stream = vec![7, 8, 9];
+        module_stream.extend_from_slice(&literal_container(source));
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["PROJECT"], b"ID=\"Sample\"\r\nModule=Module1\r\n")
+            .unwrap();
+        writer
+            .create_stream(
+                &["VBA", "_VBA_PROJECT"],
+                &[0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 1, 2, 3],
+            )
+            .unwrap();
+        writer
+            .create_stream(&["VBA", "dir"], &sample_dir())
+            .unwrap();
+        writer
+            .create_stream(&["VBA", "Module1"], &module_stream)
+            .unwrap();
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).unwrap();
+        cursor.set_position(0);
+        let mut ole = OleFile::open(cursor).unwrap();
+        let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
+        assert_eq!(project.modules()[0].source().raw(), source);
     }
 }

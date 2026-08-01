@@ -117,7 +117,7 @@ pub enum DocWriteError {
     /// OLE error
     Ole(crate::OleError),
     /// MS-OVBA project authoring error
-    Vba(crate::ovba::VbaError),
+    Vba(litchi_vba::Error),
 }
 
 impl From<std::io::Error> for DocWriteError {
@@ -132,8 +132,8 @@ impl From<crate::OleError> for DocWriteError {
     }
 }
 
-impl From<crate::ovba::VbaError> for DocWriteError {
-    fn from(err: crate::ovba::VbaError) -> Self {
+impl From<litchi_vba::Error> for DocWriteError {
+    fn from(err: litchi_vba::Error) -> Self {
         DocWriteError::Vba(err)
     }
 }
@@ -951,7 +951,7 @@ pub struct DocWriter {
     /// Password-to-open settings. The password is wiped when replaced, cleared, or dropped.
     encryption: Option<DocWriterEncryption>,
     /// Complete inert MS-OVBA project written under the MS-DOC `Macros` storage.
-    vba_project: Option<crate::ovba::VbaProjectBinary>,
+    vba_project: Option<litchi_vba::Payload>,
 }
 
 struct DocWriterEncryption {
@@ -1059,42 +1059,38 @@ impl DocWriter {
         self.encryption.as_ref().map(|value| value.profile)
     }
 
-    /// Configure a complete module-free VBA project.
-    ///
-    /// The project storage is deterministic and cache-free. No source is
-    /// compiled, interpreted, or executed.
-    pub fn enable_empty_vba_project(&mut self, project_name: &str) -> Result<(), DocWriteError> {
-        let project = crate::ovba::VbaProjectBuilder::new(project_name)
-            .build(&crate::ovba::VbaLimits::default())?;
-        self.vba_project = Some(project);
-        Ok(())
+    /// Configure a complete inert VBA project with safe default limits.
+    pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), DocWriteError> {
+        self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
     /// Configure a complete inert VBA project using explicit resource limits.
     ///
     /// Validation and serialization complete before writer state is changed.
-    pub fn set_vba_project(
+    pub fn set_vba_with(
         &mut self,
-        project: &crate::ovba::VbaProjectBuilder,
-        limits: &crate::ovba::VbaLimits,
+        project: litchi_vba::build::Project,
+        limits: &litchi_vba::Limits,
     ) -> Result<(), DocWriteError> {
-        let project = project.build(limits)?;
-        self.set_vba_project_binary(project);
+        let payload = project.finish(limits)?;
+        self.put_vba(payload);
         Ok(())
     }
 
     /// Configure an already validated and serialized inert VBA project.
-    pub fn set_vba_project_binary(&mut self, project: crate::ovba::VbaProjectBinary) {
-        self.vba_project = Some(project);
+    ///
+    /// Import standalone CFB bytes through [`litchi_vba::Payload::read`] first.
+    pub fn put_vba(&mut self, payload: litchi_vba::Payload) {
+        self.vba_project = Some(payload);
     }
 
     /// Remove the configured VBA project storage.
-    pub fn clear_vba_project(&mut self) {
+    pub fn clear_vba(&mut self) {
         self.vba_project = None;
     }
 
     /// Whether a complete VBA project is configured for output.
-    pub fn has_vba_project(&self) -> bool {
+    pub fn has_vba(&self) -> bool {
         self.vba_project.is_some()
     }
 

@@ -1,11 +1,6 @@
 /// Constants for OLE file format
 pub mod consts;
 
-/// Shared bounded MS-OVBA project, module, and compression APIs.
-pub mod ovba {
-    pub use litchi_cfb::ovba::*;
-}
-
 // CFB substrate types re-exported so callers can reach them through the
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{

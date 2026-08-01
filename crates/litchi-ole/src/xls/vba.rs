@@ -308,7 +308,12 @@ impl WorkbookVbaCollector {
                 }
                 self.metadata.workbook_code_name = Some(parse_code_name(data)?);
             },
-            _ => unreachable!(),
+            _ => {
+                return invalid(
+                    record_type,
+                    "unrecognized record reached the workbook VBA metadata parser",
+                );
+            },
         }
         Ok(())
     }
@@ -367,7 +372,9 @@ pub(crate) fn validate_code_name(value: &str) -> XlsResult<()> {
         return Ok(());
     }
     let mut characters = value.chars();
-    let first = characters.next().unwrap();
+    let Some(first) = characters.next() else {
+        return Ok(());
+    };
     if first.is_ascii() && !first.is_ascii_alphabetic() {
         return invalid_data("VBA object code name must begin with a letter");
     }
@@ -479,6 +486,15 @@ mod tests {
                 .feed_record(CODE_NAME_RECORD_TYPE, &[1, 0, 0, b'A'])
                 .is_err()
         );
+    }
+
+    #[test]
+    fn unrelated_workbook_records_are_ignored_without_panicking() {
+        let mut globals = WorkbookVbaCollector::new();
+        globals.feed_record(0xffff, b"opaque BIFF data").unwrap();
+        let metadata = globals.finish();
+        assert!(!metadata.has_project_marker());
+        assert_eq!(metadata.workbook_code_name(), None);
     }
     /// MS-XLS 2.3.1 assigns `ObProj` 211, `CodeName` 442, and `ObNoMacros` 445.
     ///
@@ -620,10 +636,7 @@ mod tests {
         let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/spreadsheet/SimpleMacro.xls");
         let mut workbook = XlsWorkbook::new(std::fs::File::open(fixture).unwrap()).unwrap();
-        let project = workbook
-            .vba_project(&litchi_cfb::ovba::VbaLimits::default())
-            .unwrap()
-            .unwrap();
+        let project = workbook.vba().unwrap().unwrap();
 
         assert!(!project.name().is_empty());
         assert!(!project.modules().is_empty());

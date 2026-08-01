@@ -78,6 +78,21 @@ format crates remain responsible for locating native records and mapping
 crypto failures into their own error vocabulary. Secret-bearing contexts keep
 their material private and zeroizing, and the crate has no async-runtime edge.
 
+`litchi-vba` owns the inert, bounded `[MS-OVBA]` codec and project model. It
+depends downward only on `litchi-cfb` and `litchi-core`; it does not own DOC,
+PPT, XLS, OPC, or OOXML package integration and never compiles, interprets, or
+executes source. Its contextual namespaces keep the public vocabulary short:
+`codec::{encode, decode}`, `dir::{Dir, Module, Kind}`,
+`project::{Project, Module, Text}`, and
+`build::{Project, Module, Id, Platform, Kind}`. A serialized `Payload` is a
+validated, move-first capability rather than an arbitrary byte alias. Callers
+can obtain one only by validating an existing compound payload or by consuming
+a checked builder; host packages consume it directly instead of accepting an
+untyped `Vec<u8>`. This preserves a concise high-level boundary without hiding
+the lower-level directory and compression codecs needed by focused tooling.
+The crate has no async-runtime edge, public lock wrapper, compatibility facade,
+or public type carrying a redundant `Vba` prefix.
+
 The current `litchi-ooxml` and `litchi-ole` monoliths are removed after their
 contents migrate. They do not remain as compatibility crates. The umbrella
 `litchi` contains no format implementation logic and re-exports canonical types

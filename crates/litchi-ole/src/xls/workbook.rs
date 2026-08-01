@@ -1515,15 +1515,22 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         crate::xls::vba::discover_vba_project_storage(&self.ole_file.list_streams())
     }
 
-    /// Parse the `_VBA_PROJECT_CUR` MS-OVBA project and expose inert source.
+    /// Parse the `_VBA_PROJECT_CUR` MS-OVBA project with safe default limits.
     ///
     /// The method returns `None` when no structurally complete VBA project is
     /// present. Source is only decompressed and decoded; it is never compiled,
     /// interpreted, or executed.
-    pub fn vba_project(
+    pub fn vba(
         &mut self,
-        limits: &crate::ovba::VbaLimits,
-    ) -> std::result::Result<Option<crate::ovba::VbaProject>, crate::ovba::VbaError> {
+    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
+        self.vba_with(&litchi_vba::Limits::default())
+    }
+
+    /// Parse the `_VBA_PROJECT_CUR` project with explicit resource limits.
+    pub fn vba_with(
+        &mut self,
+        limits: &litchi_vba::Limits,
+    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
         let Some(storage) = self.vba_project_storage() else {
             return Ok(None);
         };
@@ -1535,7 +1542,7 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             .iter()
             .map(String::as_str)
             .collect();
-        crate::ovba::VbaProject::open(&mut self.ole_file, &path, limits).map(Some)
+        litchi_vba::project::Project::open(&mut self.ole_file, &path, limits).map(Some)
     }
 
     /// Whether the CFB container holds a shared-workbook `Revision Log` stream
