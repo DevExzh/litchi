@@ -739,9 +739,10 @@ The implementation and its tests are the source of truth for this matrix. Princi
 - OOXML shared/package features: `crates/litchi-opc/src/` and `crates/litchi-ooxml/src/`
 - Shared trust-neutral Office signatures: `crates/litchi-sign/src/`
 - DOCX, XLSX, XLSB, PPTX: `crates/litchi-ooxml/src/docx/`, `xlsx/`, `xlsb/`, and `pptx/`
-- Legacy text, OLE/CFB, OfficeArt, and OGraph infrastructure: `crates/litchi-codepage/src/`, `crates/litchi-cfb/src/`, `crates/litchi-ole-common/src/`, `crates/litchi-odraw/src/`, `crates/litchi-ograph/src/`, and `crates/litchi-ole/src/`
+- Legacy text, OLE/CFB, OfficeArt, and OGraph infrastructure: `crates/litchi-codepage/src/`, `crates/litchi-cfb/src/`, `crates/litchi-ole-common/src/`, `crates/litchi-odraw/src/`, and `crates/litchi-ograph/src/`
 - Shared inert VBA codec and project model: `crates/litchi-vba/src/`
-- DOC, XLS, PPT: `crates/litchi-ole/src/doc/`, `xls/`, and `ppt/`
+- XLS: `crates/litchi-xls/src/`
+- DOC and PPT migration host: `crates/litchi-ole/src/doc/` and `crates/litchi-ole/src/ppt/`
 - OpenDocument: `crates/litchi-odf/src/`
 - Rich Text Format: `crates/litchi-rtf/src/`
 - Apple iWork: `crates/litchi-iwa/src/`

@@ -157,6 +157,7 @@
 //! ## Low-Level Modules (Advanced Use)
 //!
 //! - `ole` - Direct access to OLE2 format parsers
+//! - `xls` - Direct access to legacy Excel BIFF parsers and writers
 //! - `ooxml` - Direct access to OOXML format parsers
 //!
 //! Most users should use the high-level API and only access low-level modules
@@ -178,6 +179,7 @@ pub mod common {
     // `litchi::common::detect_file_format(...)` keep working.
     #[cfg(any(
         feature = "ole",
+        feature = "xls",
         feature = "ooxml",
         feature = "iwa",
         feature = "odf",
@@ -190,6 +192,7 @@ pub mod common {
     pub mod detection {
         #[cfg(any(
             feature = "ole",
+            feature = "xls",
             feature = "ooxml",
             feature = "iwa",
             feature = "odf",
@@ -206,6 +209,7 @@ pub mod common {
 // Smart format detection (depends on per-format crates; can't live in litchi-core).
 #[cfg(any(
     feature = "ole",
+    feature = "xls",
     feature = "ooxml",
     feature = "iwa",
     feature = "odf",
@@ -251,11 +255,11 @@ pub mod presentation;
 /// Unified Excel/Spreadsheet API (.xls, .xlsx, .xlsb, .ods, .numbers)
 ///
 /// Requires the corresponding feature flags:
-/// - `ole` for .xls
+/// - `xls` for .xls
 /// - `ooxml` for .xlsx and .xlsb
 /// - `odf` for .ods
 /// - `iwa` for .numbers
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub mod sheet;
 
 /// Markdown conversion module
@@ -275,6 +279,17 @@ pub mod markdown;
 #[cfg(feature = "ole")]
 pub mod ole {
     pub use litchi_ole::*;
+}
+
+/// Legacy Excel BIFF parser and writer (`.xls`).
+///
+/// This is the canonical low-level facade for the independently owned
+/// `litchi-xls` package. It is intentionally not nested below `ole`.
+///
+/// **Note**: This requires the `xls` feature to be enabled.
+#[cfg(feature = "xls")]
+pub mod xls {
+    pub use litchi_xls::*;
 }
 
 /// OOXML format parser (modern .docx, .pptx files)
@@ -371,7 +386,7 @@ pub use document::{Document, DocumentElement};
 #[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub use presentation::Presentation;
 
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub use sheet::Workbook;
 
 // Re-export commonly used types
@@ -379,6 +394,7 @@ pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
 
 #[cfg(any(
     feature = "ole",
+    feature = "xls",
     feature = "ooxml",
     feature = "iwa",
     feature = "odf",

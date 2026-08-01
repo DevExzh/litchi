@@ -1,0 +1,26 @@
+[package]
+name = "litchi-xls"
+description = "Typed legacy Microsoft Excel BIFF reader and writer for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+chrono             = { workspace = true }
+litchi-cfb         = { workspace = true }
+litchi-codepage    = { workspace = true }
+litchi-core        = { workspace = true }
+litchi-crypto      = { workspace = true }
+litchi-odraw       = { workspace = true }
+litchi-ograph      = { workspace = true }
+litchi-ole-common = { workspace = true }
+litchi-sign        = { workspace = true }
+litchi-vba         = { workspace = true }
+md-5               = { workspace = true }
+rand               = { workspace = true }
+rc4                = { workspace = true }
+zerocopy           = { workspace = true }
+zeroize            = { workspace = true }

@@ -7,8 +7,8 @@
 
 use litchi::ole::doc::Package as DocPackage;
 use litchi::ole::ppt::Package as PptPackage;
-use litchi::ole::xls::XlsWorkbook;
 use litchi::sheet::WorkbookTrait;
+use litchi::xls::XlsWorkbook;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -134,7 +134,7 @@ fn read_xls_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     // Note: XLS shape extraction requires access to the raw workbook stream
     // which is not directly exposed by XlsWorkbook API
     println!("XLS shape extraction requires raw workbook data access.");
-    println!("Use litchi::ole::xls::shapes::extract_shapes_from_workbook() with raw data.");
+    println!("Use litchi::xls::shapes::extract_shapes_from_workbook() with raw data.");
     println!();
     println!("Example:");
     println!("  let ole_file = OleFile::open(file)?;");

@@ -1,6 +1,6 @@
 [package]
 name        = "litchi-ole"
-description = "Legacy OLE2 binary office formats (.doc, .xls, .ppt) parser/writer for the Litchi office-formats library."
+description = "Migration host for legacy Microsoft Word (.doc) and PowerPoint (.ppt) readers and writers."
 version.workspace      = true
 edition.workspace      = true
 authors.workspace      = true
@@ -45,7 +45,3 @@ url             = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }
 zeroize         = { workspace = true }
-
-[dev-dependencies]
-p256            = { workspace = true }
-rsa             = { workspace = true }

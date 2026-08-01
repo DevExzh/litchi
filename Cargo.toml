@@ -62,6 +62,7 @@ litchi-sign      = { version = "0.0.1", path = "crates/litchi-sign" }
 litchi-slide     = { version = "0.0.1", path = "crates/litchi-slide" }
 litchi-vba       = { version = "0.0.1", path = "crates/litchi-vba" }
 litchi-word      = { version = "0.0.1", path = "crates/litchi-word" }
+litchi-xls       = { version = "0.0.1", path = "crates/litchi-xls" }
 litchi-xlsx      = { version = "0.0.1", path = "crates/litchi-xlsx" }
 md-5          = { version = "0.11", features = ["zeroize"] }
 memchr        = "2.7"

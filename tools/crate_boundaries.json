@@ -2,6 +2,7 @@
   "schema": 1,
   "packages": {
     "litchi": [
+      "litchi-cfb",
       "litchi-core",
       "litchi-eval",
       "litchi-fonts",
@@ -12,7 +13,8 @@
       "litchi-odf",
       "litchi-odraw",
       "litchi-rtf",
-      "litchi-sign"
+      "litchi-sign",
+      "litchi-xls"
     ],
     "litchi-cfb": [
       "litchi-codepage",
@@ -98,6 +100,17 @@
     "litchi-word": [
       "litchi-core"
     ],
+    "litchi-xls": [
+      "litchi-cfb",
+      "litchi-codepage",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-odraw",
+      "litchi-ograph",
+      "litchi-ole-common",
+      "litchi-sign",
+      "litchi-vba"
+    ],
     "litchi-xlsx": [
       "litchi-core",
       "litchi-drawingml",
@@ -125,7 +138,7 @@
       "dependent": "litchi-ole",
       "dependency": "litchi-codepage",
       "reason": "The legacy OLE migration host temporarily consumes the extracted typed code-page capability.",
-      "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-codepage, then delete the host."
+      "exit": "Move DOC and PPT into concrete crates that depend directly on litchi-codepage, then delete the host; XLS has already moved."
     },
     {
       "order": 20,
@@ -160,14 +173,14 @@
       "dependent": "litchi-ole",
       "dependency": "litchi-ole-common",
       "reason": "The monolith temporarily consumes the new common crate while records migrate downward.",
-      "exit": "Complete the DOC/PPT/XLS split and delete the litchi-ole migration host."
+      "exit": "Complete the remaining DOC/PPT split and delete the litchi-ole migration host; XLS has already moved."
     },
     {
       "order": 25,
       "dependent": "litchi-ole",
       "dependency": "litchi-odraw",
       "reason": "The legacy migration host temporarily consumes the extracted OfficeArt substrate.",
-      "exit": "Move DOC, PPT, and XLS into concrete crates and delete the litchi-ole host."
+      "exit": "Move DOC and PPT into concrete crates and delete the litchi-ole host; XLS has already moved."
     },
     {
       "order": 26,
@@ -181,28 +194,28 @@
       "dependent": "litchi-ole",
       "dependency": "litchi-crypto",
       "reason": "The legacy OLE monolith temporarily consumes the extracted shared Office cryptography capability.",
-      "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-crypto, then delete the host."
+      "exit": "Move DOC and PPT into concrete crates that depend directly on litchi-crypto, then delete the host; XLS has already moved."
     },
     {
       "order": 28,
       "dependent": "litchi-ole",
       "dependency": "litchi-vba",
       "reason": "The legacy OLE migration host temporarily consumes the extracted inert VBA capability.",
-      "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-vba, then delete the host."
+      "exit": "Move DOC and PPT into concrete crates that depend directly on litchi-vba, then delete the host; XLS has already moved."
     },
     {
       "order": 29,
       "dependent": "litchi-ole",
       "dependency": "litchi-sign",
       "reason": "The legacy OLE migration host temporarily consumes the extracted trust-neutral signing capability.",
-      "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-sign, then delete the host."
+      "exit": "Move DOC and PPT into concrete crates that depend directly on litchi-sign, then delete the host; XLS has already moved."
     },
     {
       "order": 30,
       "dependent": "litchi-ole",
       "dependency": "litchi-ograph",
       "reason": "The legacy OLE migration host temporarily consumes the extracted host-neutral Office Graph capability.",
-      "exit": "Move XLS workbook integration and PPT object integration into their concrete crates, then delete the host."
+      "exit": "Move the remaining PPT object integration into its concrete crate, then delete the host; XLS workbook integration has already moved."
     },
     {
       "order": 31,
@@ -293,7 +306,7 @@
       "dependent": "litchi",
       "dependency": "litchi-ole",
       "reason": "The facade still exposes the legacy OLE migration host.",
-      "exit": "Re-export the concrete DOC/PPT/XLS crates and remove the host dependency."
+      "exit": "Re-export the concrete DOC and PPT crates and remove the host dependency; XLS is already exported from its concrete crate."
     },
     {
       "order": 44,

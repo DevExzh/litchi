@@ -37,11 +37,11 @@ pub enum DetectedFormat {
 
     // OLE2 formats with parsed OleFile
     #[cfg(feature = "ole")]
-    Doc(crate::ole::OleFile<std::io::Cursor<Vec<u8>>>),
+    Doc(litchi_cfb::OleFile<std::io::Cursor<Vec<u8>>>),
     #[cfg(feature = "ole")]
-    Ppt(crate::ole::OleFile<std::io::Cursor<Vec<u8>>>),
-    #[cfg(feature = "ole")]
-    Xls(crate::ole::OleFile<std::io::Cursor<Vec<u8>>>),
+    Ppt(litchi_cfb::OleFile<std::io::Cursor<Vec<u8>>>),
+    #[cfg(feature = "xls")]
+    Xls(litchi_cfb::OleFile<std::io::Cursor<Vec<u8>>>),
 
     // iWork formats with validated ZIP archive data (lazy parsing)
     #[cfg(feature = "iwa")]
@@ -134,17 +134,20 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     }
 
     // Check OLE2 signature (DOC, PPT, XLS) - parse OleFile once
-    #[cfg(feature = "ole")]
+    #[cfg(any(feature = "ole", feature = "xls"))]
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
-        if let Ok(ole_file) = crate::ole::OleFile::open(cursor) {
+        if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor) {
             // Use existing OLE2 detection logic by checking streams
+            #[cfg(feature = "ole")]
             if ole_file.exists(&["WordDocument"]) {
                 return Some(DetectedFormat::Doc(ole_file));
             }
+            #[cfg(feature = "ole")]
             if ole_file.exists(&["PowerPoint Document"]) || ole_file.exists(&["Current User"]) {
                 return Some(DetectedFormat::Ppt(ole_file));
             }
+            #[cfg(feature = "xls")]
             if ole_file.exists(&["Workbook"]) || ole_file.exists(&["Book"]) {
                 return Some(DetectedFormat::Xls(ole_file));
             }

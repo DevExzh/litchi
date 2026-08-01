@@ -17,7 +17,7 @@ use std::path::Path;
 /// - `.numbers` - Apple Numbers (iWork Archive)
 ///
 /// **Note**: For Excel formats (.xls, .xlsx, .xlsb), use the format-specific
-/// APIs directly from `crate::ole::xls` or `crate::ooxml::xlsx`.
+/// APIs directly from `crate::xls` or `crate::ooxml::xlsx`.
 ///
 /// # Examples
 ///
@@ -111,7 +111,7 @@ impl Workbook {
                 (WorkbookImpl::Numbers(doc), metadata)
             },
 
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "xls")]
             DetectedFormat::Xls(ole_file) => {
                 // OLE file already parsed - reuse it!
                 let mut ole_file_for_metadata = ole_file;
@@ -121,7 +121,7 @@ impl Workbook {
                     .unwrap_or_default();
 
                 // Create XLS workbook directly from the parsed OLE file
-                let xls = crate::ole::xls::XlsWorkbook::from_ole_file(ole_file_for_metadata)
+                let xls = crate::xls::XlsWorkbook::from_ole_file(ole_file_for_metadata)
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 (WorkbookImpl::XlsMem(xls), metadata)
             },
@@ -202,9 +202,9 @@ impl Workbook {
             #[cfg(feature = "ooxml")]
             WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_names().to_vec()),
 
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "xls")]
             WorkbookImpl::XlsFile(xls) => Ok(xls.worksheet_names().to_vec()),
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "xls")]
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_names().to_vec()),
 
             #[cfg(feature = "odf")]
@@ -216,7 +216,7 @@ impl Workbook {
                 Ok(sheets.iter().map(|s| s.name.clone()).collect())
             },
 
-            #[cfg(any(feature = "ole", feature = "ooxml"))]
+            #[cfg(any(feature = "xls", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
             )) as Box<dyn std::error::Error + Send + Sync>),
@@ -247,9 +247,9 @@ impl Workbook {
             WorkbookImpl::Xlsx(xlsx) => Ok(xlsx.worksheet_count()),
             #[cfg(feature = "ooxml")]
             WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_count()),
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "xls")]
             WorkbookImpl::XlsFile(xls) => Ok(xls.worksheet_count()),
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "xls")]
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_count()),
             #[cfg(feature = "odf")]
             WorkbookImpl::Ods(ods_ref) => {
@@ -259,7 +259,7 @@ impl Workbook {
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
                 Ok(count)
             },
-            #[cfg(any(feature = "ole", feature = "ooxml"))]
+            #[cfg(any(feature = "xls", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
             )) as Box<dyn std::error::Error + Send + Sync>),
@@ -401,7 +401,7 @@ impl Workbook {
                 Ok(out)
             },
 
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "xls")]
             WorkbookImpl::XlsFile(xls) => {
                 let mut out = String::new();
                 for i in 0..xls.worksheet_count() {
@@ -456,7 +456,7 @@ impl Workbook {
                 }
                 Ok(out)
             },
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "xls")]
             WorkbookImpl::XlsMem(xls) => {
                 let mut out = String::new();
                 for i in 0..xls.worksheet_count() {
@@ -519,7 +519,7 @@ impl Workbook {
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
             },
 
-            #[cfg(any(feature = "ole", feature = "ooxml"))]
+            #[cfg(any(feature = "xls", feature = "ooxml"))]
             WorkbookImpl::Other => Err(Box::new(Error::ParseError(
                 "Unsupported workbook type in this build".to_string(),
             )) as Box<dyn std::error::Error + Send + Sync>),
@@ -619,7 +619,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_open_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/DateFormatTests.xlsx");
         let workbook = Workbook::open(&path);
@@ -631,7 +631,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_open_xls() {
         // XLS parsing has issues with some test files - this test documents the limitation
         // Skip if no working XLS files are available
@@ -644,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_from_bytes_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/DateFormatTests.xlsx");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -657,7 +657,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_from_bytes_xls() {
         // XLS parsing has issues with some test files - this test documents the limitation
         let path = test_data_path().join("ole/xls/Simple.xls");
@@ -669,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_worksheet_names_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/DateFormatTests.xlsx");
         let workbook = Workbook::open(&path).expect("Failed to open XLSX");
@@ -680,7 +680,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_worksheet_names_xls() {
         // XLS parsing has issues with some test files - this test documents the limitation
         let path = test_data_path().join("ole/xls/Simple.xls");
@@ -693,7 +693,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_worksheet_count_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/DateFormatTests.xlsx");
         let workbook = Workbook::open(&path).expect("Failed to open XLSX");
@@ -704,7 +704,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_worksheet_count_xls() {
         // XLS parsing has issues with some test files - this test documents the limitation
         let path = test_data_path().join("ole/xls/Simple.xls");
@@ -717,7 +717,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_text_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/DateFormatTests.xlsx");
         let workbook = Workbook::open(&path).expect("Failed to open XLSX");
@@ -726,7 +726,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_text_xls() {
         // XLS parsing has issues with some test files - this test documents the limitation
         let path = test_data_path().join("ole/xls/Simple.xls");
@@ -736,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_metadata_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/DateFormatTests.xlsx");
         let workbook = Workbook::open(&path).expect("Failed to open XLSX");
@@ -747,7 +747,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_metadata_xls() {
         // XLS parsing has issues with some test files - this test documents the limitation
         let path = test_data_path().join("ole/xls/Simple.xls");
@@ -759,7 +759,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_open_nonexistent_file() {
         let path = test_data_path().join("nonexistent_file.xlsx");
         let result = Workbook::open(&path);
@@ -767,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_from_bytes_invalid_data() {
         let bytes = b"This is not a valid spreadsheet file".to_vec();
         let result = Workbook::from_bytes(bytes);
@@ -775,7 +775,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_conditional_formatting_xlsx() {
         // Use a simpler XLSX file that is known to work
         let path = test_data_path().join("ooxml/xlsx/condFormat_cellis.xlsx");
@@ -794,7 +794,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_conditional_formatting_xls() {
         // XLS parsing has issues - test only if file can be opened
         let path = test_data_path().join("ole/xls/ConditionalFormattingSamples.xls");
@@ -805,7 +805,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_autofilter_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/autofilter.xlsx");
         let workbook = Workbook::open(&path);
@@ -818,7 +818,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "xls"))]
     fn test_workbook_data_validation_xlsx() {
         let path = test_data_path().join("ooxml/xlsx/DataValidationEvaluations.xlsx");
         let workbook = Workbook::open(&path);
@@ -831,7 +831,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_formulas_xls() {
         let path = test_data_path().join("ole/xls/FormulaEvalTestData.xls");
         let workbook = Workbook::open(&path);
@@ -843,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ole", feature = "ooxml"))]
+    #[cfg(all(feature = "xls", feature = "ooxml"))]
     fn test_workbook_hyperlinks_xls() {
         let path = test_data_path().join("ole/xls/HyperlinksOnManySheets.xls");
         let workbook = Workbook::open(&path);

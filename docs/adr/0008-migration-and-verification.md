@@ -1728,6 +1728,56 @@ final central-parser correction is covered by the complete warning-denied
 `litchi-rtf --all-targets` matrix, including real LibreOffice font metadata and
 the RTF corpus.
 
+The thirty-fourth implementation slice completes the atomic XLS ownership
+extraction. The complete BIFF source tree, its integration tests, and its
+examples move from the temporary `litchi-ole` migration host into the concrete
+`litchi-xls` crate. A source-boundary audit found no production XLS reference
+to the `litchi-ole` facade or to DOC/PPT implementation modules. The only two
+root-host references were test-fixture uses of the CFB reader and writer; they
+now name `litchi-cfb` directly. The reverse audit found no DOC or PPT source
+that imports XLS. Moving the whole format tree is therefore the smallest
+coherent ownership cut: splitting individual BIFF facilities first would
+create duplicate format owners or an upward compatibility tunnel through the
+migration host.
+
+This is an intentionally breaking topology change. `litchi-ole` deletes its
+`xls` module and XLS root re-exports and neither depends on nor re-exports
+`litchi-xls`. The canonical direct entry is `litchi_xls`; the concise umbrella
+entry is `litchi::xls`. There is deliberately no `litchi::ole::xls` or
+`litchi_ole::XlsWorkbook` compatibility path. `litchi-ole` now owns only the
+remaining DOC/PPT migration host while those formats await their concrete
+crate cuts.
+
+The canonical internal dependency ceiling for `litchi-xls` is `litchi-cfb`,
+`litchi-codepage`, `litchi-core`, `litchi-crypto`, `litchi-odraw`,
+`litchi-ograph`, `litchi-ole-common`, `litchi-sign`, and `litchi-vba`. The crate
+has no feature-selected peer format or runtime dependency, and it has no edge
+back to `litchi-ole`. Legacy text conversion remains a direct
+`litchi-codepage` capability; `litchi-core` does not regain a binary-Office
+feature switch. This keeps the format crate above focused, reusable
+foundations and prevents DOC/PPT host state from leaking into BIFF APIs.
+
+A production panic-path audit found and closed two malformed-input holes while
+the owner was isolated. Shared-string parsing now walks any chain of empty
+`CONTINUE` records and returns `UnexpectedEndOfStream` instead of indexing an
+empty segment. Pivot rewrites now validate every `BoundSheet` target as a
+unique in-range BIFF record boundary, require BOF/EOF-bounded substreams, and
+use checked source and destination slices before rewriting offsets. Regression
+tests exercise chained empty continuations plus out-of-range, duplicate, and
+mid-record sheet offsets.
+
+The ownership move and targeted safety hardening do not change valid BIFF
+writer output, package topology, or emitted wire semantics. They therefore
+create no new native Microsoft Office claim. Per the explicit review direction,
+the prior fully green workspace and Office baselines remain applicable; this
+slice uses focused package, dependency-boundary, warning, formatting, and diff
+gates instead of repeating the full workspace or Computer Use verification.
+The warning-denied `litchi-xls --all-targets` matrix passes 776 unit tests and
+196 tests across 58 integration targets, and all 15 examples build. Clippy and
+rustdoc pass with warnings denied. The boundary checker accepts 31 workspace
+packages and 89 direct internal dependencies with 31 explicit migration-debt
+entries; all seven checker regressions and edited-file diff validation pass.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

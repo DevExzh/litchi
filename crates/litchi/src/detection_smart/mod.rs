@@ -1,6 +1,7 @@
 //! Smart format detection — opens files via the per-format crates to disambiguate.
 //!
-//! Lives in the umbrella because it depends on `crate::ole`, `crate::ooxml`, `crate::iwa`.
+//! Lives in the umbrella because it coordinates the CFB substrate with
+//! `crate::ole`, `crate::xls`, `crate::ooxml`, and `crate::iwa`.
 //! `litchi-core` exposes only the leaf signature-based detection.
 
 pub mod detected;

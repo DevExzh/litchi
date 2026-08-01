@@ -4,7 +4,7 @@ High-performance Rust library for parsing Microsoft Office, OpenDocument, and Ap
 
 ## Overview
 
-`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to format-specific crates carved out of this workspace (`litchi-ole`, `litchi-ooxml`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones.
+`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to format-specific crates carved out of this workspace (`litchi-xls`, `litchi-ole`, `litchi-ooxml`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. The canonical low-level BIFF entry is `litchi::xls`; `litchi::ole` no longer contains an `xls` compatibility alias.
 
 ## Usage
 
@@ -38,11 +38,12 @@ fn main() -> Result<(), litchi::Error> {
 
 ## Feature Flags
 
-Default: `ole`, `ooxml`, `ooxml_encryption`, `eval_engine`.
+Default: `ole`, `xls`, `ooxml`, `ooxml_encryption`, `eval_engine`.
 
 | Flag | Adds support for |
 |------|------------------|
-| `ole` | Legacy `.doc`, `.xls`, `.ppt` |
+| `ole` | Legacy `.doc` and `.ppt` |
+| `xls` | Legacy Excel BIFF `.xls` |
 | `ooxml` | `.docx`, `.xlsx`, `.xlsb`, `.pptx` |
 | `ooxml_encryption` | Password-protected OOXML files |
 | `odf` | `.odt`, `.ods`, `.odp` |

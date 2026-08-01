@@ -43,11 +43,12 @@ exclude = [
 ]
 
 [features]
-default = ["ole", "ooxml", "ooxml_encryption", "eval_engine"]
+default = ["ole", "xls", "ooxml", "ooxml_encryption", "eval_engine"]
 full = [
     "iwa",
     "odf",
     "ole",
+    "xls",
     "ooxml",
     "ooxml_encryption",
     "rtf",
@@ -60,7 +61,8 @@ full = [
 # Format support features
 iwa = ["dep:litchi-iwa", "dep:soapberry-zip"]
 odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
-ole = ["dep:litchi-ole", "sign"]
+ole = ["dep:litchi-cfb", "dep:litchi-ole", "sign"]
+xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]
 ooxml = ["dep:litchi-ooxml", "dep:soapberry-zip", "sign"]
 ooxml_encryption = ["ooxml", "ole", "litchi-ooxml/encryption"]
 rtf = ["dep:litchi-rtf"]
@@ -84,6 +86,7 @@ fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
 fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
 flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
 itoa = "1.0" # Fast integer-to-string conversion
+litchi-cfb = { workspace = true, optional = true } # Compound File Binary substrate shared by independently gated legacy formats
 litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
 litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
 litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)
@@ -93,10 +96,11 @@ litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbe
 litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpers (carved out in workspace split)
 litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
 litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt image grammar exposed by the image facade
-litchi-ole = { workspace = true, optional = true } # Legacy OLE2 binary office formats (.doc, .xls, .ppt) parser/writer (carved out in workspace split, gated by `ole` feature)
+litchi-ole = { workspace = true, optional = true } # Migration host for legacy Word and PowerPoint formats (.doc, .ppt), gated by `ole`
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 litchi-sign = { workspace = true, optional = true } # Trust-neutral Office signature authoring and verification
+litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF parser/writer, independently gated by `xls`
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 once_cell = "1" # Lazy statics and one-time initialization for global state
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
@@ -160,6 +164,14 @@ required-features = ["odf"]
 [[example]]
 name = "odt_writer_test"
 required-features = ["odf"]
+
+[[example]]
+name = "odraw_native_smoke"
+required-features = ["ole", "xls"]
+
+[[example]]
+name = "read_shapes_all_formats"
+required-features = ["ole", "xls"]
 
 [[example]]
 name = "rtf_comprehensive_test"

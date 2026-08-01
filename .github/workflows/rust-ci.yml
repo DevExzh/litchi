@@ -85,6 +85,7 @@ jobs:
           -p litchi-slide
           -p litchi-vba
           -p litchi-word
+          -p litchi-xls
           -p litchi-xlsx
 
   check-and-clippy:

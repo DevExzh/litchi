@@ -144,7 +144,8 @@ litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion suppo
 
 **Available Features:**
 - `full` - Enable all supported formats and functionality
-- `ole` (default) - Legacy Office formats (.doc, .xls, .ppt)
+- `ole` (default) - Legacy Word and PowerPoint formats (.doc, .ppt)
+- `xls` (default) - Legacy Excel BIFF format (.xls)
 - `ooxml` (default) - Modern Office formats (.docx, .xlsx, .pptx)
 - `ooxml_encryption` (default) - OOXML encryption/decryption support
 - `odf` - OpenDocument formats (.odt, .ods, .odp)

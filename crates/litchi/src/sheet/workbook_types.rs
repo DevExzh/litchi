@@ -25,18 +25,18 @@ pub(super) enum WorkbookImpl {
     Xlsb(crate::ooxml::xlsb::XlsbWorkbook),
 
     // Legacy OLE-based Excel
-    #[cfg(feature = "ole")]
+    #[cfg(feature = "xls")]
     #[allow(dead_code)] // Kept for compatibility with old code
-    XlsFile(crate::ole::xls::XlsWorkbook<std::io::BufReader<std::fs::File>>),
-    #[cfg(feature = "ole")]
-    XlsMem(crate::ole::xls::XlsWorkbook<std::io::Cursor<Vec<u8>>>),
+    XlsFile(crate::xls::XlsWorkbook<std::io::BufReader<std::fs::File>>),
+    #[cfg(feature = "xls")]
+    XlsMem(crate::xls::XlsWorkbook<std::io::Cursor<Vec<u8>>>),
 
     // OpenDocument Spreadsheet
     #[cfg(feature = "odf")]
     Ods(std::cell::RefCell<litchi_odf::Spreadsheet>),
 
     // For other formats, we just indicate they're not yet fully unified
-    #[cfg(any(feature = "ole", feature = "ooxml"))]
+    #[cfg(any(feature = "xls", feature = "ooxml"))]
     #[allow(dead_code)]
     Other,
 }

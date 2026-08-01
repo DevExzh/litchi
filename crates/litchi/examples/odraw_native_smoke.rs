@@ -10,10 +10,10 @@ use litchi::ole::{
     ppt::writer::{
         FillStyle, LineStyleConfig, PptWriter, ShapeColor, ShapeStyle, ShapeType, Table,
     },
-    xls::writer::{
-        XlsGroupRect, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,
-        XlsShapeGroupWrite, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
-    },
+};
+use litchi::xls::writer::{
+    XlsGroupRect, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,
+    XlsShapeGroupWrite, XlsShapeKind, XlsShapeLine, XlsShapeText, XlsShapeWrite, XlsWriter,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
