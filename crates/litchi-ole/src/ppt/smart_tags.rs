@@ -3,6 +3,7 @@
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
+use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{PropertyBagStore, SmartTagLimits};
 
 /// One smart-tag type declared by the shared property-bag store.
@@ -34,7 +35,7 @@ pub struct PowerPointSmartTag {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowerPointSmartTagStore {
     /// ANSI code page used to decode ANSI `PBString` values.
-    pub ansi_codepage: u32,
+    pub ansi: Ansi,
     pub types: Vec<PowerPointSmartTagType>,
     pub string_table: Vec<String>,
     pub tags: Vec<PowerPointSmartTag>,
@@ -43,16 +44,11 @@ pub struct PowerPointSmartTagStore {
 impl PowerPointSmartTagStore {
     /// Parse the optional `___PPT11` smart-tag store using Windows-1252 for ANSI strings.
     pub fn parse(root: &PptRecord) -> Result<Option<Self>> {
-        Self::parse_with_ansi_codepage(root, 1252)
+        Self::parse_with(root, Ansi::WINDOWS_1252)
     }
 
-    /// Parse the optional `___PPT11` smart-tag store with an explicit ANSI code page.
-    pub fn parse_with_ansi_codepage(root: &PptRecord, codepage: u32) -> Result<Option<Self>> {
-        if litchi_core::encoding::codepage_to_encoding(codepage).is_none() {
-            return Err(PptError::Corrupted(format!(
-                "Unsupported smart-tag ANSI code page {codepage}"
-            )));
-        }
+    /// Parse with an explicitly validated ANSI page.
+    pub fn parse_with(root: &PptRecord, ansi: Ansi) -> Result<Option<Self>> {
         let mut store = None;
         for record in root.versioned_binary_tag_records(11)? {
             if record.record_type != PptRecordType::SmartTagStore11 {
@@ -63,9 +59,15 @@ impl PowerPointSmartTagStore {
                     "Record tree contains multiple PowerPoint 11 smart-tag stores".to_string(),
                 ));
             }
-            store = Some(parse_store(&record, codepage)?);
+            store = Some(parse_store(&record, ansi)?);
         }
         Ok(store)
+    }
+
+    /// Validate a raw ANSI page identifier and parse the optional store.
+    pub fn parse_page(root: &PptRecord, page: u32) -> Result<Option<Self>> {
+        let ansi = Ansi::require(page).map_err(|error| PptError::Corrupted(error.to_string()))?;
+        Self::parse_with(root, ansi)
     }
 
     /// Resolve a zero-based smart-tag index from a text run.
@@ -79,7 +81,7 @@ impl PowerPointSmartTagStore {
     }
 }
 
-fn parse_store(record: &PptRecord, codepage: u32) -> Result<PowerPointSmartTagStore> {
+fn parse_store(record: &PptRecord, ansi: Ansi) -> Result<PowerPointSmartTagStore> {
     if record.record_type != PptRecordType::SmartTagStore11
         || record.version != 0x0f
         || record.instance != 0
@@ -100,7 +102,7 @@ fn parse_store(record: &PptRecord, codepage: u32) -> Result<PowerPointSmartTagSt
     ]))
     .map_err(|_| PptError::Corrupted("smart-tag bag count overflows usize".to_string()))?;
     let limits = SmartTagLimits::default();
-    let (shared, consumed) = PropertyBagStore::parse_prefix(&data[4..], codepage, limits)
+    let (shared, consumed) = PropertyBagStore::parse_prefix(&data[4..], ansi, limits)
         .map_err(|error| PptError::Corrupted(error.to_string()))?;
     let bags_start = 4usize
         .checked_add(consumed)
@@ -146,7 +148,7 @@ fn parse_store(record: &PptRecord, codepage: u32) -> Result<PowerPointSmartTagSt
         });
     }
     Ok(PowerPointSmartTagStore {
-        ansi_codepage: codepage,
+        ansi,
         types,
         string_table,
         tags,
@@ -253,7 +255,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        assert_eq!(store.ansi_codepage, 1252);
+        assert_eq!(store.ansi, Ansi::WINDOWS_1252);
         let tag = store.get(0).unwrap();
         let kind = store.tag_type(tag).unwrap();
         assert_eq!(kind.namespace_uri, "urn:example:smarttags");
@@ -291,8 +293,7 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        assert!(
-            PowerPointSmartTagStore::parse_with_ansi_codepage(&root(11, &record), 99_999).is_err()
-        );
+        assert!(PowerPointSmartTagStore::parse_page(&root(11, &record), 99_999).is_err());
+        assert!(PowerPointSmartTagStore::parse_page(&root(11, &record), 65001).is_err());
     }
 }

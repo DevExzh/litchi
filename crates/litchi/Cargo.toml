@@ -60,10 +60,10 @@ full = [
 # Format support features
 iwa = ["dep:litchi-iwa", "dep:soapberry-zip"]
 odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
-ole = ["dep:litchi-ole", "litchi-core/ole", "sign"]
+ole = ["dep:litchi-ole", "sign"]
 ooxml = ["dep:litchi-ooxml", "dep:soapberry-zip", "sign"]
 ooxml_encryption = ["ooxml", "ole", "litchi-ooxml/encryption"]
-rtf = ["dep:litchi-rtf", "litchi-core/rtf"]
+rtf = ["dep:litchi-rtf"]
 # Additional functionality features
 formula = ["dep:litchi-formula", "litchi-ole?/formula"]
 imgconv = ["dep:litchi-imgconv", "dep:litchi-odraw", "litchi-ole?/imgconv"]

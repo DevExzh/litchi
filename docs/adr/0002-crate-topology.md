@@ -33,6 +33,12 @@ litchi-odraw -> litchi-xls
 litchi-cfb -> litchi-sign -> litchi-opc
 litchi-cfb -> litchi-ograph
 litchi-odraw -> litchi-imgconv
+
+litchi-codepage
+├── litchi-cfb
+├── litchi-ole-common
+├── litchi-rtf
+└── litchi-vba
 ```
 
 The diagram shows the main direction, not every foundation edge. In particular,
@@ -65,6 +71,16 @@ such as `doc::embedded_object::Info` for `[MS-DOC]` `ObjInfo` flags.
 
 Additional focused crates are permitted where the responsibility is real:
 
+- `litchi-codepage` owns exact legacy code-page selection plus bounded text
+  encoding and decoding. Its short contextual vocabulary is `Page`, `Mbcs`,
+  `Ansi`, and `Error`; all three capabilities occupy one byte. `Mbcs` excludes
+  UTF-16 from byte-terminated record paths, while `Ansi` admits only the exact
+  `[MS-OSHARED]` ANSI set. Checked construction rejects unsupported identifiers
+  instead of silently substituting a superficially similar encoding. Strict
+  decoding is the default, decoding recovery is explicitly named, and concrete
+  formats retain responsibility for terminators and other record-level text
+  rules. Generic hexadecimal decoding remains `litchi-core::hex` and does not
+  pull a legacy text codec into the neutral vocabulary crate.
 - `litchi-math` replaces the current equation-focused `litchi-formula` name.
 - `litchi-calc` owns spreadsheet formula parsing, dependency graphs, and pure
   calculation; it has no network or async-runtime dependency.
@@ -131,9 +147,10 @@ crypto failures into their own error vocabulary. Secret-bearing contexts keep
 their material private and zeroizing, and the crate has no async-runtime edge.
 
 `litchi-vba` owns the inert, bounded `[MS-OVBA]` codec and project model. It
-depends downward only on `litchi-cfb` and `litchi-core`; it does not own DOC,
-PPT, XLS, OPC, or OOXML package integration and never compiles, interprets, or
-executes source. Its contextual namespaces keep the public vocabulary short:
+depends downward only on `litchi-cfb` and `litchi-codepage`; it does not own
+DOC, PPT, XLS, OPC, or OOXML package integration and never compiles,
+interprets, or executes source. Its contextual namespaces keep the public
+vocabulary short:
 `codec::{encode, decode}`, `dir::{Dir, Module, Kind}`,
 `project::{Project, Module, Text}`, and
 `build::{Project, Module, Id, Platform, Kind}`. A serialized `Payload` is a

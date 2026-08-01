@@ -13,9 +13,8 @@ pub mod bom;
 pub mod bounded;
 pub mod budget;
 pub mod detection;
-#[cfg(any(feature = "ole", feature = "rtf"))]
-pub mod encoding;
 pub mod error;
+pub mod hex;
 pub mod metadata;
 pub mod selector;
 pub mod shapes;

@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Show each font defined in the document.
     for (i, font) in doc.font_table().fonts().iter().enumerate() {
         println!(
-            "  font[{}] name={:?} family={:?} charset={}",
+            "  font[{}] name={:?} family={:?} charset={:?}",
             i, font.name, font.family, font.charset
         );
     }

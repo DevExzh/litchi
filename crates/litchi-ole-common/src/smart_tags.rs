@@ -7,6 +7,8 @@
 use std::collections::HashSet;
 use std::fmt;
 
+use litchi_codepage::Ansi;
+
 /// Resource limits for a smart-tag property-bag store.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SmartTagLimits {
@@ -85,7 +87,8 @@ pub struct SmartTagPropertyBag {
 /// The shared type and string tables preceding format-specific property bags.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PropertyBagStore {
-    pub ansi_codepage: u32,
+    /// Validated ANSI page used by ANSI `PBString` values.
+    pub ansi: Ansi,
     /// Reserved `cfactoid` value. Consumers must not interpret it.
     pub reserved_factoid_count: u32,
     pub types: Vec<SmartTagType>,
@@ -96,15 +99,9 @@ impl PropertyBagStore {
     /// Parse a store prefix and return the number of bytes consumed.
     pub fn parse_prefix(
         data: &[u8],
-        ansi_codepage: u32,
+        ansi: Ansi,
         limits: SmartTagLimits,
     ) -> Result<(Self, usize), SmartTagError> {
-        if litchi_core::encoding::codepage_to_encoding(ansi_codepage).is_none() {
-            return Err(SmartTagError::new(format!(
-                "unsupported smart-tag ANSI code page {ansi_codepage}"
-            )));
-        }
-
         let mut cursor = Cursor::new(data);
         let type_count = cursor.u32("smart-tag type count")?;
         let type_count = bounded_count(
@@ -128,9 +125,9 @@ impl PropertyBagStore {
             }
             let id = u16::try_from(cursor.u32("FactoidType id")?)
                 .map_err(|_| SmartTagError::new("FactoidType id exceeds 0xFFFF"))?;
-            let namespace_uri = cursor.pb_string(ansi_codepage)?;
-            let tag_name = cursor.pb_string(ansi_codepage)?;
-            let download_url = cursor.pb_string(ansi_codepage)?;
+            let namespace_uri = cursor.pb_string(ansi)?;
+            let tag_name = cursor.pb_string(ansi)?;
+            let download_url = cursor.pb_string(ansi)?;
             if cursor.offset != end {
                 return Err(SmartTagError::new(
                     "FactoidType byte count does not match its contents",
@@ -167,12 +164,12 @@ impl PropertyBagStore {
         )?;
         let mut strings = Vec::with_capacity(string_count);
         for _ in 0..string_count {
-            strings.push(cursor.pb_string(ansi_codepage)?);
+            strings.push(cursor.pb_string(ansi)?);
         }
 
         Ok((
             Self {
-                ansi_codepage,
+                ansi,
                 reserved_factoid_count,
                 types,
                 strings,
@@ -208,19 +205,12 @@ impl PropertyBagStore {
 
     /// Serialize the shared store followed by the supplied property bags.
     ///
-    /// ANSI strings are encoded with `ansi_codepage`; values that are not
+    /// ANSI strings are encoded with [`Self::ansi`]; values that are not
     /// representable are rejected instead of being replaced.
     pub fn to_bytes_with_bags(
         &self,
         bags: &[SmartTagPropertyBag],
     ) -> Result<Vec<u8>, SmartTagError> {
-        let encoding =
-            litchi_core::encoding::codepage_to_encoding(self.ansi_codepage).ok_or_else(|| {
-                SmartTagError::new(format!(
-                    "unsupported smart-tag ANSI code page {}",
-                    self.ansi_codepage
-                ))
-            })?;
         let type_count = u32::try_from(self.types.len())
             .map_err(|_| SmartTagError::new("smart-tag type count exceeds u32"))?;
         let string_count = u32::try_from(self.strings.len())
@@ -235,9 +225,9 @@ impl PropertyBagStore {
                 ));
             }
             let mut payload = u32::from(kind.id).to_le_bytes().to_vec();
-            append_pb_string(&mut payload, &kind.namespace_uri, encoding)?;
-            append_pb_string(&mut payload, &kind.tag_name, encoding)?;
-            append_pb_string(&mut payload, &kind.download_url, encoding)?;
+            append_pb_string(&mut payload, &kind.namespace_uri, self.ansi)?;
+            append_pb_string(&mut payload, &kind.tag_name, self.ansi)?;
+            append_pb_string(&mut payload, &kind.download_url, self.ansi)?;
             let payload_len = u32::try_from(payload.len())
                 .map_err(|_| SmartTagError::new("FactoidType payload exceeds u32"))?;
             output.extend_from_slice(&payload_len.to_le_bytes());
@@ -248,7 +238,7 @@ impl PropertyBagStore {
         output.extend_from_slice(&self.reserved_factoid_count.to_le_bytes());
         output.extend_from_slice(&string_count.to_le_bytes());
         for value in &self.strings {
-            append_pb_string(&mut output, value, encoding)?;
+            append_pb_string(&mut output, value, self.ansi)?;
         }
         for bag in bags {
             if !type_ids.contains(&bag.type_id) {
@@ -370,7 +360,7 @@ impl PropertyBagStore {
 fn append_pb_string(
     output: &mut Vec<u8>,
     value: &PropertyBagString,
-    ansi_encoding: &'static encoding_rs::Encoding,
+    ansi: Ansi,
 ) -> Result<(), SmartTagError> {
     if value.value.contains('\0') {
         return Err(SmartTagError::new(
@@ -379,12 +369,9 @@ fn append_pb_string(
     }
     match value.encoding {
         PropertyBagStringEncoding::Ansi => {
-            let (encoded, _, had_errors) = ansi_encoding.encode(&value.value);
-            if had_errors {
-                return Err(SmartTagError::new(
-                    "PBString is not representable in its ANSI code page",
-                ));
-            }
+            let encoded = ansi.encode(&value.value).map_err(|error| {
+                SmartTagError::new(format!("PBString ANSI encoding failed: {error}"))
+            })?;
             let count = u16::try_from(encoded.len())
                 .ok()
                 .filter(|count| *count <= 0x7fff)
@@ -459,7 +446,7 @@ impl<'a> Cursor<'a> {
         Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
-    fn pb_string(&mut self, codepage: u32) -> Result<PropertyBagString, SmartTagError> {
+    fn pb_string(&mut self, ansi: Ansi) -> Result<PropertyBagString, SmartTagError> {
         let header = self.u16("PBString header")?;
         let count = usize::from(header & 0x7fff);
         let encoding = if header & 0x8000 != 0 {
@@ -475,20 +462,26 @@ impl<'a> Cursor<'a> {
         };
         let bytes = self.bytes(byte_count, "PBString")?;
         let value = match encoding {
-            PropertyBagStringEncoding::Ansi => {
-                litchi_core::encoding::decode_bytes(bytes, Some(codepage))
-                    .ok_or_else(|| SmartTagError::new("PBString ANSI decoding failed"))?
-            },
+            PropertyBagStringEncoding::Ansi => ansi
+                .decode(bytes)
+                .map_err(|error| {
+                    SmartTagError::new(format!("PBString ANSI decoding failed: {error}"))
+                })?
+                .into_owned(),
             PropertyBagStringEncoding::Utf16 => {
                 let units = bytes
                     .chunks_exact(2)
                     .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-                    .take_while(|unit| *unit != 0)
                     .collect::<Vec<_>>();
                 String::from_utf16(&units)
                     .map_err(|_| SmartTagError::new("PBString contains invalid UTF-16"))?
             },
         };
+        if value.contains('\0') {
+            return Err(SmartTagError::new(
+                "PBString contains an embedded NUL character",
+            ));
+        }
         Ok(PropertyBagString { value, encoding })
     }
 }
@@ -531,7 +524,8 @@ mod tests {
     fn parses_store_prefix_and_resolves_indexed_bag() {
         let data = store_and_bag();
         let (store, consumed) =
-            PropertyBagStore::parse_prefix(&data, 1252, SmartTagLimits::default()).unwrap();
+            PropertyBagStore::parse_prefix(&data, Ansi::WINDOWS_1252, SmartTagLimits::default())
+                .unwrap();
         let bags = store
             .parse_bags_to_end(&data[consumed..], SmartTagLimits::default())
             .unwrap();
@@ -549,10 +543,14 @@ mod tests {
         let data = store_and_bag();
         let mut huge = data.clone();
         huge[..4].copy_from_slice(&u32::MAX.to_le_bytes());
-        assert!(PropertyBagStore::parse_prefix(&huge, 1252, SmartTagLimits::default()).is_err());
+        assert!(
+            PropertyBagStore::parse_prefix(&huge, Ansi::WINDOWS_1252, SmartTagLimits::default(),)
+                .is_err()
+        );
 
         let (store, consumed) =
-            PropertyBagStore::parse_prefix(&data, 1252, SmartTagLimits::default()).unwrap();
+            PropertyBagStore::parse_prefix(&data, Ansi::WINDOWS_1252, SmartTagLimits::default())
+                .unwrap();
         let mut bag = data[consumed..].to_vec();
         bag[4..6].copy_from_slice(&1u16.to_le_bytes());
         assert!(
@@ -568,16 +566,36 @@ mod tests {
                 .is_err()
         );
         assert!(
-            PropertyBagStore::parse_prefix(&data[..8], 1252, SmartTagLimits::default()).is_err()
+            PropertyBagStore::parse_prefix(
+                &data[..8],
+                Ansi::WINDOWS_1252,
+                SmartTagLimits::default(),
+            )
+            .is_err()
         );
-        assert!(PropertyBagStore::parse_prefix(&data, 99_999, SmartTagLimits::default()).is_err());
+
+        let mut embedded_nul = data.clone();
+        let city = embedded_nul
+            .windows(b"city".len())
+            .position(|window| window == b"city")
+            .expect("fixture contains city");
+        embedded_nul[city + 1] = 0;
+        assert!(
+            PropertyBagStore::parse_prefix(
+                &embedded_nul,
+                Ansi::WINDOWS_1252,
+                SmartTagLimits::default(),
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn serializes_store_and_bags_exactly_and_refuses_lossy_ansi() {
         let data = store_and_bag();
         let (store, consumed) =
-            PropertyBagStore::parse_prefix(&data, 1252, SmartTagLimits::default()).unwrap();
+            PropertyBagStore::parse_prefix(&data, Ansi::WINDOWS_1252, SmartTagLimits::default())
+                .unwrap();
         let bags = store
             .parse_bags_to_end(&data[consumed..], SmartTagLimits::default())
             .unwrap();

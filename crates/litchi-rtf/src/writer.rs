@@ -4,6 +4,7 @@
 //! It supports all RTF features including formatting, tables, pictures, fields, lists, and more.
 
 use super::*;
+use litchi_codepage::Mbcs;
 use std::io::{self, Write};
 
 /// RTF 1.9.1 effective default tab width when `deftab` is omitted.
@@ -27,10 +28,8 @@ pub enum DefaultTabWidthPolicy {
 /// RTF writer options
 #[derive(Debug, Clone)]
 pub struct WriterOptions {
-    /// Use ANSI code page
-    pub use_ansi: bool,
-    /// ANSI code page number (default 1252 for Western European)
-    pub code_page: u16,
+    /// Checked legacy character set declared by the document header.
+    pub charset: Charset,
     /// Indent RTF output for readability
     pub indent: bool,
     /// Default font index
@@ -39,11 +38,33 @@ pub struct WriterOptions {
     pub default_tab_width: DefaultTabWidthPolicy,
 }
 
+/// Legacy character set declared by an RTF document header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Charset {
+    /// `\ansi` with an exact byte-stream code page.
+    Ansi(Mbcs),
+    /// Macintosh Roman (`\mac`).
+    Mac,
+    /// IBM PC code page 437 (`\pc`).
+    Pc,
+    /// IBM PC code page 850 (`\pca`).
+    Pca,
+}
+
+impl Charset {
+    /// Windows-1252 ANSI declaration.
+    pub const WINDOWS_1252: Self = Self::Ansi(Mbcs::WINDOWS_1252);
+
+    /// Validate a raw byte-stream page for an ANSI declaration.
+    pub fn ansi(page: u32) -> Result<Self, litchi_codepage::Error> {
+        Mbcs::require(page).map(Self::Ansi)
+    }
+}
+
 impl Default for WriterOptions {
     fn default() -> Self {
         Self {
-            use_ansi: true,
-            code_page: 1252,
+            charset: Charset::WINDOWS_1252,
             indent: false,
             default_font: 0,
             default_tab_width: DefaultTabWidthPolicy::PreserveDocument,
@@ -860,9 +881,17 @@ impl<W: Write> RtfWriter<W> {
         self.write_str("{")?;
         self.write_control_word("rtf", Some(1))?;
 
-        if self.options.use_ansi {
-            self.write_control_word("ansi", None)?;
-            self.write_control_word("ansicpg", Some(self.options.code_page as i32))?;
+        match self.options.charset {
+            Charset::Ansi(page) => {
+                let parameter = i32::try_from(page.id()).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "RTF code page exceeds i32")
+                })?;
+                self.write_control_word("ansi", None)?;
+                self.write_control_word("ansicpg", Some(parameter))?;
+            },
+            Charset::Mac => self.write_control_word("mac", None)?,
+            Charset::Pc => self.write_control_word("pc", None)?,
+            Charset::Pca => self.write_control_word("pca", None)?,
         }
 
         match origin {
@@ -1685,8 +1714,8 @@ impl<W: Write> RtfWriter<W> {
             }
 
             // Write charset
-            if font.charset != 0 {
-                self.write_control_word("fcharset", Some(font.charset as i32))?;
+            if let Some(charset) = font.charset {
+                self.write_control_word("fcharset", Some(i32::from(charset.id())))?;
             }
             if let Some(theme) = font.theme {
                 self.write_control_word(theme.control_word(), None)?;
@@ -1700,7 +1729,7 @@ impl<W: Write> RtfWriter<W> {
                 }),
             )?;
             if let Some(code_page) = font.code_page {
-                self.write_control_word("cpg", Some(i32::from(code_page)))?;
+                self.write_control_word("cpg", Some(i32::from(code_page.id())))?;
             }
             if let Some(panose) = font.panose {
                 self.write_str("{\\*")?;
@@ -1732,7 +1761,7 @@ impl<W: Write> RtfWriter<W> {
                     self.write_str("{\\*")?;
                     self.write_control_word("fontfile", None)?;
                     if let Some(code_page) = embedded.file_code_page {
-                        self.write_control_word("cpg", Some(i32::from(code_page)))?;
+                        self.write_control_word("cpg", Some(i32::from(code_page.id())))?;
                     }
                     self.write_str(" ")?;
                     self.write_text(name)?;
@@ -8988,6 +9017,31 @@ mod tests {
         let result = String::from_utf8(output).unwrap();
         assert!(result.contains("rtf1"));
         assert!(result.contains("Hello World"));
+    }
+
+    #[test]
+    fn checked_charsets_write_their_exact_header_controls() {
+        assert!(Charset::ansi(1200).is_err());
+        assert!(Charset::ansi(65000).is_err());
+        for (charset, expected) in [
+            (Charset::Ansi(Mbcs::WINDOWS_1252), "\\ansi\\ansicpg1252"),
+            (Charset::Mac, "\\mac"),
+            (Charset::Pc, "\\pc"),
+            (Charset::Pca, "\\pca"),
+        ] {
+            let mut output = Vec::new();
+            let options = WriterOptions {
+                charset,
+                ..WriterOptions::default()
+            };
+            let mut writer = RtfWriter::with_options(&mut output, options);
+            writer.write_document_header().unwrap();
+            writer.write_str("}").unwrap();
+
+            let result = String::from_utf8(output).unwrap();
+            assert!(result.contains(expected), "{charset:?}: {result}");
+            assert!(RtfDocument::parse(&result).is_ok(), "{charset:?}: {result}");
+        }
     }
 
     #[test]

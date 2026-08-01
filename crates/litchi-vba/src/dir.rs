@@ -1,8 +1,7 @@
 //! Typed parsing of the compressed MS-OVBA `dir` stream.
 
 use super::{Error, Limits, check_limit, codec, invalid};
-use encoding_rs::Encoding;
-use litchi_core::encoding::codepage_to_encoding;
+use litchi_codepage::Mbcs;
 
 const PROJECT_CODEPAGE_ID: u16 = 0x0003;
 const PROJECT_NAME_ID: u16 = 0x0004;
@@ -44,7 +43,7 @@ const WRITE_COOKIE: u16 = 0xffff;
 
 pub(crate) struct WriteProject<'a> {
     pub(crate) system_kind: u32,
-    pub(crate) code_page: u16,
+    pub(crate) page: Mbcs,
     pub(crate) name: &'a str,
     pub(crate) description: &'a str,
     pub(crate) help_context: u32,
@@ -71,8 +70,7 @@ pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<
     )?;
     let module_count = u16::try_from(project.modules.len())
         .map_err(|_| invalid("VBA module count exceeds the dir-stream field"))?;
-    let encoding = codepage_to_encoding(u32::from(project.code_page))
-        .ok_or(Error::UnsupportedCodePage(project.code_page))?;
+    let encoding = project.page;
     let mut output = Vec::new();
 
     push_record(
@@ -93,7 +91,7 @@ pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<
     push_record(
         &mut output,
         PROJECT_CODEPAGE_ID,
-        &project.code_page.to_le_bytes(),
+        &project.page.id16().to_le_bytes(),
     )?;
 
     let project_name = encode_mbcs(project.name, encoding, "PROJECTNAME")?;
@@ -159,7 +157,7 @@ pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<
 fn encode_module(
     output: &mut Vec<u8>,
     module: &WriteModule<'_>,
-    encoding: &'static Encoding,
+    encoding: Mbcs,
     limits: &Limits,
 ) -> Result<(), Error> {
     let name = encode_mbcs(module.name, encoding, "MODULENAME")?;
@@ -227,7 +225,7 @@ fn push_string_pair(
     id: u16,
     reserved: u16,
     value: &str,
-    encoding: &'static Encoding,
+    encoding: Mbcs,
     limits: &Limits,
     protocol_maximum: usize,
     field: &'static str,
@@ -249,7 +247,7 @@ fn push_mbcs_pair(
     id: u16,
     reserved: u16,
     value: &str,
-    encoding: &'static Encoding,
+    encoding: Mbcs,
     limits: &Limits,
     protocol_maximum: usize,
     field: &'static str,
@@ -281,18 +279,17 @@ fn check_protocol_length(field: &'static str, actual: usize, maximum: usize) -> 
 
 pub(crate) fn encode_mbcs(
     value: &str,
-    encoding: &'static Encoding,
+    encoding: Mbcs,
     field: &'static str,
 ) -> Result<Vec<u8>, Error> {
     if value.contains('\0') {
         return Err(invalid(format!("{field} contains a null character")));
     }
-    let (encoded, _, had_errors) = encoding.encode(value);
-    if had_errors {
-        return Err(invalid(format!(
+    let encoded = encoding.encode(value).map_err(|_| {
+        invalid(format!(
             "{field} is not representable in the project code page"
-        )));
-    }
+        ))
+    })?;
     if encoded.contains(&0) {
         return Err(invalid(format!("{field} encodes to a null byte")));
     }
@@ -309,7 +306,7 @@ fn encode_utf16(value: &str, field: &'static str) -> Result<Vec<u8>, Error> {
 /// Parsed metadata from an MS-OVBA `dir` stream.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Dir {
-    code_page: u16,
+    page: Mbcs,
     project_name: String,
     modules: Vec<Module>,
 }
@@ -321,9 +318,14 @@ impl Dir {
         Self::parse_decompressed(&decompressed, limits)
     }
 
-    /// Code page used by MBCS strings and module source.
-    pub fn code_page(&self) -> u16 {
-        self.code_page
+    /// Checked page used by MBCS strings and module source.
+    pub fn page(&self) -> Mbcs {
+        self.page
+    }
+
+    /// Numeric page identifier stored in `PROJECTCODEPAGE`.
+    pub fn page_id(&self) -> u16 {
+        self.page.id16()
     }
 
     /// VBA project identifier from `PROJECTNAME`.
@@ -337,13 +339,11 @@ impl Dir {
     }
 
     fn parse_decompressed(data: &[u8], limits: &Limits) -> Result<Self, Error> {
-        let (information_end, code_page, project_name) = parse_project_information(data, limits)?;
-        let encoding = codepage_to_encoding(u32::from(code_page))
-            .ok_or(Error::UnsupportedCodePage(code_page))?;
-        let project_name = decode_mbcs(&project_name, encoding, "PROJECTNAME")?;
-        let modules = find_modules(&data[information_end..], encoding, limits)?;
+        let (information_end, page, project_name) = parse_project_information(data, limits)?;
+        let project_name = decode_mbcs(&project_name, page, "PROJECTNAME")?;
+        let modules = find_modules(&data[information_end..], page, limits)?;
         Ok(Self {
-            code_page,
+            page,
             project_name,
             modules,
         })
@@ -402,7 +402,10 @@ impl Module {
     }
 }
 
-fn parse_project_information(data: &[u8], limits: &Limits) -> Result<(usize, u16, Vec<u8>), Error> {
+fn parse_project_information(
+    data: &[u8],
+    limits: &Limits,
+) -> Result<(usize, Mbcs, Vec<u8>), Error> {
     let mut reader = Reader::new(data, 0);
     reader.expect_sized_u32(PROJECT_SYS_KIND_ID, FIXED_U32_SIZE)?;
     if reader.read_u32()? > 3 {
@@ -426,8 +429,7 @@ fn parse_project_information(data: &[u8], limits: &Limits) -> Result<(usize, u16
     if project_name.is_empty() {
         return Err(invalid("PROJECTNAME must not be empty"));
     }
-    let encoding =
-        codepage_to_encoding(u32::from(code_page)).ok_or(Error::UnsupportedCodePage(code_page))?;
+    let encoding = Mbcs::new(u32::from(code_page)).ok_or(Error::UnsupportedCodePage(code_page))?;
     decode_mbcs(&project_name, encoding, "PROJECTNAME")?;
 
     reader.expect_id(PROJECT_DOC_STRING_ID)?;
@@ -464,7 +466,7 @@ fn parse_project_information(data: &[u8], limits: &Limits) -> Result<(usize, u16
             1_015,
         )?;
     }
-    Ok((reader.position, code_page, project_name))
+    Ok((reader.position, encoding, project_name))
 }
 
 impl<'a> Reader<'a> {
@@ -485,11 +487,7 @@ impl<'a> Reader<'a> {
     }
 }
 
-fn find_modules(
-    data: &[u8],
-    encoding: &'static Encoding,
-    limits: &Limits,
-) -> Result<Vec<Module>, Error> {
+fn find_modules(data: &[u8], encoding: Mbcs, limits: &Limits) -> Result<Vec<Module>, Error> {
     let mut last_error = None;
     for position in 0..data.len().saturating_sub(15) {
         if read_u16_at(data, position) != Some(PROJECT_MODULES_ID)
@@ -524,7 +522,7 @@ fn find_modules(
 fn parse_modules(
     reader: &mut Reader<'_>,
     count: usize,
-    encoding: &'static Encoding,
+    encoding: Mbcs,
     limits: &Limits,
 ) -> Result<Vec<Module>, Error> {
     let mut modules = Vec::with_capacity(count);
@@ -599,20 +597,13 @@ fn parse_modules(
     Ok(modules)
 }
 
-fn decode_mbcs(
-    bytes: &[u8],
-    encoding: &'static Encoding,
-    field: &'static str,
-) -> Result<String, Error> {
+fn decode_mbcs(bytes: &[u8], encoding: Mbcs, field: &'static str) -> Result<String, Error> {
     if bytes.contains(&0) {
         return Err(invalid(format!("{field} contains a null byte")));
     }
-    let (decoded, had_errors) = encoding.decode_without_bom_handling(bytes);
-    if had_errors {
-        return Err(invalid(format!(
-            "{field} is invalid for the project code page"
-        )));
-    }
+    let decoded = encoding
+        .decode(bytes)
+        .map_err(|_| invalid(format!("{field} is invalid for the project code page")))?;
     Ok(decoded.into_owned())
 }
 
@@ -710,7 +701,7 @@ impl<'a> Reader<'a> {
 
     fn string_pair(
         &mut self,
-        encoding: &'static Encoding,
+        encoding: Mbcs,
         reserved: u16,
         field: &'static str,
         limits: &Limits,
@@ -720,7 +711,7 @@ impl<'a> Reader<'a> {
 
     fn string_pair_bounded(
         &mut self,
-        encoding: &'static Encoding,
+        encoding: Mbcs,
         reserved: u16,
         field: &'static str,
         limits: &Limits,
@@ -750,7 +741,7 @@ impl<'a> Reader<'a> {
 
     fn mbcs_pair_bounded(
         &mut self,
-        encoding: &'static Encoding,
+        encoding: Mbcs,
         reserved: u16,
         field: &'static str,
         limits: &Limits,
@@ -880,7 +871,7 @@ mod tests {
     #[test]
     fn parses_typed_module_directory() {
         let directory = Dir::parse(&sample_dir(), &Limits::default()).unwrap();
-        assert_eq!(directory.code_page(), 1252);
+        assert_eq!(directory.page(), Mbcs::WINDOWS_1252);
         assert_eq!(directory.project_name(), "Sample");
         assert_eq!(directory.modules().len(), 1);
         let module = &directory.modules()[0];

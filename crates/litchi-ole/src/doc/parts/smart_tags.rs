@@ -5,6 +5,7 @@
 
 use super::fib::FileInformationBlock;
 use crate::doc::package::{DocError, Result};
+use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{PropertyBagStore, SmartTagLimits, SmartTagPropertyBag};
 use std::collections::{BTreeMap, HashSet};
 
@@ -77,6 +78,23 @@ impl DocumentSmartTags {
         fib: &FileInformationBlock,
         table_stream: &[u8],
     ) -> Result<Option<DocumentSmartTags>> {
+        Self::parse_impl(fib, table_stream, None)
+    }
+
+    /// Parse with an explicit ANSI page for `PBString` values.
+    pub fn parse_with(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        ansi: Ansi,
+    ) -> Result<Option<DocumentSmartTags>> {
+        Self::parse_impl(fib, table_stream, Some(ansi))
+    }
+
+    fn parse_impl(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        ansi: Option<Ansi>,
+    ) -> Result<Option<DocumentSmartTags>> {
         let bookmark_lengths = [STTBF_BKMK_FACTOID, PLCF_BKF_FACTOID, PLCF_BKL_FACTOID]
             .map(|index| fib.get_table_pointer(index).map_or(0, |(_, length)| length));
         let factoid_data = optional_slice(fib, table_stream, FACTOID_DATA, "FactoidData")?;
@@ -130,10 +148,17 @@ impl DocumentSmartTags {
         validate_positions(&starts, document_end, "PlcfBkfFactoid")?;
         validate_positions(&ends, document_end, "PlcfBklFactoid")?;
 
-        let codepage = ansi_codepage_for_lcid(fib.language_id());
         let limits = SmartTagLimits::default();
         let (store, bags) = if let Some(factoid_data) = factoid_data {
-            let (store, consumed) = PropertyBagStore::parse_prefix(factoid_data, codepage, limits)
+            let ansi = ansi
+                .or_else(|| ansi_for_lcid(fib.language_id()))
+                .ok_or_else(|| {
+                    corrupted(format!(
+                        "document LCID 0x{:04x} has no exact ANSI mapping; use parse_with",
+                        fib.language_id()
+                    ))
+                })?;
+            let (store, consumed) = PropertyBagStore::parse_prefix(factoid_data, ansi, limits)
                 .map_err(|error| corrupted(format!("invalid PropertyBagStore: {error}")))?;
             let bags = store
                 .parse_bags_to_end(&factoid_data[consumed..], limits)
@@ -493,8 +518,8 @@ fn corrupted(message: impl Into<String>) -> DocError {
     DocError::Corrupted(message.into())
 }
 
-fn ansi_codepage_for_lcid(lcid: u16) -> u32 {
-    match lcid & 0x03ff {
+fn ansi_for_lcid(lcid: u16) -> Option<Ansi> {
+    let page = match lcid & 0x03ff {
         0x01 | 0x20 | 0x29 => 1256,
         0x02 | 0x19 | 0x22 | 0x23 | 0x28 | 0x2f | 0x3f | 0x40 | 0x44 | 0x50 => 1251,
         0x04 => match lcid {
@@ -518,12 +543,49 @@ fn ansi_codepage_for_lcid(lcid: u16) -> u32 {
             0x082c => 1251,
             _ => 1254,
         },
+        0x3d => 1255,
         0x43 => match lcid {
             0x0843 => 1251,
             _ => 1254,
         },
-        _ => 1252,
-    }
+        0x42 => 1254,
+        0x5a | 0x63 | 0x65 | 0x80 | 0x8c => 1256,
+        0x6d | 0x85 => 1251,
+        0x03
+        | 0x06
+        | 0x07
+        | 0x09
+        | 0x0a
+        | 0x0b
+        | 0x0c
+        | 0x0f
+        | 0x10
+        | 0x13
+        | 0x14
+        | 0x16
+        | 0x17
+        | 0x1d
+        | 0x21
+        | 0x2d
+        | 0x30..=0x36
+        | 0x38
+        | 0x3a..=0x3c
+        | 0x3e
+        | 0x41
+        | 0x52
+        | 0x56
+        | 0x62
+        | 0x64
+        | 0x6e
+        | 0x6f
+        | 0x7a
+        | 0x7c
+        | 0x7e
+        | 0x81..=0x84
+        | 0x86..=0x88 => 1252,
+        _ => return None,
+    };
+    Ansi::new(page)
 }
 
 #[cfg(test)]
@@ -534,10 +596,12 @@ mod tests {
 
     #[test]
     fn maps_representative_lcids_to_ansi_codepages() {
-        assert_eq!(ansi_codepage_for_lcid(0x0409), 1252);
-        assert_eq!(ansi_codepage_for_lcid(0x0411), 932);
-        assert_eq!(ansi_codepage_for_lcid(0x0804), 936);
-        assert_eq!(ansi_codepage_for_lcid(0x0419), 1251);
+        assert_eq!(ansi_for_lcid(0x0409).map(Ansi::id), Some(1252));
+        assert_eq!(ansi_for_lcid(0x0411).map(Ansi::id), Some(932));
+        assert_eq!(ansi_for_lcid(0x0804).map(Ansi::id), Some(936));
+        assert_eq!(ansi_for_lcid(0x0419).map(Ansi::id), Some(1251));
+        assert_eq!(ansi_for_lcid(0), None);
+        assert_eq!(ansi_for_lcid(0x0439), None);
     }
 
     #[test]

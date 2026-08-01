@@ -1656,6 +1656,78 @@ dependency checker accepts 29 workspace packages, 75 direct internal edges,
 and 33 explicit migration-debt entries, and all seven checker regressions pass.
 These are focused gates, not a repeated full-workspace or native-Office run.
 
+The thirty-third implementation slice extracts legacy text conversion from the
+format-neutral core into `litchi-codepage`. The foundation has no runtime,
+container, or peer-format dependency and forbids unsafe code. Its exhaustive
+private discriminant makes `Page`, `Mbcs`, and `Ansi` one-byte capabilities:
+`Page` represents every exactly supported page, `Mbcs` excludes UTF-16 from
+byte-terminated paths, and `Ansi` admits only the ANSI pages enumerated by the
+local `[MS-OSHARED]` glossary. Numeric construction is checked; strict decode
+and encode are the defaults; lossy decoding is named explicitly; and the
+foundation never guesses record terminators. Approximate substitutions are
+deleted, including CP437/CP850 as IBM866, locale identifiers as code pages,
+ISO-8859-1 as Windows-1252, Macintosh variants as unrelated codecs, and UTF-7
+as UTF-8. RTF retains its exact local CP437 and CP850 tables.
+
+Self-review and an independent audit turned the capability split into format
+invariants rather than convention. The first UTF-16 round-trip regression
+caught that `encoding_rs` intentionally uses UTF-8 as the output encoding for
+its UTF-16 decoder labels; `Page` now writes UTF-16LE/BE explicitly and rejects
+partial input units. XLS carries either `Mbcs` or UTF-16LE, so a public variant
+cannot route UTF-16BE through byte-NUL scanning. Shared smart-tag stores carry
+`Ansi` directly, reject embedded NULs and unsupported pages, and expose typed
+PowerPoint and Word override entry points. Word's LCID inference is
+conservative and fallible instead of treating every unknown language as
+Windows-1252. RTF rejects unsupported `ansicpg` declarations and its writer
+stores a typed `Charset`. Font-table and embedded-font `cpg` values carry
+`FontPage`, whose variants admit only exact `Mbcs`, CP437, or CP850 codecs;
+UTF-16 and unsupported numeric identifiers therefore cannot reach the writer.
+RTF `fcharset` is a separate one-byte `FontCharset` enum, with an absent
+declaration preserved separately from ANSI charset zero. In accordance with
+`[MSFT-RTF]`, explicit `cpg` supersedes `fcharset`, the parser flushes text at
+font switches and `plain`, and each byte run is decoded with the currently
+selected font's exact page. Font-table primary, `falt`, and `fname` text is
+deferred until that same precedence is known, while a nested `fontfile` name
+uses its own local `cpg`. Only an absent/default charset inherits the header;
+an explicit unavailable charset accepts invariant ASCII transport and Unicode
+escapes but rejects non-ASCII transport instead of guessing. Valid but
+unavailable Mac Japanese, Mac Russian, symbol, and Johab codecs likewise
+produce errors when selected for body text instead of being substituted with
+Shift-JIS, KOI8-R, or another superficially related codec.
+VBA builders, parsed directories, and projects carry `Mbcs` from validation
+onward. Raw numeric entry points remain explicit, fallible secondary
+conveniences.
+
+CFB Property Set PID 1 is modeled as `CodePage::{Utf16Le, Mbcs}`. The backing
+maps and order vectors are private, generic property CRUD reserves PID 1, and
+`set_page`, `set_page_id`, and `clear_page` update the typed state, property,
+and order atomically. Serialization validates both sides of that invariant and
+returns an error for a missing ordered property instead of relying on an
+`expect`. This supplies create/update/delete coverage for the shared page while
+keeping low-level raw identifiers out of the primary mutation path.
+
+Generic hexadecimal decoding is now `litchi-core::hex::decode`; OOXML font GUID
+handling uses that focused function and returns a typed length error instead of
+an unchecked conversion. `litchi-core` no longer depends on `encoding_rs` or
+declares binary-Office and RTF feature flags. The now-unused `litchi-core` edges
+from `litchi-ole-common` and `litchi-vba` are also removed. The boundary checker
+therefore accepts 30 workspace packages and 78 direct internal dependencies
+with 31 explicit debt entries: three core debt entries close, while the honest
+temporary `litchi-ole -> litchi-codepage` host edge adds one. All seven checker
+regressions pass.
+
+Supported artifact encoding and package topology are unchanged; this slice
+turns previously guessed, malformed, or unrepresentable inputs into typed
+errors. It therefore adds no new native-Office artifact claim, and the prior
+fully green workspace and Microsoft Office baselines remain the applicable
+evidence. Per the explicit review direction, verification is limited to the
+affected package test matrices, strictness regressions, warning-denied checks,
+Clippy, rustdoc, formatting, manifest order, dependency boundaries, and diff
+validation rather than repeating the full workspace or Computer Use gates. The
+final central-parser correction is covered by the complete warning-denied
+`litchi-rtf --all-targets` matrix, including real LibreOffice font metadata and
+the RTF corpus.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

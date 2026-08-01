@@ -2,6 +2,7 @@
 
 use super::border::{Borders, CharacterBorder, CharacterShading, Shading};
 use crate::{RtfError, RtfResult};
+use litchi_codepage::Mbcs;
 use std::borrow::Cow;
 use std::num::NonZeroU16;
 
@@ -121,6 +122,212 @@ pub enum EmbeddedFontFormat {
     TrueType,
 }
 
+/// Exact byte-oriented code page for an RTF font name.
+///
+/// The DOS pages have dedicated variants because the shared codec foundation
+/// intentionally does not approximate them with a different IBM code page.
+/// UTF-16 pages are excluded because `cpg` font names are byte streams.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FontPage {
+    /// Any exact byte-stream page supported by the shared codec foundation.
+    Mbcs(Mbcs),
+    /// Original IBM PC code page 437.
+    Cp437,
+    /// DOS Latin-1 code page 850.
+    Cp850,
+}
+
+impl FontPage {
+    /// Windows-1252.
+    pub const WINDOWS_1252: Self = Self::Mbcs(Mbcs::WINDOWS_1252);
+    /// Shift JIS (Windows code page 932).
+    pub const SHIFT_JIS: Self = Self::Mbcs(Mbcs::SHIFT_JIS);
+    /// Macintosh Roman.
+    pub const MACINTOSH: Self = Self::Mbcs(Mbcs::MACINTOSH);
+    /// UTF-8 (Windows code page 65001).
+    pub const UTF_8: Self = Self::Mbcs(Mbcs::UTF_8);
+
+    /// Validates an RTF font code-page identifier.
+    pub fn new(page: u32) -> Option<Self> {
+        match page {
+            437 => Some(Self::Cp437),
+            850 => Some(Self::Cp850),
+            _ => Mbcs::new(page).map(Self::Mbcs),
+        }
+    }
+
+    /// Validates an identifier and retains an unsupported value in the error.
+    pub fn require(page: u32) -> Result<Self, litchi_codepage::Error> {
+        Self::new(page).ok_or(litchi_codepage::Error::Unsupported(page))
+    }
+
+    /// Numeric RTF code-page identifier.
+    pub const fn id(self) -> u16 {
+        match self {
+            Self::Mbcs(page) => page.id16(),
+            Self::Cp437 => 437,
+            Self::Cp850 => 850,
+        }
+    }
+}
+
+impl TryFrom<u32> for FontPage {
+    type Error = litchi_codepage::Error;
+
+    fn try_from(page: u32) -> Result<Self, Self::Error> {
+        Self::require(page)
+    }
+}
+
+impl From<Mbcs> for FontPage {
+    fn from(page: Mbcs) -> Self {
+        Self::Mbcs(page)
+    }
+}
+
+impl From<FontPage> for u32 {
+    fn from(page: FontPage) -> Self {
+        u32::from(page.id())
+    }
+}
+
+/// Valid RTF `fcharset` selector.
+///
+/// The one-byte enum preserves the font-table declaration without confusing a
+/// charset identifier with a code page. [`Self::page`] returns a codec only
+/// where this build has an exact mapping; selected unsupported charsets are
+/// rejected by the parser instead of guessed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum FontCharset {
+    Ansi = 0,
+    Default = 1,
+    Symbol = 2,
+    MacRoman = 77,
+    MacShiftJis = 78,
+    MacHangul = 79,
+    MacGb2312 = 80,
+    MacBig5 = 81,
+    MacJohab = 82,
+    MacHebrew = 83,
+    MacArabic = 84,
+    MacGreek = 85,
+    MacTurkish = 86,
+    MacThai = 87,
+    MacEastEurope = 88,
+    MacRussian = 89,
+    ShiftJis = 128,
+    Hangul = 129,
+    Johab = 130,
+    Gb2312 = 134,
+    Big5 = 136,
+    Greek = 161,
+    Turkish = 162,
+    Vietnamese = 163,
+    Hebrew = 177,
+    Arabic = 178,
+    ArabicTraditional = 179,
+    ArabicUser = 180,
+    HebrewUser = 181,
+    Baltic = 186,
+    Russian = 204,
+    Thai = 222,
+    EastEurope = 238,
+    Pc437 = 254,
+    Oem = 255,
+}
+
+impl FontCharset {
+    /// Validates a numeric RTF charset identifier.
+    pub fn new(charset: u8) -> Option<Self> {
+        Some(match charset {
+            0 => Self::Ansi,
+            1 => Self::Default,
+            2 => Self::Symbol,
+            77 => Self::MacRoman,
+            78 => Self::MacShiftJis,
+            79 => Self::MacHangul,
+            80 => Self::MacGb2312,
+            81 => Self::MacBig5,
+            82 => Self::MacJohab,
+            83 => Self::MacHebrew,
+            84 => Self::MacArabic,
+            85 => Self::MacGreek,
+            86 => Self::MacTurkish,
+            87 => Self::MacThai,
+            88 => Self::MacEastEurope,
+            89 => Self::MacRussian,
+            128 => Self::ShiftJis,
+            129 => Self::Hangul,
+            130 => Self::Johab,
+            134 => Self::Gb2312,
+            136 => Self::Big5,
+            161 => Self::Greek,
+            162 => Self::Turkish,
+            163 => Self::Vietnamese,
+            177 => Self::Hebrew,
+            178 => Self::Arabic,
+            179 => Self::ArabicTraditional,
+            180 => Self::ArabicUser,
+            181 => Self::HebrewUser,
+            186 => Self::Baltic,
+            204 => Self::Russian,
+            222 => Self::Thai,
+            238 => Self::EastEurope,
+            254 => Self::Pc437,
+            255 => Self::Oem,
+            _ => return None,
+        })
+    }
+
+    /// Numeric RTF charset identifier.
+    pub const fn id(self) -> u8 {
+        self as u8
+    }
+
+    /// Exact supported page implied by this charset.
+    pub fn page(self) -> Option<FontPage> {
+        let page = match self {
+            Self::Ansi => return Some(FontPage::WINDOWS_1252),
+            Self::Default => return None,
+            Self::MacRoman => return Some(FontPage::MACINTOSH),
+            Self::ShiftJis => return Some(FontPage::SHIFT_JIS),
+            Self::Hangul => 949,
+            Self::Gb2312 => 936,
+            Self::Big5 => 950,
+            Self::Greek => 1253,
+            Self::Turkish => 1254,
+            Self::Vietnamese => 1258,
+            Self::Hebrew => 1255,
+            Self::Arabic => 1256,
+            Self::Baltic => 1257,
+            Self::Russian => 1251,
+            Self::Thai => 874,
+            Self::EastEurope => 1250,
+            Self::Pc437 => return Some(FontPage::Cp437),
+            Self::Oem => return Some(FontPage::Cp850),
+            Self::Symbol
+            | Self::MacShiftJis
+            | Self::MacHangul
+            | Self::MacGb2312
+            | Self::MacBig5
+            | Self::MacJohab
+            | Self::MacHebrew
+            | Self::MacArabic
+            | Self::MacGreek
+            | Self::MacTurkish
+            | Self::MacThai
+            | Self::MacEastEurope
+            | Self::MacRussian
+            | Self::Johab
+            | Self::ArabicTraditional
+            | Self::ArabicUser
+            | Self::HebrewUser => return None,
+        };
+        FontPage::new(page)
+    }
+}
+
 /// Embedded font payload from the inert `fontemb` destination.
 ///
 /// A font entry may embed the font bytes directly (hexadecimal or `bin`
@@ -132,8 +339,8 @@ pub struct EmbeddedFont<'a> {
     pub format: EmbeddedFontFormat,
     /// File name from the nested `fontfile` destination, if present.
     pub file_name: Option<Cow<'a, str>>,
-    /// Code page of the `fontfile` name from its `cpg` control word.
-    pub file_code_page: Option<u16>,
+    /// Exact code page of the `fontfile` name from its `cpg` control word.
+    pub file_code_page: Option<FontPage>,
     /// Decoded embedded font bytes, if the data is carried inline.
     pub data: Option<Vec<u8>>,
 }
@@ -235,8 +442,8 @@ pub struct Font<'a> {
     pub name: Cow<'a, str>,
     /// Font family category
     pub family: FontFamily,
-    /// Character set (Windows codepage)
-    pub charset: u8,
+    /// Explicit RTF font charset selector, if declared.
+    pub charset: Option<FontCharset>,
     /// Alternate font name from the inert `falt` destination.
     pub alternate_name: Option<Cow<'a, str>>,
     /// Non-tagged font name from the inert `fname` destination.
@@ -245,8 +452,8 @@ pub struct Font<'a> {
     pub panose: Option<[u8; 10]>,
     /// Pitch preference.
     pub pitch: FontPitch,
-    /// Explicit font code page.
-    pub code_page: Option<u16>,
+    /// Explicit, exact font code page.
+    pub code_page: Option<FontPage>,
     /// Embedded font payload from the inert `fontemb` destination.
     pub embedded: Option<EmbeddedFont<'a>>,
     /// Theme-font role from the major/minor theme selectors.
@@ -256,11 +463,11 @@ pub struct Font<'a> {
 impl<'a> Font<'a> {
     /// Create a new font.
     #[inline]
-    pub fn new(name: Cow<'a, str>, family: FontFamily, charset: u8) -> Self {
+    pub fn new(name: Cow<'a, str>, family: FontFamily) -> Self {
         Self {
             name,
             family,
-            charset,
+            charset: None,
             alternate_name: None,
             non_tagged_name: None,
             panose: None,
@@ -338,7 +545,7 @@ impl<'a> FontTable<'a> {
         if index as usize >= self.fonts.len() {
             self.fonts.resize(
                 (index as usize) + 1,
-                Font::new(Cow::Borrowed(""), FontFamily::Nil, 0),
+                Font::new(Cow::Borrowed(""), FontFamily::Nil),
             );
             self.defined.resize((index as usize) + 1, false);
         }
@@ -1453,10 +1660,22 @@ mod tests {
 
     #[test]
     fn test_font_new() {
-        let font = Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0);
+        let font = Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss);
         assert_eq!(font.name, "Arial");
         assert_eq!(font.family, FontFamily::Swiss);
-        assert_eq!(font.charset, 0);
+        assert_eq!(font.charset, None);
+    }
+
+    #[test]
+    fn font_charset_is_compact_and_maps_pc_pages_exactly() {
+        assert_eq!(std::mem::size_of::<FontCharset>(), 1);
+        assert_eq!(std::mem::size_of::<Option<FontCharset>>(), 1);
+        assert_eq!(FontCharset::new(254), Some(FontCharset::Pc437));
+        assert_eq!(FontCharset::Pc437.page(), Some(FontPage::Cp437));
+        assert_eq!(FontCharset::new(255), Some(FontCharset::Oem));
+        assert_eq!(FontCharset::Oem.page(), Some(FontPage::Cp850));
+        assert_eq!(FontCharset::Default.page(), None);
+        assert_eq!(FontCharset::MacShiftJis.page(), None);
     }
 
     #[test]
@@ -1468,15 +1687,15 @@ mod tests {
     #[test]
     fn test_font_table_insert() {
         let mut table: FontTable = FontTable::new();
-        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0));
-        table.insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman, 0));
+        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss));
+        table.insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman));
         assert_eq!(table.fonts().len(), 2);
     }
 
     #[test]
     fn test_font_table_get() {
         let mut table: FontTable = FontTable::new();
-        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0));
+        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss));
         assert!(table.get(0).is_some());
         assert!(table.get(1).is_none());
     }
@@ -1484,7 +1703,7 @@ mod tests {
     #[test]
     fn test_font_table_sparse() {
         let mut table: FontTable = FontTable::new();
-        table.insert(5, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss, 0));
+        table.insert(5, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss));
         assert_eq!(table.fonts().len(), 6);
     }
 

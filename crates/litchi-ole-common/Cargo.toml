@@ -9,7 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-encoding_rs = { workspace = true }
 litchi-cfb = { workspace = true }
-litchi-core = { workspace = true, features = ["ole"] }
+litchi-codepage = { workspace = true }
 quick-xml = { workspace = true }

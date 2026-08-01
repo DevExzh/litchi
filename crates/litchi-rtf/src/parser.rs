@@ -4,8 +4,7 @@ use super::error::{RtfError, RtfResult};
 use super::lexer::{ControlWord, Token};
 use super::types::*;
 use bumpalo::Bump;
-use encoding_rs::Encoding;
-use litchi_core::encoding::codepage_to_encoding;
+use litchi_codepage::Mbcs;
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -14,9 +13,66 @@ use std::num::NonZeroU16;
 
 #[derive(Debug, Clone, Copy)]
 enum RtfEncoding {
-    Standard(&'static Encoding),
+    Standard(Mbcs),
     Cp437,
     Cp850,
+}
+
+#[derive(Default)]
+struct DeferredText {
+    parts: Vec<DeferredTextPart>,
+    source_len: usize,
+}
+
+enum DeferredTextPart {
+    Bytes(Vec<u8>),
+    Unicode(String),
+}
+
+impl DeferredText {
+    fn push_transport(&mut self, text: &str) -> RtfResult<()> {
+        let mut incoming = Vec::with_capacity(text.len());
+        append_transport_bytes(&mut incoming, text)?;
+        self.source_len = self.source_len.saturating_add(incoming.len());
+        if let Some(DeferredTextPart::Bytes(bytes)) = self.parts.last_mut() {
+            bytes.extend_from_slice(&incoming);
+        } else if !incoming.is_empty() {
+            self.parts.push(DeferredTextPart::Bytes(incoming));
+        }
+        Ok(())
+    }
+
+    fn push_unicode(&mut self, text: &str) {
+        self.source_len = self.source_len.saturating_add(text.len());
+        if let Some(DeferredTextPart::Unicode(value)) = self.parts.last_mut() {
+            value.push_str(text);
+        } else if !text.is_empty() {
+            self.parts.push(DeferredTextPart::Unicode(text.to_string()));
+        }
+    }
+
+    const fn source_len(&self) -> usize {
+        self.source_len
+    }
+
+    fn has_non_ascii_transport(&self) -> bool {
+        self.parts
+            .iter()
+            .any(|part| matches!(part, DeferredTextPart::Bytes(bytes) if !bytes.is_ascii()))
+    }
+
+    fn decode(self, encoding: RtfEncoding, context: &str) -> RtfResult<String> {
+        let mut output = String::with_capacity(self.source_len);
+        for part in self.parts {
+            match part {
+                DeferredTextPart::Bytes(bytes) => {
+                    output.push_str(&encoding.decode_strict(&bytes, context)?)
+                },
+                DeferredTextPart::Unicode(text) => output.push_str(&text),
+            }
+        }
+        Ok(output)
+    }
 }
 
 fn strict_paragraph_toggle(value: Option<i32>, name: &str) -> std::result::Result<bool, RtfError> {
@@ -75,9 +131,27 @@ fn required_paragraph_indent(value: Option<i32>, name: &str) -> std::result::Res
 impl RtfEncoding {
     fn decode(self, bytes: &[u8]) -> Cow<'_, str> {
         match self {
-            Self::Standard(encoding) => encoding.decode(bytes).0,
+            Self::Standard(page) => page.decode_lossy(bytes),
             Self::Cp437 => decode_dos_codepage(bytes, &CP437_HIGH),
             Self::Cp850 => decode_dos_codepage(bytes, &CP850_HIGH),
+        }
+    }
+
+    fn decode_strict<'b>(self, bytes: &'b [u8], context: &str) -> RtfResult<Cow<'b, str>> {
+        match self {
+            Self::Standard(page) => page.decode(bytes).map_err(|error| {
+                RtfError::MalformedDocument(format!("invalid RTF {context}: {error}"))
+            }),
+            Self::Cp437 => Ok(decode_dos_codepage(bytes, &CP437_HIGH)),
+            Self::Cp850 => Ok(decode_dos_codepage(bytes, &CP850_HIGH)),
+        }
+    }
+
+    const fn from_font_page(page: FontPage) -> Self {
+        match page {
+            FontPage::Mbcs(page) => Self::Standard(page),
+            FontPage::Cp437 => Self::Cp437,
+            FontPage::Cp850 => Self::Cp850,
         }
     }
 }
@@ -1220,7 +1294,7 @@ impl Default for State {
             destination: Destination::DocumentBody,
             visible_section_format: false,
             section_column_number: None,
-            encoding: RtfEncoding::Standard(encoding_rs::WINDOWS_1252),
+            encoding: RtfEncoding::Standard(Mbcs::WINDOWS_1252),
             revision_type: None,
             revision_author_id: None,
             revision_date: None,
@@ -5081,7 +5155,7 @@ impl<'a> Parser<'a> {
                         let decoded = self
                             .states
                             .last()
-                            .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| {
+                            .map_or(RtfEncoding::Standard(Mbcs::WINDOWS_1252), |state| {
                                 state.encoding
                             })
                             .decode(&bytes);
@@ -5117,7 +5191,7 @@ impl<'a> Parser<'a> {
                             let decoded = self
                                 .states
                                 .last()
-                                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| {
+                                .map_or(RtfEncoding::Standard(Mbcs::WINDOWS_1252), |state| {
                                     state.encoding
                                 })
                                 .decode(&bytes);
@@ -5143,7 +5217,7 @@ impl<'a> Parser<'a> {
             let decoded = self
                 .states
                 .last()
-                .map_or(RtfEncoding::Standard(encoding_rs::WINDOWS_1252), |state| {
+                .map_or(RtfEncoding::Standard(Mbcs::WINDOWS_1252), |state| {
                     state.encoding
                 })
                 .decode(&bytes);
@@ -5299,7 +5373,9 @@ impl<'a> Parser<'a> {
             | ControlWord::AnsiCodePage(_)
             | ControlWord::Mac
             | ControlWord::Pc
-            | ControlWord::Pca => {
+            | ControlWord::Pca
+            | ControlWord::FontNumber(_)
+            | ControlWord::Plain => {
                 if !text_buffer.is_empty() {
                     self.flush_text_buffer(text_buffer)?;
                 }
@@ -5473,7 +5549,7 @@ impl<'a> Parser<'a> {
                             && (s.in_table || s.table_nesting_level >= 2)
                     }) {
                         let state = self.current_state()?.clone();
-                        let encoding = state.encoding;
+                        let encoding = self.effective_text_encoding(&state)?;
                         let mut bytes = SmallVec::<[u8; 64]>::new();
                         append_transport_bytes(&mut bytes, text)?;
                         self.append_table_text(
@@ -5512,7 +5588,7 @@ impl<'a> Parser<'a> {
         // Only create blocks for text in the document body
         // Skip text from font tables, color tables, stylesheets, etc.
         if state.destination == Destination::DocumentBody {
-            let decoded_str = state.encoding.decode(buffer);
+            let decoded_str = self.effective_text_encoding(&state)?.decode(buffer);
 
             // Allocate in arena and create block
             let text = self.arena.alloc_str(&decoded_str);
@@ -5535,6 +5611,32 @@ impl<'a> Parser<'a> {
 
         buffer.clear();
         Ok(())
+    }
+
+    fn effective_text_encoding(&self, state: &State) -> RtfResult<RtfEncoding> {
+        let fonts = self.font_table.borrow();
+        let Some(font) = fonts.get(state.formatting.font_ref) else {
+            return Ok(state.encoding);
+        };
+        if let Some(page) = font.code_page {
+            return Ok(RtfEncoding::from_font_page(page));
+        }
+        let Some(charset) = font.charset else {
+            return Ok(state.encoding);
+        };
+        if charset == FontCharset::Default {
+            return Ok(state.encoding);
+        }
+        charset
+            .page()
+            .map(RtfEncoding::from_font_page)
+            .ok_or_else(|| {
+                RtfError::MalformedDocument(format!(
+                    "unsupported RTF font charset {} for font {}",
+                    charset.id(),
+                    state.formatting.font_ref
+                ))
+            })
     }
 
     fn decode_transport_text(&self, text: &str) -> RtfResult<String> {
@@ -7816,7 +7918,9 @@ impl<'a> Parser<'a> {
                 state.formatting.character_style = Some(character_style_reference(*value)?);
             },
             ControlWord::FontNumber(n) => {
-                state.formatting.font_ref = *n as FontRef;
+                state.formatting.font_ref = FontRef::try_from(*n).map_err(|_| {
+                    RtfError::MalformedDocument("invalid RTF body font reference".to_string())
+                })?;
             },
             ControlWord::Language(value) => {
                 state.formatting.language = Some(crate::LanguageId::from_rtf(*value)?);
@@ -8320,23 +8424,25 @@ impl<'a> Parser<'a> {
 
             // Character encoding
             ControlWord::Ansi => {
-                state.encoding = RtfEncoding::Standard(encoding_rs::WINDOWS_1252);
+                state.encoding = RtfEncoding::Standard(Mbcs::WINDOWS_1252);
             },
             ControlWord::AnsiCodePage(cp) => {
                 state.encoding = match *cp {
                     437 => RtfEncoding::Cp437,
                     850 => RtfEncoding::Cp850,
                     _ => {
-                        if let Some(encoding) = codepage_to_encoding(*cp as u32) {
-                            RtfEncoding::Standard(encoding)
-                        } else {
-                            state.encoding
-                        }
+                        let page =
+                            u32::try_from(*cp).ok().and_then(Mbcs::new).ok_or_else(|| {
+                                RtfError::MalformedDocument(format!(
+                                    "unsupported RTF ANSI code page {cp}"
+                                ))
+                            })?;
+                        RtfEncoding::Standard(page)
                     },
                 }
             },
             ControlWord::Mac => {
-                state.encoding = RtfEncoding::Standard(encoding_rs::MACINTOSH);
+                state.encoding = RtfEncoding::Standard(Mbcs::MACINTOSH);
             },
             ControlWord::Pc => state.encoding = RtfEncoding::Cp437,
             ControlWord::Pca => state.encoding = RtfEncoding::Cp850,
@@ -14209,7 +14315,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_style_unicode(&mut self, first_code: i32, unicode_skip: i32) -> RtfResult<String> {
+    fn parse_unicode_with_remainder(
+        &mut self,
+        first_code: i32,
+        unicode_skip: i32,
+    ) -> RtfResult<(String, String)> {
         let mut utf16 = SmallVec::<[u16; 4]>::new();
         utf16.push(first_code as u16);
         self.pos += 1;
@@ -14240,10 +14350,27 @@ impl<'a> Parser<'a> {
                 None => break,
             }
         }
-        let mut decoded = String::from_utf16(&utf16)
+        let decoded = String::from_utf16(&utf16)
             .map_err(|error| RtfError::InvalidUnicode(format!("invalid style name: {error}")))?;
+        Ok((decoded, remainder))
+    }
+
+    fn parse_style_unicode(&mut self, first_code: i32, unicode_skip: i32) -> RtfResult<String> {
+        let (mut decoded, remainder) =
+            self.parse_unicode_with_remainder(first_code, unicode_skip)?;
         decoded.push_str(&self.decode_transport_text(&remainder)?);
         Ok(decoded)
+    }
+
+    fn append_deferred_unicode(
+        &mut self,
+        target: &mut DeferredText,
+        first_code: i32,
+        unicode_skip: i32,
+    ) -> RtfResult<()> {
+        let (decoded, remainder) = self.parse_unicode_with_remainder(first_code, unicode_skip)?;
+        target.push_unicode(&decoded);
+        target.push_transport(&remainder)
     }
 
     fn required_character_value(value: Option<i32>, control: &str, maximum: u16) -> RtfResult<u16> {
@@ -15588,7 +15715,7 @@ impl<'a> Parser<'a> {
         let mut non_tagged_name = None;
         let mut panose = None;
         let mut embedded = None;
-        let mut name = String::new();
+        let mut name = DeferredText::default();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         let mut seen = std::collections::HashSet::new();
 
@@ -15712,8 +15839,13 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font charset".to_string(),
                         ));
                     }
-                    charset = Some(u8::try_from(*cs).map_err(|_| {
+                    let charset_id = u8::try_from(*cs).map_err(|_| {
                         RtfError::MalformedDocument("invalid RTF font charset".to_string())
+                    })?;
+                    charset = Some(FontCharset::new(charset_id).ok_or_else(|| {
+                        RtfError::MalformedDocument(format!(
+                            "unsupported RTF font charset {charset_id}"
+                        ))
                     })?);
                     self.pos += 1;
                 },
@@ -15741,8 +15873,13 @@ impl<'a> Parser<'a> {
                             "duplicate RTF font code page".to_string(),
                         ));
                     }
-                    code_page = Some(u16::try_from(*value).map_err(|_| {
+                    let page = u32::try_from(*value).map_err(|_| {
                         RtfError::MalformedDocument("invalid RTF font code page".to_string())
+                    })?;
+                    code_page = Some(FontPage::new(page).ok_or_else(|| {
+                        RtfError::MalformedDocument(format!(
+                            "unsupported RTF font code page {page}"
+                        ))
                     })?);
                     self.pos += 1;
                 },
@@ -15756,25 +15893,25 @@ impl<'a> Parser<'a> {
                     self.pos += 1;
                 },
                 Token::Text(text) => {
-                    name.push_str(&self.decode_transport_text(text)?);
+                    name.push_transport(text)?;
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::Unicode(first)) => {
-                    name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    self.append_deferred_unicode(&mut name, *first, unicode_skip)?;
                 },
                 Token::Control(ControlWord::UnicodeSkip(value)) => {
                     unicode_skip = (*value).max(0);
                     self.pos += 1;
                 },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
-                    name.push_str(control_symbol_text(control).unwrap_or_default());
+                    name.push_unicode(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
                 },
                 _ => {
                     self.pos += 1;
                 },
             }
-            if name.len() > 4_096 {
+            if name.source_len() > 4_096 {
                 return Err(RtfError::MalformedDocument(
                     "RTF font name exceeds the safety limit".to_string(),
                 ));
@@ -15783,14 +15920,52 @@ impl<'a> Parser<'a> {
 
         let font_num = font_num
             .ok_or_else(|| RtfError::MalformedDocument("RTF font entry lacks an ID".to_string()))?;
-        let name = name.trim().strip_suffix(';').unwrap_or(name.trim()).trim();
-        let mut font = Font::new(
-            Cow::Owned(name.to_string()),
-            font_family,
-            charset.unwrap_or(0),
-        );
-        font.alternate_name = alternate_name.map(Cow::Owned);
-        font.non_tagged_name = non_tagged_name.map(Cow::Owned);
+        let header_encoding = self.current_state()?.encoding;
+        let encoding = match (code_page, charset) {
+            (Some(page), _) => RtfEncoding::from_font_page(page),
+            (None, Some(FontCharset::Default) | None) => header_encoding,
+            (None, Some(charset)) => match charset.page() {
+                Some(page) => RtfEncoding::from_font_page(page),
+                None => {
+                    let has_non_ascii = name.has_non_ascii_transport()
+                        || alternate_name
+                            .as_ref()
+                            .is_some_and(DeferredText::has_non_ascii_transport)
+                        || non_tagged_name
+                            .as_ref()
+                            .is_some_and(DeferredText::has_non_ascii_transport);
+                    if has_non_ascii {
+                        return Err(RtfError::MalformedDocument(format!(
+                            "unsupported RTF font charset {} for non-ASCII font metadata",
+                            charset.id()
+                        )));
+                    }
+                    // ASCII transport and explicit Unicode escapes are invariant
+                    // across the unavailable legacy charset and the header page.
+                    header_encoding
+                },
+            },
+        };
+        let decode_name = |value: DeferredText, context: &str| -> RtfResult<String> {
+            let value = value.decode(encoding, context)?;
+            Ok(value
+                .trim()
+                .strip_suffix(';')
+                .unwrap_or(value.trim())
+                .trim()
+                .to_string())
+        };
+        let name = decode_name(name, "font name")?;
+        let mut font = Font::new(Cow::Owned(name), font_family);
+        font.charset = charset;
+        font.alternate_name = alternate_name
+            .map(|value| decode_name(value, "alternate font name"))
+            .transpose()?
+            .map(Cow::Owned);
+        font.non_tagged_name = non_tagged_name
+            .map(|value| decode_name(value, "non-tagged font name"))
+            .transpose()?
+            .map(Cow::Owned);
         font.panose = panose;
         font.pitch = pitch;
         font.code_page = code_page;
@@ -15810,7 +15985,10 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_font_name_destination(&mut self, expected: ControlWord<'a>) -> RtfResult<String> {
+    fn parse_font_name_destination(
+        &mut self,
+        expected: ControlWord<'a>,
+    ) -> RtfResult<DeferredText> {
         if !matches!(self.tokens.get(self.pos), Some(Token::OpenBrace))
             || !matches!(
                 self.tokens.get(self.pos + 1),
@@ -15823,35 +16001,29 @@ impl<'a> Parser<'a> {
             ));
         }
         self.pos += 3;
-        let mut value = String::new();
+        let mut value = DeferredText::default();
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let value = value
-                        .trim()
-                        .strip_suffix(';')
-                        .unwrap_or(value.trim())
-                        .trim()
-                        .to_string();
-                    if value.is_empty() || value.len() > 4_096 {
+                    if value.source_len() > 4_096 {
                         return Err(RtfError::MalformedDocument(
-                            "invalid or oversized RTF alternate font name".to_string(),
+                            "oversized RTF alternate font name".to_string(),
                         ));
                     }
                     return Ok(value);
                 },
-                Some(Token::Text(text)) => value.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Text(text)) => value.push_transport(text)?,
                 Some(Token::Control(ControlWord::Unicode(first))) => {
-                    value.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    self.append_deferred_unicode(&mut value, *first, unicode_skip)?;
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
                     unicode_skip = (*count).max(0)
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
-                    value.push_str(control_symbol_text(control).unwrap_or_default())
+                    value.push_unicode(control_symbol_text(control).unwrap_or_default())
                 },
                 Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
@@ -15861,7 +16033,7 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
-            if value.len() > 4_096 {
+            if value.source_len() > 4_096 {
                 return Err(RtfError::MalformedDocument(
                     "RTF alternate font name exceeds the safety limit".to_string(),
                 ));
@@ -16027,7 +16199,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse the nested `fontfile` destination of a `fontemb` group.
-    fn parse_font_file_destination(&mut self) -> RtfResult<(String, Option<u16>)> {
+    fn parse_font_file_destination(&mut self) -> RtfResult<(String, Option<FontPage>)> {
         self.pos += 1; // opening brace
         if matches!(
             self.tokens.get(self.pos),
@@ -16041,14 +16213,20 @@ impl<'a> Parser<'a> {
             ));
         }
         self.pos += 1;
-        let mut name = String::new();
+        let mut name = DeferredText::default();
         let mut code_page = None;
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         while self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
-                    let name = name.trim().to_string();
+                    let encoding = code_page
+                        .map(RtfEncoding::from_font_page)
+                        .unwrap_or(self.current_state()?.encoding);
+                    let name = name
+                        .decode(encoding, "embedded font file name")?
+                        .trim()
+                        .to_string();
                     if name.is_empty() || name.len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
                         return Err(RtfError::MalformedDocument(
                             "invalid or oversized RTF embedded font file name".to_string(),
@@ -16062,20 +16240,25 @@ impl<'a> Parser<'a> {
                             "duplicate RTF fontfile code page".to_string(),
                         ));
                     }
-                    code_page = Some(u16::try_from(*value).map_err(|_| {
+                    let page = u32::try_from(*value).map_err(|_| {
                         RtfError::MalformedDocument("invalid RTF fontfile code page".to_string())
+                    })?;
+                    code_page = Some(FontPage::new(page).ok_or_else(|| {
+                        RtfError::MalformedDocument(format!(
+                            "unsupported RTF fontfile code page {page}"
+                        ))
                     })?);
                 },
-                Some(Token::Text(text)) => name.push_str(&self.decode_transport_text(text)?),
+                Some(Token::Text(text)) => name.push_transport(text)?,
                 Some(Token::Control(ControlWord::Unicode(first))) => {
-                    name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
+                    self.append_deferred_unicode(&mut name, *first, unicode_skip)?;
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
                     unicode_skip = (*count).max(0);
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
-                    name.push_str(control_symbol_text(control).unwrap_or_default());
+                    name.push_unicode(control_symbol_text(control).unwrap_or_default());
                 },
                 Some(Token::OpenBrace) | Some(Token::Control(_)) | Some(Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
@@ -16085,7 +16268,7 @@ impl<'a> Parser<'a> {
                 None => return Err(RtfError::UnexpectedEof),
             }
             self.pos += 1;
-            if name.len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
+            if name.source_len() > crate::EmbeddedFont::MAX_FILE_NAME_BYTES {
                 return Err(RtfError::MalformedDocument(
                     "RTF embedded font file name exceeds the safety limit".to_string(),
                 ));

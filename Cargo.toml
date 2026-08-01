@@ -37,6 +37,7 @@ image         = { version = "0.25", features = ["default-formats", "rayon"] }
 itoa          = "1.0"
 litchi           = { version = "0.0.1", path = "crates/litchi" }
 litchi-cfb       = { version = "0.0.1", path = "crates/litchi-cfb" }
+litchi-codepage  = { version = "0.0.1", path = "crates/litchi-codepage" }
 # Path deps to internal crates.
 litchi-core      = { version = "0.0.1", path = "crates/litchi-core" }
 litchi-crypto    = { version = "0.0.1", path = "crates/litchi-crypto" }

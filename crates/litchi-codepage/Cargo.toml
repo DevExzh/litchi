@@ -1,0 +1,12 @@
+[package]
+name = "litchi-codepage"
+description = "Typed legacy code-page encoding and decoding for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+encoding_rs = { workspace = true }

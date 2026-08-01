@@ -322,8 +322,8 @@ pub use theme::DocumentTheme;
 pub use types::{
     Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
     AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
-    DocumentElement, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font, FontFamily,
-    FontPitch, FontRef, FontTable, FontTheme, Formatting, Indentation,
+    DocumentElement, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font, FontCharset,
+    FontFamily, FontPage, FontPitch, FontRef, FontTable, FontTheme, Formatting, Indentation,
     MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphContent, ParagraphDropCap,
     ParagraphDropCapKind, ParagraphFontAlignment, ParagraphLineBreaking,
     ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata, Run,
@@ -336,8 +336,8 @@ pub use write_reservation::{
     WriteReservationHash,
 };
 pub use writer::{
-    DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfWriter,
-    WriterOptions,
+    Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS,
+    RtfWriter, WriterOptions,
 };
 pub use xml_namespace::XmlNamespace;
 pub use xsl_transform::{

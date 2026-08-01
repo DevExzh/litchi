@@ -74,6 +74,10 @@ fn plain_resets_emphasis_mark() {
     let document = RtfDocument::parse(r"{\rtf1\ansi\accdot Marked\plain Unmarked\par}").unwrap();
     assert_eq!(
         document.blocks()[0].formatting.emphasis_mark,
+        EmphasisMark::Dot
+    );
+    assert_eq!(
+        document.blocks()[1].formatting.emphasis_mark,
         EmphasisMark::None
     );
 }

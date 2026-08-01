@@ -1,4 +1,4 @@
-use litchi_rtf::{EmbeddedFontFormat, RtfDocument, RtfWriter};
+use litchi_rtf::{EmbeddedFontFormat, FontPage, RtfDocument, RtfWriter};
 
 const SYNTHETIC: &str = r#"{\rtf1\ansi\uc1
 {\fonttbl
@@ -16,7 +16,7 @@ fn parses_decodes_and_round_trips_embedded_fonts() {
     let embedded = first.embedded.as_ref().unwrap();
     assert_eq!(embedded.format, EmbeddedFontFormat::TrueType);
     assert_eq!(embedded.file_name.as_deref(), Some("arial.ttf"));
-    assert_eq!(embedded.file_code_page, Some(1252));
+    assert_eq!(embedded.file_code_page, Some(FontPage::WINDOWS_1252));
     assert_eq!(
         embedded.data.as_deref(),
         Some(&[0x00, 0x01, 0x00, 0x00, 0xab, 0xcd, 0xef, 0x42][..])
@@ -54,6 +54,17 @@ fn accepts_fontemb_without_ignorable_destination_marker() {
 }
 
 #[test]
+fn fontfile_code_page_decodes_name_independently_from_the_header() {
+    let source = r#"{\rtf1\ansi\ansicpg1252
+{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg932 \'82\'a0.ttf}}Arial;}}}"#;
+    let doc = RtfDocument::parse(source).unwrap();
+    let embedded = doc.font_table().get(0).unwrap().embedded.as_ref().unwrap();
+
+    assert_eq!(embedded.file_name.as_deref(), Some("あ.ttf"));
+    assert_eq!(embedded.file_code_page.map(FontPage::id), Some(932));
+}
+
+#[test]
 fn rejects_malformed_embedded_fonts() {
     let malformed = [
         // Duplicate fontemb destination in one font entry.
@@ -72,6 +83,9 @@ fn rejects_malformed_embedded_fonts() {
         r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1252\cpg1250 a.ttf}}Arial;}}}"#,
         // Out-of-range fontfile code page.
         r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg70000 a.ttf}}Arial;}}}"#,
+        // Wide and unsupported fontfile code pages.
+        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1200 a.ttf}}Arial;}}}"#,
+        r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg65000 a.ttf}}Arial;}}}"#,
         // Nested group inside the fontfile name destination.
         r#"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile {\field X}}}Arial;}}}"#,
         // Unterminated fontemb destination.

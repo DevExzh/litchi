@@ -2,6 +2,7 @@
 
 use super::core::DocWriteError;
 use crate::doc::{SmartTagOrigin, SmartTagRecognizerRange, SmartTagRecognizerState};
+use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{
     PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, SmartTagProperty,
     SmartTagPropertyBag, SmartTagType,
@@ -350,7 +351,7 @@ fn build_factoid_data(
         });
     }
     PropertyBagStore {
-        ansi_codepage: 1252,
+        ansi: Ansi::WINDOWS_1252,
         reserved_factoid_count: 0,
         types,
         strings,

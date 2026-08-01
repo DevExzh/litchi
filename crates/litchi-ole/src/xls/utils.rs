@@ -324,7 +324,7 @@ mod tests {
 
         let compressed = [1, 0, 0, 0xC0];
         assert_eq!(
-            parse_string_record(&compressed, &XlsEncoding::Codepage(1251)).unwrap(),
+            parse_string_record(&compressed, &XlsEncoding::from_codepage(1251).unwrap()).unwrap(),
             "À"
         );
     }

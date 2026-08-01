@@ -4,6 +4,8 @@ use super::consts::*;
 use super::file::{OleError, OleFile};
 use super::writer::OleWriter;
 use chrono::{DateTime, Duration, Utc};
+use litchi_codepage::Mbcs;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read, Seek};
 
@@ -32,6 +34,45 @@ impl PropertySetGuid {
     }
 }
 
+/// Text encoding permitted by an OLE Property Set section.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CodePage {
+    /// UTF-16 little endian (code page 1200).
+    Utf16Le,
+    /// Checked NUL-terminated byte-stream code page.
+    Mbcs(Mbcs),
+}
+
+impl CodePage {
+    /// Windows-1252, the Property Set default.
+    pub const WINDOWS_1252: Self = Self::Mbcs(Mbcs::WINDOWS_1252);
+
+    /// Validate a raw Property Set code-page identifier.
+    pub fn new(page: u16) -> Option<Self> {
+        if page == UNICODE_CODEPAGE {
+            Some(Self::Utf16Le)
+        } else {
+            Mbcs::new(u32::from(page)).map(Self::Mbcs)
+        }
+    }
+
+    /// Numeric identifier stored in PID 1.
+    pub const fn id(self) -> u16 {
+        match self {
+            Self::Utf16Le => UNICODE_CODEPAGE,
+            Self::Mbcs(page) => page.id16(),
+        }
+    }
+}
+
+impl TryFrom<u16> for CodePage {
+    type Error = OleError;
+
+    fn try_from(page: u16) -> Result<Self, Self::Error> {
+        Self::new(page).ok_or_else(|| invalid(format!("unsupported Property Set code page {page}")))
+    }
+}
+
 /// One complete OLE Property Set stream.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PropertySetStream {
@@ -45,13 +86,13 @@ pub struct PropertySetStream {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PropertySet {
     pub format_identifier: PropertySetGuid,
-    pub codepage: Option<u16>,
-    pub dictionary: HashMap<u32, String>,
-    pub properties: HashMap<u32, PropertyValue>,
+    codepage: Option<CodePage>,
+    dictionary: HashMap<u32, String>,
+    properties: HashMap<u32, PropertyValue>,
     /// Property descriptor order as stored on disk, including PID 0 when present.
-    pub property_order: Vec<u32>,
+    property_order: Vec<u32>,
     /// Dictionary entry order as stored on disk.
-    pub dictionary_order: Vec<u32>,
+    dictionary_order: Vec<u32>,
 }
 
 impl PropertySet {
@@ -108,7 +149,9 @@ impl PropertySet {
     }
 
     pub fn add(&mut self, identifier: u32, value: PropertyValue) -> Result<(), OleError> {
-        if identifier == PID_DICTIONARY || self.properties.contains_key(&identifier) {
+        if matches!(identifier, PID_DICTIONARY | PID_CODEPAGE)
+            || self.properties.contains_key(&identifier)
+        {
             return Err(invalid(format!(
                 "Duplicate or reserved property identifier {identifier}"
             )));
@@ -146,6 +189,9 @@ impl PropertySet {
         identifier: u32,
         value: PropertyValue,
     ) -> Result<PropertyValue, OleError> {
+        if identifier == PID_CODEPAGE {
+            return Err(invalid("Use set_page to update PID 1"));
+        }
         let target = self
             .properties
             .get_mut(&identifier)
@@ -154,7 +200,7 @@ impl PropertySet {
     }
 
     pub fn replace(&mut self, identifier: u32, value: PropertyValue) -> Option<PropertyValue> {
-        if identifier == PID_DICTIONARY {
+        if matches!(identifier, PID_DICTIONARY | PID_CODEPAGE) {
             return None;
         }
         if !self.properties.contains_key(&identifier) {
@@ -164,6 +210,9 @@ impl PropertySet {
     }
 
     pub fn remove(&mut self, identifier: u32) -> Option<PropertyValue> {
+        if identifier == PID_CODEPAGE {
+            return None;
+        }
         self.property_order.retain(|value| *value != identifier);
         self.dictionary_order.retain(|value| *value != identifier);
         self.dictionary.remove(&identifier);
@@ -184,6 +233,9 @@ impl PropertySet {
     }
 
     pub fn rename(&mut self, identifier: u32, name: String) -> Result<(), OleError> {
+        if identifier == PID_CODEPAGE {
+            return Err(invalid("PID 1 cannot be a named property"));
+        }
         validate_property_name(&name)?;
         if self
             .dictionary
@@ -225,17 +277,33 @@ impl PropertySet {
         self.codepage = None;
     }
 
-    pub fn set_codepage(&mut self, codepage: u16) -> Result<(), OleError> {
-        if codepage == 0 {
-            return Err(invalid("Property codepage must be nonzero"));
-        }
-        self.codepage = Some(codepage);
+    /// Return the checked text page declared by PID 1.
+    pub const fn page(&self) -> Option<CodePage> {
+        self.codepage
+    }
+
+    /// Set PID 1 from a checked text-page capability.
+    pub fn set_page(&mut self, page: CodePage) {
+        let codepage = page.id();
+        self.codepage = Some(page);
         self.properties
             .insert(PID_CODEPAGE, PropertyValue::I2(codepage as i16));
         if !self.property_order.contains(&PID_CODEPAGE) {
             self.property_order.insert(0, PID_CODEPAGE);
         }
+    }
+
+    /// Validate a raw identifier and set PID 1.
+    pub fn set_page_id(&mut self, page: u16) -> Result<(), OleError> {
+        self.set_page(CodePage::try_from(page)?);
         Ok(())
+    }
+
+    /// Remove the typed PID 1 declaration.
+    pub fn clear_page(&mut self) -> Option<CodePage> {
+        self.property_order.retain(|value| *value != PID_CODEPAGE);
+        self.properties.remove(&PID_CODEPAGE);
+        self.codepage.take()
     }
 }
 
@@ -653,13 +721,10 @@ fn validate_section(section: &PropertySet) -> Result<(), OleError> {
             return Err(invalid("Dictionary references a missing property"));
         }
     }
-    if let Some(codepage) = section.codepage {
-        if codepage == 0 {
-            return Err(invalid("Codepage must be nonzero"));
-        }
-        if section.properties.get(&PID_CODEPAGE) != Some(&PropertyValue::I2(codepage as i16)) {
-            return Err(invalid("PID 1 does not match section codepage"));
-        }
+    match (section.codepage, section.properties.get(&PID_CODEPAGE)) {
+        (Some(codepage), Some(PropertyValue::I2(value))) if *value == codepage.id() as i16 => {},
+        (None, None) => {},
+        _ => return Err(invalid("PID 1 does not match section codepage")),
     }
     Ok(())
 }
@@ -736,15 +801,16 @@ fn serialize_section(section: &PropertySet) -> Result<Vec<u8>, OleError> {
     }
     let table_end = SECTION_HEADER_SIZE + order.len() * PROPERTY_DESCRIPTOR_SIZE;
     let mut values = Vec::new();
-    let codepage = section.codepage.unwrap_or(DEFAULT_CODEPAGE);
+    let codepage = section.codepage.unwrap_or(CodePage::WINDOWS_1252).id();
     for id in &order {
         values.push(if *id == PID_DICTIONARY {
             serialize_dictionary(section, codepage)?
         } else {
-            serialize_typed(
-                section.properties.get(id).expect("order normalized"),
-                codepage,
-            )?
+            let value = section
+                .properties
+                .get(id)
+                .ok_or_else(|| invalid(format!("Property order references missing PID {id}")))?;
+            serialize_typed(value, codepage)?
         })
     }
     let mut offsets = Vec::new();
@@ -949,35 +1015,10 @@ fn append_codepage_string(out: &mut Vec<u8>, value: &str, codepage: u16) -> Resu
     Ok(())
 }
 fn encode_ansi(value: &str, codepage: u16) -> Result<Vec<u8>, OleError> {
-    use encoding_rs::*;
-    let encoding = match codepage {
-        65001 => UTF_8,
-        1250 => WINDOWS_1250,
-        1251 => WINDOWS_1251,
-        1252 => WINDOWS_1252,
-        1253 => WINDOWS_1253,
-        1254 => WINDOWS_1254,
-        1255 => WINDOWS_1255,
-        1256 => WINDOWS_1256,
-        1257 => WINDOWS_1257,
-        1258 => WINDOWS_1258,
-        932 => SHIFT_JIS,
-        936 => GBK,
-        949 => EUC_KR,
-        950 => BIG5,
-        _ => {
-            return Err(invalid(format!(
-                "Unsupported authoring codepage {codepage}"
-            )));
-        },
-    };
-    let (bytes, _, errors) = encoding.encode(value);
-    if errors {
-        return Err(invalid(format!(
-            "String is not representable in codepage {codepage}"
-        )));
-    }
-    Ok(bytes.into_owned())
+    let page = Mbcs::require(u32::from(codepage)).map_err(|error| invalid(error.to_string()))?;
+    page.encode(value)
+        .map(Cow::into_owned)
+        .map_err(|error| invalid(error.to_string()))
 }
 fn align4_len(value: usize) -> usize {
     (value + 3) & !3
@@ -1111,12 +1152,12 @@ fn parse_section(data: &[u8], format_identifier: PropertySetGuid) -> Result<Prop
             let PropertyValue::I2(signed) = value else {
                 return Err(invalid("PID 1 must contain a VT_I2 codepage"));
             };
-            let codepage = signed as u16;
+            let codepage = CodePage::try_from(signed as u16)?;
             (Some(codepage), Some(PropertyValue::I2(signed)))
         },
         None => (None, None),
     };
-    let effective_codepage = codepage.unwrap_or(DEFAULT_CODEPAGE);
+    let effective_codepage = codepage.unwrap_or(CodePage::WINDOWS_1252).id();
 
     let (dictionary, dictionary_order) = match property_slice(PID_DICTIONARY)? {
         Some((offset, bytes)) => parse_dictionary(bytes, effective_codepage, offset)?,
@@ -1497,11 +1538,11 @@ fn decode_utf16(data: &[u8], description: &str) -> Result<String, OleError> {
 }
 
 fn decode_ansi(data: &[u8], codepage: u16, description: &str) -> Result<String, OleError> {
-    litchi_core::encoding::decode_bytes(data, Some(u32::from(codepage))).ok_or_else(|| {
-        invalid(format!(
-            "Could not decode {description} using codepage {codepage}"
-        ))
-    })
+    let page = Mbcs::require(u32::from(codepage))
+        .map_err(|error| invalid(format!("Could not decode {description}: {error}")))?;
+    page.decode(data)
+        .map(Cow::into_owned)
+        .map_err(|error| invalid(format!("Could not decode {description}: {error}")))
 }
 
 struct ValueReader<'a> {
@@ -1667,7 +1708,7 @@ fn filetime_to_duration(filetime: u64) -> Option<Duration> {
 
 fn extract_summary_info(metadata: &mut OleMetadata, section: &PropertySet) {
     if let Some(codepage) = section.codepage {
-        metadata.codepage = Some(u32::from(codepage));
+        metadata.codepage = Some(u32::from(codepage.id()));
     }
     metadata.title = section.property(2).and_then(extract_string);
     metadata.subject = section.property(3).and_then(extract_string);
@@ -1700,7 +1741,7 @@ fn extract_summary_info(metadata: &mut OleMetadata, section: &PropertySet) {
 
 fn extract_document_summary_info(metadata: &mut OleMetadata, section: &PropertySet) {
     if metadata.codepage.is_none() {
-        metadata.codepage = section.codepage.map(u32::from);
+        metadata.codepage = section.codepage.map(|page| u32::from(page.id()));
     }
     metadata.category = section.property(2).and_then(extract_string);
     metadata.manager = section.property(14).and_then(extract_string);
@@ -1800,11 +1841,29 @@ mod tests {
     fn parses_typed_stream_and_unsigned_codepage() {
         let stream = PropertySetStream::parse(&summary_property_stream()).unwrap();
         let section = &stream.sections[0];
-        assert_eq!(section.codepage, Some(65001));
+        assert_eq!(section.page().map(CodePage::id), Some(65001));
         assert_eq!(
             section.property(2),
             Some(&PropertyValue::Lpstr("Hello".into()))
         );
+    }
+
+    #[test]
+    fn property_set_pages_are_checked_before_mutation() {
+        let mut section = PropertySet::new(SUMMARY_INFORMATION_FMTID);
+        assert!(section.set_page_id(1201).is_err());
+        assert_eq!(section.page(), None);
+        assert_eq!(section.property(PID_CODEPAGE), None);
+        assert!(section.add(PID_CODEPAGE, PropertyValue::I2(1201)).is_err());
+
+        section.set_page(CodePage::WINDOWS_1252);
+        assert_eq!(section.page(), Some(CodePage::WINDOWS_1252));
+        assert_eq!(
+            section.property(PID_CODEPAGE),
+            Some(&PropertyValue::I2(1252))
+        );
+        assert_eq!(section.clear_page(), Some(CodePage::WINDOWS_1252));
+        assert_eq!(section.property(PID_CODEPAGE), None);
     }
 
     #[test]
@@ -1875,7 +1934,7 @@ mod tests {
             .unwrap();
         assert_eq!(stream.sections.len(), 2);
         let custom = &stream.sections[1];
-        assert_eq!(custom.codepage, Some(1200));
+        assert_eq!(custom.page(), Some(CodePage::Utf16Le));
         assert_eq!(custom.property(2), Some(&PropertyValue::I4(-96_070_278)));
         assert_eq!(
             custom.property(3),

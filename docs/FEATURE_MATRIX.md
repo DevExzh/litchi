@@ -338,7 +338,7 @@ conversion, fonts, and image conversion are optional.
 | Document theme | ✅ | ✅ | ✅ | Inert `Theme` record with custom/default versions and verbatim contents spanning `ContinueFrt12` records |
 | Protection | ✅ | ✅ | ✅ | Sheet, object, scenario, workbook, and password records |
 | Calculation, scenarios, and consolidation | ✅ | ✅ | ✅ | Typed settings and inert scenario/consolidation metadata |
-| Codepage handling | 🟡 | ✅ | 🟡 | Reader honors BIFF codepages; writer is centered on BIFF8/Windows-1252 |
+| Codepage handling | 🟡 | ✅ | 🟡 | Reader carries checked `Mbcs`/UTF-16LE state, rejects unsupported or context-invalid wide pages, and keeps record terminators in the XLS owner; writer is centered on BIFF8/Windows-1252 |
 | Reader leniency | ✅ | ✅ | N/A | `XlsOpenOptions::leniency` defaults to strict; `TolerateFormattingDefects` repairs out-of-range font family, empty font name, justify-last-line without distributed alignment, an XFCRC count disagreeing with the parsed XF records, and a FORMAT string overrunning its payload, each recorded in a bounded `XlsToleranceReport`; structural and encryption defects stay fatal in both modes |
 | Password encryption | ✅ | ✅ | ✅ | XOR and supported RC4/CryptoAPI profiles |
 | VBA project metadata | ✅ | ✅ | ✅ | Inert BIFF markers/code names plus bounded `_VBA_PROJECT_CUR` MS-OVBA parsing and deterministic cache-free project/module serialization: compressed `dir`, typed module metadata, `PROJECT`/`PROJECTwm`, `_VBA_PROJECT`, and codepage-aware module source; the XLS writer authors structurally complete module-free or module-bearing projects, derives `ObNoMacros` from serialized module content, and commits builder validation atomically; source is never compiled, interpreted, or executed |
@@ -530,7 +530,7 @@ These rows apply to packaged ODF families unless a format-specific row says othe
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Text, paragraphs, and runs | ✅ | ✅ | ✅ | Unicode/ANSI text, formatting groups, deterministic serialization, zero-width break/no-break characters (`\zwbo`/`\zwnbo`), and `\softpage`/`\softcol`/`\softline`/`\softlheightN` galley break markers with body-story positions |
+| Text, paragraphs, and runs | ✅ | ✅ | ✅ | Unicode plus exact typed legacy pages, per-run font `cpg`/`fcharset` selection with `cpg` precedence and explicit refusal of unavailable codecs, formatting groups, deterministic serialization, zero-width break/no-break characters (`\zwbo`/`\zwnbo`), and `\softpage`/`\softcol`/`\softline`/`\softlheightN` galley break markers with body-story positions |
 | Sections | ✅ | ✅ | ✅ | Typed multi-section properties, headers/footers, title-page and endnote-here flags, explicit `\sect` boundaries, inherited sections round-trip in source order, East Asian `\vertsect`/`\horzsect` rendering direction, and `\nocolbal` column-balance suppression |
 | Page layout, columns, borders, and numbering | ✅ | ✅ | ✅ | Orientation, dimensions, margins, facing pages, columns, page borders, and line/page numbering |
 | Headers and footers | ✅ | ✅ | ✅ | Header/footer story content and types |
@@ -739,7 +739,7 @@ The implementation and its tests are the source of truth for this matrix. Princi
 - OOXML shared/package features: `crates/litchi-opc/src/` and `crates/litchi-ooxml/src/`
 - Shared trust-neutral Office signatures: `crates/litchi-sign/src/`
 - DOCX, XLSX, XLSB, PPTX: `crates/litchi-ooxml/src/docx/`, `xlsx/`, `xlsb/`, and `pptx/`
-- OLE/CFB, OfficeArt, and OGraph infrastructure: `crates/litchi-cfb/src/`, `crates/litchi-ole-common/src/`, `crates/litchi-odraw/src/`, `crates/litchi-ograph/src/`, and `crates/litchi-ole/src/`
+- Legacy text, OLE/CFB, OfficeArt, and OGraph infrastructure: `crates/litchi-codepage/src/`, `crates/litchi-cfb/src/`, `crates/litchi-ole-common/src/`, `crates/litchi-odraw/src/`, `crates/litchi-ograph/src/`, and `crates/litchi-ole/src/`
 - Shared inert VBA codec and project model: `crates/litchi-vba/src/`
 - DOC, XLS, PPT: `crates/litchi-ole/src/doc/`, `xls/`, and `ppt/`
 - OpenDocument: `crates/litchi-odf/src/`

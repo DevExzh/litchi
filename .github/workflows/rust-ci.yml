@@ -72,6 +72,7 @@ jobs:
       - name: Test portable foundations
         run: >-
           cargo test
+          -p litchi-codepage
           -p litchi-core
           -p litchi-crypto
           -p litchi-drawingml

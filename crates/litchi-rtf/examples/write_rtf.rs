@@ -12,7 +12,7 @@
 //! ```
 
 use litchi_rtf::{
-    Field, FieldType, Formatting, Note, Revision, RtfDocument, RtfWriter, WriterOptions,
+    Charset, Field, FieldType, Formatting, Note, Revision, RtfDocument, RtfWriter, WriterOptions,
 };
 use std::borrow::Cow;
 use std::num::NonZeroU16;
@@ -23,8 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use explicit options instead of `RtfWriter::new` to demonstrate the
     // configuration surface (code page, default font, etc.).
     let options = WriterOptions {
-        use_ansi: true,
-        code_page: 1252,
+        charset: Charset::ansi(1252)?,
         indent: false,
         default_font: 0,
         default_tab_width: litchi_rtf::DefaultTabWidthPolicy::Override(720),

@@ -11,8 +11,8 @@ rust-version.workspace = true
 [dependencies]
 bumpalo         = { workspace = true }
 crc-fast        = { workspace = true }
-encoding_rs     = { workspace = true }
-litchi-core     = { workspace = true, features = ["rtf"] }
+litchi-codepage = { workspace = true }
+litchi-core     = { workspace = true }
 smallvec        = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }

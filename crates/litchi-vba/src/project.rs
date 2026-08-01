@@ -2,9 +2,8 @@
 
 use super::dir::{Dir, Kind};
 use super::{Error, Limits, check_limit, codec, invalid};
-use encoding_rs::Encoding;
 use litchi_cfb::{OleError, OleFile};
-use litchi_core::encoding::codepage_to_encoding;
+use litchi_codepage::Mbcs;
 use std::io::{Read, Seek};
 
 const VBA_STORAGE_NAME: &str = "VBA";
@@ -37,8 +36,8 @@ impl Text {
         self.had_decode_errors
     }
 
-    fn decode(raw: Vec<u8>, encoding: &'static Encoding) -> Self {
-        let (text, had_decode_errors) = encoding.decode_without_bom_handling(&raw);
+    fn decode(raw: Vec<u8>, page: Mbcs) -> Self {
+        let (text, had_decode_errors) = page.recover(&raw);
         let text = text.into_owned();
         Self {
             raw,
@@ -101,7 +100,7 @@ impl Module {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Project {
     project_root_path: Vec<String>,
-    code_page: u16,
+    page: Mbcs,
     name: String,
     project_properties: Text,
     modules: Vec<Module>,
@@ -134,14 +133,13 @@ impl Project {
         let compressed_dir =
             read_limited_stream(ole, &dir_path, limits.max_compressed_stream_bytes)?;
         let directory = Dir::parse(&compressed_dir, limits)?;
-        let encoding = codepage_to_encoding(u32::from(directory.code_page()))
-            .ok_or(Error::UnsupportedCodePage(directory.code_page()))?;
+        let page = directory.page();
 
         let mut project_path = project_root_path.to_vec();
         project_path.push(PROJECT_STREAM_NAME);
         let project_properties = Text::decode(
             read_limited_stream(ole, &project_path, limits.max_decompressed_stream_bytes)?,
-            encoding,
+            page,
         );
 
         let mut modules = Vec::with_capacity(directory.modules().len());
@@ -177,7 +175,7 @@ impl Project {
                 kind: metadata.kind(),
                 read_only: metadata.is_read_only(),
                 private: metadata.is_private(),
-                source: Text::decode(source_bytes, encoding),
+                source: Text::decode(source_bytes, page),
             });
         }
 
@@ -186,7 +184,7 @@ impl Project {
                 .iter()
                 .map(|component| (*component).to_owned())
                 .collect(),
-            code_page: directory.code_page(),
+            page,
             name: directory.project_name().to_owned(),
             project_properties,
             modules,
@@ -198,9 +196,14 @@ impl Project {
         &self.project_root_path
     }
 
-    /// Project code page used to decode MBCS text.
-    pub fn code_page(&self) -> u16 {
-        self.code_page
+    /// Checked project page used to decode MBCS text.
+    pub fn page(&self) -> Mbcs {
+        self.page
+    }
+
+    /// Numeric project-page identifier.
+    pub fn page_id(&self) -> u16 {
+        self.page.id16()
     }
 
     /// VBA project identifier.
@@ -340,7 +343,7 @@ mod tests {
         let mut ole = OleFile::open(cursor).unwrap();
         let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         assert_eq!(project.name(), "Sample");
-        assert_eq!(project.code_page(), 1252);
+        assert_eq!(project.page(), Mbcs::WINDOWS_1252);
         assert_eq!(project.modules().len(), 1);
         assert_eq!(project.modules()[0].source().raw(), source);
         assert_eq!(

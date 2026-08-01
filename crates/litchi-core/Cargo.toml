@@ -9,19 +9,14 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [features]
-# These features mirror the umbrella's per-format features only because
-# `src/common/encoding.rs` is feature-gated on `ole|rtf` today, and
-# `src/common/detection/odf.rs` is feature-gated on `odf`. The umbrella
-# enables these on `litchi-core` to preserve the existing gating.
+# ODF detection remains pre-ADR extraction debt. Legacy text codecs no longer
+# create binary-Office or RTF format features in this neutral crate.
 default = []
-odf     = []
-ole     = ["dep:encoding_rs"]
-rtf     = ["dep:encoding_rs"]
+odf = []
 
 [dependencies]
 aho-corasick    = { workspace = true }
 chrono          = { workspace = true }
-encoding_rs     = { workspace = true, optional = true }
 fast-float2     = { workspace = true }
 once_cell       = { workspace = true }
 quick-xml       = { workspace = true }

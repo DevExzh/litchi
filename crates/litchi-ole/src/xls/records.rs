@@ -9,6 +9,7 @@ use zerocopy::{FromBytes, LE, U16};
 
 use crate::xls::error::{XlsError, XlsResult};
 use crate::xls::utils;
+use litchi_codepage::{Mbcs, Page};
 use litchi_core::binary;
 
 /// BIFF record header (4 bytes: type + length)
@@ -333,8 +334,8 @@ impl BoundSheetRecord {
 /// Codepage/encoding information
 #[derive(Debug, Clone)]
 pub enum XlsEncoding {
-    /// Single-byte encoding with codepage
-    Codepage(u16),
+    /// NUL-terminated byte-stream encoding with a checked code page.
+    Codepage(Mbcs),
     /// UTF-16 little endian (BIFF8+)
     Utf16Le,
 }
@@ -348,28 +349,41 @@ impl XlsEncoding {
     pub fn from_codepage(codepage: u16) -> XlsResult<Self> {
         match codepage {
             1200 => Ok(XlsEncoding::Utf16Le),
-            cp => Ok(XlsEncoding::Codepage(cp)),
+            cp => Mbcs::require(u32::from(cp))
+                .map(XlsEncoding::Codepage)
+                .map_err(|error| XlsError::Encoding(error.to_string())),
         }
     }
 
     /// Decode byte data using this encoding
     ///
-    /// This method uses the shared codepage module for efficient and correct decoding.
-    ///
-    /// # Performance
-    ///
-    /// Uses zero-copy operations where possible and leverages optimized encoding_rs
-    /// for codepage conversion.
+    /// Record terminators are handled here while the shared codec performs
+    /// strict conversion without guessing format-specific boundaries.
     pub fn decode(&self, data: &[u8]) -> XlsResult<String> {
         match self {
             XlsEncoding::Utf16Le => {
-                // Use shared UTF-16 LE decoder
-                Ok(litchi_core::encoding::decode_utf16le(data))
+                if !data.len().is_multiple_of(2) {
+                    return Err(XlsError::Encoding(
+                        "UTF-16LE text has an odd byte length".to_string(),
+                    ));
+                }
+                let end = data
+                    .chunks_exact(2)
+                    .position(|pair| pair == [0, 0])
+                    .map_or(data.len(), |units| units * 2);
+                Page::UTF_16LE
+                    .decode(&data[..end])
+                    .map(|text| text.into_owned())
+                    .map_err(|error| XlsError::Encoding(error.to_string()))
             },
-            XlsEncoding::Codepage(cp) => {
-                // Use shared codepage decoder
-                litchi_core::encoding::decode_bytes(data, Some(*cp as u32))
-                    .ok_or_else(|| XlsError::Encoding(format!("Unsupported codepage: {}", cp)))
+            XlsEncoding::Codepage(page) => {
+                let end = data
+                    .iter()
+                    .position(|byte| *byte == 0)
+                    .unwrap_or(data.len());
+                page.decode(&data[..end])
+                    .map(|text| text.into_owned())
+                    .map_err(|error| XlsError::Encoding(error.to_string()))
             },
         }
     }
@@ -900,13 +914,21 @@ mod shared_string_tests {
         data.extend_from_slice(&[2, 0, 0, b'A', 0xC0]);
         data.extend_from_slice(&[1, 0, 1, 0x22, 0x6F]);
 
-        let table = SharedStringTable::parse(&data, &XlsEncoding::Codepage(1251)).unwrap();
+        let encoding = XlsEncoding::from_codepage(1251).unwrap();
+        let table = SharedStringTable::parse(&data, &encoding).unwrap();
 
         assert_eq!(table.total_count, 3);
         // BIFF8 compressed Unicode supplies an implicit zero high byte; it is
         // not encoded in the workbook CODEPAGE.
         assert_eq!(table.strings, ["AÀ", "漢"]);
         assert_eq!(table.properties, [None, None]);
+    }
+
+    #[test]
+    fn codepage_construction_and_utf16_decoding_are_strict() {
+        assert!(XlsEncoding::from_codepage(437).is_err());
+        assert!(XlsEncoding::from_codepage(1201).is_err());
+        assert!(XlsEncoding::Utf16Le.decode(b"A").is_err());
     }
 
     #[test]

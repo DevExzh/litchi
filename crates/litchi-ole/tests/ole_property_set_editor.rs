@@ -2,7 +2,8 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_ole::{
-    OleFile, OlePropertySetEditor, OleWriter, PropertySetGuid, PropertyValue, StandardPropertySet,
+    CodePage, OleFile, OlePropertySetEditor, OleWriter, PropertySetGuid, PropertyValue,
+    StandardPropertySet,
 };
 
 fn ole_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
@@ -22,7 +23,7 @@ fn generated_property_sets_round_trip_all_office_value_families() {
     let mut editor = OlePropertySetEditor::new(original).unwrap();
     editor
         .update(StandardPropertySet::SummaryInformation, |section| {
-            section.set_codepage(1252)?;
+            section.set_page(CodePage::WINDOWS_1252);
             section.add(2, PropertyValue::Lpstr("Title".into()))?;
             section.add(3, PropertyValue::I4(-42))?;
             section.add(4, PropertyValue::UI8(u64::MAX - 1))?;
@@ -59,7 +60,7 @@ fn generated_property_sets_round_trip_all_office_value_families() {
         .unwrap();
     editor
         .update(StandardPropertySet::UserDefinedProperties, |section| {
-            section.set_codepage(1200)?;
+            section.set_page(CodePage::Utf16Le);
             section.add_named(2, "担当者".into(), PropertyValue::Lpwstr("山田".into()))?;
             section.add_named(3, "Enabled".into(), PropertyValue::Bool(false))?;
             Ok(())
@@ -136,7 +137,7 @@ fn mutations_are_atomic_ordered_and_noops_are_byte_exact() {
 
     let mut editor = OlePropertySetEditor::new(original.clone()).unwrap();
     let error = editor.update(StandardPropertySet::UserDefinedProperties, |section| {
-        section.set_codepage(1200)?;
+        section.set_page(CodePage::Utf16Le);
         section.add_named(2, "Name".into(), PropertyValue::I4(1))?;
         section.add_named(3, "name".into(), PropertyValue::I4(2))
     });
@@ -146,7 +147,7 @@ fn mutations_are_atomic_ordered_and_noops_are_byte_exact() {
     let mut editor = OlePropertySetEditor::new(original).unwrap();
     editor
         .update(StandardPropertySet::SummaryInformation, |section| {
-            section.set_codepage(1252)?;
+            section.set_page(CodePage::WINDOWS_1252);
             section.add(4, PropertyValue::I4(4))?;
             section.add(2, PropertyValue::I4(2))?;
             section.reorder(&[1, 2, 4])?;

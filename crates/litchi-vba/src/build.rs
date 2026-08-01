@@ -3,7 +3,7 @@
 use super::dir::{Kind as DirKind, WriteModule, WriteProject, encode_dir, encode_mbcs};
 use super::{Error, Limits, check_limit, codec, invalid};
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_core::encoding::codepage_to_encoding;
+use litchi_codepage::Mbcs;
 use std::collections::HashSet;
 use std::io::{self, Cursor, Seek, SeekFrom, Write};
 
@@ -14,7 +14,6 @@ const PROJECT_WM_STREAM_NAME: &str = "PROJECTwm";
 const VERSION_PROJECT_STREAM_NAME: &str = "_VBA_PROJECT";
 const VERSION_PROJECT_RESERVED: u16 = 0x61cc;
 const VERSION_PROJECT_WRITE_VERSION: u16 = 0xffff;
-const DEFAULT_CODE_PAGE: u16 = 1252;
 const DEFAULT_PROJECT_VERSION_MAJOR: u32 = 1;
 const DEFAULT_PROJECT_VERSION_MINOR: u16 = 0;
 const MAX_CFB_NAME_CODE_UNITS: usize = 31;
@@ -213,7 +212,7 @@ pub struct Project {
     name: String,
     project_id: Id,
     platform: Platform,
-    code_page: u16,
+    page: Mbcs,
     description: String,
     help_context: i32,
     version_major: u32,
@@ -228,7 +227,7 @@ impl Project {
             name: name.into(),
             project_id: Id::NIL,
             platform: Platform::Windows32,
-            code_page: DEFAULT_CODE_PAGE,
+            page: Mbcs::WINDOWS_1252,
             description: String::new(),
             help_context: 0,
             version_major: DEFAULT_PROJECT_VERSION_MAJOR,
@@ -249,10 +248,16 @@ impl Project {
         self
     }
 
-    /// Set the MBCS code page used for project text and module source.
-    pub fn code_page(mut self, code_page: u16) -> Self {
-        self.code_page = code_page;
+    /// Set the checked MBCS page used for project text and module source.
+    pub fn page(mut self, page: Mbcs) -> Self {
+        self.page = page;
         self
+    }
+
+    /// Validate a raw MBCS identifier and set the project page.
+    pub fn page_id(mut self, page: u16) -> Result<Self, Error> {
+        self.page = Mbcs::new(u32::from(page)).ok_or(Error::UnsupportedCodePage(page))?;
+        Ok(self)
     }
 
     /// Set the project description.
@@ -288,8 +293,7 @@ impl Project {
             limits.max_cfb_bytes,
         )?;
         check_limit("VBA module count", self.modules.len(), limits.max_modules)?;
-        let encoding = codepage_to_encoding(u32::from(self.code_page))
-            .ok_or(Error::UnsupportedCodePage(self.code_page))?;
+        let encoding = self.page;
         validate_project_name(&self.name)?;
         validate_quoted_text(&self.description, "VBA project description")?;
         let encoded_name = encode_mbcs(&self.name, encoding, "PROJECTNAME")?;
@@ -331,7 +335,7 @@ impl Project {
         let directory = encode_dir(
             &WriteProject {
                 system_kind: self.platform.system_kind(),
-                code_page: self.code_page,
+                page: self.page,
                 name: &self.name,
                 description: &self.description,
                 help_context: u32::from_le_bytes(self.help_context.to_le_bytes()),
@@ -727,7 +731,7 @@ fn module_source(module: &Module) -> String {
 
 fn encode_project_stream(
     project: &Project,
-    encoding: &'static encoding_rs::Encoding,
+    encoding: Mbcs,
     limits: &Limits,
 ) -> Result<Vec<u8>, Error> {
     let project_id = project.project_id.braced_uppercase();
@@ -790,7 +794,7 @@ fn encode_project_stream(
 
 fn encode_project_wm_stream(
     modules: &[Module],
-    encoding: &'static encoding_rs::Encoding,
+    encoding: Mbcs,
     limits: &Limits,
 ) -> Result<Vec<u8>, Error> {
     let mut output = Vec::new();
@@ -953,7 +957,7 @@ mod tests {
     #[test]
     fn writes_nested_legacy_project_and_non_ascii_codepage_text() {
         let builder = Project::new("日本語")
-            .code_page(932)
+            .page(Mbcs::SHIFT_JIS)
             .platform(Platform::Windows64)
             .module(Module::standard(
                 "標準",
@@ -973,7 +977,7 @@ mod tests {
             crate::project::Project::open(&mut ole, &["_VBA_PROJECT_CUR"], &Limits::default())
                 .unwrap();
         assert_eq!(project.name(), "日本語");
-        assert_eq!(project.code_page(), 932);
+        assert_eq!(project.page(), Mbcs::SHIFT_JIS);
         assert!(project.modules()[0].source().text().contains("こんにちは"));
         assert!(!project.modules()[0].source().had_decode_errors());
     }
@@ -982,11 +986,11 @@ mod tests {
     fn project_wm_contains_ordered_mbcs_and_unicode_name_pairs() {
         let limits = Limits::default();
         let builder = Project::new("Map")
-            .code_page(932)
+            .page(Mbcs::SHIFT_JIS)
             .module(Module::standard("標準", ""))
             .module(Module::class("Class1", ""));
         let binary = builder.finish(&limits).unwrap();
-        let encoding = codepage_to_encoding(932).unwrap();
+        let encoding = Mbcs::SHIFT_JIS;
         let mut expected = Vec::new();
         for name in ["標準", "Class1"] {
             expected.extend_from_slice(&encode_mbcs(name, encoding, "test").unwrap());
@@ -1100,7 +1104,7 @@ mod tests {
             Project::new("Project").module(Module::standard("Module1", "MsgBox \"🙂\""));
         assert!(unrepresentable.finish(&limits).is_err());
         assert!(matches!(
-            Project::new("Project").code_page(42).finish(&limits),
+            Project::new("Project").page_id(42),
             Err(Error::UnsupportedCodePage(42))
         ));
 

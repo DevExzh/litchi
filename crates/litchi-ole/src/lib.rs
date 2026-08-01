@@ -4,7 +4,7 @@ pub mod consts;
 // CFB substrate types re-exported so callers can reach them through the
 // `litchi::ole` namespace as well as `litchi_cfb` directly.
 pub use litchi_cfb::{
-    DOCUMENT_SUMMARY_INFORMATION_FMTID, DirectoryEntry, OleError, OleFile, OleMetadata,
+    CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, DirectoryEntry, OleError, OleFile, OleMetadata,
     OlePropertySetEditor, OleWriter, PropertySet, PropertySetGuid, PropertySetStream,
     PropertyValue, SUMMARY_INFORMATION_FMTID, StandardPropertySet, USER_DEFINED_PROPERTIES_FMTID,
     is_ole_file,

@@ -5509,6 +5509,48 @@ mod tests {
     }
 
     #[test]
+    fn font_switches_select_exact_explicit_and_charset_codepages() {
+        let explicit = RtfDocument::parse(
+            r#"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\cpg1252 Latin;}{\f1\fnil\cpg932 Japanese;}}\f0\'e9|\f1\'82\'a0|\plain\'e9}"#,
+        )
+        .unwrap();
+        assert_eq!(explicit.text(), "é|あ|é");
+
+        let inferred = RtfDocument::parse(
+            r#"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset0 Latin;}{\f1\fnil\fcharset128 Japanese;}}\f0\'e9|\f1\'82\'a0|\f0\'e9}"#,
+        )
+        .unwrap();
+        assert_eq!(inferred.text(), "é|あ|é");
+
+        let inherited = RtfDocument::parse(
+            r#"{\rtf1\ansi\ansicpg1251{\fonttbl{\f0\fnil\fcharset1 Default;}}\f0\'cf\'f0\'e8\'e2\'e5\'f2}"#,
+        )
+        .unwrap();
+        assert_eq!(inherited.text(), "Привет");
+
+        let override_page = RtfDocument::parse(
+            r#"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78\cpg932 Japanese;}}\f0\'82\'a0}"#,
+        )
+        .unwrap();
+        assert_eq!(override_page.text(), "あ");
+
+        assert!(
+            RtfDocument::parse(
+                r#"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 Japanese;}}\f0\'82\'a0}"#,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_unsupported_or_wide_ansi_codepages() {
+        for page in [-1, 1200, 65000, 99_999] {
+            let source = format!(r"{{\rtf1\ansi\ansicpg{page} text}}");
+            assert!(RtfDocument::parse(&source).is_err(), "page {page}");
+        }
+    }
+
+    #[test]
     fn decodes_macintosh_and_exact_dos_character_sets() {
         let scoped = RtfDocument::parse(r#"{\rtf1\ansi \'80{\mac \'80}\'80}"#).unwrap();
         assert_eq!(scoped.text(), "€Ä€");

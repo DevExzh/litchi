@@ -1,4 +1,4 @@
-use litchi_rtf::{FontPitch, RtfDocument, RtfWriter};
+use litchi_rtf::{FontPage, FontPitch, RtfDocument, RtfWriter};
 
 const SYNTHETIC: &str = r#"{\rtf1\ansi\ansicpg1250\uc1
 {\fonttbl
@@ -16,7 +16,7 @@ fn parses_decodes_and_round_trips_extended_font_metadata() {
     assert_eq!(primary.non_tagged_name.as_deref(), Some("Non你"));
     assert_eq!(primary.panose, Some([2, 11, 6, 4, 2, 2, 2, 2, 2, 4]));
     assert_eq!(primary.pitch, FontPitch::Variable);
-    assert_eq!(primary.code_page, Some(1250));
+    assert_eq!(primary.code_page.map(FontPage::id), Some(1250));
     assert!(!table.is_defined(1));
     assert!(table.get(1).is_none());
     assert_eq!(table.get(2).unwrap().pitch, FontPitch::Fixed);
@@ -33,6 +33,22 @@ fn parses_decodes_and_round_trips_extended_font_metadata() {
 }
 
 #[test]
+fn font_pages_decode_names_independently_from_the_header() {
+    let source = r#"{\rtf1\ansi\ansicpg1252
+{\fonttbl
+{\f0\fnil\fcharset128{\*\fname \'82\'a0;}\'82\'a2{\*\falt \'82\'a4};}
+{\f1\fnil\fcharset0\cpg932{\*\fname \'82\'a0;}\'82\'a2{\*\falt \'82\'a4};}}}"#;
+    let doc = RtfDocument::parse(source).unwrap();
+
+    for font_ref in [0, 1] {
+        let font = doc.font_table().get(font_ref).unwrap();
+        assert_eq!(font.name, "い");
+        assert_eq!(font.non_tagged_name.as_deref(), Some("あ"));
+        assert_eq!(font.alternate_name.as_deref(), Some("う"));
+    }
+}
+
+#[test]
 fn rejects_malformed_extended_font_metadata() {
     let malformed = [
         r#"{\rtf1{\fonttbl{\f0\fnil Arial;}}{\fonttbl{\f1\fnil Times;}}}"#,
@@ -46,6 +62,10 @@ fn rejects_malformed_extended_font_metadata() {
         r#"{\rtf1{\fonttbl{\f0\fnil{\*\falt {\field X}}Arial;}}}"#,
         r#"{\rtf1{\fonttbl{\f0\fnil;}}}"#,
         r#"{\rtf1{\fonttbl{\f0\fnil\cpg70000 Arial;}}}"#,
+        r#"{\rtf1{\fonttbl{\f0\fnil\cpg1200 Arial;}}}"#,
+        r#"{\rtf1{\fonttbl{\f0\fnil\cpg65000 Arial;}}}"#,
+        r#"{\rtf1{\fonttbl{\f0\fnil\fcharset3 Arial;}}}"#,
+        r#"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 \'82\'a0;}}}"#,
     ];
     for source in malformed {
         assert!(

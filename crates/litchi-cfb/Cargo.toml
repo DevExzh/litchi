@@ -15,9 +15,9 @@ write = []
 
 [dependencies]
 chrono          = { workspace = true }
-encoding_rs     = { workspace = true }
 fixedbitset     = { workspace = true }
-litchi-core     = { workspace = true, features = ["ole"] }
+litchi-codepage = { workspace = true }
+litchi-core     = { workspace = true }
 smallvec        = { workspace = true }
 zerocopy        = { workspace = true }
 zerocopy-derive = { workspace = true }

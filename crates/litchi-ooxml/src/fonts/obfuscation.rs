@@ -1,5 +1,5 @@
 use crate::error::{OoxmlError, Result};
-use litchi_core::encoding::decode_hex_data;
+use litchi_core::hex;
 use litchi_core::simd::xor::xor_32_bytes_inplace;
 
 /// Obfuscates font data according to OOXML specification (ISO/IEC 29500-1:2016, 15.2.14).
@@ -58,17 +58,15 @@ pub fn obfuscate_font_data(data: &mut [u8], guid_str: &str) -> Result<()> {
     let clean_guid = guid_str
         .trim_matches(|c| c == '{' || c == '}')
         .replace('-', "");
-    let guid_bytes = decode_hex_data(&clean_guid)
+    let guid_bytes = hex::decode(&clean_guid)
         .map_err(|e| OoxmlError::Other(format!("Invalid GUID format: {}", e)))?;
 
-    if guid_bytes.len() != 16 {
-        return Err(OoxmlError::Other(format!(
+    let guid_array: [u8; 16] = guid_bytes.try_into().map_err(|bytes: Vec<u8>| {
+        OoxmlError::Other(format!(
             "Invalid GUID length: expected 16 bytes, got {}",
-            guid_bytes.len()
-        )));
-    }
-
-    let guid_array: [u8; 16] = guid_bytes.try_into().unwrap();
+            bytes.len()
+        ))
+    })?;
     obfuscate_font_data_bytes(data, &guid_array);
     Ok(())
 }
@@ -76,4 +74,24 @@ pub fn obfuscate_font_data(data: &mut [u8], guid_str: &str) -> Result<()> {
 /// De-obfuscates font data using a GUID string.
 pub fn deobfuscate_font_data(data: &mut [u8], guid_str: &str) -> Result<()> {
     obfuscate_font_data(data, guid_str)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn guid_api_round_trips_and_rejects_invalid_input() {
+        let original = [0x5a; 32];
+        let mut data = original;
+        let guid = "{00112233-4455-6677-8899-aabbccddeeff}";
+
+        obfuscate_font_data(&mut data, guid).expect("valid GUID");
+        assert_ne!(data, original);
+        deobfuscate_font_data(&mut data, guid).expect("valid GUID");
+        assert_eq!(data, original);
+
+        assert!(obfuscate_font_data(&mut data, "not-a-guid").is_err());
+        assert!(obfuscate_font_data(&mut data, "0011").is_err());
+    }
 }
