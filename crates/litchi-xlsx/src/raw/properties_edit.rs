@@ -82,10 +82,19 @@ struct Replacement {
     bytes: Vec<u8>,
 }
 
+/// One final worksheet-title slot. Existing entries retain their complete XML
+/// bytes; new entries synthesize only the required title element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Sheet<'a> {
+    Existing(usize),
+    New(&'a str),
+}
+
 /// Insert new worksheet titles after the existing worksheet title prefix.
 ///
 /// Producers may omit these optional properties. An unrecognized or stale
 /// layout is preserved byte-exact instead of being guessed at.
+#[cfg(test)]
 pub(crate) fn append_sheets(
     content: &[u8],
     existing: &[&str],
@@ -94,6 +103,63 @@ pub(crate) fn append_sheets(
     if added.is_empty() {
         return Ok(None);
     }
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(existing.len().saturating_add(added.len()))
+        .map_err(|error| invalid(format!("cannot reserve appended property order: {error}")))?;
+    order.extend((0..existing.len()).map(Sheet::Existing));
+    order.extend(added.iter().copied().map(Sheet::New));
+    arrange_sheets(content, existing, &order)
+}
+
+/// Synchronize a standard worksheet-title prefix with one checked final order.
+///
+/// Named-range titles after the worksheet prefix remain byte-exact. Stale or
+/// producer-specific optional layouts are preserved rather than guessed.
+pub(crate) fn arrange_sheets(
+    content: &[u8],
+    existing: &[&str],
+    order: &[Sheet<'_>],
+) -> Result<Option<Vec<u8>>> {
+    if order.len() < existing.len() {
+        return Err(invalid(
+            "extended-properties worksheet order omits existing sheets",
+        ));
+    }
+    let mut seen = Vec::new();
+    seen.try_reserve_exact(existing.len())
+        .map_err(|error| invalid(format!("cannot reserve property-order validation: {error}")))?;
+    seen.resize(existing.len(), false);
+    let mut new_count = 0usize;
+    let mut identity = order.len() == existing.len();
+    for (position, entry) in order.iter().copied().enumerate() {
+        match entry {
+            Sheet::Existing(index) => {
+                let slot = seen.get_mut(index).ok_or_else(|| {
+                    invalid("extended-properties order has an unknown existing sheet")
+                })?;
+                if std::mem::replace(slot, true) {
+                    return Err(invalid(
+                        "extended-properties order repeats an existing sheet",
+                    ));
+                }
+                identity &= position == index;
+            },
+            Sheet::New(_) => {
+                new_count = new_count
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("extended-properties new-sheet count overflow"))?;
+                identity = false;
+            },
+        }
+    }
+    if seen.contains(&false) {
+        return Err(invalid("extended-properties order omits an existing sheet"));
+    }
+    if identity {
+        return Ok(None);
+    }
+
     let (vector, titles, variants) = scan(content)?;
     let Some(vector) = vector else {
         return Ok(None);
@@ -115,7 +181,7 @@ pub(crate) fn append_sheets(
 
     let final_size = titles
         .len()
-        .checked_add(added.len())
+        .checked_add(new_count)
         .ok_or_else(|| invalid("extended-properties title count overflow"))?;
     let mut replacements = Vec::new();
     replacements
@@ -131,23 +197,59 @@ pub(crate) fn append_sheets(
         || sibling_name(&vector.tag.name, "lpstr"),
         |title| title.tag.name.to_string(),
     );
-    let insertion = titles
+    let prefix_start = titles
+        .first()
+        .map_or(vector.close_start, |title| title.start);
+    let prefix_end = titles
         .get(existing.len())
         .map_or(vector.close_start, |title| title.start);
-    let mut inserted = Vec::new();
-    for title in added {
-        inserted.extend_from_slice(b"<");
-        inserted.extend_from_slice(title_name.as_bytes());
-        inserted.extend_from_slice(b">");
-        inserted.extend_from_slice(escape_xml(title).as_bytes());
-        inserted.extend_from_slice(b"</");
-        inserted.extend_from_slice(title_name.as_bytes());
-        inserted.extend_from_slice(b">");
+    let mut arranged = Vec::new();
+    let prefix_len = prefix_end
+        .checked_sub(prefix_start)
+        .ok_or_else(|| invalid("extended-properties title prefix is inverted"))?;
+    arranged
+        .try_reserve_exact(prefix_len)
+        .map_err(|error| invalid(format!("cannot reserve arranged sheet titles: {error}")))?;
+    for entry in order {
+        match entry {
+            Sheet::Existing(index) => {
+                let title = titles.get(*index).ok_or_else(|| {
+                    invalid("extended-properties existing title disappeared during reorder")
+                })?;
+                let title_len = title
+                    .end
+                    .checked_sub(title.start)
+                    .ok_or_else(|| invalid("extended-properties title span is inverted"))?;
+                arranged.try_reserve(title_len).map_err(|error| {
+                    invalid(format!("cannot reserve existing sheet title: {error}"))
+                })?;
+                arranged.extend_from_slice(&content[title.start..title.end]);
+            },
+            Sheet::New(title) => {
+                let escaped = escape_xml(title);
+                let required = title_name
+                    .len()
+                    .checked_mul(2)
+                    .and_then(|size| size.checked_add(5))
+                    .and_then(|size| size.checked_add(escaped.len()))
+                    .ok_or_else(|| invalid("new extended-properties title size overflow"))?;
+                arranged
+                    .try_reserve(required)
+                    .map_err(|error| invalid(format!("cannot reserve new sheet title: {error}")))?;
+                arranged.extend_from_slice(b"<");
+                arranged.extend_from_slice(title_name.as_bytes());
+                arranged.extend_from_slice(b">");
+                arranged.extend_from_slice(escaped.as_bytes());
+                arranged.extend_from_slice(b"</");
+                arranged.extend_from_slice(title_name.as_bytes());
+                arranged.extend_from_slice(b">");
+            },
+        }
     }
     replacements.push(Replacement {
-        start: insertion,
-        end: insertion,
-        bytes: inserted,
+        start: prefix_start,
+        end: prefix_end,
+        bytes: arranged,
     });
 
     if let Some(count) = variants.windows(2).find_map(|pair| {
@@ -160,12 +262,7 @@ pub(crate) fn append_sheets(
         replacements.push(Replacement {
             start: count.0,
             end: count.1,
-            bytes: existing
-                .len()
-                .checked_add(added.len())
-                .ok_or_else(|| invalid("extended-properties worksheet count overflow"))?
-                .to_string()
-                .into_bytes(),
+            bytes: order.len().to_string().into_bytes(),
         });
     }
 
@@ -599,6 +696,31 @@ mod tests {
                 .expect("scan")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn arranges_sheet_prefix_without_touching_named_range_titles() {
+        let source = br#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>2</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="3" baseType="lpstr"><vt:lpstr data-keep="one">Data</vt:lpstr><vt:lpstr>Calc</vt:lpstr><vt:lpstr data-range="exact">Data!Print_Area</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#;
+        let output = arrange_sheets(
+            source,
+            &["Data", "Calc"],
+            &[
+                Sheet::Existing(1),
+                Sheet::New("Middle & More"),
+                Sheet::Existing(0),
+            ],
+        )
+        .expect("rewrite")
+        .expect("changed");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains("<vt:i4>3</vt:i4>"));
+        assert!(text.contains("size=\"4\""));
+        assert!(text.contains(concat!(
+            "<vt:lpstr>Calc</vt:lpstr>",
+            "<vt:lpstr>Middle &amp; More</vt:lpstr>",
+            "<vt:lpstr data-keep=\"one\">Data</vt:lpstr>",
+            "<vt:lpstr data-range=\"exact\">Data!Print_Area</vt:lpstr>"
+        )));
     }
 
     #[test]

@@ -38,6 +38,16 @@ Both calls return `Result<Option<_>>`; numeric positions are checked and
 zero-based. Names, semantic roles, A1/R1C1 references, and relative operations
 are the main entry points. Raw physical IDs are advanced diagnostics only.
 
+Structural insertion uses the same selectors as stable source-snapshot
+anchors. `add_before` and `add_after` resolve a developer name or checked
+zero-based position to semantic identity; they do not accept relationship IDs,
+native sheet IDs, or part names. Base-object moves are resolved first,
+before/after additions then stay attached to their anchor identity, repeated
+additions retain explicit call or join order, and unanchored `add` remains the
+concise tail operation. A transaction-local handle may report its current
+projected position, but a later structural intent can shift it; the committed
+patch is authoritative for final positions.
+
 Serializable patches do not inject private IDs into Office files. They anchor
 objects using available native identity, parent and semantic selectors, context
 fingerprints, expected-state hashes, and patch-local IDs for inserted objects.

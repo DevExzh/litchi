@@ -794,19 +794,87 @@ Excel build. It does not certify mixed deletion plans, non-worksheet tabs,
 recursive garbage collection, every dependency carrier, other Office builds,
 or performance.
 
+The seventeenth slice completes semantic worksheet insertion. The concise
+entries are `edit.add_before(name, anchor)?` and
+`edit.add_after(name, anchor)?`; both return `Result<Option<NewSheet<'edit>>>`
+and use the ordinary case-insensitive developer-name or checked zero-based
+selector. `None` means that the anchor did not resolve in the immutable source
+snapshot. Native sheet IDs, relationship IDs, part names, and lock wrappers
+remain private. `add(name)?` continues to mean tail insertion. Repeated
+before/after additions at one anchor retain call order, and joined independent
+edits retain explicit left-then-right join order.
+
+Anchors are stable base-sheet identities rather than transient positions. A
+pending base reorder is applied first; anchored additions then surround the
+same identities in that effective order, and tail additions follow them. This
+defines composition without exposing a more complex public ordering type.
+`NewSheet::position()` is an intentionally current projection while its
+borrowed capability is live: later structural intents may shift it after that
+borrow ends. `Change::Create` records the authoritative final position.
+`Change::Move` continues to describe the base-order phase, making patch event
+ordering deterministic rather than pretending inserted sheets participated in
+an earlier base move.
+
+One private checked `FinalOrder` is the source of truth for name-collision
+diagnostics, active-tab placement, sheet-view selection, creation changes,
+catalog verification, defined-name scopes, and extended properties. It stores
+compact `Base(index)`/`Added(index)` identities plus direct position maps. New
+worksheet parts and relationships are still allocated deterministically and
+physically appended at the low-level boundary. The catalog is then losslessly
+reordered by private relationship identity only when semantic placement
+requires it. The catalog rewriter remaps every modeled `activeTab`,
+`firstSheet`, and sheet-local `localSheetId`; a requested active sheet is
+applied only after the final order exists. The result is reparsed and every
+final relationship slot, created sheet identity/state, active position, and
+defined-name scope is checked before publication.
+
+Recognized extended properties now synchronize their complete worksheet-title
+prefix for reorder and insertion together. Existing title elements move as
+complete byte spans, new escaped titles are synthesized, vector and standard
+Worksheet counts are updated, and following named-range titles remain
+byte-exact. Missing, stale, or producer-specific layouts remain untouched
+rather than being guessed. Scope verification uses the already
+reference-rewritten workbook as its baseline, so a simultaneous rename,
+insertion, and reorder verifies both the formula rewrite and structural scope
+mapping independently.
+
+Tests cover name and numeric anchors, missing lookup, repeated before/after
+order, tail composition, base reorder composition, deterministic joins,
+population and activation, final create positions, local defined-name scope
+shifts, named-range-title preservation, strict graph allocation inherited from
+creation, source immutability, source-checked forward replay, and byte-exact
+inverse restoration. These functional tests do not establish allocation,
+latency, contention, cache, or scaling claims; those require the measurement
+program in ADR 0005.
+
+Computer Use then exercised the exact public `insert_sheet` artifact in
+Microsoft Excel for Mac 16.110.2 (build 26062818), Office LTSC Standard for Mac
+2024. Excel opened it without a repair or compatibility prompt and showed the
+ordered tabs `Inputs`, `Sheet1`, `Results`, and `Archive`, with `Results`
+active. It displayed `Revenue` and `120` on `Inputs`, and calculated
+`Results!B1` to `132` from `=Inputs!B1*1.1`. Excel accepted
+`Excel insertion resave marker` at `Results!C2` and saved without warning. The
+resaved archive passed ZIP integrity validation, and the public `open` example
+recovered the same four-tab order, active identity, source values, formula and
+cached `132`, marker, and tail-sheet text. This certifies one local
+before/after/tail insertion, population, formula calculation, activation,
+open/edit/resave/reverse-read path on that build. It does not certify every
+multi-anchor/reorder composition, optional metadata layout, other Office
+applications or builds, or performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
-hints or implement semantic before/after insertion, mixed deletion disposition,
-non-worksheet tab deletion, recursive garbage collection, grouped-tab selection
-CRUD, workbook-protection unlocking, row/column properties beyond visibility,
-row and column insertion/deletion, shifting references, merge/group-formula
-edits, dynamic-reference resolution, validation evaluation, shared-style
-definition editing or forking, named-style and row/column/theme resolution,
-rich text, dynamic arrays, patch serialization, full structured diagnostics,
+hints or implement mixed deletion disposition, non-worksheet tab deletion,
+recursive garbage collection, grouped-tab selection CRUD, workbook-protection
+unlocking, row/column properties beyond visibility, row and column
+insertion/deletion, shifting references, merge/group-formula edits,
+dynamic-reference resolution, validation evaluation, shared-style definition
+editing or forking, named-style and row/column/theme resolution, rich text,
+dynamic arrays, patch serialization, full structured diagnostics,
 eviction/resource budgets, range/structural effect joins, three-way merge,
 raw-copy preservation of clean compressed entries, cancellation-aware save
-contexts, order-aware extended-property synchronization, scratch planning, or
-output budgets. Those remain certification work; no allocation, latency,
-contention, or scaling conclusion follows from the functional tests.
+contexts, scratch planning, or output budgets. Those remain certification work;
+no allocation, latency, contention, or scaling conclusion follows from the
+functional tests.
 
 ## Evidence levels
 
