@@ -1,9 +1,6 @@
 /// Constants for OLE file format
 pub mod consts;
 
-/// Shared MS-OFFCRYPTO structures for encryption and rights management.
-pub mod office_crypto;
-
 /// Shared bounded MS-OVBA project, module, and compression APIs.
 pub mod ovba {
     pub use litchi_cfb::ovba::*;

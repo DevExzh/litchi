@@ -56,6 +56,15 @@ Additional focused crates are permitted where the responsibility is real:
   capabilities rather than creating OPC/OLE cross-dependencies.
 - Runtime adapters such as `litchi-tokio` are separate optional crates.
 
+`litchi-crypto` owns bounded `[MS-OFFCRYPTO]` structures and transformations,
+including compound-file DataSpaces metadata and password-derived cipher
+contexts. It may depend downward on `litchi-cfb` and `litchi-ole-common`, but
+not on either migration host or any concrete document format. Its namespaces
+provide short typed names such as `rc4::{Flags, Header, Context, Error}`;
+format crates remain responsible for locating native records and mapping
+crypto failures into their own error vocabulary. Secret-bearing contexts keep
+their material private and zeroizing, and the crate has no async-runtime edge.
+
 The current `litchi-ooxml` and `litchi-ole` monoliths are removed after their
 contents migrate. They do not remain as compatibility crates. The umbrella
 `litchi` contains no format implementation logic and re-exports canonical types

@@ -6,11 +6,11 @@
 use std::fmt;
 
 const LENGTH_FIELD_BYTES: usize = 8;
-pub const IRM_AES_BLOCK_BYTES: usize = 16;
+pub const AES_BLOCK_BYTES: usize = 16;
 
 /// The semantic kind of an IRM content envelope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProtectedContentKind {
+pub enum Kind {
     /// Original OOXML or legacy binary document content.
     Document,
     /// LZX-compressed MHTML viewer representation.
@@ -19,8 +19,8 @@ pub enum ProtectedContentKind {
 
 /// A borrowed MS-OFFCRYPTO protected-content stream.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ProtectedContentEnvelope<'a> {
-    pub kind: ProtectedContentKind,
+pub struct Envelope<'a> {
+    pub kind: Kind,
     /// Plaintext byte length for document content, or compressed plaintext
     /// length for viewer content.
     pub plaintext_size: u64,
@@ -29,7 +29,7 @@ pub struct ProtectedContentEnvelope<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProtectedContentError {
+pub enum Error {
     Truncated,
     EmptyCiphertext,
     MisalignedCiphertext { length: usize },
@@ -37,7 +37,7 @@ pub enum ProtectedContentError {
     CiphertextTooShort { expected: u64, actual: usize },
 }
 
-impl fmt::Display for ProtectedContentError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Truncated => write!(
@@ -58,27 +58,20 @@ impl fmt::Display for ProtectedContentError {
     }
 }
 
-impl std::error::Error for ProtectedContentError {}
+impl std::error::Error for Error {}
 
 /// Parse a document protected-content stream without copying its ciphertext.
-pub fn parse_document_content(
-    data: &[u8],
-) -> Result<ProtectedContentEnvelope<'_>, ProtectedContentError> {
-    parse_content(data, ProtectedContentKind::Document)
+pub fn parse_document(data: &[u8]) -> Result<Envelope<'_>, Error> {
+    parse_content(data, Kind::Document)
 }
 
 /// Parse an optional viewer-content stream without copying its ciphertext.
-pub fn parse_viewer_content(
-    data: &[u8],
-) -> Result<ProtectedContentEnvelope<'_>, ProtectedContentError> {
-    parse_content(data, ProtectedContentKind::Viewer)
+pub fn parse_viewer(data: &[u8]) -> Result<Envelope<'_>, Error> {
+    parse_content(data, Kind::Viewer)
 }
 
 /// Serialize an already-encrypted content envelope.
-pub fn write_content(
-    plaintext_size: u64,
-    ciphertext: &[u8],
-) -> Result<Vec<u8>, ProtectedContentError> {
+pub fn write(plaintext_size: u64, ciphertext: &[u8]) -> Result<Vec<u8>, Error> {
     validate_ciphertext(plaintext_size, ciphertext)?;
     let mut output = Vec::with_capacity(LENGTH_FIELD_BYTES + ciphertext.len());
     output.extend_from_slice(&plaintext_size.to_le_bytes());
@@ -86,44 +79,36 @@ pub fn write_content(
     Ok(output)
 }
 
-fn parse_content(
-    data: &[u8],
-    kind: ProtectedContentKind,
-) -> Result<ProtectedContentEnvelope<'_>, ProtectedContentError> {
-    let length = data
-        .get(..LENGTH_FIELD_BYTES)
-        .ok_or(ProtectedContentError::Truncated)?;
-    let plaintext_size = u64::from_le_bytes(length.try_into().expect("slice length checked"));
+fn parse_content(data: &[u8], kind: Kind) -> Result<Envelope<'_>, Error> {
+    let length = data.get(..LENGTH_FIELD_BYTES).ok_or(Error::Truncated)?;
+    let length = length.try_into().map_err(|_| Error::Truncated)?;
+    let plaintext_size = u64::from_le_bytes(length);
     let ciphertext = &data[LENGTH_FIELD_BYTES..];
     validate_ciphertext(plaintext_size, ciphertext)?;
-    Ok(ProtectedContentEnvelope {
+    Ok(Envelope {
         kind,
         plaintext_size,
         ciphertext,
     })
 }
 
-fn validate_ciphertext(
-    plaintext_size: u64,
-    ciphertext: &[u8],
-) -> Result<(), ProtectedContentError> {
+fn validate_ciphertext(plaintext_size: u64, ciphertext: &[u8]) -> Result<(), Error> {
     if ciphertext.is_empty() && plaintext_size != 0 {
-        return Err(ProtectedContentError::EmptyCiphertext);
+        return Err(Error::EmptyCiphertext);
     }
-    if !ciphertext.len().is_multiple_of(IRM_AES_BLOCK_BYTES) {
-        return Err(ProtectedContentError::MisalignedCiphertext {
+    if !ciphertext.len().is_multiple_of(AES_BLOCK_BYTES) {
+        return Err(Error::MisalignedCiphertext {
             length: ciphertext.len(),
         });
     }
-    let block_size =
-        u64::try_from(IRM_AES_BLOCK_BYTES).map_err(|_| ProtectedContentError::SizeOverflow)?;
+    let block_size = u64::try_from(AES_BLOCK_BYTES).map_err(|_| Error::SizeOverflow)?;
     let minimum = plaintext_size
         .checked_add(block_size - 1)
-        .ok_or(ProtectedContentError::SizeOverflow)?
+        .ok_or(Error::SizeOverflow)?
         / block_size
         * block_size;
-    if u64::try_from(ciphertext.len()).map_err(|_| ProtectedContentError::SizeOverflow)? < minimum {
-        return Err(ProtectedContentError::CiphertextTooShort {
+    if u64::try_from(ciphertext.len()).map_err(|_| Error::SizeOverflow)? < minimum {
+        return Err(Error::CiphertextTooShort {
             expected: minimum,
             actual: ciphertext.len(),
         });
@@ -138,9 +123,9 @@ mod tests {
     #[test]
     fn document_envelope_is_zero_copy_and_round_trips() {
         let ciphertext = [0xA5; 32];
-        let bytes = write_content(17, &ciphertext).unwrap();
-        let envelope = parse_document_content(&bytes).unwrap();
-        assert_eq!(envelope.kind, ProtectedContentKind::Document);
+        let bytes = write(17, &ciphertext).unwrap();
+        let envelope = parse_document(&bytes).unwrap();
+        assert_eq!(envelope.kind, Kind::Document);
         assert_eq!(envelope.plaintext_size, 17);
         assert_eq!(envelope.ciphertext, ciphertext);
         assert_eq!(envelope.ciphertext.as_ptr(), bytes[8..].as_ptr());
@@ -150,41 +135,35 @@ mod tests {
     fn viewer_length_describes_compressed_plaintext() {
         let mut bytes = 9u64.to_le_bytes().to_vec();
         bytes.extend_from_slice(&[0; 16]);
-        assert_eq!(
-            parse_viewer_content(&bytes).unwrap().kind,
-            ProtectedContentKind::Viewer
-        );
+        assert_eq!(parse_viewer(&bytes).unwrap().kind, Kind::Viewer);
     }
 
     #[test]
     fn malformed_envelopes_are_rejected() {
+        assert_eq!(parse_document(&[0; 7]).unwrap_err(), Error::Truncated);
         assert_eq!(
-            parse_document_content(&[0; 7]).unwrap_err(),
-            ProtectedContentError::Truncated
-        );
-        assert_eq!(
-            parse_document_content(&0u64.to_le_bytes()).unwrap(),
-            ProtectedContentEnvelope {
-                kind: ProtectedContentKind::Document,
+            parse_document(&0u64.to_le_bytes()).unwrap(),
+            Envelope {
+                kind: Kind::Document,
                 plaintext_size: 0,
                 ciphertext: &[],
             }
         );
         assert_eq!(
-            parse_document_content(&1u64.to_le_bytes()).unwrap_err(),
-            ProtectedContentError::EmptyCiphertext
+            parse_document(&1u64.to_le_bytes()).unwrap_err(),
+            Error::EmptyCiphertext
         );
         let mut unaligned = 1u64.to_le_bytes().to_vec();
         unaligned.extend_from_slice(&[0; 15]);
         assert!(matches!(
-            parse_document_content(&unaligned),
-            Err(ProtectedContentError::MisalignedCiphertext { .. })
+            parse_document(&unaligned),
+            Err(Error::MisalignedCiphertext { .. })
         ));
         let mut short = 17u64.to_le_bytes().to_vec();
         short.extend_from_slice(&[0; 16]);
         assert!(matches!(
-            parse_document_content(&short),
-            Err(ProtectedContentError::CiphertextTooShort { expected: 32, .. })
+            parse_document(&short),
+            Err(Error::CiphertextTooShort { expected: 32, .. })
         ));
     }
 }

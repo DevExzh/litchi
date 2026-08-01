@@ -2,24 +2,21 @@
 
 use super::package::{DocEncryptionKind, DocError, Result};
 use super::parts::fib::FileInformationBlock;
-use crate::office_crypto::cryptoapi::{self, CryptoApiContext, CryptoApiError};
 use encoding_rs::{
     BIG5, EUC_KR, Encoding, GBK, SHIFT_JIS, WINDOWS_874, WINDOWS_1250, WINDOWS_1251, WINDOWS_1252,
     WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257, WINDOWS_1258,
 };
+use litchi_crypto::rc4 as office_rc4;
+use litchi_crypto::rc4::{Context, Error, Flags};
 use md5::{Digest, Md5};
 use rand::{TryRng, rngs::SysRng};
 use rc4::{KeyInit, Rc4, StreamCipher};
-use sha1::Sha1;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
 const FIB_BASE_LEN: usize = 68;
 const BINARY_RC4_HEADER_LEN: usize = 52;
 const BINARY_RC4_BLOCK_SIZE: usize = 512;
-const CRYPTO_API_FLAG: u32 = 0x0000_0004;
-const CALG_RC4: u32 = 0x0000_6801;
-const CALG_SHA1: u32 = 0x0000_8004;
 const CRYPTO_API_VERIFIER_LEN: usize = 60;
 const CRYPTO_API_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
 
@@ -203,43 +200,16 @@ fn build_cryptoapi_header(
     key_bits: u16,
     salt: &[u8; 16],
     verifier: &[u8; 16],
-) -> std::result::Result<(Vec<u8>, CryptoApiContext), String> {
-    let context = cryptoapi::context_for_password(password, salt, usize::from(key_bits))
-        .map_err(|error| map_crypto_error(error).to_string())?;
-    let mut encrypted = Zeroizing::new([0u8; 36]);
-    encrypted[..16].copy_from_slice(verifier);
-    encrypted[16..].copy_from_slice(&Sha1::digest(verifier));
-    cryptoapi::apply_block_cipher(&context, 0, encrypted.as_mut())
-        .map_err(|error| map_crypto_error(error).to_string())?;
-
-    let provider = CRYPTO_API_PROVIDER
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .flat_map(u16::to_le_bytes)
-        .collect::<Vec<_>>();
-    let header_size = 32u32
-        .checked_add(provider.len() as u32)
-        .ok_or_else(|| "DOC CryptoAPI header size overflow".to_string())?;
-    let mut header = Vec::with_capacity(12 + header_size as usize + CRYPTO_API_VERIFIER_LEN);
-    header.extend_from_slice(&2u16.to_le_bytes());
-    header.extend_from_slice(&2u16.to_le_bytes());
-    header.extend_from_slice(&CRYPTO_API_FLAG.to_le_bytes());
-    header.extend_from_slice(&header_size.to_le_bytes());
-    header.extend_from_slice(&CRYPTO_API_FLAG.to_le_bytes());
-    header.extend_from_slice(&0u32.to_le_bytes());
-    header.extend_from_slice(&CALG_RC4.to_le_bytes());
-    header.extend_from_slice(&CALG_SHA1.to_le_bytes());
-    header.extend_from_slice(&u32::from(key_bits).to_le_bytes());
-    header.extend_from_slice(&1u32.to_le_bytes());
-    header.extend_from_slice(&0u32.to_le_bytes());
-    header.extend_from_slice(&0u32.to_le_bytes());
-    header.extend_from_slice(&provider);
-    header.extend_from_slice(&16u32.to_le_bytes());
-    header.extend_from_slice(salt);
-    header.extend_from_slice(&encrypted[..16]);
-    header.extend_from_slice(&20u32.to_le_bytes());
-    header.extend_from_slice(&encrypted[16..]);
-    Ok((header, context))
+) -> std::result::Result<(Vec<u8>, Context), String> {
+    office_rc4::build_header(
+        password,
+        usize::from(key_bits),
+        Flags::CRYPTO_API,
+        CRYPTO_API_PROVIDER,
+        salt,
+        verifier,
+    )
+    .map_err(|error| map_crypto_error(error).to_string())
 }
 
 const XOR_INITIAL_CODE: [u16; 15] = [
@@ -327,8 +297,8 @@ pub(super) fn decrypt_document_streams(
     let minor = u16::from_le_bytes([header[2], header[3]]);
     if matches!((major, minor), (2..=4, 2)) {
         let password = password.ok_or(DocError::PasswordRequired)?;
-        let parsed = cryptoapi::parse_header(header).map_err(map_crypto_error)?;
-        let context = cryptoapi::verify_password(&parsed, password)
+        let parsed = office_rc4::parse_header(header).map_err(map_crypto_error)?;
+        let context = office_rc4::verify(&parsed, password)
             .map_err(map_crypto_error)?
             .ok_or(DocError::InvalidPassword)?;
         apply_cryptoapi_stream(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &context)?;
@@ -370,7 +340,7 @@ pub(super) fn decrypt_document_streams(
     };
 
     let password = password.ok_or(DocError::PasswordRequired)?;
-    let secret = verify_password(&header, password)?.ok_or(DocError::InvalidPassword)?;
+    let secret = verify(&header, password)?.ok_or(DocError::InvalidPassword)?;
 
     apply_stream_cipher(&mut word_document[FIB_BASE_LEN..], FIB_BASE_LEN, &secret)?;
     apply_stream_cipher(&mut table_stream[header_len..], header_len, &secret)?;
@@ -521,13 +491,13 @@ fn apply_xor_stream(data: &mut [u8], absolute_offset: usize, context: &XorContex
     Ok(())
 }
 
-fn map_crypto_error(error: CryptoApiError) -> DocError {
+fn map_crypto_error(error: Error) -> DocError {
     match error {
-        CryptoApiError::Malformed(message) => DocError::MalformedEncryptionHeader(message),
-        CryptoApiError::UnsupportedVersion { major, minor } => {
+        Error::Malformed(message) => DocError::MalformedEncryptionHeader(message),
+        Error::UnsupportedVersion { major, minor } => {
             DocError::UnsupportedEncryption(DocEncryptionKind::Unknown { major, minor })
         },
-        CryptoApiError::UnsupportedAlgorithm => {
+        Error::UnsupportedAlgorithm => {
             DocError::UnsupportedEncryption(DocEncryptionKind::CryptoApi)
         },
     }
@@ -536,7 +506,7 @@ fn map_crypto_error(error: CryptoApiError) -> DocError {
 fn apply_cryptoapi_stream(
     mut data: &mut [u8],
     mut absolute_offset: usize,
-    context: &CryptoApiContext,
+    context: &Context,
 ) -> Result<()> {
     while !data.is_empty() {
         let block = u32::try_from(absolute_offset / BINARY_RC4_BLOCK_SIZE).map_err(|_| {
@@ -546,7 +516,7 @@ fn apply_cryptoapi_stream(
         let count = data
             .len()
             .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
-        cryptoapi::apply_block_cipher_at_offset(context, block, block_offset, &mut data[..count])
+        office_rc4::apply_at(context, block, block_offset, &mut data[..count])
             .map_err(map_crypto_error)?;
         absolute_offset += count;
         data = &mut data[count..];
@@ -581,7 +551,7 @@ fn derive_block_key(secret: &[u8; 5], block: u32) -> Zeroizing<[u8; 16]> {
     Zeroizing::new(<[u8; 16]>::from(Md5::digest(input.as_slice())))
 }
 
-fn verify_password(header: &BinaryRc4Header, password: &str) -> Result<Option<Zeroizing<[u8; 5]>>> {
+fn verify(header: &BinaryRc4Header, password: &str) -> Result<Option<Zeroizing<[u8; 5]>>> {
     let secret = derive_secret(password, &header.salt);
     let key = derive_block_key(&secret, 0);
     let mut cipher = Rc4::new_from_slice(key.as_ref()).map_err(|_| {
@@ -759,7 +729,7 @@ mod tests {
 
     #[test]
     fn cryptoapi_stream_rekeys_at_512_byte_boundaries() {
-        let context = cryptoapi::test_context([0x42; 20], 120);
+        let context = office_rc4::context("stream-position", &[0x42; 16], 120).unwrap();
         let original = vec![0x5a; 80];
         let mut data = original.clone();
         apply_cryptoapi_stream(&mut data, 500, &context).unwrap();
@@ -770,7 +740,7 @@ mod tests {
 
     #[test]
     fn cryptoapi_clear_prefix_offsets_are_consumed() {
-        let context = cryptoapi::test_context([0x24; 20], 56);
+        let context = office_rc4::context("clear-prefix", &[0x24; 16], 56).unwrap();
         let mut word = vec![0x11; 620];
         let original = word.clone();
         apply_cryptoapi_stream(&mut word[FIB_BASE_LEN..], FIB_BASE_LEN, &context).unwrap();

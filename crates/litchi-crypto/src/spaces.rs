@@ -5,10 +5,10 @@
 //! decrypted.
 //!
 //! ```no_run
-//! use litchi_ole::office_crypto::data_spaces::inspect_data_spaces_bytes;
+//! use litchi_crypto::spaces::inspect_bytes;
 //!
 //! let bytes = std::fs::read("protected.docx")?;
-//! if let Some(graph) = inspect_data_spaces_bytes(&bytes)? {
+//! if let Some(graph) = inspect_bytes(&bytes)? {
 //!     println!("IRM profile: {:?}", graph.irm);
 //! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
@@ -17,14 +17,13 @@
 use std::fmt;
 use std::io::{Read, Seek};
 
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleError, OleFile};
 
-use super::property_integrity::{
-    DOCUMENT_SUMMARY_INFORMATION_STREAM, ENCRYPTED_DOCUMENT_SUMMARY_INFORMATION_HASH_STREAM,
-    ENCRYPTED_SUMMARY_INFORMATION_HASH_STREAM, EncryptedPropertyStreamInfo,
-    SUMMARY_INFORMATION_STREAM, checksum_matches, parse_encrypted_property_stream_info,
+use super::integrity::{
+    self, DOCUMENT_SUMMARY_HASH_STREAM, DOCUMENT_SUMMARY_STREAM, Info, SUMMARY_HASH_STREAM,
+    SUMMARY_STREAM,
 };
-use super::sensitivity_labels::{SensitivityLabelList, parse_label_info};
+use super::labels::{self, List};
 use litchi_ole_common::custom_xml_data::{
     DataStorePromotion, MsoDataStore, inspect_mso_data_store,
 };
@@ -37,109 +36,122 @@ const MAX_ENTRIES: usize = 65_536;
 const MAX_STRING_BYTES: usize = 1_048_576;
 const MAX_XML_DEPTH: usize = 256;
 
-pub const DATA_SPACES_STORAGE: &str = "\u{0006}DataSpaces";
-pub const PRIMARY_STREAM: &str = "\u{0006}Primary";
-pub const DATA_SPACES_FEATURE: &str = "Microsoft.Container.DataSpaces";
-pub const DRM_TRANSFORM_ID: &str = "{C73DFACD-061F-43B0-8B64-0C620D2A8B50}";
-pub const DRM_TRANSFORM_NAME: &str = "Microsoft.Metadata.DRMTransform";
-pub const LZX_TRANSFORM_ID: &str = "{86DE7F2B-DDCE-486d-B016-405BBE82B8BC}";
-pub const LZX_TRANSFORM_NAME: &str = "Microsoft.Metadata.CompressionTransform";
-pub const ENCRYPTION_TRANSFORM_ID: &str = "{FF9A3F03-56EF-4613-BDD5-5A41C1D07246}";
-pub const ENCRYPTION_TRANSFORM_NAME: &str = "Microsoft.Container.EncryptionTransform";
+pub const STORAGE: &str = "\u{0006}DataSpaces";
+pub const PRIMARY: &str = "\u{0006}Primary";
+pub const FEATURE: &str = "Microsoft.Container.DataSpaces";
+pub const DRM_ID: &str = "{C73DFACD-061F-43B0-8B64-0C620D2A8B50}";
+pub const DRM_NAME: &str = "Microsoft.Metadata.DRMTransform";
+pub const LZX_ID: &str = "{86DE7F2B-DDCE-486d-B016-405BBE82B8BC}";
+pub const LZX_NAME: &str = "Microsoft.Metadata.CompressionTransform";
+pub const ENCRYPTION_ID: &str = "{FF9A3F03-56EF-4613-BDD5-5A41C1D07246}";
+pub const ENCRYPTION_NAME: &str = "Microsoft.Container.EncryptionTransform";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DataSpaceError {
+#[derive(Debug)]
+pub enum Error {
     Invalid(String),
-    Ole(String),
+    Ole(OleError),
 }
 
-impl fmt::Display for DataSpaceError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(message) => write!(formatter, "invalid DataSpaces structure: {message}"),
-            Self::Ole(message) => write!(formatter, "OLE DataSpaces error: {message}"),
+            Self::Ole(error) => write!(formatter, "OLE DataSpaces error: {error}"),
         }
     }
 }
 
-impl std::error::Error for DataSpaceError {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Invalid(_) => None,
+            Self::Ole(error) => Some(error),
+        }
+    }
+}
+
+impl From<OleError> for Error {
+    fn from(error: OleError) -> Self {
+        Self::Ole(error)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DataSpaceVersion {
+pub struct Version {
     pub major: u16,
     pub minor: u16,
 }
 
-impl DataSpaceVersion {
+impl Version {
     pub const V1_0: Self = Self { major: 1, minor: 0 };
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSpaceVersionInfo {
+pub struct VersionInfo {
     pub feature_identifier: String,
-    pub reader: DataSpaceVersion,
-    pub updater: DataSpaceVersion,
-    pub writer: DataSpaceVersion,
+    pub reader: Version,
+    pub updater: Version,
+    pub writer: Version,
 }
 
-impl Default for DataSpaceVersionInfo {
+impl Default for VersionInfo {
     fn default() -> Self {
         Self {
-            feature_identifier: DATA_SPACES_FEATURE.to_string(),
-            reader: DataSpaceVersion::V1_0,
-            updater: DataSpaceVersion::V1_0,
-            writer: DataSpaceVersion::V1_0,
+            feature_identifier: FEATURE.to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DataSpaceReferenceKind {
+pub enum ReferenceKind {
     Stream,
     Storage,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSpaceReference {
-    pub kind: DataSpaceReferenceKind,
+pub struct Reference {
+    pub kind: ReferenceKind,
     pub component: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSpaceMapEntry {
-    pub references: Vec<DataSpaceReference>,
+pub struct MapEntry {
+    pub references: Vec<Reference>,
     pub data_space_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSpaceMap {
-    pub entries: Vec<DataSpaceMapEntry>,
+pub struct Map {
+    pub entries: Vec<MapEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSpaceDefinition {
+pub struct Definition {
     pub transforms: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TransformInfoHeader {
+pub struct Header {
     pub transform_id: String,
     pub transform_name: String,
-    pub reader: DataSpaceVersion,
-    pub updater: DataSpaceVersion,
-    pub writer: DataSpaceVersion,
+    pub reader: Version,
+    pub updater: Version,
+    pub writer: Version,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IrmTransformInfo {
-    pub header: TransformInfoHeader,
+pub struct IrmTransform {
+    pub header: Header,
     /// Signed issuance license XML retained verbatim and never interpreted.
     pub publishing_license: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EncryptionTransformInfo {
-    pub header: TransformInfoHeader,
+pub struct EncryptionTransform {
+    pub header: Header,
     /// Null when EncryptionInfo is authoritative, as with Agile encryption.
     pub encryption_name: Option<String>,
     pub encryption_block_size: u32,
@@ -147,7 +159,7 @@ pub struct EncryptionTransformInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IrmEndUserLicense {
+pub struct License {
     pub stream_name: String,
     /// Base64-encoded Unicode LicenseID retained verbatim.
     pub encoded_license_id: String,
@@ -156,65 +168,65 @@ pub struct IrmEndUserLicense {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedDataSpaceDefinition {
+pub struct NamedDefinition {
     pub name: String,
-    pub definition: DataSpaceDefinition,
+    pub definition: Definition,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSpaceTransform {
+pub struct Transform {
     pub name: String,
-    pub header: TransformInfoHeader,
-    pub irm: Option<IrmTransformInfo>,
-    pub encryption: Option<EncryptionTransformInfo>,
-    pub end_user_licenses: Vec<IrmEndUserLicense>,
+    pub header: Header,
+    pub irm: Option<IrmTransform>,
+    pub encryption: Option<EncryptionTransform>,
+    pub end_user_licenses: Vec<License>,
     /// Non-IRM bytes following the transform header.
     pub opaque_tail: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IrmDocumentKind {
+pub enum DocumentKind {
     Ooxml,
     LegacyBinary,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IrmDataSpace {
-    pub document_kind: IrmDocumentKind,
-    pub protected_content_stream: String,
+pub struct Irm {
+    pub document_kind: DocumentKind,
+    pub protected_stream: String,
     pub viewer_content_stream: Option<String>,
     pub transform_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DataSpaceGraph {
-    pub version: DataSpaceVersionInfo,
-    pub map: DataSpaceMap,
-    pub definitions: Vec<NamedDataSpaceDefinition>,
-    pub transforms: Vec<DataSpaceTransform>,
-    pub irm: Option<IrmDataSpace>,
+pub struct Graph {
+    pub version: VersionInfo,
+    pub map: Map,
+    pub definitions: Vec<NamedDefinition>,
+    pub transforms: Vec<Transform>,
+    pub irm: Option<Irm>,
     /// Exact sensitivity-label XML bytes, retained inert when present.
     pub label_info: Option<Vec<u8>>,
     /// Validated typed view of `label_info`.
-    pub sensitivity_labels: Option<SensitivityLabelList>,
+    pub labels: Option<List>,
     /// Integrity metadata for the public SummaryInformation property stream.
-    pub summary_information_integrity: Option<PropertyStreamIntegrity>,
+    pub summary_information_integrity: Option<Integrity>,
     /// Integrity metadata for the public DocumentSummaryInformation property stream.
-    pub document_summary_information_integrity: Option<PropertyStreamIntegrity>,
+    pub document_summary_information_integrity: Option<Integrity>,
     /// Public legacy Custom XML mirror and its IRM promotion semantics.
     pub custom_xml_data_store: Option<MsoDataStore>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PropertyStreamIntegrity {
-    pub info: EncryptedPropertyStreamInfo,
+pub struct Integrity {
+    pub info: Info,
     /// `None` means a future info-stream version that readers must ignore.
-    pub checksum_matches: Option<bool>,
+    pub valid: Option<bool>,
 }
 
-pub fn parse_version_info(data: &[u8]) -> Result<DataSpaceVersionInfo, DataSpaceError> {
+pub fn parse_version_info(data: &[u8]) -> Result<VersionInfo, Error> {
     let mut reader = SliceReader::new(data)?;
-    let value = DataSpaceVersionInfo {
+    let value = VersionInfo {
         feature_identifier: reader.unicode_lpp4()?,
         reader: reader.version()?,
         updater: reader.version()?,
@@ -225,7 +237,7 @@ pub fn parse_version_info(data: &[u8]) -> Result<DataSpaceVersionInfo, DataSpace
     Ok(value)
 }
 
-pub fn write_version_info(value: &DataSpaceVersionInfo) -> Result<Vec<u8>, DataSpaceError> {
+pub fn write_version_info(value: &VersionInfo) -> Result<Vec<u8>, Error> {
     validate_version_info(value)?;
     let mut output = Vec::new();
     write_unicode_lpp4(&mut output, &value.feature_identifier)?;
@@ -235,7 +247,7 @@ pub fn write_version_info(value: &DataSpaceVersionInfo) -> Result<Vec<u8>, DataS
     Ok(output)
 }
 
-pub fn parse_data_space_map(data: &[u8]) -> Result<DataSpaceMap, DataSpaceError> {
+pub fn parse_map(data: &[u8]) -> Result<Map, Error> {
     let mut reader = SliceReader::new(data)?;
     require_u32(reader.u32()?, HEADER_LENGTH, "DataSpaceMap.HeaderLength")?;
     let count = bounded_count(reader.u32()?, "DataSpaceMap.EntryCount")?;
@@ -258,15 +270,15 @@ pub fn parse_data_space_map(data: &[u8]) -> Result<DataSpaceMap, DataSpaceError>
         let mut references = Vec::with_capacity(reference_count);
         for _ in 0..reference_count {
             let kind = match reader.u32()? {
-                0 => DataSpaceReferenceKind::Stream,
-                1 => DataSpaceReferenceKind::Storage,
+                0 => ReferenceKind::Stream,
+                1 => ReferenceKind::Storage,
                 value => {
                     return Err(invalid(format!(
                         "unknown DataSpaceReferenceComponent type {value}"
                     )));
                 },
             };
-            references.push(DataSpaceReference {
+            references.push(Reference {
                 kind,
                 component: reader.unicode_lpp4()?,
             });
@@ -277,18 +289,18 @@ pub fn parse_data_space_map(data: &[u8]) -> Result<DataSpaceMap, DataSpaceError>
                 "DataSpaceMapEntry.Length does not match its fields",
             ));
         }
-        entries.push(DataSpaceMapEntry {
+        entries.push(MapEntry {
             references,
             data_space_name,
         });
     }
     reader.finish()?;
-    let value = DataSpaceMap { entries };
+    let value = Map { entries };
     validate_map(&value)?;
     Ok(value)
 }
 
-pub fn write_data_space_map(value: &DataSpaceMap) -> Result<Vec<u8>, DataSpaceError> {
+pub fn write_map(value: &Map) -> Result<Vec<u8>, Error> {
     validate_map(value)?;
     let mut output = Vec::new();
     output.extend_from_slice(&HEADER_LENGTH.to_le_bytes());
@@ -303,8 +315,8 @@ pub fn write_data_space_map(value: &DataSpaceMap) -> Result<Vec<u8>, DataSpaceEr
         )?;
         for reference in &entry.references {
             let kind = match reference.kind {
-                DataSpaceReferenceKind::Stream => 0u32,
-                DataSpaceReferenceKind::Storage => 1u32,
+                ReferenceKind::Stream => 0u32,
+                ReferenceKind::Storage => 1u32,
             };
             output.extend_from_slice(&kind.to_le_bytes());
             write_unicode_lpp4(&mut output, &reference.component)?;
@@ -317,7 +329,7 @@ pub fn write_data_space_map(value: &DataSpaceMap) -> Result<Vec<u8>, DataSpaceEr
     Ok(output)
 }
 
-pub fn parse_data_space_definition(data: &[u8]) -> Result<DataSpaceDefinition, DataSpaceError> {
+pub fn parse_definition(data: &[u8]) -> Result<Definition, Error> {
     let mut reader = SliceReader::new(data)?;
     require_u32(
         reader.u32()?,
@@ -335,12 +347,12 @@ pub fn parse_data_space_definition(data: &[u8]) -> Result<DataSpaceDefinition, D
         transforms.push(reader.unicode_lpp4()?);
     }
     reader.finish()?;
-    let value = DataSpaceDefinition { transforms };
+    let value = Definition { transforms };
     validate_definition(&value)?;
     Ok(value)
 }
 
-pub fn write_data_space_definition(value: &DataSpaceDefinition) -> Result<Vec<u8>, DataSpaceError> {
+pub fn write_definition(value: &Definition) -> Result<Vec<u8>, Error> {
     validate_definition(value)?;
     let mut output = Vec::new();
     output.extend_from_slice(&HEADER_LENGTH.to_le_bytes());
@@ -355,7 +367,7 @@ pub fn write_data_space_definition(value: &DataSpaceDefinition) -> Result<Vec<u8
     Ok(output)
 }
 
-pub fn parse_transform_header(data: &[u8]) -> Result<(TransformInfoHeader, usize), DataSpaceError> {
+pub fn parse_transform_header(data: &[u8]) -> Result<(Header, usize), Error> {
     let mut reader = SliceReader::new(data)?;
     let transform_length =
         usize::try_from(reader.u32()?).map_err(|_| invalid("TransformLength overflows usize"))?;
@@ -364,7 +376,7 @@ pub fn parse_transform_header(data: &[u8]) -> Result<(TransformInfoHeader, usize
     if reader.position() != transform_length {
         return Err(invalid("TransformLength does not end before TransformName"));
     }
-    let value = TransformInfoHeader {
+    let value = Header {
         transform_id,
         transform_name: reader.unicode_lpp4()?,
         reader: reader.version()?,
@@ -375,7 +387,7 @@ pub fn parse_transform_header(data: &[u8]) -> Result<(TransformInfoHeader, usize
     Ok((value, reader.position()))
 }
 
-pub fn write_transform_header(value: &TransformInfoHeader) -> Result<Vec<u8>, DataSpaceError> {
+pub fn write_transform_header(value: &Header) -> Result<Vec<u8>, Error> {
     validate_transform_header(value)?;
     let mut output = Vec::new();
     output.extend_from_slice(&0u32.to_le_bytes());
@@ -391,7 +403,7 @@ pub fn write_transform_header(value: &TransformInfoHeader) -> Result<Vec<u8>, Da
     Ok(output)
 }
 
-pub fn parse_irm_transform(data: &[u8]) -> Result<IrmTransformInfo, DataSpaceError> {
+pub fn parse_irm_transform(data: &[u8]) -> Result<IrmTransform, Error> {
     let (header, consumed) = parse_transform_header(data)?;
     validate_drm_header(&header)?;
     let mut reader = SliceReader::at(data, consumed)?;
@@ -401,47 +413,37 @@ pub fn parse_irm_transform(data: &[u8]) -> Result<IrmTransformInfo, DataSpaceErr
         "ExtensibilityHeader.Length",
     )?;
     let publishing_license = reader.utf8_lpp4()?;
-    if publishing_license.as_deref().is_none_or(str::is_empty) {
-        return Err(invalid("IRM publishing license cannot be null or empty"));
-    }
-    validate_inert_xml(
-        publishing_license.as_deref().expect("presence checked"),
-        "IRM publishing license",
-    )?;
+    let license = publishing_license
+        .as_deref()
+        .filter(|license| !license.is_empty())
+        .ok_or_else(|| invalid("IRM publishing license cannot be null or empty"))?;
+    validate_inert_xml(license, "IRM publishing license")?;
     reader.finish()?;
-    Ok(IrmTransformInfo {
+    Ok(IrmTransform {
         header,
         publishing_license,
     })
 }
 
-pub fn write_irm_transform(value: &IrmTransformInfo) -> Result<Vec<u8>, DataSpaceError> {
+pub fn write_irm_transform(value: &IrmTransform) -> Result<Vec<u8>, Error> {
     validate_drm_header(&value.header)?;
-    if value
+    let license = value
         .publishing_license
         .as_deref()
-        .is_none_or(str::is_empty)
-    {
-        return Err(invalid("IRM publishing license cannot be null or empty"));
-    }
-    validate_inert_xml(
-        value
-            .publishing_license
-            .as_deref()
-            .expect("presence checked"),
-        "IRM publishing license",
-    )?;
+        .filter(|license| !license.is_empty())
+        .ok_or_else(|| invalid("IRM publishing license cannot be null or empty"))?;
+    validate_inert_xml(license, "IRM publishing license")?;
     let mut output = write_transform_header(&value.header)?;
     output.extend_from_slice(&EXTENSIBILITY_HEADER_LENGTH.to_le_bytes());
     write_utf8_lpp4(&mut output, value.publishing_license.as_deref())?;
     Ok(output)
 }
 
-pub fn parse_encryption_transform(data: &[u8]) -> Result<EncryptionTransformInfo, DataSpaceError> {
+pub fn parse_encryption_transform(data: &[u8]) -> Result<EncryptionTransform, Error> {
     let (header, consumed) = parse_transform_header(data)?;
     validate_encryption_header(&header)?;
     let mut reader = SliceReader::at(data, consumed)?;
-    let value = EncryptionTransformInfo {
+    let value = EncryptionTransform {
         header,
         encryption_name: reader.utf8_lpp4()?,
         encryption_block_size: reader.u32()?,
@@ -453,9 +455,7 @@ pub fn parse_encryption_transform(data: &[u8]) -> Result<EncryptionTransformInfo
     Ok(value)
 }
 
-pub fn write_encryption_transform(
-    value: &EncryptionTransformInfo,
-) -> Result<Vec<u8>, DataSpaceError> {
+pub fn write_encryption_transform(value: &EncryptionTransform) -> Result<Vec<u8>, Error> {
     validate_encryption_transform(value)?;
     let mut output = write_transform_header(&value.header)?;
     write_utf8_lpp4(&mut output, value.encryption_name.as_deref())?;
@@ -465,10 +465,7 @@ pub fn write_encryption_transform(
     Ok(output)
 }
 
-pub fn parse_end_user_license(
-    stream_name: &str,
-    data: &[u8],
-) -> Result<IrmEndUserLicense, DataSpaceError> {
+pub fn parse_license(stream_name: &str, data: &[u8]) -> Result<License, Error> {
     validate_eul_stream_name(stream_name)?;
     let mut reader = SliceReader::new(data)?;
     let header_start = reader.position();
@@ -486,40 +483,30 @@ pub fn parse_end_user_license(
         ));
     }
     let certificate_chain = reader.utf8_lpp4()?;
-    if certificate_chain.as_deref().is_none_or(str::is_empty) {
-        return Err(invalid(
-            "end-user license certificate chain cannot be null or empty",
-        ));
-    }
-    validate_inert_xml(
-        certificate_chain.as_deref().expect("presence checked"),
-        "end-user license certificate chain",
-    )?;
+    let chain = certificate_chain
+        .as_deref()
+        .filter(|chain| !chain.is_empty())
+        .ok_or_else(|| invalid("end-user license certificate chain cannot be null or empty"))?;
+    validate_inert_xml(chain, "end-user license certificate chain")?;
     reader.finish()?;
-    Ok(IrmEndUserLicense {
+    Ok(License {
         stream_name: stream_name.to_string(),
         encoded_license_id,
         certificate_chain,
     })
 }
 
-pub fn write_end_user_license(value: &IrmEndUserLicense) -> Result<Vec<u8>, DataSpaceError> {
+pub fn write_license(value: &License) -> Result<Vec<u8>, Error> {
     validate_eul_stream_name(&value.stream_name)?;
     if value.encoded_license_id.is_empty() {
         return Err(invalid("EndUserLicenseHeader.ID_String cannot be empty"));
     }
-    if value.certificate_chain.as_deref().is_none_or(str::is_empty) {
-        return Err(invalid(
-            "end-user license certificate chain cannot be null or empty",
-        ));
-    }
-    validate_inert_xml(
-        value
-            .certificate_chain
-            .as_deref()
-            .expect("presence checked"),
-        "end-user license certificate chain",
-    )?;
+    let chain = value
+        .certificate_chain
+        .as_deref()
+        .filter(|chain| !chain.is_empty())
+        .ok_or_else(|| invalid("end-user license certificate chain cannot be null or empty"))?;
+    validate_inert_xml(chain, "end-user license certificate chain")?;
     let mut output = vec![0; 4];
     write_utf8_lpp4(&mut output, Some(&value.encoded_license_id))?;
     let header_length = u32::try_from(output.len())
@@ -530,21 +517,17 @@ pub fn write_end_user_license(value: &IrmEndUserLicense) -> Result<Vec<u8>, Data
 }
 
 /// Inspect and cross-validate a complete DataSpaces graph in an OLE file.
-pub fn inspect_data_spaces<R: Read + Seek>(
-    ole: &mut OleFile<R>,
-) -> Result<Option<DataSpaceGraph>, DataSpaceError> {
+pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Error> {
     let custom_xml_data_store = inspect_mso_data_store(ole)
         .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
-    if !ole.exists(&[DATA_SPACES_STORAGE]) {
+    if !ole.exists(&[STORAGE]) {
         validate_custom_xml_promotion(custom_xml_data_store.as_ref(), None)?;
         return Ok(None);
     }
-    let version = parse_version_info(&read_stream(ole, &[DATA_SPACES_STORAGE, "Version"])?)?;
-    let map = parse_data_space_map(&read_stream(ole, &[DATA_SPACES_STORAGE, "DataSpaceMap"])?)?;
+    let version = parse_version_info(&read_stream(ole, &[STORAGE, "Version"])?)?;
+    let map = parse_map(&read_stream(ole, &[STORAGE, "DataSpaceMap"])?)?;
 
-    let definition_entries = ole
-        .list_directory_entries(&[DATA_SPACES_STORAGE, "DataSpaceInfo"])
-        .map_err(ole_error)?;
+    let definition_entries = ole.list_directory_entries(&[STORAGE, "DataSpaceInfo"])?;
     if definition_entries.len() > MAX_ENTRIES {
         return Err(invalid("too many DataSpaceInfo entries"));
     }
@@ -561,18 +544,13 @@ pub fn inspect_data_spaces<R: Read + Seek>(
     definition_names.sort();
     let mut definitions = Vec::with_capacity(definition_names.len());
     for name in definition_names {
-        definitions.push(NamedDataSpaceDefinition {
-            definition: parse_data_space_definition(&read_stream(
-                ole,
-                &[DATA_SPACES_STORAGE, "DataSpaceInfo", &name],
-            )?)?,
+        definitions.push(NamedDefinition {
+            definition: parse_definition(&read_stream(ole, &[STORAGE, "DataSpaceInfo", &name])?)?,
             name,
         });
     }
 
-    let transform_entries = ole
-        .list_directory_entries(&[DATA_SPACES_STORAGE, "TransformInfo"])
-        .map_err(ole_error)?;
+    let transform_entries = ole.list_directory_entries(&[STORAGE, "TransformInfo"])?;
     if transform_entries.len() > MAX_ENTRIES {
         return Err(invalid("too many TransformInfo entries"));
     }
@@ -594,37 +572,30 @@ pub fn inspect_data_spaces<R: Read + Seek>(
     let mut transforms = Vec::with_capacity(transform_names.len());
     for name in transform_names {
         let child_entries = ole
-            .list_directory_entries(&[DATA_SPACES_STORAGE, "TransformInfo", &name])
-            .map_err(ole_error)?
+            .list_directory_entries(&[STORAGE, "TransformInfo", &name])?
             .iter()
             .map(|entry| (entry.name.clone(), entry.entry_type))
             .collect::<Vec<_>>();
         if child_entries.len() > MAX_ENTRIES {
             return Err(invalid("too many transform-storage entries"));
         }
-        let bytes = read_stream(
-            ole,
-            &[DATA_SPACES_STORAGE, "TransformInfo", &name, PRIMARY_STREAM],
-        )?;
+        let bytes = read_stream(ole, &[STORAGE, "TransformInfo", &name, PRIMARY])?;
         let (header, consumed) = parse_transform_header(&bytes)?;
-        let irm = if header.transform_id == DRM_TRANSFORM_ID
-            && header.transform_name == DRM_TRANSFORM_NAME
-        {
+        let irm = if header.transform_id == DRM_ID && header.transform_name == DRM_NAME {
             Some(parse_irm_transform(&bytes)?)
         } else {
             None
         };
-        let encryption = if header.transform_id == ENCRYPTION_TRANSFORM_ID
-            && header.transform_name == ENCRYPTION_TRANSFORM_NAME
-        {
-            Some(parse_encryption_transform(&bytes)?)
-        } else {
-            None
-        };
+        let encryption =
+            if header.transform_id == ENCRYPTION_ID && header.transform_name == ENCRYPTION_NAME {
+                Some(parse_encryption_transform(&bytes)?)
+            } else {
+                None
+            };
         let parsed_known_transform = irm.is_some() || encryption.is_some();
         let mut end_user_licenses = Vec::new();
         for (child_name, entry_type) in child_entries {
-            if child_name == PRIMARY_STREAM {
+            if child_name == PRIMARY {
                 if entry_type != 2 {
                     return Err(invalid("transform Primary entry is not a stream"));
                 }
@@ -634,12 +605,9 @@ pub fn inspect_data_spaces<R: Read + Seek>(
                 if entry_type != 2 {
                     return Err(invalid("end-user license entry is not a stream"));
                 }
-                end_user_licenses.push(parse_end_user_license(
+                end_user_licenses.push(parse_license(
                     &child_name,
-                    &read_stream(
-                        ole,
-                        &[DATA_SPACES_STORAGE, "TransformInfo", &name, &child_name],
-                    )?,
+                    &read_stream(ole, &[STORAGE, "TransformInfo", &name, &child_name])?,
                 )?);
             } else {
                 return Err(invalid(format!(
@@ -652,7 +620,7 @@ pub fn inspect_data_spaces<R: Read + Seek>(
                 "IRM transform '{name}' has no end-user license stream"
             )));
         }
-        transforms.push(DataSpaceTransform {
+        transforms.push(Transform {
             name,
             header,
             irm,
@@ -668,16 +636,15 @@ pub fn inspect_data_spaces<R: Read + Seek>(
 
     validate_graph(ole, &map, &definitions, &transforms)?;
     let irm = classify_irm(&map, &definitions, &transforms)?;
-    let (label_info, sensitivity_labels) =
-        if ole.exists(&[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"]) {
-            let bytes = read_stream(ole, &[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"])?;
-            let labels = parse_label_info(&bytes)
-                .map_err(|error| invalid(format!("LabelInfo validation failed: {error}")))?;
-            (Some(bytes), Some(labels))
-        } else {
-            (None, None)
-        };
-    if sensitivity_labels.is_some()
+    let (label_info, labels) = if ole.exists(&[STORAGE, "TransformInfo", "LabelInfo"]) {
+        let bytes = read_stream(ole, &[STORAGE, "TransformInfo", "LabelInfo"])?;
+        let labels = labels::parse(&bytes)
+            .map_err(|error| invalid(format!("LabelInfo validation failed: {error}")))?;
+        (Some(bytes), Some(labels))
+    } else {
+        (None, None)
+    };
+    if labels.is_some()
         && !irm.as_ref().is_some_and(|profile| {
             transforms.iter().any(|transform| {
                 transform.name == profile.transform_name
@@ -692,16 +659,10 @@ pub fn inspect_data_spaces<R: Read + Seek>(
             "LabelInfo requires an IRM transform with a publishing license",
         ));
     }
-    let summary_information_integrity = inspect_property_integrity(
-        ole,
-        ENCRYPTED_SUMMARY_INFORMATION_HASH_STREAM,
-        SUMMARY_INFORMATION_STREAM,
-    )?;
-    let document_summary_information_integrity = inspect_property_integrity(
-        ole,
-        ENCRYPTED_DOCUMENT_SUMMARY_INFORMATION_HASH_STREAM,
-        DOCUMENT_SUMMARY_INFORMATION_STREAM,
-    )?;
+    let summary_information_integrity =
+        inspect_integrity(ole, SUMMARY_HASH_STREAM, SUMMARY_STREAM)?;
+    let document_summary_information_integrity =
+        inspect_integrity(ole, DOCUMENT_SUMMARY_HASH_STREAM, DOCUMENT_SUMMARY_STREAM)?;
     if (summary_information_integrity.is_some() || document_summary_information_integrity.is_some())
         && irm.is_none()
         && !transforms
@@ -713,14 +674,14 @@ pub fn inspect_data_spaces<R: Read + Seek>(
         ));
     }
     validate_custom_xml_promotion(custom_xml_data_store.as_ref(), irm.as_ref())?;
-    Ok(Some(DataSpaceGraph {
+    Ok(Some(Graph {
         version,
         map,
         definitions,
         transforms,
         irm,
         label_info,
-        sensitivity_labels,
+        labels,
         summary_information_integrity,
         document_summary_information_integrity,
         custom_xml_data_store,
@@ -729,8 +690,8 @@ pub fn inspect_data_spaces<R: Read + Seek>(
 
 fn validate_custom_xml_promotion(
     store: Option<&MsoDataStore>,
-    irm: Option<&IrmDataSpace>,
-) -> Result<(), DataSpaceError> {
+    irm: Option<&Irm>,
+) -> Result<(), Error> {
     if store.is_some_and(|store| store.promotion != DataStorePromotion::Unspecified)
         && irm.is_none()
     {
@@ -742,16 +703,16 @@ fn validate_custom_xml_promotion(
 }
 
 /// Open an OLE compound file and inspect its DataSpaces graph.
-pub fn inspect_data_spaces_bytes(bytes: &[u8]) -> Result<Option<DataSpaceGraph>, DataSpaceError> {
-    let mut ole = OleFile::open(std::io::Cursor::new(bytes)).map_err(ole_error)?;
-    inspect_data_spaces(&mut ole)
+pub fn inspect_bytes(bytes: &[u8]) -> Result<Option<Graph>, Error> {
+    let mut ole = OleFile::open(std::io::Cursor::new(bytes))?;
+    inspect(&mut ole)
 }
 
-fn inspect_property_integrity<R: Read + Seek>(
+fn inspect_integrity<R: Read + Seek>(
     ole: &mut OleFile<R>,
     info_stream: &str,
     property_stream: &str,
-) -> Result<Option<PropertyStreamIntegrity>, DataSpaceError> {
+) -> Result<Option<Integrity>, Error> {
     if !ole.exists(&[info_stream]) {
         return Ok(None);
     }
@@ -760,21 +721,18 @@ fn inspect_property_integrity<R: Read + Seek>(
             "{info_stream} is present without {property_stream}"
         )));
     }
-    let info = parse_encrypted_property_stream_info(&read_stream(ole, &[info_stream])?)
+    let info = integrity::parse(&read_stream(ole, &[info_stream])?)
         .map_err(|error| invalid(format!("{info_stream} is malformed: {error}")))?;
-    let checksum_matches = checksum_matches(&info, &read_stream(ole, &[property_stream])?);
-    Ok(Some(PropertyStreamIntegrity {
-        info,
-        checksum_matches,
-    }))
+    let valid = integrity::verify(&info, &read_stream(ole, &[property_stream])?);
+    Ok(Some(Integrity { info, valid }))
 }
 
 fn validate_graph<R: Read + Seek>(
     ole: &OleFile<R>,
-    map: &DataSpaceMap,
-    definitions: &[NamedDataSpaceDefinition],
-    transforms: &[DataSpaceTransform],
-) -> Result<(), DataSpaceError> {
+    map: &Map,
+    definitions: &[NamedDefinition],
+    transforms: &[Transform],
+) -> Result<(), Error> {
     if definitions.len() != map.entries.len()
         || definitions.iter().any(|definition| {
             !map.entries
@@ -786,7 +744,7 @@ fn validate_graph<R: Read + Seek>(
             "DataSpaceInfo streams do not correspond one-to-one with map entries",
         ));
     }
-    let root_entries = ole.list_directory_entries(&[]).map_err(ole_error)?;
+    let root_entries = ole.list_directory_entries(&[])?;
     let root_types = root_entries
         .iter()
         .map(|entry| (entry.name.as_str(), entry.entry_type))
@@ -811,8 +769,8 @@ fn validate_graph<R: Read + Seek>(
                     ))
                 })?;
             let expected_type = match reference.kind {
-                DataSpaceReferenceKind::Stream => 2,
-                DataSpaceReferenceKind::Storage => 1,
+                ReferenceKind::Stream => 2,
+                ReferenceKind::Storage => 1,
             };
             if *component_type != expected_type {
                 return Err(invalid(format!(
@@ -837,10 +795,10 @@ fn validate_graph<R: Read + Seek>(
 }
 
 fn classify_irm(
-    map: &DataSpaceMap,
-    definitions: &[NamedDataSpaceDefinition],
-    transforms: &[DataSpaceTransform],
-) -> Result<Option<IrmDataSpace>, DataSpaceError> {
+    map: &Map,
+    definitions: &[NamedDefinition],
+    transforms: &[Transform],
+) -> Result<Option<Irm>, Error> {
     if let Some(entry) = map
         .entries
         .iter()
@@ -856,9 +814,9 @@ fn classify_irm(
             &["DRMEncryptedTransform"],
         )?;
         require_drm_transform(transforms, "DRMEncryptedTransform")?;
-        return Ok(Some(IrmDataSpace {
-            document_kind: IrmDocumentKind::Ooxml,
-            protected_content_stream: "EncryptedPackage".to_string(),
+        return Ok(Some(Irm {
+            document_kind: DocumentKind::Ooxml,
+            protected_stream: "EncryptedPackage".to_string(),
             viewer_content_stream: None,
             transform_name: "DRMEncryptedTransform".to_string(),
         }));
@@ -882,12 +840,7 @@ fn classify_irm(
                 "0x09LZXDRMDataSpace",
                 &["0x09DRMTransform", "0x09LZXTransform"],
             )?;
-            require_named_transform(
-                transforms,
-                "0x09LZXTransform",
-                LZX_TRANSFORM_ID,
-                LZX_TRANSFORM_NAME,
-            )?;
+            require_named_transform(transforms, "0x09LZXTransform", LZX_ID, LZX_NAME)?;
             Some("0x09DRMViewerContent".to_string())
         } else {
             None
@@ -902,9 +855,9 @@ fn classify_irm(
                 "binary IRM contains an unexpected DataSpaceMap entry",
             ));
         }
-        return Ok(Some(IrmDataSpace {
-            document_kind: IrmDocumentKind::LegacyBinary,
-            protected_content_stream: "0x09DRMContent".to_string(),
+        return Ok(Some(Irm {
+            document_kind: DocumentKind::LegacyBinary,
+            protected_stream: "0x09DRMContent".to_string(),
             viewer_content_stream,
             transform_name: "0x09DRMTransform".to_string(),
         }));
@@ -912,10 +865,10 @@ fn classify_irm(
     Ok(None)
 }
 
-fn require_single_stream(entry: &DataSpaceMapEntry, expected: &str) -> Result<(), DataSpaceError> {
+fn require_single_stream(entry: &MapEntry, expected: &str) -> Result<(), Error> {
     if entry.references.as_slice()
-        != [DataSpaceReference {
-            kind: DataSpaceReferenceKind::Stream,
+        != [Reference {
+            kind: ReferenceKind::Stream,
             component: expected.to_string(),
         }]
     {
@@ -928,10 +881,10 @@ fn require_single_stream(entry: &DataSpaceMapEntry, expected: &str) -> Result<()
 }
 
 fn require_definition(
-    definitions: &[NamedDataSpaceDefinition],
+    definitions: &[NamedDefinition],
     name: &str,
     expected: &[&str],
-) -> Result<(), DataSpaceError> {
+) -> Result<(), Error> {
     let definition = definitions
         .iter()
         .find(|definition| definition.name == name)
@@ -950,10 +903,7 @@ fn require_definition(
     Ok(())
 }
 
-fn require_drm_transform(
-    transforms: &[DataSpaceTransform],
-    name: &str,
-) -> Result<(), DataSpaceError> {
+fn require_drm_transform(transforms: &[Transform], name: &str) -> Result<(), Error> {
     let transform = transforms
         .iter()
         .find(|transform| transform.name == name)
@@ -962,38 +912,38 @@ fn require_drm_transform(
 }
 
 fn require_named_transform(
-    transforms: &[DataSpaceTransform],
+    transforms: &[Transform],
     name: &str,
     transform_id: &str,
     transform_name: &str,
-) -> Result<(), DataSpaceError> {
+) -> Result<(), Error> {
     let transform = transforms
         .iter()
         .find(|transform| transform.name == name)
         .ok_or_else(|| invalid(format!("missing transform '{name}'")))?;
     if transform.header.transform_id != transform_id
         || transform.header.transform_name != transform_name
-        || transform.header.reader != DataSpaceVersion::V1_0
-        || transform.header.updater != DataSpaceVersion::V1_0
-        || transform.header.writer != DataSpaceVersion::V1_0
+        || transform.header.reader != Version::V1_0
+        || transform.header.updater != Version::V1_0
+        || transform.header.writer != Version::V1_0
     {
         return Err(invalid(format!("transform '{name}' has an invalid header")));
     }
     Ok(())
 }
 
-fn validate_version_info(value: &DataSpaceVersionInfo) -> Result<(), DataSpaceError> {
-    if value.feature_identifier != DATA_SPACES_FEATURE
-        || value.reader != DataSpaceVersion::V1_0
-        || value.updater != DataSpaceVersion::V1_0
-        || value.writer != DataSpaceVersion::V1_0
+fn validate_version_info(value: &VersionInfo) -> Result<(), Error> {
+    if value.feature_identifier != FEATURE
+        || value.reader != Version::V1_0
+        || value.updater != Version::V1_0
+        || value.writer != Version::V1_0
     {
         return Err(invalid("unsupported DataSpaceVersionInfo"));
     }
     Ok(())
 }
 
-fn validate_map(value: &DataSpaceMap) -> Result<(), DataSpaceError> {
+fn validate_map(value: &Map) -> Result<(), Error> {
     if value.entries.is_empty() || value.entries.len() > MAX_ENTRIES {
         return Err(invalid("DataSpaceMap entry count is out of bounds"));
     }
@@ -1013,7 +963,7 @@ fn validate_map(value: &DataSpaceMap) -> Result<(), DataSpaceError> {
     Ok(())
 }
 
-fn validate_definition(value: &DataSpaceDefinition) -> Result<(), DataSpaceError> {
+fn validate_definition(value: &Definition) -> Result<(), Error> {
     if value.transforms.is_empty() || value.transforms.len() > MAX_ENTRIES {
         return Err(invalid("transform reference count is out of bounds"));
     }
@@ -1027,37 +977,37 @@ fn validate_definition(value: &DataSpaceDefinition) -> Result<(), DataSpaceError
     Ok(())
 }
 
-fn validate_transform_header(value: &TransformInfoHeader) -> Result<(), DataSpaceError> {
+fn validate_transform_header(value: &Header) -> Result<(), Error> {
     validate_name(&value.transform_id, "transform identifier")?;
     validate_name(&value.transform_name, "transform name")?;
     Ok(())
 }
 
-fn validate_drm_header(value: &TransformInfoHeader) -> Result<(), DataSpaceError> {
-    if value.transform_id != DRM_TRANSFORM_ID
-        || value.transform_name != DRM_TRANSFORM_NAME
-        || value.reader != DataSpaceVersion::V1_0
-        || value.updater != DataSpaceVersion::V1_0
-        || value.writer != DataSpaceVersion::V1_0
+fn validate_drm_header(value: &Header) -> Result<(), Error> {
+    if value.transform_id != DRM_ID
+        || value.transform_name != DRM_NAME
+        || value.reader != Version::V1_0
+        || value.updater != Version::V1_0
+        || value.writer != Version::V1_0
     {
         return Err(invalid("invalid IRM transform header"));
     }
     Ok(())
 }
 
-fn validate_encryption_header(value: &TransformInfoHeader) -> Result<(), DataSpaceError> {
-    if value.transform_id != ENCRYPTION_TRANSFORM_ID
-        || value.transform_name != ENCRYPTION_TRANSFORM_NAME
-        || value.reader != DataSpaceVersion::V1_0
-        || value.updater != DataSpaceVersion::V1_0
-        || value.writer != DataSpaceVersion::V1_0
+fn validate_encryption_header(value: &Header) -> Result<(), Error> {
+    if value.transform_id != ENCRYPTION_ID
+        || value.transform_name != ENCRYPTION_NAME
+        || value.reader != Version::V1_0
+        || value.updater != Version::V1_0
+        || value.writer != Version::V1_0
     {
         return Err(invalid("invalid encryption transform header"));
     }
     Ok(())
 }
 
-fn validate_encryption_transform(value: &EncryptionTransformInfo) -> Result<(), DataSpaceError> {
+fn validate_encryption_transform(value: &EncryptionTransform) -> Result<(), Error> {
     validate_encryption_header(&value.header)?;
     if value.encryption_block_size == 0 {
         return Err(invalid("encryption transform block size cannot be zero"));
@@ -1072,7 +1022,7 @@ fn validate_encryption_transform(value: &EncryptionTransformInfo) -> Result<(), 
     Ok(())
 }
 
-fn validate_name(value: &str, label: &str) -> Result<(), DataSpaceError> {
+fn validate_name(value: &str, label: &str) -> Result<(), Error> {
     if value.is_empty()
         || value.len() > MAX_STRING_BYTES
         || value.chars().any(|character| character == '\0')
@@ -1084,7 +1034,7 @@ fn validate_name(value: &str, label: &str) -> Result<(), DataSpaceError> {
     Ok(())
 }
 
-fn validate_eul_stream_name(value: &str) -> Result<(), DataSpaceError> {
+fn validate_eul_stream_name(value: &str) -> Result<(), Error> {
     let Some(encoded_guid) = value.strip_prefix("EUL-") else {
         return Err(invalid("end-user license stream name lacks EUL- prefix"));
     };
@@ -1100,7 +1050,7 @@ fn validate_eul_stream_name(value: &str) -> Result<(), DataSpaceError> {
     Ok(())
 }
 
-fn validate_inert_xml(value: &str, label: &str) -> Result<(), DataSpaceError> {
+fn validate_inert_xml(value: &str, label: &str) -> Result<(), Error> {
     use quick_xml::Reader;
     use quick_xml::events::Event;
 
@@ -1167,7 +1117,7 @@ fn validate_inert_xml(value: &str, label: &str) -> Result<(), DataSpaceError> {
     Ok(())
 }
 
-fn bounded_count(value: u32, label: &str) -> Result<usize, DataSpaceError> {
+fn bounded_count(value: u32, label: &str) -> Result<usize, Error> {
     let value = usize::try_from(value).map_err(|_| invalid(format!("{label} overflows usize")))?;
     if value > MAX_ENTRIES {
         return Err(invalid(format!("{label} exceeds {MAX_ENTRIES}")));
@@ -1175,7 +1125,7 @@ fn bounded_count(value: u32, label: &str) -> Result<usize, DataSpaceError> {
     Ok(value)
 }
 
-fn write_count(output: &mut Vec<u8>, count: usize, label: &str) -> Result<(), DataSpaceError> {
+fn write_count(output: &mut Vec<u8>, count: usize, label: &str) -> Result<(), Error> {
     if count > MAX_ENTRIES {
         return Err(invalid(format!("{label} exceeds {MAX_ENTRIES}")));
     }
@@ -1187,7 +1137,7 @@ fn write_count(output: &mut Vec<u8>, count: usize, label: &str) -> Result<(), Da
     Ok(())
 }
 
-fn require_u32(value: u32, expected: u32, label: &str) -> Result<(), DataSpaceError> {
+fn require_u32(value: u32, expected: u32, label: &str) -> Result<(), Error> {
     if value != expected {
         return Err(invalid(format!(
             "{label} is {value:#010X}, expected {expected:#010X}"
@@ -1196,12 +1146,12 @@ fn require_u32(value: u32, expected: u32, label: &str) -> Result<(), DataSpaceEr
     Ok(())
 }
 
-fn write_version(output: &mut Vec<u8>, version: DataSpaceVersion) {
+fn write_version(output: &mut Vec<u8>, version: Version) {
     output.extend_from_slice(&version.major.to_le_bytes());
     output.extend_from_slice(&version.minor.to_le_bytes());
 }
 
-fn write_unicode_lpp4(output: &mut Vec<u8>, value: &str) -> Result<(), DataSpaceError> {
+fn write_unicode_lpp4(output: &mut Vec<u8>, value: &str) -> Result<(), Error> {
     validate_name(value, "UNICODE-LP-P4 string")?;
     let units = value.encode_utf16().collect::<Vec<_>>();
     let byte_len = units
@@ -1222,7 +1172,7 @@ fn write_unicode_lpp4(output: &mut Vec<u8>, value: &str) -> Result<(), DataSpace
     Ok(())
 }
 
-fn write_utf8_lpp4(output: &mut Vec<u8>, value: Option<&str>) -> Result<(), DataSpaceError> {
+fn write_utf8_lpp4(output: &mut Vec<u8>, value: Option<&str>) -> Result<(), Error> {
     let Some(value) = value else {
         output.extend_from_slice(&0u32.to_le_bytes());
         return Ok(());
@@ -1240,11 +1190,8 @@ fn write_utf8_lpp4(output: &mut Vec<u8>, value: Option<&str>) -> Result<(), Data
     Ok(())
 }
 
-fn read_stream<R: Read + Seek>(
-    ole: &mut OleFile<R>,
-    path: &[&str],
-) -> Result<Vec<u8>, DataSpaceError> {
-    let bytes = ole.open_stream(path).map_err(ole_error)?;
+fn read_stream<R: Read + Seek>(ole: &mut OleFile<R>, path: &[&str]) -> Result<Vec<u8>, Error> {
+    let bytes = ole.open_stream(path)?;
     if bytes.len() > MAX_STREAM_BYTES {
         return Err(invalid(format!(
             "stream '{}' exceeds {MAX_STREAM_BYTES} bytes",
@@ -1254,12 +1201,8 @@ fn read_stream<R: Read + Seek>(
     Ok(bytes)
 }
 
-fn ole_error(error: impl fmt::Display) -> DataSpaceError {
-    DataSpaceError::Ole(error.to_string())
-}
-
-fn invalid(message: impl Into<String>) -> DataSpaceError {
-    DataSpaceError::Invalid(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
 struct SliceReader<'a> {
@@ -1268,14 +1211,14 @@ struct SliceReader<'a> {
 }
 
 impl<'a> SliceReader<'a> {
-    fn new(data: &'a [u8]) -> Result<Self, DataSpaceError> {
+    fn new(data: &'a [u8]) -> Result<Self, Error> {
         if data.len() > MAX_STREAM_BYTES {
             return Err(invalid("DataSpaces stream exceeds parser limit"));
         }
         Ok(Self { data, offset: 0 })
     }
 
-    fn at(data: &'a [u8], offset: usize) -> Result<Self, DataSpaceError> {
+    fn at(data: &'a [u8], offset: usize) -> Result<Self, Error> {
         let mut reader = Self::new(data)?;
         if offset > data.len() {
             return Err(invalid("parser offset exceeds stream"));
@@ -1288,7 +1231,7 @@ impl<'a> SliceReader<'a> {
         self.offset
     }
 
-    fn take(&mut self, count: usize) -> Result<&'a [u8], DataSpaceError> {
+    fn take(&mut self, count: usize) -> Result<&'a [u8], Error> {
         let end = self
             .offset
             .checked_add(count)
@@ -1301,26 +1244,30 @@ impl<'a> SliceReader<'a> {
         Ok(bytes)
     }
 
-    fn u16(&mut self) -> Result<u16, DataSpaceError> {
-        Ok(u16::from_le_bytes(
-            self.take(2)?.try_into().expect("two-byte slice returned"),
-        ))
+    fn u16(&mut self) -> Result<u16, Error> {
+        let bytes = self
+            .take(2)?
+            .try_into()
+            .map_err(|_| invalid("invalid two-byte DataSpaces field"))?;
+        Ok(u16::from_le_bytes(bytes))
     }
 
-    fn u32(&mut self) -> Result<u32, DataSpaceError> {
-        Ok(u32::from_le_bytes(
-            self.take(4)?.try_into().expect("four-byte slice returned"),
-        ))
+    fn u32(&mut self) -> Result<u32, Error> {
+        let bytes = self
+            .take(4)?
+            .try_into()
+            .map_err(|_| invalid("invalid four-byte DataSpaces field"))?;
+        Ok(u32::from_le_bytes(bytes))
     }
 
-    fn version(&mut self) -> Result<DataSpaceVersion, DataSpaceError> {
-        Ok(DataSpaceVersion {
+    fn version(&mut self) -> Result<Version, Error> {
+        Ok(Version {
             major: self.u16()?,
             minor: self.u16()?,
         })
     }
 
-    fn unicode_lpp4(&mut self) -> Result<String, DataSpaceError> {
+    fn unicode_lpp4(&mut self) -> Result<String, Error> {
         let byte_len = usize::try_from(self.u32()?)
             .map_err(|_| invalid("UNICODE-LP-P4 length overflows usize"))?;
         if byte_len == 0 || byte_len > MAX_STRING_BYTES || byte_len % 2 != 0 {
@@ -1343,7 +1290,7 @@ impl<'a> SliceReader<'a> {
         Ok(value)
     }
 
-    fn utf8_lpp4(&mut self) -> Result<Option<String>, DataSpaceError> {
+    fn utf8_lpp4(&mut self) -> Result<Option<String>, Error> {
         let byte_len = usize::try_from(self.u32()?)
             .map_err(|_| invalid("UTF-8-LP-P4 length overflows usize"))?;
         if byte_len == 0 {
@@ -1364,7 +1311,7 @@ impl<'a> SliceReader<'a> {
         Ok(Some(value.to_string()))
     }
 
-    fn finish(self) -> Result<(), DataSpaceError> {
+    fn finish(self) -> Result<(), Error> {
         if self.offset == self.data.len() {
             Ok(())
         } else {
@@ -1379,49 +1326,45 @@ mod tests {
     use litchi_cfb::OleWriter;
     use std::io::Cursor;
 
-    fn drm_header() -> TransformInfoHeader {
-        TransformInfoHeader {
-            transform_id: DRM_TRANSFORM_ID.to_string(),
-            transform_name: DRM_TRANSFORM_NAME.to_string(),
-            reader: DataSpaceVersion::V1_0,
-            updater: DataSpaceVersion::V1_0,
-            writer: DataSpaceVersion::V1_0,
+    fn drm_header() -> Header {
+        Header {
+            transform_id: DRM_ID.to_string(),
+            transform_name: DRM_NAME.to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
         }
     }
 
     #[test]
     fn core_streams_round_trip() {
-        let version = DataSpaceVersionInfo::default();
+        let version = VersionInfo::default();
         assert_eq!(
             parse_version_info(&write_version_info(&version).unwrap()).unwrap(),
             version
         );
-        let map = DataSpaceMap {
-            entries: vec![DataSpaceMapEntry {
-                references: vec![DataSpaceReference {
-                    kind: DataSpaceReferenceKind::Stream,
+        let map = Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
                     component: "EncryptedPackage".to_string(),
                 }],
                 data_space_name: "DRMEncryptedDataSpace".to_string(),
             }],
         };
-        assert_eq!(
-            parse_data_space_map(&write_data_space_map(&map).unwrap()).unwrap(),
-            map
-        );
-        let definition = DataSpaceDefinition {
+        assert_eq!(parse_map(&write_map(&map).unwrap()).unwrap(), map);
+        let definition = Definition {
             transforms: vec!["DRMEncryptedTransform".to_string()],
         };
         assert_eq!(
-            parse_data_space_definition(&write_data_space_definition(&definition).unwrap())
-                .unwrap(),
+            parse_definition(&write_definition(&definition).unwrap()).unwrap(),
             definition
         );
     }
 
     #[test]
     fn irm_transform_round_trip_preserves_license() {
-        let transform = IrmTransformInfo {
+        let transform = IrmTransform {
             header: drm_header(),
             publishing_license: Some("<XrML>inert</XrML>".to_string()),
         };
@@ -1433,13 +1376,13 @@ mod tests {
 
     #[test]
     fn encryption_transform_round_trip_preserves_typed_parameters() {
-        let transform = EncryptionTransformInfo {
-            header: TransformInfoHeader {
-                transform_id: ENCRYPTION_TRANSFORM_ID.to_string(),
-                transform_name: ENCRYPTION_TRANSFORM_NAME.to_string(),
-                reader: DataSpaceVersion::V1_0,
-                updater: DataSpaceVersion::V1_0,
-                writer: DataSpaceVersion::V1_0,
+        let transform = EncryptionTransform {
+            header: Header {
+                transform_id: ENCRYPTION_ID.to_string(),
+                transform_name: ENCRYPTION_NAME.to_string(),
+                reader: Version::V1_0,
+                updater: Version::V1_0,
+                writer: Version::V1_0,
             },
             encryption_name: None,
             encryption_block_size: 16,
@@ -1453,33 +1396,29 @@ mod tests {
 
     #[test]
     fn end_user_license_round_trip_preserves_inert_xml() {
-        let license = IrmEndUserLicense {
+        let license = License {
             stream_name: "EUL-ETRHA1143ZLUDD412YTI3M5CTZ".to_string(),
             encoded_license_id: "VwBpAG4AZABvAHcAOgB1AHMAZQByAEA".to_string(),
             certificate_chain: Some("<?xml version=\"1.0\"?><certificatechain/>".to_string()),
         };
         assert_eq!(
-            parse_end_user_license(
-                &license.stream_name,
-                &write_end_user_license(&license).unwrap()
-            )
-            .unwrap(),
+            parse_license(&license.stream_name, &write_license(&license).unwrap()).unwrap(),
             license
         );
     }
 
     #[test]
     fn rejects_malformed_lengths_padding_counts_and_drm_identity() {
-        let mut version = write_version_info(&DataSpaceVersionInfo::default()).unwrap();
+        let mut version = write_version_info(&VersionInfo::default()).unwrap();
         version[0] = 3;
         assert!(parse_version_info(&version).is_err());
 
-        let map = DataSpaceMap {
+        let map = Map {
             entries: Vec::new(),
         };
-        assert!(write_data_space_map(&map).is_err());
+        assert!(write_map(&map).is_err());
 
-        let mut transform = write_irm_transform(&IrmTransformInfo {
+        let mut transform = write_irm_transform(&IrmTransform {
             header: drm_header(),
             publishing_license: Some("<XrML/>".to_string()),
         })
@@ -1487,7 +1426,7 @@ mod tests {
         transform[4] = 2;
         assert!(parse_irm_transform(&transform).is_err());
         assert!(
-            write_irm_transform(&IrmTransformInfo {
+            write_irm_transform(&IrmTransform {
                 header: drm_header(),
                 publishing_license: Some("<!DOCTYPE x><x/>".to_string()),
             })
@@ -1497,26 +1436,26 @@ mod tests {
 
     #[test]
     fn inspects_and_classifies_complete_ooxml_irm_graph() {
-        let map = write_data_space_map(&DataSpaceMap {
-            entries: vec![DataSpaceMapEntry {
-                references: vec![DataSpaceReference {
-                    kind: DataSpaceReferenceKind::Stream,
+        let map = write_map(&Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
                     component: "EncryptedPackage".to_string(),
                 }],
                 data_space_name: "DRMEncryptedDataSpace".to_string(),
             }],
         })
         .unwrap();
-        let definition = write_data_space_definition(&DataSpaceDefinition {
+        let definition = write_definition(&Definition {
             transforms: vec!["DRMEncryptedTransform".to_string()],
         })
         .unwrap();
-        let primary = write_irm_transform(&IrmTransformInfo {
+        let primary = write_irm_transform(&IrmTransform {
             header: drm_header(),
             publishing_license: Some("<XrML/>".to_string()),
         })
         .unwrap();
-        let end_user_license = IrmEndUserLicense {
+        let end_user_license = License {
             stream_name: "EUL-ETRHA1143ZLUDD412YTI3M5CTZ".to_string(),
             encoded_license_id: "VwBpAG4AZABvAHcAOgB1AHMAZQByAEA".to_string(),
             certificate_chain: Some("<certificatechain/>".to_string()),
@@ -1525,82 +1464,62 @@ mod tests {
         writer
             .create_stream(&["EncryptedPackage"], &[0; 16])
             .unwrap();
-        writer.create_storage(&[DATA_SPACES_STORAGE]).unwrap();
+        writer.create_storage(&[STORAGE]).unwrap();
+        writer.create_storage(&[STORAGE, "DataSpaceInfo"]).unwrap();
+        writer.create_storage(&[STORAGE, "TransformInfo"]).unwrap();
         writer
-            .create_storage(&[DATA_SPACES_STORAGE, "DataSpaceInfo"])
+            .create_storage(&[STORAGE, "TransformInfo", "DRMEncryptedTransform"])
             .unwrap();
         writer
-            .create_storage(&[DATA_SPACES_STORAGE, "TransformInfo"])
-            .unwrap();
-        writer
-            .create_storage(&[
-                DATA_SPACES_STORAGE,
-                "TransformInfo",
-                "DRMEncryptedTransform",
-            ])
-            .unwrap();
-        writer
-            .create_stream(&[DATA_SPACES_STORAGE, "DataSpaceMap"], &map)
+            .create_stream(&[STORAGE, "DataSpaceMap"], &map)
             .unwrap();
         writer
             .create_stream(
-                &[
-                    DATA_SPACES_STORAGE,
-                    "DataSpaceInfo",
-                    "DRMEncryptedDataSpace",
-                ],
+                &[STORAGE, "DataSpaceInfo", "DRMEncryptedDataSpace"],
                 &definition,
             )
             .unwrap();
         writer
             .create_stream(
-                &[
-                    DATA_SPACES_STORAGE,
-                    "TransformInfo",
-                    "DRMEncryptedTransform",
-                    PRIMARY_STREAM,
-                ],
+                &[STORAGE, "TransformInfo", "DRMEncryptedTransform", PRIMARY],
                 &primary,
             )
             .unwrap();
         writer
             .create_stream(
                 &[
-                    DATA_SPACES_STORAGE,
+                    STORAGE,
                     "TransformInfo",
                     "DRMEncryptedTransform",
                     &end_user_license.stream_name,
                 ],
-                &write_end_user_license(&end_user_license).unwrap(),
+                &write_license(&end_user_license).unwrap(),
             )
             .unwrap();
         writer
             .create_stream(
-                &[DATA_SPACES_STORAGE, "Version"],
-                &write_version_info(&DataSpaceVersionInfo::default()).unwrap(),
+                &[STORAGE, "Version"],
+                &write_version_info(&VersionInfo::default()).unwrap(),
             )
             .unwrap();
         let label_info = format!(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?><clbl:labelList xmlns:clbl=\"{}\"><clbl:label id=\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\" enabled=\"1\" method=\"Standard\" siteId=\"12345678-1234-5678-90ab-1234567890ab\" contentBits=\"8\" removed=\"0\"/></clbl:labelList>",
-            crate::office_crypto::sensitivity_labels::LABEL_INFO_NAMESPACE
+            crate::labels::NAMESPACE
         );
         writer
             .create_stream(
-                &[DATA_SPACES_STORAGE, "TransformInfo", "LabelInfo"],
+                &[STORAGE, "TransformInfo", "LabelInfo"],
                 label_info.as_bytes(),
             )
             .unwrap();
         let summary_information = b"public summary property set";
         writer
-            .create_stream(&[SUMMARY_INFORMATION_STREAM], summary_information)
+            .create_stream(&[SUMMARY_STREAM], summary_information)
             .unwrap();
         writer
             .create_stream(
-                &[ENCRYPTED_SUMMARY_INFORMATION_HASH_STREAM],
-                &crate::office_crypto::property_integrity::write_encrypted_property_stream_info(
-                    crate::office_crypto::property_integrity::mso_crc32(summary_information),
-                    &[],
-                ),
+                &[SUMMARY_HASH_STREAM],
+                &crate::integrity::write(crate::integrity::crc32(summary_information), &[]),
             )
             .unwrap();
         let custom_properties = litchi_ole_common::custom_xml_data::CustomXmlDataProperties {
@@ -1626,17 +1545,14 @@ mod tests {
         writer.write_to(&mut bytes).unwrap();
 
         let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
-        let graph = inspect_data_spaces(&mut ole).unwrap().unwrap();
+        let graph = inspect(&mut ole).unwrap().unwrap();
         let irm = graph.irm.unwrap();
-        assert_eq!(irm.document_kind, IrmDocumentKind::Ooxml);
-        assert_eq!(irm.protected_content_stream, "EncryptedPackage");
+        assert_eq!(irm.document_kind, DocumentKind::Ooxml);
+        assert_eq!(irm.protected_stream, "EncryptedPackage");
         assert_eq!(graph.transforms[0].end_user_licenses, [end_user_license]);
-        assert_eq!(graph.sensitivity_labels.unwrap().labels.len(), 1);
+        assert_eq!(graph.labels.unwrap().labels.len(), 1);
         assert_eq!(
-            graph
-                .summary_information_integrity
-                .unwrap()
-                .checksum_matches,
+            graph.summary_information_integrity.unwrap().valid,
             Some(true)
         );
         assert!(graph.document_summary_information_integrity.is_none());
@@ -1650,18 +1566,18 @@ mod tests {
 
     #[test]
     fn classifies_binary_irm_with_optional_viewer_chain() {
-        let map = DataSpaceMap {
+        let map = Map {
             entries: vec![
-                DataSpaceMapEntry {
-                    references: vec![DataSpaceReference {
-                        kind: DataSpaceReferenceKind::Stream,
+                MapEntry {
+                    references: vec![Reference {
+                        kind: ReferenceKind::Stream,
                         component: "0x09DRMContent".to_string(),
                     }],
                     data_space_name: "0x09DRMDataSpace".to_string(),
                 },
-                DataSpaceMapEntry {
-                    references: vec![DataSpaceReference {
-                        kind: DataSpaceReferenceKind::Stream,
+                MapEntry {
+                    references: vec![Reference {
+                        kind: ReferenceKind::Stream,
                         component: "0x09DRMViewerContent".to_string(),
                     }],
                     data_space_name: "0x09LZXDRMDataSpace".to_string(),
@@ -1669,15 +1585,15 @@ mod tests {
             ],
         };
         let definitions = vec![
-            NamedDataSpaceDefinition {
+            NamedDefinition {
                 name: "0x09DRMDataSpace".to_string(),
-                definition: DataSpaceDefinition {
+                definition: Definition {
                     transforms: vec!["0x09DRMTransform".to_string()],
                 },
             },
-            NamedDataSpaceDefinition {
+            NamedDefinition {
                 name: "0x09LZXDRMDataSpace".to_string(),
-                definition: DataSpaceDefinition {
+                definition: Definition {
                     transforms: vec![
                         "0x09DRMTransform".to_string(),
                         "0x09LZXTransform".to_string(),
@@ -1686,7 +1602,7 @@ mod tests {
             },
         ];
         let transforms = vec![
-            DataSpaceTransform {
+            Transform {
                 name: "0x09DRMTransform".to_string(),
                 header: drm_header(),
                 irm: None,
@@ -1694,14 +1610,14 @@ mod tests {
                 end_user_licenses: Vec::new(),
                 opaque_tail: Vec::new(),
             },
-            DataSpaceTransform {
+            Transform {
                 name: "0x09LZXTransform".to_string(),
-                header: TransformInfoHeader {
-                    transform_id: LZX_TRANSFORM_ID.to_string(),
-                    transform_name: LZX_TRANSFORM_NAME.to_string(),
-                    reader: DataSpaceVersion::V1_0,
-                    updater: DataSpaceVersion::V1_0,
-                    writer: DataSpaceVersion::V1_0,
+                header: Header {
+                    transform_id: LZX_ID.to_string(),
+                    transform_name: LZX_NAME.to_string(),
+                    reader: Version::V1_0,
+                    updater: Version::V1_0,
+                    writer: Version::V1_0,
                 },
                 irm: None,
                 encryption: None,
@@ -1713,7 +1629,7 @@ mod tests {
         let irm = classify_irm(&map, &definitions, &transforms)
             .unwrap()
             .unwrap();
-        assert_eq!(irm.document_kind, IrmDocumentKind::LegacyBinary);
+        assert_eq!(irm.document_kind, DocumentKind::LegacyBinary);
         assert_eq!(
             irm.viewer_content_stream.as_deref(),
             Some("0x09DRMViewerContent")
@@ -1734,7 +1650,7 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
         let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
-        assert!(inspect_data_spaces(&mut ole).is_err());
+        assert!(inspect(&mut ole).is_err());
 
         let unspecified = litchi_ole_common::custom_xml_data::MsoDataStore::default();
         assert!(validate_custom_xml_promotion(Some(&unspecified), None).is_ok());

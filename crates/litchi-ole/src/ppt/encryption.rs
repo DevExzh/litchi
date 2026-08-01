@@ -2,15 +2,14 @@
 
 use super::current_user::CurrentUser;
 use super::package::{PptEncryptionKind, PptError, Result};
-use crate::office_crypto::cryptoapi::CryptoApiContext;
-use crate::office_crypto::cryptoapi::{self, CryptoApiError};
+use litchi_crypto::rc4 as office_rc4;
+use litchi_crypto::rc4::{Context, Error, Flags};
 use rand::{TryRng, rngs::SysRng};
 use std::collections::BTreeMap;
 use zeroize::Zeroizing;
 
 const USER_EDIT_TYPE: u16 = 4085;
 const CRYPT_SESSION_TYPE: u16 = 12052;
-const CRYPTO_API_WITH_DOC_PROPS_FLAGS: u32 = 0x0000_000c;
 const CRYPTO_API_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
 
 /// Password-to-open encryption profile for binary PowerPoint presentations.
@@ -54,7 +53,7 @@ pub(crate) fn validate_writer_password(
 
 pub(crate) struct WriterEncryptionMaterial {
     pub session_record: Vec<u8>,
-    pub crypto: CryptoApiContext,
+    pub crypto: Context,
 }
 
 pub(crate) fn prepare_writer_encryption(
@@ -71,10 +70,10 @@ pub(crate) fn prepare_writer_encryption(
     SysRng.try_fill_bytes(verifier.as_mut()).map_err(|_| {
         "operating-system randomness unavailable for PPT CryptoAPI verifier".to_string()
     })?;
-    let (encryption_info, crypto) = cryptoapi::build_rc4_header_for_write(
+    let (encryption_info, crypto) = office_rc4::build_header(
         password,
         usize::from(key_bits),
-        CRYPTO_API_WITH_DOC_PROPS_FLAGS,
+        Flags::CRYPTO_API | Flags::DOC_PROPERTIES,
         CRYPTO_API_PROVIDER,
         &salt,
         &verifier,
@@ -98,7 +97,7 @@ pub(crate) fn encrypt_powerpoint_document_for_write(
     directory_offset: usize,
     user_edit_offset: usize,
     session_id: u32,
-    crypto: &CryptoApiContext,
+    crypto: &Context,
 ) -> std::result::Result<(), String> {
     if directory_offset >= user_edit_offset || user_edit_offset >= document.len() {
         return Err("PPT encrypted bootstrap offsets are out of order".to_string());
@@ -181,7 +180,7 @@ pub(crate) fn encrypt_powerpoint_document_for_write(
     }
     for &(start, end, persist_id) in &ranges {
         if persist_id != session_id {
-            cryptoapi::apply_block_cipher(crypto, persist_id, &mut document[start..end])
+            office_rc4::apply(crypto, persist_id, &mut document[start..end])
                 .map_err(|error| map_crypto_error(error).to_string())?;
         }
     }
@@ -190,11 +189,11 @@ pub(crate) fn encrypt_powerpoint_document_for_write(
 
 pub(crate) fn encrypt_pictures_for_write(
     data: &mut [u8],
-    crypto: &CryptoApiContext,
+    crypto: &Context,
 ) -> std::result::Result<(), String> {
     let segments = clear_picture_segments(data)?;
     for (offset, len) in segments {
-        cryptoapi::apply_block_cipher(crypto, 0, &mut data[offset..offset + len])
+        office_rc4::apply(crypto, 0, &mut data[offset..offset + len])
             .map_err(|error| map_crypto_error(error).to_string())?;
     }
     Ok(())
@@ -283,7 +282,7 @@ pub(super) struct EncryptedPresentation {
     pub live_offsets: Vec<usize>,
     pub mappings: Vec<(u32, u32)>,
     #[cfg(feature = "imgconv")]
-    pub crypto: CryptoApiContext,
+    pub crypto: Context,
 }
 
 #[derive(Clone, Copy)]
@@ -389,9 +388,9 @@ pub(super) fn decrypt_powerpoint_document(
         session_header.data_len,
         "CryptSession10Container",
     )?;
-    let header = cryptoapi::parse_header(session_data).map_err(map_crypto_error)?;
+    let header = office_rc4::parse_header(session_data).map_err(map_crypto_error)?;
     let password = password.ok_or(PptError::PasswordRequired)?;
-    let crypto = cryptoapi::verify_password(&header, password)
+    let crypto = office_rc4::verify(&header, password)
         .map_err(map_crypto_error)?
         .ok_or(PptError::InvalidPassword)?;
 
@@ -409,8 +408,7 @@ pub(super) fn decrypt_powerpoint_document(
         }
         let encrypted_header = checked_slice(document, offset, 8, "encrypted persist header")?;
         let mut clear_header = encrypted_header.to_vec();
-        cryptoapi::apply_block_cipher(&crypto, persist_id, &mut clear_header)
-            .map_err(map_crypto_error)?;
+        office_rc4::apply(&crypto, persist_id, &mut clear_header).map_err(map_crypto_error)?;
         let data_len = usize::try_from(u32::from_le_bytes(clear_header[4..8].try_into().unwrap()))
             .map_err(|_| {
                 PptError::Corrupted("persist record length does not fit in memory".to_string())
@@ -437,7 +435,7 @@ pub(super) fn decrypt_powerpoint_document(
         }
     }
     for &(start, end, persist_id) in &ranges {
-        cryptoapi::apply_block_cipher(&crypto, persist_id, &mut decrypted[start..end])
+        office_rc4::apply(&crypto, persist_id, &mut decrypted[start..end])
             .map_err(map_crypto_error)?;
     }
     *document = decrypted;
@@ -451,7 +449,7 @@ pub(super) fn decrypt_powerpoint_document(
 }
 
 #[cfg(feature = "imgconv")]
-pub(super) fn decrypt_pictures(data: &mut Vec<u8>, crypto: &CryptoApiContext) -> Result<()> {
+pub(super) fn decrypt_pictures(data: &mut Vec<u8>, crypto: &Context) -> Result<()> {
     let mut clear = data.clone();
     let mut record_offset = 0usize;
     while record_offset < clear.len() {
@@ -567,13 +565,13 @@ fn parse_persist_directory(data: &[u8], offset: usize) -> Result<BTreeMap<u32, u
     Ok(mappings)
 }
 
-fn map_crypto_error(error: CryptoApiError) -> PptError {
+fn map_crypto_error(error: Error) -> PptError {
     match error {
-        CryptoApiError::Malformed(message) => PptError::MalformedEncryptionHeader(message),
-        CryptoApiError::UnsupportedVersion { major, minor } => {
+        Error::Malformed(message) => PptError::MalformedEncryptionHeader(message),
+        Error::UnsupportedVersion { major, minor } => {
             PptError::UnsupportedEncryption(PptEncryptionKind::Unknown { major, minor })
         },
-        CryptoApiError::UnsupportedAlgorithm => {
+        Error::UnsupportedAlgorithm => {
             PptError::UnsupportedEncryption(PptEncryptionKind::CryptoApi)
         },
     }
@@ -584,10 +582,10 @@ fn decrypt_picture_segment(
     data: &mut [u8],
     offset: usize,
     len: usize,
-    crypto: &CryptoApiContext,
+    crypto: &Context,
 ) -> Result<()> {
     let segment = checked_slice_mut(data, offset, len, "encrypted picture field")?;
-    cryptoapi::apply_block_cipher(crypto, 0, segment).map_err(map_crypto_error)
+    office_rc4::apply(crypto, 0, segment).map_err(map_crypto_error)
 }
 
 fn record_header(data: &[u8], offset: usize) -> Result<RecordHeader> {

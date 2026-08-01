@@ -1,12 +1,10 @@
 use crate::error::{OoxmlError, Result};
+use litchi_cfb::OleFile;
 use litchi_cfb::writer::OleWriter;
-use litchi_ole::OleFile;
-use litchi_ole::office_crypto::data_spaces::{
-    DataSpaceDefinition, DataSpaceMap, DataSpaceMapEntry, DataSpaceReference,
-    DataSpaceReferenceKind, DataSpaceVersion, DataSpaceVersionInfo, ENCRYPTION_TRANSFORM_ID,
-    ENCRYPTION_TRANSFORM_NAME, EncryptionTransformInfo, TransformInfoHeader, inspect_data_spaces,
-    write_data_space_definition, write_data_space_map, write_encryption_transform,
-    write_version_info,
+use litchi_crypto::spaces::{
+    Definition, ENCRYPTION_ID, ENCRYPTION_NAME, EncryptionTransform, Header, Map, MapEntry,
+    PRIMARY, Reference, ReferenceKind, STORAGE, Version, VersionInfo, inspect, write_definition,
+    write_encryption_transform, write_map, write_version_info,
 };
 
 /// Build an OLE compound file that wraps the given OOXML `EncryptionInfo`
@@ -16,27 +14,27 @@ pub(crate) fn build_ole_encrypted_package(
     encryption_info: &[u8],
     encrypted_package: &[u8],
 ) -> Result<Vec<u8>> {
-    let dataspace_map = write_data_space_map(&DataSpaceMap {
-        entries: vec![DataSpaceMapEntry {
-            references: vec![DataSpaceReference {
-                kind: DataSpaceReferenceKind::Stream,
+    let dataspace_map = write_map(&Map {
+        entries: vec![MapEntry {
+            references: vec![Reference {
+                kind: ReferenceKind::Stream,
                 component: "EncryptedPackage".to_string(),
             }],
             data_space_name: "StrongEncryptionDataSpace".to_string(),
         }],
     })
     .map_err(data_space_error)?;
-    let dataspace_def = write_data_space_definition(&DataSpaceDefinition {
+    let dataspace_def = write_definition(&Definition {
         transforms: vec!["StrongEncryptionTransform".to_string()],
     })
     .map_err(data_space_error)?;
-    let transform_primary = write_encryption_transform(&EncryptionTransformInfo {
-        header: TransformInfoHeader {
-            transform_id: ENCRYPTION_TRANSFORM_ID.to_string(),
-            transform_name: ENCRYPTION_TRANSFORM_NAME.to_string(),
-            reader: DataSpaceVersion::V1_0,
-            updater: DataSpaceVersion::V1_0,
-            writer: DataSpaceVersion::V1_0,
+    let transform_primary = write_encryption_transform(&EncryptionTransform {
+        header: Header {
+            transform_id: ENCRYPTION_ID.to_string(),
+            transform_name: ENCRYPTION_NAME.to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
         },
         encryption_name: None,
         encryption_block_size: 16,
@@ -44,9 +42,7 @@ pub(crate) fn build_ole_encrypted_package(
     })
     .map_err(data_space_error)?;
     let dataspace_version =
-        write_version_info(&DataSpaceVersionInfo::default()).map_err(data_space_error)?;
-
-    let ds_root = "\u{0006}DataSpaces";
+        write_version_info(&VersionInfo::default()).map_err(data_space_error)?;
 
     let mut writer = OleWriter::new();
 
@@ -59,16 +55,16 @@ pub(crate) fn build_ole_encrypted_package(
         .map_err(|e| OoxmlError::Other(format!("failed to create EncryptedPackage stream: {e}")))?;
 
     writer
-        .create_storage(&[ds_root])
+        .create_storage(&[STORAGE])
         .map_err(|e| OoxmlError::Other(format!("failed to create DataSpaces storage: {e}")))?;
     writer
-        .create_storage(&[ds_root, "DataSpaceInfo"])
+        .create_storage(&[STORAGE, "DataSpaceInfo"])
         .map_err(|e| OoxmlError::Other(format!("failed to create DataSpaceInfo storage: {e}")))?;
     writer
-        .create_storage(&[ds_root, "TransformInfo"])
+        .create_storage(&[STORAGE, "TransformInfo"])
         .map_err(|e| OoxmlError::Other(format!("failed to create TransformInfo storage: {e}")))?;
     writer
-        .create_storage(&[ds_root, "TransformInfo", "StrongEncryptionTransform"])
+        .create_storage(&[STORAGE, "TransformInfo", "StrongEncryptionTransform"])
         .map_err(|e| {
             OoxmlError::Other(format!(
                 "failed to create StrongEncryptionTransform storage: {e}"
@@ -76,11 +72,11 @@ pub(crate) fn build_ole_encrypted_package(
         })?;
 
     writer
-        .create_stream(&[ds_root, "DataSpaceMap"], &dataspace_map)
+        .create_stream(&[STORAGE, "DataSpaceMap"], &dataspace_map)
         .map_err(|e| OoxmlError::Other(format!("failed to create DataSpaceMap stream: {e}")))?;
     writer
         .create_stream(
-            &[ds_root, "DataSpaceInfo", "StrongEncryptionDataSpace"],
+            &[STORAGE, "DataSpaceInfo", "StrongEncryptionDataSpace"],
             &dataspace_def,
         )
         .map_err(|e| {
@@ -91,10 +87,10 @@ pub(crate) fn build_ole_encrypted_package(
     writer
         .create_stream(
             &[
-                ds_root,
+                STORAGE,
                 "TransformInfo",
                 "StrongEncryptionTransform",
-                "\u{0006}Primary",
+                PRIMARY,
             ],
             &transform_primary,
         )
@@ -104,7 +100,7 @@ pub(crate) fn build_ole_encrypted_package(
             ))
         })?;
     writer
-        .create_stream(&[ds_root, "Version"], &dataspace_version)
+        .create_stream(&[STORAGE, "Version"], &dataspace_version)
         .map_err(|e| {
             OoxmlError::Other(format!("failed to create DataSpaces/Version stream: {e}"))
         })?;
@@ -127,11 +123,11 @@ pub(crate) fn parse_ole_encrypted_package(bytes: &[u8]) -> Result<(Vec<u8>, Vec<
     // LibreOffice has historically emitted otherwise valid encrypted
     // packages without DataSpaces. Preserve that compatibility fallback, but
     // require a complete, exact StrongEncryption graph whenever it is present.
-    if let Some(graph) = inspect_data_spaces(&mut ole).map_err(data_space_error)?
+    if let Some(graph) = inspect(&mut ole).map_err(data_space_error)?
         && graph.map.entries.as_slice()
-            != [DataSpaceMapEntry {
-                references: vec![DataSpaceReference {
-                    kind: DataSpaceReferenceKind::Stream,
+            != [MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
                     component: "EncryptedPackage".to_string(),
                 }],
                 data_space_name: "StrongEncryptionDataSpace".to_string(),
@@ -161,26 +157,21 @@ fn data_space_error(error: impl std::fmt::Display) -> OoxmlError {
 mod tests {
     use super::*;
     use litchi_cfb::OleWriter;
-    use litchi_ole::office_crypto::data_spaces::{
-        ENCRYPTION_TRANSFORM_ID, inspect_data_spaces_bytes,
-    };
+    use litchi_crypto::spaces::{ENCRYPTION_ID, inspect_bytes};
 
     #[test]
-    fn encrypted_package_wrapper_has_valid_typed_data_spaces() {
+    fn encrypted_package_wrapper_has_valid_typed_spaces() {
         let encryption_info = [3, 0, 2, 0, 0, 0, 0, 0];
         let encrypted_package = [4, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4];
         let bytes = build_ole_encrypted_package(&encryption_info, &encrypted_package).unwrap();
 
-        let graph = inspect_data_spaces_bytes(&bytes).unwrap().unwrap();
+        let graph = inspect_bytes(&bytes).unwrap().unwrap();
         assert!(graph.irm.is_none());
         assert_eq!(
             graph.map.entries[0].data_space_name,
             "StrongEncryptionDataSpace"
         );
-        assert_eq!(
-            graph.transforms[0].header.transform_id,
-            ENCRYPTION_TRANSFORM_ID
-        );
+        assert_eq!(graph.transforms[0].header.transform_id, ENCRYPTION_ID);
         assert_eq!(
             graph.transforms[0]
                 .encryption
@@ -195,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_libreoffice_package_without_data_spaces() {
+    fn accepts_libreoffice_package_without_spaces() {
         let encryption_info = [3, 0, 2, 0, 0, 0, 0, 0];
         let encrypted_package = [0; 8];
         let mut writer = OleWriter::new();

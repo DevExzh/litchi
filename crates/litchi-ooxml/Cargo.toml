@@ -10,7 +10,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-encryption = ["dep:aes", "dep:cbc", "dep:hmac", "dep:sha1", "dep:litchi-ole"]
+encryption = ["dep:aes", "dep:cbc", "dep:hmac", "dep:sha1", "dep:litchi-crypto"]
 fonts = ["dep:litchi-fonts", "dep:allsorts"]
 
 [dependencies]
@@ -26,9 +26,9 @@ fast-float2     = { workspace = true }
 hmac            = { workspace = true, optional = true }
 litchi-cfb      = { workspace = true }
 litchi-core     = { workspace = true }
+litchi-crypto   = { workspace = true, optional = true }
 litchi-drawingml = { workspace = true }
 litchi-fonts    = { workspace = true, optional = true }
-litchi-ole      = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc      = { workspace = true }
 litchi-xlsx     = { workspace = true }

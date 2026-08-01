@@ -22,6 +22,7 @@ encoding_rs     = { workspace = true }
 flate2          = { workspace = true }
 litchi-cfb      = { workspace = true }
 litchi-core     = { workspace = true, features = ["ole"] }
+litchi-crypto   = { workspace = true }
 litchi-formula  = { workspace = true, optional = true }
 litchi-imgconv  = { workspace = true, optional = true }
 litchi-odraw    = { workspace = true }

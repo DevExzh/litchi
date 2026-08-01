@@ -6,7 +6,7 @@ pub use agile::{decrypt_ooxml_package_agile, encrypt_ooxml_package_agile};
 pub use standard2007::{decrypt_ooxml_package_standard_2007, encrypt_ooxml_package_standard_2007};
 
 use crate::error::{OoxmlError, Result};
-use litchi_ole::is_ole_file;
+use litchi_cfb::is_ole_file;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncryptionMode {

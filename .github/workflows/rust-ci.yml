@@ -73,6 +73,7 @@ jobs:
         run: >-
           cargo test
           -p litchi-core
+          -p litchi-crypto
           -p litchi-drawingml
           -p litchi-odraw
           -p litchi-ole-common

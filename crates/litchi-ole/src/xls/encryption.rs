@@ -1,7 +1,8 @@
 //! BIFF8 password-to-open encryption handling.
 
 use super::error::{XlsEncryptionKind, XlsError, XlsResult};
-use crate::office_crypto::cryptoapi::{self, CryptoApiContext, CryptoApiError, CryptoApiHeader};
+use litchi_crypto::rc4 as office_rc4;
+use litchi_crypto::rc4::{Context, Error, Flags, Header};
 use md5::{Digest, Md5};
 use rand::{TryRng, rngs::SysRng};
 use rc4::{KeyInit, Rc4, StreamCipher};
@@ -14,7 +15,6 @@ const BINARY_RC4_BLOCK_SIZE: usize = 1024;
 const CODEPAGE_SID: u16 = 0x0042;
 const BOF_SID: u16 = 0x0809;
 const EOF_SID: u16 = 0x000a;
-const CRYPTOAPI_RC4_FLAGS: u32 = 0x0000_0004;
 const CRYPTOAPI_RC4_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
 
 /// Password-to-open encryption profiles supported by the BIFF8 writer.
@@ -121,7 +121,7 @@ struct BinaryRc4FilePass {
 enum FilePassRecord {
     Xor(XorObfuscation),
     BinaryRc4(BinaryRc4FilePass),
-    CryptoApi(CryptoApiHeader),
+    CryptoApi(Header),
     Unsupported(XlsEncryptionKind),
 }
 
@@ -156,7 +156,7 @@ impl FilePassRecord {
                 let minor = u16::from_le_bytes([data[4], data[5]]);
                 if matches!((major, minor), (2..=4, 2)) {
                     let header =
-                        cryptoapi::parse_header(&data[2..]).map_err(map_cryptoapi_header_error)?;
+                        office_rc4::parse_header(&data[2..]).map_err(map_cryptoapi_header_error)?;
                     return Ok(Self::CryptoApi(header));
                 }
                 if (major, minor) != (1, 1) {
@@ -188,7 +188,7 @@ impl FilePassRecord {
 enum WorkbookCipher {
     Xor([u8; 16]),
     BinaryRc4(Box<BinaryRc4Stream>),
-    CryptoApi(CryptoApiContext),
+    CryptoApi(Context),
 }
 
 struct BinaryRc4Stream {
@@ -307,10 +307,10 @@ fn prepare_writer_material(
         XlsEncryptionProfile::CryptoApiRc4 { key_bits } => {
             let salt = random_16("CryptoAPI salt")?;
             let verifier = random_16("CryptoAPI verifier")?;
-            let (header, context) = cryptoapi::build_rc4_header_for_write(
+            let (header, context) = office_rc4::build_header(
                 &encryption.password,
                 usize::from(key_bits),
-                CRYPTOAPI_RC4_FLAGS,
+                Flags::CRYPTO_API,
                 CRYPTOAPI_RC4_PROVIDER,
                 &salt,
                 &verifier,
@@ -590,7 +590,7 @@ pub(crate) fn prepare_workbook_stream(
                 },
                 FilePassRecord::CryptoApi(header) => {
                     let password = password.ok_or(XlsError::PasswordRequired)?;
-                    let context = cryptoapi::verify_password(&header, password)
+                    let context = office_rc4::verify(&header, password)
                         .map_err(map_cryptoapi_runtime_error)?
                         .ok_or(XlsError::InvalidPassword)?;
                     cipher = Some(WorkbookCipher::CryptoApi(context));
@@ -636,19 +636,19 @@ pub(crate) fn prepare_workbook_stream(
     Ok(workbook)
 }
 
-fn map_cryptoapi_header_error(error: CryptoApiError) -> XlsError {
+fn map_cryptoapi_header_error(error: Error) -> XlsError {
     match error {
-        CryptoApiError::Malformed(message) => XlsError::MalformedFilePass(message),
-        CryptoApiError::UnsupportedVersion { .. } | CryptoApiError::UnsupportedAlgorithm => {
+        Error::Malformed(message) => XlsError::MalformedFilePass(message),
+        Error::UnsupportedVersion { .. } | Error::UnsupportedAlgorithm => {
             XlsError::UnsupportedEncryption(XlsEncryptionKind::CryptoApi)
         },
     }
 }
 
-fn map_cryptoapi_runtime_error(error: CryptoApiError) -> XlsError {
+fn map_cryptoapi_runtime_error(error: Error) -> XlsError {
     match error {
-        CryptoApiError::Malformed(message) => XlsError::InvalidData(message),
-        CryptoApiError::UnsupportedVersion { .. } | CryptoApiError::UnsupportedAlgorithm => {
+        Error::Malformed(message) => XlsError::InvalidData(message),
+        Error::UnsupportedVersion { .. } | Error::UnsupportedAlgorithm => {
             XlsError::UnsupportedEncryption(XlsEncryptionKind::CryptoApi)
         },
     }
@@ -657,7 +657,7 @@ fn map_cryptoapi_runtime_error(error: CryptoApiError) -> XlsError {
 fn apply_cryptoapi_at(
     mut data: &mut [u8],
     mut absolute: usize,
-    context: &CryptoApiContext,
+    context: &Context,
 ) -> XlsResult<()> {
     while !data.is_empty() {
         let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_| {
@@ -667,7 +667,7 @@ fn apply_cryptoapi_at(
         let count = data
             .len()
             .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
-        cryptoapi::apply_block_cipher_at_offset(context, block, block_offset, &mut data[..count])
+        office_rc4::apply_at(context, block, block_offset, &mut data[..count])
             .map_err(map_cryptoapi_runtime_error)?;
         absolute = absolute.checked_add(count).ok_or_else(|| {
             XlsError::InvalidData("Workbook CryptoAPI stream offset overflow".to_string())
@@ -960,7 +960,7 @@ mod tests {
     #[test]
     fn cryptoapi_cursor_handles_key_sizes_clear_gaps_and_block_boundaries() {
         for key_bits in [40, 56, 120, 128] {
-            let context = cryptoapi::test_context([0x5a; 20], key_bits);
+            let context = office_rc4::context("cursor-test", &[0x5a; 16], key_bits).unwrap();
             let original = vec![0xa5; 80];
             let mut encrypted = original.clone();
             apply_cryptoapi_at(&mut encrypted, 1000, &context).unwrap();

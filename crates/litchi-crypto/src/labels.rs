@@ -6,10 +6,11 @@
 use std::collections::HashSet;
 use std::fmt;
 
+use bitflags::bitflags;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
-pub const LABEL_INFO_NAMESPACE: &str = "http://schemas.microsoft.com/office/2020/mipLabelMetadata";
+pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/2020/mipLabelMetadata";
 const MAX_LABEL_INFO_BYTES: usize = 16 * 1024 * 1024;
 const MAX_LABELS: usize = 65_536;
 const MAX_EXTENSIONS: usize = 65_536;
@@ -18,9 +19,9 @@ const MAX_ATTRIBUTE_BYTES: usize = 1_048_576;
 
 /// Canonical lowercase classification GUID used by the `siteId` attribute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ClassificationGuid([u8; 16]);
+pub struct Guid([u8; 16]);
 
-impl ClassificationGuid {
+impl Guid {
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
@@ -30,7 +31,7 @@ impl ClassificationGuid {
     }
 }
 
-impl fmt::Display for ClassificationGuid {
+impl fmt::Display for Guid {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (index, byte) in self.0.iter().enumerate() {
             if matches!(index, 4 | 6 | 8 | 10) {
@@ -42,8 +43,8 @@ impl fmt::Display for ClassificationGuid {
     }
 }
 
-impl std::str::FromStr for ClassificationGuid {
-    type Err = SensitivityLabelError;
+impl std::str::FromStr for Guid {
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         if value.len() != 36
@@ -59,7 +60,7 @@ impl std::str::FromStr for ClassificationGuid {
             let value = match byte {
                 b'0'..=b'9' => byte - b'0',
                 b'a'..=b'f' => byte - b'a' + 10,
-                _ => unreachable!("format checked"),
+                _ => return Err(invalid("siteId contains a non-hexadecimal digit")),
             };
             if nibble % 2 == 0 {
                 output[nibble / 2] = value << 4;
@@ -73,7 +74,7 @@ impl std::str::FromStr for ClassificationGuid {
 
 /// Assignment method retained according to the open string-valued schema.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LabelAssignmentMethod {
+pub enum Method {
     Standard,
     Privileged,
     /// Empty method required for a removed-label tombstone.
@@ -82,7 +83,7 @@ pub enum LabelAssignmentMethod {
     Other(String),
 }
 
-impl LabelAssignmentMethod {
+impl Method {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Standard => "Standard",
@@ -93,52 +94,53 @@ impl LabelAssignmentMethod {
     }
 }
 
-/// Content-marking DWORD. Unknown future bits are preserved on read.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SensitivityContentBits(pub u32);
+bitflags! {
+    /// Content-marking DWORD. Unknown future bits are preserved on read.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct Content: u32 {
+        const HEADER = 1;
+        const FOOTER = 2;
+        const WATERMARK = 4;
+        const ENCRYPTION = 8;
+    }
+}
 
-impl SensitivityContentBits {
-    pub const HEADER: u32 = 1;
-    pub const FOOTER: u32 = 2;
-    pub const WATERMARK: u32 = 4;
-    pub const ENCRYPTION: u32 = 8;
-    pub const KNOWN_MASK: u32 = Self::HEADER | Self::FOOTER | Self::WATERMARK | Self::ENCRYPTION;
-
+impl Content {
     pub const fn unknown_bits(self) -> u32 {
-        self.0 & !Self::KNOWN_MASK
+        self.bits() & !Self::all().bits()
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SensitivityLabel {
+pub struct Label {
     pub id: String,
     pub enabled: bool,
-    pub method: LabelAssignmentMethod,
-    pub site_id: ClassificationGuid,
-    pub content_bits: Option<SensitivityContentBits>,
+    pub method: Method,
+    pub site_id: Guid,
+    pub content_bits: Option<Content>,
     pub removed: bool,
 }
 
 /// Opaque, validated complete `<ext>` fragment with its non-empty URI.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SensitivityLabelExtension {
+pub struct Extension {
     pub uri: String,
     pub xml: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct SensitivityLabelList {
-    pub labels: Vec<SensitivityLabel>,
-    pub extensions: Vec<SensitivityLabelExtension>,
+pub struct List {
+    pub labels: Vec<Label>,
+    pub extensions: Vec<Extension>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SensitivityLabelError {
+pub enum Error {
     Invalid(String),
     Xml(String),
 }
 
-impl fmt::Display for SensitivityLabelError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(message) => write!(formatter, "invalid LabelInfo: {message}"),
@@ -147,10 +149,10 @@ impl fmt::Display for SensitivityLabelError {
     }
 }
 
-impl std::error::Error for SensitivityLabelError {}
+impl std::error::Error for Error {}
 
 /// Parse and validate a complete LabelInfo XML stream.
-pub fn parse_label_info(xml: &[u8]) -> Result<SensitivityLabelList, SensitivityLabelError> {
+pub fn parse(xml: &[u8]) -> Result<List, Error> {
     if xml.len() > MAX_LABEL_INFO_BYTES {
         return Err(invalid("stream exceeds the 16 MiB safety limit"));
     }
@@ -168,12 +170,12 @@ pub fn parse_label_info(xml: &[u8]) -> Result<SensitivityLabelList, SensitivityL
         Event::Empty(root) => {
             validate_root(&root, reader.decoder())?;
             ensure_only_trailing_misc(&mut reader, &mut buffer)?;
-            return Ok(SensitivityLabelList::default());
+            return Ok(List::default());
         },
         _ => return Err(invalid("labelList must be the one root element")),
     };
     let prefixes = validate_root(&root, reader.decoder())?;
-    let mut result = SensitivityLabelList::default();
+    let mut result = List::default();
     let mut seen_sites = HashSet::new();
     let mut extension_list_seen = false;
 
@@ -239,14 +241,14 @@ pub fn parse_label_info(xml: &[u8]) -> Result<SensitivityLabelList, SensitivityL
 
 /// Serialize LabelInfo deterministically, including the normative label
 /// attribute order. Unknown extension fragments remain byte-for-byte intact.
-pub fn write_label_info(value: &SensitivityLabelList) -> Result<Vec<u8>, SensitivityLabelError> {
+pub fn write(value: &List) -> Result<Vec<u8>, Error> {
     validate_list(value, true)?;
     let mut output = Vec::new();
     output.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>");
     output.extend_from_slice(b"<clbl:labelList xmlns:clbl=\"");
-    output.extend_from_slice(LABEL_INFO_NAMESPACE.as_bytes());
+    output.extend_from_slice(NAMESPACE.as_bytes());
     output.extend_from_slice(b"\" xmlns=\"");
-    output.extend_from_slice(LABEL_INFO_NAMESPACE.as_bytes());
+    output.extend_from_slice(NAMESPACE.as_bytes());
     output.extend_from_slice(b"\"");
     let mut declared_prefixes = HashSet::new();
     declared_prefixes.insert(b"clbl".to_vec());
@@ -256,7 +258,7 @@ pub fn write_label_info(value: &SensitivityLabelList) -> Result<Vec<u8>, Sensiti
             output.extend_from_slice(b" xmlns:");
             output.extend_from_slice(prefix);
             output.extend_from_slice(b"=\"");
-            output.extend_from_slice(LABEL_INFO_NAMESPACE.as_bytes());
+            output.extend_from_slice(NAMESPACE.as_bytes());
             output.extend_from_slice(b"\"");
         }
     }
@@ -272,7 +274,7 @@ pub fn write_label_info(value: &SensitivityLabelList) -> Result<Vec<u8>, Sensiti
         output.extend_from_slice(label.site_id.to_string().as_bytes());
         if let Some(bits) = label.content_bits {
             output.extend_from_slice(b"\" contentBits=\"");
-            output.extend_from_slice(bits.0.to_string().as_bytes());
+            output.extend_from_slice(bits.bits().to_string().as_bytes());
         }
         output.extend_from_slice(b"\" removed=\"");
         output.push(if label.removed { b'1' } else { b'0' });
@@ -297,8 +299,8 @@ fn parse_extension_list(
     buffer: &mut Vec<u8>,
     xml: &[u8],
     prefixes: &HashSet<Vec<u8>>,
-    result: &mut SensitivityLabelList,
-) -> Result<(), SensitivityLabelError> {
+    result: &mut List,
+) -> Result<(), Error> {
     loop {
         buffer.clear();
         let start = usize::try_from(reader.buffer_position())
@@ -316,7 +318,7 @@ fn parse_extension_list(
                 consume_extension(reader, buffer, prefixes)?;
                 let end = usize::try_from(reader.buffer_position())
                     .map_err(|_| invalid("XML position overflows usize"))?;
-                result.extensions.push(SensitivityLabelExtension {
+                result.extensions.push(Extension {
                     uri,
                     xml: xml
                         .get(start..end)
@@ -346,7 +348,7 @@ fn consume_extension(
     reader: &mut Reader<&[u8]>,
     buffer: &mut Vec<u8>,
     prefixes: &HashSet<Vec<u8>>,
-) -> Result<(), SensitivityLabelError> {
+) -> Result<(), Error> {
     let mut depth = 1usize;
     let mut direct_children = 0usize;
     loop {
@@ -396,7 +398,7 @@ fn parse_label(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     prefixes: &HashSet<Vec<u8>>,
-) -> Result<SensitivityLabel, SensitivityLabelError> {
+) -> Result<Label, Error> {
     validate_inherited_namespace(element, prefixes, decoder)?;
     let mut id = None;
     let mut enabled = None;
@@ -422,7 +424,7 @@ fn parse_label(
             b"method" => method.replace(parse_method(value)).is_some(),
             b"siteId" => site_id.replace(value.parse()?).is_some(),
             b"contentBits" => content_bits
-                .replace(SensitivityContentBits(value.parse().map_err(|_| {
+                .replace(Content::from_bits_retain(value.parse().map_err(|_| {
                     invalid("contentBits is not an unsigned decimal DWORD")
                 })?))
                 .is_some(),
@@ -438,7 +440,7 @@ fn parse_label(
             return Err(invalid("label has a duplicate attribute"));
         }
     }
-    Ok(SensitivityLabel {
+    Ok(Label {
         id: id.ok_or_else(|| invalid("label lacks id"))?,
         enabled: enabled.ok_or_else(|| invalid("label lacks enabled"))?,
         method: method.ok_or_else(|| invalid("label lacks method"))?,
@@ -448,7 +450,7 @@ fn parse_label(
     })
 }
 
-fn validate_list(value: &SensitivityLabelList, writing: bool) -> Result<(), SensitivityLabelError> {
+fn validate_list(value: &List, writing: bool) -> Result<(), Error> {
     if value.labels.len() > MAX_LABELS {
         return Err(invalid("too many labels"));
     }
@@ -474,7 +476,7 @@ fn validate_list(value: &SensitivityLabelList, writing: bool) -> Result<(), Sens
     Ok(())
 }
 
-fn validate_label(label: &SensitivityLabel, writing: bool) -> Result<(), SensitivityLabelError> {
+fn validate_label(label: &Label, writing: bool) -> Result<(), Error> {
     if label.id.is_empty() || label.id.len() > MAX_ATTRIBUTE_BYTES {
         return Err(invalid("label id is empty or too long"));
     }
@@ -485,13 +487,13 @@ fn validate_label(label: &SensitivityLabel, writing: bool) -> Result<(), Sensiti
         return Err(invalid("label method is too long"));
     }
     if label.removed {
-        if !matches!(label.method, LabelAssignmentMethod::Removed) {
+        if !matches!(label.method, Method::Removed) {
             return Err(invalid("removed label method must be empty"));
         }
         if writing && label.content_bits.is_some() {
             return Err(invalid("writer omits contentBits for removed labels"));
         }
-    } else if matches!(label.method, LabelAssignmentMethod::Removed) {
+    } else if matches!(label.method, Method::Removed) {
         return Err(invalid("active label method cannot be empty"));
     }
     if writing
@@ -504,7 +506,7 @@ fn validate_label(label: &SensitivityLabel, writing: bool) -> Result<(), Sensiti
     Ok(())
 }
 
-fn parse_extension_fragment(xml: &[u8]) -> Result<String, SensitivityLabelError> {
+fn parse_extension_fragment(xml: &[u8]) -> Result<String, Error> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -526,7 +528,7 @@ fn parse_extension_fragment(xml: &[u8]) -> Result<String, SensitivityLabelError>
     }
 }
 
-fn extension_prefix(xml: &[u8]) -> Result<&[u8], SensitivityLabelError> {
+fn extension_prefix(xml: &[u8]) -> Result<&[u8], Error> {
     let name_start = xml
         .strip_prefix(b"<")
         .ok_or_else(|| invalid("extension XML lacks a start tag"))?;
@@ -547,7 +549,7 @@ fn extension_prefix(xml: &[u8]) -> Result<&[u8], SensitivityLabelError> {
 fn validate_root(
     root: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<HashSet<Vec<u8>>, SensitivityLabelError> {
+) -> Result<HashSet<Vec<u8>>, Error> {
     let name = root.name();
     let bytes = name.as_ref();
     if local_name(bytes) != b"labelList" {
@@ -566,7 +568,7 @@ fn validate_root(
     };
     let namespace = optional_attribute(root, &namespace_key, decoder)?
         .ok_or_else(|| invalid("labelList namespace is not declared"))?;
-    if namespace != LABEL_INFO_NAMESPACE {
+    if namespace != NAMESPACE {
         return Err(invalid("labelList uses the wrong namespace"));
     }
     let mut prefixes = HashSet::new();
@@ -578,7 +580,7 @@ fn validate_root(
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| xml_error(error.to_string()))?;
-        if value == LABEL_INFO_NAMESPACE {
+        if value == NAMESPACE {
             prefixes.insert(
                 attribute
                     .key
@@ -599,7 +601,7 @@ fn validate_inherited_namespace(
     element: &BytesStart<'_>,
     prefixes: &HashSet<Vec<u8>>,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<(), SensitivityLabelError> {
+) -> Result<(), Error> {
     let name = element.name();
     let prefix = name
         .as_ref()
@@ -618,19 +620,13 @@ fn validate_inherited_namespace(
         key.extend_from_slice(prefix);
         key
     };
-    if optional_attribute(element, &key, decoder)?
-        .is_some_and(|namespace| namespace != LABEL_INFO_NAMESPACE)
-    {
+    if optional_attribute(element, &key, decoder)?.is_some_and(|namespace| namespace != NAMESPACE) {
         return Err(invalid("element rebinds the label namespace prefix"));
     }
     Ok(())
 }
 
-fn push_label(
-    result: &mut SensitivityLabelList,
-    sites: &mut HashSet<ClassificationGuid>,
-    label: SensitivityLabel,
-) -> Result<(), SensitivityLabelError> {
+fn push_label(result: &mut List, sites: &mut HashSet<Guid>, label: Label) -> Result<(), Error> {
     if result.labels.len() >= MAX_LABELS {
         return Err(invalid("too many labels"));
     }
@@ -647,7 +643,7 @@ fn expect_empty_element_body(
     buffer: &mut Vec<u8>,
     prefixes: &HashSet<Vec<u8>>,
     local: &[u8],
-) -> Result<(), SensitivityLabelError> {
+) -> Result<(), Error> {
     loop {
         buffer.clear();
         match read_event(reader, buffer)? {
@@ -662,7 +658,7 @@ fn expect_empty_element_body(
 fn ensure_only_trailing_misc(
     reader: &mut Reader<&[u8]>,
     buffer: &mut Vec<u8>,
-) -> Result<(), SensitivityLabelError> {
+) -> Result<(), Error> {
     loop {
         buffer.clear();
         match read_event(reader, buffer)? {
@@ -678,7 +674,7 @@ fn required_attribute(
     element: &BytesStart<'_>,
     key: &[u8],
     decoder: quick_xml::encoding::Decoder,
-) -> Result<String, SensitivityLabelError> {
+) -> Result<String, Error> {
     optional_attribute(element, key, decoder)?
         .ok_or_else(|| invalid(format!("element lacks {}", String::from_utf8_lossy(key))))
 }
@@ -687,7 +683,7 @@ fn optional_attribute(
     element: &BytesStart<'_>,
     key: &[u8],
     decoder: quick_xml::encoding::Decoder,
-) -> Result<Option<String>, SensitivityLabelError> {
+) -> Result<Option<String>, Error> {
     let mut value = None;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
@@ -704,7 +700,7 @@ fn optional_attribute(
     Ok(value)
 }
 
-fn reject_non_namespace_attributes(element: &BytesStart<'_>) -> Result<(), SensitivityLabelError> {
+fn reject_non_namespace_attributes(element: &BytesStart<'_>) -> Result<(), Error> {
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         if !is_namespace_attribute(attribute.key.as_ref()) {
@@ -714,16 +710,16 @@ fn reject_non_namespace_attributes(element: &BytesStart<'_>) -> Result<(), Sensi
     Ok(())
 }
 
-fn parse_method(value: String) -> LabelAssignmentMethod {
+fn parse_method(value: String) -> Method {
     match value.as_str() {
-        "Standard" => LabelAssignmentMethod::Standard,
-        "Privileged" => LabelAssignmentMethod::Privileged,
-        "" => LabelAssignmentMethod::Removed,
-        _ => LabelAssignmentMethod::Other(value),
+        "Standard" => Method::Standard,
+        "Privileged" => Method::Privileged,
+        "" => Method::Removed,
+        _ => Method::Other(value),
     }
 }
 
-fn parse_bool(value: &str) -> Result<bool, SensitivityLabelError> {
+fn parse_bool(value: &str) -> Result<bool, Error> {
     match value {
         "1" | "true" => Ok(true),
         "0" | "false" => Ok(false),
@@ -766,10 +762,7 @@ fn whitespace(bytes: &[u8]) -> bool {
     bytes.iter().all(u8::is_ascii_whitespace)
 }
 
-fn read_event<'a>(
-    reader: &mut Reader<&[u8]>,
-    buffer: &'a mut Vec<u8>,
-) -> Result<Event<'a>, SensitivityLabelError> {
+fn read_event<'a>(reader: &mut Reader<&[u8]>, buffer: &'a mut Vec<u8>) -> Result<Event<'a>, Error> {
     reader
         .read_event_into(buffer)
         .map_err(|error| xml_error(error.to_string()))
@@ -805,12 +798,12 @@ fn push_escaped_attribute(output: &mut Vec<u8>, value: &str) {
     }
 }
 
-fn invalid(message: impl Into<String>) -> SensitivityLabelError {
-    SensitivityLabelError::Invalid(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
 }
 
-fn xml_error(message: impl Into<String>) -> SensitivityLabelError {
-    SensitivityLabelError::Xml(message.into())
+fn xml_error(message: impl Into<String>) -> Error {
+    Error::Xml(message.into())
 }
 
 #[cfg(test)]
@@ -819,88 +812,83 @@ mod tests {
 
     const SITE: &str = "12345678-1234-5678-90ab-1234567890ab";
 
-    fn active_label() -> SensitivityLabel {
-        SensitivityLabel {
+    fn active_label() -> Label {
+        Label {
             id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee".to_string(),
             enabled: true,
-            method: LabelAssignmentMethod::Privileged,
+            method: Method::Privileged,
             site_id: SITE.parse().unwrap(),
-            content_bits: Some(SensitivityContentBits(
-                SensitivityContentBits::HEADER | SensitivityContentBits::ENCRYPTION,
-            )),
+            content_bits: Some(Content::HEADER | Content::ENCRYPTION),
             removed: false,
         }
     }
 
     #[test]
     fn typed_labels_round_trip_in_normative_attribute_order() {
-        let value = SensitivityLabelList {
+        let value = List {
             labels: vec![active_label()],
             extensions: Vec::new(),
         };
-        let xml = write_label_info(&value).unwrap();
+        let xml = write(&value).unwrap();
         let text = std::str::from_utf8(&xml).unwrap();
         assert!(text.contains(
             "id=\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\" enabled=\"1\" method=\"Privileged\" siteId=\"12345678-1234-5678-90ab-1234567890ab\" contentBits=\"9\" removed=\"0\""
         ));
-        assert_eq!(parse_label_info(&xml).unwrap(), value);
+        assert_eq!(parse(&xml).unwrap(), value);
     }
 
     #[test]
     fn unknown_extension_is_preserved_exactly() {
         let xml = format!(
-            "<?xml version=\"1.0\" encoding=\"utf-8\"?><x:labelList xmlns:x=\"{LABEL_INFO_NAMESPACE}\"><x:extLst><x:ext uri=\"urn:test\"><future:data xmlns:future=\"urn:future\" value=\"1\"/></x:ext></x:extLst></x:labelList>"
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?><x:labelList xmlns:x=\"{NAMESPACE}\"><x:extLst><x:ext uri=\"urn:test\"><future:data xmlns:future=\"urn:future\" value=\"1\"/></x:ext></x:extLst></x:labelList>"
         );
-        let parsed = parse_label_info(xml.as_bytes()).unwrap();
+        let parsed = parse(xml.as_bytes()).unwrap();
         assert_eq!(parsed.extensions[0].uri, "urn:test");
         assert_eq!(
             parsed.extensions[0].xml,
             b"<x:ext uri=\"urn:test\"><future:data xmlns:future=\"urn:future\" value=\"1\"/></x:ext>"
         );
-        let round_trip = write_label_info(&parsed).unwrap();
+        let round_trip = write(&parsed).unwrap();
         assert!(
             std::str::from_utf8(&round_trip)
                 .unwrap()
-                .contains(&format!("xmlns:x=\"{LABEL_INFO_NAMESPACE}\""))
+                .contains(&format!("xmlns:x=\"{NAMESPACE}\""))
         );
-        assert_eq!(parse_label_info(&round_trip).unwrap(), parsed);
+        assert_eq!(parse(&round_trip).unwrap(), parsed);
     }
 
     #[test]
     fn removed_label_is_a_typed_tombstone() {
-        let value = SensitivityLabelList {
-            labels: vec![SensitivityLabel {
+        let value = List {
+            labels: vec![Label {
                 id: SITE.to_string(),
                 enabled: false,
-                method: LabelAssignmentMethod::Removed,
+                method: Method::Removed,
                 site_id: SITE.parse().unwrap(),
                 content_bits: None,
                 removed: true,
             }],
             extensions: Vec::new(),
         };
-        assert_eq!(
-            parse_label_info(&write_label_info(&value).unwrap()).unwrap(),
-            value
-        );
+        assert_eq!(parse(&write(&value).unwrap()).unwrap(), value);
     }
 
     #[test]
     fn malformed_and_conflicting_metadata_is_rejected() {
-        assert!(parse_label_info(b"<labelList/>").is_err());
+        assert!(parse(b"<labelList/>").is_err());
         let duplicate = format!(
-            "<?xml version=\"1.0\"?><labelList xmlns=\"{LABEL_INFO_NAMESPACE}\"><label id=\"a\" enabled=\"1\" method=\"Standard\" siteId=\"{SITE}\" removed=\"0\"/><label id=\"b\" enabled=\"1\" method=\"Standard\" siteId=\"{SITE}\" removed=\"0\"/></labelList>"
+            "<?xml version=\"1.0\"?><labelList xmlns=\"{NAMESPACE}\"><label id=\"a\" enabled=\"1\" method=\"Standard\" siteId=\"{SITE}\" removed=\"0\"/><label id=\"b\" enabled=\"1\" method=\"Standard\" siteId=\"{SITE}\" removed=\"0\"/></labelList>"
         );
-        assert!(parse_label_info(duplicate.as_bytes()).is_err());
+        assert!(parse(duplicate.as_bytes()).is_err());
         let rebound = format!(
-            "<?xml version=\"1.0\"?><x:labelList xmlns:x=\"{LABEL_INFO_NAMESPACE}\"><x:label xmlns:x=\"urn:wrong\" id=\"a\" enabled=\"1\" method=\"Standard\" siteId=\"{SITE}\" removed=\"0\"/></x:labelList>"
+            "<?xml version=\"1.0\"?><x:labelList xmlns:x=\"{NAMESPACE}\"><x:label xmlns:x=\"urn:wrong\" id=\"a\" enabled=\"1\" method=\"Standard\" siteId=\"{SITE}\" removed=\"0\"/></x:labelList>"
         );
-        assert!(parse_label_info(rebound.as_bytes()).is_err());
+        assert!(parse(rebound.as_bytes()).is_err());
 
         let mut removed = active_label();
         removed.removed = true;
         assert!(
-            write_label_info(&SensitivityLabelList {
+            write(&List {
                 labels: vec![removed],
                 extensions: Vec::new(),
             })
@@ -910,14 +898,12 @@ mod tests {
 
     #[test]
     fn dtd_and_reserved_writer_bits_are_rejected() {
-        let xml = format!(
-            "<?xml version=\"1.0\"?><!DOCTYPE x><labelList xmlns=\"{LABEL_INFO_NAMESPACE}\"/>"
-        );
-        assert!(parse_label_info(xml.as_bytes()).is_err());
+        let xml = format!("<?xml version=\"1.0\"?><!DOCTYPE x><labelList xmlns=\"{NAMESPACE}\"/>");
+        assert!(parse(xml.as_bytes()).is_err());
         let mut label = active_label();
-        label.content_bits = Some(SensitivityContentBits(0x10));
+        label.content_bits = Some(Content::from_bits_retain(0x10));
         assert!(
-            write_label_info(&SensitivityLabelList {
+            write(&List {
                 labels: vec![label],
                 extensions: Vec::new(),
             })

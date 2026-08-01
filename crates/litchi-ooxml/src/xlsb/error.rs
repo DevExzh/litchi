@@ -152,21 +152,21 @@ impl From<litchi_core::binary::BinaryError> for XlsbError {
 }
 
 #[cfg(feature = "encryption")]
-impl From<litchi_ole::OleError> for XlsbError {
-    fn from(err: litchi_ole::OleError) -> Self {
+impl From<litchi_cfb::OleError> for XlsbError {
+    fn from(err: litchi_cfb::OleError) -> Self {
         match err {
-            litchi_ole::OleError::Io(e) => XlsbError::Io(e),
-            litchi_ole::OleError::InvalidFormat(msg) => {
+            litchi_cfb::OleError::Io(e) => XlsbError::Io(e),
+            litchi_cfb::OleError::InvalidFormat(msg) => {
                 XlsbError::Encoding(format!("Invalid format: {}", msg))
             },
-            litchi_ole::OleError::InvalidData(msg) => {
+            litchi_cfb::OleError::InvalidData(msg) => {
                 XlsbError::Encoding(format!("Invalid data: {}", msg))
             },
-            litchi_ole::OleError::NotOleFile => XlsbError::Encoding("Not an OLE file".to_string()),
-            litchi_ole::OleError::CorruptedFile(msg) => {
+            litchi_cfb::OleError::NotOleFile => XlsbError::Encoding("Not an OLE file".to_string()),
+            litchi_cfb::OleError::CorruptedFile(msg) => {
                 XlsbError::Encoding(format!("Corrupted file: {}", msg))
             },
-            litchi_ole::OleError::StreamNotFound => {
+            litchi_cfb::OleError::StreamNotFound => {
                 XlsbError::FileNotFound("Stream not found".to_string())
             },
         }

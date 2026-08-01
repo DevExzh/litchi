@@ -1205,6 +1205,36 @@ ODraw extraction and first host migration slice, not completion of the planned
 `litchi-doc`, `litchi-ppt`, and `litchi-xls` crate split or the complete binary
 CRUD checklist.
 
+The twenty-fifth implementation slice extracts shared `[MS-OFFCRYPTO]`
+structures and transformations into the runtime-neutral `litchi-crypto`
+crate. Bounded DataSpaces, property-integrity, protected-content, sensitivity-
+label, and RC4 CryptoAPI code no longer lives in the binary-format monolith.
+The crate depends downward on `litchi-cfb` and `litchi-ole-common`, has no
+concrete DOC/PPT/XLS or OOXML dependency, and neither activates protected
+content nor anchors asynchronous work to a runtime. Secret-derived RC4 state
+is private, zeroizing, and move-only; cipher operations borrow it, and block-key
+derivation does not allocate. Contextual modules avoid global prefixes:
+`spaces::{Graph, Map, Transform}`, `integrity::Info`,
+`protected::{Envelope, Kind}`, and `labels::{List, Label, Content}`. `Content`
+and the CryptoAPI flag set use compact typed bitflags; sensitivity-label reads
+retain unknown bits while writes reject them. The public CryptoAPI surface uses
+module-scoped typed names and short verbs: `rc4::{Flags, Header, Context, Error}` plus
+`build_header`, `parse_header`, `context`, `verify`, `apply`, and `apply_at`.
+Unsupported algorithms and invalid flags are rejected as typed errors; no raw
+flag integer, public secret field, assertion-based parser branch, or runtime
+lock wrapper is required for ordinary use.
+
+DOC, PPT, and XLS encryption paths now consume this capability directly
+through the legacy host, while encrypted OOXML package inspection depends on
+`litchi-crypto` and `litchi-cfb` rather than reaching through `litchi-ole`.
+The dependency fence removes that cross-family monolith edge instead of
+retaining a compatibility re-export. This completes only the shared crypto
+prerequisite. The read-only extraction audits found that signatures, VBA,
+generic embedded-object handling, the remaining host image bridge, and the
+PPT/XLS chart-workbook bridge must also move to focused lower layers before
+the internally dense DOC, PPT, and XLS trees can move atomically. Those concrete
+crate splits and broader encryption interoperability certification remain open.
+
 Computer Use exercised permanent generated smoke artifacts in the installed
 macOS desktop Microsoft Word, PowerPoint, and Excel applications. PowerPoint
 opened the generated PPT without repair, rendered the title, rectangle,

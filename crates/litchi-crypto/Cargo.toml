@@ -1,0 +1,19 @@
+[package]
+name = "litchi-crypto"
+description = "Runtime-neutral MS-OFFCRYPTO primitives for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bitflags = { workspace = true }
+litchi-cfb = { workspace = true }
+litchi-ole-common = { workspace = true }
+quick-xml = { workspace = true }
+rc4 = { workspace = true }
+sha1 = { workspace = true }
+subtle = { workspace = true }
+zeroize = { workspace = true }

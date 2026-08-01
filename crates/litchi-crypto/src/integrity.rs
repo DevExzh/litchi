@@ -10,14 +10,14 @@ const CRC_CACHE_MASK: u32 = 0xFFFF;
 const CRC_POLYNOMIAL: u32 = 0xAF;
 static CRC_CACHE: LazyLock<[u32; 256]> = LazyLock::new(build_crc_cache);
 
-pub const ENCRYPTED_SUMMARY_INFORMATION_HASH_STREAM: &str = "EncryptedSIHash";
-pub const ENCRYPTED_DOCUMENT_SUMMARY_INFORMATION_HASH_STREAM: &str = "EncryptedDSIHash";
-pub const SUMMARY_INFORMATION_STREAM: &str = "\u{0005}SummaryInformation";
-pub const DOCUMENT_SUMMARY_INFORMATION_STREAM: &str = "\u{0005}DocumentSummaryInformation";
+pub const SUMMARY_HASH_STREAM: &str = "EncryptedSIHash";
+pub const DOCUMENT_SUMMARY_HASH_STREAM: &str = "EncryptedDSIHash";
+pub const SUMMARY_STREAM: &str = "\u{0005}SummaryInformation";
+pub const DOCUMENT_SUMMARY_STREAM: &str = "\u{0005}DocumentSummaryInformation";
 
-/// Parsed EncryptedPropertyStreamInfo structure.
+/// Parsed Info structure.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EncryptedPropertyStreamInfo {
+pub enum Info {
     /// Version 0, whose checksum and reserved bytes are understood.
     Version0 { checksum: u32, reserved: Vec<u8> },
     /// A future version that readers are required to ignore.
@@ -25,12 +25,12 @@ pub enum EncryptedPropertyStreamInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PropertyIntegrityError {
+pub enum Error {
     Truncated,
     InvalidStreamId(u8),
 }
 
-impl fmt::Display for PropertyIntegrityError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Truncated => write!(formatter, "encrypted property hash stream is truncated"),
@@ -42,31 +42,33 @@ impl fmt::Display for PropertyIntegrityError {
     }
 }
 
-impl std::error::Error for PropertyIntegrityError {}
+impl std::error::Error for Error {}
 
-pub fn parse_encrypted_property_stream_info(
-    data: &[u8],
-) -> Result<EncryptedPropertyStreamInfo, PropertyIntegrityError> {
+pub fn parse(data: &[u8]) -> Result<Info, Error> {
     let Some((&stream_id, tail)) = data.split_first() else {
-        return Err(PropertyIntegrityError::Truncated);
+        return Err(Error::Truncated);
     };
     if stream_id != STREAM_ID {
-        return Err(PropertyIntegrityError::InvalidStreamId(stream_id));
+        return Err(Error::InvalidStreamId(stream_id));
     }
     let Some((&version, payload)) = tail.split_first() else {
-        return Err(PropertyIntegrityError::Truncated);
+        return Err(Error::Truncated);
     };
     if version != CURRENT_VERSION {
-        return Ok(EncryptedPropertyStreamInfo::UnsupportedVersion { version });
+        return Ok(Info::UnsupportedVersion { version });
     }
-    let checksum = payload.get(..4).ok_or(PropertyIntegrityError::Truncated)?;
-    Ok(EncryptedPropertyStreamInfo::Version0 {
-        checksum: u32::from_le_bytes(checksum.try_into().expect("slice length checked")),
+    let checksum = payload
+        .get(..4)
+        .ok_or(Error::Truncated)?
+        .try_into()
+        .map_err(|_| Error::Truncated)?;
+    Ok(Info::Version0 {
+        checksum: u32::from_le_bytes(checksum),
         reserved: payload[4..].to_vec(),
     })
 }
 
-pub fn write_encrypted_property_stream_info(checksum: u32, reserved: &[u8]) -> Vec<u8> {
+pub fn write(checksum: u32, reserved: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(HEADER_BYTES + reserved.len());
     output.push(STREAM_ID);
     output.push(CURRENT_VERSION);
@@ -79,7 +81,7 @@ pub fn write_encrypted_property_stream_info(checksum: u32, reserved: &[u8]) -> V
 ///
 /// Passing the returned value into a later call is equivalent to hashing the
 /// concatenated slices. The value normally used for a new stream is zero.
-pub fn mso_crc32_update(initial: u32, data: &[u8]) -> u32 {
+pub fn update(initial: u32, data: &[u8]) -> u32 {
     data.iter().fold(initial, |crc, byte| {
         let index = ((crc >> 24) as u8 ^ byte) as usize;
         crc.wrapping_shl(8) ^ CRC_CACHE[index]
@@ -87,19 +89,14 @@ pub fn mso_crc32_update(initial: u32, data: &[u8]) -> u32 {
 }
 
 /// Compute the property-stream checksum from the protocol's zero seed.
-pub fn mso_crc32(data: &[u8]) -> u32 {
-    mso_crc32_update(0, data)
+pub fn crc32(data: &[u8]) -> u32 {
+    update(0, data)
 }
 
-pub fn checksum_matches(
-    info: &EncryptedPropertyStreamInfo,
-    property_stream: &[u8],
-) -> Option<bool> {
+pub fn verify(info: &Info, property_stream: &[u8]) -> Option<bool> {
     match info {
-        EncryptedPropertyStreamInfo::Version0 { checksum, .. } => {
-            Some(*checksum == mso_crc32(property_stream))
-        },
-        EncryptedPropertyStreamInfo::UnsupportedVersion { .. } => None,
+        Info::Version0 { checksum, .. } => Some(*checksum == crc32(property_stream)),
+        Info::UnsupportedVersion { .. } => None,
     }
 }
 
@@ -125,10 +122,10 @@ mod tests {
 
     #[test]
     fn version_zero_round_trips_with_reserved_bytes() {
-        let bytes = write_encrypted_property_stream_info(0x1234_5678, &[9, 8, 7]);
+        let bytes = write(0x1234_5678, &[9, 8, 7]);
         assert_eq!(
-            parse_encrypted_property_stream_info(&bytes).unwrap(),
-            EncryptedPropertyStreamInfo::Version0 {
+            parse(&bytes).unwrap(),
+            Info::Version0 {
                 checksum: 0x1234_5678,
                 reserved: vec![9, 8, 7],
             }
@@ -138,41 +135,32 @@ mod tests {
     #[test]
     fn future_versions_are_ignored_without_interpreting_payload() {
         assert_eq!(
-            parse_encrypted_property_stream_info(&[STREAM_ID, 3]).unwrap(),
-            EncryptedPropertyStreamInfo::UnsupportedVersion { version: 3 }
+            parse(&[STREAM_ID, 3]).unwrap(),
+            Info::UnsupportedVersion { version: 3 }
         );
     }
 
     #[test]
     fn invalid_header_is_rejected() {
+        assert_eq!(parse(&[]).unwrap_err(), Error::Truncated);
         assert_eq!(
-            parse_encrypted_property_stream_info(&[]).unwrap_err(),
-            PropertyIntegrityError::Truncated
+            parse(&[1, 0, 0, 0, 0, 0]).unwrap_err(),
+            Error::InvalidStreamId(1)
         );
-        assert_eq!(
-            parse_encrypted_property_stream_info(&[1, 0, 0, 0, 0, 0]).unwrap_err(),
-            PropertyIntegrityError::InvalidStreamId(1)
-        );
-        assert_eq!(
-            parse_encrypted_property_stream_info(&[STREAM_ID, 0, 1]).unwrap_err(),
-            PropertyIntegrityError::Truncated
-        );
+        assert_eq!(parse(&[STREAM_ID, 0, 1]).unwrap_err(), Error::Truncated);
     }
 
     #[test]
     fn crc_is_incremental_and_can_verify_an_info_stream() {
-        let whole = mso_crc32(b"SummaryInformation bytes");
-        let first = mso_crc32_update(0, b"Summary");
-        assert_eq!(whole, mso_crc32_update(first, b"Information bytes"));
-        assert_eq!(mso_crc32(b"123456789"), 0xBD0B_E338);
-        let info = EncryptedPropertyStreamInfo::Version0 {
+        let whole = crc32(b"SummaryInformation bytes");
+        let first = update(0, b"Summary");
+        assert_eq!(whole, update(first, b"Information bytes"));
+        assert_eq!(crc32(b"123456789"), 0xBD0B_E338);
+        let info = Info::Version0 {
             checksum: whole,
             reserved: Vec::new(),
         };
-        assert_eq!(
-            checksum_matches(&info, b"SummaryInformation bytes"),
-            Some(true)
-        );
-        assert_eq!(checksum_matches(&info, b"changed"), Some(false));
+        assert_eq!(verify(&info, b"SummaryInformation bytes"), Some(true));
+        assert_eq!(verify(&info, b"changed"), Some(false));
     }
 }

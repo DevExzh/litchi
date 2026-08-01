@@ -16,6 +16,10 @@
       "litchi-core"
     ],
     "litchi-core": [],
+    "litchi-crypto": [
+      "litchi-cfb",
+      "litchi-ole-common"
+    ],
     "litchi-drawingml": [
       "litchi-core",
       "litchi-ooxml-common",
@@ -148,6 +152,13 @@
       "exit": "Move inert package embedding behind a focused shared capability without a format-family back edge."
     },
     {
+      "order": 27,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-crypto",
+      "reason": "The legacy OLE monolith temporarily consumes the extracted shared Office cryptography capability.",
+      "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-crypto, then delete the host."
+    },
+    {
       "order": 30,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-cfb",
@@ -178,9 +189,9 @@
     {
       "order": 34,
       "dependent": "litchi-ooxml",
-      "dependency": "litchi-ole",
-      "reason": "Encryption support currently creates a cross-family monolith edge.",
-      "exit": "Replace the edge with focused crypto/container capabilities and delete both migration hosts."
+      "dependency": "litchi-crypto",
+      "reason": "The OOXML migration host temporarily owns encrypted-package integration over the extracted shared cryptography capability.",
+      "exit": "Move encrypted-package integration to concrete OOXML crates or a focused adapter, then delete the host."
     },
     {
       "order": 35,
@@ -248,6 +259,7 @@
   ],
   "runtime_neutral": [
     "litchi-core",
+    "litchi-crypto",
     "litchi-drawingml",
     "litchi-odraw",
     "litchi-ole-common",
