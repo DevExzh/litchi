@@ -28,7 +28,8 @@ mod data_validation;
 
 /// BIFF8 calculation and recalculation records.
 mod calculation;
-mod chart;
+/// BIFF8 chart-sheet and embedded-chart metadata and mutation.
+pub mod chart;
 
 /// BIFF8 chart future-record (FRT) records: `ChartFrtInfo`, `CatLab`,
 /// `StartBlock`, and `EndBlock`.
@@ -45,23 +46,11 @@ mod chart_layout;
 /// `FrtWrapper`).
 mod chart_frt_wrapper;
 
-/// BIFF8 `Chart3DBarShape` record: bar/column data-point shapes.
-mod chart_3d_bar_shape;
-
-/// BIFF8 chart `CrtLine` and `CrtLink` records.
-mod crt_line_link;
-
 /// BIFF8 `MarkerFormat` record: data-marker color, size, and shape.
 mod marker_format;
 
-/// BIFF8 `PieFormat` record: pie data-point explosion distance.
-mod pie_format;
-
 /// BIFF8 `ObjectLink` record: the chart object a text is linked to.
 mod object_link;
-
-/// BIFF8 `SerParent` record: the series of a trendline or error bar.
-mod ser_parent;
 
 /// BIFF8 `UsesELFs` record: the natural language formula flag.
 mod uses_elfs;
@@ -71,9 +60,6 @@ mod ser_aux_err_bar;
 
 /// BIFF8 `SerAuxTrend` record: a trendline.
 mod ser_aux_trend;
-
-/// BIFF8 `SerFmt` record: series line/marker properties.
-mod ser_fmt;
 
 /// BIFF8 `Fbi` record: scalable chart font information.
 mod fbi;
@@ -93,14 +79,8 @@ mod plot_growth;
 /// BIFF8 `Scl` record: the view zoom fraction.
 mod scl;
 
-/// BIFF8 fieldless chart collection markers (`Begin`, `End`, `PlotArea`).
-mod chart_markers;
-
 /// BIFF8 `Chart3d` record: 3-D plot area attributes.
 mod chart_3d;
-
-/// BIFF8 `Frame` record: the frame around a chart element.
-mod frame;
 
 /// BIFF8 `BopPopCustom` record: a custom pie split bit sequence.
 mod bop_pop_custom;
@@ -349,16 +329,13 @@ pub use calculation::{
 };
 pub use cell::XlsCell;
 pub use cell_watch::XlsCellWatch;
-pub use chart::*;
 pub use chart_3d::XlsChart3d;
-pub use chart_3d_bar_shape::{XlsChart3DBarShape, XlsChart3DRiserShape, XlsChart3DTaper};
 pub use chart_frt::{
     XlsCatLab, XlsCatLabAlignment, XlsChartBlockObjectKind, XlsChartFrtInfo, XlsChartFrtVersion,
     XlsChartFutureRecordRange, XlsEndBlock, XlsStartBlock,
 };
 pub use chart_frt_wrapper::{XlsEndObject, XlsFrtObjectKind, XlsFrtWrapper, XlsStartObject};
 pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
-pub use chart_markers::{XlsBegin, XlsEnd, XlsPlotArea};
 pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
 pub use comments::CommentVisibility;
 pub use conditional_format::{
@@ -372,7 +349,6 @@ pub use consolidation::{
     XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile, XlsConsolidationFunction,
     XlsConsolidationRange, XlsConsolidationSource,
 };
-pub use crt_line_link::{XlsCrtLine, XlsCrtLineKind, XlsCrtLink};
 pub use crt_ml_frt::XlsCrtMlFrt;
 pub use custom_view::{
     XlsChartSheetCustomViewBegin, XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay,
@@ -410,7 +386,6 @@ pub use force_full_calculation::XlsForceFullCalculation;
 pub use formula_errors::{
     XlsFormulaErrorChecks, XlsFormulaErrorFeature, XlsFormulaErrorHeader, XlsFormulaErrorRange,
 };
-pub use frame::{XlsFrame, XlsFrameType};
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
 pub use header_footer_picture::XlsHeaderFooterPicture;
 pub use interface_records::{XlsInterfaceEnd, XlsInterfaceHdr};
@@ -444,7 +419,6 @@ pub use palette::{XlsColor, XlsPalette};
 pub use phonetic_info::{
     XlsPhoneticAlignment, XlsPhoneticFormat, XlsPhoneticInfo, XlsPhoneticRange, XlsPhoneticType,
 };
-pub use pie_format::XlsPieFormat;
 pub use pivot_olap::{
     XlsHiddenMemberSet, XlsPivotFieldOlapExt, XlsPivotHierarchy, XlsPivotHierarchyAxis,
     XlsPivotItemOlapFlags, XlsPivotPageItemOlapExt, XlsPivotViewOlapHeader,
@@ -480,8 +454,6 @@ pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenario
 pub use scl::XlsScl;
 pub use ser_aux_err_bar::{XlsErrorBarDirection, XlsErrorBarSource, XlsSerAuxErrBar};
 pub use ser_aux_trend::{XlsSerAuxTrend, XlsTrendlineKind};
-pub use ser_fmt::XlsSerFmt;
-pub use ser_parent::XlsSerParent;
 pub use shapes::XlsShape;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
 pub use sheet_ext::{XlsSheetExt, XlsSheetExtOptional};

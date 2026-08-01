@@ -1511,6 +1511,67 @@ rustdoc on the extracted foundations, legacy-name searches, primary-path panic
 searches, and diff validation are clean. These are focused crate and boundary
 gates, not a repeated full-workspace run or a new native-Office certification.
 
+The thirty-first implementation slice moves the binary chart host bridge onto
+that neutral foundation. `litchi-ograph::chart` now distinguishes a strict
+standalone Graph package from allocation-free chart discovery inside an
+arbitrary Excel `Workbook` stream. Borrowed `Ref`, move-owned `Stream`, and
+move-owned `Book` preserve exact bytes and allocations at the appropriate
+boundary. The semantic `Chart` uses producer-specific, type-checked Graph and
+Excel link and cache grammars, bounded identifiers and numeric settings, and
+short `axis`, `format`, and `group` modules. A pristine parsed chart replays its
+original allocation exactly; edits to a parsed chart are refused until opaque
+record placement can be proved. Fresh semantic authoring is also refused until
+the complete mandatory chart-format, series, axis-parent, and cache scaffolds
+required by `[MS-XLS]` section 2.1.7.20.1 and the corresponding
+`[MS-OGRAPH]` chart-sheet grammar are modeled; the safe facade does not expose
+a self-consistent but Office-nonconforming abbreviated stream. Chart-group line
+and up/down-bar
+values nevertheless own their mandatory format records, so the type system
+cannot construct those abbreviated invalid collections when authoring resumes.
+
+XLS now exposes the concise `xls::chart::{Chart, Editor, Selector, Location}`
+facade, with semantic sheet-name and embedded-chart selectors as the primary
+entry points and checked raw positions as an explicit secondary capability.
+Seven duplicate record modules and their long compatibility names are deleted;
+BIFF framing, discovery, bounded encoding, and shared chart records come from
+`litchi-ograph`. Unsupported records remain inspectable, but an edit that would
+guess their placement returns a typed `UnsafeEdit`; unchanged chart substreams
+are copied exactly. PowerPoint chart discovery likewise returns one neutral,
+bounded inventory across standalone Graph and embedded Excel chart objects,
+supports semantic frame and slide selectors, and reports per-object failures
+without discarding successful siblings.
+
+This slice deliberately leaves the PowerPoint writer's temporary XLS chart
+authoring peer seam and the remaining duplicate XLS semantic projection visible
+as migration debt. Every public XLS add, insert, chart-sheet creation,
+replacement, and standalone chart-workbook path, plus `PptWriter::add_chart`,
+returns the typed `litchi_ograph::Error::UnsupportedAuthoring` without mutation
+instead of emitting that incomplete legacy grammar. Exact replay, inventory,
+removal, and reordering of existing XLS charts remain enabled. The abbreviated
+generator survives only under `cfg(test)` as parser-fixture scaffolding and is
+not an Office-conformance claim. Transaction snapshots that clone whole
+XLS workbooks also remain a measured redesign target. Read-side PPT code no
+longer depends on XLS, but restoring writer support requires a neutral
+host-authoring contract, the complete mandatory scaffold, and new native Office
+evidence rather than silently changing embedded-object topology. Because this
+slice adds no new emitted chart artifact, Computer Use is not repeated and no
+new native Microsoft Office claim is made. Per the explicit review decision,
+verification for this slice uses only
+the focused OGraph, OLE chart integration, dependency-boundary, warning,
+Clippy, rustdoc, formatting, and diff gates; the earlier fully green workspace
+baseline is relied upon instead of rerunning the full workspace gate.
+
+Focused evidence is green. OGraph passes 31 warning-denied tests, all-target
+check and Clippy, and warning-denied rustdoc. OLE passes 33 XLS chart-focused
+unit tests, four PPT chart-focused unit tests, and nine XLS/PPT integration
+tests, including typed atomic refusal, exact clean replay, real POI and
+LibreOffice fixture gates, both chart host topologies, and per-object failure
+isolation. Its all-feature/all-target warning-denied check and Clippy and its
+all-feature warning-denied rustdoc are clean. The dependency checker accepts 29
+workspace packages, 75 direct internal edges, and 33 explicit migration-debt
+entries; all seven checker regression tests pass. Formatting, manifest order,
+source-boundary searches, and diff validation are also clean.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

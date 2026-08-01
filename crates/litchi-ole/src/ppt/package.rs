@@ -30,6 +30,8 @@ pub enum PptError {
     Ole(OleError),
     /// Checked OfficeArt parsing or validation error.
     OfficeArt(litchi_odraw::Error),
+    /// Host-neutral Office Graph parsing or validation error.
+    Graph(litchi_ograph::Error),
     /// Invalid PPT format
     InvalidFormat(String),
     /// Stream not found
@@ -64,12 +66,19 @@ impl From<litchi_odraw::Error> for PptError {
     }
 }
 
+impl From<litchi_ograph::Error> for PptError {
+    fn from(err: litchi_ograph::Error) -> Self {
+        Self::Graph(err)
+    }
+}
+
 impl std::fmt::Display for PptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PptError::Io(e) => write!(f, "IO error: {}", e),
             PptError::Ole(e) => write!(f, "OLE error: {}", e),
             PptError::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
+            PptError::Graph(e) => write!(f, "Office Graph error: {e}"),
             PptError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
             PptError::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
             PptError::Corrupted(s) => write!(f, "Corrupted file: {}", s),
@@ -87,7 +96,23 @@ impl std::fmt::Display for PptError {
     }
 }
 
-impl std::error::Error for PptError {}
+impl std::error::Error for PptError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Ole(error) => Some(error),
+            Self::OfficeArt(error) => Some(error),
+            Self::Graph(error) => Some(error),
+            Self::InvalidFormat(_)
+            | Self::StreamNotFound(_)
+            | Self::Corrupted(_)
+            | Self::PasswordRequired
+            | Self::InvalidPassword
+            | Self::UnsupportedEncryption(_)
+            | Self::MalformedEncryptionHeader(_) => None,
+        }
+    }
+}
 
 /// Result type for PPT operations.
 pub type Result<T> = std::result::Result<T, PptError>;
@@ -300,6 +325,9 @@ impl From<PptError> for litchi_core::Error {
             PptError::Ole(ole_err) => litchi_core::Error::from(ole_err),
             PptError::OfficeArt(error) => {
                 litchi_core::Error::CorruptedFile(format!("Invalid OfficeArt data: {error}"))
+            },
+            PptError::Graph(error) => {
+                litchi_core::Error::CorruptedFile(format!("Invalid Office Graph data: {error}"))
             },
             PptError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             PptError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),

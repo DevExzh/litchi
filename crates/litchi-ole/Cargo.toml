@@ -26,6 +26,7 @@ litchi-crypto   = { workspace = true }
 litchi-formula  = { workspace = true, optional = true }
 litchi-imgconv  = { workspace = true, optional = true }
 litchi-odraw    = { workspace = true }
+litchi-ograph   = { workspace = true }
 litchi-ole-common = { workspace = true }
 litchi-opc      = { workspace = true }
 litchi-sign     = { workspace = true }

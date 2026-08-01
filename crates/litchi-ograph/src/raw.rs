@@ -78,6 +78,120 @@ impl<'a> RecordRef<'a> {
     pub const fn offset(self) -> usize {
         self.offset
     }
+
+    /// Copies this frame into an owned record under conservative default bounds.
+    pub fn own(self) -> Result<Record> {
+        self.own_with(Limits::default())
+    }
+
+    /// Copies this frame into an owned record under explicit bounds.
+    pub fn own_with(self, limits: Limits) -> Result<Record> {
+        let limits = limits.validate()?;
+        if self.payload.len() > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                resource: "record bytes",
+                observed: as_u64(self.payload.len()),
+                maximum: as_u64(limits.max_record_bytes),
+            });
+        }
+        if self.encoded.len() > limits.max_output_bytes {
+            return Err(Error::LimitExceeded {
+                resource: "output bytes",
+                observed: as_u64(self.encoded.len()),
+                maximum: as_u64(limits.max_output_bytes),
+            });
+        }
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.encoded.len())
+            .map_err(|_| Error::Allocation {
+                resource: "record frame",
+            })?;
+        bytes.extend_from_slice(self.encoded);
+        Ok(Record {
+            bytes,
+            kind: self.kind,
+        })
+    }
+}
+
+/// Move-owned, lossless BIFF record frame.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Record {
+    bytes: Vec<u8>,
+    kind: Kind,
+}
+
+impl Record {
+    /// Takes ownership and validates exactly one complete frame.
+    pub fn open(bytes: Vec<u8>) -> Result<Self> {
+        Self::with_limits(bytes, Limits::default())
+    }
+
+    /// Takes ownership and validates exactly one frame under explicit bounds.
+    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        if bytes.len() > limits.max_output_bytes {
+            return Err(Error::LimitExceeded {
+                resource: "output bytes",
+                observed: as_u64(bytes.len()),
+                maximum: as_u64(limits.max_output_bytes),
+            });
+        }
+
+        let (kind, encoded_len) = {
+            let mut records = Records::validated(&bytes, limits);
+            let first = records.next().ok_or(Error::InvalidRecordFrame {
+                offset: 0,
+                reason: "record frame is empty",
+            })??;
+            let values = (first.kind, first.encoded.len());
+            if let Some(next) = records.next() {
+                let next = next?;
+                return Err(Error::InvalidRecordFrame {
+                    offset: next.offset,
+                    reason: "input contains more than one BIFF record",
+                });
+            }
+            values
+        };
+        if encoded_len != bytes.len() {
+            return Err(Error::InvalidRecordFrame {
+                offset: encoded_len,
+                reason: "bytes follow the complete BIFF record",
+            });
+        }
+        Ok(Self { bytes, kind })
+    }
+
+    /// Record identifier.
+    pub const fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    /// Borrow the exact encoded frame.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Borrow this record without copying.
+    pub fn as_ref(&self) -> RecordRef<'_> {
+        let payload = match self.bytes.get(HEADER_BYTES..) {
+            Some(payload) => payload,
+            None => &[],
+        };
+        RecordRef {
+            kind: self.kind,
+            payload,
+            encoded: &self.bytes,
+            offset: 0,
+        }
+    }
+
+    /// Recover the original frame allocation without copying.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
 }
 
 /// Bounded, allocation-free iterator over BIFF record frames.
@@ -104,13 +218,17 @@ impl<'a> Records<'a> {
 
     /// Parses using explicitly configured resource limits.
     pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
-        Ok(Self {
+        Ok(Self::validated(bytes, limits.validate()?))
+    }
+
+    pub(crate) fn validated(bytes: &'a [u8], limits: Limits) -> Self {
+        Self {
             bytes,
             offset: 0,
             count: 0,
-            limits: limits.validate()?,
+            limits,
             done: false,
-        })
+        }
     }
 
     fn fail(&mut self, error: Error) -> Option<Result<RecordRef<'a>>> {
@@ -166,8 +284,32 @@ impl<'a> Iterator for Records<'a> {
                 available,
             });
         };
-        let kind = Kind::new(u16::from_le_bytes([header[0], header[1]]));
-        let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        let Some((&kind_lo, tail)) = header.split_first() else {
+            return self.fail(Error::TruncatedHeader {
+                offset: self.offset,
+                available,
+            });
+        };
+        let Some((&kind_hi, tail)) = tail.split_first() else {
+            return self.fail(Error::TruncatedHeader {
+                offset: self.offset,
+                available,
+            });
+        };
+        let Some((&len_lo, tail)) = tail.split_first() else {
+            return self.fail(Error::TruncatedHeader {
+                offset: self.offset,
+                available,
+            });
+        };
+        let Some(&len_hi) = tail.first() else {
+            return self.fail(Error::TruncatedHeader {
+                offset: self.offset,
+                available,
+            });
+        };
+        let kind = Kind::new(u16::from_le_bytes([kind_lo, kind_hi]));
+        let payload_len = usize::from(u16::from_le_bytes([len_lo, len_hi]));
         if payload_len > self.limits.max_record_bytes {
             return self.fail(Error::LimitExceeded {
                 resource: "record bytes",
@@ -438,6 +580,42 @@ mod tests {
         assert!(matches!(
             Records::with_limits(&[], limits),
             Err(Error::InvalidLimit {
+                resource: "record bytes",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn owned_record_requires_one_exact_bounded_frame() {
+        assert!(matches!(
+            Record::open(Vec::new()),
+            Err(Error::InvalidRecordFrame {
+                reason: "record frame is empty",
+                ..
+            })
+        ));
+
+        let mut multiple = record(1, &[1]);
+        multiple.extend_from_slice(&record(2, &[2]));
+        assert!(matches!(
+            Record::open(multiple),
+            Err(Error::InvalidRecordFrame {
+                reason: "input contains more than one BIFF record",
+                ..
+            })
+        ));
+
+        let frame = record(1, &[1, 2]);
+        assert!(matches!(
+            Record::with_limits(
+                frame,
+                Limits {
+                    max_record_bytes: 1,
+                    ..Limits::default()
+                }
+            ),
+            Err(Error::LimitExceeded {
                 resource: "record bytes",
                 ..
             })

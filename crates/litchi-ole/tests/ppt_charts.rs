@@ -1,4 +1,9 @@
+use std::io::Cursor;
+use std::path::PathBuf;
+
+use litchi_ograph::chart::Kind as GraphKind;
 use litchi_ole::OleWriter;
+use litchi_ole::ppt::chart::{Chart, Frame, Kind};
 use litchi_ole::ppt::ole_object::{
     PowerPointOleColorFollow, PowerPointOleContainerKind, PowerPointOleDimensionPolicy,
     PowerPointOleDrawAspect, PowerPointOleEmbedPreferences, PowerPointOleExternalObject,
@@ -8,14 +13,11 @@ use litchi_ole::ppt::ole_object::{
 use litchi_ole::ppt::ole_storage::{
     PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
 };
-use litchi_ole::ppt::{Package, PowerPointChartKind, PowerPointOlePackageEditor};
-use litchi_ole::xls::{
-    XlsChart, XlsChartCacheEntry, XlsChartCachedValue, XlsChartCellReference, XlsChartDataLink,
-    XlsChartEditor, XlsChartGroupKind, XlsChartLimits, XlsChartLocation, XlsChartSeries,
-    XlsChartType,
-};
-use std::io::Cursor;
-use std::path::PathBuf;
+use litchi_ole::ppt::{Package, PowerPointOlePackageEditor};
+
+const BOF: u16 = 0x0809;
+const EOF: u16 = 0x000A;
+const UNKNOWN: u16 = 0x7777;
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -30,75 +32,58 @@ fn record(kind: u16, data: &[u8]) -> Vec<u8> {
     out
 }
 
-fn bof(kind: u16) -> Vec<u8> {
-    let mut data = Vec::new();
-    data.extend(0x0600u16.to_le_bytes());
-    data.extend(kind.to_le_bytes());
-    data.extend([0; 12]);
-    record(0x0809, &data)
+fn graph_bof(doc_type: u16) -> [u8; 16] {
+    let mut payload = [0; 16];
+    payload[0..2].copy_from_slice(&0x0680_u16.to_le_bytes());
+    payload[2..4].copy_from_slice(&doc_type.to_le_bytes());
+    payload[4..6].copy_from_slice(&0x0DBB_u16.to_le_bytes());
+    payload[6..8].copy_from_slice(&0x07CD_u16.to_le_bytes());
+    payload[8..12].copy_from_slice(&(0x0000_0009_u32 | (6 << 14)).to_le_bytes());
+    payload[12..16].copy_from_slice(&(0x06_u32 | (6 << 8)).to_le_bytes());
+    payload
 }
 
-/// A minimal one-worksheet compound file accepted by `XlsChartEditor`.
-fn workbook() -> Vec<u8> {
-    let mut globals = bof(5);
-    let bound_at = globals.len();
-    let mut bound = vec![0; 8];
-    bound[6] = 1;
-    bound.extend(b"S");
-    globals.extend(record(0x0085, &bound));
-    globals.extend(record(0x000a, &[]));
-    let offset = globals.len() as u32;
-    globals[bound_at + 4..bound_at + 8].copy_from_slice(&offset.to_le_bytes());
-    globals.extend(bof(0x0010));
-    globals.extend(record(0x000a, &[]));
+fn excel_bof(doc_type: u16) -> [u8; 16] {
+    let mut payload = [0; 16];
+    payload[0..2].copy_from_slice(&0x0600_u16.to_le_bytes());
+    payload[2..4].copy_from_slice(&doc_type.to_le_bytes());
+    payload
+}
+
+fn graph_workbook() -> Vec<u8> {
+    let mut workbook = record(BOF, &graph_bof(0x0005));
+    workbook.extend(record(UNKNOWN, &[1, 2, 3]));
+    workbook.extend(record(EOF, &[]));
+    workbook.extend(record(BOF, &graph_bof(0x8000)));
+    workbook.extend(record(UNKNOWN, &[4, 5]));
+    workbook.extend(record(EOF, &[]));
+    workbook
+}
+
+fn excel_workbook() -> Vec<u8> {
+    let mut workbook = record(BOF, &excel_bof(0x0005));
+    workbook.extend(record(UNKNOWN, &[1, 2, 3]));
+    workbook.extend(record(EOF, &[]));
+    workbook.extend(record(BOF, &excel_bof(0x0020)));
+    workbook.extend(record(UNKNOWN, &[4, 5]));
+    workbook.extend(record(EOF, &[]));
+    workbook
+}
+
+fn compound(workbook: &[u8]) -> Vec<u8> {
     let mut writer = OleWriter::new();
-    writer.create_stream(&["Workbook"], &globals).unwrap();
+    writer
+        .create_stream(&["Workbook"], workbook)
+        .expect("create Workbook stream");
     let mut out = Cursor::new(Vec::new());
-    writer.write_to(&mut out).unwrap();
+    writer.write_to(&mut out).expect("write compound file");
     out.into_inner()
-}
-
-/// A chart-bearing compound file: one line-chart series with a BIFF data
-/// link, a cached value, and a title.
-fn chart_workbook() -> Vec<u8> {
-    let mut chart = XlsChart {
-        title: Some("Sales".to_string()),
-        ..Default::default()
-    };
-    chart.series.push(XlsChartSeries {
-        category_count: 4,
-        value_count: 4,
-        links: vec![XlsChartDataLink {
-            role: 1,
-            source_type: 2,
-            unlinked_number_format: false,
-            number_format: 0,
-            formula_tokens: vec![0x3b, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0],
-            references: vec![XlsChartCellReference {
-                extern_sheet_index: 0,
-                first_row: 0,
-                last_row: 3,
-                first_column: 0,
-                last_column: 0,
-            }],
-        }],
-        ..Default::default()
-    });
-    chart.cached_values.push(XlsChartCacheEntry {
-        cache_index: 0,
-        row: 0,
-        column: 0,
-        value: XlsChartCachedValue::Number(42.0),
-    });
-    let mut editor = XlsChartEditor::open(workbook(), XlsChartLimits::default()).unwrap();
-    editor.add(0, 7, 0, chart).unwrap();
-    editor.finish().unwrap()
 }
 
 fn chart_object(
     id: u32,
     subtype: PowerPointOleObjectSubtype,
-    prog_id: &str,
+    program: &str,
 ) -> PowerPointOleExternalObject {
     PowerPointOleExternalObject::Object(PowerPointOleObjectDefinition {
         kind: PowerPointOleContainerKind::Embedded(PowerPointOleEmbedPreferences {
@@ -113,17 +98,17 @@ fn chart_object(
             object_type: PowerPointOleObjectType::Embedded,
             id,
             subtype,
-            persist_id: 1, // reassigned by the package editor
+            persist_id: 1, // Reassigned by the package editor.
             unused: [0; 4],
         },
         menu_name: None,
-        program_id: Some(prog_id.to_string()),
+        program_id: Some(program.to_string()),
         clipboard_name: None,
         metafile: None,
     })
 }
 
-fn uncompressed_storage(data: Vec<u8>) -> PowerPointOleStorage {
+fn uncompressed(data: Vec<u8>) -> PowerPointOleStorage {
     PowerPointOleStorage {
         kind: PowerPointOleStorageKind::OleObject,
         compression: PowerPointOleStorageCompression::Uncompressed,
@@ -131,112 +116,130 @@ fn uncompressed_storage(data: Vec<u8>) -> PowerPointOleStorage {
     }
 }
 
-#[test]
-fn embedded_native_chart_is_parsed_and_corrupt_chart_degrades() {
-    let bytes = std::fs::read(fixture("ppt_with_embeded.ppt")).unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
-    let presentation = package.presentation().unwrap();
-    let mut collection = presentation
+fn editor_with_seed(seed: u32) -> PowerPointOlePackageEditor {
+    let original = std::fs::read(fixture("ppt_with_embeded.ppt")).expect("read fixture");
+    let mut package = Package::from_reader(Cursor::new(original.clone())).expect("open fixture");
+    let presentation = package.presentation().expect("read presentation");
+    let mut objects = presentation
         .ole_objects()
-        .unwrap()
-        .expect("fixture has an external-object list");
-    // The unmodified fixture embeds Word tables and Excel sheets, not charts.
-    assert!(presentation.charts().unwrap().is_empty());
-    drop(presentation);
-
-    collection.id_seed = 8;
-    let original = std::fs::read(fixture("ppt_with_embeded.ppt")).unwrap();
-    let mut editor = PowerPointOlePackageEditor::open(original, collection).unwrap();
-    editor
-        .add(
-            chart_object(7, PowerPointOleObjectSubtype::ExcelChart, "Excel.Chart.8"),
-            uncompressed_storage(chart_workbook()),
-        )
-        .unwrap();
-    editor
-        .add(
-            chart_object(8, PowerPointOleObjectSubtype::Graph, "MSGraph.Chart.8"),
-            uncompressed_storage(b"not a compound file".to_vec()),
-        )
-        .unwrap();
-    let bytes = editor.finish().unwrap();
-
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
-    let presentation = package.presentation().unwrap();
-    let inventory = presentation.charts().unwrap();
-
-    assert_eq!(
-        inventory.charts.len(),
-        1,
-        "failures: {:?}",
-        inventory.failures
-    );
-    assert_eq!(inventory.failures.len(), 1);
-    assert_eq!(inventory.failures[0].object_id, 8);
-
-    let chart = &inventory.charts[0];
-    assert_eq!(chart.object_id, 7);
-    assert_eq!(chart.kind, PowerPointChartKind::ExcelChart);
-    assert_eq!(chart.program_id.as_deref(), Some("Excel.Chart.8"));
-    assert_eq!(chart.charts.len(), 1);
-    let entry = &chart.charts[0];
-    assert_eq!(
-        entry.location,
-        XlsChartLocation::Embedded {
-            sheet_index: 0,
-            object_id: 7
-        }
-    );
-    assert!(matches!(
-        entry.chart.chart_type(),
-        XlsChartType::Single(XlsChartGroupKind::Line { .. })
-    ));
-    assert_eq!(entry.chart.title.as_deref(), Some("Sales"));
-    assert_eq!(entry.chart.series.len(), 1);
-    assert_eq!(entry.chart.series[0].links.len(), 1);
-    assert_eq!(entry.chart.series[0].links[0].references.len(), 1);
+        .expect("parse objects")
+        .expect("fixture object list");
     assert!(
-        entry
-            .chart
-            .cached_values
-            .iter()
-            .any(|value| value.value == XlsChartCachedValue::Number(42.0))
+        presentation
+            .charts()
+            .expect("enumerate fixture charts")
+            .is_empty(),
+        "fixture itself must not contain native chart objects"
     );
+    objects.id_seed = seed;
+    PowerPointOlePackageEditor::open(original, objects).expect("open package editor")
 }
 
 #[test]
-fn prog_id_identifies_chart_when_subtype_is_default() {
-    let bytes = std::fs::read(fixture("ppt_with_embeded.ppt")).unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
-    let presentation = package.presentation().unwrap();
-    let mut collection = presentation.ole_objects().unwrap().unwrap();
-    drop(presentation);
-    collection.id_seed = 7;
-    let mut editor = PowerPointOlePackageEditor::open(
-        std::fs::read(fixture("ppt_with_embeded.ppt")).unwrap(),
-        collection,
-    )
-    .unwrap();
+fn graph_and_excel_objects_use_neutral_typed_views() {
+    let mut editor = editor_with_seed(9);
+    editor
+        .add(
+            chart_object(7, PowerPointOleObjectSubtype::Graph, "MSGraph.Chart.8"),
+            uncompressed(compound(&graph_workbook())),
+        )
+        .expect("add Graph object");
+    editor
+        .add(
+            chart_object(8, PowerPointOleObjectSubtype::ExcelChart, "Excel.Chart.8"),
+            uncompressed(compound(&excel_workbook())),
+        )
+        .expect("add Excel object");
+    editor
+        .add(
+            chart_object(9, PowerPointOleObjectSubtype::Graph, "MSGraph.Chart.8"),
+            uncompressed(b"not a compound file".to_vec()),
+        )
+        .expect("add corrupt object");
+
+    let bytes = editor.finish().expect("finish package edit");
+    let mut package = Package::from_reader(Cursor::new(bytes)).expect("reopen package");
+    let presentation = package.presentation().expect("read presentation");
+    let inventory = presentation.charts().expect("enumerate charts");
+
+    assert_eq!(inventory.seen(), 3);
+    assert_eq!(inventory.len(), 2);
+    assert_eq!(inventory.charts().count(), 2);
+    assert_eq!(inventory.failures().count(), 1);
+    let failure = inventory.failures().next().expect("corrupt object failure");
+    assert_eq!(failure.kind(), Kind::Graph);
+    assert_eq!(failure.info().object_id(), 9);
+
+    let graph = inventory.get(0).expect("Graph chart");
+    assert_eq!(graph.kind(), Kind::Graph);
+    assert_eq!(graph.info().object_id(), 7);
+    assert_eq!(graph.info().program(), Some("MSGraph.Chart.8"));
+    assert!(graph.info().frame().is_none());
+    let Chart::Graph(graph) = graph else {
+        panic!("kind and variant must agree");
+    };
+    assert_eq!(graph.package().topology().stream_count(), 1);
+    assert_eq!(graph.book().len(), 1);
+    let chart = graph
+        .book()
+        .charts()
+        .next()
+        .expect("one chart")
+        .expect("validated chart");
+    assert_eq!(chart.kind(), GraphKind::Graph);
+    assert_eq!(chart.records().count(), 3);
+    assert!(chart.offset() > 0);
+
+    let excel = inventory.get(1).expect("Excel chart");
+    assert_eq!(excel.kind(), Kind::Excel);
+    assert_eq!(excel.info().object_id(), 8);
+    let Chart::Excel(excel) = excel else {
+        panic!("kind and variant must agree");
+    };
+    assert_eq!(excel.book().len(), 1);
+    let chart = excel
+        .book()
+        .charts()
+        .next()
+        .expect("one chart")
+        .expect("validated chart");
+    assert_eq!(chart.kind(), GraphKind::Excel);
+    assert_eq!(chart.records().count(), 3);
+    assert!(chart.offset() > 0);
+
+    assert!(
+        inventory
+            .at(Frame::new(1, 1).expect("valid frame selector"))
+            .is_none()
+    );
+    assert!(Frame::new(0, 1).is_none());
+    assert!(Frame::new(1, 0).is_none());
+    assert_eq!(inventory.on_slide(1).count(), 0);
+}
+
+#[test]
+fn program_identifies_chart_when_subtype_is_default() {
+    let mut editor = editor_with_seed(7);
     editor
         .add(
             chart_object(7, PowerPointOleObjectSubtype::Default, "Excel.Chart.8"),
-            uncompressed_storage(chart_workbook()),
+            uncompressed(compound(&excel_workbook())),
         )
-        .unwrap();
-    let bytes = editor.finish().unwrap();
+        .expect("add chart");
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
-    let presentation = package.presentation().unwrap();
-    let inventory = presentation.charts().unwrap();
-    assert_eq!(inventory.failures.len(), 0);
-    assert_eq!(inventory.charts.len(), 1);
-    assert_eq!(inventory.charts[0].kind, PowerPointChartKind::ExcelChart);
+    let bytes = editor.finish().expect("finish package edit");
+    let mut package = Package::from_reader(Cursor::new(bytes)).expect("reopen package");
+    let presentation = package.presentation().expect("read presentation");
+    let inventory = presentation.charts().expect("enumerate charts");
+    assert_eq!(inventory.failures().count(), 0);
+    assert_eq!(inventory.charts().count(), 1);
+    assert_eq!(inventory.get(0).map(Chart::kind), Some(Kind::Excel));
 }
 
 #[test]
 fn presentation_without_charts_yields_empty_inventory() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/ppt/empty.ppt");
-    let mut package = Package::open(path).unwrap();
-    let presentation = package.presentation().unwrap();
-    assert!(presentation.charts().unwrap().is_empty());
+    let mut package = Package::open(path).expect("open empty fixture");
+    let presentation = package.presentation().expect("read presentation");
+    assert!(presentation.charts().expect("enumerate charts").is_empty());
 }

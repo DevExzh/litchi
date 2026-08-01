@@ -2,8 +2,9 @@
 //!
 //! The crate deliberately separates three layers:
 //!
-//! - [`raw`] is a bounded, allocation-free view over BIFF record framing;
+//! - [`raw`] provides bounded borrowed and move-owned BIFF record framing;
 //! - [`record`] contains small typed record codecs;
+//! - [`chart`] discovers standalone and Excel-hosted chart substreams;
 //! - [`PackageRef`] and [`Package`] validate standalone OGraph compound files.
 //!
 //! Parsing preserves record order, unknown records, reserved bits, and unused
@@ -12,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod chart;
 mod error;
 mod limits;
 mod package;
@@ -20,4 +22,4 @@ pub mod record;
 
 pub use error::{Error, Result};
 pub use limits::{Limits, MAX_BIFF_RECORD_BYTES};
-pub use package::{Package, PackageRef, Payload, Topology};
+pub use package::{Package, PackageRef, Payload, Topology, Workbook, WorkbookRef};

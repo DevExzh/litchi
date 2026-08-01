@@ -25,6 +25,8 @@ pub enum XlsError {
     Cfb(litchi_cfb::OleError),
     /// MS-OVBA project authoring or parsing error
     Vba(litchi_vba::Error),
+    /// Host-neutral Office Graph parsing or encoding error.
+    Graph(litchi_ograph::Error),
     /// Invalid BIFF record
     InvalidRecord {
         /// Record type
@@ -67,6 +69,8 @@ pub enum XlsError {
     UnsupportedFeature(String),
     /// Invalid data
     InvalidData(String),
+    /// A requested edit cannot preserve unsupported source records safely.
+    UnsafeEdit(String),
     /// Unexpected record type
     UnexpectedRecordType {
         /// Expected record type
@@ -84,6 +88,7 @@ impl fmt::Display for XlsError {
             XlsError::Io(e) => write!(f, "I/O error: {}", e),
             XlsError::Cfb(e) => write!(f, "CFB error: {}", e),
             XlsError::Vba(e) => write!(f, "VBA project error: {}", e),
+            XlsError::Graph(e) => write!(f, "Office Graph error: {e}"),
             XlsError::InvalidRecord {
                 record_type,
                 message,
@@ -131,6 +136,7 @@ impl fmt::Display for XlsError {
             XlsError::InvalidData(msg) => {
                 write!(f, "Invalid data: {}", msg)
             },
+            XlsError::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
             XlsError::UnexpectedRecordType { expected, found } => {
                 write!(
                     f,
@@ -151,6 +157,7 @@ impl std::error::Error for XlsError {
             XlsError::Io(e) => Some(e),
             XlsError::Cfb(e) => Some(e),
             XlsError::Vba(e) => Some(e),
+            XlsError::Graph(e) => Some(e),
             _ => None,
         }
     }
@@ -171,6 +178,12 @@ impl From<litchi_cfb::OleError> for XlsError {
 impl From<litchi_vba::Error> for XlsError {
     fn from(err: litchi_vba::Error) -> Self {
         XlsError::Vba(err)
+    }
+}
+
+impl From<litchi_ograph::Error> for XlsError {
+    fn from(err: litchi_ograph::Error) -> Self {
+        Self::Graph(err)
     }
 }
 

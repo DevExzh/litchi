@@ -558,23 +558,22 @@ impl Presentation {
         PowerPointOleStorage::parse_as(&record, kind).map(Some)
     }
 
-    /// Enumerate typed, inert native charts embedded as OLE objects.
+    /// Enumerate inert native charts as neutral Office Graph views.
     ///
     /// Embedded objects whose subtype or ProgID identifies `MSGraph.Chart` or
     /// `Excel.Chart` ([MS-PPT] 2.13.11) have their `ExOleObjStg` payload opened
-    /// as a compound storage and their BIFF8 chart substreams parsed. Linked
-    /// charts are never opened. Everything is inert: no formula evaluation, no
-    /// rendering, and no OLE activation. A corrupt payload degrades to a
-    /// per-object failure entry and never aborts the remaining charts.
-    pub fn charts(&self) -> Result<crate::ppt::PowerPointChartInventory> {
-        self.charts_with_limits(crate::xls::XlsChartLimits::default())
+    /// as a bounded compound storage and their chart substreams validated by
+    /// `litchi-ograph`. Linked charts are never opened. A corrupt payload
+    /// degrades to a per-object failure without aborting the remaining charts.
+    pub fn charts(&self) -> Result<crate::ppt::chart::Inventory> {
+        self.charts_with(litchi_ograph::Limits::default())
     }
 
-    /// Enumerate native charts with caller-supplied BIFF8 chart resource limits.
-    pub fn charts_with_limits(
+    /// Enumerate native charts with explicit neutral resource limits.
+    pub fn charts_with(
         &self,
-        limits: crate::xls::XlsChartLimits,
-    ) -> Result<crate::ppt::PowerPointChartInventory> {
+        limits: litchi_ograph::Limits,
+    ) -> Result<crate::ppt::chart::Inventory> {
         crate::ppt::chart::enumerate(self, limits)
     }
 

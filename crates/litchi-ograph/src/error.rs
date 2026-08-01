@@ -120,6 +120,47 @@ pub enum Error {
         reason: &'static str,
     },
 
+    /// A BIFF chart substream is malformed or structurally incomplete.
+    #[error("invalid chart substream at offset {offset}: {reason}")]
+    InvalidChart {
+        /// Record offset nearest the failure.
+        offset: usize,
+        /// Static structural explanation.
+        reason: &'static str,
+    },
+
+    /// An owned raw-record input is not exactly one complete BIFF frame.
+    #[error("invalid BIFF record frame at offset {offset}: {reason}")]
+    InvalidRecordFrame {
+        /// Record offset nearest the failure.
+        offset: usize,
+        /// Static structural explanation.
+        reason: &'static str,
+    },
+
+    /// A semantic chart value cannot be represented safely.
+    #[error("invalid chart {field}: {reason}")]
+    InvalidModel {
+        /// Semantic field nearest the failure.
+        field: &'static str,
+        /// Static validation explanation.
+        reason: &'static str,
+    },
+
+    /// Re-encoding a parsed chart would risk losing opaque source data.
+    #[error("unsafe parsed-chart edit refused: {reason}")]
+    UnsafeEdit {
+        /// Why a byte-preserving rewrite cannot be guaranteed.
+        reason: &'static str,
+    },
+
+    /// Fresh semantic authoring is not yet backed by a complete wire grammar.
+    #[error("unsupported chart authoring: {reason}")]
+    UnsupportedAuthoring {
+        /// Static explanation of the missing proof boundary.
+        reason: &'static str,
+    },
+
     /// Checked length arithmetic could not be represented.
     #[error("size overflow while processing {resource}")]
     SizeOverflow {

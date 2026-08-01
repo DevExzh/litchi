@@ -95,6 +95,8 @@ pub enum PptWriteError {
     Ole(crate::OleError),
     /// MS-OVBA project authoring error
     Vba(litchi_vba::Error),
+    /// Host-neutral Office Graph authoring error.
+    Graph(litchi_ograph::Error),
 }
 
 /// Build a minimal, valid Current User stream referencing the given UserEditAtom offset.
@@ -209,6 +211,12 @@ impl From<litchi_vba::Error> for PptWriteError {
     }
 }
 
+impl From<litchi_ograph::Error> for PptWriteError {
+    fn from(err: litchi_ograph::Error) -> Self {
+        Self::Graph(err)
+    }
+}
+
 impl std::fmt::Display for PptWriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -216,6 +224,7 @@ impl std::fmt::Display for PptWriteError {
             PptWriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
             PptWriteError::Ole(e) => write!(f, "OLE error: {}", e),
             PptWriteError::Vba(e) => write!(f, "VBA project error: {}", e),
+            PptWriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
         }
     }
 }
@@ -226,6 +235,7 @@ impl std::error::Error for PptWriteError {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::Vba(error) => Some(error),
+            Self::Graph(error) => Some(error),
             Self::InvalidData(_) => None,
         }
     }
@@ -1849,12 +1859,13 @@ impl PptWriter {
         Ok(())
     }
 
-    /// Add a native chart to a slide
+    /// Validate a native-chart request and refuse incomplete binary authoring.
     ///
-    /// The chart is embedded as an `Excel.Chart.8` OLE object: its data is
-    /// serialized into a BIFF8 chart workbook ([MS-OGRAPH]) persisted as an
-    /// `ExOleObjStg` record, declared in the document `ExObjList`, and
-    /// displayed through an OLE object frame shape on the slide.
+    /// No presentation state is changed. A structurally valid request returns
+    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through
+    /// [`PptWriteError::Graph`] until the complete Office-compatible BIFF chart
+    /// grammar is implemented. Invalid chart definitions, frames, or slide
+    /// indexes continue to return [`PptWriteError::InvalidData`].
     ///
     /// # Arguments
     ///
@@ -1876,7 +1887,17 @@ impl PptWriter {
                 "chart frame dimensions must be positive".to_string(),
             ));
         }
-        let workbook = chart.build_workbook()?;
+        let x = pt_to_emu_i32(x);
+        let y = pt_to_emu_i32(y);
+        let width = pt_to_emu_i32(width);
+        let height = pt_to_emu_i32(height);
+        x.checked_add(width).ok_or_else(|| {
+            PptWriteError::InvalidData("chart frame horizontal extent is too large".to_string())
+        })?;
+        y.checked_add(height).ok_or_else(|| {
+            PptWriteError::InvalidData("chart frame vertical extent is too large".to_string())
+        })?;
+        chart.validate()?;
         let total: usize = self.slides.iter().map(|slide| slide.charts.len()).sum();
         if total >= super::chart::MAX_CHART_OBJECTS {
             return Err(PptWriteError::InvalidData(format!(
@@ -1884,18 +1905,13 @@ impl PptWriter {
                 super::chart::MAX_CHART_OBJECTS
             )));
         }
-        let slide_data = self
-            .slides
-            .get_mut(slide)
+        self.slides
+            .get(slide)
             .ok_or_else(|| PptWriteError::InvalidData(format!("Slide {} does not exist", slide)))?;
-        slide_data.charts.push(PositionedChart {
-            x: pt_to_emu_i32(x),
-            y: pt_to_emu_i32(y),
-            width: pt_to_emu_i32(width),
-            height: pt_to_emu_i32(height),
-            workbook,
-        });
-        Ok(())
+        Err(litchi_ograph::Error::UnsupportedAuthoring {
+            reason: "PPT chart creation requires the complete Office-compatible BIFF chart grammar",
+        }
+        .into())
     }
 
     /// Assign external-object and persist identifiers to every chart.
@@ -2884,15 +2900,15 @@ impl PptWriter {
                 .filter(|plan| plan.slide == i)
                 .map(|plan| {
                     let chart = &slide.charts[plan.chart];
-                    super::chart::ChartFrame {
-                        x: chart.x,
-                        y: chart.y,
-                        width: chart.width,
-                        height: chart.height,
-                        ex_obj_id: plan.ex_obj_id,
-                    }
+                    super::chart::ChartFrame::new(
+                        chart.x,
+                        chart.y,
+                        chart.width,
+                        chart.height,
+                        plan.ex_obj_id,
+                    )
                 })
-                .collect();
+                .collect::<Result<Vec<_>, _>>()?;
             let dg = create_dg_container_with_charts(
                 drawing_id,
                 &escher_shapes,
@@ -3246,15 +3262,15 @@ impl PptWriter {
                 .filter(|plan| plan.slide == i)
                 .map(|plan| {
                     let chart = &slide.charts[plan.chart];
-                    super::chart::ChartFrame {
-                        x: chart.x,
-                        y: chart.y,
-                        width: chart.width,
-                        height: chart.height,
-                        ex_obj_id: plan.ex_obj_id,
-                    }
+                    super::chart::ChartFrame::new(
+                        chart.x,
+                        chart.y,
+                        chart.width,
+                        chart.height,
+                        plan.ex_obj_id,
+                    )
                 })
-                .collect();
+                .collect::<Result<Vec<_>, _>>()?;
             let dg = create_dg_container_with_charts(
                 drawing_id,
                 &escher_shapes,

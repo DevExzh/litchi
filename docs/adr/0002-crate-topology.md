@@ -101,11 +101,25 @@ does not become a compatibility tunnel for types it does not own. File helpers
 use short contextual names (`images::doc`, `images::ppt`, `images::escher`, and
 `images::store`) and return borrowed views whenever the input lifetime permits.
 
-`litchi-ograph` owns only neutral chart records, borrowed and owned package
-views, deterministic record encoding, and the standalone compound-package
-codec. XLS owns workbook tabs, BIFF objects, and chart-substream mutation; PPT
-owns frames and embedded-object integration. The neutral crate does not depend
-on either host, expose a runtime lock wrapper, or imply rendering or activation.
+`litchi-ograph` owns only neutral chart records, bounded chart-substream
+discovery, borrowed `chart::Ref` and move-owned `chart::Stream`/`chart::Book`
+capabilities, the semantic `chart::Chart` model, deterministic record encoding,
+and the standalone compound-package codec. Strict `[MS-OGRAPH]` packages have a
+globals-plus-one-Graph-chart Workbook; the separate host-neutral scanner also
+accepts Excel chart BOFs nested in arbitrary Workbook streams without claiming
+that the surrounding workbook is a standalone Graph package. Context-specific
+`chart::Link` variants keep Graph's fixed datasheet coordinate and Excel's
+variable parsed formula from being conflated.
+
+An untouched parsed semantic chart consumes back into its exact source
+allocation. Mutation of a parsed chart is refused until every opaque record and
+reserved byte has a proven placement. Fresh semantic authoring is likewise
+refused until the complete mandatory chart-sheet, format, series, axis-parent,
+and cache grammar is modeled; a partial self-roundtrip is not treated as an
+Office-compatible artifact. XLS owns workbook tabs, BIFF objects, and chart-host
+mutation; PPT owns frames and embedded-object integration. The neutral crate
+does not depend on either host, expose a runtime lock wrapper, or imply
+rendering, formula evaluation, activation, or current fresh-authoring support.
 
 `litchi-crypto` owns bounded `[MS-OFFCRYPTO]` structures and transformations,
 including compound-file DataSpaces metadata and password-derived cipher
