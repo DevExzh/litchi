@@ -34,11 +34,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             for row in sheet.rows()? {
                 println!(
-                    "  row {} (index {}): hidden={}, height={:?}, custom_height={}, outline={}, collapsed={}, thick_top={}, thick_bottom={}, phonetic={}, custom_format={}",
+                    "  row {} (index {}): hidden={}, height={:?}, style={:?}, custom_height={}, outline={}, collapsed={}, thick_top={}, thick_bottom={}, phonetic={}, custom_format={}",
                     row.index().get() + 1,
                     row.index().get(),
                     row.hidden(),
                     row.height().map(litchi_xlsx::Height::get),
+                    sheet.row_style(row.index())?,
                     row.custom_height(),
                     row.outline().get(),
                     row.collapsed(),
@@ -50,11 +51,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             for column in sheet.columns()? {
                 println!(
-                    "  column {} (index {}): hidden={}, width={:?}, outline={}, collapsed={}, best_fit={}, phonetic={}",
+                    "  column {} (index {}): hidden={}, width={:?}, style={:?}, outline={}, collapsed={}, best_fit={}, phonetic={}",
                     column.index().a1(),
                     column.index().get(),
                     column.hidden(),
                     column.width().map(litchi_xlsx::Width::get),
+                    sheet.column_style(column.index())?,
                     column.outline().get(),
                     column.collapsed(),
                     column.best_fit(),

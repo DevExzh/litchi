@@ -166,6 +166,15 @@ impl ColumnState {
                 },
             }
         }
+        if let Some(style) = action.style {
+            properties.style = match style {
+                StyleEffect::Set(key) => StyleState::Shared(StyleKey::new(
+                    key,
+                    Arc::clone(&workbook.inner.style_lineage),
+                )),
+                StyleEffect::Reset => StyleState::Default,
+            };
+        }
         if let Some(best_fit) = action.best_fit {
             properties.flags.set(ColumnFlags::BEST_FIT, best_fit);
         }
@@ -224,6 +233,21 @@ impl RowState {
                 HeightEffect::Reset => {
                     properties.height = None;
                     properties.flags.remove(RowFlags::CUSTOM_HEIGHT);
+                },
+            }
+        }
+        if let Some(style) = action.style {
+            match style {
+                StyleEffect::Set(key) => {
+                    properties.style = StyleState::Shared(StyleKey::new(
+                        key,
+                        Arc::clone(&workbook.inner.style_lineage),
+                    ));
+                    properties.flags.insert(RowFlags::CUSTOM_FORMAT);
+                },
+                StyleEffect::Reset => {
+                    properties.style = StyleState::Default;
+                    properties.flags.remove(RowFlags::CUSTOM_FORMAT);
                 },
             }
         }
@@ -2939,14 +2963,6 @@ impl Edit {
         Ok(())
     }
 
-    fn row_actions(&mut self, position: usize) -> &mut BTreeMap<RowIndex, RowAction> {
-        &mut self.sheets.entry(position).or_default().rows
-    }
-
-    fn column_actions(&mut self, position: usize) -> &mut BTreeMap<ColumnIndex, ColumnAction> {
-        &mut self.sheets.entry(position).or_default().columns
-    }
-
     fn conflicts_with(&self, other: &Self) -> ConflictSet {
         let mut conflicts = Vec::new();
         let removal_conflict = self
@@ -3243,8 +3259,11 @@ impl SheetEdit<'_> {
     /// Select one checked row for short property-editing verbs.
     pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
         let row = at.into().resolve()?;
+        let style_lineage = &self.edit.base.inner.style_lineage;
+        let actions = &mut self.edit.sheets.entry(self.position).or_default().rows;
         Ok(RowEdit {
-            actions: self.edit.row_actions(self.position),
+            actions,
+            style_lineage,
             row,
         })
     }
@@ -3252,8 +3271,11 @@ impl SheetEdit<'_> {
     /// Select one column by its primary A1 label or a checked zero-based input.
     pub fn column<'a>(&mut self, at: impl Into<ColumnAt<'a>>) -> Result<ColumnEdit<'_>> {
         let column = at.into().resolve()?;
+        let style_lineage = &self.edit.base.inner.style_lineage;
+        let actions = &mut self.edit.sheets.entry(self.position).or_default().columns;
         Ok(ColumnEdit {
-            actions: self.edit.column_actions(self.position),
+            actions,
+            style_lineage,
             column,
         })
     }
@@ -3408,6 +3430,7 @@ impl NewSheet<'_> {
         let row = at.into().resolve()?;
         Ok(RowEdit {
             actions: &mut self.added.actions.rows,
+            style_lineage: self.style_lineage,
             row,
         })
     }
@@ -3417,6 +3440,7 @@ impl NewSheet<'_> {
         let column = at.into().resolve()?;
         Ok(ColumnEdit {
             actions: &mut self.added.actions.columns,
+            style_lineage: self.style_lineage,
             column,
         })
     }
@@ -3500,6 +3524,7 @@ impl NewSheet<'_> {
 #[derive(Debug)]
 pub struct RowEdit<'a> {
     actions: &'a mut BTreeMap<RowIndex, RowAction>,
+    style_lineage: &'a Arc<StyleLineage>,
     row: RowIndex,
 }
 
@@ -3533,6 +3558,24 @@ impl RowEdit<'_> {
     /// Remove the explicit height and its derived custom-height marker.
     pub fn reset_height(&mut self) -> &mut Self {
         self.action().height = Some(HeightEffect::Reset);
+        self
+    }
+
+    /// Apply an existing shared style as this row's default formatting.
+    ///
+    /// The handle must belong to the transaction's shared-style lineage.
+    /// Cells with an explicit local style continue to take precedence.
+    pub fn style(&mut self, style: &Style) -> Result<&mut Self> {
+        if !Arc::ptr_eq(self.style_lineage, &style.owner.style_lineage) {
+            return Err(Error::ForeignStyle);
+        }
+        self.action().style = Some(StyleEffect::Set(style.raw()));
+        Ok(self)
+    }
+
+    /// Remove the row's explicit default style and custom-format marker.
+    pub fn reset_style(&mut self) -> &mut Self {
+        self.action().style = Some(StyleEffect::Reset);
         self
     }
 
@@ -3596,6 +3639,7 @@ impl RowEdit<'_> {
 #[derive(Debug)]
 pub struct ColumnEdit<'a> {
     actions: &'a mut BTreeMap<ColumnIndex, ColumnAction>,
+    style_lineage: &'a Arc<StyleLineage>,
     column: ColumnIndex,
 }
 
@@ -3631,6 +3675,27 @@ impl ColumnEdit<'_> {
     /// Remove the explicit width and its derived custom-width marker.
     pub fn reset_width(&mut self) -> &mut Self {
         self.action().width = Some(WidthEffect::Reset);
+        self
+    }
+
+    /// Apply an existing shared style as this column's default formatting.
+    ///
+    /// The handle must belong to the transaction's shared-style lineage.
+    /// Cells with an explicit local style continue to take precedence.
+    /// When the column has no stored width, stage [`Self::width`] in the same
+    /// transaction; commit otherwise rejects the style instead of producing
+    /// a zero-width column in Excel.
+    pub fn style(&mut self, style: &Style) -> Result<&mut Self> {
+        if !Arc::ptr_eq(self.style_lineage, &style.owner.style_lineage) {
+            return Err(Error::ForeignStyle);
+        }
+        self.action().style = Some(StyleEffect::Set(style.raw()));
+        Ok(self)
+    }
+
+    /// Remove the column's explicit default style without changing its width.
+    pub fn reset_style(&mut self) -> &mut Self {
+        self.action().style = Some(StyleEffect::Reset);
         self
     }
 
@@ -5583,6 +5648,273 @@ mod tests {
         assert!(matches!(
             changed.apply(committed.patch()),
             Err(Error::PatchConflict { part }) if part == "/xl/styles.xml"
+        ));
+    }
+
+    #[test]
+    fn grid_default_styles_are_lineage_checked_reversible_and_facet_composable() {
+        let source = styled_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let accent = source
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .style("A1")
+            .expect("style lookup")
+            .expect("accent style");
+
+        let mut edit = source.edit().expect("edit");
+        {
+            let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("sheet");
+            sheet
+                .row(1)
+                .expect("row 2")
+                .style(&accent)
+                .expect("row style")
+                .height(24)
+                .expect("row height");
+            sheet
+                .column("C")
+                .expect("column C")
+                .style(&accent)
+                .expect("column style")
+                .width(16)
+                .expect("column width");
+        }
+        let committed = edit.commit().expect("style commit");
+        assert_eq!(committed.patch().len(), 2);
+
+        let row_change = committed
+            .patch()
+            .changes()
+            .iter()
+            .find_map(Change::row)
+            .expect("row change");
+        let RowState::Stored(row_after) = row_change.2 else {
+            panic!("expected stored row")
+        };
+        assert!(row_after.custom_format());
+        assert!(matches!(row_after.style(), StyleState::Shared(_)));
+
+        let column_change = committed
+            .patch()
+            .changes()
+            .iter()
+            .find_map(Change::column)
+            .expect("column change");
+        let ColumnState::Stored(column_after) = column_change.2 else {
+            panic!("expected stored column")
+        };
+        assert!(matches!(column_after.style(), StyleState::Shared(_)));
+
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        assert!(sheet.row(1).expect("row 2").custom_format());
+        assert!(matches!(
+            sheet.row_style(1).expect("row style"),
+            Some(crate::LocalStyle::Shared(style)) if style.same(&accent)
+        ));
+        assert!(matches!(
+            sheet.column_style("C").expect("column style"),
+            Some(crate::LocalStyle::Shared(style)) if style.same(&accent)
+        ));
+
+        let mut reset = committed.workbook().edit().expect("reset edit");
+        {
+            let mut sheet = reset.sheet("Sheet1").expect("lookup").expect("sheet");
+            sheet.row(1).expect("row 2").reset_style();
+            sheet.column("C").expect("column C").reset_style();
+        }
+        let reset = reset.commit().expect("reset commit");
+        let reset_sheet = reset
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        assert!(!reset_sheet.row(1).expect("row 2").custom_format());
+        assert!(matches!(
+            reset_sheet.row_style(1).expect("row style"),
+            Some(crate::LocalStyle::Default)
+        ));
+        assert!(matches!(
+            reset_sheet.column_style("C").expect("column style"),
+            Some(crate::LocalStyle::Default)
+        ));
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let reopened = Workbook::from_bytes(source_bytes).expect("reopened source");
+        let replayed = reopened
+            .apply(committed.patch())
+            .expect("source-checked replay");
+        let (_, _, replayed_row) = replayed
+            .patch()
+            .changes()
+            .iter()
+            .find_map(Change::row)
+            .expect("replayed row");
+        let RowState::Stored(replayed_row) = replayed_row else {
+            panic!("expected replayed row")
+        };
+        let StyleState::Shared(replayed_key) = replayed_row.style() else {
+            panic!("expected rebound row style")
+        };
+        assert!(
+            replayed
+                .workbook()
+                .styles()
+                .expect("styles")
+                .find(replayed_key)
+                .is_some()
+        );
+        assert!(
+            source
+                .styles()
+                .expect("source styles")
+                .find(replayed_key)
+                .is_none()
+        );
+
+        let mut styles = source.edit().expect("styles edit");
+        {
+            let mut sheet = styles.sheet(0usize).expect("lookup").expect("sheet");
+            sheet
+                .row(2)
+                .expect("row 3")
+                .style(&accent)
+                .expect("row style");
+            sheet
+                .column("D")
+                .expect("column D")
+                .style(&accent)
+                .expect("column style");
+        }
+        let mut layout = source.edit().expect("layout edit");
+        {
+            let mut sheet = layout.sheet(0usize).expect("lookup").expect("sheet");
+            sheet.row(2).expect("row 3").height(22).expect("height");
+            sheet
+                .column("D")
+                .expect("column D")
+                .width(18)
+                .expect("width");
+        }
+        styles.join(layout).expect("disjoint grid facets");
+        let joined = styles.commit().expect("joined commit");
+        let joined_sheet = joined
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet");
+        assert_eq!(
+            joined_sheet
+                .row(2)
+                .expect("row 3")
+                .height()
+                .map(crate::row::Height::get),
+            Some(22.0)
+        );
+        assert!(matches!(
+            joined_sheet.column_style("D").expect("column style"),
+            Some(crate::LocalStyle::Shared(_))
+        ));
+
+        let mut left = source.edit().expect("left style");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(3)
+            .expect("row 4")
+            .style(&accent)
+            .expect("style");
+        let mut right = source.edit().expect("right style");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(3)
+            .expect("row 4")
+            .reset_style();
+        assert!(left.join(right).is_err());
+
+        let mut missing_width = source.edit().expect("missing-width edit");
+        missing_width
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .column("E")
+            .expect("column E")
+            .style(&accent)
+            .expect("lineage");
+        assert!(matches!(
+            missing_width.commit(),
+            Err(Error::ColumnEditBlocked {
+                reason: crate::error::ColumnEditBlock::StyleNeedsWidth,
+                ..
+            })
+        ));
+
+        let foreign = Workbook::new()
+            .expect("foreign workbook")
+            .styles()
+            .expect("foreign styles")
+            .base()
+            .expect("foreign base style");
+        let mut rejected = source.edit().expect("rejected edit");
+        {
+            let mut sheet = rejected.sheet(0usize).expect("lookup").expect("sheet");
+            assert!(matches!(
+                sheet.row(4).expect("row 5").style(&foreign),
+                Err(Error::ForeignStyle)
+            ));
+            assert!(matches!(
+                sheet.column("E").expect("column E").style(&foreign),
+                Err(Error::ForeignStyle)
+            ));
+        }
+        assert!(rejected.is_empty());
+
+        let mut add = source.edit().expect("new sheet edit");
+        {
+            let mut sheet = add.add("Styled").expect("new sheet");
+            sheet.set("A2", "row").expect("row cell");
+            sheet.set("C1", "column").expect("column cell");
+            sheet
+                .row(1)
+                .expect("row 2")
+                .style(&accent)
+                .expect("row style");
+            sheet
+                .column("C")
+                .expect("column C")
+                .width(12)
+                .expect("column width")
+                .style(&accent)
+                .expect("column style");
+        }
+        let added = add.commit().expect("new sheet commit");
+        let sheet = added
+            .workbook()
+            .sheet("Styled")
+            .expect("lookup")
+            .expect("sheet");
+        assert!(matches!(
+            sheet.row_style(1).expect("row style"),
+            Some(crate::LocalStyle::Shared(_))
+        ));
+        assert!(matches!(
+            sheet.column_style("C").expect("column style"),
+            Some(crate::LocalStyle::Shared(_))
         ));
     }
 

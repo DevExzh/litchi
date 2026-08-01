@@ -184,6 +184,7 @@ pub(crate) enum HeightEffect {
 pub(crate) struct RowAction {
     pub(crate) hidden: Option<bool>,
     pub(crate) height: Option<HeightEffect>,
+    pub(crate) style: Option<StyleEffect>,
     pub(crate) outline: Option<Outline>,
     pub(crate) collapsed: Option<bool>,
     pub(crate) thick_top: Option<bool>,
@@ -197,6 +198,7 @@ impl RowAction {
         Self {
             hidden: Some(true),
             height: None,
+            style: None,
             outline: None,
             collapsed: None,
             thick_top: None,
@@ -210,6 +212,7 @@ impl RowAction {
         Self {
             hidden: Some(false),
             height: None,
+            style: None,
             outline: None,
             collapsed: None,
             thick_top: None,
@@ -221,6 +224,7 @@ impl RowAction {
     pub(crate) const fn materializes(self) -> bool {
         matches!(self.hidden, Some(true))
             || matches!(self.height, Some(HeightEffect::Set(_)))
+            || matches!(self.style, Some(StyleEffect::Set(_)))
             || matches!(self.outline, Some(level) if level.get() != 0)
             || matches!(self.collapsed, Some(true))
             || matches!(self.thick_top, Some(true))
@@ -231,6 +235,7 @@ impl RowAction {
     pub(crate) const fn overlaps(self, other: Self) -> bool {
         (self.hidden.is_some() && other.hidden.is_some())
             || (self.height.is_some() && other.height.is_some())
+            || (self.style.is_some() && other.style.is_some())
             || (self.outline.is_some() && other.outline.is_some())
             || (self.collapsed.is_some() && other.collapsed.is_some())
             || (self.thick_top.is_some() && other.thick_top.is_some())
@@ -244,6 +249,9 @@ impl RowAction {
         }
         if self.height.is_none() {
             self.height = other.height;
+        }
+        if self.style.is_none() {
+            self.style = other.style;
         }
         if self.outline.is_none() {
             self.outline = other.outline;
@@ -275,6 +283,7 @@ pub(crate) enum WidthEffect {
 pub(crate) struct ColumnAction {
     pub(crate) hidden: Option<bool>,
     pub(crate) width: Option<WidthEffect>,
+    pub(crate) style: Option<StyleEffect>,
     pub(crate) best_fit: Option<bool>,
     pub(crate) outline: Option<Outline>,
     pub(crate) collapsed: Option<bool>,
@@ -287,6 +296,7 @@ impl ColumnAction {
         Self {
             hidden: Some(true),
             width: None,
+            style: None,
             best_fit: None,
             outline: None,
             collapsed: None,
@@ -299,6 +309,7 @@ impl ColumnAction {
         Self {
             hidden: Some(false),
             width: None,
+            style: None,
             best_fit: None,
             outline: None,
             collapsed: None,
@@ -309,6 +320,7 @@ impl ColumnAction {
     pub(crate) const fn materializes(self) -> bool {
         matches!(self.hidden, Some(true))
             || matches!(self.width, Some(WidthEffect::Set(_)))
+            || matches!(self.style, Some(StyleEffect::Set(_)))
             || matches!(self.best_fit, Some(true))
             || matches!(self.outline, Some(level) if level.get() != 0)
             || matches!(self.collapsed, Some(true))
@@ -318,6 +330,7 @@ impl ColumnAction {
     pub(crate) const fn overlaps(self, other: Self) -> bool {
         (self.hidden.is_some() && other.hidden.is_some())
             || (self.width.is_some() && other.width.is_some())
+            || (self.style.is_some() && other.style.is_some())
             || (self.best_fit.is_some() && other.best_fit.is_some())
             || (self.outline.is_some() && other.outline.is_some())
             || (self.collapsed.is_some() && other.collapsed.is_some())
@@ -330,6 +343,9 @@ impl ColumnAction {
         }
         if self.width.is_none() {
             self.width = other.width;
+        }
+        if self.style.is_none() {
+            self.style = other.style;
         }
         if self.best_fit.is_none() {
             self.best_fit = other.best_fit;
@@ -724,6 +740,36 @@ fn validate_column_actions(
             column: *column,
             reason: ColumnEditBlock::ProtectedSheet,
         });
+    }
+    let mut owners = Assignments::new()?;
+    if let Some(stored) = &layout.columns {
+        for (index, column) in stored.columns.iter().enumerate() {
+            owners.assign(column.first, column.last, index);
+        }
+    }
+    for (column, action) in actions {
+        if !matches!(action.style, Some(StyleEffect::Set(_)))
+            || matches!(action.width, Some(WidthEffect::Set(_)))
+        {
+            continue;
+        }
+        let has_width = owners
+            .get(*column)
+            .and_then(|index| layout.columns.as_ref()?.columns.get(index))
+            .is_some_and(|stored| {
+                stored
+                    .tag
+                    .attributes
+                    .iter()
+                    .any(|attribute| attribute.name.as_ref() == "width")
+            });
+        if !has_width || matches!(action.width, Some(WidthEffect::Reset)) {
+            return Err(Error::ColumnEditBlocked {
+                sheet: sheet.to_owned(),
+                column: *column,
+                reason: ColumnEditBlock::StyleNeedsWidth,
+            });
+        }
     }
     Ok(())
 }
@@ -1755,6 +1801,12 @@ fn column_effect_attributes(
             appended.push(("customWidth", "1".to_owned()));
         }
     }
+    if let Some(style) = action.style {
+        removed.push("style");
+        if let StyleEffect::Set(key) = style {
+            appended.push(("style", key.to_string()));
+        }
+    }
     if let Some(best_fit) = action.best_fit {
         removed.push("bestFit");
         if best_fit {
@@ -1979,6 +2031,13 @@ fn row_effect_attributes(
         if let HeightEffect::Set(height) = height {
             appended.push(("ht", height.get().to_string()));
             appended.push(("customHeight", "1".to_owned()));
+        }
+    }
+    if let Some(style) = action.style {
+        removed.extend(["s", "customFormat"]);
+        if let StyleEffect::Set(key) = style {
+            appended.push(("s", key.to_string()));
+            appended.push(("customFormat", "1".to_owned()));
         }
     }
     if let Some(outline) = action.outline {
@@ -2520,6 +2579,72 @@ mod tests {
     }
 
     #[test]
+    fn row_style_retargeting_derives_custom_format_and_resets_sparsely() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:sheetData><x:row r="2" s="1" customFormat="1" ht="20" z:keep="yes"/></x:sheetData></x:worksheet>"#
+        );
+        let edited = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::from([
+                    (
+                        Row::new(1).expect("row 2"),
+                        RowAction {
+                            style: Some(StyleEffect::Reset),
+                            ..RowAction::default()
+                        },
+                    ),
+                    (
+                        Row::new(2).expect("row 3"),
+                        RowAction {
+                            style: Some(StyleEffect::Set(2)),
+                            ..RowAction::default()
+                        },
+                    ),
+                    (
+                        Row::new(3).expect("row 4"),
+                        RowAction {
+                            style: Some(StyleEffect::Reset),
+                            ..RowAction::default()
+                        },
+                    ),
+                ]),
+                columns: BTreeMap::new(),
+            },
+        )
+        .expect("row style rewrite");
+        let text = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(text.contains(r#"<x:row r="2" ht="20" z:keep="yes"/>"#));
+        assert!(text.contains(r#"<x:row r="3" s="2" customFormat="1"/>"#));
+        assert!(!text.contains(r#"r="4""#));
+
+        let store = worksheet::parse(&edited, || Ok(None)).expect("reparse row styles");
+        let second = store.row(Row::new(1).expect("row 2"));
+        assert_eq!(
+            store
+                .row_entry(second.index())
+                .expect("row 2")
+                .properties
+                .style,
+            None
+        );
+        assert!(!second.custom_format());
+        let third = store.row(Row::new(2).expect("row 3"));
+        assert_eq!(
+            store
+                .row_entry(third.index())
+                .expect("row 3")
+                .properties
+                .style,
+            Some(2)
+        );
+        assert!(third.custom_format());
+        assert!(!store.row(Row::new(3).expect("row 4")).stored());
+    }
+
+    #[test]
     fn protected_sheet_blocks_row_visibility_before_rewrite() {
         let xml = format!(
             r#"<worksheet xmlns="{S}"><sheetData/><sheetProtection sheet="1"/></worksheet>"#
@@ -2665,6 +2790,119 @@ mod tests {
         assert_eq!(e.outline().get(), 1);
         assert!(e.collapsed());
         assert!(e.phonetic());
+    }
+
+    #[test]
+    fn column_style_retargeting_splits_ranges_and_resets_sparsely() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:cols><x:col min="2" max="4" width="20" style="1" z:keep="yes"/></x:cols><x:sheetData/></x:worksheet>"#
+        );
+        let edited = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::new(),
+                columns: BTreeMap::from([
+                    (
+                        Column::new(1).expect("B"),
+                        ColumnAction {
+                            style: Some(StyleEffect::Reset),
+                            ..ColumnAction::default()
+                        },
+                    ),
+                    (
+                        Column::new(2).expect("C"),
+                        ColumnAction {
+                            style: Some(StyleEffect::Set(2)),
+                            ..ColumnAction::default()
+                        },
+                    ),
+                    (
+                        Column::new(4).expect("E"),
+                        ColumnAction {
+                            style: Some(StyleEffect::Set(3)),
+                            width: Some(WidthEffect::Set(Width::new(12.0).expect("width"))),
+                            ..ColumnAction::default()
+                        },
+                    ),
+                    (
+                        Column::new(5).expect("F"),
+                        ColumnAction {
+                            style: Some(StyleEffect::Reset),
+                            ..ColumnAction::default()
+                        },
+                    ),
+                ]),
+            },
+        )
+        .expect("column style rewrite");
+        let text = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(text.contains(r#"z:keep="yes""#));
+        assert!(!text.contains(r#"min="6""#));
+
+        let store = worksheet::parse(&edited, || Ok(None)).expect("reparse column styles");
+        assert_eq!(
+            store
+                .column_entry(Column::new(1).expect("B"))
+                .expect("B")
+                .properties
+                .style,
+            None
+        );
+        assert_eq!(
+            store
+                .column_entry(Column::new(2).expect("C"))
+                .expect("C")
+                .properties
+                .style,
+            Some(2)
+        );
+        assert_eq!(
+            store
+                .column_entry(Column::new(3).expect("D"))
+                .expect("D")
+                .properties
+                .style,
+            Some(1)
+        );
+        assert_eq!(
+            store
+                .column_entry(Column::new(4).expect("E"))
+                .expect("E")
+                .properties
+                .style,
+            Some(3)
+        );
+        assert!(!store.column(Column::new(5).expect("F")).stored());
+    }
+
+    #[test]
+    fn style_only_implicit_column_is_blocked_before_zero_width_materialization() {
+        let xml = format!(r#"<x:worksheet xmlns:x="{S}"><x:sheetData/></x:worksheet>"#);
+        let result = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::new(),
+                columns: BTreeMap::from([(
+                    Column::new(2).expect("C"),
+                    ColumnAction {
+                        style: Some(StyleEffect::Set(1)),
+                        ..ColumnAction::default()
+                    },
+                )]),
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(Error::ColumnEditBlocked {
+                column,
+                reason: ColumnEditBlock::StyleNeedsWidth,
+                ..
+            }) if column == Column::new(2).expect("C")
+        ));
     }
 
     #[test]

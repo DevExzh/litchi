@@ -969,11 +969,67 @@ on that build. It does not certify every height normalization, thick-edge or
 phonetic rendering, row shared-style authoring, structural row shifts, other
 Office applications or builds, or performance.
 
+The twentieth slice makes row and column shared-style defaults writable without
+publishing a physical `cellXfs` index. `RowEdit::style` and
+`ColumnEdit::style` accept an existing lineage-checked `Style`; handles from an
+unrelated style table are rejected before they mutate the plan. The paired
+`reset_style` verbs remove only the selected grid-default reference. Row and
+column style effects remain independent from height, width, visibility,
+outline, and other property facets, so disjoint transaction plans join without
+locks while two style writes to one logical record conflict deterministically.
+The same borrowed editors work for existing and transaction-local new sheets.
+
+Worksheet surgery writes row `s` together with its derived `customFormat`
+marker, writes column `style`, and removes those exact attributes on reset. It
+continues to preserve unrelated known and unknown attributes, child payloads,
+namespace spelling, compact effective column ranges, and untouched bytes.
+Style set materializes a sparse row or column property; reset on an implicit
+record remains a no-op. A style-only implicit column is the deliberate
+exception: the native Excel probe interpreted a style-only record with omitted
+`col/@width` as zero-width. Commit therefore returns
+`ColumnEditBlock::StyleNeedsWidth` unless the column already owns a width or the
+same transaction stages one. This prevents a seemingly harmless format edit
+from collapsing a visible column. Complete row/column patch states carry the
+opaque style identity, source style-byte guard, and target-lineage rebinding;
+inverse application restores the exact source package bytes.
+
+Tests cover set/reset, row custom-format derivation, compact column splitting,
+sparse materialization/no-op behavior, the implicit-column width block,
+foreign-lineage rejection without plan mutation, existing and new sheets,
+exact inverse restoration, byte-identical replay/rebinding, independent-facet
+joins, and same-style-facet conflicts. The public `grid_styles` example obtains
+the shared style semantically from `A1`, applies it to row 4, and applies it to
+column D while setting a checked width of 12. It saves through the ordinary
+transaction facade and verifies the committed resource identities without
+using a numeric style ID.
+
+Computer Use exercised that exact example output in Microsoft Excel for Mac
+16.110.2 (build 26062818), Office LTSC Standard for Mac 2024. The first native
+probe was intentionally treated as a failed verification: an implicit
+style-only column became zero-width, and already-stored cells retained their
+local formatting instead of being retroactively changed by a grid default.
+That evidence produced the typed width block and clarified the documented
+layer semantics. The corrected artifact opened without a repair or
+compatibility prompt, kept width-12 column D visible, and retained row 4's
+default style. Creating `row default verified` at previously missing A4 and
+`column default verified` at previously missing D1 made Excel report and render
+both values in the bold shared style originally authored on A1. Excel saved the
+workbook without warning; the resaved archive passed ZIP integrity validation.
+The public reader recovered declared/used/stored bounds A1:D4, both marker
+cells, row 4 with `customFormat` and its shared style, and column D with width
+12 and its shared style. The resaved XML retained `row/@s` plus
+`customFormat`, `col/@style` plus width, and explicit shared-style references
+on the newly created cells. This certifies one local row-default/column-default/
+new-cell-inheritance/open/edit/resave/reverse-read path on that build. It does
+not claim that grid defaults rewrite existing local cell styles, certify every
+style family or producer normalization, cover structural row/column shifts,
+other Office applications or builds, or establish performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection
-unlocking, row and column shared-style retargeting, default-row layout and
-descent editing, row and column insertion/deletion, shifting references,
+unlocking, default-row layout and descent editing, row and column
+insertion/deletion, shifting references,
 merge/group-formula edits, dynamic-reference resolution, validation evaluation,
 shared-style definition editing or forking, named-style and row/column/theme
 resolution, rich text,

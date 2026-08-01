@@ -66,6 +66,16 @@ operations. Independently prepared edits may join when they touch different
 facets of one row or column; two writes to the same facet conflict rather than
 acquiring a public lock or choosing a last writer.
 
+Row and column formatting uses the same opaque `Style` resource as cell
+formatting through the short `style`/`reset_style` verbs. These operations name
+the grid-default layer: an explicit local cell style remains a separate,
+higher-precedence layer rather than being silently rewritten. A row style
+derives its required custom-format marker. A new column style must share a
+transaction with an explicit width, because Excel interprets the resulting
+style-only column record as zero-width; the safe facade returns a typed block
+instead of collapsing an implicit column. Existing column records retain their
+effective width while their style is retargeted.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

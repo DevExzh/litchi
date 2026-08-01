@@ -166,6 +166,9 @@ pub enum RowEditBlock {
 pub enum ColumnEditBlock {
     ProtectedSheet,
     MarkupCompatibility,
+    /// A new column record cannot safely carry a style without an explicit
+    /// width because Excel interprets that style-only record as zero-width.
+    StyleNeedsWidth,
 }
 
 /// Why the workbook tab editor refused a state or ordering mutation.
@@ -266,6 +269,9 @@ impl std::fmt::Display for ColumnEditBlock {
             Self::ProtectedSheet => "the worksheet is protected",
             Self::MarkupCompatibility => {
                 "the effective column record contains an unmodeled extension payload"
+            },
+            Self::StyleNeedsWidth => {
+                "styling an implicit column requires an explicit width in the same transaction"
             },
         })
     }
