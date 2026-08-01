@@ -5,19 +5,21 @@ use std::fmt;
 use std::sync::Arc;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationship, TargetMode};
-use litchi_sheet::{At, Cell as Address, Column as ColumnIndex, ColumnAt, Row as RowIndex, RowAt};
+use litchi_sheet::{
+    Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
+};
 
 use super::{Sheet, SheetKind, SheetSelector, Visibility, Workbook};
 use crate::cell::{Cell, Content, Stored};
 use crate::column::{
     Flags as ColumnFlags, Outline, OutlineAt, Props as ColumnProps, State as ColumnState, WidthAt,
 };
-use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, invalid};
+use crate::error::{EditBlock, Error, MergeEditBlock, RemoveBlock, Result, TabEditBlock, invalid};
 use crate::layout::{self, Defaults};
 use crate::raw;
 use crate::raw::worksheet::edit::{
-    Action, ColumnAction, DefaultsAction, DescentEffect, HeightEffect, OptionalEffect, Payload,
-    Plan, RowAction, StyleEffect, WidthEffect,
+    Action, ColumnAction, DefaultsAction, DescentEffect, HeightEffect, MergePlan, OptionalEffect,
+    Payload, Plan, RowAction, StyleEffect, WidthEffect,
 };
 use crate::row::{Flags as RowFlags, HeightAt, Props as RowProps, State as RowState};
 use crate::sheet::Name;
@@ -342,6 +344,231 @@ fn defaults_after(
     Ok(Some(defaults))
 }
 
+fn ensure_merge_area(sheet: &str, range: Rect) -> Result<()> {
+    if range.rows() == 1 && range.columns() == 1 {
+        return Err(Error::MergeEditBlocked {
+            sheet: sheet.to_owned(),
+            range,
+            reason: MergeEditBlock::SingleCell,
+        });
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+struct MergeProjection {
+    plan: MergePlan,
+    changes: Vec<(Rect, crate::merge::Change)>,
+}
+
+fn rect_key(range: Rect) -> (u32, u32, u32, u32) {
+    let start = range.start();
+    let (end_row, end_column) = range.end();
+    (start.row().get(), start.column().get(), end_row, end_column)
+}
+
+fn has_content_after(before: Option<&Cell>, action: Option<&Action>) -> bool {
+    match action {
+        Some(Action::Remove) => false,
+        Some(Action::Update {
+            payload: Some(Payload::Set(_)),
+            ..
+        }) => true,
+        Some(Action::Update {
+            payload: Some(Payload::Clear | Payload::ClearIfPresent),
+            ..
+        }) => false,
+        Some(Action::Update { payload: None, .. }) | None => {
+            before.is_some_and(|cell| !matches!(cell, Cell::Empty))
+        },
+    }
+}
+
+fn follower_content(
+    store: Option<&crate::cell::Store>,
+    cells: &BTreeMap<Address, Action>,
+    range: Rect,
+) -> Option<Address> {
+    let anchor = range.start();
+    let mut blocked = None;
+    if let Some(store) = store {
+        for (address, cell) in store.cells(range) {
+            if address != anchor && has_content_after(Some(cell), cells.get(&address)) {
+                blocked = Some(blocked.map_or(address, |current: Address| current.min(address)));
+            }
+        }
+    }
+    for (address, action) in cells.range(anchor..) {
+        if address.row().get() >= range.end().0 {
+            break;
+        }
+        if *address == anchor || !range.contains(*address) {
+            continue;
+        }
+        if store.is_some_and(|store| store.entry(*address).is_some()) {
+            continue;
+        }
+        if has_content_after(None, Some(action)) {
+            blocked = Some(blocked.map_or(*address, |current| current.min(*address)));
+        }
+    }
+    blocked
+}
+
+fn project_merges(
+    sheet: &str,
+    store: Option<&crate::cell::Store>,
+    intents: Vec<MergeIntent>,
+    cells: &BTreeMap<Address, Action>,
+) -> Result<MergeProjection> {
+    let base = store.map_or(&[][..], crate::cell::Store::merge_ranges);
+    let mut projected = Vec::new();
+    projected
+        .try_reserve_exact(base.len())
+        .map_err(|error| invalid(format!("cannot reserve merged-range projection: {error}")))?;
+    projected.extend_from_slice(base);
+    for intent in intents {
+        match intent {
+            MergeIntent::Add(range) => {
+                ensure_merge_area(sheet, range)?;
+                if projected.contains(&range) {
+                    continue;
+                }
+                if let Some(existing) = projected
+                    .iter()
+                    .copied()
+                    .find(|existing| crate::merge::overlaps(*existing, range))
+                {
+                    return Err(Error::MergeEditBlocked {
+                        sheet: sheet.to_owned(),
+                        range,
+                        reason: MergeEditBlock::Overlap { existing },
+                    });
+                }
+                if let Some(address) = follower_content(store, cells, range) {
+                    return Err(Error::MergeEditBlocked {
+                        sheet: sheet.to_owned(),
+                        range,
+                        reason: MergeEditBlock::FollowerContent { address },
+                    });
+                }
+                projected.try_reserve(1).map_err(|error| {
+                    invalid(format!("cannot grow merged-range projection: {error}"))
+                })?;
+                projected.push(range);
+            },
+            MergeIntent::Remove(range) => projected.retain(|candidate| *candidate != range),
+        }
+    }
+    let projected = crate::merge::Index::new(projected)?;
+    let projected = projected.as_slice();
+
+    let mut remove = Vec::new();
+    remove
+        .try_reserve_exact(base.len())
+        .map_err(|error| invalid(format!("cannot reserve removed merged ranges: {error}")))?;
+    remove.extend(
+        base.iter()
+            .copied()
+            .filter(|range| !projected.contains(range)),
+    );
+    let mut add = Vec::new();
+    add.try_reserve_exact(projected.len())
+        .map_err(|error| invalid(format!("cannot reserve added merged ranges: {error}")))?;
+    add.extend(
+        projected
+            .iter()
+            .copied()
+            .filter(|range| !base.contains(range)),
+    );
+    remove.sort_unstable_by_key(|range| rect_key(*range));
+    add.sort_unstable_by_key(|range| rect_key(*range));
+
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(remove.len().saturating_add(add.len()))
+        .map_err(|error| invalid(format!("cannot reserve merged-range changes: {error}")))?;
+    changes.extend(
+        remove
+            .iter()
+            .copied()
+            .map(|range| (range, crate::merge::Change::Remove)),
+    );
+    changes.extend(
+        add.iter()
+            .copied()
+            .map(|range| (range, crate::merge::Change::Add)),
+    );
+    Ok(MergeProjection {
+        plan: MergePlan { add, remove },
+        changes,
+    })
+}
+
+fn intersection(left: Rect, right: Rect) -> Option<Rect> {
+    if !crate::merge::overlaps(left, right) {
+        return None;
+    }
+    let start_row = left.start().row().get().max(right.start().row().get());
+    let start_column = left
+        .start()
+        .column()
+        .get()
+        .max(right.start().column().get());
+    let (left_end_row, left_end_column) = left.end();
+    let (right_end_row, right_end_column) = right.end();
+    Rect::at(
+        start_row,
+        start_column,
+        left_end_row.min(right_end_row),
+        left_end_column.min(right_end_column),
+    )
+    .ok()
+}
+
+fn merge_conflicts(left: &SheetActions, right: &SheetActions) -> Vec<Rect> {
+    let mut ranges = Vec::new();
+    for left_intent in &left.merges {
+        for right_intent in &right.merges {
+            if let Some(overlap) = intersection(left_intent.range(), right_intent.range()) {
+                ranges.push(overlap);
+            }
+        }
+    }
+    for intent in &left.merges {
+        if let MergeIntent::Add(range) = intent {
+            ranges.extend(
+                right
+                    .cells
+                    .iter()
+                    .filter(|(address, action)| {
+                        **address != range.start()
+                            && range.contains(**address)
+                            && has_content_after(None, Some(action))
+                    })
+                    .map(|(address, _)| Rect::single(*address)),
+            );
+        }
+    }
+    for intent in &right.merges {
+        if let MergeIntent::Add(range) = intent {
+            ranges.extend(
+                left.cells
+                    .iter()
+                    .filter(|(address, action)| {
+                        **address != range.start()
+                            && range.contains(**address)
+                            && has_content_after(None, Some(action))
+                    })
+                    .map(|(address, _)| Rect::single(*address)),
+            );
+        }
+    }
+    ranges.sort_unstable_by_key(|range| rect_key(*range));
+    ranges.dedup();
+    ranges
+}
+
 /// One deterministic semantic change in a reversible patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -383,6 +610,11 @@ pub enum Change {
         before: Option<Defaults>,
         after: Option<Defaults>,
     },
+    Merge {
+        sheet: Box<str>,
+        range: Rect,
+        change: crate::merge::Change,
+    },
     Cell {
         sheet: Box<str>,
         address: Address,
@@ -412,6 +644,7 @@ impl Change {
             Self::Move { sheet, .. }
             | Self::Visibility { sheet, .. }
             | Self::Defaults { sheet, .. }
+            | Self::Merge { sheet, .. }
             | Self::Cell { sheet, .. }
             | Self::Row { sheet, .. }
             | Self::Column { sheet, .. } => sheet,
@@ -428,6 +661,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -448,6 +682,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -464,6 +699,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -485,6 +721,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Defaults { .. }
+            | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -495,6 +732,14 @@ impl Change {
     pub fn defaults(&self) -> Option<(Option<&Defaults>, Option<&Defaults>)> {
         match self {
             Self::Defaults { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            _ => None,
+        }
+    }
+
+    /// Merged-range membership transition, when applicable.
+    pub const fn merged(&self) -> Option<(Rect, crate::merge::Change)> {
+        match self {
+            Self::Merge { range, change, .. } => Some((*range, *change)),
             _ => None,
         }
     }
@@ -515,6 +760,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Merge { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
         }
@@ -533,6 +779,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Column { .. } => None,
         }
@@ -554,6 +801,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. } => None,
         }
@@ -636,6 +884,15 @@ impl Change {
                 sheet: sheet.clone(),
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::Merge {
+                sheet,
+                range,
+                change,
+            } => Self::Merge {
+                sheet: sheet.clone(),
+                range: *range,
+                change: change.inverse(),
             },
             Self::Cell {
                 sheet,
@@ -736,6 +993,11 @@ pub enum Conflict {
         position: usize,
         fields: layout::Fields,
     },
+    Merges {
+        sheet: Box<str>,
+        position: usize,
+        ranges: Box<[Rect]>,
+    },
     Cells {
         sheet: Box<str>,
         position: usize,
@@ -763,6 +1025,7 @@ impl Conflict {
             | Self::Active { sheet, .. }
             | Self::Tab { sheet, .. }
             | Self::Defaults { sheet, .. }
+            | Self::Merges { sheet, .. }
             | Self::Cells { sheet, .. }
             | Self::Rows { sheet, .. }
             | Self::Columns { sheet, .. } => sheet,
@@ -778,6 +1041,7 @@ impl Conflict {
             | Self::Active { position, .. }
             | Self::Tab { position, .. }
             | Self::Defaults { position, .. }
+            | Self::Merges { position, .. }
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
             | Self::Columns { position, .. } => *position,
@@ -817,6 +1081,14 @@ impl Conflict {
         }
     }
 
+    /// Structurally overlapping merged ranges, when applicable.
+    pub fn merges(&self) -> Option<&[Rect]> {
+        match self {
+            Self::Merges { ranges, .. } => Some(ranges),
+            _ => None,
+        }
+    }
+
     /// Deterministically ordered cells written by both edits, when applicable.
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
@@ -827,6 +1099,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::Merges { .. }
             | Self::Rows { .. }
             | Self::Columns { .. } => None,
         }
@@ -842,6 +1115,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::Merges { .. }
             | Self::Cells { .. }
             | Self::Columns { .. } => None,
         }
@@ -858,6 +1132,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::Merges { .. }
             | Self::Cells { .. }
             | Self::Rows { .. } => None,
         }
@@ -871,6 +1146,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. } => 1,
             Self::Defaults { fields, .. } => fields.bits().count_ones() as usize,
+            Self::Merges { ranges, .. } => ranges.len(),
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
@@ -1257,6 +1533,7 @@ struct SheetActions {
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<RowIndex, RowAction>,
     columns: BTreeMap<ColumnIndex, ColumnAction>,
+    merges: Vec<MergeIntent>,
 }
 
 impl SheetActions {
@@ -1267,6 +1544,7 @@ impl SheetActions {
             .saturating_add(self.cells.len())
             .saturating_add(self.rows.len())
             .saturating_add(self.columns.len())
+            .saturating_add(self.merges.len())
     }
 
     fn is_empty(&self) -> bool {
@@ -1276,7 +1554,34 @@ impl SheetActions {
             && self.cells.is_empty()
             && self.rows.is_empty()
             && self.columns.is_empty()
+            && self.merges.is_empty()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MergeIntent {
+    Add(Rect),
+    Remove(Rect),
+}
+
+impl MergeIntent {
+    const fn range(self) -> Rect {
+        match self {
+            Self::Add(range) | Self::Remove(range) => range,
+        }
+    }
+}
+
+fn pending_merge(base: &[Rect], intents: &[MergeIntent], address: Address) -> Option<Rect> {
+    let mut current = base.iter().copied().find(|range| range.contains(address));
+    for intent in intents {
+        match *intent {
+            MergeIntent::Add(range) if range.contains(address) => current = Some(range),
+            MergeIntent::Remove(range) if current == Some(range) => current = None,
+            MergeIntent::Add(_) | MergeIntent::Remove(_) => {},
+        }
+    }
+    current
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1750,6 +2055,7 @@ impl Edit {
                 .saturating_add(added.actions.cells.len())
                 .saturating_add(added.actions.rows.len())
                 .saturating_add(added.actions.columns.len())
+                .saturating_add(added.actions.merges.len())
         })
     }
 
@@ -1842,6 +2148,7 @@ impl Edit {
                             Entry::Occupied(mut entry) => entry.get_mut().merge(action),
                         }
                     }
+                    accepted.merges.extend(actions.merges);
                 },
             }
         }
@@ -2196,8 +2503,14 @@ impl Edit {
                 cells,
                 rows,
                 columns,
+                merges,
             } = requested;
-            if defaults.is_none() && cells.is_empty() && rows.is_empty() && columns.is_empty() {
+            if defaults.is_none()
+                && cells.is_empty()
+                && rows.is_empty()
+                && columns.is_empty()
+                && merges.is_empty()
+            {
                 continue;
             }
             if data.kind != SheetKind::Worksheet {
@@ -2211,6 +2524,14 @@ impl Edit {
             };
             let store = sheet.store()?;
             let change_start = changes.len();
+            let merge_projection = project_merges(&data.name, Some(store), merges, &cells)?;
+            for (range, change) in &merge_projection.changes {
+                changes.push(Change::Merge {
+                    sheet: data.name.clone().into_boxed_str(),
+                    range: *range,
+                    change: *change,
+                });
+            }
             let mut effective_defaults = None;
             if let Some(action) = defaults {
                 let before = store.defaults().cloned();
@@ -2292,22 +2613,49 @@ impl Edit {
                 && effective_cells.is_empty()
                 && effective_rows.is_empty()
                 && effective_columns.is_empty()
+                && merge_projection.plan.is_empty()
             {
                 continue;
             }
 
             let part = base.inner.package.get_part(&data.part_uri)?;
             let before = part.blob_arc();
-            let after = raw::worksheet::edit::rewrite(
-                &before,
-                &data.name,
-                Plan {
-                    defaults: effective_defaults,
-                    cells: effective_cells,
-                    rows: effective_rows,
-                    columns: effective_columns,
-                },
-            )?;
+            let MergePlan { add, remove } = merge_projection.plan;
+            let mut after = if remove.is_empty() {
+                None
+            } else {
+                Some(raw::worksheet::edit::rewrite_merges(
+                    &before,
+                    &data.name,
+                    MergePlan {
+                        add: Vec::new(),
+                        remove,
+                    },
+                )?)
+            };
+            let ordinary = Plan {
+                defaults: effective_defaults,
+                cells: effective_cells,
+                rows: effective_rows,
+                columns: effective_columns,
+            };
+            if !ordinary.is_empty() {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(raw::worksheet::edit::rewrite(input, &data.name, ordinary)?);
+            }
+            if !add.is_empty() {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(raw::worksheet::edit::rewrite_merges(
+                    input,
+                    &data.name,
+                    MergePlan {
+                        add,
+                        remove: Vec::new(),
+                    },
+                )?);
+            }
+            let after =
+                after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
             base.inner.validate_styles(&parsed)?;
             for change in &changes[change_start..] {
@@ -2318,6 +2666,18 @@ impl Edit {
                     | Change::Move { .. }
                     | Change::Active { .. }
                     | Change::Visibility { .. } => {},
+                    Change::Merge {
+                        sheet,
+                        range,
+                        change,
+                        ..
+                    } => {
+                        if parsed.merge_ranges().contains(range) != change.after() {
+                            return Err(invalid(format!(
+                                "worksheet merged-range verification failed at {sheet}!{range}"
+                            )));
+                        }
+                    },
                     Change::Defaults { sheet, after, .. } => {
                         if parsed.defaults() != after.as_ref() {
                             return Err(invalid(format!(
@@ -3238,6 +3598,14 @@ impl Edit {
                     });
                 }
             }
+            let ranges = merge_conflicts(left, right);
+            if !ranges.is_empty() {
+                conflicts.push(Conflict::Merges {
+                    sheet: sheet.into(),
+                    position: *position,
+                    ranges: ranges.into_boxed_slice(),
+                });
+            }
             let mut addresses = Vec::new();
             let mut left_cells = left.cells.iter().peekable();
             let mut right_cells = right.cells.iter().peekable();
@@ -3455,6 +3823,65 @@ impl SheetEdit<'_> {
         })
     }
 
+    /// Merge a checked rectangular selection without discarding follower data.
+    ///
+    /// The top-left cell remains the visible anchor. Commit returns a typed
+    /// refusal if another covered cell has content, a group formula intersects
+    /// the range, or producer compatibility state owns the merge collection.
+    pub fn merge<'a>(&mut self, area: impl Into<Area<'a>>) -> Result<&mut Self> {
+        let range = area.into().resolve()?;
+        let sheet = self
+            .edit
+            .base
+            .inner
+            .sheets
+            .get(self.position)
+            .ok_or_else(|| invalid("merged-range target disappeared"))?
+            .name
+            .as_str();
+        ensure_merge_area(sheet, range)?;
+        let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
+        intents
+            .try_reserve(1)
+            .map_err(|error| invalid(format!("cannot grow merged-range edit plan: {error}")))?;
+        intents.push(MergeIntent::Add(range));
+        Ok(self)
+    }
+
+    /// Unmerge the range containing one checked cell, if any.
+    pub fn unmerge<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        let range = {
+            let data = self
+                .edit
+                .base
+                .inner
+                .sheets
+                .get(self.position)
+                .cloned()
+                .ok_or_else(|| invalid("unmerge target disappeared"))?;
+            let sheet = Sheet {
+                owner: Arc::clone(&self.edit.base.inner),
+                data,
+            };
+            let intents = self
+                .edit
+                .sheets
+                .get(&self.position)
+                .map_or(&[][..], |actions| actions.merges.as_slice());
+            pending_merge(sheet.store()?.merge_ranges(), intents, address)
+        };
+        let Some(range) = range else {
+            return Ok(self);
+        };
+        let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
+        intents
+            .try_reserve(1)
+            .map_err(|error| invalid(format!("cannot grow merged-range edit plan: {error}")))?;
+        intents.push(MergeIntent::Remove(range));
+        Ok(self)
+    }
+
     /// Create or replace a cell's primary value or formula.
     pub fn set<'a>(
         &mut self,
@@ -3625,6 +4052,30 @@ impl NewSheet<'_> {
             style_lineage: self.style_lineage,
             column,
         })
+    }
+
+    /// Merge a checked range on this transaction-local worksheet.
+    pub fn merge<'b>(&mut self, area: impl Into<Area<'b>>) -> Result<&mut Self> {
+        let range = area.into().resolve()?;
+        ensure_merge_area(self.added.name.as_str(), range)?;
+        self.added.actions.merges.try_reserve(1).map_err(|error| {
+            invalid(format!("cannot grow new-sheet merged-range plan: {error}"))
+        })?;
+        self.added.actions.merges.push(MergeIntent::Add(range));
+        Ok(self)
+    }
+
+    /// Unmerge the range containing one cell in this pending worksheet.
+    pub fn unmerge<'b>(&mut self, at: impl Into<At<'b>>) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        let Some(range) = pending_merge(&[], &self.added.actions.merges, address) else {
+            return Ok(self);
+        };
+        self.added.actions.merges.try_reserve(1).map_err(|error| {
+            invalid(format!("cannot grow new-sheet merged-range plan: {error}"))
+        })?;
+        self.added.actions.merges.push(MergeIntent::Remove(range));
+        Ok(self)
     }
 
     /// Create or replace a cell's primary value or formula.
@@ -4934,8 +5385,17 @@ fn create_sheets(
             cells,
             rows,
             columns,
+            merges,
         } = actions;
         let change_start = changes.len();
+        let merge_projection = project_merges(name.as_str(), None, merges, &cells)?;
+        for (range, change) in &merge_projection.changes {
+            changes.push(Change::Merge {
+                sheet: name.as_str().into(),
+                range: *range,
+                change: *change,
+            });
+        }
         let mut effective_defaults = None;
         if let Some(action) = defaults {
             let after =
@@ -5018,6 +5478,22 @@ fn create_sheets(
                 columns: effective_columns,
             },
         )?;
+        let MergePlan { add, remove } = merge_projection.plan;
+        if !remove.is_empty() {
+            return Err(invalid(
+                "new worksheet merge projection unexpectedly removed a range",
+            ));
+        }
+        if !add.is_empty() {
+            content = raw::worksheet::edit::rewrite_merges(
+                &content,
+                name.as_str(),
+                MergePlan {
+                    add,
+                    remove: Vec::new(),
+                },
+            )?;
+        }
         if active == Some(index) {
             content = raw::sheet_view_edit::rewrite(
                 &content,
@@ -5032,6 +5508,18 @@ fn create_sheets(
         workbook.inner.validate_styles(&parsed)?;
         for change in &changes[change_start..] {
             match change {
+                Change::Merge {
+                    sheet,
+                    range,
+                    change,
+                    ..
+                } => {
+                    if parsed.merge_ranges().contains(range) != change.after() {
+                        return Err(invalid(format!(
+                            "new worksheet merged-range verification failed at {sheet}!{range}"
+                        )));
+                    }
+                },
                 Change::Cell {
                     sheet,
                     address,
@@ -5238,15 +5726,15 @@ mod tests {
         let book = committed.workbook();
         let sheet = book.sheet("Sheet1").expect("lookup").expect("sheet");
         assert!(matches!(
-            sheet.cell("A1").expect("A1"),
+            sheet.cell("A1").expect("A1").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "hello"
         ));
         assert!(matches!(
-            sheet.cell("B2").expect("B2"),
+            sheet.cell("B2").expect("B2").stored(),
             Some(Cell::Value(Value::Number(number))) if number == &Number::new("42").expect("number")
         ));
         assert!(matches!(
-            sheet.cell("C3").expect("C3"),
+            sheet.cell("C3").expect("C3").stored(),
             Some(Cell::Formula(_))
         ));
         let extents = sheet.extents().expect("committed extents");
@@ -5268,12 +5756,293 @@ mod tests {
         );
         assert!(matches!(
             source.apply(committed.patch()),
-            Ok(applied) if applied.workbook().sheet("Sheet1").expect("lookup").expect("sheet").cell("A1").expect("cell").is_some()
+            Ok(applied) if applied.workbook().sheet("Sheet1").expect("lookup").expect("sheet").cell("A1").expect("cell").stored().is_some()
         ));
         assert!(matches!(
             book.apply(committed.patch()),
             Err(Error::PatchConflict { .. })
         ));
+    }
+
+    #[test]
+    fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
+        let source = merged_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let source_sheet = source.sheet("Sheet1").expect("lookup").expect("sheet");
+        assert_eq!(
+            source_sheet
+                .merges()
+                .expect("merged ranges")
+                .map(Rect::a1)
+                .collect::<Vec<_>>(),
+            ["A1:B2"]
+        );
+        assert!(matches!(
+            source_sheet.cell("A1").expect("anchor"),
+            crate::cell::View::Stored(Cell::Value(_))
+        ));
+        assert!(matches!(
+            source_sheet.cell("B2").expect("covered"),
+            crate::cell::View::Covered(range) if range == Rect::from_a1("A1:B2").expect("range")
+        ));
+
+        let mut edit = source.edit().expect("edit");
+        edit.sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet")
+            .unmerge("B2")
+            .and_then(|sheet| sheet.set("B2", "revealed"))
+            .and_then(|sheet| sheet.merge("C3:D4"))
+            .expect("merged-range changes");
+        let committed = edit.commit().expect("commit");
+        assert_eq!(committed.patch().len(), 3);
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        assert_eq!(
+            sheet
+                .merges()
+                .expect("merged ranges")
+                .map(Rect::a1)
+                .collect::<Vec<_>>(),
+            ["C3:D4"]
+        );
+        assert!(matches!(
+            sheet.cell("B2").expect("uncovered cell").stored(),
+            Some(Cell::Value(Value::Text(value))) if value.as_str() == "revealed"
+        ));
+        assert!(matches!(
+            sheet.cell("D4").expect("covered cell"),
+            crate::cell::View::Covered(range) if range == Rect::from_a1("C3:D4").expect("range")
+        ));
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let mut blocked = source.edit().expect("blocked edit");
+        blocked
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("D1:E2")
+            .expect("plan merge");
+        assert!(matches!(
+            blocked.commit(),
+            Err(Error::MergeEditBlocked {
+                reason: MergeEditBlock::FollowerContent { address },
+                ..
+            }) if address == Address::from_a1("E2").expect("address")
+        ));
+
+        let mut cleared = source.edit().expect("clear edit");
+        cleared
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .clear("E2")
+            .and_then(|sheet| sheet.merge("D1:E2"))
+            .expect("clear then merge");
+        let cleared = cleared.commit().expect("safe merge");
+        assert!(matches!(
+            cleared
+                .workbook()
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .cell("E2")
+                .expect("covered"),
+            crate::cell::View::Covered(range) if range == Rect::from_a1("D1:E2").expect("range")
+        ));
+
+        let mut merge = source.edit().expect("independent merge");
+        merge
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("D1:E2")
+            .expect("merge");
+        let mut clear = source.edit().expect("independent clear");
+        clear
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .clear("E2")
+            .expect("clear");
+        merge.join(clear).expect("clear makes the merge safe");
+        assert!(matches!(
+            merge
+                .commit()
+                .expect("joined clear and merge")
+                .workbook()
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .cell("E2")
+                .expect("covered"),
+            crate::cell::View::Covered(_)
+        ));
+
+        let mut merge = source.edit().expect("independent merge");
+        merge
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("C3:D4")
+            .expect("merge");
+        let mut write = source.edit().expect("independent follower write");
+        write
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .set("D4", "hidden")
+            .expect("write");
+        assert!(matches!(
+            merge.join(write).expect_err("follower content must conflict").failure(),
+            JoinFailure::Overlap(conflicts)
+                if conflicts.conflicts().iter().any(|conflict| conflict.merges().is_some())
+        ));
+
+        let mut overlap = source.edit().expect("overlap edit");
+        overlap
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("B2:C3")
+            .expect("plan overlap");
+        assert!(matches!(
+            overlap.commit(),
+            Err(Error::MergeEditBlocked {
+                reason: MergeEditBlock::Overlap { existing },
+                ..
+            }) if existing == Rect::from_a1("A1:B2").expect("existing")
+        ));
+
+        let mut created = source.edit().expect("create edit");
+        created
+            .add("Merged")
+            .expect("new sheet")
+            .set("A1", "anchor")
+            .and_then(|sheet| sheet.merge("A1:C2"))
+            .expect("new merged range");
+        let created = created.commit().expect("create merged sheet");
+        assert!(matches!(
+            created
+                .workbook()
+                .sheet("Merged")
+                .expect("lookup")
+                .expect("sheet")
+                .cell("C2")
+                .expect("covered"),
+            crate::cell::View::Covered(range) if range == Rect::from_a1("A1:C2").expect("range")
+        ));
+
+        let mut left = source.edit().expect("left edit");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("C3:D4")
+            .expect("left merge");
+        let mut right = source.edit().expect("right edit");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("F1:G2")
+            .expect("right merge");
+        left.join(right).expect("disjoint merge join");
+        assert_eq!(
+            left.commit()
+                .expect("joined commit")
+                .workbook()
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .merges()
+                .expect("merges")
+                .count(),
+            3
+        );
+
+        let mut left = source.edit().expect("left overlap");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("C3:D4")
+            .expect("left merge");
+        let mut right = source.edit().expect("right overlap");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .merge("D4:E5")
+            .expect("right merge");
+        let error = left.join(right).expect_err("overlapping joins must fail");
+        assert!(matches!(
+            error.failure(),
+            JoinFailure::Overlap(conflicts)
+                if conflicts.conflicts().iter().any(|conflict| conflict.merges().is_some())
+        ));
+
+        let mut left = source.edit().expect("left unmerge");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .unmerge("A1")
+            .expect("left unmerge");
+        let mut right = source.edit().expect("right unmerge");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .unmerge("B2")
+            .expect("right unmerge");
+        let error = left
+            .join(right)
+            .expect_err("two selectors for one merge must conflict");
+        assert!(matches!(
+            error.failure(),
+            JoinFailure::Overlap(conflicts)
+                if conflicts.conflicts().iter().any(|conflict| {
+                    conflict.merges().is_some_and(|ranges| {
+                        ranges == [Rect::from_a1("A1:B2").expect("range")]
+                    })
+                })
+        ));
+
+        let mut missing = source.edit().expect("missing unmerge");
+        missing
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .unmerge("H8")
+            .expect("missing range is a no-op");
+        assert!(missing.commit().expect("no-op commit").patch().is_empty());
+    }
+
+    #[test]
+    fn merged_range_reads_share_one_snapshot_without_public_locks() {
+        let workbook = Arc::new(merged_workbook());
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                let workbook = Arc::clone(&workbook);
+                scope.spawn(move || {
+                    let sheet = workbook.sheet(0usize).expect("lookup").expect("sheet");
+                    assert!(matches!(
+                        sheet.cell("B2").expect("covered"),
+                        crate::cell::View::Covered(range)
+                            if range == Rect::from_a1("A1:B2").expect("range")
+                    ));
+                    assert_eq!(sheet.merges().expect("merges").count(), 1);
+                });
+            }
+        });
     }
 
     #[test]
@@ -5298,8 +6067,11 @@ mod tests {
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet");
-        assert!(matches!(sheet.cell("A1").expect("cell"), Some(Cell::Empty)));
-        assert!(sheet.cell("B1").expect("cell").is_none());
+        assert!(matches!(
+            sheet.cell("A1").expect("cell").stored(),
+            Some(Cell::Empty)
+        ));
+        assert!(sheet.cell("B1").expect("cell").is_missing());
 
         let mut edit = cleared.workbook().edit().expect("edit");
         edit.sheet(0usize)
@@ -5316,7 +6088,7 @@ mod tests {
                 .expect("sheet")
                 .cell("A1")
                 .expect("cell")
-                .is_none()
+                .is_missing()
         );
     }
 
@@ -5756,7 +6528,7 @@ mod tests {
             Some(0.3)
         );
         assert!(matches!(
-            sheet.cell("A1").expect("cell lookup"),
+            sheet.cell("A1").expect("cell lookup").stored(),
             Some(Cell::Value(Value::Text(value))) if value.as_str() == "ready"
         ));
 
@@ -6648,7 +7420,7 @@ mod tests {
         let active = committed.workbook().active_sheet().expect("active sheet");
         assert_eq!(active.name(), "Sheet2");
         assert!(matches!(
-            active.cell("A1").expect("cell"),
+            active.cell("A1").expect("cell").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "active payload"
         ));
 
@@ -6814,11 +7586,11 @@ mod tests {
             .expect("lookup")
             .expect("Calc");
         assert!(matches!(
-            calc.cell("A1").expect("formula cell"),
+            calc.cell("A1").expect("formula cell").stored(),
             Some(Cell::Formula(formula)) if formula.text() == "'Input 2026'!A1"
         ));
         assert!(matches!(
-            calc.cell("D1").expect("composed cell"),
+            calc.cell("D1").expect("composed cell").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "composed"
         ));
         for uri in [
@@ -6886,11 +7658,11 @@ mod tests {
             .expect("created sheet");
         assert_eq!(summary.data.native_id, 2);
         assert!(matches!(
-            summary.cell("A1").expect("A1"),
+            summary.cell("A1").expect("A1").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "created in one transaction"
         ));
         assert!(matches!(
-            summary.cell("B2").expect("B2"),
+            summary.cell("B2").expect("B2").stored(),
             Some(Cell::Formula(formula)) if formula.text() == "1+1"
         ));
         assert!(summary.row(3u32).expect("row").hidden());
@@ -6996,7 +7768,8 @@ mod tests {
                 .expect("lookup")
                 .expect("created")
                 .cell("A1")
-                .expect("cell"),
+                .expect("cell")
+                .stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "before-a"
         ));
         assert_eq!(
@@ -7193,7 +7966,7 @@ mod tests {
             .expect("lookup")
             .expect("created sheet");
         assert!(matches!(
-            created.cell("A1").expect("formula"),
+            created.cell("A1").expect("formula").stored(),
             Some(Cell::Formula(formula)) if formula.text() == "Input!A1"
         ));
         let properties = part_text(committed.workbook(), "/docProps/app.xml");
@@ -7860,7 +8633,8 @@ mod tests {
                 .expect("lookup")
                 .expect("Sheet3")
                 .cell("A1")
-                .expect("cell"),
+                .expect("cell")
+                .stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "three"
         ));
         assert_eq!(
@@ -7962,7 +8736,7 @@ mod tests {
             &Visibility::Hidden
         );
         assert!(matches!(
-            active.cell("B1").expect("cell"),
+            active.cell("B1").expect("cell").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "moved payload"
         ));
         assert_eq!(
@@ -8263,7 +9037,7 @@ mod tests {
             .expect("sheet");
         assert_eq!(sheet.visibility(), &Visibility::Hidden);
         assert!(matches!(
-            sheet.cell("A1").expect("cell"),
+            sheet.cell("A1").expect("cell").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "preserved while hidden"
         ));
 
@@ -8461,7 +9235,8 @@ mod tests {
                 .expect("lookup")
                 .expect("sheet")
                 .cell("A1")
-                .expect("cell"),
+                .expect("cell")
+                .stored(),
             Some(Cell::Empty)
         ));
     }
@@ -8508,11 +9283,11 @@ mod tests {
             .expect("lookup")
             .expect("sheet");
         assert!(matches!(
-            sheet.cell("A1").expect("A1"),
+            sheet.cell("A1").expect("A1").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "left"
         ));
         assert!(matches!(
-            sheet.cell("C3").expect("C3"),
+            sheet.cell("C3").expect("C3").stored(),
             Some(Cell::Value(Value::Number(number))) if number.as_str() == "42"
         ));
 
@@ -8602,7 +9377,7 @@ mod tests {
             .expect("sheet");
         assert!(sheet.row(1).expect("row 2").hidden());
         assert!(matches!(
-            sheet.cell("A2").expect("A2"),
+            sheet.cell("A2").expect("A2").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "same row"
         ));
 
@@ -8805,7 +9580,10 @@ mod tests {
 
         let book = committed.workbook();
         let sheet = book.sheet(0usize).expect("lookup").expect("sheet");
-        assert!(matches!(sheet.cell("D1").expect("D1"), Some(Cell::Empty)));
+        assert!(matches!(
+            sheet.cell("D1").expect("D1").stored(),
+            Some(Cell::Empty)
+        ));
         let styles = book.styles().expect("styles");
         let inherited = styles.find(&accent.key()).expect("inherited style key");
         assert!(inherited.same(&accent));
@@ -8983,7 +9761,7 @@ mod tests {
             .expect("lookup")
             .expect("sheet");
         assert!(matches!(
-            sheet.cell("B1").expect("B1"),
+            sheet.cell("B1").expect("B1").stored(),
             Some(Cell::Value(Value::Number(number))) if number.as_str() == "9"
         ));
         assert!(matches!(
@@ -9024,7 +9802,7 @@ mod tests {
             sheet.local_style("A1").expect("local style"),
             Some(crate::LocalStyle::Default)
         ));
-        assert!(sheet.cell("Z99").expect("missing").is_none());
+        assert!(sheet.cell("Z99").expect("missing").is_missing());
 
         let restored = committed
             .workbook()
@@ -9177,6 +9955,18 @@ mod tests {
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" mc:Ignorable="ac"><sheetFormatPr baseColWidth="10" defaultColWidth="12" defaultRowHeight="15" customHeight="0" zeroHeight="1" thickTop="1" ac:dyDescent="0.1"/><sheetData><row r="2" customHeight="0" ac:dyDescent="0.2"/></sheetData></worksheet>"#.to_vec(),
             );
         Workbook::from_package(package).expect("defaults workbook")
+    }
+
+    fn merged_workbook() -> Workbook {
+        let baseline = Workbook::new().expect("baseline");
+        let mut package = baseline.inner.package.clone();
+        package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+            .expect("worksheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:E2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>anchor</t></is></c></row><row r="2"><c r="E2" t="inlineStr"><is><t>keep</t></is></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells></worksheet>"#.to_vec(),
+            );
+        Workbook::from_package(package).expect("merged workbook")
     }
 
     fn two_sheet_workbook(second_kind: SheetKind) -> Workbook {

@@ -41,6 +41,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 extents.used().map(Rect::a1),
                 extents.stored().map(Rect::a1),
             );
+            for range in sheet.merges()? {
+                println!("  merged: {range}");
+            }
             for (address, cell) in sheet.cells(Rect::ALL)? {
                 println!(
                     "  ({}, {}): {cell:?}",

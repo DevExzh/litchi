@@ -58,10 +58,13 @@ retain inclusive syntax and absolute/relative semantics. Sparse `cells(range)`
 and dense budgeted `grid(range)` are distinct. Declared, stored, content, and
 formatted extents are distinct views.
 
-Cell lookup distinguishes missing, empty, exact value, formula, legacy array,
-dynamic-array anchor/spill, data table, covered merge, and unknown states.
-Cached and calculated values carry freshness/provenance separately. Exact stored
-values never change merely because a number format resembles a date or currency.
+Cell lookup uses a compact view enum to distinguish missing, stored, and
+merge-covered coordinates. The stored cell enum then distinguishes empty,
+exact value, formula, legacy array, dynamic-array anchor/spill, data table, and
+unknown states. This keeps structural coverage out of the payload model and
+does not materialize follower cells. Cached and calculated values carry
+freshness/provenance separately. Exact stored values never change merely
+because a number format resembles a date or currency.
 
 Defined names are scoped typed expressions. Tables own a stable schema, range,
 columns, totals, formulas, filters, and style, with optional validated typed row

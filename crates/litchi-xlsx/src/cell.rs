@@ -11,6 +11,7 @@ use crate::column;
 use crate::error::{Result, invalid};
 use crate::formula::{Formula, Kind};
 use crate::layout::Defaults;
+use crate::merge;
 use crate::row;
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
@@ -32,6 +33,45 @@ pub enum Cell {
     /// fields are available on [`Unknown`]; the snapshot retains original part
     /// bytes for lossless future saves.
     Unknown(Unknown),
+}
+
+/// Exact semantic state at one logical worksheet coordinate.
+///
+/// A covered coordinate is reported before any producer-stored follower cell,
+/// because the merge anchor owns its visible content. Sparse stored traversal
+/// remains available through [`crate::Sheet::cells`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum View<'a> {
+    /// No cell record or covering merge exists at this coordinate.
+    Missing,
+    /// The coordinate is covered by a merge whose anchor is `range.start()`.
+    Covered(Rect),
+    /// One physical cell record is stored at this coordinate.
+    Stored(&'a Cell),
+}
+
+impl<'a> View<'a> {
+    /// Borrow the physical cell state when this coordinate owns one.
+    pub const fn stored(self) -> Option<&'a Cell> {
+        match self {
+            Self::Stored(cell) => Some(cell),
+            Self::Missing | Self::Covered(_) => None,
+        }
+    }
+
+    /// Covering merged range, if this is a non-anchor coordinate.
+    pub const fn merge(self) -> Option<Rect> {
+        match self {
+            Self::Covered(range) => Some(range),
+            Self::Missing | Self::Stored(_) => None,
+        }
+    }
+
+    /// Whether this coordinate has neither a record nor merge coverage.
+    pub const fn is_missing(self) -> bool {
+        matches!(self, Self::Missing)
+    }
 }
 
 /// Exact value stored by SpreadsheetML.
@@ -467,6 +507,7 @@ pub(crate) struct Store {
     rows: Box<[row::Stored]>,
     columns: Box<[column::Stored]>,
     defaults: Option<Defaults>,
+    merges: merge::Index,
     extents: Extents,
 }
 
@@ -523,6 +564,7 @@ impl Store {
         mut rows: Vec<row::Stored>,
         columns: Box<[column::Stored]>,
         defaults: Option<Defaults>,
+        merges: Vec<Rect>,
         declared: Option<Rect>,
     ) -> Result<Self> {
         cells.sort_unstable_by_key(|entry| entry.address);
@@ -555,11 +597,13 @@ impl Store {
                 styled.push(entry.address);
             }
         }
+        let merges = merge::Index::new(merges)?;
         Ok(Self {
             cells: cells.into_boxed_slice(),
             rows: rows.into_boxed_slice(),
             columns,
             defaults,
+            merges,
             extents: Extents {
                 declared,
                 stored: stored.finish()?,
@@ -569,6 +613,17 @@ impl Store {
         })
     }
 
+    pub(crate) fn view(&self, address: Address) -> View<'_> {
+        if let Some(range) = self.merges.containing(address)
+            && range.start() != address
+        {
+            return View::Covered(range);
+        }
+        self.entry(address)
+            .map_or(View::Missing, |entry| View::Stored(&entry.cell))
+    }
+
+    #[cfg(test)]
     pub(crate) fn get(&self, address: Address) -> Option<&Cell> {
         self.entry(address).map(|entry| &entry.cell)
     }
@@ -621,6 +676,14 @@ impl Store {
 
     pub(crate) const fn defaults(&self) -> Option<&Defaults> {
         self.defaults.as_ref()
+    }
+
+    pub(crate) fn merges(&self) -> merge::Merges<'_> {
+        self.merges.iter()
+    }
+
+    pub(crate) fn merge_ranges(&self) -> &[Rect] {
+        self.merges.as_slice()
     }
 
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {

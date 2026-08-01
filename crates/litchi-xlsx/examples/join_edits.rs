@@ -36,11 +36,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         .workbook()
         .sheet("Sheet1")?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Sheet1 is missing"))?;
-    if !matches!(sheet.cell("A1")?, Some(Cell::Value(Value::Text(_)))) {
+    if !matches!(
+        sheet.cell("A1")?.stored(),
+        Some(Cell::Value(Value::Text(_)))
+    ) {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "A1 was not joined").into());
     }
     if !matches!(
-        sheet.cell("B1")?,
+        sheet.cell("B1")?.stored(),
         Some(Cell::Value(Value::Number(number))) if number.as_str() == "42"
     ) {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "B1 was not joined").into());

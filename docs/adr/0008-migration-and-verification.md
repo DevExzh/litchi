@@ -52,9 +52,10 @@ cannot represent coordinates outside the modern spreadsheet grid. A half-open
 and column without admitting a sentinel as a valid cell. Borrowed A1 lookup such
 as `sheet.cell("A1")` is the semantic main entry; raw zero-based `(row, column)`
 tuples remain convenient, and reusable checked `Address` values avoid repeated
-validation in hot loops. Lookup returns `Result<Option<&Cell>>`: absence is
-distinct from an explicitly stored `Cell::Empty`, and no `Index` implementation
-converts a miss into a panic.
+validation in hot loops. The initial lookup returned `Result<Option<&Cell>>`;
+the twenty-second slice replaces that provisional shape with
+`Result<cell::View<'_>>`, distinguishing missing, explicitly stored, and
+merge-covered coordinates without an indexing panic or native identifier.
 
 Worksheet payloads load on first use into hidden thread-safe snapshot caches.
 The parser streams into a row-major compact sparse slice, resolves shared
@@ -63,7 +64,7 @@ records, retains exact numeric lexical forms, and keeps formula cache origin and
 freshness separate. Sparse `cells(range)` traversal and stored extent are
 implemented; the eighth slice later separates declared, content, and direct-
 style extents. Fully resolved formatted extents including row/column defaults,
-rich-text formatting, merge coverage, dynamic-array spill states, shared-style
+rich-text formatting, dynamic-array spill states, shared-style
 definition editing, dense budgeted grids, cache eviction, and operation budgets
 remain open, as does replacing remaining parser `Invalid` messages with the
 full structured context taxonomy. The current non-evicting cache is therefore a
@@ -1090,15 +1091,79 @@ paths on that build. It does not establish stable row-specific descent across
 Excel resave, every default flag or producer normalization, other Office
 applications or builds, or performance.
 
+The twenty-second slice implements sparse merged-cell CRUD in
+`litchi-xlsx`. The worksheet parser validates `mergeCells` counts, child
+context, non-single ranges, and two-dimensional non-overlap, then stores only
+checked `Rect` values in a compact static interval tree. Each range contributes
+one 32-bit span index; lookup descends balanced row partitions and binary-
+searches column-disjoint spans instead of scanning or expanding rows.
+The compact index reserves one `u32` sentinel and therefore admits at most
+4,294,967,294 ranges, matching Excel's documented `mergeCell` occurrence limit
+in the local `[MS-OE376]` section 2.1.661 conformance notes.
+`Sheet::merges()` borrows the ranges directly. `Sheet::cell()` now returns
+`cell::View`: anchors retain their stored payload, followers return
+`Covered(Rect)`, and missing coordinates stay distinct. A producer follower
+record is not discarded, but the structural view wins so callers cannot
+accidentally treat hidden payload as an ordinary cell. No range is expanded
+into per-coordinate state.
+
+Existing and transaction-local sheets expose short `merge(area)` and
+`unmerge(at)` verbs. Commit projects intents sequentially, returns typed errors
+for single-cell or overlapping ranges, and refuses a new range whose final
+follower cells contain data. Explicit clears/removals in the same transaction
+are honored. Serialization runs in three phases—remove old merge structure,
+apply ordinary sparse edits, add new merge structure—so editing a just-unmerged
+follower and clearing before merge are both safe. Protected sheets, grouped
+formulas, markup-compatibility ownership, and unmodeled `mergeCells` children
+remain typed blocks rather than guessed rewrites.
+
+Low-level surgery retains untouched `mergeCell` bytes, qualified names,
+unknown attributes, and container attributes, updates the advisory count,
+removes an empty container, inserts a new container at its schema position, and
+only expands a producer `dimension` for newly added ranges. It never shrinks a
+dimension or normalizes it merely because an existing merge lies outside the
+hint. Every result is reparsed before publication. Complete semantic merge
+changes join the source-checked reversible patch; disjoint merge rectangles can
+join without locks, while intersecting intents and independently written
+follower content produce deterministic structural conflicts. Independent
+follower clears/removals remain joinable and run before merge creation.
+
+Tests cover sparse lookup without follower materialization, malformed counts
+and contexts, overlap rejection, lossless add/remove/container deletion,
+schema ordering, typed dependency blocks, unmerge-and-edit, clear-and-merge,
+new sheets, exact inverse restoration, concurrent snapshot reads, and
+disjoint/overlapping joins. The public `merged_cells` example performs create,
+unmerge, follower update, and a second merge through the ordinary facade. These
+are functional and preservation gates; they make no latency, allocation, cache,
+or contention claim.
+
+Computer Use exercised that example in Microsoft Excel for Mac 16.110.2
+(build 26062818), Office LTSC Standard for Mac 2024. Excel opened the generated
+workbook without a repair or compatibility prompt and reported used range
+A1:F4. Navigating to covered B2 selected anchor A1 and retained `Merged title`;
+navigating to covered C4 selected A4 and retained `Merged footer`; F2 remained
+an independent unmerged cell with `Unmerged follower`. Excel wrote
+`Excel merge resave marker` to F3 and saved a separate XLSX without warning.
+The resaved archive passed ZIP integrity validation, and the public reader
+recovered exactly `A1:C2` and `A4:C4`, the unmerged F2 content, and the F3
+marker. Excel added its normal theme, shared-string, style, and document-
+property parts and materialized empty physical records for merge followers;
+`cell::View` still reports those coordinates as covered, which is the intended
+structural precedence. This certifies one local create/unmerge/remerge/open/
+edit/resave/reverse-read path on that build. It does not certify merge styling,
+structural row/column shifts, grouped formulas, every producer normalization,
+other Office applications or builds, or performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection
 unlocking, row and column insertion/deletion, shifting references,
-merge/group-formula edits, dynamic-reference resolution, validation evaluation,
+group-formula edits, dynamic-reference resolution, validation evaluation,
 shared-style definition editing or forking, named-style and row/column/theme
 resolution, rich text,
 dynamic arrays, patch serialization, full structured diagnostics,
-eviction/resource budgets, range/structural effect joins, three-way merge,
+eviction/resource budgets, general range/structural effect joins, three-way
+merge,
 raw-copy preservation of clean compressed entries, cancellation-aware save
 contexts, scratch planning, or output budgets. Those remain certification work;
 no allocation, latency, contention, or scaling conclusion follows from the

@@ -31,12 +31,43 @@ const MAX_CELL_STYLE: u32 = 65_490;
 const MAX_COLUMN_STYLE: u32 = 65_429;
 const MAX_METADATA_INDEX: u32 = 2_147_483_647;
 
+fn merge_successor(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"phoneticPr"
+            | b"conditionalFormatting"
+            | b"dataValidations"
+            | b"hyperlinks"
+            | b"printOptions"
+            | b"pageMargins"
+            | b"pageSetup"
+            | b"headerFooter"
+            | b"rowBreaks"
+            | b"colBreaks"
+            | b"customProperties"
+            | b"cellWatches"
+            | b"ignoredErrors"
+            | b"smartTags"
+            | b"drawing"
+            | b"legacyDrawing"
+            | b"legacyDrawingHF"
+            | b"picture"
+            | b"oleObjects"
+            | b"controls"
+            | b"webPublishItems"
+            | b"tableParts"
+            | b"extLst"
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Context {
     Worksheet,
     SheetFormat,
     Columns,
     SheetData,
+    MergeCells,
+    Merge,
     Row,
     Cell,
     Formula,
@@ -145,6 +176,10 @@ struct Parser {
     seen_columns: bool,
     column_records: usize,
     seen_sheet_data: bool,
+    merges: Vec<Rect>,
+    merge_count: Option<usize>,
+    seen_merges: bool,
+    merge_window_closed: bool,
 }
 
 pub(crate) fn parse<'a, F>(content: &[u8], strings: F) -> Result<Store>
@@ -176,6 +211,10 @@ impl Parser {
             seen_columns: false,
             column_records: 0,
             seen_sheet_data: false,
+            merges: Vec::new(),
+            merge_count: None,
+            seen_merges: false,
+            merge_window_closed: false,
         }
     }
 
@@ -228,14 +267,14 @@ impl Parser {
                     parser.finish(child)?;
                 },
                 Event::Text(value) => {
-                    if stack.last() == Some(&Context::SheetFormat)
+                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge))
                         && !value
                             .decode()
                             .map_err(|error| invalid(error.to_string()))?
                             .trim()
                             .is_empty()
                     {
-                        return Err(invalid("worksheet sheetFormatPr cannot contain text"));
+                        return Err(invalid("worksheet leaf property cannot contain text"));
                     }
                     if let Some(target) = text_target(&stack) {
                         parser.push_text(
@@ -245,8 +284,8 @@ impl Parser {
                     }
                 },
                 Event::CData(value) => {
-                    if stack.last() == Some(&Context::SheetFormat) {
-                        return Err(invalid("worksheet sheetFormatPr cannot contain CDATA"));
+                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
+                        return Err(invalid("worksheet leaf property cannot contain CDATA"));
                     }
                     if let Some(target) = text_target(&stack) {
                         parser.push_text(
@@ -256,9 +295,9 @@ impl Parser {
                     }
                 },
                 Event::GeneralRef(value) => {
-                    if stack.last() == Some(&Context::SheetFormat) {
+                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
                         return Err(invalid(
-                            "worksheet sheetFormatPr cannot contain character references",
+                            "worksheet leaf property cannot contain character references",
                         ));
                     }
                     if let Some(target) = text_target(&stack) {
@@ -303,10 +342,11 @@ impl Parser {
         let rows = parser.rows;
         let columns = column::resolve(parser.columns)?;
         let defaults = parser.defaults;
+        let merges = parser.merges;
         for cell in parser.cells {
             cells.push(materialize(cell, strings)?);
         }
-        Store::from_unsorted(cells, rows, columns, defaults, declared_extent)
+        Store::from_unsorted(cells, rows, columns, defaults, merges, declared_extent)
     }
 
     fn start(
@@ -316,8 +356,18 @@ impl Parser {
         element: &BytesStart<'_>,
         decoder: Decoder,
     ) -> Result<Context> {
-        if parent == Context::SheetFormat {
-            return Err(invalid("worksheet sheetFormatPr must be a leaf element"));
+        if matches!(parent, Context::SheetFormat | Context::Merge) {
+            return Err(invalid(
+                "worksheet leaf property must not have child elements",
+            ));
+        }
+        if parent == Context::Worksheet && self.seen_sheet_data {
+            let local = element.name().local_name();
+            if is_spreadsheetml_name(namespace, element.name(), local.as_ref())
+                && merge_successor(local.as_ref())
+            {
+                self.merge_window_closed = true;
+            }
         }
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
@@ -363,6 +413,56 @@ impl Parser {
             }
             self.seen_sheet_data = true;
             return Ok(Context::SheetData);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"mergeCells")
+        {
+            if !self.seen_sheet_data {
+                return Err(invalid("worksheet mergeCells appears before sheetData"));
+            }
+            if self.seen_merges {
+                return Err(invalid("worksheet has duplicate mergeCells elements"));
+            }
+            if self.merge_window_closed {
+                return Err(invalid(
+                    "worksheet mergeCells appears after a schema successor",
+                ));
+            }
+            self.seen_merges = true;
+            self.merge_count =
+                optional_u32(element, b"count", decoder, "worksheet merged-range count")?
+                    .map(usize::try_from)
+                    .transpose()
+                    .map_err(|_| invalid("worksheet merged-range count does not fit usize"))?;
+            return Ok(Context::MergeCells);
+        }
+        if parent == Context::MergeCells
+            && is_spreadsheetml_name(namespace, element.name(), b"mergeCell")
+        {
+            let reference = unqualified_attribute_value(element, b"ref", decoder)?
+                .ok_or_else(|| invalid("worksheet mergeCell is missing ref"))?;
+            let range = Rect::from_a1(&reference)
+                .map_err(|error| invalid(format!("invalid merged range '{reference}': {error}")))?;
+            if range.rows() == 1 && range.columns() == 1 {
+                return Err(invalid(format!(
+                    "worksheet merged range '{reference}' contains only one cell"
+                )));
+            }
+            self.merges
+                .try_reserve(1)
+                .map_err(|error| invalid(format!("cannot grow merged ranges: {error}")))?;
+            self.merges.push(range);
+            return Ok(Context::Merge);
+        }
+        if parent == Context::MergeCells {
+            return Err(invalid("worksheet mergeCells has an unmodeled child"));
+        }
+        if is_spreadsheetml_name(namespace, element.name(), b"mergeCells")
+            || is_spreadsheetml_name(namespace, element.name(), b"mergeCell")
+        {
+            return Err(invalid(
+                "worksheet merge markup appears outside its schema context",
+            ));
         }
         if parent == Context::SheetData && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
@@ -861,6 +961,23 @@ impl Parser {
             Context::Columns if self.column_records == 0 => {
                 Err(invalid("worksheet cols contains no col records"))
             },
+            Context::MergeCells => {
+                if self.merges.is_empty() {
+                    return Err(invalid(
+                        "worksheet mergeCells contains no mergeCell records",
+                    ));
+                }
+                if self
+                    .merge_count
+                    .is_some_and(|count| count != self.merges.len())
+                {
+                    return Err(invalid(format!(
+                        "worksheet merged-range count differs from {} records",
+                        self.merges.len()
+                    )));
+                }
+                Ok(())
+            },
             _ => Ok(()),
         }
     }
@@ -1317,6 +1434,52 @@ mod tests {
             formula.cached().map(Cache::value),
             Some(Value::Text(value)) if value.as_str() == "cached"
         ));
+    }
+
+    #[test]
+    fn parses_sparse_merges_and_rejects_ambiguous_merge_markup() {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="2"><c r="B2"><v>2</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:C3"/><mergeCell ref="E5:F5"/></mergeCells></worksheet>"#
+        );
+        let store = parse(xml.as_bytes(), || Ok(None)).expect("valid merged ranges");
+        assert_eq!(store.entries().len(), 2, "merges must stay sparse");
+        assert_eq!(
+            store.merges().map(Rect::a1).collect::<Vec<_>>(),
+            ["A1:C3", "E5:F5"]
+        );
+        assert!(matches!(
+            store.view(Address::from_a1("A1").expect("anchor")),
+            crate::cell::View::Stored(Cell::Value(_))
+        ));
+        assert!(matches!(
+            store.view(Address::from_a1("B2").expect("covered")),
+            crate::cell::View::Covered(range) if range == Rect::from_a1("A1:C3").expect("range")
+        ));
+        assert!(matches!(
+            store.view(Address::from_a1("D4").expect("missing")),
+            crate::cell::View::Missing
+        ));
+
+        for malformed in [
+            format!(
+                r#"<worksheet xmlns="{S}"><sheetData/><mergeCells count="2"><mergeCell ref="A1:B2"/></mergeCells></worksheet>"#
+            ),
+            format!(
+                r#"<worksheet xmlns="{S}"><sheetData/><mergeCells><mergeCell ref="A1:C3"/><mergeCell ref="C3:D4"/></mergeCells></worksheet>"#
+            ),
+            format!(
+                r#"<worksheet xmlns="{S}"><sheetData/><mergeCells><mergeCell ref="A1"/></mergeCells></worksheet>"#
+            ),
+            format!(
+                r#"<worksheet xmlns="{S}"><sheetData/><mergeCells><future/></mergeCells></worksheet>"#
+            ),
+            format!(r#"<worksheet xmlns="{S}"><sheetData/><mergeCell ref="A1:B2"/></worksheet>"#),
+            format!(
+                r#"<worksheet xmlns="{S}"><sheetData/><hyperlinks/><mergeCells><mergeCell ref="A1:B2"/></mergeCells></worksheet>"#
+            ),
+        ] {
+            assert!(parse(malformed.as_bytes(), || Ok(None)).is_err());
+        }
     }
 
     #[test]

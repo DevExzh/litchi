@@ -15,13 +15,18 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32, x14ac};
+use super::{
+    merge_successor, optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32,
+    x14ac,
+};
 use crate::cell::{Content, Value};
 use crate::column::{Assignments, Width};
 use crate::error::{
-    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, Result, RowEditBlock, invalid,
+    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, Result, RowEditBlock,
+    invalid,
 };
 use crate::layout::{self, Descent};
+use crate::merge;
 use crate::outline::Outline;
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::strings::encode_spreadsheet_text;
@@ -553,6 +558,19 @@ impl From<BTreeMap<Address, Action>> for Plan {
     }
 }
 
+/// Final add/remove effects for one worksheet merge container.
+#[derive(Debug, Default)]
+pub(crate) struct MergePlan {
+    pub(crate) add: Vec<Rect>,
+    pub(crate) remove: Vec<Rect>,
+}
+
+impl MergePlan {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.add.is_empty() && self.remove.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct Span {
     start: usize,
@@ -652,6 +670,23 @@ struct DimensionTag {
     declared: Rect,
 }
 
+#[derive(Debug)]
+struct MergeSlot {
+    range: Rect,
+    span: Span,
+}
+
+#[derive(Debug)]
+struct MergeCellsSlot {
+    span: Span,
+    tag_end: usize,
+    close_start: usize,
+    tag: Tag,
+    merges: Box<[MergeSlot]>,
+    payload: bool,
+    empty: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FrameKind {
     Worksheet,
@@ -662,6 +697,8 @@ enum FrameKind {
     Row,
     Cell,
     Primary,
+    MergeCells,
+    Merge,
     Other,
 }
 
@@ -727,6 +764,22 @@ struct PendingSheetData {
     rows: Vec<RowSlot>,
 }
 
+#[derive(Debug)]
+struct PendingMergeCells {
+    start: usize,
+    tag_end: usize,
+    tag: Tag,
+    count: Option<usize>,
+    merges: Vec<MergeSlot>,
+    payload: bool,
+}
+
+#[derive(Debug)]
+struct PendingMerge {
+    range: Rect,
+    start: usize,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct SelectionRange {
     first_row: u32,
@@ -736,6 +789,16 @@ struct SelectionRange {
 }
 
 impl SelectionRange {
+    fn from_rect(range: Rect) -> Self {
+        let (end_row, end_column) = range.end();
+        Self {
+            first_row: range.start().row().get(),
+            first_column: range.start().column().get(),
+            last_row: end_row - 1,
+            last_column: end_column - 1,
+        }
+    }
+
     fn cell_or_area(value: &str) -> Result<Self> {
         let (first, last) = value.split_once(':').unwrap_or((value, value));
         if last.contains(':') {
@@ -810,6 +873,45 @@ impl SelectionRange {
     fn starts_at(self, address: Address) -> bool {
         self.first_row == address.row().get() && self.first_column == address.column().get()
     }
+
+    fn overlaps(self, range: Rect) -> bool {
+        let (end_row, end_column) = range.end();
+        self.first_row < end_row
+            && range.start().row().get() <= self.last_row
+            && self.first_column < end_column
+            && range.start().column().get() <= self.last_column
+    }
+}
+
+fn merge_range(element: &BytesStart<'_>, decoder: Decoder) -> Result<Rect> {
+    let value = unqualified_attribute_value(element, b"ref", decoder)?
+        .ok_or_else(|| invalid("mergeCell is missing ref during edit"))?;
+    let range = Rect::from_a1(&value).map_err(|error| {
+        invalid(format!(
+            "invalid merged range '{value}' during edit: {error}"
+        ))
+    })?;
+    if range.rows() == 1 && range.columns() == 1 {
+        return Err(invalid(format!(
+            "merged range '{value}' contains only one cell during edit"
+        )));
+    }
+    Ok(range)
+}
+
+fn merge_predecessor(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"sheetData"
+            | b"sheetCalcPr"
+            | b"sheetProtection"
+            | b"protectedRanges"
+            | b"scenarios"
+            | b"autoFilter"
+            | b"sortState"
+            | b"dataConsolidate"
+            | b"customSheetViews"
+    )
 }
 
 #[derive(Debug)]
@@ -833,6 +935,9 @@ struct Layout {
     extended_validation: bool,
     formula_ranges: Box<[SelectionRange]>,
     defaults_compatibility: bool,
+    merge_cells: Option<MergeCellsSlot>,
+    merge_insertion: usize,
+    merge_compatibility: bool,
 }
 
 #[derive(Debug, Default)]
@@ -850,11 +955,16 @@ struct Scanner {
     cell: Option<PendingCell>,
     previous_row: u32,
     protected: bool,
-    merged: Vec<SelectionRange>,
     validations: Vec<SelectionRange>,
     extended_validation: bool,
     formulas: Vec<FormulaStorage>,
     defaults_compatibility: bool,
+    merge_cells: Option<MergeCellsSlot>,
+    pending_merge_cells: Option<PendingMergeCells>,
+    pending_merge: Option<PendingMerge>,
+    merge_insertion: Option<usize>,
+    merge_compatibility: bool,
+    root_close_start: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -1135,6 +1245,248 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
     Ok(output)
 }
 
+#[derive(Debug)]
+struct MergeReplacement {
+    span: Span,
+    bytes: Vec<u8>,
+}
+
+/// Losslessly add and remove direct worksheet merge records.
+pub(crate) fn rewrite_merges(content: &[u8], sheet: &str, plan: MergePlan) -> Result<Vec<u8>> {
+    if plan.is_empty() {
+        return Ok(content.to_vec());
+    }
+    let layout = scan(content)?;
+    let requested = plan
+        .add
+        .first()
+        .or_else(|| plan.remove.first())
+        .copied()
+        .ok_or_else(|| invalid("merged-range edit lost its requested range"))?;
+    if layout.protected {
+        return Err(merge_block(
+            sheet,
+            requested,
+            MergeEditBlock::ProtectedSheet,
+        ));
+    }
+    if layout.merge_compatibility {
+        return Err(merge_block(
+            sheet,
+            requested,
+            MergeEditBlock::MarkupCompatibility,
+        ));
+    }
+    if layout
+        .merge_cells
+        .as_ref()
+        .is_some_and(|container| container.payload)
+    {
+        return Err(merge_block(
+            sheet,
+            requested,
+            MergeEditBlock::UnmodeledPayload,
+        ));
+    }
+
+    let merge_count = layout
+        .merge_cells
+        .as_ref()
+        .map_or(0, |container| container.merges.len());
+    let mut base = Vec::new();
+    base.try_reserve_exact(merge_count)
+        .map_err(|error| invalid(format!("cannot reserve source merged ranges: {error}")))?;
+    if let Some(container) = layout.merge_cells.as_ref() {
+        base.extend(container.merges.iter().map(|merge| merge.range));
+    }
+    let mut projected = Vec::new();
+    projected
+        .try_reserve_exact(base.len().saturating_add(plan.add.len()))
+        .map_err(|error| invalid(format!("cannot reserve projected merged ranges: {error}")))?;
+    projected.extend_from_slice(&base);
+    for range in &plan.remove {
+        projected.retain(|candidate| candidate != range);
+    }
+    for range in plan.add {
+        if range.rows() == 1 && range.columns() == 1 {
+            return Err(merge_block(sheet, range, MergeEditBlock::SingleCell));
+        }
+        if layout
+            .formula_ranges
+            .iter()
+            .any(|formula| formula.overlaps(range))
+        {
+            return Err(merge_block(sheet, range, MergeEditBlock::GroupFormula));
+        }
+        if projected.contains(&range) {
+            continue;
+        }
+        if let Some(existing) = projected
+            .iter()
+            .copied()
+            .find(|existing| merge::overlaps(*existing, range))
+        {
+            return Err(merge_block(
+                sheet,
+                range,
+                MergeEditBlock::Overlap { existing },
+            ));
+        }
+        projected.push(range);
+    }
+    if projected == base {
+        return Ok(content.to_vec());
+    }
+    let projected = merge::Index::new(projected)?;
+    let projected = projected.as_slice();
+
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(2)
+        .map_err(|error| invalid(format!("cannot reserve merged-range replacements: {error}")))?;
+    if let Some(dimension) = layout.dimension.as_ref() {
+        let expanded = projected
+            .iter()
+            .copied()
+            .filter(|range| !base.contains(range))
+            .fold(dimension.declared, Rect::union);
+        if expanded != dimension.declared {
+            let mut bytes = Vec::new();
+            write_tag(
+                &mut bytes,
+                &dimension.tag,
+                dimension.empty,
+                &["ref"],
+                &[("ref", expanded.a1())],
+            );
+            replacements.push(MergeReplacement {
+                span: dimension.span,
+                bytes,
+            });
+        }
+    }
+
+    match layout.merge_cells.as_ref() {
+        Some(container) => replacements.push(MergeReplacement {
+            span: container.span,
+            bytes: write_merge_cells(content, container, projected),
+        }),
+        None => replacements.push(MergeReplacement {
+            span: Span {
+                start: layout.merge_insertion,
+                end: layout.merge_insertion,
+            },
+            bytes: write_new_merge_cells(&layout.sheet_data.tag.name, projected),
+        }),
+    }
+    apply_merge_replacements(content, replacements)
+}
+
+fn merge_block(sheet: &str, range: Rect, reason: MergeEditBlock) -> Error {
+    Error::MergeEditBlocked {
+        sheet: sheet.to_owned(),
+        range,
+        reason,
+    }
+}
+
+fn write_merge_cells(content: &[u8], container: &MergeCellsSlot, projected: &[Rect]) -> Vec<u8> {
+    if projected.is_empty() {
+        return Vec::new();
+    }
+    let mut output = Vec::new();
+    write_tag(
+        &mut output,
+        &container.tag,
+        false,
+        &["count"],
+        &[("count", projected.len().to_string())],
+    );
+    if !container.empty {
+        let mut cursor = container.tag_end;
+        for stored in &container.merges {
+            output.extend_from_slice(&content[cursor..stored.span.start]);
+            if projected.contains(&stored.range) {
+                output.extend_from_slice(&content[stored.span.start..stored.span.end]);
+            }
+            cursor = stored.span.end;
+        }
+        output.extend_from_slice(&content[cursor..container.close_start]);
+    }
+    let child_name = sibling_name(&container.tag.name, "mergeCell");
+    let child = Tag {
+        name: child_name.into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    for range in projected
+        .iter()
+        .copied()
+        .filter(|range| !container.merges.iter().any(|stored| stored.range == *range))
+    {
+        write_tag(&mut output, &child, true, &[], &[("ref", range.a1())]);
+    }
+    write_close(&mut output, &container.tag.name);
+    output
+}
+
+fn write_new_merge_cells(sheet_data_name: &str, projected: &[Rect]) -> Vec<u8> {
+    let name = sibling_name(sheet_data_name, "mergeCells");
+    let child_name = sibling_name(sheet_data_name, "mergeCell");
+    let tag = Tag {
+        name: name.into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    let mut output = Vec::new();
+    write_tag(
+        &mut output,
+        &tag,
+        false,
+        &[],
+        &[("count", projected.len().to_string())],
+    );
+    let child = Tag {
+        name: child_name.into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    for range in projected {
+        write_tag(&mut output, &child, true, &[], &[("ref", range.a1())]);
+    }
+    write_close(&mut output, &tag.name);
+    output
+}
+
+fn apply_merge_replacements(
+    content: &[u8],
+    mut replacements: Vec<MergeReplacement>,
+) -> Result<Vec<u8>> {
+    replacements.sort_unstable_by_key(|replacement| replacement.span.start);
+    if replacements
+        .windows(2)
+        .any(|pair| pair[0].span.end > pair[1].span.start)
+    {
+        return Err(invalid("overlapping merged-range replacements"));
+    }
+    let size = replacements
+        .iter()
+        .try_fold(content.len(), |size, replacement| {
+            size.checked_sub(replacement.span.end - replacement.span.start)?
+                .checked_add(replacement.bytes.len())
+        })
+        .ok_or_else(|| invalid("merged-range output size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(size)
+        .map_err(|error| invalid(format!("cannot reserve merged-range output: {error}")))?;
+    let mut cursor = 0usize;
+    for replacement in replacements {
+        output.extend_from_slice(&content[cursor..replacement.span.start]);
+        output.extend_from_slice(&replacement.bytes);
+        cursor = replacement.span.end;
+    }
+    output.extend_from_slice(&content[cursor..]);
+    Ok(output)
+}
+
 fn plan_sets_descent(plan: &Plan) -> bool {
     plan.rows
         .values()
@@ -1349,6 +1701,25 @@ fn scan(content: &[u8]) -> Result<Layout> {
                     .ok_or_else(|| invalid("worksheet edit scan has an unmatched closing tag"))?;
                 scanner.finish(frame, event_start, event_end)?;
             },
+            Event::Text(value) => {
+                if stack.last().is_some_and(|frame| {
+                    matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
+                }) && !value
+                    .decode()
+                    .map_err(|error| invalid(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    scanner.mark_merge_payload();
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) => {
+                if stack.last().is_some_and(|frame| {
+                    matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
+                }) {
+                    scanner.mark_merge_payload();
+                }
+            },
             Event::Eof => break,
             _ => {},
         }
@@ -1380,6 +1751,28 @@ impl Scanner {
                 tag: tag(element, decoder)?,
             });
             return Ok(FrameKind::Worksheet);
+        }
+        self.observe_merge_position(parent, namespace, element, span.start);
+        if is_spreadsheetml_name(namespace, element.name(), b"mergeCells") {
+            if parent != Some(FrameKind::Worksheet) {
+                self.merge_compatibility = true;
+                return Ok(FrameKind::Other);
+            }
+            self.start_merge_cells(element, decoder, start, end)?;
+            return Ok(FrameKind::MergeCells);
+        }
+        if is_spreadsheetml_name(namespace, element.name(), b"mergeCell") {
+            if parent != Some(FrameKind::MergeCells) {
+                self.merge_compatibility = true;
+                return Ok(FrameKind::Other);
+            }
+            let range = merge_range(element, decoder)?;
+            self.pending_merge = Some(PendingMerge { range, start });
+            return Ok(FrameKind::Merge);
+        }
+        if matches!(parent, Some(FrameKind::MergeCells | FrameKind::Merge)) {
+            self.mark_merge_payload();
+            return Ok(FrameKind::Other);
         }
         if is_spreadsheetml_name(namespace, element.name(), b"sheetFormatPr") {
             if parent != Some(FrameKind::Worksheet) {
@@ -1519,6 +1912,41 @@ impl Scanner {
         span: Span,
     ) -> Result<()> {
         self.scan_guard(namespace, element, decoder)?;
+        self.observe_merge_position(parent, namespace, element, span.start);
+        if is_spreadsheetml_name(namespace, element.name(), b"mergeCells") {
+            if parent != Some(FrameKind::Worksheet) {
+                self.merge_compatibility = true;
+                return Ok(());
+            }
+            self.ensure_merge_cells_slot()?;
+            self.merge_cells = Some(MergeCellsSlot {
+                span,
+                tag_end: span.end,
+                close_start: span.end,
+                tag: tag(element, decoder)?,
+                merges: Box::new([]),
+                payload: false,
+                empty: true,
+            });
+            return Ok(());
+        }
+        if is_spreadsheetml_name(namespace, element.name(), b"mergeCell") {
+            if parent != Some(FrameKind::MergeCells) {
+                self.merge_compatibility = true;
+                return Ok(());
+            }
+            let range = merge_range(element, decoder)?;
+            self.pending_merge_cells
+                .as_mut()
+                .ok_or_else(|| invalid("mergeCell appears outside mergeCells edit state"))?
+                .merges
+                .push(MergeSlot { range, span });
+            return Ok(());
+        }
+        if matches!(parent, Some(FrameKind::MergeCells | FrameKind::Merge)) {
+            self.mark_merge_payload();
+            return Ok(());
+        }
         if is_spreadsheetml_name(namespace, element.name(), b"sheetFormatPr") {
             if parent != Some(FrameKind::Worksheet) {
                 self.defaults_compatibility = true;
@@ -1689,6 +2117,53 @@ impl Scanner {
 
     fn finish(&mut self, frame: Frame, close_start: usize, end: usize) -> Result<()> {
         match frame.kind {
+            FrameKind::Worksheet => {
+                self.root_close_start = Some(close_start);
+            },
+            FrameKind::Merge => {
+                let merge = self
+                    .pending_merge
+                    .take()
+                    .ok_or_else(|| invalid("mergeCell close without edit state"))?;
+                self.pending_merge_cells
+                    .as_mut()
+                    .ok_or_else(|| invalid("mergeCell closed outside mergeCells"))?
+                    .merges
+                    .push(MergeSlot {
+                        range: merge.range,
+                        span: Span {
+                            start: merge.start,
+                            end,
+                        },
+                    });
+            },
+            FrameKind::MergeCells => {
+                let merges = self
+                    .pending_merge_cells
+                    .take()
+                    .ok_or_else(|| invalid("mergeCells close without edit state"))?;
+                if merges
+                    .count
+                    .is_some_and(|count| count != merges.merges.len())
+                {
+                    return Err(invalid(format!(
+                        "worksheet merged-range count differs from {} records during edit",
+                        merges.merges.len()
+                    )));
+                }
+                self.merge_cells = Some(MergeCellsSlot {
+                    span: Span {
+                        start: merges.start,
+                        end,
+                    },
+                    tag_end: merges.tag_end,
+                    close_start,
+                    tag: merges.tag,
+                    merges: merges.merges.into_boxed_slice(),
+                    payload: merges.payload,
+                    empty: false,
+                });
+            },
             FrameKind::Column => {
                 let column = self
                     .column
@@ -1954,6 +2429,77 @@ impl Scanner {
         Ok(())
     }
 
+    fn ensure_merge_cells_slot(&self) -> Result<()> {
+        if self.pending_merge_cells.is_some() || self.merge_cells.is_some() {
+            return Err(invalid("worksheet has duplicate mergeCells during edit"));
+        }
+        if self.sheet_data.is_none() {
+            return Err(invalid(
+                "worksheet mergeCells appears before sheetData during edit",
+            ));
+        }
+        if self.merge_insertion.is_some() {
+            return Err(invalid(
+                "worksheet mergeCells appears after a schema successor during edit",
+            ));
+        }
+        Ok(())
+    }
+
+    fn start_merge_cells(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        start: usize,
+        tag_end: usize,
+    ) -> Result<()> {
+        self.ensure_merge_cells_slot()?;
+        let count = optional_u32(element, b"count", decoder, "worksheet merged-range count")?
+            .map(usize::try_from)
+            .transpose()
+            .map_err(|_| invalid("worksheet merged-range count does not fit usize during edit"))?;
+        self.pending_merge_cells = Some(PendingMergeCells {
+            start,
+            tag_end,
+            tag: tag(element, decoder)?,
+            count,
+            merges: Vec::new(),
+            payload: false,
+        });
+        Ok(())
+    }
+
+    fn mark_merge_payload(&mut self) {
+        if let Some(merges) = self.pending_merge_cells.as_mut() {
+            merges.payload = true;
+        } else if let Some(merges) = self.merge_cells.as_mut() {
+            merges.payload = true;
+        }
+    }
+
+    fn observe_merge_position(
+        &mut self,
+        parent: Option<FrameKind>,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        start: usize,
+    ) {
+        if parent != Some(FrameKind::Worksheet) || self.sheet_data.is_none() {
+            return;
+        }
+        let local_name = element.name().local_name();
+        let local = local_name.as_ref();
+        if is_spreadsheetml_name(namespace, element.name(), local) {
+            if merge_successor(local) {
+                self.merge_insertion.get_or_insert(start);
+            } else if !merge_predecessor(local) && local != b"mergeCells" {
+                self.merge_compatibility = true;
+            }
+        } else {
+            self.merge_compatibility = true;
+        }
+    }
+
     fn scan_guard(
         &mut self,
         namespace: &ResolveResult<'_>,
@@ -1963,11 +2509,6 @@ impl Scanner {
         if is_spreadsheetml_name(namespace, element.name(), b"sheetProtection") {
             self.protected |= optional_bool(element, b"sheet", decoder, "sheet protection flag")?
                 .unwrap_or(false);
-        }
-        if is_spreadsheetml_name(namespace, element.name(), b"mergeCell") {
-            let value = unqualified_attribute_value(element, b"ref", decoder)?
-                .ok_or_else(|| invalid("mergeCell is missing ref during edit"))?;
-            self.merged.push(SelectionRange::cell_or_area(&value)?);
         }
         if is_spreadsheetml_name(namespace, element.name(), b"dataValidation") {
             let value = unqualified_attribute_value(element, b"sqref", decoder)?
@@ -2019,6 +2560,10 @@ impl Scanner {
         let sheet_data = self
             .sheet_data
             .ok_or_else(|| invalid("worksheet cell edits require a direct sheetData element"))?;
+        let merge_insertion = self
+            .merge_insertion
+            .or(self.root_close_start)
+            .ok_or_else(|| invalid("worksheet edit scan did not find the root closing tag"))?;
         if self
             .defaults
             .as_ref()
@@ -2100,6 +2645,29 @@ impl Scanner {
                 );
             }
         }
+        let merge_count = self
+            .merge_cells
+            .as_ref()
+            .map_or(0, |container| container.merges.len());
+        let mut merged_ranges = Vec::new();
+        merged_ranges
+            .try_reserve_exact(merge_count)
+            .map_err(|error| invalid(format!("cannot reserve scanned merged ranges: {error}")))?;
+        if let Some(container) = self.merge_cells.as_ref() {
+            merged_ranges.extend(container.merges.iter().map(|merge| merge.range));
+        }
+        let merged_ranges = merge::Index::new(merged_ranges)?;
+        let mut merged = Vec::new();
+        merged
+            .try_reserve_exact(merged_ranges.as_slice().len())
+            .map_err(|error| invalid(format!("cannot reserve merge edit guards: {error}")))?;
+        merged.extend(
+            merged_ranges
+                .as_slice()
+                .iter()
+                .copied()
+                .map(SelectionRange::from_rect),
+        );
         Ok(Layout {
             root,
             defaults: self.defaults,
@@ -2107,11 +2675,14 @@ impl Scanner {
             columns: self.columns,
             dimension: self.dimension,
             protected: self.protected,
-            merged: self.merged.into_boxed_slice(),
+            merged: merged.into_boxed_slice(),
             validations: self.validations.into_boxed_slice(),
             extended_validation: self.extended_validation,
             formula_ranges: formula_ranges.into_boxed_slice(),
             defaults_compatibility: self.defaults_compatibility,
+            merge_cells: self.merge_cells,
+            merge_insertion,
+            merge_compatibility: self.merge_compatibility,
         })
     }
 }
@@ -3979,6 +4550,100 @@ mod tests {
             store.get(Address::from_a1("C1").unwrap()),
             Some(Cell::Empty)
         ));
+    }
+
+    #[test]
+    fn merge_surgery_is_lossless_ordered_and_dependency_checked() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:dimension z:keep="dimension" ref="A1"/><x:sheetData/><x:mergeCells z:keep="container" count="1"><x:mergeCell z:keep="record" ref="E5:F5"/></x:mergeCells><x:hyperlinks/></x:worksheet>"#
+        );
+        let added = rewrite_merges(
+            xml.as_bytes(),
+            "Data",
+            MergePlan {
+                add: vec![Rect::from_a1("B2:C3").expect("range")],
+                remove: Vec::new(),
+            },
+        )
+        .expect("add merge");
+        let added_text = std::str::from_utf8(&added).expect("UTF-8");
+        assert!(added_text.contains(r#"z:keep="dimension" ref="A1:C3""#));
+        assert!(added_text.contains(r#"z:keep="container" count="2""#));
+        assert!(added_text.contains(r#"<x:mergeCell z:keep="record" ref="E5:F5"/>"#));
+        assert!(added_text.contains(r#"<x:mergeCell ref="B2:C3"/>"#));
+        assert!(
+            added_text.find("<x:mergeCells").expect("merge container")
+                < added_text.find("<x:hyperlinks").expect("successor")
+        );
+
+        let removed = rewrite_merges(
+            &added,
+            "Data",
+            MergePlan {
+                add: Vec::new(),
+                remove: vec![Rect::from_a1("E5:F5").expect("range")],
+            },
+        )
+        .expect("remove merge");
+        let removed_text = std::str::from_utf8(&removed).expect("UTF-8");
+        assert!(!removed_text.contains("E5:F5"));
+        assert!(removed_text.contains(r#"z:keep="container" count="1""#));
+
+        let emptied = rewrite_merges(
+            &removed,
+            "Data",
+            MergePlan {
+                add: Vec::new(),
+                remove: vec![Rect::from_a1("B2:C3").expect("range")],
+            },
+        )
+        .expect("remove final merge");
+        let emptied = std::str::from_utf8(&emptied).expect("UTF-8");
+        assert!(!emptied.contains("mergeCells"));
+        assert!(
+            emptied.contains(r#"ref="A1:C3""#),
+            "dimensions never shrink"
+        );
+
+        let requested = Rect::from_a1("A1:B2").expect("range");
+        for (xml, expected) in [
+            (
+                format!(
+                    r#"<worksheet xmlns="{S}"><sheetData/><sheetProtection sheet="1"/></worksheet>"#
+                ),
+                MergeEditBlock::ProtectedSheet,
+            ),
+            (
+                format!(
+                    r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><f t="array" ref="A1:B2">A1:B2</f></c></row></sheetData></worksheet>"#
+                ),
+                MergeEditBlock::GroupFormula,
+            ),
+            (
+                format!(
+                    r#"<worksheet xmlns="{S}" xmlns:z="urn:future"><sheetData/><mergeCells><mergeCell ref="C3:D4"/><z:future/></mergeCells></worksheet>"#
+                ),
+                MergeEditBlock::UnmodeledPayload,
+            ),
+            (
+                format!(
+                    r#"<worksheet xmlns="{S}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><sheetData/><mc:AlternateContent/></worksheet>"#
+                ),
+                MergeEditBlock::MarkupCompatibility,
+            ),
+        ] {
+            assert!(matches!(
+                rewrite_merges(
+                    xml.as_bytes(),
+                    "Data",
+                    MergePlan {
+                        add: vec![requested],
+                        remove: Vec::new(),
+                    },
+                ),
+                Err(Error::MergeEditBlocked { reason, .. }) if reason == expected
+            ));
+        }
     }
 
     #[test]

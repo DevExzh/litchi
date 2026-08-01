@@ -18,11 +18,13 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 
+#[cfg(test)]
+use crate::Cell;
 use crate::cell::{Extents, Store, Text};
 use crate::error::{Error, Result, invalid};
 use crate::raw;
 use crate::style::StyleLineage;
-use crate::{Cell, Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
+use crate::{Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -505,13 +507,14 @@ impl Sheet {
         Arc::ptr_eq(&self.owner, &other.owner)
     }
 
-    /// Look up a cell by raw zero-based `(row, column)` or a checked [`crate::Address`].
+    /// Look up one exact logical cell state by A1 or checked coordinate.
     ///
-    /// `None` means no cell record is stored. [`Cell::Empty`] means a record is
-    /// present but has no primary payload.
-    pub fn cell<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<&Cell>> {
+    /// [`crate::cell::View::Missing`], [`crate::cell::View::Covered`], and a
+    /// producer-stored [`crate::Cell`] are distinct without materializing follower
+    /// cells for large merged ranges.
+    pub fn cell<'a>(&self, at: impl Into<At<'a>>) -> Result<crate::cell::View<'_>> {
         let address = at.into().resolve()?;
-        Ok(self.store()?.get(address))
+        Ok(self.store()?.view(address))
     }
 
     /// Exact local style state for a stored cell.
@@ -554,6 +557,11 @@ impl Sheet {
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
         let range = area.into().resolve()?;
         Ok(self.store()?.cells(range))
+    }
+
+    /// Lazily traverse validated, non-overlapping merged ranges.
+    pub fn merges(&self) -> Result<crate::merge::Merges<'_>> {
+        Ok(self.store()?.merges())
     }
 
     /// Borrow one checked logical row, including an implicit default row.
@@ -1255,15 +1263,16 @@ mod tests {
         let sheet = workbook.sheet("data").expect("lookup").expect("present");
 
         assert!(matches!(
-            sheet.cell("A1").expect("cell lookup"),
+            sheet.cell("A1").expect("cell lookup").stored(),
             Some(Cell::Value(Value::Text(text))) if text.as_str() == "Office & Litchi"
         ));
-        assert!(sheet.cell((0, 1)).expect("missing lookup").is_none());
+        assert!(sheet.cell((0, 1)).expect("missing lookup").is_missing());
         assert!(matches!(
-            sheet.cell((1, 2)).expect("number lookup"),
+            sheet.cell((1, 2)).expect("number lookup").stored(),
             Some(Cell::Value(Value::Number(number))) if number.as_str() == "-0.000"
         ));
-        let Some(Cell::Formula(formula)) = sheet.cell((2, 1)).expect("formula lookup") else {
+        let Some(Cell::Formula(formula)) = sheet.cell((2, 1)).expect("formula lookup").stored()
+        else {
             panic!("expected formula cell")
         };
         assert_eq!(formula.text(), "C2*2");
@@ -1272,7 +1281,7 @@ mod tests {
             Some(Value::Number(number)) if number.as_str() == "0"
         ));
         assert!(matches!(
-            sheet.cell((4, 3)).expect("empty lookup"),
+            sheet.cell((4, 3)).expect("empty lookup").stored(),
             Some(Cell::Empty)
         ));
         assert!(matches!(
@@ -1330,7 +1339,7 @@ mod tests {
                     barrier.wait();
                     let sheet = workbook.sheet("Data").expect("lookup").expect("present");
                     assert!(matches!(
-                        sheet.cell((0, 0)).expect("cell lookup"),
+                        sheet.cell((0, 0)).expect("cell lookup").stored(),
                         Some(Cell::Value(Value::Text(text))) if text.as_str() == "Office & Litchi"
                     ));
                 });
@@ -1396,7 +1405,9 @@ mod tests {
             }
             let workbook = Workbook::open(path).expect("corpus workbook");
             let sheet = workbook.sheet(0usize).expect("lookup").expect("present");
-            let Some(Cell::Formula(formula)) = sheet.cell(address).expect("formula lookup") else {
+            let Some(Cell::Formula(formula)) =
+                sheet.cell(address).expect("formula lookup").stored()
+            else {
                 panic!("expected formula at {address:?}")
             };
             assert_eq!(formula.text(), expected);

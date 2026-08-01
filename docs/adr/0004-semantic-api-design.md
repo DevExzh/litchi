@@ -97,6 +97,40 @@ descent uses the existing `row` selector and the same checked scalar. Compact
 default edits to join when their facets are disjoint while retaining
 deterministic conflicts for the same facet.
 
+Merged cells are a structural view over the sparse grid, not synthetic cell
+records. `Sheet::cell` returns `cell::View::{Missing, Covered(Rect), Stored}`:
+the merge anchor remains an ordinary stored-or-missing cell, while every other
+coordinate in the range is `Covered` even if a producer left a physical
+follower record behind. `Sheet::merges()` lazily borrows checked `Rect` values;
+neither lookup nor traversal expands a range into its constituent addresses.
+This extra enum is deliberate: returning `Option<&Cell>` cannot distinguish a
+missing cell from a covered coordinate without encouraging callers to inspect
+native IDs or XML.
+
+The ordinary mutation verbs are `merge(area)` and `unmerge(at)`. The primary
+inputs are A1 areas and lookup coordinates, with reusable checked ranges and
+raw checked numeric forms remaining concise secondary inputs. `unmerge`
+selects the containing range, so callers do not need to rediscover its exact
+boundaries. A one-cell merge, overlap, protected sheet, multi-cell formula,
+unknown compatibility owner, or unmodeled merge-container payload is a typed
+error. Creating a merge that would hide follower content is also rejected; a
+caller must explicitly clear, remove, or relocate that content in the same
+transaction. Transaction ordering is structural removal, ordinary grid edits,
+then structural creation, allowing both safe unmerge-and-edit and
+clear-and-merge workflows without publishing an intermediate state.
+
+Patch membership transitions use `merge::Change::{Add, Remove}` rather than two
+independent booleans, so an impossible no-op transition cannot be constructed.
+Merge changes participate in reversible patches and disjoint edit joins. Two
+merge intents conflict only where their checked rectangles intersect; a merge
+creation also conflicts with an independently planned follower content write.
+Follower clear/remove and style-only effects remain composable because the
+three-phase writer applies them before creating the merge.
+Disjoint structural ranges move into one edit without public locks or wrapper
+types. The low-level writer preserves untouched merge records, namespace
+spelling, unknown attributes, and schema order; a safe facade never exposes
+relationship IDs or physical merge record positions.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

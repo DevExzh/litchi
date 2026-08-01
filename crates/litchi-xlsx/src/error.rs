@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use litchi_sheet::{Cell as Address, Column as ColumnIndex, Row as RowIndex};
+use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
 
 use crate::column::WidthError;
 use crate::layout::{
@@ -103,6 +103,13 @@ pub enum Error {
         sheet: String,
         reason: DefaultsEditBlock,
     },
+    /// A safe merged-range edit would lose content or cross unmodeled state.
+    #[error("cannot edit merged range {range} on sheet '{sheet}': {reason}")]
+    MergeEditBlocked {
+        sheet: String,
+        range: Rect,
+        reason: MergeEditBlock,
+    },
     /// A safe workbook tab edit is forbidden by workbook structure or by an
     /// extension payload whose effective catalog cannot be edited losslessly.
     #[error("cannot edit tab at position {position} ('{sheet}'): {reason}")]
@@ -197,6 +204,19 @@ pub enum DefaultsEditBlock {
     MarkupCompatibility,
     /// Materializing `sheetFormatPr` requires its mandatory row height.
     NeedsHeight,
+}
+
+/// Why the ordinary merged-range editor refused a mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MergeEditBlock {
+    ProtectedSheet,
+    SingleCell,
+    Overlap { existing: Rect },
+    FollowerContent { address: Address },
+    GroupFormula,
+    MarkupCompatibility,
+    UnmodeledPayload,
 }
 
 /// Why the workbook tab editor refused a state or ordering mutation.
@@ -316,6 +336,31 @@ impl std::fmt::Display for DefaultsEditBlock {
                 "creating worksheet defaults requires a height in the same transaction"
             },
         })
+    }
+}
+
+impl std::fmt::Display for MergeEditBlock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ProtectedSheet => formatter.write_str("the worksheet is protected"),
+            Self::SingleCell => formatter.write_str("a merge must contain at least two cells"),
+            Self::Overlap { existing } => {
+                write!(formatter, "it overlaps existing merged range {existing}")
+            },
+            Self::FollowerContent { address } => write!(
+                formatter,
+                "covered cell {address} has content that Excel could discard"
+            ),
+            Self::GroupFormula => {
+                formatter.write_str("it intersects an array, data-table, or shared formula group")
+            },
+            Self::MarkupCompatibility => formatter.write_str(
+                "effective merged ranges are controlled by unmodeled compatibility markup",
+            ),
+            Self::UnmodeledPayload => {
+                formatter.write_str("the merge container has unmodeled child payload")
+            },
+        }
     }
 }
 

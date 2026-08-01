@@ -10,6 +10,7 @@ pub mod column;
 mod error;
 pub mod formula;
 pub mod layout;
+pub mod merge;
 mod outline;
 pub mod raw;
 pub mod row;
@@ -20,8 +21,8 @@ mod workbook;
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
 pub use column::{Column, Columns, Width, WidthAt};
 pub use error::{
-    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, RemoveBlock, RenameBlock, Result,
-    RowEditBlock, TabEditBlock,
+    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, MergeEditBlock, RemoveBlock, RenameBlock,
+    Result, RowEditBlock, TabEditBlock,
 };
 pub use formula::Formula;
 pub use litchi_sheet::{
