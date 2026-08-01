@@ -591,6 +591,10 @@ impl Store {
             .and_then(|position| self.rows.get(position))
     }
 
+    pub(crate) fn row_entries(&self) -> &[row::Stored] {
+        &self.rows
+    }
+
     pub(crate) fn rows(&self) -> row::Rows<'_> {
         row::Rows::new(&self.rows)
     }

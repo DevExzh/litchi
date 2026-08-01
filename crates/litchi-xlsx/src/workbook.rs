@@ -4,7 +4,7 @@ mod edit;
 
 pub use edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure,
-    NewSheet, Patch, RowEdit, RowState, SheetEdit, State, TabEdit,
+    NewSheet, Patch, RowEdit, SheetEdit, State, TabEdit,
 };
 
 use std::collections::HashMap;
@@ -567,6 +567,27 @@ impl Sheet {
         Ok(self.store()?.rows())
     }
 
+    /// Exact shared-style state contributed by a stored row record.
+    ///
+    /// `None` means the logical row is implicit. [`LocalStyle::Default`]
+    /// means an explicit record applies without a shared-style reference.
+    pub fn row_style(&self, at: impl Into<RowAt>) -> Result<Option<LocalStyle>> {
+        let index = at.into().resolve()?;
+        let Some(entry) = self.store()?.row_entry(index) else {
+            return Ok(None);
+        };
+        entry
+            .properties
+            .style
+            .map_or(Ok(Some(LocalStyle::Default)), |key| {
+                self.owner.require_style(key)?;
+                Ok(Some(LocalStyle::Shared(Style::from_raw(
+                    Arc::clone(&self.owner),
+                    key,
+                ))))
+            })
+    }
+
     /// Borrow one checked logical column, including an implicit default
     /// column. A1 labels such as `"B"` are the primary entry; raw inputs are
     /// zero-based and validated before lookup.
@@ -687,6 +708,10 @@ impl Inner {
     fn validate_styles(&self, store: &Store) -> Result<()> {
         if !store.entries().iter().any(|entry| entry.style.is_some())
             && !store
+                .row_entries()
+                .iter()
+                .any(|entry| entry.properties.style.is_some())
+            && !store
                 .column_entries()
                 .iter()
                 .any(|entry| entry.properties.style.is_some())
@@ -703,6 +728,17 @@ impl Inner {
                 "worksheet cell {} references shared style {}, but the workbook contains {len} cell formats",
                 entry.address,
                 entry.style.unwrap_or_default()
+            )));
+        }
+        if let Some(entry) = store
+            .row_entries()
+            .iter()
+            .find(|entry| entry.properties.style.is_some_and(|key| key >= len))
+        {
+            return Err(invalid(format!(
+                "worksheet row {} references shared style {}, but the workbook contains {len} cell formats",
+                entry.index,
+                entry.properties.style.unwrap_or_default()
             )));
         }
         if let Some(entry) = store
@@ -1168,6 +1204,23 @@ mod tests {
                 .expect("sheet")
                 .column(1),
             Err(Error::Invalid(message)) if message.contains("column 1 references shared style 1")
+        ));
+
+        let mut dangling_row = baseline.inner.package.clone();
+        dangling_row
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+            .expect("sheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="2" s="1" customFormat="1"/></sheetData></worksheet>"#.to_vec(),
+            );
+        let dangling_row = Workbook::from_package(dangling_row).expect("lazy row style");
+        assert!(matches!(
+            dangling_row
+                .sheet(0usize)
+                .expect("lookup")
+                .expect("sheet")
+                .row(1),
+            Err(Error::Invalid(message)) if message.contains("row 1 references shared style 1")
         ));
     }
 

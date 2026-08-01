@@ -55,7 +55,7 @@ enum TextTarget {
 struct PendingRow {
     number: u32,
     last_column: u32,
-    hidden: bool,
+    properties: row::Properties,
 }
 
 #[derive(Debug)]
@@ -385,11 +385,56 @@ impl Parser {
             )));
         }
         self.previous_row = number;
+        let height = optional_f64(element, b"ht", decoder, "worksheet row height")?
+            .map(row::Height::new)
+            .transpose()?;
+        let style = optional_u32(element, b"s", decoder, "worksheet row style")?;
+        if style.is_some_and(|style| style > MAX_CELL_STYLE) {
+            return Err(invalid(format!(
+                "worksheet row style exceeds {MAX_CELL_STYLE}"
+            )));
+        }
+        let outline = row::OutlineAt::from(
+            optional_u32(
+                element,
+                b"outlineLevel",
+                decoder,
+                "worksheet row outline level",
+            )?
+            .unwrap_or(0),
+        )
+        .resolve()?;
+        let mut flags = row::Flags::empty();
+        for (attribute, flag, field) in [
+            (b"hidden".as_slice(), row::Flags::HIDDEN, "hidden"),
+            (
+                b"customHeight".as_slice(),
+                row::Flags::CUSTOM_HEIGHT,
+                "customHeight",
+            ),
+            (b"collapsed".as_slice(), row::Flags::COLLAPSED, "collapsed"),
+            (b"thickTop".as_slice(), row::Flags::THICK_TOP, "thickTop"),
+            (b"thickBot".as_slice(), row::Flags::THICK_BOTTOM, "thickBot"),
+            (b"ph".as_slice(), row::Flags::PHONETIC, "ph"),
+            (
+                b"customFormat".as_slice(),
+                row::Flags::CUSTOM_FORMAT,
+                "customFormat",
+            ),
+        ] {
+            if optional_bool(element, attribute, decoder, field)?.unwrap_or(false) {
+                flags.insert(flag);
+            }
+        }
         self.row = Some(PendingRow {
             number,
             last_column: 0,
-            hidden: optional_bool(element, b"hidden", decoder, "worksheet row hidden flag")?
-                .unwrap_or(false),
+            properties: row::Properties {
+                height,
+                style,
+                outline,
+                flags,
+            },
         });
         Ok(())
     }
@@ -762,8 +807,10 @@ impl Parser {
         self.rows
             .try_reserve(1)
             .map_err(|error| invalid(format!("cannot grow sparse worksheet rows: {error}")))?;
-        self.rows
-            .push(row::Stored::new(RowIndex::new(row.number - 1)?, row.hidden));
+        self.rows.push(row::Stored::new(
+            RowIndex::new(row.number - 1)?,
+            row.properties,
+        ));
         Ok(())
     }
 }
@@ -1162,7 +1209,7 @@ mod tests {
     #[test]
     fn keeps_declared_stored_content_and_style_extents_distinct() {
         let xml = format!(
-            r#"<worksheet xmlns="{S}"><dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>1</v></c></row><row r="4" hidden="true"><c r="D4"/></row><row r="9" hidden="0"><c r="F9" s="1"/></row></sheetData></worksheet>"#
+            r#"<worksheet xmlns="{S}"><dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>1</v></c></row><row r="4" ht="30.5" s="1" customFormat="1" customHeight="true" hidden="true" outlineLevel="2" collapsed="1" thickTop="1" thickBot="true" ph="1"><c r="D4"/></row><row r="9" hidden="0"><c r="F9" s="1"/></row></sheetData></worksheet>"#
         );
         let store = parse(xml.as_bytes(), || Ok(None)).expect("valid extents");
         let extents = store.extents();
@@ -1171,7 +1218,20 @@ mod tests {
         assert_eq!(extents.content().map(Rect::a1).as_deref(), Some("B2"));
         assert_eq!(extents.styled().map(Rect::a1).as_deref(), Some("F9"));
         assert_eq!(extents.used().map(Rect::a1).as_deref(), Some("B2:F9"));
-        assert!(store.row(RowIndex::new(3).expect("row 4")).hidden());
+        let row = store.row(RowIndex::new(3).expect("row 4"));
+        assert!(row.hidden());
+        assert_eq!(row.height().map(row::Height::get), Some(30.5));
+        assert!(row.custom_height());
+        assert_eq!(row.outline().get(), 2);
+        assert!(row.collapsed());
+        assert!(row.thick_top());
+        assert!(row.thick_bottom());
+        assert!(row.phonetic());
+        assert!(row.custom_format());
+        assert_eq!(
+            store.row_entry(row.index()).unwrap().properties.style,
+            Some(1)
+        );
         assert!(!store.row(RowIndex::new(8).expect("row 9")).hidden());
         let implicit = store.row(RowIndex::new(5).expect("row 6"));
         assert!(!implicit.stored());
@@ -1259,13 +1319,18 @@ mod tests {
     }
 
     #[test]
-    fn rejects_malformed_dimensions_and_row_visibility() {
+    fn rejects_malformed_dimensions_and_row_properties() {
         for body in [
             "<dimension/><sheetData/>",
             r#"<dimension ref="A0"/><sheetData/>"#,
             r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#,
             r#"<sheetData/><dimension ref="A1"/>"#,
             r#"<sheetData><row r="1" hidden="yes"/></sheetData>"#,
+            r#"<sheetData><row r="1" ht="NaN"/></sheetData>"#,
+            r#"<sheetData><row r="1" ht="409.1"/></sheetData>"#,
+            r#"<sheetData><row r="1" s="65491"/></sheetData>"#,
+            r#"<sheetData><row r="1" outlineLevel="8"/></sheetData>"#,
+            r#"<sheetData><row r="1" thickTop="yes"/></sheetData>"#,
         ] {
             let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
             assert!(

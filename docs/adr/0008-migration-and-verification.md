@@ -916,13 +916,67 @@ resave/reverse-read path on that build. It does not certify every producer
 normalization, column shared-style authoring, structural column shifts, other
 Office applications or builds, or performance.
 
+The nineteenth slice expands row CRUD from visibility into the corresponding
+typed, orthogonal layout surface. `row::{Height, Outline, Props, State}` keeps
+the public vocabulary compact; `Outline` is the same checked type used by
+columns rather than a duplicate wire wrapper. `Height` stores the exact finite
+point value and admits only Excel's `0..=409` range, while `Outline` admits only
+`0..=7`. The parser validates the checked-in `[MS-OE376]` row profile, including
+one-based row order, style references through 65,490, outline depth, and every
+SpreadsheetML boolean spelling. `Sheet::row_style` exposes default or shared
+resource identity without a physical style index. `row::Props` and the borrowed
+row view separately report height, custom-height, shared style, outline,
+hidden, collapsed, thick-top, thick-bottom, phonetic, and custom-format facets;
+an implicit logical row remains distinct from a stored `<row>` record.
+
+Transactions retain the concise numeric row selector and add
+`height`/`reset_height`, `outline`, `hide`/`show`, `collapse`/`expand`,
+`thick_top`/`normal_top`, `thick_bottom`/`normal_bottom`, and
+`show_phonetic`/`hide_phonetic`. Inputs are fully checked before an action is
+inserted. Independent edits to different facets of one row join; two writes to
+the same facet conflict deterministically. The compact private action stores
+orthogonal optional effects rather than a lock-bearing public object. Complete
+before/after states retain shared-style lineage and byte guards, so patch replay
+against another style table is rejected and replay against a byte-identical
+snapshot safely rebinds the opaque handle.
+
+Worksheet surgery changes only selected direct row attributes and preserves
+cells, child payloads, namespace prefixes, unknown attributes, and untouched
+bytes. Setting a height also sets `customHeight`; resetting removes both.
+Default-only operations on an implicit row are no-ops, while materializing
+operations create a sparse empty row record. Every rewritten worksheet is
+reparsed before publication, and inverse patches restore exact source part
+bytes. Tests cover checked and constant-evaluated bounds, malformed row
+attributes, all writable facets, unrelated-attribute preservation, sparse
+materialization, reset and inversion, independent-facet joins, same-facet
+conflicts, and shared-style replay/rebinding. These are type and functional
+checks, not allocation, latency, CPU, cache, or contention measurements.
+
+Computer Use exercised the exact public `rows` artifact in Microsoft Excel for
+Mac 16.110.2 (build 26062818), Office LTSC Standard for Mac 2024. Excel opened
+it without a repair or compatibility prompt, rendered row 2 taller, omitted
+hidden row 3, and showed the level-one outline control for collapsed row 4.
+On this build, the Row Height dialog reported `40` for the source OOXML
+`ht="30"`; Excel normalized the saved XML to `ht="40"`, reopened it at the
+same displayed value, and retained the visible size. This observed producer
+normalization is recorded rather than treated as a cross-producer numeric
+stability guarantee. Excel accepted `Excel row-layout resave marker` at B2 and
+saved without warning. The resaved archive passed ZIP integrity validation,
+and the public reader recovered A1:B4, the marker, row 2's normalized height and
+custom-height state, row 3's hidden state, and row 4's outline/collapsed state.
+This certifies one local height/hide/outline/open/edit/resave/reverse-read path
+on that build. It does not certify every height normalization, thick-edge or
+phonetic rendering, row shared-style authoring, structural row shifts, other
+Office applications or builds, or performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection
-unlocking, row properties beyond visibility, column shared-style retargeting,
-row and column insertion/deletion, shifting references, merge/group-formula
-edits, dynamic-reference resolution, validation evaluation, shared-style
-definition editing or forking, named-style and row/column/theme resolution, rich text,
+unlocking, row and column shared-style retargeting, default-row layout and
+descent editing, row and column insertion/deletion, shifting references,
+merge/group-formula edits, dynamic-reference resolution, validation evaluation,
+shared-style definition editing or forking, named-style and row/column/theme
+resolution, rich text,
 dynamic arrays, patch serialization, full structured diagnostics,
 eviction/resource budgets, range/structural effect joins, three-way merge,
 raw-copy preservation of clean compressed entries, cancellation-aware save

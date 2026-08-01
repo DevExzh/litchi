@@ -54,15 +54,17 @@ ranges, rows, sheets, and other developer-facing collections; native
 relationship IDs, part names, and physical style indexes stay below the facade.
 
 Properties with constrained wire domains use short types in focused modules.
-The XLSX column surface therefore uses `column::{Width, Outline, Props, State}`:
-`Width` admits only finite Office widths, `Outline` admits only supported
-levels, `Props` exposes independent read-only facets, and `State` distinguishes
-an implicit column from a stored property record. Shared format identity is a
-lineage-checked resource handle, not a public numeric ID. Mutation uses paired
-short verbs (`hide`/`show`, `best_fit`/`fixed`, `collapse`/`expand`) plus checked
-set/reset operations. Independently prepared edits may join when they touch
-different facets of one column; two writes to the same facet conflict rather
-than acquiring a public lock or choosing a last writer.
+The XLSX grid-property surface therefore uses `column::{Width, Props, State}`
+and `row::{Height, Props, State}` with one shared checked `Outline` type. Widths
+admit only finite Office widths, heights admit only finite Excel point heights,
+and outline levels cannot exceed the supported depth. `Props` exposes
+independent read-only facets, while `State` distinguishes an implicit grid
+property from a stored record. Shared format identity is a lineage-checked
+resource handle, not a public numeric ID. Mutation uses paired short verbs
+(`hide`/`show`, `best_fit`/`fixed`, `collapse`/`expand`) plus checked set/reset
+operations. Independently prepared edits may join when they touch different
+facets of one row or column; two writes to the same facet conflict rather than
+acquiring a public lock or choosing a last writer.
 
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an

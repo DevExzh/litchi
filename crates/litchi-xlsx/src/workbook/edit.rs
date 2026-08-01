@@ -15,8 +15,9 @@ use crate::column::{
 use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, invalid};
 use crate::raw;
 use crate::raw::worksheet::edit::{
-    Action, ColumnAction, Payload, Plan, RowAction, StyleEffect, WidthEffect,
+    Action, ColumnAction, HeightEffect, Payload, Plan, RowAction, StyleEffect, WidthEffect,
 };
+use crate::row::{Flags as RowFlags, HeightAt, Props as RowProps, State as RowState};
 use crate::sheet::Name;
 use crate::style::StyleLineage;
 use crate::{Style, StyleKey, StyleState};
@@ -95,14 +96,6 @@ impl State {
             Self::Missing | Self::Cell { .. } => None,
         }
     }
-}
-
-/// Exact row-record state before or after a visibility edit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum RowState {
-    Missing,
-    Stored { hidden: bool },
 }
 
 /// Semantic active-tab identity recorded in a patch without native Office IDs.
@@ -190,17 +183,66 @@ impl ColumnState {
 }
 
 impl RowState {
-    fn read(value: Option<&crate::row::Stored>) -> Self {
-        value.map_or(Self::Missing, |row| Self::Stored { hidden: row.hidden })
+    fn read(value: Option<&crate::row::Stored>, workbook: &Workbook) -> Self {
+        value.map_or(Self::Missing, |row| {
+            Self::Stored(RowProps {
+                height: row.properties.height,
+                style: row.properties.style.map_or(StyleState::Default, |key| {
+                    StyleState::Shared(StyleKey::new(
+                        key,
+                        Arc::clone(&workbook.inner.style_lineage),
+                    ))
+                }),
+                outline: row.properties.outline,
+                flags: row.properties.flags,
+            })
+        })
     }
 
-    fn after(before: Option<&crate::row::Stored>, action: RowAction) -> Self {
-        match (before, action) {
-            (None, RowAction::Show) => Self::Missing,
-            (_, action) => Self::Stored {
-                hidden: action.hidden(),
-            },
+    fn after(before: Option<&crate::row::Stored>, action: RowAction, workbook: &Workbook) -> Self {
+        if before.is_none() && !action.materializes() {
+            return Self::Missing;
         }
+        let mut properties = match Self::read(before, workbook) {
+            Self::Missing => RowProps {
+                height: None,
+                style: StyleState::Default,
+                outline: Outline::NONE,
+                flags: RowFlags::empty(),
+            },
+            Self::Stored(properties) => properties,
+        };
+        if let Some(hidden) = action.hidden {
+            properties.flags.set(RowFlags::HIDDEN, hidden);
+        }
+        if let Some(height) = action.height {
+            match height {
+                HeightEffect::Set(height) => {
+                    properties.height = Some(height);
+                    properties.flags.insert(RowFlags::CUSTOM_HEIGHT);
+                },
+                HeightEffect::Reset => {
+                    properties.height = None;
+                    properties.flags.remove(RowFlags::CUSTOM_HEIGHT);
+                },
+            }
+        }
+        if let Some(outline) = action.outline {
+            properties.outline = outline;
+        }
+        if let Some(collapsed) = action.collapsed {
+            properties.flags.set(RowFlags::COLLAPSED, collapsed);
+        }
+        if let Some(thick_top) = action.thick_top {
+            properties.flags.set(RowFlags::THICK_TOP, thick_top);
+        }
+        if let Some(thick_bottom) = action.thick_bottom {
+            properties.flags.set(RowFlags::THICK_BOTTOM, thick_bottom);
+        }
+        if let Some(phonetic) = action.phonetic {
+            properties.flags.set(RowFlags::PHONETIC, phonetic);
+        }
+        Self::Stored(properties)
     }
 }
 
@@ -364,11 +406,11 @@ impl Change {
     }
 
     /// Row state tuple when this is a row-property change.
-    pub fn row(&self) -> Option<(RowIndex, RowState, RowState)> {
+    pub fn row(&self) -> Option<(RowIndex, &RowState, &RowState)> {
         match self {
             Self::Row {
                 row, before, after, ..
-            } => Some((*row, *before, *after)),
+            } => Some((*row, before, after)),
             Self::Create { .. }
             | Self::Remove { .. }
             | Self::Rename { .. }
@@ -488,8 +530,8 @@ impl Change {
             } => Self::Row {
                 sheet: sheet.clone(),
                 row: *row,
-                before: *after,
-                after: *before,
+                before: after.clone(),
+                after: before.clone(),
             },
             Self::Column {
                 sheet,
@@ -515,6 +557,10 @@ impl Change {
                 before.rebind_style(&workbook.inner.style_lineage);
                 after.rebind_style(&workbook.inner.style_lineage);
             },
+            Self::Row { before, after, .. } => {
+                before.rebind_style(&workbook.inner.style_lineage);
+                after.rebind_style(&workbook.inner.style_lineage);
+            },
             _ => {},
         }
     }
@@ -525,6 +571,9 @@ impl Change {
                 before.uses_shared_style() || after.uses_shared_style()
             },
             Self::Column { before, after, .. } => {
+                before.uses_shared_style() || after.uses_shared_style()
+            },
+            Self::Row { before, after, .. } => {
                 before.uses_shared_style() || after.uses_shared_style()
             },
             _ => false,
@@ -1623,7 +1672,14 @@ impl Edit {
                             },
                         }
                     }
-                    accepted.rows.extend(actions.rows);
+                    for (row, action) in actions.rows {
+                        match accepted.rows.entry(row) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(action);
+                            },
+                            Entry::Occupied(mut entry) => entry.get_mut().merge(action),
+                        }
+                    }
                     for (column, action) in actions.columns {
                         match accepted.columns.entry(column) {
                             Entry::Vacant(entry) => {
@@ -2030,8 +2086,8 @@ impl Edit {
             let mut effective_rows = BTreeMap::new();
             for (row, action) in rows {
                 let before = store.row_entry(row);
-                let before_state = RowState::read(before);
-                let after_state = RowState::after(before, action);
+                let before_state = RowState::read(before, &base);
+                let after_state = RowState::after(before, action, &base);
                 if before_state == after_state {
                     continue;
                 }
@@ -2103,7 +2159,7 @@ impl Edit {
                     Change::Row {
                         sheet, row, after, ..
                     } => {
-                        let actual = RowState::read(parsed.row_entry(*row));
+                        let actual = RowState::read(parsed.row_entry(*row), &base);
                         if actual != *after {
                             return Err(invalid(format!(
                                 "worksheet row edit verification failed at {sheet}!row {}",
@@ -3030,9 +3086,14 @@ impl Edit {
 
             let rows = left
                 .rows
-                .keys()
-                .filter(|row| right.rows.contains_key(row))
-                .copied()
+                .iter()
+                .filter_map(|(row, action)| {
+                    right
+                        .rows
+                        .get(row)
+                        .is_some_and(|other| action.overlaps(*other))
+                        .then_some(*row)
+                })
                 .collect::<Vec<_>>();
             if !rows.is_empty() {
                 conflicts.push(Conflict::Rows {
@@ -3443,15 +3504,90 @@ pub struct RowEdit<'a> {
 }
 
 impl RowEdit<'_> {
+    fn action(&mut self) -> &mut RowAction {
+        self.actions.entry(self.row).or_default()
+    }
+
     /// Hide this row while preserving all row and cell content.
     pub fn hide(&mut self) -> &mut Self {
-        self.actions.insert(self.row, RowAction::Hide);
+        self.action().hidden = Some(true);
         self
     }
 
     /// Show this row while preserving all row and cell content.
     pub fn show(&mut self) -> &mut Self {
-        self.actions.insert(self.row, RowAction::Show);
+        self.action().hidden = Some(false);
+        self
+    }
+
+    /// Set a checked row height in points and mark it as explicitly customized.
+    ///
+    /// Raw finite values in `0..=409` and reusable [`crate::row::Height`]
+    /// values are both accepted.
+    pub fn height(&mut self, height: impl Into<HeightAt>) -> Result<&mut Self> {
+        let height = height.into().resolve()?;
+        self.action().height = Some(HeightEffect::Set(height));
+        Ok(self)
+    }
+
+    /// Remove the explicit height and its derived custom-height marker.
+    pub fn reset_height(&mut self) -> &mut Self {
+        self.action().height = Some(HeightEffect::Reset);
+        self
+    }
+
+    /// Set a checked outline level in Office's `0..=7` domain.
+    pub fn outline(&mut self, level: impl Into<OutlineAt>) -> Result<&mut Self> {
+        let level = level.into().resolve()?;
+        self.action().outline = Some(level);
+        Ok(self)
+    }
+
+    /// Store the affected outline in its collapsed state.
+    pub fn collapse(&mut self) -> &mut Self {
+        self.action().collapsed = Some(true);
+        self
+    }
+
+    /// Store the affected outline in its expanded state.
+    pub fn expand(&mut self) -> &mut Self {
+        self.action().collapsed = Some(false);
+        self
+    }
+
+    /// Request a thick top edge for this row.
+    pub fn thick_top(&mut self) -> &mut Self {
+        self.action().thick_top = Some(true);
+        self
+    }
+
+    /// Restore the normal top edge for this row.
+    pub fn normal_top(&mut self) -> &mut Self {
+        self.action().thick_top = Some(false);
+        self
+    }
+
+    /// Request a thick bottom edge for this row.
+    pub fn thick_bottom(&mut self) -> &mut Self {
+        self.action().thick_bottom = Some(true);
+        self
+    }
+
+    /// Restore the normal bottom edge for this row.
+    pub fn normal_bottom(&mut self) -> &mut Self {
+        self.action().thick_bottom = Some(false);
+        self
+    }
+
+    /// Show phonetic information by default for this row.
+    pub fn show_phonetic(&mut self) -> &mut Self {
+        self.action().phonetic = Some(true);
+        self
+    }
+
+    /// Hide phonetic information by default for this row.
+    pub fn hide_phonetic(&mut self) -> &mut Self {
+        self.action().phonetic = Some(false);
         self
     }
 }
@@ -4458,7 +4594,7 @@ fn create_sheets(
         let mut effective_rows = BTreeMap::new();
         for (row, action) in rows {
             let before = RowState::Missing;
-            let after = RowState::after(None, action);
+            let after = RowState::after(None, action, workbook);
             if before == after {
                 continue;
             }
@@ -4532,7 +4668,7 @@ fn create_sheets(
                 Change::Row {
                     sheet, row, after, ..
                 } => {
-                    if RowState::read(parsed.row_entry(*row)) != *after {
+                    if RowState::read(parsed.row_entry(*row), workbook) != *after {
                         return Err(invalid(format!(
                             "new worksheet row verification failed at {sheet}!row {}",
                             row.get()
@@ -4810,13 +4946,13 @@ mod tests {
 
         assert_eq!(committed.patch().len(), 2);
         assert!(matches!(
-            committed.patch().changes()[1],
+            &committed.patch().changes()[1],
             Change::Row {
                 row,
                 before: RowState::Missing,
-                after: RowState::Stored { hidden: true },
+                after: RowState::Stored(properties),
                 ..
-            } if row.get() == 1
+            } if row.get() == 1 && properties.hidden()
         ));
         let sheet = committed
             .workbook()
@@ -4867,6 +5003,240 @@ mod tests {
         assert!(matches!(
             sheet.row(litchi_sheet::ROWS),
             Err(Error::Coordinate(_))
+        ));
+    }
+
+    #[test]
+    fn row_layout_is_typed_reversible_and_facet_composable() {
+        let source = Workbook::new().expect("source workbook");
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        edit.sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .row(1)
+            .expect("row 2")
+            .height(30)
+            .expect("checked height")
+            .outline(2)
+            .expect("checked outline")
+            .collapse()
+            .thick_top()
+            .thick_bottom()
+            .show_phonetic();
+        let committed = edit.commit().expect("layout commit");
+
+        assert_eq!(committed.patch().len(), 1);
+        let (_, before, after) = committed.patch().changes()[0].row().expect("row change");
+        assert!(matches!(before, RowState::Missing));
+        let RowState::Stored(properties) = after else {
+            panic!("expected stored row properties")
+        };
+        assert_eq!(properties.height().map(crate::row::Height::get), Some(30.0));
+        assert_eq!(properties.outline().get(), 2);
+        assert!(properties.custom_height());
+        assert!(properties.collapsed());
+        assert!(properties.thick_top());
+        assert!(properties.thick_bottom());
+        assert!(properties.phonetic());
+        assert!(!properties.hidden());
+        assert!(!properties.custom_format());
+        assert!(matches!(properties.style(), StyleState::Default));
+
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet");
+        let row = sheet.row(1).expect("row 2");
+        assert_eq!(row.height().map(crate::row::Height::get), Some(30.0));
+        assert_eq!(row.outline().get(), 2);
+        assert!(row.custom_height());
+        assert!(row.collapsed());
+        assert!(row.thick_top());
+        assert!(row.thick_bottom());
+        assert!(row.phonetic());
+        assert!(matches!(
+            sheet.row_style(1).expect("row style"),
+            Some(crate::LocalStyle::Default)
+        ));
+
+        let mut reset = committed.workbook().edit().expect("reset edit");
+        reset
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet")
+            .row(1)
+            .expect("row 2")
+            .reset_height()
+            .outline(0)
+            .expect("outline reset")
+            .expand()
+            .normal_top()
+            .normal_bottom()
+            .hide_phonetic();
+        let reset = reset.commit().expect("reset commit");
+        let reset_sheet = reset
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        let reset_row = reset_sheet.row(1).expect("row 2");
+        assert_eq!(reset_row.height(), None);
+        assert!(!reset_row.custom_height());
+        assert_eq!(reset_row.outline(), Outline::NONE);
+        assert!(!reset_row.collapsed());
+        assert!(!reset_row.thick_top());
+        assert!(!reset_row.thick_bottom());
+        assert!(!reset_row.phonetic());
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let mut invalid = source.edit().expect("invalid edit");
+        let mut sheet = invalid.sheet(0usize).expect("lookup").expect("sheet");
+        assert!(matches!(
+            sheet.row(1).expect("row 2").height(f64::NAN),
+            Err(Error::RowHeight(_))
+        ));
+        assert!(matches!(
+            sheet.row(1).expect("row 2").height(409.1),
+            Err(Error::RowHeight(_))
+        ));
+        assert!(matches!(
+            sheet.row(1).expect("row 2").outline(8),
+            Err(Error::Outline(_))
+        ));
+
+        let mut height = source.edit().expect("height edit");
+        height
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(2)
+            .expect("row 3")
+            .height(crate::row::Height::new(22.0).expect("prevalidated height"))
+            .expect("height");
+        let mut visibility = source.edit().expect("visibility edit");
+        visibility
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(2)
+            .expect("row 3")
+            .hide();
+        height.join(visibility).expect("disjoint facets on one row");
+        let joined = height.commit().expect("joined commit");
+        let joined_sheet = joined
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet");
+        let joined_row = joined_sheet.row(2).expect("row 3");
+        assert!(joined_row.hidden());
+        assert_eq!(joined_row.height().map(crate::row::Height::get), Some(22.0));
+
+        let mut left = source.edit().expect("left height");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(3)
+            .expect("row 4")
+            .height(10)
+            .expect("height");
+        let mut right = source.edit().expect("right height");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("sheet")
+            .row(3)
+            .expect("row 4")
+            .reset_height();
+        assert!(left.join(right).is_err());
+    }
+
+    #[test]
+    fn row_layout_patch_guards_and_rebinds_hidden_shared_style_identity() {
+        let source = styled_row_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("edit");
+        edit.sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet")
+            .row(1)
+            .expect("row 2")
+            .height(28)
+            .expect("height");
+        let committed = edit.commit().expect("commit");
+        let (_, _, after) = committed.patch().changes()[0].row().expect("row change");
+        let RowState::Stored(properties) = after else {
+            panic!("expected stored properties")
+        };
+        assert!(properties.custom_format());
+        assert!(matches!(properties.style(), StyleState::Shared(_)));
+
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("sheet");
+        assert!(matches!(
+            sheet.row_style(1).expect("row style"),
+            Some(crate::LocalStyle::Shared(_))
+        ));
+
+        let reopened = Workbook::from_bytes(source_bytes).expect("reopened source");
+        let replayed = reopened
+            .apply(committed.patch())
+            .expect("source-checked replay");
+        let (_, _, replayed_after) = replayed.patch().changes()[0]
+            .row()
+            .expect("replayed row change");
+        let RowState::Stored(replayed_properties) = replayed_after else {
+            panic!("expected replayed properties")
+        };
+        let StyleState::Shared(replayed_key) = replayed_properties.style() else {
+            panic!("expected rebound shared style")
+        };
+        assert!(
+            replayed
+                .workbook()
+                .styles()
+                .expect("replayed styles")
+                .find(replayed_key)
+                .is_some()
+        );
+        assert!(
+            source
+                .styles()
+                .expect("source styles")
+                .find(replayed_key)
+                .is_none()
+        );
+
+        let mut changed_package = source.inner.package.clone();
+        let styles_uri = PackURI::new("/xl/styles.xml").expect("styles URI");
+        let changed_xml = {
+            let styles = changed_package.get_part(&styles_uri).expect("styles part");
+            std::str::from_utf8(styles.blob())
+                .expect("UTF-8 styles")
+                .replace("FFFFFF00", "FFFF0000")
+                .into_bytes()
+        };
+        changed_package
+            .get_part_mut(&styles_uri)
+            .expect("styles part")
+            .set_blob(changed_xml);
+        let changed = Workbook::from_package(changed_package).expect("changed style table");
+        assert!(matches!(
+            changed.apply(committed.patch()),
+            Err(Error::PatchConflict { part }) if part == "/xl/styles.xml"
         ));
     }
 
@@ -5094,7 +5464,7 @@ mod tests {
         ));
         assert!(matches!(
             sheet.column("B").expect("B").outline(8),
-            Err(Error::ColumnOutline(_))
+            Err(Error::Outline(_))
         ));
 
         let mut width = source.edit().expect("width edit");
@@ -7907,6 +8277,18 @@ mod tests {
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="3" max="3" style="1"/></cols><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#.to_vec(),
             );
         Workbook::from_package(package).expect("styled column workbook")
+    }
+
+    fn styled_row_workbook() -> Workbook {
+        let baseline = styled_workbook();
+        let mut package = baseline.inner.package.clone();
+        package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+            .expect("worksheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c></row><row r="2" s="1" customFormat="1"/></sheetData></worksheet>"#.to_vec(),
+            );
+        Workbook::from_package(package).expect("styled row workbook")
     }
 
     fn two_sheet_workbook(second_kind: SheetKind) -> Workbook {

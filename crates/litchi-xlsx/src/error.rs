@@ -4,7 +4,9 @@ use thiserror::Error;
 
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Row as RowIndex};
 
-use crate::column::{OutlineError, WidthError};
+use crate::column::WidthError;
+use crate::outline::OutlineError;
+use crate::row::HeightError;
 use crate::sheet::NameError;
 use crate::workbook::JoinError;
 
@@ -33,9 +35,12 @@ pub enum Error {
     /// A column width is non-finite or outside Office's checked domain.
     #[error(transparent)]
     ColumnWidth(#[from] WidthError),
-    /// A column outline level is outside Office's checked domain.
+    /// A row height is non-finite or outside Excel's checked domain.
     #[error(transparent)]
-    ColumnOutline(#[from] OutlineError),
+    RowHeight(#[from] HeightError),
+    /// A row or column outline level is outside Office's checked domain.
+    #[error(transparent)]
+    Outline(#[from] OutlineError),
     /// A worksheet name is outside Office's checked domain.
     #[error(transparent)]
     SheetName(#[from] NameError),

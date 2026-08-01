@@ -32,8 +32,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                     address.column().get()
                 );
             }
-            for row in sheet.rows()?.filter(|row| row.hidden()) {
-                println!("  hidden row: {}", row.index().get());
+            for row in sheet.rows()? {
+                println!(
+                    "  row {} (index {}): hidden={}, height={:?}, custom_height={}, outline={}, collapsed={}, thick_top={}, thick_bottom={}, phonetic={}, custom_format={}",
+                    row.index().get() + 1,
+                    row.index().get(),
+                    row.hidden(),
+                    row.height().map(litchi_xlsx::Height::get),
+                    row.custom_height(),
+                    row.outline().get(),
+                    row.collapsed(),
+                    row.thick_top(),
+                    row.thick_bottom(),
+                    row.phonetic(),
+                    row.custom_format(),
+                );
             }
             for column in sheet.columns()? {
                 println!(

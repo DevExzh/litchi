@@ -17,10 +17,12 @@ use quick_xml::reader::NsReader;
 
 use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32};
 use crate::cell::{Content, Value};
-use crate::column::{Assignments, Outline, Width};
+use crate::column::{Assignments, Width};
 use crate::error::{ColumnEditBlock, EditBlock, Error, Result, RowEditBlock, invalid};
+use crate::outline::Outline;
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::strings::encode_spreadsheet_text;
+use crate::row::Height;
 
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
@@ -170,11 +172,95 @@ impl Action {
     }
 }
 
-/// One explicit row-visibility effect.
+/// One checked height mutation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RowAction {
-    Hide,
-    Show,
+pub(crate) enum HeightEffect {
+    Set(Height),
+    Reset,
+}
+
+/// Orthogonal effects on one stored row record.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct RowAction {
+    pub(crate) hidden: Option<bool>,
+    pub(crate) height: Option<HeightEffect>,
+    pub(crate) outline: Option<Outline>,
+    pub(crate) collapsed: Option<bool>,
+    pub(crate) thick_top: Option<bool>,
+    pub(crate) thick_bottom: Option<bool>,
+    pub(crate) phonetic: Option<bool>,
+}
+
+impl RowAction {
+    #[cfg(test)]
+    pub(crate) const fn hide() -> Self {
+        Self {
+            hidden: Some(true),
+            height: None,
+            outline: None,
+            collapsed: None,
+            thick_top: None,
+            thick_bottom: None,
+            phonetic: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn show() -> Self {
+        Self {
+            hidden: Some(false),
+            height: None,
+            outline: None,
+            collapsed: None,
+            thick_top: None,
+            thick_bottom: None,
+            phonetic: None,
+        }
+    }
+
+    pub(crate) const fn materializes(self) -> bool {
+        matches!(self.hidden, Some(true))
+            || matches!(self.height, Some(HeightEffect::Set(_)))
+            || matches!(self.outline, Some(level) if level.get() != 0)
+            || matches!(self.collapsed, Some(true))
+            || matches!(self.thick_top, Some(true))
+            || matches!(self.thick_bottom, Some(true))
+            || matches!(self.phonetic, Some(true))
+    }
+
+    pub(crate) const fn overlaps(self, other: Self) -> bool {
+        (self.hidden.is_some() && other.hidden.is_some())
+            || (self.height.is_some() && other.height.is_some())
+            || (self.outline.is_some() && other.outline.is_some())
+            || (self.collapsed.is_some() && other.collapsed.is_some())
+            || (self.thick_top.is_some() && other.thick_top.is_some())
+            || (self.thick_bottom.is_some() && other.thick_bottom.is_some())
+            || (self.phonetic.is_some() && other.phonetic.is_some())
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        if self.hidden.is_none() {
+            self.hidden = other.hidden;
+        }
+        if self.height.is_none() {
+            self.height = other.height;
+        }
+        if self.outline.is_none() {
+            self.outline = other.outline;
+        }
+        if self.collapsed.is_none() {
+            self.collapsed = other.collapsed;
+        }
+        if self.thick_top.is_none() {
+            self.thick_top = other.thick_top;
+        }
+        if self.thick_bottom.is_none() {
+            self.thick_bottom = other.thick_bottom;
+        }
+        if self.phonetic.is_none() {
+            self.phonetic = other.phonetic;
+        }
+    }
 }
 
 /// One checked width mutation.
@@ -257,12 +343,6 @@ impl ColumnAction {
         if self.phonetic.is_none() {
             self.phonetic = other.phonetic;
         }
-    }
-}
-
-impl RowAction {
-    pub(crate) const fn hidden(self) -> bool {
-        matches!(self, Self::Hide)
     }
 }
 
@@ -1717,7 +1797,7 @@ fn write_sheet_data(
             .insert(address, action);
     }
     for (row, action) in rows {
-        by_row.entry(row.get() + 1).or_default().visibility = Some(action);
+        by_row.entry(row.get() + 1).or_default().row = Some(action);
     }
 
     if data.empty {
@@ -1766,7 +1846,7 @@ fn write_sheet_data(
 #[derive(Debug, Default)]
 struct RowEdits {
     cells: BTreeMap<Address, Action>,
-    visibility: Option<RowAction>,
+    row: Option<RowAction>,
 }
 
 fn write_row(output: &mut Vec<u8>, source: &[u8], row: &RowSlot, edits: &RowEdits) -> Result<()> {
@@ -1787,11 +1867,8 @@ fn write_row(output: &mut Vec<u8>, source: &[u8], row: &RowSlot, edits: &RowEdit
             removed.extend(["spans", "r"]);
             appended.push(("r", row.number.to_string()));
         }
-        if let Some(visibility) = edits.visibility {
-            removed.push("hidden");
-            if visibility.hidden() {
-                appended.push(("hidden", "1".to_owned()));
-            }
+        if let Some(action) = edits.row {
+            row_effect_attributes(action, &mut removed, &mut appended);
         }
         write_tag(output, &row.tag, !creates_cell, &removed, &appended);
         if !creates_cell {
@@ -1804,17 +1881,14 @@ fn write_row(output: &mut Vec<u8>, source: &[u8], row: &RowSlot, edits: &RowEdit
         return Ok(());
     }
 
-    if membership_changed || edits.visibility.is_some() {
+    if membership_changed || edits.row.is_some() {
         let mut removed = Vec::new();
         let mut appended = Vec::new();
         if membership_changed {
             removed.push("spans");
         }
-        if let Some(visibility) = edits.visibility {
-            removed.push("hidden");
-            if visibility.hidden() {
-                appended.push(("hidden", "1".to_owned()));
-            }
+        if let Some(action) = edits.row {
+            row_effect_attributes(action, &mut removed, &mut appended);
         }
         write_tag(output, &row.tag, false, &removed, &appended);
     } else {
@@ -1864,8 +1938,8 @@ fn write_new_row(
     edits: &RowEdits,
 ) -> Result<()> {
     let creates_cell = edits.cells.values().any(Action::creates_missing);
-    let hide = edits.visibility.is_some_and(RowAction::hidden);
-    if !creates_cell && !hide {
+    let materializes = edits.row.is_some_and(RowAction::materializes);
+    if !creates_cell && !materializes {
         return Ok(());
     }
     let name = sibling_name(sheet_data_name, "row");
@@ -1874,10 +1948,11 @@ fn write_new_row(
         attributes: Box::new([]),
     };
     let mut appended = vec![("r", number.to_string())];
-    if hide {
-        appended.push(("hidden", "1".to_owned()));
+    let mut removed = Vec::new();
+    if let Some(action) = edits.row {
+        row_effect_attributes(action, &mut removed, &mut appended);
     }
-    write_tag(output, &tag, !creates_cell, &[], &appended);
+    write_tag(output, &tag, !creates_cell, &removed, &appended);
     if !creates_cell {
         return Ok(());
     }
@@ -1886,6 +1961,45 @@ fn write_new_row(
     }
     write_close(output, &name);
     Ok(())
+}
+
+fn row_effect_attributes(
+    action: RowAction,
+    removed: &mut Vec<&'static str>,
+    appended: &mut Vec<(&'static str, String)>,
+) {
+    if let Some(hidden) = action.hidden {
+        removed.push("hidden");
+        if hidden {
+            appended.push(("hidden", "1".to_owned()));
+        }
+    }
+    if let Some(height) = action.height {
+        removed.extend(["ht", "customHeight"]);
+        if let HeightEffect::Set(height) = height {
+            appended.push(("ht", height.get().to_string()));
+            appended.push(("customHeight", "1".to_owned()));
+        }
+    }
+    if let Some(outline) = action.outline {
+        removed.push("outlineLevel");
+        if outline != Outline::NONE {
+            appended.push(("outlineLevel", outline.get().to_string()));
+        }
+    }
+    for (value, name) in [
+        (action.collapsed, "collapsed"),
+        (action.thick_top, "thickTop"),
+        (action.thick_bottom, "thickBot"),
+        (action.phonetic, "ph"),
+    ] {
+        if let Some(value) = value {
+            removed.push(name);
+            if value {
+                appended.push((name, "1".to_owned()));
+            }
+        }
+    }
 }
 
 fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Action) -> Result<()> {
@@ -2295,10 +2409,10 @@ mod tests {
                 Action::set(40_i32.into()),
             )]),
             rows: BTreeMap::from([
-                (Row::new(0).expect("row 1"), RowAction::Show),
-                (Row::new(1).expect("row 2"), RowAction::Hide),
-                (Row::new(2).expect("row 3"), RowAction::Hide),
-                (Row::new(3).expect("row 4"), RowAction::Hide),
+                (Row::new(0).expect("row 1"), RowAction::show()),
+                (Row::new(1).expect("row 2"), RowAction::hide()),
+                (Row::new(2).expect("row 3"), RowAction::hide()),
+                (Row::new(3).expect("row 4"), RowAction::hide()),
             ]),
             columns: BTreeMap::new(),
         };
@@ -2323,6 +2437,89 @@ mod tests {
     }
 
     #[test]
+    fn row_layout_facets_preserve_unedited_state_and_materialize_sparsely() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:sheetData><x:row r="2" s="1" customFormat="1" ht="20" customHeight="1" hidden="1" outlineLevel="2" collapsed="1" thickTop="1" thickBot="1" ph="1" z:keep="yes"><x:c r="A2"><x:v>2</x:v></x:c></x:row></x:sheetData></x:worksheet>"#
+        );
+        let edited = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                cells: BTreeMap::new(),
+                rows: BTreeMap::from([
+                    (
+                        Row::new(1).expect("row 2"),
+                        RowAction {
+                            hidden: Some(false),
+                            height: Some(HeightEffect::Reset),
+                            outline: Some(Outline::new(3).expect("outline")),
+                            collapsed: Some(false),
+                            thick_top: Some(false),
+                            phonetic: Some(false),
+                            ..RowAction::default()
+                        },
+                    ),
+                    (
+                        Row::new(2).expect("row 3"),
+                        RowAction {
+                            height: Some(HeightEffect::Set(Height::new(25.0).expect("height"))),
+                            outline: Some(Outline::new(1).expect("outline")),
+                            collapsed: Some(true),
+                            thick_bottom: Some(true),
+                            phonetic: Some(true),
+                            ..RowAction::default()
+                        },
+                    ),
+                    (
+                        Row::new(3).expect("row 4"),
+                        RowAction {
+                            hidden: Some(false),
+                            height: Some(HeightEffect::Reset),
+                            ..RowAction::default()
+                        },
+                    ),
+                ]),
+                columns: BTreeMap::new(),
+            },
+        )
+        .expect("row layout rewrite");
+        let text = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(text.contains(concat!(
+            r#"<x:row r="2" s="1" customFormat="1" thickBot="1" z:keep="yes" "#,
+            r#"outlineLevel="3">"#
+        )));
+        assert!(text.contains(concat!(
+            r#"<x:row r="3" ht="25" customHeight="1" outlineLevel="1" "#,
+            r#"collapsed="1" thickBot="1" ph="1"/>"#
+        )));
+        assert!(!text.contains(r#"r="4""#));
+
+        let store = worksheet::parse(&edited, || Ok(None)).expect("reparse row layout");
+        let second = store.row(Row::new(1).expect("row 2"));
+        assert_eq!(second.height(), None);
+        assert!(!second.custom_height());
+        assert!(!second.hidden());
+        assert_eq!(second.outline().get(), 3);
+        assert!(!second.collapsed());
+        assert!(!second.thick_top());
+        assert!(second.thick_bottom());
+        assert!(!second.phonetic());
+        assert!(second.custom_format());
+        assert_eq!(
+            store.row_entry(second.index()).unwrap().properties.style,
+            Some(1)
+        );
+        let third = store.row(Row::new(2).expect("row 3"));
+        assert_eq!(third.height().map(Height::get), Some(25.0));
+        assert!(third.custom_height());
+        assert_eq!(third.outline().get(), 1);
+        assert!(third.collapsed());
+        assert!(third.thick_bottom());
+        assert!(third.phonetic());
+        assert!(!store.row(Row::new(3).expect("row 4")).stored());
+    }
+
+    #[test]
     fn protected_sheet_blocks_row_visibility_before_rewrite() {
         let xml = format!(
             r#"<worksheet xmlns="{S}"><sheetData/><sheetProtection sheet="1"/></worksheet>"#
@@ -2332,7 +2529,7 @@ mod tests {
             "Data",
             Plan {
                 cells: BTreeMap::new(),
-                rows: BTreeMap::from([(Row::new(0).expect("row 1"), RowAction::Hide)]),
+                rows: BTreeMap::from([(Row::new(0).expect("row 1"), RowAction::hide())]),
                 columns: BTreeMap::new(),
             },
         );
