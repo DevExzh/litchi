@@ -18,6 +18,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             sheet.is_active()
         );
         if sheet.kind() == SheetKind::Worksheet {
+            if let Some(defaults) = sheet.defaults()? {
+                println!(
+                    "  defaults: base_width={}, stored_base_width={:?}, width={:?}, height={}, descent={:?}, custom_height={}, hidden={}, thick_top={}, thick_bottom={}, row_outline={}, column_outline={}",
+                    defaults.base_width(),
+                    defaults.stored_base_width(),
+                    defaults.width().map(litchi_xlsx::layout::Width::get),
+                    defaults.height().get(),
+                    defaults.descent().map(litchi_xlsx::layout::Descent::get),
+                    defaults.custom_height(),
+                    defaults.hidden(),
+                    defaults.thick_top(),
+                    defaults.thick_bottom(),
+                    defaults.row_outline().get(),
+                    defaults.column_outline().get(),
+                );
+            }
             let extents = sheet.extents()?;
             println!(
                 "  bounds: declared={:?}, used={:?}, stored={:?}",
@@ -34,11 +50,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             for row in sheet.rows()? {
                 println!(
-                    "  row {} (index {}): hidden={}, height={:?}, style={:?}, custom_height={}, outline={}, collapsed={}, thick_top={}, thick_bottom={}, phonetic={}, custom_format={}",
+                    "  row {} (index {}): hidden={}, height={:?}, descent={:?}, style={:?}, custom_height={}, outline={}, collapsed={}, thick_top={}, thick_bottom={}, phonetic={}, custom_format={}",
                     row.index().get() + 1,
                     row.index().get(),
                     row.hidden(),
                     row.height().map(litchi_xlsx::Height::get),
+                    row.descent().map(litchi_xlsx::layout::Descent::get),
                     sheet.row_style(row.index())?,
                     row.custom_height(),
                     row.outline().get(),

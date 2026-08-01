@@ -12,13 +12,16 @@ use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Rect, Row};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32};
+use super::{optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32, x14ac};
 use crate::cell::{Content, Value};
 use crate::column::{Assignments, Width};
-use crate::error::{ColumnEditBlock, EditBlock, Error, Result, RowEditBlock, invalid};
+use crate::error::{
+    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, Result, RowEditBlock, invalid,
+};
+use crate::layout::{self, Descent};
 use crate::outline::Outline;
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::strings::encode_spreadsheet_text;
@@ -179,11 +182,19 @@ pub(crate) enum HeightEffect {
     Reset,
 }
 
+/// One checked typographic-descent mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DescentEffect {
+    Set(Descent),
+    Reset,
+}
+
 /// Orthogonal effects on one stored row record.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct RowAction {
     pub(crate) hidden: Option<bool>,
     pub(crate) height: Option<HeightEffect>,
+    pub(crate) descent: Option<DescentEffect>,
     pub(crate) style: Option<StyleEffect>,
     pub(crate) outline: Option<Outline>,
     pub(crate) collapsed: Option<bool>,
@@ -198,6 +209,7 @@ impl RowAction {
         Self {
             hidden: Some(true),
             height: None,
+            descent: None,
             style: None,
             outline: None,
             collapsed: None,
@@ -212,6 +224,7 @@ impl RowAction {
         Self {
             hidden: Some(false),
             height: None,
+            descent: None,
             style: None,
             outline: None,
             collapsed: None,
@@ -224,6 +237,7 @@ impl RowAction {
     pub(crate) const fn materializes(self) -> bool {
         matches!(self.hidden, Some(true))
             || matches!(self.height, Some(HeightEffect::Set(_)))
+            || matches!(self.descent, Some(DescentEffect::Set(_)))
             || matches!(self.style, Some(StyleEffect::Set(_)))
             || matches!(self.outline, Some(level) if level.get() != 0)
             || matches!(self.collapsed, Some(true))
@@ -235,6 +249,7 @@ impl RowAction {
     pub(crate) const fn overlaps(self, other: Self) -> bool {
         (self.hidden.is_some() && other.hidden.is_some())
             || (self.height.is_some() && other.height.is_some())
+            || (self.descent.is_some() && other.descent.is_some())
             || (self.style.is_some() && other.style.is_some())
             || (self.outline.is_some() && other.outline.is_some())
             || (self.collapsed.is_some() && other.collapsed.is_some())
@@ -249,6 +264,9 @@ impl RowAction {
         }
         if self.height.is_none() {
             self.height = other.height;
+        }
+        if self.descent.is_none() {
+            self.descent = other.descent;
         }
         if self.style.is_none() {
             self.style = other.style;
@@ -267,6 +285,146 @@ impl RowAction {
         }
         if self.phonetic.is_none() {
             self.phonetic = other.phonetic;
+        }
+    }
+}
+
+/// Set or remove one optional worksheet-default value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OptionalEffect<T> {
+    Set(T),
+    Reset,
+}
+
+/// Orthogonal effects on the worksheet's `sheetFormatPr` record.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct DefaultsEffects {
+    pub(crate) base_width: Option<OptionalEffect<u8>>,
+    pub(crate) width: Option<OptionalEffect<layout::Width>>,
+    pub(crate) height: Option<layout::Height>,
+    pub(crate) hidden: Option<bool>,
+    pub(crate) thick_top: Option<bool>,
+    pub(crate) thick_bottom: Option<bool>,
+    pub(crate) descent: Option<DescentEffect>,
+}
+
+impl DefaultsEffects {
+    pub(crate) fn fields(self) -> layout::Fields {
+        let mut fields = layout::Fields::empty();
+        if self.base_width.is_some() {
+            fields.insert(layout::Fields::BASE_WIDTH);
+        }
+        if self.width.is_some() {
+            fields.insert(layout::Fields::WIDTH);
+        }
+        if self.height.is_some() {
+            fields.insert(layout::Fields::HEIGHT);
+        }
+        if self.hidden.is_some() {
+            fields.insert(layout::Fields::HIDDEN);
+        }
+        if self.thick_top.is_some() {
+            fields.insert(layout::Fields::THICK_TOP);
+        }
+        if self.thick_bottom.is_some() {
+            fields.insert(layout::Fields::THICK_BOTTOM);
+        }
+        if self.descent.is_some() {
+            fields.insert(layout::Fields::DESCENT);
+        }
+        fields
+    }
+
+    pub(crate) const fn materializes(self) -> bool {
+        matches!(self.base_width, Some(OptionalEffect::Set(_)))
+            || matches!(self.width, Some(OptionalEffect::Set(_)))
+            || self.height.is_some()
+            || matches!(self.hidden, Some(true))
+            || matches!(self.thick_top, Some(true))
+            || matches!(self.thick_bottom, Some(true))
+            || matches!(self.descent, Some(DescentEffect::Set(_)))
+    }
+
+    fn merge(&mut self, other: Self) {
+        if self.base_width.is_none() {
+            self.base_width = other.base_width;
+        }
+        if self.width.is_none() {
+            self.width = other.width;
+        }
+        if self.height.is_none() {
+            self.height = other.height;
+        }
+        if self.hidden.is_none() {
+            self.hidden = other.hidden;
+        }
+        if self.thick_top.is_none() {
+            self.thick_top = other.thick_top;
+        }
+        if self.thick_bottom.is_none() {
+            self.thick_bottom = other.thick_bottom;
+        }
+        if self.descent.is_none() {
+            self.descent = other.descent;
+        }
+    }
+}
+
+/// Whole-record deletion or facet-level worksheet-default updates.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct DefaultsAction {
+    remove: bool,
+    effects: DefaultsEffects,
+}
+
+impl DefaultsAction {
+    pub(crate) fn update(&mut self) -> &mut DefaultsEffects {
+        self.remove = false;
+        &mut self.effects
+    }
+
+    pub(crate) const fn remove() -> Self {
+        Self {
+            remove: true,
+            effects: DefaultsEffects {
+                base_width: None,
+                width: None,
+                height: None,
+                hidden: None,
+                thick_top: None,
+                thick_bottom: None,
+                descent: None,
+            },
+        }
+    }
+
+    pub(crate) const fn is_remove(self) -> bool {
+        self.remove
+    }
+
+    pub(crate) const fn effects(self) -> DefaultsEffects {
+        self.effects
+    }
+
+    pub(crate) fn fields(self) -> layout::Fields {
+        if self.remove {
+            layout::Fields::all()
+        } else {
+            self.effects.fields()
+        }
+    }
+
+    pub(crate) const fn materializes(self) -> bool {
+        !self.remove && self.effects.materializes()
+    }
+
+    pub(crate) fn overlaps(self, other: Self) -> bool {
+        self.remove || other.remove || self.fields().intersects(other.fields())
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        if !self.remove && !other.remove {
+            self.effects.merge(other.effects);
         }
     }
 }
@@ -365,6 +523,7 @@ impl ColumnAction {
 /// Move-only worksheet rewrite plan with orthogonal cell and row facets.
 #[derive(Debug, Default)]
 pub(crate) struct Plan {
+    pub(crate) defaults: Option<DefaultsAction>,
     pub(crate) cells: BTreeMap<Address, Action>,
     pub(crate) rows: BTreeMap<Row, RowAction>,
     pub(crate) columns: BTreeMap<Column, ColumnAction>,
@@ -373,6 +532,7 @@ pub(crate) struct Plan {
 impl Plan {
     pub(crate) fn cells(cells: BTreeMap<Address, Action>) -> Self {
         Self {
+            defaults: None,
             cells,
             rows: BTreeMap::new(),
             columns: BTreeMap::new(),
@@ -380,7 +540,10 @@ impl Plan {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.cells.is_empty() && self.rows.is_empty() && self.columns.is_empty()
+        self.defaults.is_none()
+            && self.cells.is_empty()
+            && self.rows.is_empty()
+            && self.columns.is_empty()
     }
 }
 
@@ -427,8 +590,25 @@ struct RowSlot {
     tag_end: usize,
     close_start: usize,
     tag: Tag,
+    descent_attribute: Option<Box<str>>,
     cells: Box<[CellSlot]>,
     empty: bool,
+}
+
+#[derive(Debug)]
+struct DefaultsSlot {
+    span: Span,
+    tag_end: usize,
+    close_start: usize,
+    tag: Tag,
+    descent_attribute: Option<Box<str>>,
+    empty: bool,
+}
+
+#[derive(Debug)]
+struct RootSlot {
+    span: Span,
+    tag: Tag,
 }
 
 #[derive(Debug)]
@@ -475,6 +655,7 @@ struct DimensionTag {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FrameKind {
     Worksheet,
+    Defaults,
     Columns,
     Column,
     SheetData,
@@ -507,7 +688,16 @@ struct PendingRow {
     start: usize,
     tag_end: usize,
     tag: Tag,
+    descent_attribute: Option<Box<str>>,
     cells: Vec<CellSlot>,
+}
+
+#[derive(Debug)]
+struct PendingDefaults {
+    start: usize,
+    tag_end: usize,
+    tag: Tag,
+    descent_attribute: Option<Box<str>>,
 }
 
 #[derive(Debug)]
@@ -632,6 +822,8 @@ struct FormulaStorage {
 
 #[derive(Debug)]
 struct Layout {
+    root: RootSlot,
+    defaults: Option<DefaultsSlot>,
     sheet_data: SheetData,
     columns: Option<ColumnsSlot>,
     dimension: Option<DimensionTag>,
@@ -640,10 +832,14 @@ struct Layout {
     validations: Box<[SelectionRange]>,
     extended_validation: bool,
     formula_ranges: Box<[SelectionRange]>,
+    defaults_compatibility: bool,
 }
 
 #[derive(Debug, Default)]
 struct Scanner {
+    root: Option<RootSlot>,
+    defaults: Option<DefaultsSlot>,
+    pending_defaults: Option<PendingDefaults>,
     sheet_data: Option<SheetData>,
     columns: Option<ColumnsSlot>,
     dimension: Option<DimensionTag>,
@@ -658,6 +854,170 @@ struct Scanner {
     validations: Vec<SelectionRange>,
     extended_validation: bool,
     formulas: Vec<FormulaStorage>,
+    defaults_compatibility: bool,
+}
+
+#[derive(Debug)]
+struct RootEffect {
+    removed: Option<Box<str>>,
+    appended: Vec<(Box<str>, String)>,
+}
+
+#[derive(Debug)]
+struct ExtensionNames {
+    descent: Box<str>,
+    root: Option<RootEffect>,
+}
+
+impl ExtensionNames {
+    fn plan(layout: &Layout, required: bool) -> Result<Self> {
+        if !required {
+            return Ok(Self {
+                descent: "x14ac:dyDescent".into(),
+                root: None,
+            });
+        }
+
+        let root = &layout.root;
+        let x14_prefix = x14_prefix(layout)?;
+        let mce_prefix = namespace_prefix(&root.tag, MCE)
+            .map(str::to_owned)
+            .unwrap_or_else(|| available_prefix(&root.tag, "mc"));
+        let mut appended = Vec::new();
+        if namespace_uri(&root.tag, &x14_prefix) != Some(x14ac::NAMESPACE) {
+            appended.push((
+                format!("xmlns:{x14_prefix}").into_boxed_str(),
+                String::from_utf8_lossy(x14ac::NAMESPACE).into_owned(),
+            ));
+        }
+        if namespace_prefix(&root.tag, MCE).is_none() {
+            appended.push((
+                format!("xmlns:{mce_prefix}").into_boxed_str(),
+                String::from_utf8_lossy(MCE).into_owned(),
+            ));
+        }
+
+        let mut ignorable = None::<(&str, &str)>;
+        for attribute in &root.tag.attributes {
+            let Some((prefix, local)) = attribute.name.split_once(':') else {
+                continue;
+            };
+            if local != "Ignorable" || namespace_uri(&root.tag, prefix) != Some(MCE) {
+                continue;
+            }
+            if ignorable
+                .replace((&attribute.name, &attribute.value))
+                .is_some()
+            {
+                return Err(invalid(
+                    "worksheet root has duplicate MCE Ignorable attributes",
+                ));
+            }
+        }
+        let (removed, ignorable_value) = match ignorable {
+            Some((name, value))
+                if !value
+                    .split_whitespace()
+                    .any(|token| token == x14_prefix.as_str()) =>
+            {
+                let mut tokens = value.split_whitespace().collect::<Vec<_>>();
+                tokens.push(&x14_prefix);
+                (Some(name.into()), Some(tokens.join(" ")))
+            },
+            Some(_) => (None, None),
+            None => (None, Some(x14_prefix.clone())),
+        };
+        if let Some(ignorable_value) = ignorable_value {
+            appended.push((
+                format!("{mce_prefix}:Ignorable").into_boxed_str(),
+                ignorable_value,
+            ));
+        }
+
+        Ok(Self {
+            descent: format!("{x14_prefix}:dyDescent").into_boxed_str(),
+            root: (!appended.is_empty()).then_some(RootEffect { removed, appended }),
+        })
+    }
+}
+
+fn x14_prefix(layout: &Layout) -> Result<String> {
+    if let Some(prefix) = layout.root.tag.attributes.iter().find_map(|attribute| {
+        attribute.name.strip_prefix("xmlns:").filter(|prefix| {
+            attribute.value.as_bytes() == x14ac::NAMESPACE && x14_prefix_is_usable(layout, prefix)
+        })
+    }) {
+        return Ok(prefix.to_owned());
+    }
+    if x14_prefix_is_usable(layout, "x14ac") {
+        return Ok("x14ac".to_owned());
+    }
+
+    let declarations = layout_tags(layout).try_fold(0usize, |count, tag| {
+        count
+            .checked_add(
+                tag.attributes
+                    .iter()
+                    .filter(|attribute| attribute.name.starts_with("xmlns:"))
+                    .count(),
+            )
+            .ok_or_else(|| invalid("worksheet namespace declaration count overflow"))
+    })?;
+    let limit = declarations
+        .checked_add(1)
+        .ok_or_else(|| invalid("worksheet namespace prefix search overflow"))?;
+    for suffix in 1..=limit {
+        let candidate = format!("x14ac{suffix}");
+        if x14_prefix_is_usable(layout, &candidate) {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("cannot allocate a worksheet extension prefix"))
+}
+
+fn x14_prefix_is_usable(layout: &Layout, prefix: &str) -> bool {
+    layout_tags(layout)
+        .all(|tag| namespace_uri(tag, prefix).is_none_or(|namespace| namespace == x14ac::NAMESPACE))
+}
+
+fn layout_tags(layout: &Layout) -> impl Iterator<Item = &Tag> {
+    std::iter::once(&layout.root.tag)
+        .chain(std::iter::once(&layout.sheet_data.tag))
+        .chain(layout.defaults.iter().map(|defaults| &defaults.tag))
+        .chain(layout.sheet_data.rows.iter().map(|row| &row.tag))
+}
+
+fn namespace_prefix<'a>(tag: &'a Tag, namespace: &[u8]) -> Option<&'a str> {
+    tag.attributes.iter().find_map(|attribute| {
+        attribute
+            .name
+            .strip_prefix("xmlns:")
+            .filter(|_| attribute.value.as_bytes() == namespace)
+    })
+}
+
+fn namespace_uri<'a>(tag: &'a Tag, prefix: &str) -> Option<&'a [u8]> {
+    let name = format!("xmlns:{prefix}");
+    tag.attributes
+        .iter()
+        .find(|attribute| attribute.name.as_ref() == name)
+        .map(|attribute| attribute.value.as_bytes())
+}
+
+fn available_prefix(tag: &Tag, base: &str) -> String {
+    if namespace_uri(tag, base).is_none() {
+        return base.to_owned();
+    }
+    // At most one candidate can be occupied by each stored attribute, so
+    // checking one more suffix than the attribute count guarantees a free
+    // prefix without relying on an unbounded iterator.
+    for suffix in 1..=tag.attributes.len().saturating_add(1) {
+        let candidate = format!("{base}{suffix}");
+        if namespace_uri(tag, &candidate).is_none() {
+            return candidate;
+        }
+    }
+    format!("{base}Extension")
 }
 
 pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Result<Vec<u8>> {
@@ -669,13 +1029,16 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
     validate_actions(&layout, sheet, &plan.cells)?;
     validate_row_actions(&layout, sheet, &plan.rows)?;
     validate_column_actions(&layout, sheet, &plan.columns)?;
+    validate_defaults_action(&layout, sheet, plan.defaults)?;
     let dimension = expanded_dimension(&layout, &plan.cells);
+    let extension_names = ExtensionNames::plan(&layout, plan_sets_descent(&plan))?;
 
     let effects = plan
         .cells
         .len()
         .checked_add(plan.rows.len())
         .and_then(|count| count.checked_add(plan.columns.len()))
+        .and_then(|count| count.checked_add(usize::from(plan.defaults.is_some())))
         .ok_or_else(|| invalid("worksheet edit effect count overflow"))?;
     let extra = effects
         .checked_mul(128)
@@ -686,11 +1049,17 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
         .try_reserve(extra)
         .map_err(|error| invalid(format!("cannot reserve worksheet edit output: {error}")))?;
     let Plan {
+        defaults,
         cells,
         rows,
         columns,
     } = plan;
     let mut cursor = 0usize;
+    if let Some(effect) = &extension_names.root {
+        output.extend_from_slice(&content[cursor..layout.root.span.start]);
+        write_root(&mut output, &layout.root, effect);
+        cursor = layout.root.span.end;
+    }
     if let Some((tag, range)) = dimension {
         output.extend_from_slice(&content[cursor..tag.span.start]);
         write_tag(
@@ -701,6 +1070,38 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
             &[("ref", range.a1())],
         );
         cursor = tag.span.end;
+    }
+    if let Some(action) = defaults {
+        match layout.defaults.as_ref() {
+            Some(stored) => {
+                output.extend_from_slice(&content[cursor..stored.span.start]);
+                if !action.is_remove() {
+                    write_defaults(
+                        &mut output,
+                        content,
+                        stored,
+                        action.effects(),
+                        &extension_names.descent,
+                    );
+                }
+                cursor = stored.span.end;
+            },
+            None if action.materializes() => {
+                let insertion = layout
+                    .columns
+                    .as_ref()
+                    .map_or(layout.sheet_data.span.start, |columns| columns.span.start);
+                output.extend_from_slice(&content[cursor..insertion]);
+                write_new_defaults(
+                    &mut output,
+                    &layout.sheet_data.tag.name,
+                    action.effects(),
+                    &extension_names.descent,
+                );
+                cursor = insertion;
+            },
+            None => {},
+        }
     }
     if !columns.is_empty() {
         match layout.columns.as_ref() {
@@ -721,10 +1122,55 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
         output
             .extend_from_slice(&content[layout.sheet_data.span.start..layout.sheet_data.span.end]);
     } else {
-        write_sheet_data(&mut output, content, &layout.sheet_data, cells, rows)?;
+        write_sheet_data(
+            &mut output,
+            content,
+            &layout.sheet_data,
+            cells,
+            rows,
+            &extension_names.descent,
+        )?;
     }
     output.extend_from_slice(&content[layout.sheet_data.span.end..]);
     Ok(output)
+}
+
+fn plan_sets_descent(plan: &Plan) -> bool {
+    plan.rows
+        .values()
+        .any(|action| matches!(action.descent, Some(DescentEffect::Set(_))))
+        || plan
+            .defaults
+            .is_some_and(|action| matches!(action.effects().descent, Some(DescentEffect::Set(_))))
+}
+
+fn validate_defaults_action(
+    layout: &Layout,
+    sheet: &str,
+    action: Option<DefaultsAction>,
+) -> Result<()> {
+    let Some(action) = action else {
+        return Ok(());
+    };
+    let reason = if layout.protected {
+        Some(DefaultsEditBlock::ProtectedSheet)
+    } else if layout.defaults_compatibility {
+        Some(DefaultsEditBlock::MarkupCompatibility)
+    } else if layout.defaults.is_none()
+        && action.materializes()
+        && action.effects().height.is_none()
+    {
+        Some(DefaultsEditBlock::NeedsHeight)
+    } else {
+        None
+    };
+    if let Some(reason) = reason {
+        return Err(Error::DefaultsEditBlocked {
+            sheet: sheet.to_owned(),
+            reason,
+        });
+    }
+    Ok(())
 }
 
 fn validate_column_actions(
@@ -872,8 +1318,11 @@ fn scan(content: &[u8]) -> Result<Layout> {
                     &namespace,
                     &element,
                     decoder,
-                    event_start,
-                    event_end,
+                    &resolver,
+                    Span {
+                        start: event_start,
+                        end: event_end,
+                    },
                 )?;
                 stack.push(Frame {
                     kind,
@@ -887,6 +1336,7 @@ fn scan(content: &[u8]) -> Result<Layout> {
                     &namespace,
                     &element,
                     decoder,
+                    &resolver,
                     Span {
                         start: event_start,
                         end: event_end,
@@ -916,17 +1366,50 @@ impl Scanner {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
         decoder: Decoder,
-        start: usize,
-        end: usize,
+        resolver: &NamespaceResolver,
+        span: Span,
     ) -> Result<FrameKind> {
+        let Span { start, end } = span;
         self.scan_guard(namespace, element, decoder)?;
         if parent.is_none() && is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
+            if self.root.is_some() {
+                return Err(invalid("worksheet edit scan found duplicate roots"));
+            }
+            self.root = Some(RootSlot {
+                span,
+                tag: tag(element, decoder)?,
+            });
             return Ok(FrameKind::Worksheet);
+        }
+        if is_spreadsheetml_name(namespace, element.name(), b"sheetFormatPr") {
+            if parent != Some(FrameKind::Worksheet) {
+                self.defaults_compatibility = true;
+                return Ok(FrameKind::Other);
+            }
+            if self.pending_defaults.is_some() || self.defaults.is_some() {
+                return Err(invalid("worksheet has duplicate sheetFormatPr during edit"));
+            }
+            if self.pending_columns.is_some()
+                || self.columns.is_some()
+                || self.pending_sheet_data.is_some()
+                || self.sheet_data.is_some()
+            {
+                return Err(invalid(
+                    "worksheet sheetFormatPr appears after column or cell data during edit",
+                ));
+            }
+            self.pending_defaults = Some(PendingDefaults {
+                start: span.start,
+                tag_end: span.end,
+                tag: tag(element, decoder)?,
+                descent_attribute: x14ac::attribute_name(element, resolver)?,
+            });
+            return Ok(FrameKind::Defaults);
         }
         if parent == Some(FrameKind::Worksheet)
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
         {
-            self.record_dimension(element, decoder, Span { start, end }, false)?;
+            self.record_dimension(element, decoder, span, false)?;
             return Ok(FrameKind::Other);
         }
         if parent == Some(FrameKind::Worksheet)
@@ -980,7 +1463,7 @@ impl Scanner {
         if parent == Some(FrameKind::SheetData)
             && is_spreadsheetml_name(namespace, element.name(), b"row")
         {
-            self.start_row(element, decoder, start, end)?;
+            self.start_row(element, decoder, resolver, start, end)?;
             return Ok(FrameKind::Row);
         }
         if parent == Some(FrameKind::Row) && is_spreadsheetml_name(namespace, element.name(), b"c")
@@ -1032,9 +1515,37 @@ impl Scanner {
         namespace: &ResolveResult<'_>,
         element: &BytesStart<'_>,
         decoder: Decoder,
+        resolver: &NamespaceResolver,
         span: Span,
     ) -> Result<()> {
         self.scan_guard(namespace, element, decoder)?;
+        if is_spreadsheetml_name(namespace, element.name(), b"sheetFormatPr") {
+            if parent != Some(FrameKind::Worksheet) {
+                self.defaults_compatibility = true;
+                return Ok(());
+            }
+            if self.pending_defaults.is_some() || self.defaults.is_some() {
+                return Err(invalid("worksheet has duplicate sheetFormatPr during edit"));
+            }
+            if self.pending_columns.is_some()
+                || self.columns.is_some()
+                || self.pending_sheet_data.is_some()
+                || self.sheet_data.is_some()
+            {
+                return Err(invalid(
+                    "worksheet sheetFormatPr appears after column or cell data during edit",
+                ));
+            }
+            self.defaults = Some(DefaultsSlot {
+                span,
+                tag_end: span.end,
+                close_start: span.end,
+                tag: tag(element, decoder)?,
+                descent_attribute: x14ac::attribute_name(element, resolver)?,
+                empty: true,
+            });
+            return Ok(());
+        }
         if parent == Some(FrameKind::Worksheet)
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
         {
@@ -1109,6 +1620,7 @@ impl Scanner {
                 tag_end: span.end,
                 close_start: span.end,
                 tag: tag(element, decoder)?,
+                descent_attribute: x14ac::attribute_name(element, resolver)?,
                 cells: Box::new([]),
                 empty: true,
             };
@@ -1200,6 +1712,23 @@ impl Scanner {
                         empty: false,
                     });
             },
+            FrameKind::Defaults => {
+                let defaults = self
+                    .pending_defaults
+                    .take()
+                    .ok_or_else(|| invalid("sheetFormatPr close without edit state"))?;
+                self.defaults = Some(DefaultsSlot {
+                    span: Span {
+                        start: defaults.start,
+                        end,
+                    },
+                    tag_end: defaults.tag_end,
+                    close_start,
+                    tag: defaults.tag,
+                    descent_attribute: defaults.descent_attribute,
+                    empty: false,
+                });
+            },
             FrameKind::Columns => {
                 let columns = self
                     .pending_columns
@@ -1281,6 +1810,7 @@ impl Scanner {
                         tag_end: row.tag_end,
                         close_start,
                         tag: row.tag,
+                        descent_attribute: row.descent_attribute,
                         cells: row.cells.into_boxed_slice(),
                         empty: false,
                     });
@@ -1311,6 +1841,7 @@ impl Scanner {
         &mut self,
         element: &BytesStart<'_>,
         decoder: Decoder,
+        resolver: &NamespaceResolver,
         start: usize,
         end: usize,
     ) -> Result<()> {
@@ -1321,6 +1852,7 @@ impl Scanner {
             start,
             tag_end: end,
             tag: tag(element, decoder)?,
+            descent_attribute: x14ac::attribute_name(element, resolver)?,
             cells: Vec::new(),
         });
         Ok(())
@@ -1481,9 +2013,35 @@ impl Scanner {
     }
 
     fn finish_layout(self) -> Result<Layout> {
+        let root = self
+            .root
+            .ok_or_else(|| invalid("worksheet edit scan requires a worksheet root"))?;
         let sheet_data = self
             .sheet_data
             .ok_or_else(|| invalid("worksheet cell edits require a direct sheetData element"))?;
+        if self
+            .defaults
+            .as_ref()
+            .is_some_and(|defaults| defaults.span.start >= sheet_data.span.start)
+        {
+            return Err(invalid(
+                "worksheet sheetFormatPr must precede sheetData during edit",
+            ));
+        }
+        if let (Some(defaults), Some(columns)) = (&self.defaults, &self.columns)
+            && defaults.span.start >= columns.span.start
+        {
+            return Err(invalid(
+                "worksheet sheetFormatPr must precede cols during edit",
+            ));
+        }
+        if let (Some(dimension), Some(defaults)) = (&self.dimension, &self.defaults)
+            && dimension.span.start >= defaults.span.start
+        {
+            return Err(invalid(
+                "worksheet dimension must precede sheetFormatPr during edit",
+            ));
+        }
         if self
             .columns
             .as_ref()
@@ -1543,6 +2101,8 @@ impl Scanner {
             }
         }
         Ok(Layout {
+            root,
+            defaults: self.defaults,
             sheet_data,
             columns: self.columns,
             dimension: self.dimension,
@@ -1551,6 +2111,7 @@ impl Scanner {
             validations: self.validations.into_boxed_slice(),
             extended_validation: self.extended_validation,
             formula_ranges: formula_ranges.into_boxed_slice(),
+            defaults_compatibility: self.defaults_compatibility,
         })
     }
 }
@@ -1586,6 +2147,116 @@ fn expanded_dimension<'a>(
     let result = bounds.0?;
     let expanded = dimension.declared.union(result);
     (expanded != dimension.declared).then_some((dimension, expanded))
+}
+
+fn write_root(output: &mut Vec<u8>, root: &RootSlot, effect: &RootEffect) {
+    output.extend_from_slice(b"<");
+    output.extend_from_slice(root.tag.name.as_bytes());
+    for attribute in &root.tag.attributes {
+        if effect
+            .removed
+            .as_deref()
+            .is_some_and(|name| name == attribute.name.as_ref())
+        {
+            continue;
+        }
+        write_attribute(output, &attribute.name, &attribute.value);
+    }
+    for (name, value) in &effect.appended {
+        write_attribute(output, name, value);
+    }
+    output.extend_from_slice(b">");
+}
+
+fn write_defaults(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    stored: &DefaultsSlot,
+    effects: DefaultsEffects,
+    descent_name: &str,
+) {
+    let stored_descent = stored.descent_attribute.as_deref().unwrap_or(descent_name);
+    let mut removed = Vec::new();
+    let mut appended = Vec::new();
+    defaults_effect_attributes(
+        effects,
+        stored_descent,
+        descent_name,
+        &mut removed,
+        &mut appended,
+    );
+    write_tag(output, &stored.tag, stored.empty, &removed, &appended);
+    if !stored.empty {
+        output.extend_from_slice(&source[stored.tag_end..stored.close_start]);
+        write_close(output, &stored.tag.name);
+    }
+}
+
+fn write_new_defaults(
+    output: &mut Vec<u8>,
+    sheet_data_name: &str,
+    effects: DefaultsEffects,
+    descent_name: &str,
+) {
+    let name = sibling_name(sheet_data_name, "sheetFormatPr");
+    let tag = Tag {
+        name: name.into_boxed_str(),
+        attributes: Box::new([]),
+    };
+    let mut removed = Vec::new();
+    let mut appended = Vec::new();
+    defaults_effect_attributes(
+        effects,
+        descent_name,
+        descent_name,
+        &mut removed,
+        &mut appended,
+    );
+    write_tag(output, &tag, true, &removed, &appended);
+}
+
+fn defaults_effect_attributes<'a>(
+    effects: DefaultsEffects,
+    stored_descent_name: &'a str,
+    appended_descent_name: &'a str,
+    removed: &mut Vec<&'a str>,
+    appended: &mut Vec<(&'a str, String)>,
+) {
+    if let Some(effect) = effects.base_width {
+        removed.push("baseColWidth");
+        if let OptionalEffect::Set(value) = effect {
+            appended.push(("baseColWidth", value.to_string()));
+        }
+    }
+    if let Some(effect) = effects.width {
+        removed.push("defaultColWidth");
+        if let OptionalEffect::Set(value) = effect {
+            appended.push(("defaultColWidth", value.get().to_string()));
+        }
+    }
+    if let Some(height) = effects.height {
+        removed.extend(["defaultRowHeight", "customHeight"]);
+        appended.push(("defaultRowHeight", height.get().to_string()));
+        appended.push(("customHeight", "1".to_owned()));
+    }
+    for (value, name) in [
+        (effects.hidden, "zeroHeight"),
+        (effects.thick_top, "thickTop"),
+        (effects.thick_bottom, "thickBottom"),
+    ] {
+        if let Some(value) = value {
+            removed.push(name);
+            if value {
+                appended.push((name, "1".to_owned()));
+            }
+        }
+    }
+    if let Some(effect) = effects.descent {
+        removed.push(stored_descent_name);
+        if let DescentEffect::Set(value) = effect {
+            appended.push((appended_descent_name, value.get().to_string()));
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1839,6 +2510,7 @@ fn write_sheet_data(
     data: &SheetData,
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<Row, RowAction>,
+    descent_name: &str,
 ) -> Result<()> {
     let mut by_row = BTreeMap::<u32, RowEdits>::new();
     for (address, action) in cells {
@@ -1855,7 +2527,7 @@ fn write_sheet_data(
     if data.empty {
         write_tag(output, &data.tag, false, &[], &[]);
         for (number, edits) in by_row {
-            write_new_row(output, &data.tag.name, number, &edits)?;
+            write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
         }
         write_close(output, &data.tag.name);
         return Ok(());
@@ -1871,7 +2543,7 @@ fn write_sheet_data(
             .is_some_and(|(number, _)| *number < row.number)
         {
             if let Some((number, edits)) = pending.next() {
-                write_new_row(output, &data.tag.name, number, &edits)?;
+                write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
             }
         }
         if pending
@@ -1881,7 +2553,7 @@ fn write_sheet_data(
             let (_, edits) = pending
                 .next()
                 .ok_or_else(|| invalid("worksheet row edit ordering was lost"))?;
-            write_row(output, source, row, &edits)?;
+            write_row(output, source, row, &edits, descent_name)?;
         } else {
             output.extend_from_slice(&source[row.span.start..row.span.end]);
         }
@@ -1889,7 +2561,7 @@ fn write_sheet_data(
     }
     output.extend_from_slice(&source[cursor..data.close_start]);
     for (number, edits) in pending {
-        write_new_row(output, &data.tag.name, number, &edits)?;
+        write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
     }
     output.extend_from_slice(&source[data.close_start..data.span.end]);
     Ok(())
@@ -1901,7 +2573,13 @@ struct RowEdits {
     row: Option<RowAction>,
 }
 
-fn write_row(output: &mut Vec<u8>, source: &[u8], row: &RowSlot, edits: &RowEdits) -> Result<()> {
+fn write_row(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    row: &RowSlot,
+    edits: &RowEdits,
+    descent_name: &str,
+) -> Result<()> {
     let actions = &edits.cells;
     let membership_changed = actions.iter().any(|(address, action)| {
         let exists = row
@@ -1920,7 +2598,12 @@ fn write_row(output: &mut Vec<u8>, source: &[u8], row: &RowSlot, edits: &RowEdit
             appended.push(("r", row.number.to_string()));
         }
         if let Some(action) = edits.row {
-            row_effect_attributes(action, &mut removed, &mut appended);
+            row_effect_attributes(
+                action,
+                row.descent_attribute.as_deref().unwrap_or(descent_name),
+                &mut removed,
+                &mut appended,
+            );
         }
         write_tag(output, &row.tag, !creates_cell, &removed, &appended);
         if !creates_cell {
@@ -1940,7 +2623,12 @@ fn write_row(output: &mut Vec<u8>, source: &[u8], row: &RowSlot, edits: &RowEdit
             removed.push("spans");
         }
         if let Some(action) = edits.row {
-            row_effect_attributes(action, &mut removed, &mut appended);
+            row_effect_attributes(
+                action,
+                row.descent_attribute.as_deref().unwrap_or(descent_name),
+                &mut removed,
+                &mut appended,
+            );
         }
         write_tag(output, &row.tag, false, &removed, &appended);
     } else {
@@ -1988,6 +2676,7 @@ fn write_new_row(
     sheet_data_name: &str,
     number: u32,
     edits: &RowEdits,
+    descent_name: &str,
 ) -> Result<()> {
     let creates_cell = edits.cells.values().any(Action::creates_missing);
     let materializes = edits.row.is_some_and(RowAction::materializes);
@@ -2002,7 +2691,7 @@ fn write_new_row(
     let mut appended = vec![("r", number.to_string())];
     let mut removed = Vec::new();
     if let Some(action) = edits.row {
-        row_effect_attributes(action, &mut removed, &mut appended);
+        row_effect_attributes(action, descent_name, &mut removed, &mut appended);
     }
     write_tag(output, &tag, !creates_cell, &removed, &appended);
     if !creates_cell {
@@ -2015,10 +2704,11 @@ fn write_new_row(
     Ok(())
 }
 
-fn row_effect_attributes(
+fn row_effect_attributes<'a>(
     action: RowAction,
-    removed: &mut Vec<&'static str>,
-    appended: &mut Vec<(&'static str, String)>,
+    descent_name: &'a str,
+    removed: &mut Vec<&'a str>,
+    appended: &mut Vec<(&'a str, String)>,
 ) {
     if let Some(hidden) = action.hidden {
         removed.push("hidden");
@@ -2031,6 +2721,12 @@ fn row_effect_attributes(
         if let HeightEffect::Set(height) = height {
             appended.push(("ht", height.get().to_string()));
             appended.push(("customHeight", "1".to_owned()));
+        }
+    }
+    if let Some(descent) = action.descent {
+        removed.push(descent_name);
+        if let DescentEffect::Set(value) = descent {
+            appended.push((descent_name, value.get().to_string()));
         }
     }
     if let Some(style) = action.style {
@@ -2243,24 +2939,24 @@ fn write_tag(
         if removed.iter().any(|name| *name == attribute.name.as_ref()) {
             continue;
         }
-        output.extend_from_slice(b" ");
-        output.extend_from_slice(attribute.name.as_bytes());
-        output.extend_from_slice(b"=\"");
-        output.extend_from_slice(escape_xml(&attribute.value).as_bytes());
-        output.extend_from_slice(b"\"");
+        write_attribute(output, &attribute.name, &attribute.value);
     }
     for (name, value) in appended {
-        output.extend_from_slice(b" ");
-        output.extend_from_slice(name.as_bytes());
-        output.extend_from_slice(b"=\"");
-        output.extend_from_slice(escape_xml(value).as_bytes());
-        output.extend_from_slice(b"\"");
+        write_attribute(output, name, value);
     }
     if empty {
         output.extend_from_slice(b"/>");
     } else {
         output.extend_from_slice(b">");
     }
+}
+
+fn write_attribute(output: &mut Vec<u8>, name: &str, value: &str) {
+    output.extend_from_slice(b" ");
+    output.extend_from_slice(name.as_bytes());
+    output.extend_from_slice(b"=\"");
+    output.extend_from_slice(escape_xml(value).as_bytes());
+    output.extend_from_slice(b"\"");
 }
 
 fn write_close(output: &mut Vec<u8>, name: &str) {
@@ -2463,6 +3159,7 @@ mod tests {
             r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:dimension ref="A1:A4"/><x:sheetData><x:row r="1" hidden="1" z:keep="yes"><x:c r="A1"><x:v>1</x:v></x:c></x:row><x:row r="2" hidden="0" z:empty="keep"/><x:row r="4"><x:c r="A4"><x:v>4</x:v></x:c></x:row></x:sheetData></x:worksheet>"#
         );
         let plan = Plan {
+            defaults: None,
             cells: BTreeMap::from([(
                 Address::from_a1("A4").expect("A4"),
                 Action::set(40_i32.into()),
@@ -2504,6 +3201,7 @@ mod tests {
             xml.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::from([
                     (
@@ -2579,6 +3277,258 @@ mod tests {
     }
 
     #[test]
+    fn worksheet_defaults_and_row_descent_rewrite_losslessly_by_facet() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"
+                xmlns:compat="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                xmlns:ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+                compat:Ignorable="ac">
+                <x:sheetFormatPr baseColWidth="10" defaultColWidth="12"
+                    defaultRowHeight="15" customHeight="0" zeroHeight="1"
+                    thickTop="1" ac:dyDescent="0.1" z:keep="yes"/>
+                <x:sheetData z:data="keep"><x:row r="1" customHeight="0"
+                    ac:dyDescent="0.2" z:row="keep"/><x:row r="2"/></x:sheetData>
+            </x:worksheet>"#
+        );
+        let mut defaults = DefaultsAction::default();
+        {
+            let effects = defaults.update();
+            effects.base_width = Some(OptionalEffect::Reset);
+            effects.width = Some(OptionalEffect::Set(
+                layout::Width::new(14.5).expect("default width"),
+            ));
+            effects.height = Some(layout::Height::new(20.0).expect("default height"));
+            effects.hidden = Some(false);
+            effects.thick_top = Some(false);
+            effects.thick_bottom = Some(true);
+            effects.descent = Some(DescentEffect::Set(
+                Descent::new(0.25).expect("default descent"),
+            ));
+        }
+        let edited = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                defaults: Some(defaults),
+                cells: BTreeMap::new(),
+                rows: BTreeMap::from([
+                    (
+                        Row::new(0).expect("row 1"),
+                        RowAction {
+                            descent: Some(DescentEffect::Reset),
+                            ..RowAction::default()
+                        },
+                    ),
+                    (
+                        Row::new(1).expect("row 2"),
+                        RowAction {
+                            descent: Some(DescentEffect::Set(
+                                Descent::new(0.3).expect("row descent"),
+                            )),
+                            ..RowAction::default()
+                        },
+                    ),
+                    (
+                        Row::new(2).expect("row 3"),
+                        RowAction {
+                            descent: Some(DescentEffect::Set(
+                                Descent::new(0.4).expect("row descent"),
+                            )),
+                            ..RowAction::default()
+                        },
+                    ),
+                ]),
+                columns: BTreeMap::new(),
+            },
+        )
+        .expect("defaults rewrite");
+        let text = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(text.contains(r#"z:keep="yes""#));
+        assert!(text.contains(r#"z:data="keep""#));
+        assert!(text.contains(r#"z:row="keep""#));
+        assert!(!text.contains("baseColWidth="));
+        assert!(!text.contains("zeroHeight="));
+        assert!(!text.contains("thickTop="));
+        assert!(text.contains(r#"defaultColWidth="14.5""#));
+        assert!(text.contains(r#"defaultRowHeight="20" customHeight="1""#));
+        assert!(text.contains(r#"thickBottom="1" ac:dyDescent="0.25""#));
+
+        let store = worksheet::parse(&edited, || Ok(None)).expect("reparse defaults");
+        let defaults = store.defaults().expect("stored defaults");
+        assert_eq!(defaults.stored_base_width(), None);
+        assert_eq!(defaults.base_width(), layout::DEFAULT_BASE_WIDTH);
+        assert_eq!(defaults.width().map(layout::Width::get), Some(14.5));
+        assert_eq!(defaults.height().get(), 20.0);
+        assert!(!defaults.hidden());
+        assert!(!defaults.thick_top());
+        assert!(defaults.thick_bottom());
+        assert_eq!(defaults.descent().map(Descent::get), Some(0.25));
+        assert_eq!(
+            store
+                .row(Row::new(0).expect("row 1"))
+                .descent()
+                .map(Descent::get),
+            None
+        );
+        assert_eq!(
+            store
+                .row(Row::new(1).expect("row 2"))
+                .descent()
+                .map(Descent::get),
+            Some(0.3)
+        );
+        assert_eq!(
+            store
+                .row(Row::new(2).expect("row 3"))
+                .descent()
+                .map(Descent::get),
+            Some(0.4)
+        );
+
+        let removed = rewrite(
+            &edited,
+            "Data",
+            Plan {
+                defaults: Some(DefaultsAction::remove()),
+                cells: BTreeMap::new(),
+                rows: BTreeMap::new(),
+                columns: BTreeMap::new(),
+            },
+        )
+        .expect("remove defaults");
+        assert!(
+            worksheet::parse(&removed, || Ok(None))
+                .expect("reparse removed defaults")
+                .defaults()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn new_descent_injects_collision_free_ignorable_namespaces() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:x14ac="urn:occupied"
+                xmlns:mc="urn:also-occupied"><x:sheetData
+                xmlns:x14ac1="urn:locally-occupied"><x:row r="5"/></x:sheetData></x:worksheet>"#
+        );
+        let mut defaults = DefaultsAction::default();
+        {
+            let effects = defaults.update();
+            effects.height = Some(layout::Height::new(17.0).expect("height"));
+            effects.descent = Some(DescentEffect::Set(
+                Descent::new(0.2).expect("default descent"),
+            ));
+        }
+        let edited = rewrite(
+            xml.as_bytes(),
+            "Data",
+            Plan {
+                defaults: Some(defaults),
+                cells: BTreeMap::new(),
+                rows: BTreeMap::from([(
+                    Row::new(4).expect("row 5"),
+                    RowAction {
+                        descent: Some(DescentEffect::Set(Descent::new(0.35).expect("row descent"))),
+                        ..RowAction::default()
+                    },
+                )]),
+                columns: BTreeMap::new(),
+            },
+        )
+        .expect("inject extension namespaces");
+        let text = std::str::from_utf8(&edited).expect("UTF-8");
+        assert!(text.contains(concat!(
+            r#"xmlns:x14ac2="http://schemas.microsoft.com/office/"#,
+            r#"spreadsheetml/2009/9/ac""#
+        )));
+        assert!(text.contains(concat!(
+            r#"xmlns:mc1="http://schemas.openxmlformats.org/"#,
+            r#"markup-compatibility/2006""#
+        )));
+        assert!(text.contains(r#"mc1:Ignorable="x14ac2""#));
+        assert!(text.contains(r#"x14ac2:dyDescent="0.2""#));
+        assert!(text.contains(r#"x14ac2:dyDescent="0.35""#));
+
+        let store = worksheet::parse(&edited, || Ok(None)).expect("reparse injected XML");
+        let defaults = store.defaults().expect("materialized defaults");
+        assert_eq!(defaults.height().get(), 17.0);
+        assert_eq!(defaults.descent().map(Descent::get), Some(0.2));
+        assert_eq!(
+            store
+                .row(Row::new(4).expect("row 5"))
+                .descent()
+                .map(Descent::get),
+            Some(0.35)
+        );
+    }
+
+    #[test]
+    fn defaults_edits_refuse_missing_dependencies_before_rewrite() {
+        let plain = format!(r#"<worksheet xmlns="{S}"><sheetData/></worksheet>"#);
+        let mut needs_height = DefaultsAction::default();
+        needs_height.update().width = Some(OptionalEffect::Set(
+            layout::Width::new(12.0).expect("width"),
+        ));
+        assert!(matches!(
+            rewrite(
+                plain.as_bytes(),
+                "Data",
+                Plan {
+                    defaults: Some(needs_height),
+                    cells: BTreeMap::new(),
+                    rows: BTreeMap::new(),
+                    columns: BTreeMap::new(),
+                },
+            ),
+            Err(Error::DefaultsEditBlocked {
+                reason: DefaultsEditBlock::NeedsHeight,
+                ..
+            })
+        ));
+
+        let protected = format!(
+            r#"<worksheet xmlns="{S}"><sheetData/><sheetProtection sheet="1"/></worksheet>"#
+        );
+        assert!(matches!(
+            rewrite(
+                protected.as_bytes(),
+                "Data",
+                Plan {
+                    defaults: Some(DefaultsAction::remove()),
+                    cells: BTreeMap::new(),
+                    rows: BTreeMap::new(),
+                    columns: BTreeMap::new(),
+                },
+            ),
+            Err(Error::DefaultsEditBlocked {
+                reason: DefaultsEditBlock::ProtectedSheet,
+                ..
+            })
+        ));
+
+        let compatibility = format!(
+            r#"<worksheet xmlns="{S}" xmlns:z="urn:future"><extLst><ext><sheetFormatPr
+                defaultRowHeight="15"/></ext></extLst><sheetData/></worksheet>"#
+        );
+        assert!(matches!(
+            rewrite(
+                compatibility.as_bytes(),
+                "Data",
+                Plan {
+                    defaults: Some(DefaultsAction::remove()),
+                    cells: BTreeMap::new(),
+                    rows: BTreeMap::new(),
+                    columns: BTreeMap::new(),
+                },
+            ),
+            Err(Error::DefaultsEditBlocked {
+                reason: DefaultsEditBlock::MarkupCompatibility,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn row_style_retargeting_derives_custom_format_and_resets_sparsely() {
         let xml = format!(
             r#"<x:worksheet xmlns:x="{S}" xmlns:z="urn:future"><x:sheetData><x:row r="2" s="1" customFormat="1" ht="20" z:keep="yes"/></x:sheetData></x:worksheet>"#
@@ -2587,6 +3537,7 @@ mod tests {
             xml.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::from([
                     (
@@ -2653,6 +3604,7 @@ mod tests {
             xml.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::from([(Row::new(0).expect("row 1"), RowAction::hide())]),
                 columns: BTreeMap::new(),
@@ -2676,6 +3628,7 @@ mod tests {
             xml.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::new(),
                 columns: BTreeMap::from([
@@ -2713,6 +3666,7 @@ mod tests {
             xml.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::new(),
                 columns: BTreeMap::from([
@@ -2801,6 +3755,7 @@ mod tests {
             xml.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::new(),
                 columns: BTreeMap::from([
@@ -2884,6 +3839,7 @@ mod tests {
             xml.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::new(),
                 columns: BTreeMap::from([(
@@ -2912,6 +3868,7 @@ mod tests {
             plain.as_bytes(),
             "Data",
             Plan {
+                defaults: None,
                 cells: BTreeMap::new(),
                 rows: BTreeMap::new(),
                 columns: BTreeMap::from([
@@ -2935,6 +3892,7 @@ mod tests {
                 extended.as_bytes(),
                 "Data",
                 Plan {
+                    defaults: None,
                     cells: BTreeMap::new(),
                     rows: BTreeMap::new(),
                     columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::hide(),)]),
@@ -2954,6 +3912,7 @@ mod tests {
                 extended_columns.as_bytes(),
                 "Data",
                 Plan {
+                    defaults: None,
                     cells: BTreeMap::new(),
                     rows: BTreeMap::new(),
                     columns: BTreeMap::from([(Column::new(1).expect("B"), ColumnAction::hide(),)]),
@@ -2973,6 +3932,7 @@ mod tests {
                 protected.as_bytes(),
                 "Data",
                 Plan {
+                    defaults: None,
                     cells: BTreeMap::new(),
                     rows: BTreeMap::new(),
                     columns: BTreeMap::from([(Column::new(0).expect("A"), ColumnAction::hide(),)]),

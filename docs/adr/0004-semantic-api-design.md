@@ -76,6 +76,27 @@ style-only column record as zero-width; the safe facade returns a typed block
 instead of collapsing an implicit column. Existing column records retain their
 effective width while their style is retargeted.
 
+Worksheet-wide grid defaults live in the focused `xlsx::layout` module rather
+than adding ambiguous long names to the crate root. `layout::{Height, Width,
+Descent, Defaults}` is deliberately distinct from explicit `row::Height` and
+`column::Width`: the wire domains and inheritance layers differ. A sheet
+returns `Result<Option<&layout::Defaults>>`; absence remains observable because
+the correct row height and column width can depend on fonts and producer state
+and must not be guessed. The stored value exposes effective behavior, including
+Microsoft's rule that an `x14ac:dyDescent` makes `custom_height` true even when
+the core marker is false. The checked numeric wrappers are niche-encoded so an
+optional descent occupies one machine word.
+
+The paired `SheetEdit::defaults()` editor uses short named verbs for each
+orthogonal facet and works unchanged on a transaction-local new sheet.
+Materializing an absent `sheetFormatPr` requires `height` in the same
+transaction, enforced by a typed error before bytes change; reset-only edits on
+an absent record remain no-ops. Whole-record `remove` is explicit. Row-specific
+descent uses the existing `row` selector and the same checked scalar. Compact
+`layout::Fields` bitflags describe overlap, allowing independently prepared
+default edits to join when their facets are disjoint while retaining
+deterministic conflicts for the same facet.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

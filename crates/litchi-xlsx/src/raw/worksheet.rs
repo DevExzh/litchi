@@ -1,6 +1,7 @@
 //! Namespace-aware streaming parser for sparse worksheet cell data.
 
 pub(crate) mod edit;
+mod x14ac;
 
 use std::collections::{HashMap, HashSet};
 
@@ -18,6 +19,7 @@ use crate::cell::{Cell, Date, ErrorValue, Number, Store, Stored, Text, Unknown, 
 use crate::column::{self, Assignments, Flags};
 use crate::error::{Result, invalid};
 use crate::formula::{Cache, Formula, Kind};
+use crate::layout::{self, Defaults};
 use crate::row;
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
@@ -32,6 +34,7 @@ const MAX_METADATA_INDEX: u32 = 2_147_483_647;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Context {
     Worksheet,
+    SheetFormat,
     Columns,
     SheetData,
     Row,
@@ -130,12 +133,15 @@ struct Parser {
     cells: Vec<RawCell>,
     rows: Vec<row::Stored>,
     columns: Option<Assignments<column::Properties>>,
+    defaults: Option<Defaults>,
+    extensions: x14ac::Values,
     declared_extent: Option<Rect>,
     row: Option<PendingRow>,
     cell: Option<PendingCell>,
     seen_rows: HashSet<u32>,
     previous_row: u32,
     seen_dimension: bool,
+    seen_defaults: bool,
     seen_columns: bool,
     column_records: usize,
     seen_sheet_data: bool,
@@ -145,36 +151,40 @@ pub(crate) fn parse<'a, F>(content: &[u8], strings: F) -> Result<Store>
 where
     F: FnOnce() -> Result<Option<&'a [Text]>>,
 {
+    let extensions = x14ac::capture(content)?;
     let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
     let content = std::str::from_utf8(processed.as_ref())
         .map_err(|error| invalid(format!("worksheet XML is not UTF-8: {error}")))?;
-    Parser::parse(content, strings)
+    Parser::parse(content, strings, extensions)
 }
 
 impl Parser {
-    fn new() -> Self {
+    fn new(extensions: x14ac::Values) -> Self {
         Self {
             cells: Vec::new(),
             rows: Vec::new(),
             columns: None,
+            defaults: None,
+            extensions,
             declared_extent: None,
             row: None,
             cell: None,
             seen_rows: HashSet::new(),
             previous_row: 0,
             seen_dimension: false,
+            seen_defaults: false,
             seen_columns: false,
             column_records: 0,
             seen_sheet_data: false,
         }
     }
 
-    fn parse<'a, F>(content: &str, strings: F) -> Result<Store>
+    fn parse<'a, F>(content: &str, strings: F, extensions: x14ac::Values) -> Result<Store>
     where
         F: FnOnce() -> Result<Option<&'a [Text]>>,
     {
         let mut reader = NsReader::from_reader(content.as_bytes());
-        let mut parser = Self::new();
+        let mut parser = Self::new(extensions);
         let mut stack = Vec::new();
         let mut closed_root = false;
 
@@ -218,6 +228,15 @@ impl Parser {
                     parser.finish(child)?;
                 },
                 Event::Text(value) => {
+                    if stack.last() == Some(&Context::SheetFormat)
+                        && !value
+                            .decode()
+                            .map_err(|error| invalid(error.to_string()))?
+                            .trim()
+                            .is_empty()
+                    {
+                        return Err(invalid("worksheet sheetFormatPr cannot contain text"));
+                    }
                     if let Some(target) = text_target(&stack) {
                         parser.push_text(
                             target,
@@ -226,6 +245,9 @@ impl Parser {
                     }
                 },
                 Event::CData(value) => {
+                    if stack.last() == Some(&Context::SheetFormat) {
+                        return Err(invalid("worksheet sheetFormatPr cannot contain CDATA"));
+                    }
                     if let Some(target) = text_target(&stack) {
                         parser.push_text(
                             target,
@@ -234,6 +256,11 @@ impl Parser {
                     }
                 },
                 Event::GeneralRef(value) => {
+                    if stack.last() == Some(&Context::SheetFormat) {
+                        return Err(invalid(
+                            "worksheet sheetFormatPr cannot contain character references",
+                        ));
+                    }
                     if let Some(target) = text_target(&stack) {
                         parser.push_text(target, &decode_xml_reference(&value)?)?;
                     }
@@ -275,10 +302,11 @@ impl Parser {
         let declared_extent = parser.declared_extent;
         let rows = parser.rows;
         let columns = column::resolve(parser.columns)?;
+        let defaults = parser.defaults;
         for cell in parser.cells {
             cells.push(materialize(cell, strings)?);
         }
-        Store::from_unsorted(cells, rows, columns, declared_extent)
+        Store::from_unsorted(cells, rows, columns, defaults, declared_extent)
     }
 
     fn start(
@@ -288,6 +316,9 @@ impl Parser {
         element: &BytesStart<'_>,
         decoder: Decoder,
     ) -> Result<Context> {
+        if parent == Context::SheetFormat {
+            return Err(invalid("worksheet sheetFormatPr must be a leaf element"));
+        }
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
         {
@@ -308,6 +339,12 @@ impl Parser {
                 ))
             })?);
             return Ok(Context::Other);
+        }
+        if parent == Context::Worksheet
+            && is_spreadsheetml_name(namespace, element.name(), b"sheetFormatPr")
+        {
+            self.start_defaults(element, decoder)?;
+            return Ok(Context::SheetFormat);
         }
         if parent == Context::Worksheet && is_spreadsheetml_name(namespace, element.name(), b"cols")
         {
@@ -431,10 +468,105 @@ impl Parser {
             last_column: 0,
             properties: row::Properties {
                 height,
+                descent: self.extensions.rows.remove(&number),
                 style,
                 outline,
                 flags,
             },
+        });
+        Ok(())
+    }
+
+    fn start_defaults(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if self.seen_defaults {
+            return Err(invalid("worksheet has duplicate sheetFormatPr elements"));
+        }
+        if self.seen_columns || self.seen_sheet_data {
+            return Err(invalid(
+                "worksheet sheetFormatPr appears after column or cell data",
+            ));
+        }
+        self.seen_defaults = true;
+
+        let base_width = optional_u32(
+            element,
+            b"baseColWidth",
+            decoder,
+            "worksheet base column width",
+        )?
+        .map(|value| {
+            u8::try_from(value)
+                .map_err(|_| invalid("worksheet base column width exceeds Office maximum 255"))
+        })
+        .transpose()?;
+        let width = optional_f64(
+            element,
+            b"defaultColWidth",
+            decoder,
+            "worksheet default column width",
+        )?
+        .map(layout::Width::new)
+        .transpose()?;
+        let height = optional_f64(
+            element,
+            b"defaultRowHeight",
+            decoder,
+            "worksheet default row height",
+        )?
+        .ok_or_else(|| invalid("worksheet sheetFormatPr is missing defaultRowHeight"))
+        .and_then(|value| layout::Height::new(value).map_err(Into::into))?;
+        let row_outline = optional_u32(
+            element,
+            b"outlineLevelRow",
+            decoder,
+            "worksheet row outline summary",
+        )?
+        .map(row::OutlineAt::from)
+        .map(row::OutlineAt::resolve)
+        .transpose()?;
+        let column_outline = optional_u32(
+            element,
+            b"outlineLevelCol",
+            decoder,
+            "worksheet column outline summary",
+        )?
+        .map(row::OutlineAt::from)
+        .map(row::OutlineAt::resolve)
+        .transpose()?;
+        let mut flags = layout::Flags::empty();
+        let mut present = layout::Flags::empty();
+        for (attribute, flag, field) in [
+            (
+                b"customHeight".as_slice(),
+                layout::Flags::CUSTOM_HEIGHT,
+                "customHeight",
+            ),
+            (
+                b"zeroHeight".as_slice(),
+                layout::Flags::HIDDEN,
+                "zeroHeight",
+            ),
+            (b"thickTop".as_slice(), layout::Flags::THICK_TOP, "thickTop"),
+            (
+                b"thickBottom".as_slice(),
+                layout::Flags::THICK_BOTTOM,
+                "thickBottom",
+            ),
+        ] {
+            if let Some(value) = optional_bool(element, attribute, decoder, field)? {
+                present.insert(flag);
+                flags.set(flag, value);
+            }
+        }
+        self.defaults = Some(Defaults {
+            base_width,
+            width,
+            height,
+            descent: self.extensions.defaults.take(),
+            row_outline,
+            column_outline,
+            flags,
+            present,
         });
         Ok(())
     }
@@ -1237,6 +1369,89 @@ mod tests {
         assert!(!implicit.stored());
         assert!(!implicit.hidden());
         assert_eq!(store.rows().count(), 3);
+    }
+
+    #[test]
+    fn parses_checked_grid_defaults_and_effective_x14ac_descent() {
+        let xml = format!(
+            r#"<x:worksheet xmlns:x="{S}" xmlns:future="urn:future"
+                xmlns:compat="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                xmlns:ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+                compat:Ignorable="ac future">
+                <x:sheetFormatPr baseColWidth="10" defaultColWidth="12.5"
+                    defaultRowHeight="16" customHeight="false" zeroHeight="true"
+                    thickTop="1" thickBottom="true" outlineLevelRow="3"
+                    outlineLevelCol="2" ac:dyDescent="0.2" future:keep="yes"/>
+                <x:sheetData><x:row r="2" customHeight="0" ac:dyDescent="0.3"/></x:sheetData>
+            </x:worksheet>"#
+        );
+        let store = parse(xml.as_bytes(), || Ok(None)).expect("valid worksheet defaults");
+        let defaults = store.defaults().expect("stored defaults");
+        assert_eq!(defaults.base_width(), 10);
+        assert_eq!(defaults.stored_base_width(), Some(10));
+        assert_eq!(defaults.width().map(layout::Width::get), Some(12.5));
+        assert_eq!(defaults.height().get(), 16.0);
+        assert!(defaults.custom_height());
+        assert!(defaults.hidden());
+        assert!(defaults.thick_top());
+        assert!(defaults.thick_bottom());
+        assert_eq!(defaults.row_outline().get(), 3);
+        assert_eq!(defaults.column_outline().get(), 2);
+        assert_eq!(defaults.descent().map(layout::Descent::get), Some(0.2));
+
+        let row = store.row(RowIndex::new(1).expect("row 2"));
+        assert_eq!(row.descent().map(layout::Descent::get), Some(0.3));
+        assert!(row.custom_height());
+    }
+
+    #[test]
+    fn rejects_malformed_grid_defaults_and_descent() {
+        for body in [
+            r#"<sheetFormatPr/>"#,
+            r#"<sheetFormatPr defaultRowHeight="-1"/>"#,
+            r#"<sheetFormatPr defaultRowHeight="NaN"/>"#,
+            r#"<sheetFormatPr defaultRowHeight="15" baseColWidth="256"/>"#,
+            r#"<sheetFormatPr defaultRowHeight="15" defaultColWidth="65536"/>"#,
+            r#"<sheetFormatPr defaultRowHeight="15" outlineLevelRow="8"/>"#,
+            r#"<sheetFormatPr defaultRowHeight="15" outlineLevelCol="8"/>"#,
+            r#"<sheetFormatPr defaultRowHeight="15">text</sheetFormatPr>"#,
+            r#"<sheetFormatPr defaultRowHeight="15"><future/></sheetFormatPr>"#,
+            r#"<sheetFormatPr defaultRowHeight="15"/><sheetFormatPr defaultRowHeight="16"/>"#,
+            r#"<sheetData/><sheetFormatPr defaultRowHeight="15"/>"#,
+        ] {
+            let xml = format!(r#"<worksheet xmlns="{S}">{body}<sheetData/></worksheet>"#);
+            assert!(
+                parse(xml.as_bytes(), || Ok(None)).is_err(),
+                "accepted {body}"
+            );
+        }
+
+        for value in ["-0.1", "NaN", "inf"] {
+            let xml = format!(
+                r#"<worksheet xmlns="{S}"
+                    xmlns:a="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    mc:Ignorable="a"><sheetFormatPr defaultRowHeight="15" a:dyDescent="{value}"/><sheetData/></worksheet>"#
+            );
+            assert!(
+                parse(xml.as_bytes(), || Ok(None)).is_err(),
+                "accepted dyDescent={value}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_extension_xml_beyond_the_depth_limit() {
+        let mut xml = format!(r#"<worksheet xmlns="{S}">"#);
+        for _ in 0..256 {
+            xml.push_str("<future>");
+        }
+        for _ in 0..256 {
+            xml.push_str("</future>");
+        }
+        xml.push_str("</worksheet>");
+
+        assert!(parse(xml.as_bytes(), || Ok(None)).is_err());
     }
 
     #[test]

@@ -5,6 +5,9 @@ use thiserror::Error;
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Row as RowIndex};
 
 use crate::column::WidthError;
+use crate::layout::{
+    DescentError, HeightError as DefaultHeightError, WidthError as DefaultWidthError,
+};
 use crate::outline::OutlineError;
 use crate::row::HeightError;
 use crate::sheet::NameError;
@@ -38,6 +41,15 @@ pub enum Error {
     /// A row height is non-finite or outside Excel's checked domain.
     #[error(transparent)]
     RowHeight(#[from] HeightError),
+    /// A worksheet default row height is negative or non-finite.
+    #[error(transparent)]
+    DefaultHeight(#[from] DefaultHeightError),
+    /// A worksheet default column width is outside Office's checked domain.
+    #[error(transparent)]
+    DefaultWidth(#[from] DefaultWidthError),
+    /// A typographic descent is negative or non-finite.
+    #[error(transparent)]
+    Descent(#[from] DescentError),
     /// A row or column outline level is outside Office's checked domain.
     #[error(transparent)]
     Outline(#[from] OutlineError),
@@ -84,6 +96,12 @@ pub enum Error {
         sheet: String,
         column: ColumnIndex,
         reason: ColumnEditBlock,
+    },
+    /// A safe worksheet-default edit is forbidden by worksheet state.
+    #[error("cannot edit defaults on sheet '{sheet}': {reason}")]
+    DefaultsEditBlocked {
+        sheet: String,
+        reason: DefaultsEditBlock,
     },
     /// A safe workbook tab edit is forbidden by workbook structure or by an
     /// extension payload whose effective catalog cannot be edited losslessly.
@@ -169,6 +187,16 @@ pub enum ColumnEditBlock {
     /// A new column record cannot safely carry a style without an explicit
     /// width because Excel interprets that style-only record as zero-width.
     StyleNeedsWidth,
+}
+
+/// Why the ordinary worksheet-default editor refused a mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DefaultsEditBlock {
+    ProtectedSheet,
+    MarkupCompatibility,
+    /// Materializing `sheetFormatPr` requires its mandatory row height.
+    NeedsHeight,
 }
 
 /// Why the workbook tab editor refused a state or ordering mutation.
@@ -272,6 +300,20 @@ impl std::fmt::Display for ColumnEditBlock {
             },
             Self::StyleNeedsWidth => {
                 "styling an implicit column requires an explicit width in the same transaction"
+            },
+        })
+    }
+}
+
+impl std::fmt::Display for DefaultsEditBlock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::ProtectedSheet => "the worksheet is protected",
+            Self::MarkupCompatibility => {
+                "the effective defaults are controlled by unmodeled compatibility markup"
+            },
+            Self::NeedsHeight => {
+                "creating worksheet defaults requires a height in the same transaction"
             },
         })
     }

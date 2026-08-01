@@ -6,6 +6,7 @@ use bitflags::bitflags;
 use litchi_sheet::Row as Index;
 use thiserror::Error;
 
+use crate::layout::Descent;
 pub use crate::outline::{Outline, OutlineAt, OutlineError};
 use crate::style::StyleState;
 
@@ -106,6 +107,7 @@ bitflags! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Properties {
     pub(crate) height: Option<Height>,
+    pub(crate) descent: Option<Descent>,
     pub(crate) style: Option<u32>,
     pub(crate) outline: Outline,
     pub(crate) flags: Flags,
@@ -117,6 +119,7 @@ pub(crate) struct Properties {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Props {
     pub(crate) height: Option<Height>,
+    pub(crate) descent: Option<Descent>,
     pub(crate) style: StyleState,
     pub(crate) outline: Outline,
     pub(crate) flags: Flags,
@@ -126,6 +129,11 @@ impl Props {
     /// Producer-stored row height, if present.
     pub const fn height(&self) -> Option<Height> {
         self.height
+    }
+
+    /// Producer-stored typographic descent at 100% worksheet zoom.
+    pub const fn descent(&self) -> Option<Descent> {
+        self.descent
     }
 
     /// Exact local shared-style state without a physical style index.
@@ -145,7 +153,7 @@ impl Props {
 
     /// Whether the row height is explicitly customized.
     pub const fn custom_height(&self) -> bool {
-        self.flags.contains(Flags::CUSTOM_HEIGHT)
+        self.flags.contains(Flags::CUSTOM_HEIGHT) || self.descent.is_some()
     }
 
     /// Whether the row's outline is stored in its collapsed state.
@@ -250,6 +258,14 @@ impl<'a> Row<'a> {
         }
     }
 
+    /// Producer-stored typographic descent at 100% worksheet zoom.
+    pub const fn descent(self) -> Option<Descent> {
+        match self.stored {
+            Some(row) => row.properties.descent,
+            None => None,
+        }
+    }
+
     /// Whether the row is explicitly hidden.
     pub const fn hidden(self) -> bool {
         match self.stored {
@@ -261,7 +277,10 @@ impl<'a> Row<'a> {
     /// Whether the producer stored a custom-height marker.
     pub const fn custom_height(self) -> bool {
         match self.stored {
-            Some(row) => row.properties.flags.contains(Flags::CUSTOM_HEIGHT),
+            Some(row) => {
+                row.properties.flags.contains(Flags::CUSTOM_HEIGHT)
+                    || row.properties.descent.is_some()
+            },
             None => false,
         }
     }

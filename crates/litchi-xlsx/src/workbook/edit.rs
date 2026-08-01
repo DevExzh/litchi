@@ -13,9 +13,11 @@ use crate::column::{
     Flags as ColumnFlags, Outline, OutlineAt, Props as ColumnProps, State as ColumnState, WidthAt,
 };
 use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, invalid};
+use crate::layout::{self, Defaults};
 use crate::raw;
 use crate::raw::worksheet::edit::{
-    Action, ColumnAction, HeightEffect, Payload, Plan, RowAction, StyleEffect, WidthEffect,
+    Action, ColumnAction, DefaultsAction, DescentEffect, HeightEffect, OptionalEffect, Payload,
+    Plan, RowAction, StyleEffect, WidthEffect,
 };
 use crate::row::{Flags as RowFlags, HeightAt, Props as RowProps, State as RowState};
 use crate::sheet::Name;
@@ -196,6 +198,7 @@ impl RowState {
         value.map_or(Self::Missing, |row| {
             Self::Stored(RowProps {
                 height: row.properties.height,
+                descent: row.properties.descent,
                 style: row.properties.style.map_or(StyleState::Default, |key| {
                     StyleState::Shared(StyleKey::new(
                         key,
@@ -215,6 +218,7 @@ impl RowState {
         let mut properties = match Self::read(before, workbook) {
             Self::Missing => RowProps {
                 height: None,
+                descent: None,
                 style: StyleState::Default,
                 outline: Outline::NONE,
                 flags: RowFlags::empty(),
@@ -235,6 +239,12 @@ impl RowState {
                     properties.flags.remove(RowFlags::CUSTOM_HEIGHT);
                 },
             }
+        }
+        if let Some(descent) = action.descent {
+            properties.descent = match descent {
+                DescentEffect::Set(value) => Some(value),
+                DescentEffect::Reset => None,
+            };
         }
         if let Some(style) = action.style {
             match style {
@@ -268,6 +278,68 @@ impl RowState {
         }
         Self::Stored(properties)
     }
+}
+
+fn defaults_after(
+    before: Option<&Defaults>,
+    action: DefaultsAction,
+) -> std::result::Result<Option<Defaults>, crate::DefaultsEditBlock> {
+    if action.is_remove() {
+        return Ok(None);
+    }
+    if before.is_none() && !action.materializes() {
+        return Ok(None);
+    }
+    let effects = action.effects();
+    let mut defaults = match before {
+        Some(value) => value.clone(),
+        None => Defaults {
+            base_width: None,
+            width: None,
+            height: effects
+                .height
+                .ok_or(crate::DefaultsEditBlock::NeedsHeight)?,
+            descent: None,
+            row_outline: None,
+            column_outline: None,
+            flags: layout::Flags::empty(),
+            present: layout::Flags::empty(),
+        },
+    };
+    if let Some(effect) = effects.base_width {
+        defaults.base_width = match effect {
+            OptionalEffect::Set(value) => Some(value),
+            OptionalEffect::Reset => None,
+        };
+    }
+    if let Some(effect) = effects.width {
+        defaults.width = match effect {
+            OptionalEffect::Set(value) => Some(value),
+            OptionalEffect::Reset => None,
+        };
+    }
+    if let Some(height) = effects.height {
+        defaults.height = height;
+        defaults.flags.insert(layout::Flags::CUSTOM_HEIGHT);
+        defaults.present.insert(layout::Flags::CUSTOM_HEIGHT);
+    }
+    for (value, flag) in [
+        (effects.hidden, layout::Flags::HIDDEN),
+        (effects.thick_top, layout::Flags::THICK_TOP),
+        (effects.thick_bottom, layout::Flags::THICK_BOTTOM),
+    ] {
+        if let Some(value) = value {
+            defaults.flags.set(flag, value);
+            defaults.present.set(flag, value);
+        }
+    }
+    if let Some(effect) = effects.descent {
+        defaults.descent = match effect {
+            DescentEffect::Set(value) => Some(value),
+            DescentEffect::Reset => None,
+        };
+    }
+    Ok(Some(defaults))
 }
 
 /// One deterministic semantic change in a reversible patch.
@@ -306,6 +378,11 @@ pub enum Change {
         before: Visibility,
         after: Visibility,
     },
+    Defaults {
+        sheet: Box<str>,
+        before: Option<Defaults>,
+        after: Option<Defaults>,
+    },
     Cell {
         sheet: Box<str>,
         address: Address,
@@ -334,6 +411,7 @@ impl Change {
             Self::Active { after, .. } => after.name(),
             Self::Move { sheet, .. }
             | Self::Visibility { sheet, .. }
+            | Self::Defaults { sheet, .. }
             | Self::Cell { sheet, .. }
             | Self::Row { sheet, .. }
             | Self::Column { sheet, .. } => sheet,
@@ -349,6 +427,7 @@ impl Change {
             | Self::Rename { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
+            | Self::Defaults { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -368,6 +447,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
+            | Self::Defaults { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -383,6 +463,7 @@ impl Change {
             | Self::Rename { .. }
             | Self::Move { .. }
             | Self::Visibility { .. }
+            | Self::Defaults { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -403,9 +484,18 @@ impl Change {
             | Self::Rename { .. }
             | Self::Move { .. }
             | Self::Active { .. }
+            | Self::Defaults { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
+        }
+    }
+
+    /// Worksheet-default transition when this changes `sheetFormatPr`.
+    pub fn defaults(&self) -> Option<(Option<&Defaults>, Option<&Defaults>)> {
+        match self {
+            Self::Defaults { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            _ => None,
         }
     }
 
@@ -424,6 +514,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
+            | Self::Defaults { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
         }
@@ -441,6 +532,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
+            | Self::Defaults { .. }
             | Self::Cell { .. }
             | Self::Column { .. } => None,
         }
@@ -461,6 +553,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Visibility { .. }
+            | Self::Defaults { .. }
             | Self::Cell { .. }
             | Self::Row { .. } => None,
         }
@@ -532,6 +625,15 @@ impl Change {
             } => Self::Visibility {
                 sheet: sheet.clone(),
                 position: *position,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Defaults {
+                sheet,
+                before,
+                after,
+            } => Self::Defaults {
+                sheet: sheet.clone(),
                 before: after.clone(),
                 after: before.clone(),
             },
@@ -629,6 +731,11 @@ pub enum Conflict {
         sheet: Box<str>,
         position: usize,
     },
+    Defaults {
+        sheet: Box<str>,
+        position: usize,
+        fields: layout::Fields,
+    },
     Cells {
         sheet: Box<str>,
         position: usize,
@@ -655,6 +762,7 @@ impl Conflict {
             | Self::Order { sheet, .. }
             | Self::Active { sheet, .. }
             | Self::Tab { sheet, .. }
+            | Self::Defaults { sheet, .. }
             | Self::Cells { sheet, .. }
             | Self::Rows { sheet, .. }
             | Self::Columns { sheet, .. } => sheet,
@@ -669,6 +777,7 @@ impl Conflict {
             | Self::Order { position, .. }
             | Self::Active { position, .. }
             | Self::Tab { position, .. }
+            | Self::Defaults { position, .. }
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
             | Self::Columns { position, .. } => *position,
@@ -700,6 +809,14 @@ impl Conflict {
         matches!(self, Self::Order { .. })
     }
 
+    /// Overlapping worksheet-default facets, when applicable.
+    pub const fn defaults(&self) -> Option<layout::Fields> {
+        match self {
+            Self::Defaults { fields, .. } => Some(*fields),
+            _ => None,
+        }
+    }
+
     /// Deterministically ordered cells written by both edits, when applicable.
     pub fn cells(&self) -> Option<&[Address]> {
         match self {
@@ -709,6 +826,7 @@ impl Conflict {
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
+            | Self::Defaults { .. }
             | Self::Rows { .. }
             | Self::Columns { .. } => None,
         }
@@ -723,6 +841,7 @@ impl Conflict {
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
+            | Self::Defaults { .. }
             | Self::Cells { .. }
             | Self::Columns { .. } => None,
         }
@@ -738,6 +857,7 @@ impl Conflict {
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. }
+            | Self::Defaults { .. }
             | Self::Cells { .. }
             | Self::Rows { .. } => None,
         }
@@ -750,6 +870,7 @@ impl Conflict {
             | Self::Order { .. }
             | Self::Active { .. }
             | Self::Tab { .. } => 1,
+            Self::Defaults { fields, .. } => fields.bits().count_ones() as usize,
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
@@ -1132,6 +1253,7 @@ impl GraphChange {
 struct SheetActions {
     rename: Option<Name>,
     visibility: Option<TabAction>,
+    defaults: Option<DefaultsAction>,
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<RowIndex, RowAction>,
     columns: BTreeMap<ColumnIndex, ColumnAction>,
@@ -1141,6 +1263,7 @@ impl SheetActions {
     fn len(&self) -> usize {
         usize::from(self.rename.is_some())
             .saturating_add(usize::from(self.visibility.is_some()))
+            .saturating_add(usize::from(self.defaults.is_some()))
             .saturating_add(self.cells.len())
             .saturating_add(self.rows.len())
             .saturating_add(self.columns.len())
@@ -1149,6 +1272,7 @@ impl SheetActions {
     fn is_empty(&self) -> bool {
         self.rename.is_none()
             && self.visibility.is_none()
+            && self.defaults.is_none()
             && self.cells.is_empty()
             && self.rows.is_empty()
             && self.columns.is_empty()
@@ -1622,6 +1746,7 @@ impl Edit {
         );
         self.added.iter().fold(existing, |len, added| {
             len.saturating_add(1)
+                .saturating_add(usize::from(added.actions.defaults.is_some()))
                 .saturating_add(added.actions.cells.len())
                 .saturating_add(added.actions.rows.len())
                 .saturating_add(added.actions.columns.len())
@@ -1685,6 +1810,11 @@ impl Edit {
                     }
                     if accepted.visibility.is_none() {
                         accepted.visibility = actions.visibility;
+                    }
+                    match (accepted.defaults.as_mut(), actions.defaults) {
+                        (None, defaults) => accepted.defaults = defaults,
+                        (Some(accepted), Some(defaults)) => accepted.merge(defaults),
+                        (Some(_), None) => {},
                     }
                     for (address, action) in actions.cells {
                         match accepted.cells.entry(address) {
@@ -2062,11 +2192,12 @@ impl Edit {
             let SheetActions {
                 rename: _,
                 visibility: _,
+                defaults,
                 cells,
                 rows,
                 columns,
             } = requested;
-            if cells.is_empty() && rows.is_empty() && columns.is_empty() {
+            if defaults.is_none() && cells.is_empty() && rows.is_empty() && columns.is_empty() {
                 continue;
             }
             if data.kind != SheetKind::Worksheet {
@@ -2080,6 +2211,24 @@ impl Edit {
             };
             let store = sheet.store()?;
             let change_start = changes.len();
+            let mut effective_defaults = None;
+            if let Some(action) = defaults {
+                let before = store.defaults().cloned();
+                let after = defaults_after(before.as_ref(), action).map_err(|reason| {
+                    Error::DefaultsEditBlocked {
+                        sheet: data.name.clone(),
+                        reason,
+                    }
+                })?;
+                if before != after {
+                    effective_defaults = Some(action);
+                    changes.push(Change::Defaults {
+                        sheet: data.name.clone().into_boxed_str(),
+                        before,
+                        after,
+                    });
+                }
+            }
             let mut effective_cells = BTreeMap::new();
             for (address, action) in cells {
                 let before = store.entry(address);
@@ -2139,7 +2288,8 @@ impl Edit {
                     after: after_state,
                 });
             }
-            if effective_cells.is_empty()
+            if effective_defaults.is_none()
+                && effective_cells.is_empty()
                 && effective_rows.is_empty()
                 && effective_columns.is_empty()
             {
@@ -2152,6 +2302,7 @@ impl Edit {
                 &before,
                 &data.name,
                 Plan {
+                    defaults: effective_defaults,
                     cells: effective_cells,
                     rows: effective_rows,
                     columns: effective_columns,
@@ -2167,6 +2318,13 @@ impl Edit {
                     | Change::Move { .. }
                     | Change::Active { .. }
                     | Change::Visibility { .. } => {},
+                    Change::Defaults { sheet, after, .. } => {
+                        if parsed.defaults() != after.as_ref() {
+                            return Err(invalid(format!(
+                                "worksheet defaults edit verification failed at {sheet}"
+                            )));
+                        }
+                    },
                     Change::Cell {
                         sheet,
                         address,
@@ -3070,6 +3228,16 @@ impl Edit {
                     position: *position,
                 });
             }
+            if let (Some(left), Some(right)) = (left.defaults, right.defaults) {
+                let fields = left.fields() & right.fields();
+                if left.overlaps(right) {
+                    conflicts.push(Conflict::Defaults {
+                        sheet: sheet.into(),
+                        position: *position,
+                        fields,
+                    });
+                }
+            }
             let mut addresses = Vec::new();
             let mut left_cells = left.cells.iter().peekable();
             let mut right_cells = right.cells.iter().peekable();
@@ -3256,6 +3424,13 @@ pub struct SheetEdit<'a> {
 }
 
 impl SheetEdit<'_> {
+    /// Borrow the worksheet-wide grid-default editor.
+    pub fn defaults(&mut self) -> DefaultsEdit<'_> {
+        DefaultsEdit {
+            action: &mut self.edit.sheets.entry(self.position).or_default().defaults,
+        }
+    }
+
     /// Select one checked row for short property-editing verbs.
     pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
         let row = at.into().resolve()?;
@@ -3425,6 +3600,13 @@ impl NewSheet<'_> {
         self
     }
 
+    /// Borrow the pending worksheet's grid-default editor.
+    pub fn defaults(&mut self) -> DefaultsEdit<'_> {
+        DefaultsEdit {
+            action: &mut self.added.actions.defaults,
+        }
+    }
+
     /// Select one checked row for short property-editing verbs.
     pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
         let row = at.into().resolve()?;
@@ -3520,6 +3702,107 @@ impl NewSheet<'_> {
     }
 }
 
+/// Transaction-scoped worksheet-grid-default editor.
+#[derive(Debug)]
+pub struct DefaultsEdit<'a> {
+    action: &'a mut Option<DefaultsAction>,
+}
+
+impl DefaultsEdit<'_> {
+    fn action(&mut self) -> &mut DefaultsAction {
+        self.action.get_or_insert_default()
+    }
+
+    /// Set the base width in whole Normal-style characters (`0..=255`).
+    pub fn base_width(&mut self, width: u8) -> &mut Self {
+        self.action().update().base_width = Some(OptionalEffect::Set(width));
+        self
+    }
+
+    /// Restore the implicit base width of eight characters.
+    pub fn reset_base_width(&mut self) -> &mut Self {
+        self.action().update().base_width = Some(OptionalEffect::Reset);
+        self
+    }
+
+    /// Set a checked default column width in character units.
+    pub fn width(&mut self, width: impl Into<layout::WidthAt>) -> Result<&mut Self> {
+        let width = width.into().resolve()?;
+        self.action().update().width = Some(OptionalEffect::Set(width));
+        Ok(self)
+    }
+
+    /// Restore font-derived default column-width calculation.
+    pub fn reset_width(&mut self) -> &mut Self {
+        self.action().update().width = Some(OptionalEffect::Reset);
+        self
+    }
+
+    /// Set a checked default row height and derive its custom-height marker.
+    pub fn height(&mut self, height: impl Into<layout::HeightAt>) -> Result<&mut Self> {
+        let height = height.into().resolve()?;
+        self.action().update().height = Some(height);
+        Ok(self)
+    }
+
+    /// Hide rows without an explicit row record by default.
+    pub fn hide(&mut self) -> &mut Self {
+        self.action().update().hidden = Some(true);
+        self
+    }
+
+    /// Show implicit rows by removing the hidden-default marker.
+    pub fn show(&mut self) -> &mut Self {
+        self.action().update().hidden = Some(false);
+        self
+    }
+
+    /// Request a thick top edge on default rows.
+    pub fn thick_top(&mut self) -> &mut Self {
+        self.action().update().thick_top = Some(true);
+        self
+    }
+
+    /// Restore the normal top edge on default rows.
+    pub fn normal_top(&mut self) -> &mut Self {
+        self.action().update().thick_top = Some(false);
+        self
+    }
+
+    /// Request a thick bottom edge on default rows.
+    pub fn thick_bottom(&mut self) -> &mut Self {
+        self.action().update().thick_bottom = Some(true);
+        self
+    }
+
+    /// Restore the normal bottom edge on default rows.
+    pub fn normal_bottom(&mut self) -> &mut Self {
+        self.action().update().thick_bottom = Some(false);
+        self
+    }
+
+    /// Set typographic descent in pixels at 100% worksheet zoom.
+    pub fn descent(&mut self, value: impl Into<layout::DescentAt>) -> Result<&mut Self> {
+        let value = value.into().resolve()?;
+        self.action().update().descent = Some(DescentEffect::Set(value));
+        Ok(self)
+    }
+
+    /// Remove the explicit typographic descent.
+    pub fn reset_descent(&mut self) -> &mut Self {
+        self.action().update().descent = Some(DescentEffect::Reset);
+        self
+    }
+
+    /// Remove the complete stored defaults record.
+    ///
+    /// A later facet setter on this handle starts a fresh update instead.
+    pub fn remove(&mut self) -> &mut Self {
+        *self.action = Some(DefaultsAction::remove());
+        self
+    }
+}
+
 /// Transaction-scoped editor for one checked worksheet row.
 #[derive(Debug)]
 pub struct RowEdit<'a> {
@@ -3558,6 +3841,19 @@ impl RowEdit<'_> {
     /// Remove the explicit height and its derived custom-height marker.
     pub fn reset_height(&mut self) -> &mut Self {
         self.action().height = Some(HeightEffect::Reset);
+        self
+    }
+
+    /// Set typographic descent in pixels at 100% worksheet zoom.
+    pub fn descent(&mut self, value: impl Into<layout::DescentAt>) -> Result<&mut Self> {
+        let value = value.into().resolve()?;
+        self.action().descent = Some(DescentEffect::Set(value));
+        Ok(self)
+    }
+
+    /// Remove the row's explicit typographic descent.
+    pub fn reset_descent(&mut self) -> &mut Self {
+        self.action().descent = Some(DescentEffect::Reset);
         self
     }
 
@@ -4634,11 +4930,28 @@ fn create_sheets(
         let SheetActions {
             rename: _,
             visibility: _,
+            defaults,
             cells,
             rows,
             columns,
         } = actions;
         let change_start = changes.len();
+        let mut effective_defaults = None;
+        if let Some(action) = defaults {
+            let after =
+                defaults_after(None, action).map_err(|reason| Error::DefaultsEditBlocked {
+                    sheet: name.as_str().to_owned(),
+                    reason,
+                })?;
+            if after.is_some() {
+                effective_defaults = Some(action);
+                changes.push(Change::Defaults {
+                    sheet: name.as_str().into(),
+                    before: None,
+                    after,
+                });
+            }
+        }
         let mut effective_cells = BTreeMap::new();
         for (address, action) in cells {
             let before = State::Missing;
@@ -4699,6 +5012,7 @@ fn create_sheets(
             &template,
             name.as_str(),
             Plan {
+                defaults: effective_defaults,
                 cells: effective_cells,
                 rows: effective_rows,
                 columns: effective_columns,
@@ -4750,6 +5064,13 @@ fn create_sheets(
                         return Err(invalid(format!(
                             "new worksheet column verification failed at {sheet}!column {}",
                             column.get()
+                        )));
+                    }
+                },
+                Change::Defaults { sheet, after, .. } => {
+                    if parsed.defaults() != after.as_ref() {
+                        return Err(invalid(format!(
+                            "new worksheet defaults verification failed at {sheet}"
                         )));
                     }
                 },
@@ -5224,6 +5545,229 @@ mod tests {
             .expect("row 4")
             .reset_height();
         assert!(left.join(right).is_err());
+    }
+
+    #[test]
+    fn worksheet_defaults_are_typed_reversible_and_facet_composable() {
+        let source = defaults_workbook();
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let original = source.sheet("Sheet1").expect("lookup").expect("worksheet");
+        let defaults = original
+            .defaults()
+            .expect("default lookup")
+            .expect("stored defaults");
+        assert_eq!(defaults.base_width(), 10);
+        assert_eq!(defaults.width().map(layout::Width::get), Some(12.0));
+        assert_eq!(defaults.height().get(), 15.0);
+        assert_eq!(defaults.descent().map(layout::Descent::get), Some(0.1));
+        assert!(defaults.custom_height());
+        assert!(defaults.hidden());
+        assert!(defaults.thick_top());
+        assert_eq!(
+            original
+                .row(1)
+                .expect("row 2")
+                .descent()
+                .map(layout::Descent::get),
+            Some(0.2)
+        );
+
+        let mut edit = source.edit().expect("defaults edit");
+        {
+            let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("worksheet");
+            {
+                let mut defaults = sheet.defaults();
+                defaults
+                    .reset_base_width()
+                    .show()
+                    .normal_top()
+                    .thick_bottom();
+                defaults.width(14.5).expect("checked width");
+                defaults.height(20).expect("checked height");
+                defaults.descent(0.25).expect("checked descent");
+            }
+            sheet
+                .row(1)
+                .expect("row 2")
+                .reset_descent()
+                .height(24)
+                .expect("checked row height");
+        }
+        let committed = edit.commit().expect("defaults commit");
+        assert_eq!(committed.patch().len(), 2);
+        assert!(committed.patch().graph.is_empty());
+        let (before, after) = committed.patch().changes()[0]
+            .defaults()
+            .expect("defaults change");
+        assert!(before.is_some());
+        let after = after.expect("updated defaults");
+        assert_eq!(after.stored_base_width(), None);
+        assert_eq!(after.base_width(), layout::DEFAULT_BASE_WIDTH);
+        assert_eq!(after.width().map(layout::Width::get), Some(14.5));
+        assert_eq!(after.height().get(), 20.0);
+        assert_eq!(after.descent().map(layout::Descent::get), Some(0.25));
+        assert!(!after.hidden());
+        assert!(!after.thick_top());
+        assert!(after.thick_bottom());
+
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("worksheet");
+        assert_eq!(sheet.defaults().expect("lookup"), Some(after));
+        let row = sheet.row(1).expect("row 2");
+        assert_eq!(row.descent(), None);
+        assert_eq!(row.height().map(crate::row::Height::get), Some(24.0));
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let mut width = source.edit().expect("width edit");
+        width
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("worksheet")
+            .defaults()
+            .width(18)
+            .expect("width");
+        let mut hidden = source.edit().expect("hidden edit");
+        hidden
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("worksheet")
+            .defaults()
+            .hide();
+        width.join(hidden).expect("disjoint default facets");
+        let joined = width.commit().expect("joined defaults");
+        let joined_sheet = joined
+            .workbook()
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("worksheet");
+        let defaults = joined_sheet.defaults().expect("lookup").expect("defaults");
+        assert_eq!(defaults.width().map(layout::Width::get), Some(18.0));
+        assert!(defaults.hidden());
+
+        let mut left = source.edit().expect("left height");
+        left.sheet(0usize)
+            .expect("lookup")
+            .expect("worksheet")
+            .defaults()
+            .height(16)
+            .expect("height");
+        let mut right = source.edit().expect("right height");
+        right
+            .sheet(0usize)
+            .expect("lookup")
+            .expect("worksheet")
+            .defaults()
+            .height(17)
+            .expect("height");
+        let error = left.join(right).expect_err("same default facet conflicts");
+        let conflicts = error.conflicts().expect("default conflicts");
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts.conflicts().len(), 1);
+        assert_eq!(
+            conflicts.conflicts()[0].defaults(),
+            Some(layout::Fields::HEIGHT)
+        );
+
+        let mut invalid = source.edit().expect("invalid defaults");
+        let mut sheet = invalid.sheet(0usize).expect("lookup").expect("worksheet");
+        assert!(matches!(
+            sheet.defaults().height(f64::NAN),
+            Err(Error::DefaultHeight(_))
+        ));
+        assert!(matches!(
+            sheet.defaults().width(65_536.0),
+            Err(Error::DefaultWidth(_))
+        ));
+        assert!(matches!(
+            sheet.defaults().descent(-0.1),
+            Err(Error::Descent(_))
+        ));
+        assert!(matches!(
+            sheet.row(0).expect("row 1").descent(f64::INFINITY),
+            Err(Error::Descent(_))
+        ));
+    }
+
+    #[test]
+    fn new_sheet_defaults_require_height_and_commit_with_short_selectors() {
+        let source = Workbook::new().expect("source workbook");
+        let mut incomplete = source.edit().expect("incomplete edit");
+        incomplete
+            .add("Incomplete")
+            .expect("new sheet")
+            .defaults()
+            .width(12)
+            .expect("checked width");
+        assert!(matches!(
+            incomplete.commit(),
+            Err(Error::DefaultsEditBlocked {
+                reason: crate::DefaultsEditBlock::NeedsHeight,
+                ..
+            })
+        ));
+
+        let source_bytes = source.to_bytes().expect("source bytes");
+        let mut edit = source.edit().expect("new sheet edit");
+        {
+            let mut sheet = edit.add("Grid").expect("new sheet");
+            sheet.set("A1", "ready").expect("cell");
+            {
+                let mut defaults = sheet.defaults();
+                defaults.height(18).expect("height");
+                defaults.width(13.5).expect("width");
+                defaults.descent(0.2).expect("descent");
+            }
+            sheet
+                .row(4)
+                .expect("row 5")
+                .descent(0.3)
+                .expect("row descent");
+        }
+        let committed = edit.commit().expect("new sheet commit");
+        let sheet = committed
+            .workbook()
+            .sheet("Grid")
+            .expect("name lookup")
+            .expect("new worksheet");
+        let defaults = sheet
+            .defaults()
+            .expect("defaults lookup")
+            .expect("stored defaults");
+        assert_eq!(defaults.height().get(), 18.0);
+        assert_eq!(defaults.width().map(layout::Width::get), Some(13.5));
+        assert_eq!(defaults.descent().map(layout::Descent::get), Some(0.2));
+        assert_eq!(
+            sheet
+                .row(4)
+                .expect("row 5")
+                .descent()
+                .map(layout::Descent::get),
+            Some(0.3)
+        );
+        assert!(matches!(
+            sheet.cell("A1").expect("cell lookup"),
+            Some(Cell::Value(Value::Text(value))) if value.as_str() == "ready"
+        ));
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse new sheet");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
     }
 
     #[test]
@@ -8621,6 +9165,18 @@ mod tests {
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c></row><row r="2" s="1" customFormat="1"/></sheetData></worksheet>"#.to_vec(),
             );
         Workbook::from_package(package).expect("styled row workbook")
+    }
+
+    fn defaults_workbook() -> Workbook {
+        let baseline = Workbook::new().expect("baseline");
+        let mut package = baseline.inner.package.clone();
+        package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+            .expect("worksheet part")
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" mc:Ignorable="ac"><sheetFormatPr baseColWidth="10" defaultColWidth="12" defaultRowHeight="15" customHeight="0" zeroHeight="1" thickTop="1" ac:dyDescent="0.1"/><sheetData><row r="2" customHeight="0" ac:dyDescent="0.2"/></sheetData></worksheet>"#.to_vec(),
+            );
+        Workbook::from_package(package).expect("defaults workbook")
     }
 
     fn two_sheet_workbook(second_kind: SheetKind) -> Workbook {

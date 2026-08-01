@@ -1025,11 +1025,75 @@ not claim that grid defaults rewrite existing local cell styles, certify every
 style family or producer normalization, cover structural row/column shifts,
 other Office applications or builds, or establish performance.
 
+The twenty-first slice makes worksheet-wide grid defaults and typographic
+descent first-class. The focused `layout` module contains checked `Height`,
+`Width`, and `Descent` values plus the complete modeled `Defaults` record. The
+types remain separate from `row::Height` and `column::Width` because their wire
+domains differ: `[MS-OE376]` §2.1.678 permits `baseColWidth` through 255 and
+`defaultColWidth` in the finite `0..65536` interval, while the required default
+row height and Microsoft `x14ac:dyDescent` are finite and non-negative. The
+numeric wrappers use a nonzero bit encoding, so `Option<layout::Descent>` stays
+eight bytes rather than adding another tag word to every stored row. This is a
+layout assertion, not a workload memory measurement.
+
+`Sheet::defaults()` returns `Result<Option<&layout::Defaults>>` and never
+invents font-dependent state when `sheetFormatPr` is absent. The read model
+preserves optional base/default widths, required height, custom/hidden/thick
+flags, producer outline summaries, and sheet-level descent. Row views and patch
+states now also expose row descent. Microsoft's `[MS-XLSX]` rule is represented
+semantically: a stored descent makes `custom_height()` true even when the core
+`customHeight` spelling is absent or false. Physical namespace prefixes and
+native IDs remain below the facade.
+
+Existing and new-sheet transactions both expose the short
+`defaults()` editor. It supports base width and default width set/reset,
+required height, hide/show, thick/normal edges, descent set/reset, and explicit
+whole-record removal. Creating a record without supplying its required height
+returns `DefaultsEditBlock::NeedsHeight` before rewrite; protected sheets and
+unmodeled compatibility ownership also produce typed blocks. Compact
+`layout::Fields` bitflags make each default facet independently joinable, while
+same-facet writes and whole-record deletion conflict deterministically. Row
+descent remains independent from row height and the other row-property facets.
+No public lock wrapper or last-writer-wins rule is introduced.
+
+The parser performs a narrow, depth-bounded capture of only direct
+`x14ac:dyDescent` attributes before common MCE preprocessing. It does not claim
+to understand the complete extension namespace or bypass `MustUnderstand`.
+Worksheet surgery preserves untouched bytes, unknown attributes, child
+payloads, existing qualified names, and unedited default facets. When a new
+descent requires namespace declarations, it chooses collision-free prefixes,
+adds the exact x14ac and MCE namespace bindings, and extends `mc:Ignorable`.
+Rewritten parts are reparsed before publication; complete before/after default
+and row states make patches reversible to exact source part bytes. Unit and
+semantic tests cover checked domains, arbitrary prefixes, extension-depth and
+malformed inputs, sparse insertion, set/reset/remove, protected and
+compatibility blocks, new sheets, source-exact inversion, and disjoint/same-
+facet joins. The public `sheet_defaults` example applies height 24, width 14,
+sheet descent 0.2, and row-2 height/descent 32/0.3 through the ordinary facade.
+
+Computer Use exercised that example against an Excel-authored baseline in
+Microsoft Excel for Mac 16.110.2 (build 26062818), Office LTSC Standard for Mac
+2024. Excel opened the Litchi output without a repair or compatibility prompt.
+Its Row Height dialog reported exactly 32 for row 2 and exactly 24 for an
+implicit row; its Column Width dialog reported 13.17 for stored OOXML width 14,
+the application's display-unit normalization. Excel added
+`Excel default-layout resave marker` at E4 and saved as a separate XLSX without
+warning. The resaved archive passed ZIP integrity validation, and the public
+reader recovered the marker, default height 24, default width 14, sheet descent
+0.2, and row-2 height 32. Excel normalized the row-specific descent from 0.3 to
+the sheet value 0.2 and materialized some row heights during resave; that
+producer behavior is recorded rather than presented as lexical stability. A
+second artifact created from Litchi's minimal workbook forced collision-safe
+x14ac/MCE namespace injection and also opened in Excel without repair. This
+certifies those local open/dialog/edit/resave/reverse-read and namespace-open
+paths on that build. It does not establish stable row-specific descent across
+Excel resave, every default flag or producer normalization, other Office
+applications or builds, or performance.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection
-unlocking, default-row layout and descent editing, row and column
-insertion/deletion, shifting references,
+unlocking, row and column insertion/deletion, shifting references,
 merge/group-formula edits, dynamic-reference resolution, validation evaluation,
 shared-style definition editing or forking, named-style and row/column/theme
 resolution, rich text,

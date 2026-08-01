@@ -10,6 +10,7 @@ use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex
 use crate::column;
 use crate::error::{Result, invalid};
 use crate::formula::{Formula, Kind};
+use crate::layout::Defaults;
 use crate::row;
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
@@ -465,6 +466,7 @@ pub(crate) struct Store {
     cells: Box<[Stored]>,
     rows: Box<[row::Stored]>,
     columns: Box<[column::Stored]>,
+    defaults: Option<Defaults>,
     extents: Extents,
 }
 
@@ -520,6 +522,7 @@ impl Store {
         mut cells: Vec<Stored>,
         mut rows: Vec<row::Stored>,
         columns: Box<[column::Stored]>,
+        defaults: Option<Defaults>,
         declared: Option<Rect>,
     ) -> Result<Self> {
         cells.sort_unstable_by_key(|entry| entry.address);
@@ -556,6 +559,7 @@ impl Store {
             cells: cells.into_boxed_slice(),
             rows: rows.into_boxed_slice(),
             columns,
+            defaults,
             extents: Extents {
                 declared,
                 stored: stored.finish()?,
@@ -613,6 +617,10 @@ impl Store {
 
     pub(crate) fn columns(&self) -> column::Columns<'_> {
         column::Columns::new(&self.columns)
+    }
+
+    pub(crate) const fn defaults(&self) -> Option<&Defaults> {
+        self.defaults.as_ref()
     }
 
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {

@@ -3,8 +3,8 @@
 mod edit;
 
 pub use edit::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, Edit, JoinError, JoinFailure,
-    NewSheet, Patch, RowEdit, SheetEdit, State, TabEdit,
+    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
+    JoinFailure, NewSheet, Patch, RowEdit, SheetEdit, State, TabEdit,
 };
 
 use std::collections::HashMap;
@@ -601,6 +601,14 @@ impl Sheet {
     /// last-record-wins semantics.
     pub fn columns(&self) -> Result<Columns<'_>> {
         Ok(self.store()?.columns())
+    }
+
+    /// Stored worksheet-grid defaults, if the producer supplied them.
+    ///
+    /// Absence is preserved rather than guessing a font-dependent row height
+    /// or column width.
+    pub fn defaults(&self) -> Result<Option<&crate::layout::Defaults>> {
+        Ok(self.store()?.defaults())
     }
 
     /// Exact shared-style state contributed by a column-property record.
