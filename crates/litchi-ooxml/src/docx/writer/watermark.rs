@@ -320,7 +320,9 @@ impl Watermark {
 
         // Fill with opacity (separate element, not attribute!)
         if self.semitransparent {
-            xml.push_str(&format!("<v:fill opacity=\"{SEMITRANSPARENT_FILL_OPACITY}\"/>"));
+            xml.push_str(&format!(
+                "<v:fill opacity=\"{SEMITRANSPARENT_FILL_OPACITY}\"/>"
+            ));
         }
 
         // Text path
@@ -539,11 +541,12 @@ impl ImageWatermark {
                 "watermark image exceeds {MAX_WATERMARK_IMAGE_BYTES} bytes"
             )));
         }
-        let format = crate::docx::format::ImageFormat::detect_from_bytes(&data).ok_or_else(|| {
-            OoxmlError::InvalidFormat("Unknown watermark image format".to_string())
-        })?;
-        let (width_pt, height_pt) = sniff_dimensions_pt(&data, format)
-            .unwrap_or((POINTS_PER_INCH, POINTS_PER_INCH));
+        let format =
+            crate::docx::format::ImageFormat::detect_from_bytes(&data).ok_or_else(|| {
+                OoxmlError::InvalidFormat("Unknown watermark image format".to_string())
+            })?;
+        let (width_pt, height_pt) =
+            sniff_dimensions_pt(&data, format).unwrap_or((POINTS_PER_INCH, POINTS_PER_INCH));
         Ok(Self {
             data,
             format,
@@ -669,14 +672,26 @@ fn jpeg_dimensions(data: &[u8]) -> Option<(u32, u32)> {
             offset += 2;
             continue;
         }
-        let length = u16::from_be_bytes(data.get(offset + 2..offset + 4)?.try_into().ok()?) as usize;
+        let length =
+            u16::from_be_bytes(data.get(offset + 2..offset + 4)?.try_into().ok()?) as usize;
         if length < 2 {
             return None;
         }
         // Start-of-frame markers (excluding DHT/DAC/RST/TEM) carry dimensions.
         if matches!(
             code,
-            0xC0 | 0xC1 | 0xC2 | 0xC3 | 0xC5 | 0xC6 | 0xC7 | 0xC9 | 0xCA | 0xCB | 0xCD | 0xCE | 0xCF
+            0xC0 | 0xC1
+                | 0xC2
+                | 0xC3
+                | 0xC5
+                | 0xC6
+                | 0xC7
+                | 0xC9
+                | 0xCA
+                | 0xCB
+                | 0xCD
+                | 0xCE
+                | 0xCF
         ) {
             let height = u16::from_be_bytes(data.get(offset + 5..offset + 7)?.try_into().ok()?);
             let width = u16::from_be_bytes(data.get(offset + 7..offset + 9)?.try_into().ok()?);
@@ -1043,9 +1058,7 @@ mod tests {
     #[test]
     fn validates_image_watermark_inputs() {
         assert!(ImageWatermark::new(vec![0, 1, 2, 3]).is_err());
-        assert!(
-            ImageWatermark::new(vec![0x89; MAX_WATERMARK_IMAGE_BYTES + 1]).is_err()
-        );
+        assert!(ImageWatermark::new(vec![0x89; MAX_WATERMARK_IMAGE_BYTES + 1]).is_err());
         let mut watermark = ImageWatermark::new(minimal_png(10, 10)).unwrap();
         assert!(watermark.set_scale(0.0).is_err());
         assert!(watermark.set_scale(f64::NAN).is_err());
@@ -1072,7 +1085,11 @@ mod tests {
         assert_eq!(anchors[0].dimensions_pt(), (36.0, 18.0));
 
         // Text watermarks are not image anchors and vice versa.
-        assert!(Watermark::from_header_xml(xml.as_bytes()).unwrap().is_empty());
+        assert!(
+            Watermark::from_header_xml(xml.as_bytes())
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1088,7 +1105,10 @@ mod tests {
         watermark.set_color("#445566");
         watermark.set_layout(WatermarkLayout::Horizontal);
         watermark.set_semitransparent(false);
-        package.document_mut().unwrap().set_watermark(watermark.clone());
+        package
+            .document_mut()
+            .unwrap()
+            .set_watermark(watermark.clone());
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -1106,7 +1126,10 @@ mod tests {
         let mut package = Package::new().unwrap();
         let mut watermark = ImageWatermark::new(payload.clone()).unwrap();
         watermark.set_scale(2.0).unwrap();
-        package.document_mut().unwrap().set_image_watermark(watermark);
+        package
+            .document_mut()
+            .unwrap()
+            .set_image_watermark(watermark);
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
@@ -1141,8 +1164,7 @@ mod tests {
         {
             let document = package.document_mut().unwrap();
             document.set_watermark(Watermark::text("DRAFT"));
-            document
-                .set_image_watermark(ImageWatermark::new(minimal_png(10, 10)).unwrap());
+            document.set_image_watermark(ImageWatermark::new(minimal_png(10, 10)).unwrap());
             document.remove_watermark();
             document.remove_image_watermark();
             assert!(!document.has_watermark());
@@ -1168,8 +1190,7 @@ mod tests {
             let document = package.document_mut().unwrap();
             document.add_paragraph_with_text("content page");
             document.set_watermark(Watermark::text("CONFIDENTIAL"));
-            document
-                .set_image_watermark(ImageWatermark::new(payload.clone()).unwrap());
+            document.set_image_watermark(ImageWatermark::new(payload.clone()).unwrap());
         }
         package.save(file.path()).unwrap();
 

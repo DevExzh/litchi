@@ -3,7 +3,7 @@
 use super::core::PptWriteError;
 use super::records::{RecordBuilder, record_type};
 use crate::consts::PptRecordType;
-use crate::smart_tags::{
+use litchi_ole_common::smart_tags::{
     PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, SmartTagProperty,
     SmartTagPropertyBag, SmartTagType,
 };

@@ -8,9 +8,9 @@ use quick_xml::reader::NsReader;
 use ryu::Buffer as RyuBuffer;
 use std::fmt::Write as FmtWrite;
 
-use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::xlsx::cell::Cell;
 use crate::xlsx::namespace::is_spreadsheetml_name;
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SparklineType {

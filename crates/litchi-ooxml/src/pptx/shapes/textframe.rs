@@ -1,8 +1,8 @@
+use crate::error::{OoxmlError, Result};
 /// Text frame for accessing text content in shapes.
 use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, extract_omml_formulas,
 };
-use crate::error::{OoxmlError, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};

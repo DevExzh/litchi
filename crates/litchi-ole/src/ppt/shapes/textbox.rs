@@ -76,21 +76,29 @@ impl<'a> TextBox<'a> {
         // Extract basic shape properties
         let properties = record.extract_shape_properties()?;
 
-        let (text, runs, paragraph_runs, text_ruler, metachars, outline_text_refs) = if let Some(textbox_record) =
-            Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
-        {
-            let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
-            (
-                wrapper.text().to_string(),
-                wrapper.runs().to_vec(),
-                wrapper.paragraph_runs().to_vec(),
-                wrapper.text_ruler().cloned(),
-                wrapper.metachars().to_vec(),
-                wrapper.outline_text_refs().to_vec(),
-            )
-        } else {
-            (String::new(), Vec::new(), Vec::new(), None, Vec::new(), Vec::new())
-        };
+        let (text, runs, paragraph_runs, text_ruler, metachars, outline_text_refs) =
+            if let Some(textbox_record) =
+                Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
+            {
+                let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
+                (
+                    wrapper.text().to_string(),
+                    wrapper.runs().to_vec(),
+                    wrapper.paragraph_runs().to_vec(),
+                    wrapper.text_ruler().cloned(),
+                    wrapper.metachars().to_vec(),
+                    wrapper.outline_text_refs().to_vec(),
+                )
+            } else {
+                (
+                    String::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                    Vec::new(),
+                    Vec::new(),
+                )
+            };
         let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
         let text_style_extension9 = record.extract_text_style_extension9()?;
         let text_style_extension10 = record.extract_text_style_extension10()?;

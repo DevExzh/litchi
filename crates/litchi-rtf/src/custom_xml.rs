@@ -70,8 +70,7 @@ impl<'a> CustomXmlAttribute<'a> {
         }
         if self.value.contains(['\0', '\r', '\n']) {
             return Err(RtfError::MalformedDocument(
-                "RTF custom XML attribute value contains a forbidden control character"
-                    .to_string(),
+                "RTF custom XML attribute value contains a forbidden control character".to_string(),
             ));
         }
         Ok(())
@@ -128,12 +127,12 @@ impl<'a> CustomXmlTag<'a> {
 
     pub(crate) fn validate(&self) -> RtfResult<()> {
         validate_name("tag name", self.name.as_ref(), MAX_CUSTOM_XML_NAME_BYTES)?;
-        if let Some(id) = self.namespace {
-            if id == 0 || id > i32::MAX as u32 {
-                return Err(RtfError::MalformedDocument(
-                    "RTF custom XML namespace references must be in 1..=2147483647".to_string(),
-                ));
-            }
+        if let Some(id) = self.namespace
+            && (id == 0 || id > i32::MAX as u32)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF custom XML namespace references must be in 1..=2147483647".to_string(),
+            ));
         }
         if self.attributes.len() > MAX_CUSTOM_XML_ATTRIBUTES_PER_TAG {
             return Err(RtfError::MalformedDocument(

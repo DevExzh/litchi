@@ -133,10 +133,10 @@ impl OdfControlForm {
         validate_optional_string("form datasource", self.datasource.as_deref())?;
         validate_optional_string("form target frame", self.target_frame.as_deref())?;
         validate_resource(self.href.as_deref())?;
-        if let Some(command_type) = &self.command_type {
-            if !matches!(command_type.as_str(), "table" | "query" | "command") {
-                return invalid(format!("invalid form command type '{command_type}'"));
-            }
+        if let Some(command_type) = &self.command_type
+            && !matches!(command_type.as_str(), "table" | "query" | "command")
+        {
+            return invalid(format!("invalid form command type '{command_type}'"));
         }
         let mut result = format!(
             r#"<form:form xmlns:form="{FORM}" xmlns:office="{OFFICE}" xmlns:text="{TEXT}" xmlns:xlink="{XLINK}" form:name="{}""#,
@@ -439,14 +439,15 @@ fn scan(xml: &str) -> Result<Scan> {
                     return invalid(
                         "event and macro content is outside the text-control mutation API",
                     );
-                } else if namespace_uri.as_deref() == Some(TEXT) && local == b"p" {
-                    if let Some(control_index) = stack.iter().rev().find_map(|open| open.control) {
-                        if controls[control_index].control.kind != OdfTextControlKind::Textarea {
-                            return invalid("text:p is only valid in form:textarea");
-                        }
-                        paragraph = true;
-                        paragraph_text.clear();
+                } else if namespace_uri.as_deref() == Some(TEXT)
+                    && local == b"p"
+                    && let Some(control_index) = stack.iter().rev().find_map(|open| open.control)
+                {
+                    if controls[control_index].control.kind != OdfTextControlKind::Textarea {
+                        return invalid("text:p is only valid in form:textarea");
                     }
+                    paragraph = true;
+                    paragraph_text.clear();
                 }
                 stack.push(Open {
                     local,
@@ -495,27 +496,27 @@ fn scan(xml: &str) -> Result<Scan> {
                     return invalid(
                         "event and macro content is outside the text-control mutation API",
                     );
-                } else if namespace_uri.as_deref() == Some(TEXT) && local == b"p" {
-                    if let Some(control_index) = stack.iter().rev().find_map(|open| open.control) {
-                        if controls[control_index].control.kind != OdfTextControlKind::Textarea {
-                            return invalid("text:p is only valid in form:textarea");
-                        }
-                        controls[control_index]
-                            .control
-                            .paragraphs
-                            .push(String::new());
+                } else if namespace_uri.as_deref() == Some(TEXT)
+                    && local == b"p"
+                    && let Some(control_index) = stack.iter().rev().find_map(|open| open.control)
+                {
+                    if controls[control_index].control.kind != OdfTextControlKind::Textarea {
+                        return invalid("text:p is only valid in form:textarea");
                     }
+                    controls[control_index]
+                        .control
+                        .paragraphs
+                        .push(String::new());
                 }
             },
-            Event::Text(text)
-                if stack.last().is_some_and(|open| open.paragraph) => {
-                    paragraph_text.push_str(&text.decode().map_err(|error| {
-                        Error::InvalidFormat(format!("invalid textarea text: {error}"))
-                    })?);
-                    if paragraph_text.len() > MAX_STRING {
-                        return invalid("textarea paragraph exceeds 1 MiB");
-                    }
-                },
+            Event::Text(text) if stack.last().is_some_and(|open| open.paragraph) => {
+                paragraph_text.push_str(&text.decode().map_err(|error| {
+                    Error::InvalidFormat(format!("invalid textarea text: {error}"))
+                })?);
+                if paragraph_text.len() > MAX_STRING {
+                    return invalid("textarea paragraph exceeds 1 MiB");
+                }
+            },
             Event::End(ref element) => {
                 let open = stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("form control XML stack underflow".to_string())
@@ -628,10 +629,10 @@ fn validate_form_element(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> 
     let attrs = attributes(reader, element)?;
     validate_allowed(&attrs, FORM_ATTRS)?;
     validate_name("form name", &required(&attrs, FORM, "name")?)?;
-    if let Some(value) = optional(&attrs, FORM, "command-type") {
-        if !matches!(value.as_str(), "table" | "query" | "command") {
-            return invalid(format!("invalid form command type '{value}'"));
-        }
+    if let Some(value) = optional(&attrs, FORM, "command-type")
+        && !matches!(value.as_str(), "table" | "query" | "command")
+    {
+        return invalid(format!("invalid form command type '{value}'"));
     }
     for name in [
         "allow-deletes",
@@ -643,15 +644,15 @@ fn validate_form_element(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> 
     ] {
         let _ = optional_bool(&attrs, FORM, name)?;
     }
-    if let Some(value) = optional(&attrs, XLINK, "type") {
-        if value != "simple" {
-            return invalid("form xlink:type must be simple");
-        }
+    if let Some(value) = optional(&attrs, XLINK, "type")
+        && value != "simple"
+    {
+        return invalid("form xlink:type must be simple");
     }
-    if let Some(value) = optional(&attrs, XLINK, "actuate") {
-        if value != "onRequest" {
-            return invalid("form xlink:actuate must be onRequest");
-        }
+    if let Some(value) = optional(&attrs, XLINK, "actuate")
+        && value != "onRequest"
+    {
+        return invalid("form xlink:actuate must be onRequest");
     }
     validate_resource(optional(&attrs, XLINK, "href").as_deref())
 }

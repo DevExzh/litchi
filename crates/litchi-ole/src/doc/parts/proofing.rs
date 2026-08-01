@@ -256,7 +256,7 @@ impl ProofingStateTable {
         data: &[u8],
         maximum_cp: Option<u32>,
     ) -> Result<Self> {
-        if data.len() < 4 || (data.len() - 4) % 6 != 0 {
+        if data.len() < 4 || !(data.len() - 4).is_multiple_of(6) {
             return Err(corrupted("proofing PLCF length must have form 6n + 4"));
         }
         if data.len() > MAX_PROOFING_TABLE_BYTES {
@@ -636,10 +636,7 @@ mod tests {
             table.range(2).unwrap().status().state(),
             ProofingState::Edit
         );
-        assert_eq!(
-            table.to_bytes().unwrap(),
-            POI_LANGUAGE_DETECTION
-        );
+        assert_eq!(table.to_bytes().unwrap(), POI_LANGUAGE_DETECTION);
     }
 
     #[test]

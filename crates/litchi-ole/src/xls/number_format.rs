@@ -566,24 +566,19 @@ impl XlsFormatting {
         for (dxf_index, dxf) in differential_formats.iter().enumerate() {
             for property in dxf.properties().properties() {
                 if let crate::xls::differential_format::XlsXfProperty::NumberFormatId(id) = property
+                    && *id > 81
                 {
-                    if *id > 81 {
-                        if !(164..=392).contains(id) {
-                            return Err(invalid(
-                                crate::xls::differential_format::DXF_RECORD_TYPE,
-                                format!(
-                                    "DXF {dxf_index} uses reserved number format identifier {id}"
-                                ),
-                            ));
-                        }
-                        if !format_by_id.contains_key(id) {
-                            return Err(invalid(
-                                crate::xls::differential_format::DXF_RECORD_TYPE,
-                                format!(
-                                    "DXF {dxf_index} references missing custom number format {id}"
-                                ),
-                            ));
-                        }
+                    if !(164..=392).contains(id) {
+                        return Err(invalid(
+                            crate::xls::differential_format::DXF_RECORD_TYPE,
+                            format!("DXF {dxf_index} uses reserved number format identifier {id}"),
+                        ));
+                    }
+                    if !format_by_id.contains_key(id) {
+                        return Err(invalid(
+                            crate::xls::differential_format::DXF_RECORD_TYPE,
+                            format!("DXF {dxf_index} references missing custom number format {id}"),
+                        ));
                     }
                 }
             }

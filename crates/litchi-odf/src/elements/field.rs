@@ -4651,8 +4651,7 @@ impl FieldParser {
                             Error::InvalidFormat("field element stack underflow".to_string())
                         })?;
                     }
-                    if active.last().is_some_and(|field| field.depth == 0) {
-                        let mut field = active.pop().expect("checked active field");
+                    if let Some(mut field) = active.pop_if(|field| field.depth == 0) {
                         field.element.set_text(&field.text);
                         fields.push((field.order, Field::from_element(field.element)?));
                     }
@@ -5017,8 +5016,7 @@ fn parse_meta_fields(xml: &str) -> Result<Vec<OdfDynamicTextField>> {
                         field.builder.end_element()?;
                     }
                 }
-                if active.last().is_some_and(|field| field.depth == depth) {
-                    let field = active.pop().expect("checked active meta-field");
+                if let Some(field) = active.pop_if(|field| field.depth == depth) {
                     completed.push((
                         field.order,
                         OdfDynamicTextField::MetaField {
@@ -5197,8 +5195,7 @@ pub(crate) fn parse_note_body_contents(xml: &str) -> Result<Vec<OdfNoteBodyConte
                         body.builder.end_element()?;
                     }
                 }
-                if active.last().is_some_and(|body| body.depth == depth) {
-                    let body = active.pop().expect("checked active note body");
+                if let Some(body) = active.pop_if(|body| body.depth == depth) {
                     completed.push((body.order, body.builder.finish_note_body()?));
                 }
                 stack.pop().ok_or_else(|| {
@@ -5412,13 +5409,7 @@ fn validate_meta_nodes(
     }
     match grammar {
         MetaContentGrammar::DropDown => {
-            return validate_meta_drop_down(
-                nodes,
-                depth,
-                aggregate,
-                node_count,
-                display_text,
-            );
+            return validate_meta_drop_down(nodes, depth, aggregate, node_count, display_text);
         },
         MetaContentGrammar::Ruby => {
             return validate_meta_exact_pair(
@@ -5696,12 +5687,7 @@ fn validate_meta_drop_down(
         match node {
             OdfMetaFieldNode::Text(value) => {
                 display_started = true;
-                validate_dynamic_value(
-                    "meta-field drop-down text",
-                    Some(value),
-                    false,
-                    aggregate,
-                )?;
+                validate_dynamic_value("meta-field drop-down text", Some(value), false, aggregate)?;
                 display_text.push_str(value);
             },
             OdfMetaFieldNode::Element(element) => {
@@ -5763,9 +5749,7 @@ fn validate_meta_drop_down_attributes(attributes: &[OdfMetaFieldAttribute]) -> R
     Ok(())
 }
 
-fn validate_meta_drop_down_label_attributes(
-    attributes: &[OdfMetaFieldAttribute],
-) -> Result<()> {
+fn validate_meta_drop_down_label_attributes(attributes: &[OdfMetaFieldAttribute]) -> Result<()> {
     for attribute in attributes {
         if attribute.namespace_uri != TEXT_DATABASE_NAMESPACE
             || !matches!(attribute.local_name.as_str(), "value" | "current-selected")
@@ -6364,20 +6348,20 @@ fn parse_database_fields(xml: &str) -> Result<Vec<OdfDatabaseField>> {
                     field.field.source.connection_resource =
                         Some(parse_connection_resource(&reader, element, &mut aggregate)?);
                     field.connection_depth = Some(depth + 1);
-                } else if namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE) {
-                    if let Some(kind) = database_field_kind(&local) {
-                        validate_database_parent(stack.last())?;
-                        if fields.len() >= MAX_FIELDS {
-                            return Err(Error::InvalidFormat(format!(
-                                "document exceeds {MAX_FIELDS} database fields"
-                            )));
-                        }
-                        active = Some(ActiveDatabaseField {
-                            depth: depth + 1,
-                            field: parse_database_field(&reader, element, kind, &mut aggregate)?,
-                            connection_depth: None,
-                        });
+                } else if namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                    && let Some(kind) = database_field_kind(&local)
+                {
+                    validate_database_parent(stack.last())?;
+                    if fields.len() >= MAX_FIELDS {
+                        return Err(Error::InvalidFormat(format!(
+                            "document exceeds {MAX_FIELDS} database fields"
+                        )));
                     }
+                    active = Some(ActiveDatabaseField {
+                        depth: depth + 1,
+                        field: parse_database_field(&reader, element, kind, &mut aggregate)?,
+                        connection_depth: None,
+                    });
                 }
                 depth = checked_field_depth(depth)?;
                 stack.push((namespace_uri, local));
@@ -6398,27 +6382,26 @@ fn parse_database_fields(xml: &str) -> Result<Vec<OdfDatabaseField>> {
                     }
                     field.field.source.connection_resource =
                         Some(parse_connection_resource(&reader, element, &mut aggregate)?);
-                } else if namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE) {
-                    if let Some(kind) = database_field_kind(&local) {
-                        validate_database_parent(stack.last())?;
-                        if fields.len() >= MAX_FIELDS {
-                            return Err(Error::InvalidFormat(format!(
-                                "document exceeds {MAX_FIELDS} database fields"
-                            )));
-                        }
-                        let field = parse_database_field(&reader, element, kind, &mut aggregate)?;
-                        fields.push(validate_database_field(field)?);
+                } else if namespace_uri.as_deref() == Some(TEXT_DATABASE_NAMESPACE)
+                    && let Some(kind) = database_field_kind(&local)
+                {
+                    validate_database_parent(stack.last())?;
+                    if fields.len() >= MAX_FIELDS {
+                        return Err(Error::InvalidFormat(format!(
+                            "document exceeds {MAX_FIELDS} database fields"
+                        )));
                     }
+                    let field = parse_database_field(&reader, element, kind, &mut aggregate)?;
+                    fields.push(validate_database_field(field)?);
                 }
             },
             Event::End(_) => {
-                if let Some(field) = active.as_mut() {
-                    if field
+                if let Some(field) = active.as_mut()
+                    && field
                         .connection_depth
                         .is_some_and(|connection_depth| connection_depth == depth)
-                    {
-                        field.connection_depth = None;
-                    }
+                {
+                    field.connection_depth = None;
                 }
                 if active.as_ref().is_some_and(|field| field.depth == depth) {
                     let field = active.take().expect("checked database field").field;
@@ -6684,9 +6667,11 @@ fn push_drop_down_label(
             "text:drop-down exceeds {MAX_DROP_DOWN_LABELS} labels"
         )));
     }
-    field
-        .labels
-        .push(parse_drop_down_label(reader, element, &mut field.aggregate)?);
+    field.labels.push(parse_drop_down_label(
+        reader,
+        element,
+        &mut field.aggregate,
+    )?);
     Ok(())
 }
 
@@ -6716,11 +6701,7 @@ fn parse_drop_down_label(
     })
 }
 
-fn append_drop_down_text(
-    field: &mut ActiveDropDownField,
-    depth: usize,
-    value: &str,
-) -> Result<()> {
+fn append_drop_down_text(field: &mut ActiveDropDownField, depth: usize, value: &str) -> Result<()> {
     if field.label_depth.is_some() || field.depth != depth {
         return Err(Error::InvalidFormat(
             "text:label must be empty in text:drop-down".to_string(),
@@ -7604,7 +7585,10 @@ mod drop_down_field_tests {
         let xml = document(
             r#"<t:drop-down t:name="Priority &amp; state"><t:label t:value="Low" t:current-selected="false"/><t:label t:value="High &amp; urgent" t:current-selected="1"></t:label><t:label/>High &amp; urgent</t:drop-down>"#,
         );
-        assert_eq!(FieldParser::parse_dynamic_text_fields(&xml).unwrap(), vec![field()]);
+        assert_eq!(
+            FieldParser::parse_dynamic_text_fields(&xml).unwrap(),
+            vec![field()]
+        );
 
         let fragment = field().to_xml_fragment().unwrap();
         assert!(fragment.contains(r#"text:name="Priority &amp; state""#));

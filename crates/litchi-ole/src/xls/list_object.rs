@@ -1068,13 +1068,13 @@ impl XlsWebFieldInfo {
                     "Web default value does not match column type",
                 ));
             }
-            if let XlsWebDefaultValue::String(value) = value {
-                if value.encode_utf16().count() > 255 {
-                    return Err(invalid(
-                        FEATURE11_RECORD_TYPE,
-                        "Web default string exceeds 255 characters",
-                    ));
-                }
+            if let XlsWebDefaultValue::String(value) = value
+                && value.encode_utf16().count() > 255
+            {
+                return Err(invalid(
+                    FEATURE11_RECORD_TYPE,
+                    "Web default string exceeds 255 characters",
+                ));
             }
         }
         Ok(())
@@ -2790,10 +2790,10 @@ impl XlsListObject {
         let mut output = Vec::new();
         for (index, item) in list12.into_iter().enumerate() {
             output.push(item);
-            if index == 0 {
-                if let Some(filter) = &self.autofilter12_criteria {
-                    output.extend(write_table_autofilter12(filter, self.range, self.id)?);
-                }
+            if index == 0
+                && let Some(filter) = &self.autofilter12_criteria
+            {
+                output.extend(write_table_autofilter12(filter, self.range, self.id)?);
             }
             for future in self
                 .opaque_future_records

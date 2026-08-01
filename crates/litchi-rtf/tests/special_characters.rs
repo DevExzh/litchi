@@ -43,7 +43,11 @@ fn special_character_control_words_round_trip_through_the_writer() {
             "serialized {control} as {serialized}"
         );
         let reparsed = RtfDocument::parse_bytes(&output).unwrap();
-        assert_eq!(reparsed.text(), format!("A{expected}B"), "reparsed {control}");
+        assert_eq!(
+            reparsed.text(),
+            format!("A{expected}B"),
+            "reparsed {control}"
+        );
     }
 }
 

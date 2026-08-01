@@ -317,13 +317,13 @@ pub(crate) fn validate_master_page_schema(xml: &str, pages: &mut [MasterPage]) -
                         .ok_or_else(|| invalid("master-page inventory mismatch"))?;
                     validate_header(&reader, &element, page)?;
                     page_index += 1;
-                } else if let Some(master) = active.as_mut() {
-                    if stack.len() + 1 == master.depth + 1 {
-                        let kind = classify(&current)
-                            .ok_or_else(|| invalid("unexpected direct style:master-page child"))?;
-                        register_child(master, kind)?;
-                        push_child(xml, pages, master, kind, start, end)?;
-                    }
+                } else if let Some(master) = active.as_mut()
+                    && stack.len() + 1 == master.depth + 1
+                {
+                    let kind = classify(&current)
+                        .ok_or_else(|| invalid("unexpected direct style:master-page child"))?;
+                    register_child(master, kind)?;
+                    push_child(xml, pages, master, kind, start, end)?;
                 }
             },
             Event::End(_) => {

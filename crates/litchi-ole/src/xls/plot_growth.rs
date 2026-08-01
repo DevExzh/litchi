@@ -61,8 +61,12 @@ impl XlsPlotGrowth {
             });
         }
         Ok(Self {
-            dx: XlsFixedPoint::from_raw(i32::from_le_bytes(data[0..4].try_into().expect("checked"))),
-            dy: XlsFixedPoint::from_raw(i32::from_le_bytes(data[4..8].try_into().expect("checked"))),
+            dx: XlsFixedPoint::from_raw(i32::from_le_bytes(
+                data[0..4].try_into().expect("checked"),
+            )),
+            dy: XlsFixedPoint::from_raw(i32::from_le_bytes(
+                data[4..8].try_into().expect("checked"),
+            )),
         })
     }
 

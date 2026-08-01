@@ -85,7 +85,12 @@ fn parses_style_entry_borders_and_keeps_character_borders_distinct() {
 
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(
-        reparsed.stylesheet().styles()[0].paragraph.unwrap().borders.top.style,
+        reparsed.stylesheet().styles()[0]
+            .paragraph
+            .unwrap()
+            .borders
+            .top
+            .style,
         BorderStyle::Single
     );
 }

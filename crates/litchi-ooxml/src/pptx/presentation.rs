@@ -1,5 +1,3 @@
-/// Main presentation object - the high-level API for working with presentations.
-use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::actions::{ActionLoadLimits, PptxActionSetting, load_slide_action_settings};
 use crate::pptx::controls::{ControlLoadLimits, PptxSlideControl, load_slide_controls};
@@ -13,11 +11,11 @@ use crate::pptx::parts::{
     PresentationKinsokuSettings, PresentationMetadata, PresentationModificationVerifier,
     PresentationPart, PresentationPhotoAlbum, SlideMasterPart, SlidePart, SlideSize,
 };
-use crate::pptx::show_events::{
-    PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events,
-};
+use crate::pptx::show_events::{PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events};
 use crate::pptx::slide::{Slide, SlideMaster};
 use crate::pptx::tags::{SlideTagList, TagList};
+/// Main presentation object - the high-level API for working with presentations.
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
@@ -828,9 +826,7 @@ impl<'a> Presentation<'a> {
             .slides()?
             .into_iter()
             .enumerate()
-            .map(|(slide_index, slide)| {
-                (slide.part().part().partname().to_string(), slide_index)
-            })
+            .map(|(slide_index, slide)| (slide.part().part().partname().to_string(), slide_index))
             .collect::<std::collections::HashMap<_, _>>();
         let mut all_comments = Vec::new();
         for slide_comments in comments.slides {

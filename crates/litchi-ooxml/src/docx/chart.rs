@@ -650,13 +650,12 @@ fn scan_document_xml(xml: &[u8], conformance: DocxChartConformance) -> Result<Ve
                 }
             },
             Event::End(_) => {
-                if frames.last().is_some_and(|frame| frame.0 == depth) {
-                    let (_, count) = frames.pop().unwrap();
-                    if count != 1 {
-                        return Err(invalid(
-                            "chart graphicData must contain exactly one chart reference",
-                        ));
-                    }
+                if let Some((_, count)) = frames.pop_if(|frame| frame.0 == depth)
+                    && count != 1
+                {
+                    return Err(invalid(
+                        "chart graphicData must contain exactly one chart reference",
+                    ));
                 }
                 if depth == 0 {
                     return Err(invalid("unexpected document XML closing element"));

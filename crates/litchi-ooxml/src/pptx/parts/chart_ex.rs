@@ -1888,12 +1888,11 @@ fn validate_series_point_references(
     if series.data_points.iter().any(|point| point.index >= bound) {
         return invalid("ChartEx dataPt index does not resolve to cached series data");
     }
-    if let Some(labels) = &series.data_labels {
-        if labels.labels.iter().any(|label| label.index >= bound)
-            || labels.hidden_indices.iter().any(|index| *index >= bound)
-        {
-            return invalid("ChartEx data label index does not resolve to cached series data");
-        }
+    if let Some(labels) = &series.data_labels
+        && (labels.labels.iter().any(|label| label.index >= bound)
+            || labels.hidden_indices.iter().any(|index| *index >= bound))
+    {
+        return invalid("ChartEx data label index does not resolve to cached series data");
     }
     Ok(())
 }
@@ -3494,7 +3493,7 @@ fn validate_geo_base64(value: &str) -> Result<(usize, usize)> {
             return invalid("invalid ChartEx geography base64 data");
         }
     }
-    if encoded % 4 != 0 {
+    if !encoded.is_multiple_of(4) {
         return invalid("invalid ChartEx geography base64 length");
     }
     let decoded = encoded
@@ -4443,9 +4442,9 @@ fn reject_unknown(attributes: &[Attribute], allowed: &[(&str, &str)], element: &
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
-            .map_err(xml_error)?
-            .to_owned()),
+        ResolveResult::Bound(Namespace(value)) => {
+            Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+        },
         ResolveResult::Unbound => Ok(String::new()),
         ResolveResult::Unknown(prefix) => invalid(format!(
             "unbound ChartEx prefix '{}'",

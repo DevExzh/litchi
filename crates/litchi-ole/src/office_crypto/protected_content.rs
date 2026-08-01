@@ -110,7 +110,7 @@ fn validate_ciphertext(
     if ciphertext.is_empty() && plaintext_size != 0 {
         return Err(ProtectedContentError::EmptyCiphertext);
     }
-    if ciphertext.len() % IRM_AES_BLOCK_BYTES != 0 {
+    if !ciphertext.len().is_multiple_of(IRM_AES_BLOCK_BYTES) {
         return Err(ProtectedContentError::MisalignedCiphertext {
             length: ciphertext.len(),
         });

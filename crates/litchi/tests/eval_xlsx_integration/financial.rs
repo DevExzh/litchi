@@ -38,7 +38,6 @@ async fn eval_pduration_and_rri() {
 
 fn build_financial_workbook(path: &str) {
     let mut wb = XlsxWorkbook::create().expect("create workbook");
-    wb.add_worksheet("Financial");
 
     {
         let ws = wb.worksheet_mut(0).expect("worksheet 0");

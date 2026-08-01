@@ -248,7 +248,10 @@ pub(crate) fn remove_sheet_image_alternative(
     Ok(removed)
 }
 
-pub(crate) fn write_sheet_images_content(out: &mut String, images: &[crate::OdfImage]) -> Result<()> {
+pub(crate) fn write_sheet_images_content(
+    out: &mut String,
+    images: &[crate::OdfImage],
+) -> Result<()> {
     if images.is_empty() {
         return Ok(());
     }
@@ -264,7 +267,11 @@ pub(crate) fn write_sheet_images_content(out: &mut String, images: &[crate::OdfI
             attribute(out, "svg:y", frame.y.as_deref());
             attribute(out, "svg:width", frame.width.as_deref());
             attribute(out, "svg:height", frame.height.as_deref());
-            attribute(out, "table:end-cell-address", frame.end_cell_address.as_deref());
+            attribute(
+                out,
+                "table:end-cell-address",
+                frame.end_cell_address.as_deref(),
+            );
             out.push('>');
             if let Some(title) = &frame.title {
                 out.push_str("<svg:title>");

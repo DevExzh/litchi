@@ -464,13 +464,13 @@ fn end_scope(
 ) -> Result<()> {
     if scope == Scope::DataRefs {
         validate_reference_count(references.len())?;
-        if let Some(count) = *declared_count {
-            if count as usize != references.len() {
-                return Err(invalid(format!(
-                    "dataRefs count {count} does not match {} dataRef children",
-                    references.len()
-                )));
-            }
+        if let Some(count) = *declared_count
+            && count as usize != references.len()
+        {
+            return Err(invalid(format!(
+                "dataRefs count {count} does not match {} dataRef children",
+                references.len()
+            )));
         }
         let collection = WorksheetDataReferences {
             references: std::mem::take(references),

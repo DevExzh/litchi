@@ -50,11 +50,21 @@ fn parses_normal_and_length_line_heights() {
     );
     let set = parse_paragraph_style_line_spacings(&x).unwrap();
     assert_eq!(
-        set.get("N").unwrap().properties.as_ref().unwrap().line_height,
+        set.get("N")
+            .unwrap()
+            .properties
+            .as_ref()
+            .unwrap()
+            .line_height,
         Some(LineHeight::Normal)
     );
     assert_eq!(
-        set.get("L").unwrap().properties.as_ref().unwrap().line_height,
+        set.get("L")
+            .unwrap()
+            .properties
+            .as_ref()
+            .unwrap()
+            .line_height,
         Some(LineHeight::Length(
             OdfNonNegativeLength::new("0.6cm").unwrap()
         ))
@@ -121,8 +131,9 @@ fn parses_flat_fixtures() {
             .any(|p| p.tab_stop_distance.is_some())
     );
 
-    let bytes =
-        include_bytes!("../../../test-data/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt");
+    let bytes = include_bytes!(
+        "../../../test-data/libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt"
+    );
     let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.paragraph_style_line_spacings().unwrap();
     assert!(

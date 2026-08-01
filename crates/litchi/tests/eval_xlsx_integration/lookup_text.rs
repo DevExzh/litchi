@@ -54,7 +54,6 @@ async fn eval_lookup_and_text_functions() {
 
 fn build_workbook(path: &str) {
     let mut wb = XlsxWorkbook::create().expect("create workbook");
-    wb.add_worksheet("Sheet1");
 
     {
         let ws = wb.worksheet_mut(0).expect("worksheet 0");

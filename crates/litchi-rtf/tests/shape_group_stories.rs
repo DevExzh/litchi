@@ -16,7 +16,9 @@ fn write_document(document: &RtfDocument<'_>) -> String {
 #[test]
 fn libreoffice_root_groups_keep_body_position_and_round_trip() {
     for source in [
-        include_str!("../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo89496.rtf"),
+        include_str!(
+            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo89496.rtf"
+        ),
         include_str!(
             "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf127806.rtf"
         ),

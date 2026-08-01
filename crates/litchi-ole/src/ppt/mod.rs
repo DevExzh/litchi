@@ -86,8 +86,8 @@ pub mod color_scheme;
 pub mod comments;
 pub mod current_user;
 pub mod document_atom;
-pub mod document_properties;
 pub mod document_comparison;
+pub mod document_properties;
 pub mod document_structure;
 mod encryption;
 pub mod envelope;
@@ -104,15 +104,15 @@ pub mod main_master;
 pub mod master_style;
 pub mod modify_password;
 pub mod named_shows;
+pub mod ole_editor;
 pub mod ole_object;
 pub mod ole_storage;
-pub mod ole_editor;
 pub mod picture_bullets;
 pub mod placeholder_atom;
 pub mod print_options;
 pub mod privacy;
-pub mod prog_tags;
 pub mod prog_tag_extensions;
+pub mod prog_tags;
 pub mod recolor;
 pub mod routing_slip;
 pub mod shape_flags;
@@ -128,30 +128,28 @@ pub mod text_extensions;
 pub mod text_format_exception;
 pub mod text_interaction;
 pub mod text_metachar;
-pub mod text_si_exception;
-pub mod text_special_info;
-pub mod view_set_info;
 pub mod text_prop;
 pub mod text_ruler;
 pub mod text_run;
+pub mod text_si_exception;
+pub mod text_special_info;
 pub mod vba_info;
+pub mod view_set_info;
 
 // Re-export main types for convenience
+pub use document_comparison::{
+    PowerPointDiffFlags, PowerPointDiffNode, PowerPointDiffRecordHeaders, PowerPointDiffTree10,
+    PowerPointDiffType, PowerPointDocDiffFlags, PowerPointElementType,
+    PowerPointMainMasterDiffFlags, PowerPointReviewingToolbarStates, PowerPointShapeDiffFlags,
+    PowerPointSlideCreationEntry, PowerPointSlideDiffFlags, PowerPointSlideListTable10,
+    PowerPointTableDiffFlags, PowerPointTextDiffFlags,
+};
+pub use encryption::PptEncryptionProfile;
 pub use non_zoom_view::{
     PowerPointNoZoomViewInfo, PowerPointNonZoomViewKind, PowerPointOutlineSorterViewInfo,
     PowerPointOutlineSorterViewInformation,
 };
-pub use document_comparison::{
-    PowerPointDiffFlags, PowerPointDiffNode, PowerPointDiffRecordHeaders,
-    PowerPointDiffTree10, PowerPointDiffType, PowerPointDocDiffFlags,
-    PowerPointElementType, PowerPointMainMasterDiffFlags,
-    PowerPointReviewingToolbarStates, PowerPointShapeDiffFlags,
-    PowerPointSlideCreationEntry, PowerPointSlideDiffFlags,
-    PowerPointSlideListTable10, PowerPointTableDiffFlags,
-    PowerPointTextDiffFlags,
-};
 pub use package::{Package, PptEncryptionKind, PptError, PptOpenOptions};
-pub use encryption::PptEncryptionProfile;
 pub use presentation::{ParsedCustomShow, ParsedSlideComments, Presentation};
 pub use presentation_advisor::{PowerPointAdvisorRule, PowerPointPresentationAdvisorSettings};
 pub use slide::{
@@ -193,19 +191,19 @@ pub use client_data::{
     OFFICE_ART_CLIENT_DATA_RECORD_TYPE, PowerPointClientData, PowerPointClientDataChild,
     PowerPointClientDataChildKind, PowerPointClientDataLimits,
 };
-pub use comments::{PowerPointCommentAuthor, PowerPointCommentAuthors};
-pub use current_user::CurrentUser;
-pub use document_properties::{
-    PowerPoint10DocumentProperties, PowerPoint12DocumentProperties, PowerPointCustomTableStyles,
-    PowerPointGridSpacing, PowerPointPhotoAlbumFrameShape, PowerPointPhotoAlbumLayout,
-    PowerPointPhotoAlbumSettings,
-};
 pub use color_scheme::{
     PowerPointColorScheme, PowerPointColorSchemeAtom, PowerPointColorSchemeAtomKind,
     PowerPointSchemeColor,
 };
+pub use comments::{PowerPointCommentAuthor, PowerPointCommentAuthors};
+pub use current_user::CurrentUser;
 pub use document_atom::{
     PowerPointDocumentAtom, PowerPointDocumentDimensions, PowerPointSlideSizeType,
+};
+pub use document_properties::{
+    PowerPoint10DocumentProperties, PowerPoint12DocumentProperties, PowerPointCustomTableStyles,
+    PowerPointGridSpacing, PowerPointPhotoAlbumFrameShape, PowerPointPhotoAlbumLayout,
+    PowerPointPhotoAlbumSettings,
 };
 pub use document_structure::{PowerPointCustomTableStylesPlacement, PowerPointDocumentStructure};
 pub use envelope::PowerPointEnvelopeSettings;
@@ -254,6 +252,7 @@ pub use main_master::{
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use modify_password::PowerPointModifyPassword;
 pub use named_shows::{PowerPointNamedShow, PowerPointNamedShows};
+pub use ole_editor::PowerPointOlePackageEditor;
 pub use ole_object::{
     PowerPointOleColorFollow, PowerPointOleContainerKind, PowerPointOleControl,
     PowerPointOleDimensionPolicy, PowerPointOleDrawAspect, PowerPointOleEmbedPreferences,
@@ -264,7 +263,6 @@ pub use ole_object::{
 pub use ole_storage::{
     PowerPointOleStorage, PowerPointOleStorageCompression, PowerPointOleStorageKind,
 };
-pub use ole_editor::PowerPointOlePackageEditor;
 pub use picture_bullets::{PictureBullet, PictureBulletCollection, PictureBulletType};
 pub use placeholder_atom::{
     PowerPointPlaceholderAtom, PowerPointPlaceholderContext, PowerPointPlaceholderEntry,
@@ -273,10 +271,6 @@ pub use placeholder_atom::{
 };
 pub use print_options::{PowerPointPrintColorMode, PowerPointPrintOptions, PowerPointPrintTarget};
 pub use privacy::PowerPointPrivacySettings;
-pub use prog_tags::{
-    PowerPointProgBinaryTag, PowerPointProgBinaryTagVersion, PowerPointProgStringTag,
-    PowerPointProgTag, PowerPointProgTagLimits, PowerPointProgTagScope, PowerPointProgTags,
-};
 pub use prog_tag_extensions::{
     PowerPoint9DocBinaryTagExtension, PowerPoint9SlideBinaryTagExtension,
     PowerPoint10DocBinaryTagExtension, PowerPoint10SlideBinaryTagExtension,
@@ -284,6 +278,10 @@ pub use prog_tag_extensions::{
     PowerPoint12SlideBinaryTagExtension, PowerPointDocBinaryTagExtension,
     PowerPointDocumentTagExtensions, PowerPointSlideBinaryTagExtension,
     PowerPointSlideTagExtensions,
+};
+pub use prog_tags::{
+    PowerPointProgBinaryTag, PowerPointProgBinaryTagVersion, PowerPointProgStringTag,
+    PowerPointProgTag, PowerPointProgTagLimits, PowerPointProgTagScope, PowerPointProgTags,
 };
 pub use recolor::{
     PowerPointRecolorBitmapType, PowerPointRecolorBrush, PowerPointRecolorEntry,
@@ -324,6 +322,7 @@ pub use slide_sync::{PowerPointSlideSyncInfo, PowerPointSystemTime};
 pub use smart_tags::{
     PowerPointSmartTag, PowerPointSmartTagProperty, PowerPointSmartTagStore, PowerPointSmartTagType,
 };
+pub use style_text_prop::{PowerPointStyleTextPropAtom, PowerPointTextCFRun, PowerPointTextPFRun};
 pub use text_bookmark::PowerPointTextBookmark;
 pub use text_extensions::{
     TextCharacterExtension9, TextCharacterExtension10, TextDefaultsExtension9,
@@ -332,29 +331,15 @@ pub use text_extensions::{
     TextSpecialInfoExtension11, TextStyleExtension9, TextStyleExtension9Run, TextStyleExtension10,
     TextStyleExtension11, VersionedTextDefaults, VersionedTextMasterStyles,
 };
-pub use style_text_prop::{
-    PowerPointStyleTextPropAtom, PowerPointTextCFRun, PowerPointTextPFRun,
-};
 pub use text_format_exception::{
-    PowerPointBulletFlags, PowerPointCFStyle, PowerPointTextCFException,
-    PowerPointTextPFException, PowerPointWrapFlags,
+    PowerPointBulletFlags, PowerPointCFStyle, PowerPointTextCFException, PowerPointTextPFException,
+    PowerPointWrapFlags,
 };
 pub use text_interaction::{
     PowerPointShapeTextInteractionEntry, PowerPointTextBodyInteractions, PowerPointTextInteraction,
     PowerPointTextInteractionLimits, PowerPointTextRange, PowerPointTextType,
 };
 pub use text_metachar::{PowerPointMetacharKind, PowerPointTextMetachar};
-pub use text_si_exception::{
-    PowerPointOutlineTextRef, PowerPointSpellingFlags, PowerPointTextSpecialInfoDefaults,
-};
-pub use text_special_info::{
-    PowerPointMasterTextPropLevels, PowerPointMasterTextPropRun, PowerPointTextSIException,
-    PowerPointTextSIRun, PowerPointTextSpecialInfoRuns,
-};
-pub use view_set_info::{
-    PowerPointNormalViewSet, PowerPointNormalViewSetInfo, PowerPointNormalViewSetPayload,
-    PowerPointNotesTextViewInfo, PowerPointViewBarState,
-};
 pub use text_prop::{TextProp, TextPropCollection, TextPropType, TextTabStop};
 pub use text_ruler::{TextRuler, TextRulerLevel, parse_default_text_ruler};
 pub use text_run::{
@@ -362,9 +347,20 @@ pub use text_run::{
     ParagraphTabAlignment, ParagraphTabStop, ParagraphTextDirection, TextRun, TextRunExtractor,
     TextRunFormatting,
 };
+pub use text_si_exception::{
+    PowerPointOutlineTextRef, PowerPointSpellingFlags, PowerPointTextSpecialInfoDefaults,
+};
+pub use text_special_info::{
+    PowerPointMasterTextPropLevels, PowerPointMasterTextPropRun, PowerPointTextSIException,
+    PowerPointTextSIRun, PowerPointTextSpecialInfoRuns,
+};
 pub use vba_info::{
     PowerPointVbaInfo, PowerPointVbaProjectCompression, PowerPointVbaProjectError,
     PowerPointVbaProjectLimits, PowerPointVbaProjectStorage,
+};
+pub use view_set_info::{
+    PowerPointNormalViewSet, PowerPointNormalViewSetInfo, PowerPointNormalViewSetPayload,
+    PowerPointNotesTextViewInfo, PowerPointViewBarState,
 };
 
 // Re-export writer types
@@ -379,10 +375,10 @@ pub mod animation;
 pub mod transition;
 
 // Re-export transition types for ergonomic read access
-pub use transition::{
-    AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
-};
 pub use animation::{
     PowerPointAnimationEditor, PowerPointAnimationEditorLimits, PowerPointAnimationScope,
     PowerPointAnimationTimeline, PowerPointLegacyShapeAnimation,
+};
+pub use transition::{
+    AdvanceMode, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed, TransitionType,
 };

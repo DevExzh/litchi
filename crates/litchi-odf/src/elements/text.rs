@@ -192,13 +192,11 @@ impl NumberedParagraph {
 
     /// The `text:level` nesting level of the paragraph.
     pub fn level(&self) -> Option<Result<u32>> {
-        self.element
-            .get_attribute("text:level")
-            .map(|value| {
-                value.parse::<u32>().map_err(|_| {
-                    Error::InvalidFormat("text:level is not a non-negative integer".to_string())
-                })
+        self.element.get_attribute("text:level").map(|value| {
+            value.parse::<u32>().map_err(|_| {
+                Error::InvalidFormat("text:level is not a non-negative integer".to_string())
             })
+        })
     }
 
     /// The `text:list-id` identifying the list the paragraph belongs to.
@@ -208,13 +206,11 @@ impl NumberedParagraph {
 
     /// The `text:start-value` restarting numbering at this paragraph.
     pub fn start_value(&self) -> Option<Result<i32>> {
-        self.element
-            .get_attribute("text:start-value")
-            .map(|value| {
-                value.parse::<i32>().map_err(|_| {
-                    Error::InvalidFormat("text:start-value is not an integer".to_string())
-                })
-            })
+        self.element.get_attribute("text:start-value").map(|value| {
+            value
+                .parse::<i32>()
+                .map_err(|_| Error::InvalidFormat("text:start-value is not an integer".to_string()))
+        })
     }
 
     /// Convert into a plain paragraph view of the same content.

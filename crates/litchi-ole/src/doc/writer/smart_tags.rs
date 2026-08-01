@@ -2,7 +2,7 @@
 
 use super::core::DocWriteError;
 use crate::doc::{SmartTagOrigin, SmartTagRecognizerRange, SmartTagRecognizerState};
-use crate::smart_tags::{
+use litchi_ole_common::smart_tags::{
     PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, SmartTagProperty,
     SmartTagPropertyBag, SmartTagType,
 };

@@ -2707,20 +2707,18 @@ impl<'a> FormulaParser<'a> {
         let is_command = tab & 0x8000 != 0;
         self.offset += 3;
 
-        if !is_command {
-            if let Some(function) = builtin_function_by_index(index) {
-                if function.min_args == function.max_args {
-                    return Err(XlsbError::InvalidFormula(format!(
-                        "PtgFuncVar specifies fixed-arity function {}",
-                        function.name
-                    )));
-                }
-                if !function.accepts_arg_count(arg_count) {
-                    return Err(XlsbError::InvalidFormula(format!(
-                        "{} does not accept {arg_count} arguments",
-                        function.name
-                    )));
-                }
+        if !is_command && let Some(function) = builtin_function_by_index(index) {
+            if function.min_args == function.max_args {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "PtgFuncVar specifies fixed-arity function {}",
+                    function.name
+                )));
+            }
+            if !function.accepts_arg_count(arg_count) {
+                return Err(XlsbError::InvalidFormula(format!(
+                    "{} does not accept {arg_count} arguments",
+                    function.name
+                )));
             }
         }
 
@@ -3183,9 +3181,9 @@ impl BuiltinFunction {
         match self.index {
             // GETPIVOTDATA permits the two mandatory arguments, one optional
             // field, or complete field/item pairs thereafter.
-            358 => count <= 3 || count % 2 == 0,
+            358 => count <= 3 || count.is_multiple_of(2),
             // COUNTIFS is made solely of range/criteria pairs.
-            481 => count % 2 == 0,
+            481 => count.is_multiple_of(2),
             // SUMIFS and AVERAGEIFS have one leading aggregate range followed
             // by range/criteria pairs.
             482 | 484 => count % 2 == 1,

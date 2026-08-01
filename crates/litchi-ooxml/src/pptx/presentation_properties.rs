@@ -1221,10 +1221,10 @@ fn validate(v: &PresentationProperties) -> Result<()> {
     if let Some(h) = &v.html_publish {
         bounded(&h.target.relationship_id)?;
     }
-    if let Some(w) = &v.web {
-        if let Some(e) = &w.encoding {
-            bounded(e)?;
-        }
+    if let Some(w) = &v.web
+        && let Some(e) = &w.encoding
+    {
+        bounded(e)?;
     }
     Ok(())
 }

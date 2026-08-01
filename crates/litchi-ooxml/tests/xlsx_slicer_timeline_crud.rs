@@ -1,13 +1,12 @@
 use litchi_ooxml::xlsx::{
-    PivotFilterType, Slicer, SlicerCacheDefinition, Timeline,
-    TimelineCacheDefinition, TimelineLevel, TimelineRange, TimelineState, add_slicer,
-    add_slicer_cache, add_timeline, add_timeline_cache, find_slicer, find_slicer_cache,
-    find_timeline, find_timeline_cache, parse_slicer_cache_definition, parse_slicers,
-    remove_slicer,
-    remove_slicer_cache, remove_timeline, remove_timeline_cache, reorder_slicer_caches,
-    reorder_slicers, reorder_timeline_caches, reorder_timelines, replace_slicer,
-    replace_slicer_cache, replace_timeline, replace_timeline_cache, update_slicer,
-    update_slicer_cache, update_timeline, update_timeline_cache,
+    PivotFilterType, Slicer, SlicerCacheDefinition, Timeline, TimelineCacheDefinition,
+    TimelineLevel, TimelineRange, TimelineState, add_slicer, add_slicer_cache, add_timeline,
+    add_timeline_cache, find_slicer, find_slicer_cache, find_timeline, find_timeline_cache,
+    parse_slicer_cache_definition, parse_slicers, remove_slicer, remove_slicer_cache,
+    remove_timeline, remove_timeline_cache, reorder_slicer_caches, reorder_slicers,
+    reorder_timeline_caches, reorder_timelines, replace_slicer, replace_slicer_cache,
+    replace_timeline, replace_timeline_cache, update_slicer, update_slicer_cache, update_timeline,
+    update_timeline_cache,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
@@ -56,14 +55,9 @@ fn timeline_cache(name: &str, source: &str) -> TimelineCacheDefinition {
         pivot_tables: Vec::new(),
         state: TimelineState {
             selection: Some(
-                TimelineRange::new("2026-01-01T00:00:00Z", "2026-01-31T23:59:59Z")
-                    .unwrap(),
+                TimelineRange::new("2026-01-01T00:00:00Z", "2026-01-31T23:59:59Z").unwrap(),
             ),
-            bounds: TimelineRange::new(
-                "2026-01-01T00:00:00Z",
-                "2026-12-31T23:59:59Z",
-            )
-            .unwrap(),
+            bounds: TimelineRange::new("2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z").unwrap(),
             extension_list: None,
             single_range_filter_state: Some(true),
             minimal_refresh_version: 0,
@@ -155,15 +149,24 @@ fn slicer_cache_and_view_crud_preserves_state_extensions_and_shared_targets() {
     let mut replacement = Slicer::new("View_B", "Cache_B", 300_000);
     replacement.style = Some("SlicerStyleLight2".into());
     replace_slicer(&mut package, &worksheet, "View_B", replacement).unwrap();
-    reorder_slicers(&mut package, &worksheet, &["View_B".into(), "View_A".into()]).unwrap();
-    assert!(find_slicer(&package, &worksheet, "View_A")
-        .unwrap()
-        .unwrap()
-        .extension_list
-        .is_some());
+    reorder_slicers(
+        &mut package,
+        &worksheet,
+        &["View_B".into(), "View_A".into()],
+    )
+    .unwrap();
+    assert!(
+        find_slicer(&package, &worksheet, "View_A")
+            .unwrap()
+            .unwrap()
+            .extension_list
+            .is_some()
+    );
     assert!(remove_slicer_cache(&mut package, "Cache_A").is_err());
-    update_slicer_cache(&mut package, "Cache_A", |cache| cache.source_name = "Region".into())
-        .unwrap();
+    update_slicer_cache(&mut package, "Cache_A", |cache| {
+        cache.source_name = "Region".into()
+    })
+    .unwrap();
     let mut cache_b_replacement = slicer_cache("Cache_B", "Town");
     cache_b_replacement.uid = None;
     replace_slicer_cache(&mut package, "Cache_B", cache_b_replacement).unwrap();
@@ -183,14 +186,16 @@ fn slicer_cache_and_view_crud_preserves_state_extensions_and_shared_targets() {
     let target = PackURI::new(&view_part.part_name).unwrap();
     assert!(package.get_part(&target).is_err());
     assert!(cache_b.part_name.contains("slicerCache"));
-    assert!(std::str::from_utf8(
-        package
-            .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
-            .unwrap()
-            .blob()
-    )
-    .unwrap()
-    .contains("urn:unrelated"));
+    assert!(
+        std::str::from_utf8(
+            package
+                .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+                .unwrap()
+                .blob()
+        )
+        .unwrap()
+        .contains("urn:unrelated")
+    );
 }
 
 #[test]
@@ -198,13 +203,19 @@ fn timeline_cache_and_view_crud_preserves_selection_and_reference_integrity() {
     let (mut package, worksheet) = package();
     let cache_a = add_timeline_cache(&mut package, timeline_cache("Timeline_A", "Date")).unwrap();
     add_timeline_cache(&mut package, timeline_cache("Timeline_B", "ShipDate")).unwrap();
-    reorder_timeline_caches(
+    reorder_timeline_caches(&mut package, &["Timeline_B".into(), "Timeline_A".into()]).unwrap();
+    add_timeline(
         &mut package,
-        &["Timeline_B".into(), "Timeline_A".into()],
+        &worksheet,
+        timeline("Timeline_View_A", "Timeline_A"),
     )
     .unwrap();
-    add_timeline(&mut package, &worksheet, timeline("Timeline_View_A", "Timeline_A")).unwrap();
-    add_timeline(&mut package, &worksheet, timeline("Timeline_View_B", "Timeline_B")).unwrap();
+    add_timeline(
+        &mut package,
+        &worksheet,
+        timeline("Timeline_View_B", "Timeline_B"),
+    )
+    .unwrap();
     update_timeline(&mut package, &worksheet, "Timeline_View_A", |view| {
         view.caption = Some("Updated Date".into());
         view.selection_level = TimelineLevel::Month;

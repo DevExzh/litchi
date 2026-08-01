@@ -404,7 +404,8 @@ impl XlsAutoFilter12DateGroup {
                 "date grouping component is out of range",
             ));
         }
-        let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+        let leap =
+            year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
         let days = match month {
             2 if leap => 29,
             2 => 28,

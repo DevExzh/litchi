@@ -280,9 +280,9 @@ pub(crate) fn validate_conditional_style_collection(
         if let Some(parent) = &style.parent_style_name {
             validate_style_name(parent, "parent style name")?;
         }
-        total_rules = total_rules.checked_add(style.rules.len()).ok_or_else(|| {
-            Error::InvalidFormat("conditional rule count overflow".to_string())
-        })?;
+        total_rules = total_rules
+            .checked_add(style.rules.len())
+            .ok_or_else(|| Error::InvalidFormat("conditional rule count overflow".to_string()))?;
         if total_rules > MAX_CONDITIONAL_RULES {
             return Err(Error::InvalidFormat(format!(
                 "document exceeds the {MAX_CONDITIONAL_RULES} conditional rule limit"
@@ -374,9 +374,7 @@ fn formula_prefix(condition: &str) -> Option<&str> {
 }
 
 fn validate_xml_prefix(prefix: &str) -> Result<()> {
-    if formula_prefix(&format!("{prefix}:x")) != Some(prefix)
-        || matches!(prefix, "xml" | "xmlns")
-    {
+    if formula_prefix(&format!("{prefix}:x")) != Some(prefix) || matches!(prefix, "xml" | "xmlns") {
         return Err(Error::InvalidFormat(format!(
             "invalid conditional formula namespace prefix '{prefix}'"
         )));
@@ -519,16 +517,13 @@ fn rewrite_ranges(
             out.push_str(&xml[position..]);
             Ok(out)
         },
-        AutomaticStylesInsertion::ExpandEmpty { slash, name } => Ok(format!(
-            "{}>{canonical}</{name}>",
-            &xml[..slash]
-        )),
+        AutomaticStylesInsertion::ExpandEmpty { slash, name } => {
+            Ok(format!("{}>{canonical}</{name}>", &xml[..slash]))
+        },
     }
 }
 
-fn managed_style_ranges(
-    xml: &str,
-) -> Result<(Vec<Range<usize>>, AutomaticStylesInsertion)> {
+fn managed_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStylesInsertion)> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -586,9 +581,10 @@ fn managed_style_ranges(
                     let slash = xml[..event_end].rfind("/>").ok_or_else(|| {
                         Error::InvalidFormat("malformed empty automatic styles".to_string())
                     })?;
-                    let name = String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
-                        Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
-                    })?;
+                    let name =
+                        String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
+                            Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
+                        })?;
                     insertion = Some(AutomaticStylesInsertion::ExpandEmpty { slash, name });
                 } else if depth == 2
                     && candidate.is_some()
@@ -767,9 +763,7 @@ enum AutomaticStylesInsertion {
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
-fn conditional_style_ranges(
-    xml: &str,
-) -> Result<(Vec<Range<usize>>, AutomaticStylesInsertion)> {
+fn conditional_style_ranges(xml: &str) -> Result<(Vec<Range<usize>>, AutomaticStylesInsertion)> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -792,10 +786,7 @@ fn conditional_style_ranges(
                 ));
             },
             Event::Start(element) => {
-                if depth == 1
-                    && is_style_namespace
-                    && element.local_name().as_ref() == b"style"
-                {
+                if depth == 1 && is_style_namespace && element.local_name().as_ref() == b"style" {
                     let is_cell = optional_attribute(
                         reader.resolver(),
                         reader.decoder(),
@@ -822,9 +813,10 @@ fn conditional_style_ranges(
                     let slash = xml[..event_end].rfind("/>").ok_or_else(|| {
                         Error::InvalidFormat("malformed empty automatic styles".to_string())
                     })?;
-                    let name = String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
-                        Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
-                    })?;
+                    let name =
+                        String::from_utf8(element.name().as_ref().to_vec()).map_err(|_| {
+                            Error::InvalidFormat("automatic styles name is not UTF-8".to_string())
+                        })?;
                     insertion = Some(AutomaticStylesInsertion::ExpandEmpty { slash, name });
                 } else if depth == 2
                     && candidate.is_some()
@@ -1598,11 +1590,14 @@ mod tests {
         };
         let style = ConditionalCellStyle::new(
             "new&style",
-            vec![ConditionalCellStyleRule::new("x:test()<2", "Red")
-                .with_formula_namespace(FormulaNamespace {
-                    prefix: "x".to_string(),
-                    uri: "urn:example:formula".to_string(),
-                })],
+            vec![
+                ConditionalCellStyleRule::new("x:test()<2", "Red").with_formula_namespace(
+                    FormulaNamespace {
+                        prefix: "x".to_string(),
+                        uri: "urn:example:formula".to_string(),
+                    },
+                ),
+            ],
         );
         let common = HashSet::from(["Red".to_string()]);
         validate_conditional_style_collection(std::slice::from_ref(&style), &common).unwrap();
@@ -1628,16 +1623,10 @@ mod tests {
             "combo",
             vec![ConditionalCellStyleRule::new("cell-content()>0", "Red")],
         );
-        let protection = TableCellProtectionStyle::new(
-            "combo",
-            CellStyleProtection::HiddenAndProtected,
-        );
-        let rewritten = rewrite_managed_cell_styles(
-            Some(&fragment),
-            &[conditional],
-            &[protection],
-        )
-        .unwrap();
+        let protection =
+            TableCellProtectionStyle::new("combo", CellStyleProtection::HiddenAndProtected);
+        let rewritten =
+            rewrite_managed_cell_styles(Some(&fragment), &[conditional], &[protection]).unwrap();
         assert!(rewritten.xml.contains(
             r#"<draw:gradient xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" draw:name="keep"/>"#
         ));
@@ -1645,7 +1634,11 @@ mod tests {
             r#"<s:style s:name="plain" s:family="table-cell"><s:table-cell-properties/></s:style>"#
         ));
         assert_eq!(rewritten.xml.matches("name=\"combo\"").count(), 1);
-        assert!(rewritten.xml.contains("cell-protect=\"hidden-and-protected\""));
+        assert!(
+            rewritten
+                .xml
+                .contains("cell-protect=\"hidden-and-protected\"")
+        );
         assert!(rewritten.xml.contains("condition=\"cell-content()&gt;0\""));
     }
 

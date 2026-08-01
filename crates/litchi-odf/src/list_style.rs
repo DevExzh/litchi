@@ -162,9 +162,9 @@ impl ListLevelImageSource {
             Self::Linked(href) => name_ok(href, "xlink:href"),
             Self::Embedded(data) => {
                 if data.len() > MAX_BINARY
-                    || !data
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'='))
+                    || !data.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'=')
+                    })
                 {
                     return Err(bad("office:binary-data must be base64 text"));
                 }
@@ -818,7 +818,11 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
                         state.skip = None;
                     } else if state.open_level == Some(depth) {
                         state.open_level = None;
-                    } else if state.image.as_ref().is_some_and(|image| image.depth == depth) {
+                    } else if state
+                        .image
+                        .as_ref()
+                        .is_some_and(|image| image.depth == depth)
+                    {
                         let image = state.image.take().unwrap();
                         let source = match (image.href, image.binary_seen) {
                             (Some(href), false) => ListLevelImageSource::Linked(href),
@@ -865,8 +869,10 @@ pub fn parse_list_styles(xml: &str) -> Result<ListStyleSet> {
 impl OpenDocumentPackage {
     /// Parse the `text:list-style` declarations of the package `styles.xml`.
     pub fn list_styles(&self) -> Result<ListStyleSet> {
-        self.styles_xml()?
-            .map_or_else(|| Ok(ListStyleSet::default()), |xml| parse_list_styles(&xml))
+        self.styles_xml()?.map_or_else(
+            || Ok(ListStyleSet::default()),
+            |xml| parse_list_styles(&xml),
+        )
     }
 }
 impl FlatOpenDocument {

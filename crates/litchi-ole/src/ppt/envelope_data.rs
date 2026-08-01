@@ -424,7 +424,7 @@ impl<'a> Cursor<'a> {
     }
 
     fn utf16_bytes(&mut self, byte_length: usize) -> Result<Vec<u16>> {
-        if byte_length % 2 != 0 {
+        if !byte_length.is_multiple_of(2) {
             return corrupted("UTF-16 envelope string has an odd byte size");
         }
         let units: Vec<u16> = self

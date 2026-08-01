@@ -58,7 +58,7 @@ impl PersistMapping {
     /// # Performance
     ///
     /// - Zero-copy: works with references instead of owned records
-    /// - Avoids cloning large record data (Vec<u8>)
+    /// - Avoids cloning large record data (`Vec<u8>`)
     /// - Same logic as `build_from_records` but more efficient
     pub fn build_from_records_ref(records: &[&PptRecord]) -> Self {
         // Count PersistPtrHolder records for capacity estimation

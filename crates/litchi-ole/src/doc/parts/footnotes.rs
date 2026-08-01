@@ -131,7 +131,7 @@ impl FootnotesTable {
     ) -> Result<Vec<FootnoteReference>> {
         // Parse text PLCF with element_size = 0 (just CPs)
         // Manually parse since PlcfParser expects element_size > 0
-        if txt_plcf_data.len() % 4 != 0 {
+        if !txt_plcf_data.len().is_multiple_of(4) {
             return Err(DocError::Corrupted(
                 "note text PLCF contains a partial CP".to_string(),
             ));

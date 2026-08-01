@@ -123,7 +123,7 @@ fn parse_bin_table(
     let (offset, length) = pointer(fib, index)?;
     let range = table_range(table, offset, length, label)?;
     let bytes = &table[range];
-    if bytes.len() < 12 || (bytes.len() - 4) % 8 != 0 {
+    if bytes.len() < 12 || !(bytes.len() - 4).is_multiple_of(8) {
         return Err(invalid(format!("{label} has an invalid PLCF length")));
     }
     let count = (bytes.len() - 4) / 8;
@@ -226,7 +226,7 @@ fn relocate_section_table(
     let (offset, length) = pointer(fib, PLCF_SED_INDEX)?;
     let range = table_range(table, offset, length, "attached glossary PlcfSed")?;
     let plc = &mut table[range];
-    if plc.len() < 20 || (plc.len() - 4) % 16 != 0 {
+    if plc.len() < 20 || !(plc.len() - 4).is_multiple_of(16) {
         return Err(invalid("attached glossary PlcfSed has an invalid length"));
     }
     let count = (plc.len() - 4) / 16;
@@ -317,7 +317,7 @@ pub(super) fn merge_attached_glossary(
     if main_word.len() < FIB_SIZE || glossary_word.len() < FIB_SIZE {
         return Err(invalid("DOC writer emitted a truncated FIB"));
     }
-    if main_word.len() % WORD_PAGE_SIZE != 0 {
+    if !main_word.len().is_multiple_of(WORD_PAGE_SIZE) {
         return Err(invalid("main WordDocument stream is not page-aligned"));
     }
 

@@ -104,7 +104,9 @@ fn builder_authored_sparkline_groups_round_trip_the_package() {
 
     let bytes = builder.build().unwrap();
     let xml = content_xml(&bytes);
-    assert!(xml.contains(r#"xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0""#));
+    assert!(xml.contains(
+        r#"xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0""#
+    ));
     assert!(xml.contains("<calcext:sparkline-groups>"));
     assert!(xml.contains(
         r##"calcext:type="column" calcext:line-width="1pt" calcext:display-empty-cells-as="gap" calcext:markers="true" calcext:high="true" calcext:low="true" calcext:negative="true" calcext:display-x-axis="true" calcext:min-axis-type="custom" calcext:max-axis-type="individual" calcext:manual-min="-5" calcext:color-series="#0369a3" calcext:color-low="#c9211e""##
@@ -169,11 +171,7 @@ fn mutable_creates_replaces_and_removes_sparkline_groups() {
     let mut mutable = MutableSpreadsheet::from_spreadsheet(reopened).unwrap();
     mutable.set_sheet_sparkline_groups(0, Vec::new()).unwrap();
     let mut reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
-    assert!(
-        reopened.sheets().unwrap()[0]
-            .sparkline_groups()
-            .is_empty()
-    );
+    assert!(reopened.sheets().unwrap()[0].sparkline_groups().is_empty());
     let xml = content_xml(&mutable.to_bytes().unwrap());
     assert!(!xml.contains("calcext:sparkline-groups"));
 }
@@ -209,11 +207,7 @@ fn invalid_sparkline_groups_are_rejected_atomically() {
             .add_sheet_sparkline_group(0, SparklineGroup::new(Vec::new()))
             .is_err()
     );
-    assert!(
-        mutable
-            .add_sheet_sparkline_group(9, group_a())
-            .is_err()
-    );
+    assert!(mutable.add_sheet_sparkline_group(9, group_a()).is_err());
     assert!(mutable.remove_sheet_sparkline_group(9, 0).is_err());
 }
 

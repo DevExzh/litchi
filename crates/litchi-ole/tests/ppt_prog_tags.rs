@@ -33,8 +33,8 @@ fn presentation_exposes_document_prog_tags_with_typed_extensions() {
     // Every binary tag payload decodes as a strict record sequence, and the
     // container serializes back byte-for-byte.
     let limits = Default::default();
-    let reparsed = PowerPointProgTags::parse(&tags.to_record(limits).unwrap(), tags.scope, limits)
-        .unwrap();
+    let reparsed =
+        PowerPointProgTags::parse(&tags.to_record(limits).unwrap(), tags.scope, limits).unwrap();
     assert_eq!(reparsed, tags);
 
     let extensions = tags.document_extensions().unwrap();
@@ -43,10 +43,7 @@ fn presentation_exposes_document_prog_tags_with_typed_extensions() {
         let extension = extensions.powerpoint9.as_ref().unwrap();
         assert!(!extension.text_master_styles.is_empty());
         // Extension-level serialization reproduces the retained blob exactly.
-        assert_eq!(
-            extension.to_payload().unwrap(),
-            pp9.payload,
-        );
+        assert_eq!(extension.to_payload().unwrap(), pp9.payload,);
     }
 
     // Slide, notes, and main-master scopes parse without corruption.
@@ -55,11 +52,11 @@ fn presentation_exposes_document_prog_tags_with_typed_extensions() {
             assert_eq!(slide_tags.scope, PowerPointProgTagScope::Slide);
             slide_tags.slide_extensions().unwrap();
         }
-        if let Some(notes) = slide.speaker_notes().unwrap() {
-            if let Some(notes_tags) = notes.programmable_tags().unwrap() {
-                assert_eq!(notes_tags.scope, PowerPointProgTagScope::Slide);
-                notes_tags.slide_extensions().unwrap();
-            }
+        if let Some(notes) = slide.speaker_notes().unwrap()
+            && let Some(notes_tags) = notes.programmable_tags().unwrap()
+        {
+            assert_eq!(notes_tags.scope, PowerPointProgTagScope::Slide);
+            notes_tags.slide_extensions().unwrap();
         }
     }
     for master_tags in presentation.main_master_programmable_tags().unwrap() {
@@ -72,7 +69,11 @@ fn presentation_exposes_document_prog_tags_with_typed_extensions() {
 fn presentation_prog_tags_cover_poi_fixtures() {
     // A spread of real-world files: every ProgTags container in these scopes
     // must parse strictly and its versioned extensions must decode.
-    for name in ["basic_test_ppt_file.ppt", "WithComments.ppt", "datetime.ppt"] {
+    for name in [
+        "basic_test_ppt_file.ppt",
+        "WithComments.ppt",
+        "datetime.ppt",
+    ] {
         let mut package = Package::open(poi_fixture(name)).unwrap();
         let presentation = package.presentation().unwrap();
         if let Some(tags) = presentation.programmable_tags().unwrap() {

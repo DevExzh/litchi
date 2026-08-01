@@ -5,9 +5,9 @@
 //! metadata: message identifiers are stored verbatim and no message is ever
 //! contacted, opened, or rendered.
 
+use super::super::CommentDateTime;
 use super::super::package::{DocError, Result};
 use super::super::revision::decode_dttm;
-use super::super::CommentDateTime;
 use super::fib::FileInformationBlock;
 
 /// Table-pointer index of `fcRmdThreading`/`lcbRmdThreading`.
@@ -209,8 +209,7 @@ fn parse_sttb<'a>(
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
         strings.push(
-            String::from_utf16(&units)
-                .map_err(|_| corrupted(field("contains invalid UTF-16")))?,
+            String::from_utf16(&units).map_err(|_| corrupted(field("contains invalid UTF-16")))?,
         );
         *offset = end;
         let extra_end = end
@@ -285,7 +284,13 @@ mod tests {
         let display = first.display().expect("non-empty message keeps its MDP");
         let created = display.created().expect("valid DTTM decodes");
         assert_eq!(
-            (created.year, created.month, created.day, created.hour, created.minute),
+            (
+                created.year,
+                created.month,
+                created.day,
+                created.hour,
+                created.minute
+            ),
             (2026, 7, 15, 10, 30)
         );
         assert_eq!(display.author_index(), 0);
@@ -312,10 +317,8 @@ mod tests {
         assert!(DocumentRmdThreading::parse_bytes(&trailing).is_err());
         // Invalid DTTM on a non-empty message.
         let bad_dttm = mdp(60, 0); // minute 60 is out of range
-        assert!(DocumentRmdThreading::parse_bytes(&rmd_threading(
-            &[("<id>", &bad_dttm)],
-            &[]
-        ))
-        .is_err());
+        assert!(
+            DocumentRmdThreading::parse_bytes(&rmd_threading(&[("<id>", &bad_dttm)], &[])).is_err()
+        );
     }
 }

@@ -176,8 +176,7 @@ pub(crate) fn parse_calculation_settings(xml: &str) -> Result<Option<Calculation
         {
             document_body_depth = Some(depth);
         }
-        let is_document_body_child =
-            document_body_depth.is_some_and(|value| depth == value + 1);
+        let is_document_body_child = document_body_depth.is_some_and(|value| depth == value + 1);
         match event {
             Event::Start(element)
                 if is_table && element.local_name().as_ref() == b"calculation-settings" =>

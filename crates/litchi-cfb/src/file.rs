@@ -696,7 +696,7 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     pub(crate) fn validate_directory(dir_data: &[u8], sector_size: usize) -> Result<(), OleError> {
-        if dir_data.is_empty() || dir_data.len() % DIRENTRY_SIZE != 0 {
+        if dir_data.is_empty() || !dir_data.len().is_multiple_of(DIRENTRY_SIZE) {
             return Err(OleError::CorruptedFile(
                 "CFB directory stream must contain complete 128-byte entries".to_string(),
             ));
@@ -864,7 +864,9 @@ impl<R: Read + Seek> OleFile<R> {
                 ));
             },
             STGTY_STORAGE
-                if sid == 0 || !matches!(raw.start_sector.get(), 0 | ENDOFCHAIN) || stream_size != 0 =>
+                if sid == 0
+                    || !matches!(raw.start_sector.get(), 0 | ENDOFCHAIN)
+                    || stream_size != 0 =>
             {
                 return Err(OleError::CorruptedFile(format!(
                     "invalid CFB storage fields at SID {sid}"

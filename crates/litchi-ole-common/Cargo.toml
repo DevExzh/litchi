@@ -1,0 +1,15 @@
+[package]
+name = "litchi-ole-common"
+description = "Shared validated structures for legacy binary Office formats."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+encoding_rs = { workspace = true }
+litchi-cfb = { workspace = true }
+litchi-core = { workspace = true, features = ["ole"] }
+quick-xml = { workspace = true }

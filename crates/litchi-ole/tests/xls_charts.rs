@@ -1,16 +1,125 @@
-use litchi_ole::xls::{XlsChart,XlsChartEditor,XlsChartGroup,XlsChartGroupKind,XlsChartLimits,XlsChartLocation,XlsChartSeries,XlsChartType};
 use litchi_ole::OleWriter;
+use litchi_ole::xls::{
+    XlsChart, XlsChartEditor, XlsChartGroup, XlsChartGroupKind, XlsChartLimits, XlsChartLocation,
+    XlsChartSeries, XlsChartType,
+};
 use std::io::Cursor;
 
-fn record(kind:u16,data:&[u8])->Vec<u8>{let mut out=kind.to_le_bytes().to_vec();out.extend((data.len()as u16).to_le_bytes());out.extend(data);out}
-fn bof(kind:u16)->Vec<u8>{let mut d=Vec::new();d.extend(0x0600u16.to_le_bytes());d.extend(kind.to_le_bytes());d.extend([0;12]);record(0x0809,&d)}
-fn workbook()->Vec<u8>{let mut globals=bof(5);let bound_at=globals.len();let mut bound=vec![0;8];bound[6]=1;bound.extend(b"S");globals.extend(record(0x0085,&bound));globals.extend(record(0x000a,&[]));let offset=globals.len()as u32;globals[bound_at+4..bound_at+8].copy_from_slice(&offset.to_le_bytes());globals.extend(bof(0x0010));globals.extend(record(0x000a,&[]));let mut writer=OleWriter::new();writer.create_stream(&["Workbook"],&globals).unwrap();let mut out=Cursor::new(Vec::new());writer.write_to(&mut out).unwrap();out.into_inner()}
+fn record(kind: u16, data: &[u8]) -> Vec<u8> {
+    let mut out = kind.to_le_bytes().to_vec();
+    out.extend((data.len() as u16).to_le_bytes());
+    out.extend(data);
+    out
+}
+fn bof(kind: u16) -> Vec<u8> {
+    let mut d = Vec::new();
+    d.extend(0x0600u16.to_le_bytes());
+    d.extend(kind.to_le_bytes());
+    d.extend([0; 12]);
+    record(0x0809, &d)
+}
+fn workbook() -> Vec<u8> {
+    let mut globals = bof(5);
+    let bound_at = globals.len();
+    let mut bound = vec![0; 8];
+    bound[6] = 1;
+    bound.extend(b"S");
+    globals.extend(record(0x0085, &bound));
+    globals.extend(record(0x000a, &[]));
+    let offset = globals.len() as u32;
+    globals[bound_at + 4..bound_at + 8].copy_from_slice(&offset.to_le_bytes());
+    globals.extend(bof(0x0010));
+    globals.extend(record(0x000a, &[]));
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &globals).unwrap();
+    let mut out = Cursor::new(Vec::new());
+    writer.write_to(&mut out).unwrap();
+    out.into_inner()
+}
 
 #[test]
-fn embedded_add_replace_reorder_remove_and_rollback(){let mut editor=XlsChartEditor::open(workbook(),XlsChartLimits::default()).unwrap();let mut line=XlsChart::default();line.series.push(XlsChartSeries::default());editor.add(0,7,0,line.clone()).unwrap();let before=editor.charts();assert!(editor.add(0,7,1,line.clone()).is_err());assert_eq!(editor.charts(),before);let mut combo=line;combo.groups.push(XlsChartGroup{order:1,vary_colors:false,kind:XlsChartGroupKind::Bar{overlap:0,gap:150,flags:0}});editor.replace(&XlsChartLocation::Embedded{sheet_index:0,object_id:7},combo).unwrap();editor.add(0,8,1,XlsChart::default()).unwrap();editor.reorder(0,&[8,7]).unwrap();editor.remove(&XlsChartLocation::Embedded{sheet_index:0,object_id:8}).unwrap();let reopened=XlsChartEditor::open(editor.finish().unwrap(),XlsChartLimits::default()).unwrap();assert_eq!(reopened.charts().len(),1);assert!(matches!(reopened.charts()[0].chart.chart_type(),XlsChartType::Combo(_)));}
+fn embedded_add_replace_reorder_remove_and_rollback() {
+    let mut editor = XlsChartEditor::open(workbook(), XlsChartLimits::default()).unwrap();
+    let mut line = XlsChart::default();
+    line.series.push(XlsChartSeries::default());
+    editor.add(0, 7, 0, line.clone()).unwrap();
+    let before = editor.charts();
+    assert!(editor.add(0, 7, 1, line.clone()).is_err());
+    assert_eq!(editor.charts(), before);
+    let mut combo = line;
+    combo.groups.push(XlsChartGroup {
+        order: 1,
+        vary_colors: false,
+        kind: XlsChartGroupKind::Bar {
+            overlap: 0,
+            gap: 150,
+            flags: 0,
+        },
+    });
+    editor
+        .replace(
+            &XlsChartLocation::Embedded {
+                sheet_index: 0,
+                object_id: 7,
+            },
+            combo,
+        )
+        .unwrap();
+    editor.add(0, 8, 1, XlsChart::default()).unwrap();
+    editor.reorder(0, &[8, 7]).unwrap();
+    editor
+        .remove(&XlsChartLocation::Embedded {
+            sheet_index: 0,
+            object_id: 8,
+        })
+        .unwrap();
+    let reopened =
+        XlsChartEditor::open(editor.finish().unwrap(), XlsChartLimits::default()).unwrap();
+    assert_eq!(reopened.charts().len(), 1);
+    assert!(matches!(
+        reopened.charts()[0].chart.chart_type(),
+        XlsChartType::Combo(_)
+    ));
+}
 
 #[test]
-fn chart_sheet_insert_reorder_remove_and_reopen(){let mut editor=XlsChartEditor::open(workbook(),XlsChartLimits::default()).unwrap();editor.add_chart_sheet(0,"Chart",XlsChart::default()).unwrap();assert!(matches!(editor.charts()[0].location,XlsChartLocation::ChartSheet{sheet_index:0}));editor.reorder_sheets(&[1,0]).unwrap();assert!(editor.find(&XlsChartLocation::ChartSheet{sheet_index:1}).is_some());editor.remove_chart_sheet(1).unwrap();let reopened=XlsChartEditor::open(editor.finish().unwrap(),XlsChartLimits::default()).unwrap();assert!(reopened.charts().is_empty());}
+fn chart_sheet_insert_reorder_remove_and_reopen() {
+    let mut editor = XlsChartEditor::open(workbook(), XlsChartLimits::default()).unwrap();
+    editor
+        .add_chart_sheet(0, "Chart", XlsChart::default())
+        .unwrap();
+    assert!(matches!(
+        editor.charts()[0].location,
+        XlsChartLocation::ChartSheet { sheet_index: 0 }
+    ));
+    editor.reorder_sheets(&[1, 0]).unwrap();
+    assert!(
+        editor
+            .find(&XlsChartLocation::ChartSheet { sheet_index: 1 })
+            .is_some()
+    );
+    editor.remove_chart_sheet(1).unwrap();
+    let reopened =
+        XlsChartEditor::open(editor.finish().unwrap(), XlsChartLimits::default()).unwrap();
+    assert!(reopened.charts().is_empty());
+}
 
 #[test]
-fn bundled_poi_and_libreoffice_chart_fixtures_are_strictly_gated(){let root=std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");for path in [root.join("test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls"),root.join("test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls"),root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls"),root.join("test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls")]{let original=std::fs::read(&path).unwrap();match XlsChartEditor::open(original.clone(),XlsChartLimits::default()){Ok(editor)=>{let _=editor.charts();assert_eq!(std::fs::read(&path).unwrap(),original)},Err(_)=>assert_eq!(std::fs::read(&path).unwrap(),original)}}}
+fn bundled_poi_and_libreoffice_chart_fixtures_are_strictly_gated() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for path in [
+        root.join("test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls"),
+        root.join("test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls"),
+        root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls"),
+        root.join("test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls"),
+    ] {
+        let original = std::fs::read(&path).unwrap();
+        match XlsChartEditor::open(original.clone(), XlsChartLimits::default()) {
+            Ok(editor) => {
+                let _ = editor.charts();
+                assert_eq!(std::fs::read(&path).unwrap(), original)
+            },
+            Err(_) => assert_eq!(std::fs::read(&path).unwrap(), original),
+        }
+    }
+}

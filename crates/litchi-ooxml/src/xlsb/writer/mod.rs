@@ -66,23 +66,22 @@ pub(crate) mod conditional_formatting;
 // Re-export main types for public API
 pub use crate::xlsb::drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
 pub use crate::xlsb::external_link::{
-    MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
-    MAX_XLSB_EXTERNAL_CACHED_VALUES, XlsbDdeItem, XlsbExternalAreaReference,
-    XlsbExternalCachedValue, XlsbExternalCellLocation, XlsbExternalCellReference,
-    XlsbExternalDefinedName, XlsbExternalErrorValue, XlsbExternalLink, XlsbExternalLinkKind,
-    XlsbExternalNameFormula, XlsbExternalNameFormulaKind, XlsbExternalSheetRange,
-    XlsbExternalValueMatrix, XlsbOleItem,
+    MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS, MAX_XLSB_EXTERNAL_CACHED_VALUES,
+    XlsbDdeItem, XlsbExternalAreaReference, XlsbExternalCachedValue, XlsbExternalCellLocation,
+    XlsbExternalCellReference, XlsbExternalDefinedName, XlsbExternalErrorValue, XlsbExternalLink,
+    XlsbExternalLinkKind, XlsbExternalNameFormula, XlsbExternalNameFormulaKind,
+    XlsbExternalSheetRange, XlsbExternalValueMatrix, XlsbOleItem,
 };
 pub use crate::xlsb::pivot_view::XlsbPivotTableViewPart;
-pub use crate::xlsx::{
-    ChartAnchor, WorksheetChart, XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxEmuExtent,
-    XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor, XlsxShapeBodyProperties,
-    XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun, XlsxTextAutofit, XlsxTextDirection,
-    XlsxTextInsets, XlsxTextVerticalAnchor, XlsxTextWrap,
-};
 pub use crate::xlsx::writer::{
     XlsxConnectionEndSpec, XlsxConnectionShapeSpec, XlsxDrawingObjectSpec, XlsxGroupSpec,
     XlsxShapeSpec,
+};
+pub use crate::xlsx::{
+    ChartAnchor, WorksheetChart, XlsxCellMarker, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset,
+    XlsxGroupTransform, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeParagraph,
+    XlsxShapePreset, XlsxShapeRun, XlsxTextAutofit, XlsxTextDirection, XlsxTextInsets,
+    XlsxTextVerticalAnchor, XlsxTextWrap,
 };
 pub use chartsheet::MutableXlsbChartSheet;
 pub use record::RecordWriter;

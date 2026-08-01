@@ -259,12 +259,22 @@ mod tests {
         assert!(XlsSerAuxTrend::parse(&bytes[..26]).is_err());
         assert!(XlsSerAuxTrend::parse(&[bytes.as_slice(), &[0]].concat()).is_err());
         // Undefined regt.
-        assert!(XlsSerAuxTrend::parse(&record(0x05, 0x02, nil_intercept(), 0, 0, 0.0, 0.0)).is_err());
+        assert!(
+            XlsSerAuxTrend::parse(&record(0x05, 0x02, nil_intercept(), 0, 0, 0.0, 0.0)).is_err()
+        );
         // Polynomial order outside 0x02..=0x06.
-        assert!(XlsSerAuxTrend::parse(&record(0x00, 0x01, nil_intercept(), 0, 0, 0.0, 0.0)).is_err());
-        assert!(XlsSerAuxTrend::parse(&record(0x00, 0x07, nil_intercept(), 0, 0, 0.0, 0.0)).is_err());
+        assert!(
+            XlsSerAuxTrend::parse(&record(0x00, 0x01, nil_intercept(), 0, 0, 0.0, 0.0)).is_err()
+        );
+        assert!(
+            XlsSerAuxTrend::parse(&record(0x00, 0x07, nil_intercept(), 0, 0, 0.0, 0.0)).is_err()
+        );
         // Non-Boolean fEquation / fRSquared.
-        assert!(XlsSerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0x02, 0, 0.0, 0.0)).is_err());
-        assert!(XlsSerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0, 0xFF, 0.0, 0.0)).is_err());
+        assert!(
+            XlsSerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0x02, 0, 0.0, 0.0)).is_err()
+        );
+        assert!(
+            XlsSerAuxTrend::parse(&record(0x01, 0x00, nil_intercept(), 0, 0xFF, 0.0, 0.0)).is_err()
+        );
     }
 }

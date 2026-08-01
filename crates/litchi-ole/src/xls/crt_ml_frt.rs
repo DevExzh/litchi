@@ -105,7 +105,11 @@ impl XlsCrtMlFrt {
 
         let mut chain = data[FRT_HEADER_LEN + FIELD_LEN..data.len() - FIELD_LEN].to_vec();
         for continuation in continues {
-            validate_frt_header(continuation, CRT_ML_FRT_CONTINUE_RECORD_TYPE, "CrtMlFrtContinue")?;
+            validate_frt_header(
+                continuation,
+                CRT_ML_FRT_CONTINUE_RECORD_TYPE,
+                "CrtMlFrtContinue",
+            )?;
             chain.extend_from_slice(&continuation[FRT_HEADER_LEN..]);
         }
         // MS-XLS 2.4.70: cb specifies the exact size of the XmlTkChain,
@@ -120,7 +124,9 @@ impl XlsCrtMlFrt {
             flags: u16::from_le_bytes([data[2], data[3]]),
             reserved: data[4..FRT_HEADER_LEN].try_into().expect("length checked"),
             chain,
-            unused: data[data.len() - FIELD_LEN..].try_into().expect("length checked"),
+            unused: data[data.len() - FIELD_LEN..]
+                .try_into()
+                .expect("length checked"),
         })
     }
 
@@ -251,8 +257,7 @@ mod tests {
         }
         // cb exceeds the legal maximum.
         let mut huge = record.clone();
-        huge[FRT_HEADER_LEN..FRT_HEADER_LEN + 4]
-            .copy_from_slice(&0x8000_0000u32.to_le_bytes());
+        huge[FRT_HEADER_LEN..FRT_HEADER_LEN + 4].copy_from_slice(&0x8000_0000u32.to_le_bytes());
         assert!(XlsCrtMlFrt::parse(&huge, &[]).is_err());
         // cb does not match the reassembled chain size.
         let mut short = record.clone();

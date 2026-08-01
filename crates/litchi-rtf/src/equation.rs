@@ -43,7 +43,9 @@ impl EquationSpacing {
             .parse()
             .map_err(|_| malformed("RTF EQ switch has a non-numeric spacing argument"))?;
         if value > MAX_SPACING_POINTS {
-            return Err(malformed("RTF EQ spacing argument exceeds the safety limit"));
+            return Err(malformed(
+                "RTF EQ spacing argument exceeds the safety limit",
+            ));
         }
         Ok(Self(value))
     }
@@ -462,7 +464,9 @@ impl<'a> Parser<'a> {
                     options.underline = true;
                     Ok(())
                 },
-                _ => Err(malformed("RTF EQ displacement switch has an unknown option")),
+                _ => Err(malformed(
+                    "RTF EQ displacement switch has an unknown option",
+                )),
             },
             EquationSwitch::Integral(options) => match name {
                 [b's', b'u'] => {

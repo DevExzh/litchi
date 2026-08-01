@@ -2,11 +2,11 @@
 //!
 //! This module provides types for working with charts in PPTX files.
 
+use crate::error::{OoxmlError, Result};
+use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,
 };
-use crate::error::{OoxmlError, Result};
-use litchi_core::xml::escape_xml;
 use litchi_opc::part::Part;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;

@@ -145,7 +145,9 @@ fn parses_libreoffice_list_style_fixture() {
     );
     let flat = FlatOpenDocument::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.list_styles().unwrap();
-    let one = set.get("ListStyleOne").expect("fixture declares ListStyleOne");
+    let one = set
+        .get("ListStyleOne")
+        .expect("fixture declares ListStyleOne");
     assert!(!one.levels.is_empty());
     assert!(
         one.levels
@@ -157,7 +159,8 @@ fn parses_libreoffice_list_style_fixture() {
 #[test]
 fn rejects_invalid_declarations() {
     // Missing text:bullet-char.
-    let x = wrap(r#"<t:list-style s:name="B"><t:list-level-style-bullet t:level="1"/></t:list-style>"#);
+    let x =
+        wrap(r#"<t:list-style s:name="B"><t:list-level-style-bullet t:level="1"/></t:list-style>"#);
     assert!(parse_list_styles(&x).is_err());
     // Duplicate level.
     let x = wrap(
@@ -175,7 +178,8 @@ fn rejects_invalid_declarations() {
     );
     assert!(parse_list_styles(&x).is_err());
     // Image without href or binary data.
-    let x = wrap(r#"<t:list-style s:name="I"><t:list-level-style-image t:level="1"/></t:list-style>"#);
+    let x =
+        wrap(r#"<t:list-style s:name="I"><t:list-level-style-image t:level="1"/></t:list-style>"#);
     assert!(parse_list_styles(&x).is_err());
     // Image combining href and binary data.
     let x = wrap(

@@ -4,8 +4,7 @@ use litchi_ooxml::xlsx::connections::{
 use litchi_ooxml::xlsx::{
     QueryTable, QueryTableConformance, QueryTableField, QueryTableRefresh,
     add_worksheet_query_table, find_worksheet_query_table, load_worksheet_query_tables,
-    remove_worksheet_query_table, reorder_worksheet_query_tables,
-    update_worksheet_query_table,
+    remove_worksheet_query_table, reorder_worksheet_query_tables, update_worksheet_query_table,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -49,7 +48,8 @@ fn package() -> (OpcPackage, PackURI) {
     let mut workbook = BlobPart::new(
         workbook_name.clone(),
         ct::SML_SHEET_MAIN.into(),
-        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#.to_vec(),
+        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+            .to_vec(),
     );
     workbook.relate_to("worksheets/sheet1.xml", rt::WORKSHEET);
     package.add_part(Box::new(workbook));
@@ -88,7 +88,10 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
     };
     connections.reorder(&[2, 1]).unwrap();
     store_in_package(&mut package, &connections, false).unwrap();
-    assert_eq!(load_from_package(&package).unwrap().unwrap().connections[0].id, 2);
+    assert_eq!(
+        load_from_package(&package).unwrap().unwrap().connections[0].id,
+        2
+    );
 
     let first = add_worksheet_query_table(
         &mut package,
@@ -104,10 +107,17 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
         QueryTableConformance::Strict,
     )
     .unwrap();
-    assert_eq!(load_worksheet_query_tables(&package, &worksheet).unwrap().len(), 2);
-    assert!(find_worksheet_query_table(&package, &worksheet, first.relationship_id())
-        .unwrap()
-        .is_some());
+    assert_eq!(
+        load_worksheet_query_tables(&package, &worksheet)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        find_worksheet_query_table(&package, &worksheet, first.relationship_id())
+            .unwrap()
+            .is_some()
+    );
 
     update_worksheet_query_table(
         &mut package,
@@ -120,16 +130,17 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
     let reordered = reorder_worksheet_query_tables(
         &mut package,
         &worksheet,
-        &[second.relationship_id().into(), first.relationship_id().into()],
+        &[
+            second.relationship_id().into(),
+            first.relationship_id().into(),
+        ],
     )
     .unwrap();
     assert_eq!(reordered[0].query_table().name(), "Query B");
-    assert!(remove_worksheet_query_table(
-        &mut package,
-        &worksheet,
-        reordered[1].relationship_id()
-    )
-    .unwrap());
+    assert!(
+        remove_worksheet_query_table(&mut package, &worksheet, reordered[1].relationship_id())
+            .unwrap()
+    );
 }
 
 #[test]
@@ -137,18 +148,26 @@ fn missing_connection_and_bad_reorder_are_atomic() {
     let (mut package, worksheet) = package();
     store_in_package(
         &mut package,
-        &Connections { connections: vec![connection(1, "only")] },
+        &Connections {
+            connections: vec![connection(1, "only")],
+        },
         false,
     )
     .unwrap();
-    assert!(add_worksheet_query_table(
-        &mut package,
-        &worksheet,
-        table("Missing", 99),
-        QueryTableConformance::Transitional,
-    )
-    .is_err());
-    assert!(load_worksheet_query_tables(&package, &worksheet).unwrap().is_empty());
+    assert!(
+        add_worksheet_query_table(
+            &mut package,
+            &worksheet,
+            table("Missing", 99),
+            QueryTableConformance::Transitional,
+        )
+        .is_err()
+    );
+    assert!(
+        load_worksheet_query_tables(&package, &worksheet)
+            .unwrap()
+            .is_empty()
+    );
 
     let added = add_worksheet_query_table(
         &mut package,
@@ -157,15 +176,12 @@ fn missing_connection_and_bad_reorder_are_atomic() {
         QueryTableConformance::Transitional,
     )
     .unwrap();
-    assert!(reorder_worksheet_query_tables(
-        &mut package,
-        &worksheet,
-        &["missing".into()]
-    )
-    .is_err());
-    assert!(find_worksheet_query_table(&package, &worksheet, added.relationship_id())
-        .unwrap()
-        .is_some());
+    assert!(reorder_worksheet_query_tables(&mut package, &worksheet, &["missing".into()]).is_err());
+    assert!(
+        find_worksheet_query_table(&package, &worksheet, added.relationship_id())
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[test]
@@ -173,7 +189,9 @@ fn removal_preserves_a_query_table_target_shared_by_another_part() {
     let (mut package, worksheet) = package();
     store_in_package(
         &mut package,
-        &Connections { connections: vec![connection(1, "only")] },
+        &Connections {
+            connections: vec![connection(1, "only")],
+        },
         false,
     )
     .unwrap();
@@ -194,11 +212,8 @@ fn removal_preserves_a_query_table_target_shared_by_another_part() {
     );
     package.add_part(Box::new(owner));
     let target = PackURI::new(added.part_name()).unwrap();
-    assert!(remove_worksheet_query_table(
-        &mut package,
-        &worksheet,
-        added.relationship_id()
-    )
-    .unwrap());
+    assert!(
+        remove_worksheet_query_table(&mut package, &worksheet, added.relationship_id()).unwrap()
+    );
     assert!(package.get_part(&target).is_ok());
 }

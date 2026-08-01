@@ -392,10 +392,12 @@ fn validate_rule(dv: &DataValidation) -> XlsbResult<()> {
     if let Some(list_formula) = &dv.list_formula {
         validate_dval_list_formula(list_formula)?;
     }
-    if dv.string_list && dv.formula1_binary.is_none() && dv.list_formula.is_none() {
-        if let Some(formula) = dv.formula1.as_deref() {
-            let _ = compile_string_list(formula)?;
-        }
+    if dv.string_list
+        && dv.formula1_binary.is_none()
+        && dv.list_formula.is_none()
+        && let Some(formula) = dv.formula1.as_deref()
+    {
+        let _ = compile_string_list(formula)?;
     }
     for (name, value, maximum) in [
         ("error title", dv.error_title.as_deref(), 32),

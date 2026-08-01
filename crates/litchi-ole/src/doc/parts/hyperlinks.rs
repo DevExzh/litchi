@@ -51,7 +51,7 @@ pub struct Hyperlink {
     /// Character position range in the main document
     pub start_cp: u32,
     pub end_cp: u32,
-    /// The raw field code (e.g., "HYPERLINK \"http://example.com\"")
+    /// The raw field code (for example, `HYPERLINK "http://example.com"`)
     pub field_code: String,
     /// The destination (extracted from field code)
     pub destination: String,

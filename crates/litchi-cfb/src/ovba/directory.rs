@@ -627,7 +627,7 @@ fn decode_mbcs(
 }
 
 fn decode_utf16(bytes: &[u8], field: &'static str) -> Result<String, VbaError> {
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err(invalid(format!("{field} byte length is not even")));
     }
     let code_units = bytes

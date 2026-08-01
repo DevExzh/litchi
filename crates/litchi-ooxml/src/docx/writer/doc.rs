@@ -1,6 +1,6 @@
+use crate::docx::OfficeMath;
 /// Document writer implementation for DOCX.
 use crate::docx::alt_chunk::{AltChunk, AltChunkNamespace, scan_alt_chunks};
-use crate::docx::OfficeMath;
 use crate::error::{OoxmlError, Result};
 use std::fmt::Write as FmtWrite;
 
@@ -13,10 +13,10 @@ use super::ole_object::MutableOleObject;
 use super::paragraph::{MutableParagraph, ParagraphElement};
 use super::section::SectionProperties;
 use super::smartart::{MAX_SMART_ARTS, MutableSmartArt};
-use super::vml_shape::MutableVmlShape;
 use super::table::MutableTable;
 use super::theme::MutableTheme;
 use super::toc::TableOfContents;
+use super::vml_shape::MutableVmlShape;
 use super::watermark::{ImageWatermark, Watermark};
 use std::collections::HashSet;
 // Import settings types
@@ -238,10 +238,7 @@ impl MutableDocument {
     pub fn from_xml(xml: &str) -> Result<Self> {
         let parsed = DocumentBody::from_xml(xml)?;
         parsed.body.validate_section_placement()?;
-        let section = parsed
-            .body
-            .final_section_properties()?
-            .unwrap_or_default();
+        let section = parsed.body.final_section_properties()?.unwrap_or_default();
         Ok(Self {
             body: parsed.body,
             toc_config: None,
@@ -291,7 +288,8 @@ impl MutableDocument {
         properties: SectionProperties,
     ) -> Result<()> {
         properties.validate()?;
-        self.body.insert_section_break(paragraph_index, properties)?;
+        self.body
+            .insert_section_break(paragraph_index, properties)?;
         self.modified = true;
         Ok(())
     }
@@ -320,11 +318,7 @@ impl MutableDocument {
     }
 
     /// Move a section break to the end of another paragraph.
-    pub fn move_section_break(
-        &mut self,
-        index: usize,
-        after_paragraph: usize,
-    ) -> Result<()> {
+    pub fn move_section_break(&mut self, index: usize, after_paragraph: usize) -> Result<()> {
         let properties = self.remove_section_break(index)?;
         self.insert_section_break(after_paragraph, properties)
     }
@@ -438,7 +432,10 @@ impl MutableDocument {
     /// payload is stored verbatim as an inert `/word/embeddings/oleObjectN.bin`
     /// part and is discoverable through
     /// [`crate::docx::Package::embedded_parts`] after save and reopen.
-    pub fn add_ole_object(&mut self, mut object: MutableOleObject) -> Result<&mut MutableOleObject> {
+    pub fn add_ole_object(
+        &mut self,
+        mut object: MutableOleObject,
+    ) -> Result<&mut MutableOleObject> {
         if object.shape_id.is_empty() {
             let mut number = self.next_ole_shape_number;
             let shape_id = loop {
@@ -477,10 +474,7 @@ impl MutableDocument {
             return true;
         }
         let preserved_hit = |raw: &str| raw.contains(shape_id);
-        if self
-            .preserved_prefix
-            .as_deref()
-            .is_some_and(preserved_hit)
+        if self.preserved_prefix.as_deref().is_some_and(preserved_hit)
             || self.preserved_suffix.as_deref().is_some_and(preserved_hit)
         {
             return true;
@@ -698,9 +692,7 @@ impl MutableDocument {
             .footnotes
             .iter()
             .position(|note| note.id == id)
-            .ok_or_else(|| {
-                OoxmlError::InvalidFormat(format!("footnote ID {id} does not exist"))
-            })?;
+            .ok_or_else(|| OoxmlError::InvalidFormat(format!("footnote ID {id} does not exist")))?;
         let removed = self.footnotes.remove(index);
         self.strip_note_references(true, id);
         self.modified = true;
@@ -728,9 +720,7 @@ impl MutableDocument {
             .endnotes
             .iter()
             .position(|note| note.id == id)
-            .ok_or_else(|| {
-                OoxmlError::InvalidFormat(format!("endnote ID {id} does not exist"))
-            })?;
+            .ok_or_else(|| OoxmlError::InvalidFormat(format!("endnote ID {id} does not exist")))?;
         let removed = self.endnotes.remove(index);
         self.strip_note_references(false, id);
         self.modified = true;
@@ -816,9 +806,7 @@ impl MutableDocument {
             .comments
             .iter()
             .position(|comment| comment.id() == id)
-            .ok_or_else(|| {
-                OoxmlError::InvalidFormat(format!("comment ID {id} does not exist"))
-            })?;
+            .ok_or_else(|| OoxmlError::InvalidFormat(format!("comment ID {id} does not exist")))?;
         self.modified = true;
         Ok(self.comments.remove(index))
     }
@@ -2135,8 +2123,11 @@ impl DocumentBody {
             .iter()
             .enumerate()
             .filter_map(|(index, element)| {
-                matches!(element, BodyElement::Table(_) | BodyElement::PreservedTable(_))
-                    .then_some(index)
+                matches!(
+                    element,
+                    BodyElement::Table(_) | BodyElement::PreservedTable(_)
+                )
+                .then_some(index)
             })
             .collect()
     }
@@ -2191,9 +2182,13 @@ impl DocumentBody {
     /// Remove the paragraph at paragraph-relative `index`; returns the
     /// vacated element position.
     fn remove_paragraph(&mut self, index: usize) -> Result<usize> {
-        let position = self.paragraph_positions().get(index).copied().ok_or_else(|| {
-            OoxmlError::InvalidFormat(format!("paragraph index {index} is out of range"))
-        })?;
+        let position = self
+            .paragraph_positions()
+            .get(index)
+            .copied()
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("paragraph index {index} is out of range"))
+            })?;
         self.elements.remove(position);
         Ok(position)
     }
@@ -2256,9 +2251,13 @@ impl DocumentBody {
         chunk: AltChunk,
         namespace: AltChunkNamespace,
     ) -> Result<AltChunk> {
-        let position = self.alt_chunk_positions().get(index).copied().ok_or_else(|| {
-            OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
-        })?;
+        let position = self
+            .alt_chunk_positions()
+            .get(index)
+            .copied()
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
+            })?;
         let xml = chunk.to_xml(namespace);
         match std::mem::replace(
             &mut self.elements[position],
@@ -2270,9 +2269,13 @@ impl DocumentBody {
     }
 
     fn remove_alt_chunk(&mut self, index: usize) -> Result<AltChunk> {
-        let position = self.alt_chunk_positions().get(index).copied().ok_or_else(|| {
-            OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
-        })?;
+        let position = self
+            .alt_chunk_positions()
+            .get(index)
+            .copied()
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
+            })?;
         match self.elements.remove(position) {
             BodyElement::PreservedAltChunk(_, chunk) => Ok(chunk),
             _ => unreachable!(),
@@ -2396,7 +2399,9 @@ impl DocumentBody {
         self.elements
             .iter()
             .find_map(|element| match element {
-                BodyElement::PreservedSectionProperties(raw) => Some(SectionProperties::from_xml(raw)),
+                BodyElement::PreservedSectionProperties(raw) => {
+                    Some(SectionProperties::from_xml(raw))
+                },
                 _ => None,
             })
             .transpose()
@@ -2552,9 +2557,7 @@ impl DocumentBody {
         let mut current = 0usize;
         for element in &mut self.elements {
             match element {
-                BodyElement::Paragraph(paragraph)
-                    if paragraph.properties.section.is_some() =>
-                {
+                BodyElement::Paragraph(paragraph) if paragraph.properties.section.is_some() => {
                     if current == index {
                         return paragraph.remove_section_break().ok_or_else(|| {
                             OoxmlError::InvalidFormat("section break disappeared".to_string())
@@ -2583,7 +2586,10 @@ impl DocumentBody {
     fn paragraph_element_mut(&mut self, index: usize) -> Option<&mut BodyElement> {
         let mut current = 0usize;
         for element in &mut self.elements {
-            if matches!(element, BodyElement::Paragraph(_) | BodyElement::PreservedParagraph(_)) {
+            if matches!(
+                element,
+                BodyElement::Paragraph(_) | BodyElement::PreservedParagraph(_)
+            ) {
                 if current == index {
                     return Some(element);
                 }
@@ -2606,7 +2612,10 @@ impl DocumentBody {
                 },
                 BodyElement::PreservedParagraph(raw) => {
                     if let Some((start, end)) = paragraph_section_range(raw)? {
-                        collect_section_parts(&SectionProperties::from_xml(&raw[start..end])?, parts)?;
+                        collect_section_parts(
+                            &SectionProperties::from_xml(&raw[start..end])?,
+                            parts,
+                        )?;
                     }
                 },
                 _ => {},
@@ -2743,7 +2752,9 @@ fn paragraph_section_range(xml: &str) -> Result<Option<(usize, usize)>> {
             "paragraph section properties must be inside one pPr".to_string(),
         ));
     }
-    let close = xml[..properties[0].1].rfind("</").unwrap_or(properties[0].1);
+    let close = xml[..properties[0].1]
+        .rfind("</")
+        .unwrap_or(properties[0].1);
     if !xml[section.1..close].trim().is_empty() {
         return Err(OoxmlError::InvalidFormat(
             "paragraph section properties must be the final pPr child".to_string(),
@@ -2922,13 +2933,15 @@ fn push_raw_body_xml(
                     "http://purl.oclc.org/ooxml/officeDocument/relationships",
                 ),
             ];
-            let parsed = namespace_pairs.into_iter().find_map(|(word, relationship)| {
-                let wrapped = format!(
-                    r#"<root xmlns:w="{word}" xmlns:r="{relationship}">{raw_xml}</root>"#
-                );
-                let mut chunks = scan_alt_chunks(wrapped.as_bytes()).ok()?;
-                (chunks.len() == 1).then(|| chunks.pop_first().expect("length checked").1)
-            });
+            let parsed = namespace_pairs
+                .into_iter()
+                .find_map(|(word, relationship)| {
+                    let wrapped = format!(
+                        r#"<root xmlns:w="{word}" xmlns:r="{relationship}">{raw_xml}</root>"#
+                    );
+                    let mut chunks = scan_alt_chunks(wrapped.as_bytes()).ok()?;
+                    (chunks.len() == 1).then(|| chunks.pop_first().expect("length checked").1)
+                });
             BodyElement::PreservedAltChunk(
                 raw_xml,
                 parsed.ok_or_else(|| {

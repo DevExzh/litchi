@@ -10,9 +10,9 @@
 mod model;
 pub(crate) mod package;
 mod parse;
-pub(crate) mod write;
 #[cfg(test)]
 mod tests;
+pub(crate) mod write;
 
 pub use model::{
     XlsbCommandType, XlsbConnection, XlsbConnectionParameter, XlsbConnectionProperties,

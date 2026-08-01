@@ -186,8 +186,14 @@ impl MutableTable {
     }
 
     fn ensure_local_id_available(&self, id: u32) -> Result<()> {
-        if self.revision.as_ref().is_some_and(|(_, value)| value.id() == id)
-            || self.property_change.as_ref().is_some_and(|value| value.metadata.id() == id)
+        if self
+            .revision
+            .as_ref()
+            .is_some_and(|(_, value)| value.id() == id)
+            || self
+                .property_change
+                .as_ref()
+                .is_some_and(|value| value.metadata.id() == id)
         {
             return Err(OoxmlError::InvalidFormat(format!(
                 "duplicate table revision ID {id}"
@@ -226,7 +232,10 @@ impl MutableTable {
             if let Some(border) = border {
                 Self::write_border(xml, name, border)?;
             } else if default_missing {
-                write!(xml, "<w:{name} w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"000000\"/>")?;
+                write!(
+                    xml,
+                    "<w:{name} w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"000000\"/>"
+                )?;
             }
         }
         write!(xml, "</w:{wrapper}>")?;
@@ -251,15 +260,29 @@ impl MutableTable {
                 )))
             }
         };
-        if let Some((_, metadata)) = &self.revision { insert(metadata)?; }
-        if let Some(change) = &self.property_change { insert(&change.metadata)?; }
+        if let Some((_, metadata)) = &self.revision {
+            insert(metadata)?;
+        }
+        if let Some(change) = &self.property_change {
+            insert(&change.metadata)?;
+        }
         for row in &self.rows {
-            if let Some((_, metadata)) = &row.revision { insert(metadata)?; }
-            if let Some(change) = &row.property_change { insert(&change.metadata)?; }
+            if let Some((_, metadata)) = &row.revision {
+                insert(metadata)?;
+            }
+            if let Some(change) = &row.property_change {
+                insert(&change.metadata)?;
+            }
             for cell in &row.cells {
-                if let Some((_, metadata)) = &cell.revision { insert(metadata)?; }
-                if let Some(change) = &cell.merge_change { insert(&change.metadata)?; }
-                if let Some(change) = &cell.property_change { insert(&change.metadata)?; }
+                if let Some((_, metadata)) = &cell.revision {
+                    insert(metadata)?;
+                }
+                if let Some(change) = &cell.merge_change {
+                    insert(&change.metadata)?;
+                }
+                if let Some(change) = &cell.property_change {
+                    insert(&change.metadata)?;
+                }
             }
         }
         Ok(())
@@ -392,7 +415,9 @@ impl MutableRow {
         previous: &MutableRow,
     ) -> Result<&mut Self> {
         if self.property_change.is_some() {
-            return Err(OoxmlError::InvalidFormat("row property revision already exists".into()));
+            return Err(OoxmlError::InvalidFormat(
+                "row property revision already exists".into(),
+            ));
         }
         if previous.revision.is_some() || previous.property_change.is_some() {
             return Err(OoxmlError::InvalidFormat(
@@ -400,7 +425,10 @@ impl MutableRow {
             ));
         }
         self.ensure_local_id_available(metadata.id())?;
-        self.property_change = Some(PropertyChange { metadata, previous: previous.division_id.clone() });
+        self.property_change = Some(PropertyChange {
+            metadata,
+            previous: previous.division_id.clone(),
+        });
         Ok(self)
     }
 
@@ -409,10 +437,18 @@ impl MutableRow {
     }
 
     fn ensure_local_id_available(&self, id: u32) -> Result<()> {
-        if self.revision.as_ref().is_some_and(|(_, value)| value.id() == id)
-            || self.property_change.as_ref().is_some_and(|value| value.metadata.id() == id)
+        if self
+            .revision
+            .as_ref()
+            .is_some_and(|(_, value)| value.id() == id)
+            || self
+                .property_change
+                .as_ref()
+                .is_some_and(|value| value.metadata.id() == id)
         {
-            return Err(OoxmlError::InvalidFormat(format!("duplicate row revision ID {id}")));
+            return Err(OoxmlError::InvalidFormat(format!(
+                "duplicate row revision ID {id}"
+            )));
         }
         Ok(())
     }
@@ -578,10 +614,16 @@ impl MutableCell {
             ));
         }
         if self.merge_change.is_some() {
-            return Err(OoxmlError::InvalidFormat("cell merge revision already exists".into()));
+            return Err(OoxmlError::InvalidFormat(
+                "cell merge revision already exists".into(),
+            ));
         }
         self.ensure_local_id_available(metadata.id())?;
-        self.merge_change = Some(CellMergeChange { metadata, original, current });
+        self.merge_change = Some(CellMergeChange {
+            metadata,
+            original,
+            current,
+        });
         Ok(self)
     }
 
@@ -591,15 +633,23 @@ impl MutableCell {
         previous: &MutableCell,
     ) -> Result<&mut Self> {
         if self.property_change.is_some() {
-            return Err(OoxmlError::InvalidFormat("cell property revision already exists".into()));
+            return Err(OoxmlError::InvalidFormat(
+                "cell property revision already exists".into(),
+            ));
         }
-        if previous.revision.is_some() || previous.merge_change.is_some() || previous.property_change.is_some() {
+        if previous.revision.is_some()
+            || previous.merge_change.is_some()
+            || previous.property_change.is_some()
+        {
             return Err(OoxmlError::InvalidFormat(
                 "previous cell properties must not contain revision metadata".into(),
             ));
         }
         self.ensure_local_id_available(metadata.id())?;
-        self.property_change = Some(PropertyChange { metadata, previous: previous.properties.clone() });
+        self.property_change = Some(PropertyChange {
+            metadata,
+            previous: previous.properties.clone(),
+        });
         Ok(self)
     }
 
@@ -608,11 +658,22 @@ impl MutableCell {
     }
 
     fn ensure_local_id_available(&self, id: u32) -> Result<()> {
-        if self.revision.as_ref().is_some_and(|(_, value)| value.id() == id)
-            || self.merge_change.as_ref().is_some_and(|value| value.metadata.id() == id)
-            || self.property_change.as_ref().is_some_and(|value| value.metadata.id() == id)
+        if self
+            .revision
+            .as_ref()
+            .is_some_and(|(_, value)| value.id() == id)
+            || self
+                .merge_change
+                .as_ref()
+                .is_some_and(|value| value.metadata.id() == id)
+            || self
+                .property_change
+                .as_ref()
+                .is_some_and(|value| value.metadata.id() == id)
         {
-            return Err(OoxmlError::InvalidFormat(format!("duplicate cell revision ID {id}")));
+            return Err(OoxmlError::InvalidFormat(format!(
+                "duplicate cell revision ID {id}"
+            )));
         }
         Ok(())
     }
@@ -631,14 +692,18 @@ impl MutableCell {
         if let Some(state) = properties.vertical_merge {
             match state {
                 VMergeState::Restart => xml.push_str("<w:vMerge w:val=\"restart\"/>"),
-                VMergeState::Continue => xml.push_str("<w:vMerge/>")
+                VMergeState::Continue => xml.push_str("<w:vMerge/>"),
             }
         }
         if let Some(borders) = &properties.borders {
             MutableTable::write_borders(xml, "tcBorders", borders, false)?;
         }
         if let Some(color) = &properties.background_color {
-            write!(xml, "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>", escape_xml(color))?;
+            write!(
+                xml,
+                "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>",
+                escape_xml(color)
+            )?;
         }
         Ok(())
     }
@@ -647,7 +712,11 @@ impl MutableCell {
         xml.push_str("<w:tc>");
 
         // Write cell properties if any
-        if self.has_properties() || self.revision.is_some() || self.merge_change.is_some() || self.property_change.is_some() {
+        if self.has_properties()
+            || self.revision.is_some()
+            || self.merge_change.is_some()
+            || self.property_change.is_some()
+        {
             xml.push_str("<w:tcPr>");
             Self::write_property_values(xml, &self.properties)?;
             if let Some((kind, metadata)) = &self.revision {
@@ -658,7 +727,12 @@ impl MutableCell {
             if let Some(change) = &self.merge_change {
                 xml.push_str("<w:cellMerge");
                 change.metadata.write_attributes(xml)?;
-                write!(xml, " w:vMerge=\"{}\" w:vMergeOrig=\"{}\"/>", change.current.token(), change.original.token())?;
+                write!(
+                    xml,
+                    " w:vMerge=\"{}\" w:vMergeOrig=\"{}\"/>",
+                    change.current.token(),
+                    change.original.token()
+                )?;
             }
             if let Some(change) = &self.property_change {
                 xml.push_str("<w:tcPrChange");
@@ -773,7 +847,10 @@ mod revision_tests {
         assert!(cell_marker < cell_merge && cell_merge < cell_change);
 
         let parsed = Table::new(xml.into_bytes()).revisions().unwrap();
-        let kinds: Vec<_> = parsed.iter().map(|revision| revision.revision_type()).collect();
+        let kinds: Vec<_> = parsed
+            .iter()
+            .map(|revision| revision.revision_type())
+            .collect();
         for kind in [
             RevisionType::TableInsert,
             RevisionType::TablePropertiesChange,

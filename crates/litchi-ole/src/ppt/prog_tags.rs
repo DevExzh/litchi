@@ -178,7 +178,10 @@ impl PowerPointProgTags {
     /// Parse the `SlideProgTagsContainer` of a slide-like container record
     /// (`SlideContainer`, `NotesContainer`, `MainMasterContainer`, or
     /// `HandoutContainer`; MS-PPT section 2.5.19).
-    pub fn parse_slide(container: &PptRecord, limits: PowerPointProgTagLimits) -> Result<Option<Self>> {
+    pub fn parse_slide(
+        container: &PptRecord,
+        limits: PowerPointProgTagLimits,
+    ) -> Result<Option<Self>> {
         let Some(record) = single_child(container, PptRecordType::ProgTags)? else {
             return Ok(None);
         };
@@ -273,7 +276,12 @@ impl PowerPointProgTags {
     /// Serialize a complete `ProgTags` container record.
     pub fn to_bytes(&self, limits: PowerPointProgTagLimits) -> Result<Vec<u8>> {
         let payload = self.to_payload(limits)?;
-        encode_record(0x0f, self.instance, PptRecordType::ProgTags.as_u16(), &payload)
+        encode_record(
+            0x0f,
+            self.instance,
+            PptRecordType::ProgTags.as_u16(),
+            &payload,
+        )
     }
 
     /// Serialize only the `ProgTags` container payload.
@@ -292,7 +300,11 @@ impl PowerPointProgTags {
             )?;
             payload.extend_from_slice(&encoded);
         }
-        check_limit(payload.len(), limits.max_container_bytes, "ProgTags payload")?;
+        check_limit(
+            payload.len(),
+            limits.max_container_bytes,
+            "ProgTags payload",
+        )?;
         // Reparse before returning so public-field mutations cannot serialize an
         // invalid duplicate/version combination or bypass any current limit.
         Self::parse_payload(&payload, self.instance, self.scope, limits)?;
@@ -339,7 +351,11 @@ fn parse_string_tag(
     record: RawRecord,
     limits: PowerPointProgTagLimits,
 ) -> Result<PowerPointProgStringTag> {
-    require_container_header(&record, PptRecordType::ProgStringTag, "ProgStringTagContainer")?;
+    require_container_header(
+        &record,
+        PptRecordType::ProgStringTag,
+        "ProgStringTagContainer",
+    )?;
     let children = parse_sequence(&record.data, 2, "ProgStringTagContainer")?;
     if children.is_empty() || children.len() > 2 {
         return corrupted("ProgStringTagContainer must contain a name and at most one value");
@@ -365,7 +381,11 @@ fn parse_binary_tag(
     scope: PowerPointProgTagScope,
     limits: PowerPointProgTagLimits,
 ) -> Result<PowerPointProgBinaryTag> {
-    require_container_header(&record, PptRecordType::ProgBinaryTag, "ProgBinaryTagContainer")?;
+    require_container_header(
+        &record,
+        PptRecordType::ProgBinaryTag,
+        "ProgBinaryTagContainer",
+    )?;
     let children = parse_sequence(&record.data, 2, "ProgBinaryTagContainer")?;
     if children.len() != 2 {
         return corrupted("ProgBinaryTagContainer must contain exactly one CString/blob pair");
@@ -439,8 +459,13 @@ fn parse_cstring_atom(
     printable: bool,
     limits: PowerPointProgTagLimits,
 ) -> Result<Vec<u16>> {
-    require_atom_header(record, PptRecordType::CString, instance, "programmable tag CString")?;
-    if record.data.is_empty() || record.data.len() % 2 != 0 {
+    require_atom_header(
+        record,
+        PptRecordType::CString,
+        instance,
+        "programmable tag CString",
+    )?;
+    if record.data.is_empty() || !record.data.len().is_multiple_of(2) {
         return corrupted("Programmable tag CString length must be positive and even");
     }
     let count = record.data.len() / 2;
@@ -705,9 +730,11 @@ mod tests {
                 .name,
             "___PPT9"
         );
-        assert!(parsed
-            .binary_tag(PowerPointProgBinaryTagVersion::PowerPoint11)
-            .is_none());
+        assert!(
+            parsed
+                .binary_tag(PowerPointProgBinaryTagVersion::PowerPoint11)
+                .is_none()
+        );
         let unknown = parsed
             .binary_tag(PowerPointProgBinaryTagVersion::Unknown)
             .unwrap();
@@ -723,23 +750,27 @@ mod tests {
             binary_tag("___PPT9", &versioned_payload()),
         ]
         .concat();
-        assert!(PowerPointProgTags::parse_payload(
-            &duplicate,
-            0,
-            PowerPointProgTagScope::Document,
-            limits
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &duplicate,
+                0,
+                PowerPointProgTagScope::Document,
+                limits
+            )
+            .is_err()
+        );
 
         // A versioned tag whose blob is not a strict record sequence is invalid.
         let invalid_blob = binary_tag("___PPT10", &[1, 2, 3]);
-        assert!(PowerPointProgTags::parse_payload(
-            &invalid_blob,
-            0,
-            PowerPointProgTagScope::Document,
-            limits
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &invalid_blob,
+                0,
+                PowerPointProgTagScope::Document,
+                limits
+            )
+            .is_err()
+        );
 
         let mut missing_blob = record(
             0,
@@ -756,22 +787,26 @@ mod tests {
             PptRecordType::ProgBinaryTag.as_u16(),
             &missing_blob,
         );
-        assert!(PowerPointProgTags::parse_payload(
-            &missing_blob,
-            0,
-            PowerPointProgTagScope::Document,
-            limits
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &missing_blob,
+                0,
+                PowerPointProgTagScope::Document,
+                limits
+            )
+            .is_err()
+        );
 
         let disallowed = record(0, 0, PptRecordType::CString.as_u16(), &[65, 0]);
-        assert!(PowerPointProgTags::parse_payload(
-            &disallowed,
-            0,
-            PowerPointProgTagScope::Document,
-            limits
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &disallowed,
+                0,
+                PowerPointProgTagScope::Document,
+                limits
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -781,13 +816,15 @@ mod tests {
 
         let mut truncated = valid.clone();
         truncated.pop();
-        assert!(PowerPointProgTags::parse_payload(
-            &truncated,
-            0,
-            PowerPointProgTagScope::Document,
-            defaults
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &truncated,
+                0,
+                PowerPointProgTagScope::Document,
+                defaults
+            )
+            .is_err()
+        );
 
         let invalid_utf16 = record(0, 0, PptRecordType::CString.as_u16(), &[0x00, 0xd8]);
         let invalid_utf16 = record(
@@ -796,22 +833,26 @@ mod tests {
             PptRecordType::ProgStringTag.as_u16(),
             &invalid_utf16,
         );
-        assert!(PowerPointProgTags::parse_payload(
-            &invalid_utf16,
-            0,
-            PowerPointProgTagScope::Document,
-            defaults
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &invalid_utf16,
+                0,
+                PowerPointProgTagScope::Document,
+                defaults
+            )
+            .is_err()
+        );
 
         let control_name = string_tag("bad\nname", None);
-        assert!(PowerPointProgTags::parse_payload(
-            &control_name,
-            0,
-            PowerPointProgTagScope::Document,
-            defaults
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &control_name,
+                0,
+                PowerPointProgTagScope::Document,
+                defaults
+            )
+            .is_err()
+        );
 
         let cases = [
             PowerPointProgTagLimits {
@@ -836,26 +877,30 @@ mod tests {
             },
         ];
         for limits in cases {
-            assert!(PowerPointProgTags::parse_payload(
-                &valid,
-                0,
-                PowerPointProgTagScope::Document,
-                limits
-            )
-            .is_err());
+            assert!(
+                PowerPointProgTags::parse_payload(
+                    &valid,
+                    0,
+                    PowerPointProgTagScope::Document,
+                    limits
+                )
+                .is_err()
+            );
         }
 
         let known = binary_tag("___PPT12", &versioned_payload());
-        assert!(PowerPointProgTags::parse_payload(
-            &known,
-            0,
-            PowerPointProgTagScope::Document,
-            PowerPointProgTagLimits {
-                max_binary_records: 1,
-                ..defaults
-            }
-        )
-        .is_err());
+        assert!(
+            PowerPointProgTags::parse_payload(
+                &known,
+                0,
+                PowerPointProgTagScope::Document,
+                PowerPointProgTagLimits {
+                    max_binary_records: 1,
+                    ..defaults
+                }
+            )
+            .is_err()
+        );
     }
 
     fn parsed_container(version: u16, kind: PptRecordType, payload: &[u8]) -> PptRecord {
@@ -881,12 +926,20 @@ mod tests {
 
         // A document without a DocInfoListContainer has no tags.
         let bare = parsed_container(0x0f, PptRecordType::Document, &[]);
-        assert!(PowerPointProgTags::parse_document(&bare, limits).unwrap().is_none());
+        assert!(
+            PowerPointProgTags::parse_document(&bare, limits)
+                .unwrap()
+                .is_none()
+        );
 
         // A DocInfoListContainer without ProgTags has no tags.
         let empty_list = record(0x0f, 0, PptRecordType::DocInfoList.as_u16(), &[]);
         let no_tags = parsed_container(0x0f, PptRecordType::Document, &empty_list);
-        assert!(PowerPointProgTags::parse_document(&no_tags, limits).unwrap().is_none());
+        assert!(
+            PowerPointProgTags::parse_document(&no_tags, limits)
+                .unwrap()
+                .is_none()
+        );
 
         // Duplicate DocInfoListContainer or ProgTags children are rejected.
         let duplicate_list = parsed_container(
@@ -924,12 +977,18 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(parsed.scope, PowerPointProgTagScope::Slide);
-        assert!(parsed
-            .binary_tag(PowerPointProgBinaryTagVersion::PowerPoint9)
-            .is_some());
+        assert!(
+            parsed
+                .binary_tag(PowerPointProgBinaryTagVersion::PowerPoint9)
+                .is_some()
+        );
 
         let bare = parsed_container(0x0f, PptRecordType::Slide, &[]);
-        assert!(PowerPointProgTags::parse_slide(&bare, limits).unwrap().is_none());
+        assert!(
+            PowerPointProgTags::parse_slide(&bare, limits)
+                .unwrap()
+                .is_none()
+        );
 
         let duplicate = parsed_container(
             0x0f,

@@ -304,7 +304,8 @@ impl CookieElement for GrammarCookie {
         self.icdb()
     }
     fn header_checker(&self) -> Option<(u8, u8)> {
-        self.is_header().then_some((self.lid_primary(), self.lid_sub()))
+        self.is_header()
+            .then_some((self.lid_primary(), self.lid_sub()))
     }
 }
 
@@ -372,7 +373,7 @@ impl<E: CookieElement> GrammarCookiePlc<E> {
         cookie_data_len: Option<u32>,
     ) -> Result<Self> {
         let stride = 4 + E::SIZE;
-        if data.len() < 4 || (data.len() - 4) % stride != 0 {
+        if data.len() < 4 || !(data.len() - 4).is_multiple_of(stride) {
             return Err(corrupted(format!(
                 "{} PLC length must have form {}n + 4",
                 E::KIND,
@@ -479,16 +480,19 @@ fn validate_entries<E: CookieElement>(
             )));
         }
         if previous.is_some_and(|value| entry.start_cp < value) {
-            return Err(corrupted(format!("{} PLC CPs are not nondecreasing", E::KIND)));
+            return Err(corrupted(format!(
+                "{} PLC CPs are not nondecreasing",
+                E::KIND
+            )));
         }
         previous = Some(entry.start_cp);
-        if let Some(checker) = entry.cookie.header_checker() {
-            if !header_checkers.insert(checker) {
-                return Err(corrupted(format!(
-                    "{} PLC has duplicate header entries for one grammar checker",
-                    E::KIND
-                )));
-            }
+        if let Some(checker) = entry.cookie.header_checker()
+            && !header_checkers.insert(checker)
+        {
+            return Err(corrupted(format!(
+                "{} PLC has duplicate header entries for one grammar checker",
+                E::KIND
+            )));
         }
     }
     if terminal_cp > MAX_CP {
@@ -574,8 +578,7 @@ fn parse_fib_table<E: CookieElement>(
     if length == 0 {
         return Ok(None);
     }
-    let start =
-        usize::try_from(offset).map_err(|_| corrupted("cookie PLC offset is too large"))?;
+    let start = usize::try_from(offset).map_err(|_| corrupted("cookie PLC offset is too large"))?;
     let length =
         usize::try_from(length).map_err(|_| corrupted("cookie PLC length is too large"))?;
     let end = start
@@ -627,14 +630,21 @@ mod tests {
         let flags = u16::from_le_bytes([bytes[8], bytes[9]]);
         assert_eq!(flags, 0x1 | 0x4 | 0x05 << 3 | 0x09 << 8);
         assert!(GrammarCookie::from_bytes(&bytes[..9]).is_err());
-        assert!(GrammarCookie::try_new(1, 0, 0, CookieErrorType::Default, false, 0x20, 0, false).is_err());
-        assert!(GrammarCookie::try_new(1, 0, 0, CookieErrorType::Default, false, 0, 0x80, false).is_err());
+        assert!(
+            GrammarCookie::try_new(1, 0, 0, CookieErrorType::Default, false, 0x20, 0, false)
+                .is_err()
+        );
+        assert!(
+            GrammarCookie::try_new(1, 0, 0, CookieErrorType::Default, false, 0, 0x80, false)
+                .is_err()
+        );
     }
 
     #[test]
     fn fcksold_validates_signed_ranges_and_zeroes_padding() {
-        let legacy = LegacyGrammarCookie::try_new(0x0409, 5, -3, CookieErrorType::Homonym, true, 12)
-            .unwrap();
+        let legacy =
+            LegacyGrammarCookie::try_new(0x0409, 5, -3, CookieErrorType::Homonym, true, 12)
+                .unwrap();
         let bytes = legacy.to_bytes();
         assert_eq!(bytes.len(), LegacyGrammarCookie::SIZE);
         assert_eq!(&bytes[6..8], &[0, 0]);
@@ -647,13 +657,19 @@ mod tests {
         messy[6] = 0xFF;
         messy[9] |= 0x7C;
         assert_eq!(LegacyGrammarCookie::from_bytes(&messy).unwrap(), legacy);
-        assert!(LegacyGrammarCookie::try_new(0, -1, 0, CookieErrorType::Default, false, 0).is_err());
+        assert!(
+            LegacyGrammarCookie::try_new(0, -1, 0, CookieErrorType::Default, false, 0).is_err()
+        );
         assert!(LegacyGrammarCookie::try_new(0, 0, 1, CookieErrorType::Default, false, 0).is_err());
     }
 
     #[test]
     fn plcfcookie_parses_and_round_trips() {
-        let cookies = [cookie(7, 0, false), cookie(3, 40, true), cookie(2, 48, false)];
+        let cookies = [
+            cookie(7, 0, false),
+            cookie(3, 40, true),
+            cookie(2, 48, false),
+        ];
         let bytes = plc_bytes(&[10, 20, 20], 30, &cookies);
         let table = GrammarCookieTable::parse_bytes(&bytes).unwrap();
         assert_eq!(table.len(), 3);
@@ -702,17 +718,9 @@ mod tests {
         let bytes = plc_bytes(&[10, 20], 30, &[cookie(1, 0, true), cookie(1, 4, true)]);
         assert!(GrammarCookieTable::parse_bytes(&bytes).is_err());
         // Distinct checkers may each carry one header entry.
-        let other_checker = GrammarCookie::try_new(
-            1,
-            0,
-            8,
-            CookieErrorType::Default,
-            false,
-            0x05,
-            0x0A,
-            true,
-        )
-        .unwrap();
+        let other_checker =
+            GrammarCookie::try_new(1, 0, 8, CookieErrorType::Default, false, 0x05, 0x0A, true)
+                .unwrap();
         let bytes = plc_bytes(&[10, 20], 30, &[cookie(1, 0, true), other_checker]);
         assert!(GrammarCookieTable::parse_bytes(&bytes).is_ok());
     }
@@ -737,8 +745,10 @@ mod tests {
         let legacy = plc_bytes(
             &[2],
             20,
-            &[LegacyGrammarCookie::try_new(0x0409, 3, 0, CookieErrorType::Default, false, 8)
-                .unwrap()],
+            &[
+                LegacyGrammarCookie::try_new(0x0409, 3, 0, CookieErrorType::Default, false, 8)
+                    .unwrap(),
+            ],
         );
         let mut table_stream = vec![0u8; 16];
         table_stream.extend_from_slice(&current);
@@ -746,7 +756,11 @@ mod tests {
         let fib = fib_with_pointers(&[
             (COOKIE_DATA_FIB_INDEX, 0x800, 16),
             (COOKIE_FIB_INDEX, 16, current.len() as u32),
-            (COOKIE_OLD_FIB_INDEX, (16 + current.len()) as u32, legacy.len() as u32),
+            (
+                COOKIE_OLD_FIB_INDEX,
+                (16 + current.len()) as u32,
+                legacy.len() as u32,
+            ),
         ]);
         let tables = GrammarCookieTables::parse(&fib, &table_stream).unwrap();
         assert_eq!(tables.current().unwrap().len(), 1);

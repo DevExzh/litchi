@@ -674,12 +674,20 @@ mod tests {
 
         package.set_vba_project(&authored_project()).unwrap();
         assert_eq!(
-            package.opc_package().get_part(&source).unwrap().content_type(),
+            package
+                .opc_package()
+                .get_part(&source)
+                .unwrap()
+                .content_type(),
             content_type::WML_TEMPLATE_MACRO_MAIN
         );
         package.remove_vba_project().unwrap();
         assert_eq!(
-            package.opc_package().get_part(&source).unwrap().content_type(),
+            package
+                .opc_package()
+                .get_part(&source)
+                .unwrap()
+                .content_type(),
             content_type::WML_TEMPLATE_MAIN
         );
     }

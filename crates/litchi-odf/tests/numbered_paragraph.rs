@@ -35,8 +35,7 @@ fn numbered_paragraphs_are_extracted_with_numbering_attributes() {
 #[test]
 fn numbered_paragraphs_convert_to_plain_paragraphs() {
     let elements = DocumentParser::parse_elements_in_order(CONTENT).unwrap();
-    let DocumentOrderElement::NumberedParagraph(para) = elements.into_iter().nth(1).unwrap()
-    else {
+    let DocumentOrderElement::NumberedParagraph(para) = elements.into_iter().nth(1).unwrap() else {
         panic!()
     };
     let plain = para.into_paragraph();

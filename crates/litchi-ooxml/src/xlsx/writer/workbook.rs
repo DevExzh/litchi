@@ -11,9 +11,9 @@ use std::fmt::Write as FmtWrite;
 use super::sheet::{MutableWorksheet, NamedRange};
 use super::strings::MutableSharedStrings;
 use super::styles::StylesBuilder;
+use crate::xlsx::ProtectionPasswordVerifier;
 pub use crate::xlsx::workbook_protection::WorkbookProtectionMetadata as WorkbookProtection;
 use crate::xlsx::workbook_protection::write_workbook_protection;
-use crate::xlsx::ProtectionPasswordVerifier;
 
 /// Type alias for cell position to style index mapping.
 type CellStyleMap = HashMap<(u32, u32), usize>;
@@ -529,14 +529,13 @@ impl MutableWorkbookData {
             .iter()
             .any(|pivot| pivot.dest_sheet_index == index)
         {
-            return Err(format!(
-                "cannot remove worksheet {index}: a pivot table targets it"
-            )
-            .into());
+            return Err(
+                format!("cannot remove worksheet {index}: a pivot table targets it").into(),
+            );
         }
-        let position = self.workbook_position(index).ok_or_else(|| {
-            format!("worksheet {index} is missing from the workbook sheet order")
-        })?;
+        let position = self
+            .workbook_position(index)
+            .ok_or_else(|| format!("worksheet {index} is missing from the workbook sheet order"))?;
 
         let removed = self.worksheets.remove(index);
         self.sheet_order.remove(position);
@@ -606,14 +605,15 @@ impl MutableWorkbookData {
     /// names scoped to the removed sheet are dropped and names scoped to
     /// later sheets shift one position up.
     fn remap_sheet_scopes_after_removal(&mut self, position: u32) {
-        self.named_ranges.retain_mut(|range| match range.local_sheet_id {
-            Some(local) if local == position => false,
-            Some(local) if local > position => {
-                range.local_sheet_id = Some(local - 1);
-                true
-            },
-            _ => true,
-        });
+        self.named_ranges
+            .retain_mut(|range| match range.local_sheet_id {
+                Some(local) if local == position => false,
+                Some(local) if local > position => {
+                    range.local_sheet_id = Some(local - 1);
+                    true
+                },
+                _ => true,
+            });
     }
 
     /// Workbook-order position of a sheet slot in the `sheets` sequence
@@ -941,7 +941,9 @@ impl MutableWorkbookData {
 
         // Write workbook protection if configured (must come after workbookPr per OOXML spec)
         if let Some(ref protection) = self.protection {
-            xml.push_str(&write_workbook_protection(protection).map_err(|error| error.to_string())?);
+            xml.push_str(
+                &write_workbook_protection(protection).map_err(|error| error.to_string())?,
+            );
         }
 
         // Add bookViews (required by Excel)
@@ -1186,11 +1188,9 @@ impl MutableWorkbookData {
         use super::sheet::MutableWorksheet;
 
         let mut protection = WorkbookProtection::new();
-        protection.set_workbook_verifier(
-            password.map(|value| {
-                ProtectionPasswordVerifier::Legacy(MutableWorksheet::hash_password(value))
-            }),
-        );
+        protection.set_workbook_verifier(password.map(|value| {
+            ProtectionPasswordVerifier::Legacy(MutableWorksheet::hash_password(value))
+        }));
         protection.set_structure_locked(lock_structure);
         protection.set_windows_locked(lock_windows);
         self.protection = Some(protection);

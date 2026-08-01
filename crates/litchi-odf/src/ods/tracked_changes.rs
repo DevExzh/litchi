@@ -1069,7 +1069,10 @@ impl SpreadsheetTrackedChanges {
                     nodes = nodes.saturating_add(value.cut_offs.len());
                     for cut_off in &value.cut_offs {
                         match cut_off {
-                            SpreadsheetChangeCutOff::Insertion { change_id, position } => {
+                            SpreadsheetChangeCutOff::Insertion {
+                                change_id,
+                                position,
+                            } => {
                                 validate_tracked_string(
                                     change_id,
                                     "insertion cut-off id",
@@ -1102,12 +1105,7 @@ impl SpreadsheetTrackedChanges {
                     validate_tracked_address(&value.address)?;
                     validate_tracked_cell(&value.previous, &mut aggregate)?;
                     if let Some(id) = &value.previous_change_id {
-                        validate_tracked_string(
-                            id,
-                            "previous change id",
-                            false,
-                            &mut aggregate,
-                        )?;
+                        validate_tracked_string(id, "previous change id", false, &mut aggregate)?;
                     }
                     nodes = nodes.saturating_add(3);
                 },
@@ -1236,7 +1234,9 @@ fn validate_tracked_cell(cell: &SpreadsheetTrackedCell, aggregate: &mut usize) -
     )?;
     match &cell.value {
         SpreadsheetTrackedCellValue::Number(value)
-        | SpreadsheetTrackedCellValue::Percentage(value) if !value.is_finite() => {
+        | SpreadsheetTrackedCellValue::Percentage(value)
+            if !value.is_finite() =>
+        {
             return tracked_invalid("tracked cell numeric value must be finite");
         },
         SpreadsheetTrackedCellValue::Currency { value, code } => {
@@ -1262,9 +1262,12 @@ fn validate_tracked_metadata(
     if let Some(id) = &metadata.rejecting_change_id {
         validate_tracked_string(id, "rejecting change id", false, aggregate)?;
     }
-    for value in [metadata.info.creator.as_deref(), metadata.info.date.as_deref()]
-        .into_iter()
-        .flatten()
+    for value in [
+        metadata.info.creator.as_deref(),
+        metadata.info.date.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
     {
         validate_tracked_string(value, "change metadata", true, aggregate)?;
     }
@@ -1298,9 +1301,7 @@ fn validate_tracked_metadata(
                     validate_tracked_cell(cell, aggregate)?;
                 }
                 if address.is_none() && cell.is_none() {
-                    return tracked_invalid(
-                        "cell-content-deletion requires an address or cell",
-                    );
+                    return tracked_invalid("cell-content-deletion requires an address or cell");
                 }
             },
             SpreadsheetNestedDeletion::Change { change_id } => {
@@ -1317,10 +1318,12 @@ fn validate_tracked_reference(
     reference: Option<&str>,
     ids: &std::collections::HashMap<&str, usize>,
 ) -> Result<()> {
-    if let Some(reference) = reference {
-        if !ids.contains_key(reference) {
-            return tracked_invalid(format!("tracked change references unknown id '{reference}'"));
-        }
+    if let Some(reference) = reference
+        && !ids.contains_key(reference)
+    {
+        return tracked_invalid(format!(
+            "tracked change references unknown id '{reference}'"
+        ));
     }
     Ok(())
 }
@@ -1450,7 +1453,11 @@ fn write_tracked_metadata(output: &mut String, metadata: &SpreadsheetChangeMetad
         output.push_str("<table:deletions>");
         for deletion in &metadata.deletions {
             match deletion {
-                SpreadsheetNestedDeletion::CellContent { change_id, address, cell } => {
+                SpreadsheetNestedDeletion::CellContent {
+                    change_id,
+                    address,
+                    cell,
+                } => {
                     output.push_str("<table:cell-content-deletion");
                     if let Some(id) = change_id {
                         push_tracked_attr(output, "table:id", id);
@@ -1488,7 +1495,10 @@ fn write_tracked_cut_offs(output: &mut String, cut_offs: &[SpreadsheetChangeCutO
             _ => "<table:movement-cut-off",
         });
         match value {
-            SpreadsheetChangeCutOff::Insertion { change_id, position } => {
+            SpreadsheetChangeCutOff::Insertion {
+                change_id,
+                position,
+            } => {
                 push_tracked_attr(output, "table:id", change_id);
                 push_tracked_i64(output, "table:position", *position);
             },
@@ -1505,11 +1515,7 @@ fn write_tracked_cut_offs(output: &mut String, cut_offs: &[SpreadsheetChangeCutO
     output.push_str("</table:cut-offs>");
 }
 
-fn write_tracked_range(
-    output: &mut String,
-    name: &str,
-    range: &SpreadsheetTrackedRangeAddress,
-) {
+fn write_tracked_range(output: &mut String, name: &str, range: &SpreadsheetTrackedRangeAddress) {
     output.push_str("<table:");
     output.push_str(name);
     match range {
@@ -1573,17 +1579,29 @@ fn write_tracked_cell(output: &mut String, cell: &SpreadsheetTrackedCell) {
         SpreadsheetTrackedCellValue::Empty => {},
         SpreadsheetTrackedCellValue::Boolean(value) => {
             push_tracked_attr(output, "office:value-type", "boolean");
-            push_tracked_attr(output, "office:boolean-value", if *value { "true" } else { "false" });
+            push_tracked_attr(
+                output,
+                "office:boolean-value",
+                if *value { "true" } else { "false" },
+            );
         },
         SpreadsheetTrackedCellValue::Number(value) => write_tracked_number(output, "float", *value),
-        SpreadsheetTrackedCellValue::Percentage(value) => write_tracked_number(output, "percentage", *value),
+        SpreadsheetTrackedCellValue::Percentage(value) => {
+            write_tracked_number(output, "percentage", *value)
+        },
         SpreadsheetTrackedCellValue::Currency { value, code } => {
             write_tracked_number(output, "currency", *value);
             push_tracked_attr(output, "office:currency", code);
         },
-        SpreadsheetTrackedCellValue::Date(value) => write_tracked_value(output, "date", "office:date-value", value),
-        SpreadsheetTrackedCellValue::Time(value) => write_tracked_value(output, "time", "office:time-value", value),
-        SpreadsheetTrackedCellValue::Text(value) => write_tracked_value(output, "string", "office:string-value", value),
+        SpreadsheetTrackedCellValue::Date(value) => {
+            write_tracked_value(output, "date", "office:date-value", value)
+        },
+        SpreadsheetTrackedCellValue::Time(value) => {
+            write_tracked_value(output, "time", "office:time-value", value)
+        },
+        SpreadsheetTrackedCellValue::Text(value) => {
+            write_tracked_value(output, "string", "office:string-value", value)
+        },
     }
     if cell.display_text.is_empty() {
         output.push_str("/>");
@@ -1961,7 +1979,6 @@ fn resolve_reference(name: &str) -> Result<String> {
     let value = if let Some(value) = builtin {
         value
     } else {
-        
         if let Some(hex) = name.strip_prefix("#x") {
             u32::from_str_radix(hex, 16).ok()
         } else if let Some(decimal) = name.strip_prefix('#') {

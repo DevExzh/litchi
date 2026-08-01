@@ -1,8 +1,8 @@
 use litchi_odf::{
-    MasterDocument, MasterDocumentBuilder, MasterDocumentElement, MasterSection,
-    MasterSubdocument, MutableMasterDocument, OdfDocumentSigner, OdfEncryptionProfile,
-    OdfSignatureAlgorithm, OdfSignatureValidity, OwnedPackage, PackageWriter, Section,
-    SectionDisplay, TableOfContentsSource, TextIndex, TextIndexBody,
+    MasterDocument, MasterDocumentBuilder, MasterDocumentElement, MasterSection, MasterSubdocument,
+    MutableMasterDocument, OdfDocumentSigner, OdfEncryptionProfile, OdfSignatureAlgorithm,
+    OdfSignatureValidity, OwnedPackage, PackageWriter, Section, SectionDisplay,
+    TableOfContentsSource, TextIndex, TextIndexBody,
 };
 
 const ODM: &str = "application/vnd.oasis.opendocument.text-master";
@@ -44,10 +44,11 @@ fn package(content: &str) -> Vec<u8> {
 
 #[test]
 fn builder_authors_odm_and_otm_with_nested_mixed_content() {
-    let mut nested = MasterSection::new(local_section("Outer & 文档", "Local <cached>"))
-        .unwrap();
+    let mut nested = MasterSection::new(local_section("Outer & 文档", "Local <cached>")).unwrap();
     nested
-        .push(MasterDocumentElement::Paragraph("Nested & text".to_string()))
+        .push(MasterDocumentElement::Paragraph(
+            "Nested & text".to_string(),
+        ))
         .unwrap();
     nested
         .push(MasterDocumentElement::Subdocument(
@@ -149,21 +150,27 @@ fn invalid_links_duplicates_depth_and_reorders_roll_back() {
     let fixture = include_str!("fixtures/libreoffice-master-document-content.xml");
     let mut mutable = MutableMasterDocument::from_bytes(package(fixture)).unwrap();
     let before = mutable.content_xml().to_string();
-    assert!(mutable
-        .add_subdocument(&MasterSubdocument::new("Chapter B", "other.odt").unwrap())
-        .is_err());
+    assert!(
+        mutable
+            .add_subdocument(&MasterSubdocument::new("Chapter B", "other.odt").unwrap())
+            .is_err()
+    );
     assert_eq!(mutable.content_xml(), before);
-    assert!(mutable
-        .reorder_subdocuments(&["Chapter A".to_string(), "missing".to_string()])
-        .is_err());
+    assert!(
+        mutable
+            .reorder_subdocuments(&["Chapter A".to_string(), "missing".to_string()])
+            .is_err()
+    );
     assert_eq!(mutable.content_xml(), before);
     assert!(mutable.move_body_element(99, 0).is_err());
     assert_eq!(mutable.content_xml(), before);
 
     let mut builder = MasterDocumentBuilder::new();
-    assert!(builder
-        .add_auxiliary_file("../escape.bin", vec![], None)
-        .is_err());
+    assert!(
+        builder
+            .add_auxiliary_file("../escape.bin", vec![], None)
+            .is_err()
+    );
     builder.add_paragraph("still valid").unwrap();
     assert!(builder.build().is_ok());
 
@@ -199,11 +206,13 @@ fn encrypted_and_signed_master_packages_compose() {
     builder.set_document_signer(signer);
     let bytes = builder.build().unwrap();
     let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
-    assert!(package
-        .verify_document_signatures()
-        .unwrap()
-        .iter()
-        .all(|result| result.validity == OdfSignatureValidity::Valid));
+    assert!(
+        package
+            .verify_document_signatures()
+            .unwrap()
+            .iter()
+            .all(|result| result.validity == OdfSignatureValidity::Valid)
+    );
     let opened = MasterDocument::from_bytes_with_password(bytes, "master-password").unwrap();
     assert_eq!(opened.subdocuments().len(), 1);
 }

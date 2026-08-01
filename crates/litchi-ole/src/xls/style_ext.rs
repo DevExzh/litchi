@@ -183,20 +183,23 @@ impl XlsStyleExt {
             .checked_add(6)
             .and_then(|start| start.checked_add(name_chars * 2))
             .ok_or_else(|| invalid("style name length overflow"))?;
-        let name_bytes = data.get(FRT_HEADER_LEN + 6..name_end).ok_or(XlsError::InvalidLength {
-            expected: name_end,
-            found: data.len(),
-        })?;
+        let name_bytes = data
+            .get(FRT_HEADER_LEN + 6..name_end)
+            .ok_or(XlsError::InvalidLength {
+                expected: name_end,
+                found: data.len(),
+            })?;
         let units = name_bytes
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
         let name = String::from_utf16(&units)
             .map_err(|_| invalid("style name contains invalid UTF-16"))?;
-        let properties = XlsXfProperties::parse(
-            data.get(name_end..)
-                .ok_or(XlsError::InvalidLength { expected: name_end, found: data.len() })?,
-        )?;
+        let properties =
+            XlsXfProperties::parse(data.get(name_end..).ok_or(XlsError::InvalidLength {
+                expected: name_end,
+                found: data.len(),
+            })?)?;
         Ok(Self {
             built_in,
             hidden: flags & HIDDEN != 0,
@@ -233,7 +236,10 @@ impl XlsStyleExt {
         payload.push(flags);
         payload.push(self.category.code());
         payload.extend_from_slice(
-            &self.built_in_data.unwrap_or(NOT_BUILT_IN_DATA).to_le_bytes(),
+            &self
+                .built_in_data
+                .unwrap_or(NOT_BUILT_IN_DATA)
+                .to_le_bytes(),
         );
         payload.extend_from_slice(&(name_units as u16).to_le_bytes());
         for unit in self.name.encode_utf16() {
@@ -282,7 +288,10 @@ mod tests {
         assert_eq!(parsed.category(), XlsStyleCategory::ThemedCell);
         assert_eq!(parsed.built_in_data(), Some(0));
         assert_eq!(parsed.name(), "Heading 1");
-        assert_eq!(parsed.properties().properties(), &[XlsXfProperty::Locked(true)]);
+        assert_eq!(
+            parsed.properties().properties(),
+            &[XlsXfProperty::Locked(true)]
+        );
         assert_eq!(parsed.to_payload().unwrap(), data);
     }
 
@@ -304,14 +313,41 @@ mod tests {
         wrong_rt[0..2].copy_from_slice(&0x087Du16.to_le_bytes());
         assert!(XlsStyleExt::parse(&wrong_rt).is_err());
         // fCustom without fBuiltIn.
-        assert!(XlsStyleExt::parse(&record(0x04, 0x00, NOT_BUILT_IN_DATA, "x", &xf_props_bytes())).is_err());
+        assert!(
+            XlsStyleExt::parse(&record(
+                0x04,
+                0x00,
+                NOT_BUILT_IN_DATA,
+                "x",
+                &xf_props_bytes()
+            ))
+            .is_err()
+        );
         // Reserved category.
-        assert!(XlsStyleExt::parse(&record(0x00, 0x06, NOT_BUILT_IN_DATA, "x", &xf_props_bytes())).is_err());
+        assert!(
+            XlsStyleExt::parse(&record(
+                0x00,
+                0x06,
+                NOT_BUILT_IN_DATA,
+                "x",
+                &xf_props_bytes()
+            ))
+            .is_err()
+        );
         // Custom style with built-in data.
         assert!(XlsStyleExt::parse(&record(0x00, 0x00, 0x0001, "x", &xf_props_bytes())).is_err());
         // Overlong name.
         let long = "x".repeat(256);
-        assert!(XlsStyleExt::parse(&record(0x00, 0x00, NOT_BUILT_IN_DATA, &long, &xf_props_bytes())).is_err());
+        assert!(
+            XlsStyleExt::parse(&record(
+                0x00,
+                0x00,
+                NOT_BUILT_IN_DATA,
+                &long,
+                &xf_props_bytes()
+            ))
+            .is_err()
+        );
         // Builder validation.
         let props = XlsXfProperties::default();
         let mut value =

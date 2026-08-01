@@ -73,7 +73,9 @@ impl XlsCellWatch {
             return Err(invalid("CellWatch FrtRefHeaderU.grbitFrt.fFrtRef is not 1"));
         }
         if flags & FRT_FLAG_ALERT != 0 {
-            return Err(invalid("CellWatch FrtRefHeaderU.grbitFrt.fFrtAlert is not 0"));
+            return Err(invalid(
+                "CellWatch FrtRefHeaderU.grbitFrt.fFrtAlert is not 0",
+            ));
         }
         let row_first = u16::from_le_bytes([data[4], data[5]]);
         let row_last = u16::from_le_bytes([data[6], data[7]]);

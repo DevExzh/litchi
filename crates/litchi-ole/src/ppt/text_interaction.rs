@@ -301,7 +301,8 @@ pub(crate) fn parse_text_bodies(
             let interactions =
                 PowerPointTextInteraction::parse_records(body.iter().copied(), text_units, limits)?;
             let text = exact_text_from_records(body.iter().copied())?;
-            let metachars = crate::ppt::text_metachar::metachars_from_records(body.iter().copied())?;
+            let metachars =
+                crate::ppt::text_metachar::metachars_from_records(body.iter().copied())?;
             result.push(PowerPointTextBodyInteractions {
                 text_header_instance: header.instance,
                 text_type,

@@ -91,10 +91,12 @@ fn package(xml: &str) -> Vec<u8> {
 #[test]
 fn whole_schema_and_granular_crud_save_reopen() {
     let mut document = DatabaseDocument::from_bytes(package(&content("", ""))).unwrap();
-    assert!(document
-        .set_schema_definition(Some(&schema()))
-        .unwrap()
-        .is_none());
+    assert!(
+        document
+            .set_schema_definition(Some(&schema()))
+            .unwrap()
+            .is_none()
+    );
     assert!(document.schema_definition().unwrap().unwrap().tables[2].is_view());
     document.move_schema_table(2, 1).unwrap();
     document.move_schema_column(0, 2, 1).unwrap();
@@ -122,9 +124,11 @@ fn whole_schema_and_granular_crud_save_reopen() {
     std::fs::remove_file(path).unwrap();
     let parsed = reopened.schema_definition().unwrap().unwrap();
     assert_eq!(parsed.tables.len(), 3);
-    assert!(String::from_utf8(reopened.get_file("content.xml").unwrap())
-        .unwrap()
-        .contains("用户 &amp; users"));
+    assert!(
+        String::from_utf8(reopened.get_file("content.xml").unwrap())
+            .unwrap()
+            .contains("用户 &amp; users")
+    );
     assert_eq!(reopened.get_file("database/data").unwrap(), b"opaque");
 }
 
@@ -145,8 +149,7 @@ fn dangling_duplicates_and_destructive_edits_are_atomic() {
         assert_eq!(document.to_bytes(), before);
     }
     let mut invalid = schema();
-    invalid.tables[1].keys.as_mut().unwrap()[0].column_groups[0][0]
-        .related_column_name = None;
+    invalid.tables[1].keys.as_mut().unwrap()[0].column_groups[0][0].related_column_name = None;
     assert!(invalid.validate().is_err());
     let mut invalid = schema();
     invalid.tables[0].keys.as_mut().unwrap()[0].referenced_table_name = Some("orders".into());
@@ -161,13 +164,7 @@ fn relation_column_crud_and_clear_are_validated() {
     let mut document = DatabaseDocument::from_bytes(package(&content("", ""))).unwrap();
     document.set_schema_definition(Some(&schema())).unwrap();
     document
-        .update_schema_key_column(
-            1,
-            0,
-            0,
-            0,
-            OdfDatabaseKeyColumn::foreign("user_id", "id"),
-        )
+        .update_schema_key_column(1, 0, 0, 0, OdfDatabaseKeyColumn::foreign("user_id", "id"))
         .unwrap();
     document.remove_schema_key_column(1, 0, 0, 0).unwrap();
     let before = document.to_bytes();
@@ -175,16 +172,23 @@ fn relation_column_crud_and_clear_are_validated() {
     assert_eq!(document.to_bytes(), before);
     document.remove_schema_key(1, 0).unwrap();
     document.remove_schema_table(0).unwrap();
-    assert_eq!(document.clear_schema_definition().unwrap().unwrap().tables.len(), 2);
+    assert_eq!(
+        document
+            .clear_schema_definition()
+            .unwrap()
+            .unwrap()
+            .tables
+            .len(),
+        2
+    );
     assert!(document.schema_definition().unwrap().is_none());
 }
 
 #[test]
 fn libreoffice_table_representation_variation_is_preserved() {
-    let bytes = include_bytes!(
-        "../../../test-data/libreoffice-core/extras/source/database/biblio.odb"
-    )
-    .to_vec();
+    let bytes =
+        include_bytes!("../../../test-data/libreoffice-core/extras/source/database/biblio.odb")
+            .to_vec();
     let mut document = DatabaseDocument::from_bytes(bytes).unwrap();
     let original = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
     let settings = document.get_file("settings.xml").unwrap();
@@ -216,15 +220,19 @@ fn encrypted_and_signed_schema_package_reopens() {
         .unwrap();
     writer.add_file("content.xml", xml.as_bytes()).unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
-    assert!(OwnedPackage::from_bytes(bytes.clone())
-        .unwrap()
-        .verify_document_signatures()
-        .unwrap()
-        .iter()
-        .all(|result| result.validity == OdfSignatureValidity::Valid));
-    let reopened =
-        DatabaseDocument::from_bytes_with_password(bytes, "database-password").unwrap();
-    assert_eq!(reopened.schema_definition().unwrap().unwrap().tables.len(), 3);
+    assert!(
+        OwnedPackage::from_bytes(bytes.clone())
+            .unwrap()
+            .verify_document_signatures()
+            .unwrap()
+            .iter()
+            .all(|result| result.validity == OdfSignatureValidity::Valid)
+    );
+    let reopened = DatabaseDocument::from_bytes_with_password(bytes, "database-password").unwrap();
+    assert_eq!(
+        reopened.schema_definition().unwrap().unwrap().tables.len(),
+        3
+    );
 }
 
 #[test]

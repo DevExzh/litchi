@@ -174,11 +174,17 @@ fn parse_olap_string(data: &[u8], record_type: u16) -> XlsResult<(String, usize)
     let header = slice_at(data, 0, 3, record_type)?;
     let char_count = usize::from(read_u16(header, 0));
     if char_count > MAX_OLAP_STRING_CHARS {
-        return Err(invalid(record_type, "XLUnicodeString exceeds 255 characters"));
+        return Err(invalid(
+            record_type,
+            "XLUnicodeString exceeds 255 characters",
+        ));
     }
     let options = header[2];
     if options & STRING_OPTION_RESERVED != 0 {
-        return Err(invalid(record_type, "XLUnicodeString reserved option bits set"));
+        return Err(invalid(
+            record_type,
+            "XLUnicodeString reserved option bits set",
+        ));
     }
     let wide = options & HIGH_BYTE != 0;
     let byte_len = char_count * if wide { 2 } else { 1 };
@@ -225,7 +231,12 @@ fn append_olap_string(record_type: u16, value: &str, output: &mut Vec<u8>) -> Xl
 }
 
 /// Validate an `XLUnicodeString` field length on the write path.
-fn check_string_len(record_type: u16, value: &str, field: &str, allow_empty: bool) -> XlsResult<()> {
+fn check_string_len(
+    record_type: u16,
+    value: &str,
+    field: &str,
+    allow_empty: bool,
+) -> XlsResult<()> {
     let char_count = value.chars().count();
     if char_count > MAX_OLAP_STRING_CHARS {
         return Err(XlsError::InvalidData(format!(
@@ -268,7 +279,10 @@ impl XlsPivotViewOlapHeader {
         let page_extension_count = read_i32(fixed, 4);
         let field_extension_count = read_i32(fixed, 8);
         if hierarchy_count < 1 {
-            return Err(invalid(SX_VIEW_EX_RECORD_TYPE, "SXViewEx csxth must be at least 1"));
+            return Err(invalid(
+                SX_VIEW_EX_RECORD_TYPE,
+                "SXViewEx csxth must be at least 1",
+            ));
         }
         if page_extension_count < 0 || field_extension_count < 0 {
             return Err(invalid(
@@ -278,11 +292,17 @@ impl XlsPivotViewOlapHeader {
         }
         let future_len = read_u32(fixed, 12) as usize;
         if future_len > MAX_FUTURE_BYTES {
-            return Err(invalid(SX_VIEW_EX_RECORD_TYPE, "SXViewEx cbFuture exceeds 1024"));
+            return Err(invalid(
+                SX_VIEW_EX_RECORD_TYPE,
+                "SXViewEx cbFuture exceeds 1024",
+            ));
         }
         let future_bytes = slice_at(body, 16, future_len, SX_VIEW_EX_RECORD_TYPE)?;
         if 16 + future_len != body.len() {
-            return Err(invalid(SX_VIEW_EX_RECORD_TYPE, "SXViewEx cbFuture does not match the record size"));
+            return Err(invalid(
+                SX_VIEW_EX_RECORD_TYPE,
+                "SXViewEx cbFuture does not match the record size",
+            ));
         }
         Ok(XlsPivotViewOlapHeader {
             hierarchy_count: hierarchy_count as u32,
@@ -472,7 +492,10 @@ impl XlsPivotHierarchy {
         let pivot_field_index = read_i32(fixed, 8);
         let axis_field_count = read_i32(fixed, 12);
         if axis_field_count < 0 {
-            return Err(invalid(SXTH_RECORD_TYPE, "SXTH csxvdXl must be non-negative"));
+            return Err(invalid(
+                SXTH_RECORD_TYPE,
+                "SXTH csxvdXl must be non-negative",
+            ));
         }
         let drag = read_u16(fixed, 16);
         let drag_to_row = drag & DRAG_TO_ROW != 0;
@@ -497,10 +520,16 @@ impl XlsPivotHierarchy {
         let (dimension, used) = parse_olap_string(&body[offset..], SXTH_RECORD_TYPE)?;
         offset += used;
         if unique_name.is_empty() || display_name.is_empty() {
-            return Err(invalid(SXTH_RECORD_TYPE, "SXTH stUnique/stDisplay must not be empty"));
+            return Err(invalid(
+                SXTH_RECORD_TYPE,
+                "SXTH stUnique/stDisplay must not be empty",
+            ));
         }
         if is_measure && !dimension.is_empty() {
-            return Err(invalid(SXTH_RECORD_TYPE, "SXTH measure must have an empty stDimension"));
+            return Err(invalid(
+                SXTH_RECORD_TYPE,
+                "SXTH measure must have an empty stDimension",
+            ));
         }
 
         let level_count = read_u32(slice_at(body, offset, 4, SXTH_RECORD_TYPE)?, 0) as usize;
@@ -527,7 +556,10 @@ impl XlsPivotHierarchy {
             let value = read_i32(slice_at(body, offset, 4, SXTH_RECORD_TYPE)?, 0);
             offset += 4;
             if value < -1 {
-                return Err(invalid(SXTH_RECORD_TYPE, "SXTH rgisxvd element must be -1 or a pivot field index"));
+                return Err(invalid(
+                    SXTH_RECORD_TYPE,
+                    "SXTH rgisxvd element must be -1 or a pivot field index",
+                ));
             }
             level_fields.push(value);
         }
@@ -544,8 +576,7 @@ impl XlsPivotHierarchy {
         // rgHiddenMemberSets exists iff cHiddenMemberSets > 0 and cisxvd > 0.
         if hidden_set_count > 0 && level_count > 0 {
             for _ in 0..hidden_set_count {
-                let name_count =
-                    read_u32(slice_at(body, offset, 4, SXTH_RECORD_TYPE)?, 0) as usize;
+                let name_count = read_u32(slice_at(body, offset, 4, SXTH_RECORD_TYPE)?, 0) as usize;
                 offset += 4;
                 let mut member_names = Vec::with_capacity(name_count.min(body.len() / 3));
                 for _ in 0..name_count {
@@ -637,7 +668,12 @@ impl XlsPivotHierarchy {
         }
         check_string_len(SXTH_RECORD_TYPE, &self.unique_name, "unique_name", false)?;
         check_string_len(SXTH_RECORD_TYPE, &self.display_name, "display_name", false)?;
-        check_string_len(SXTH_RECORD_TYPE, &self.default_member, "default_member", true)?;
+        check_string_len(
+            SXTH_RECORD_TYPE,
+            &self.default_member,
+            "default_member",
+            true,
+        )?;
         check_string_len(SXTH_RECORD_TYPE, &self.all_member, "all_member", true)?;
         check_string_len(SXTH_RECORD_TYPE, &self.dimension, "dimension", true)?;
         for &field in &self.level_fields {
@@ -769,7 +805,12 @@ impl XlsPivotPageItemOlapExt {
     /// Serialize back to a complete `SXPIEx` record payload.
     pub fn to_payload(&self) -> XlsResult<Vec<u8>> {
         check_string_len(SXPI_EX_RECORD_TYPE, &self.unique_name, "unique_name", true)?;
-        check_string_len(SXPI_EX_RECORD_TYPE, &self.display_name, "display_name", true)?;
+        check_string_len(
+            SXPI_EX_RECORD_TYPE,
+            &self.display_name,
+            "display_name",
+            true,
+        )?;
         let mut payload = Vec::new();
         payload.extend_from_slice(&SXPI_EX_FRT_RT.to_le_bytes());
         payload.extend_from_slice(&0u16.to_le_bytes()); // grbitFrt
@@ -890,7 +931,10 @@ impl XlsPivotFieldOlapExt {
         let olap_level_index = read_i32(fixed, 4);
         let item_count = read_i32(fixed, 8);
         if item_count < 0 {
-            return Err(invalid(SXVDT_EX_RECORD_TYPE, "SXVDTEx csxvi must be non-negative"));
+            return Err(invalid(
+                SXVDT_EX_RECORD_TYPE,
+                "SXVDTEx csxvi must be non-negative",
+            ));
         }
         let item_count = item_count as usize;
         let items = slice_at(body, 12, item_count * 2, SXVDT_EX_RECORD_TYPE)?;
@@ -994,8 +1038,8 @@ mod tests {
 
     #[test]
     fn view_ex_parses() {
-        let header = XlsPivotViewOlapHeader::parse(&view_ex_payload(2, 1, 3, &[0xDE, 0xAD]))
-            .expect("parse");
+        let header =
+            XlsPivotViewOlapHeader::parse(&view_ex_payload(2, 1, 3, &[0xDE, 0xAD])).expect("parse");
         assert_eq!(header.hierarchy_count, 2);
         assert_eq!(header.page_extension_count, 1);
         assert_eq!(header.field_extension_count, 3);
@@ -1005,9 +1049,11 @@ mod tests {
     #[test]
     fn view_ex_rejects_bad_header_and_counts() {
         // Wrong FrtHeaderOld.rt (the record type itself is NOT the rt here).
-        assert!(XlsPivotViewOlapHeader::parse(&view_ex_payload(1, 0, 0, &[])[..])
-            .map(|_| ())
-            .is_ok());
+        assert!(
+            XlsPivotViewOlapHeader::parse(&view_ex_payload(1, 0, 0, &[])[..])
+                .map(|_| ())
+                .is_ok()
+        );
         let mut payload = view_ex_payload(1, 0, 0, &[]);
         payload[0] = 0x0E; // rt = 0x080E (the record type) is wrong per spec
         payload[1] = 0x08;
@@ -1053,7 +1099,10 @@ mod tests {
                 future_bytes: future,
             };
             let payload = header.to_payload().expect("serialize");
-            assert_eq!(XlsPivotViewOlapHeader::parse(&payload).expect("re-parse"), header);
+            assert_eq!(
+                XlsPivotViewOlapHeader::parse(&payload).expect("re-parse"),
+                header
+            );
         }
         // Zero hierarchies cannot be written.
         let bad = XlsPivotViewOlapHeader {
@@ -1144,7 +1193,10 @@ mod tests {
     fn hierarchy_parses() {
         let mut builder = HierarchyBuilder::new();
         builder.hidden_set_count = 2;
-        builder.hidden_sets = vec![vec!["&[4]".to_string()], vec!["&[7]".to_string(), "&[9]".to_string()]];
+        builder.hidden_sets = vec![
+            vec!["&[4]".to_string()],
+            vec!["&[7]".to_string(), "&[9]".to_string()],
+        ];
         // Inclusive filter forbids hidden sets; flip to exclusive.
         builder.flags &= !TH_FILTER_INCLUSIVE;
         let hierarchy = XlsPivotHierarchy::parse(&builder.build()).expect("parse");
@@ -1155,7 +1207,12 @@ mod tests {
         assert!(!hierarchy.is_kpi);
         assert_eq!(
             hierarchy.axis,
-            XlsPivotHierarchyAxis { row: true, column: false, page: false, data: false }
+            XlsPivotHierarchyAxis {
+                row: true,
+                column: false,
+                page: false,
+                data: false
+            }
         );
         assert_eq!(hierarchy.pivot_field_index, 3);
         assert_eq!(hierarchy.axis_field_count, 2);
@@ -1170,7 +1227,10 @@ mod tests {
         assert_eq!(hierarchy.dimension, "[Product]");
         assert_eq!(hierarchy.level_fields, vec![3, -1, 5]);
         assert_eq!(hierarchy.hidden_member_sets.len(), 2);
-        assert_eq!(hierarchy.hidden_member_sets[0].member_names, vec!["&[4]".to_string()]);
+        assert_eq!(
+            hierarchy.hidden_member_sets[0].member_names,
+            vec!["&[4]".to_string()]
+        );
         assert_eq!(
             hierarchy.hidden_member_sets[1].member_names,
             vec!["&[7]".to_string(), "&[9]".to_string()]
@@ -1310,7 +1370,12 @@ mod tests {
             filter_inclusive: false,
             is_key_attribute_hierarchy: true,
             is_kpi: false,
-            axis: XlsPivotHierarchyAxis { row: true, column: true, page: false, data: false },
+            axis: XlsPivotHierarchyAxis {
+                row: true,
+                column: true,
+                page: false,
+                data: false,
+            },
             pivot_field_index: -1,
             axis_field_count: 1,
             drag_to_row: true,
@@ -1329,7 +1394,10 @@ mod tests {
             }],
         };
         let payload = hierarchy.to_payload().expect("serialize");
-        assert_eq!(XlsPivotHierarchy::parse(&payload).expect("re-parse"), hierarchy);
+        assert_eq!(
+            XlsPivotHierarchy::parse(&payload).expect("re-parse"),
+            hierarchy
+        );
 
         // A measure hierarchy with no level fields.
         let measure = XlsPivotHierarchy {
@@ -1344,7 +1412,12 @@ mod tests {
             filter_inclusive: false,
             is_key_attribute_hierarchy: false,
             is_kpi: false,
-            axis: XlsPivotHierarchyAxis { row: false, column: false, page: false, data: true },
+            axis: XlsPivotHierarchyAxis {
+                row: false,
+                column: false,
+                page: false,
+                data: true,
+            },
             pivot_field_index: 7,
             axis_field_count: 0,
             drag_to_row: false,
@@ -1361,7 +1434,10 @@ mod tests {
             hidden_member_sets: Vec::new(),
         };
         let payload = measure.to_payload().expect("serialize");
-        assert_eq!(XlsPivotHierarchy::parse(&payload).expect("re-parse"), measure);
+        assert_eq!(
+            XlsPivotHierarchy::parse(&payload).expect("re-parse"),
+            measure
+        );
     }
 
     #[test]
@@ -1386,7 +1462,9 @@ mod tests {
 
         let mut bad = base.clone();
         bad.filter_inclusive = true;
-        bad.hidden_member_sets = vec![XlsHiddenMemberSet { member_names: vec!["x".to_string()] }];
+        bad.hidden_member_sets = vec![XlsHiddenMemberSet {
+            member_names: vec!["x".to_string()],
+        }];
         assert!(bad.to_payload().is_err());
 
         let mut bad = base.clone();
@@ -1406,8 +1484,8 @@ mod tests {
 
     #[test]
     fn page_ext_parses() {
-        let ext =
-            XlsPivotPageItemOlapExt::parse(&page_ext_payload(1, "[Product].&[3]", "Bikes")).expect("parse");
+        let ext = XlsPivotPageItemOlapExt::parse(&page_ext_payload(1, "[Product].&[3]", "Bikes"))
+            .expect("parse");
         assert_eq!(ext.hierarchy_index, 1);
         assert_eq!(ext.unique_name, "[Product].&[3]");
         assert_eq!(ext.display_name, "Bikes");
@@ -1422,7 +1500,9 @@ mod tests {
         assert!(XlsPivotPageItemOlapExt::parse(&payload).is_err());
 
         // Oversized string, truncation, trailing bytes.
-        assert!(XlsPivotPageItemOlapExt::parse(&page_ext_payload(0, &"x".repeat(300), "d")).is_err());
+        assert!(
+            XlsPivotPageItemOlapExt::parse(&page_ext_payload(0, &"x".repeat(300), "d")).is_err()
+        );
         assert!(XlsPivotPageItemOlapExt::parse(&[]).is_err());
         let payload = page_ext_payload(0, "u", "d");
         assert!(XlsPivotPageItemOlapExt::parse(&payload[..payload.len() - 1]).is_err());
@@ -1439,7 +1519,10 @@ mod tests {
             display_name: "Year 2024 €".to_string(), // wide string path
         };
         let payload = ext.to_payload().expect("serialize");
-        assert_eq!(XlsPivotPageItemOlapExt::parse(&payload).expect("re-parse"), ext);
+        assert_eq!(
+            XlsPivotPageItemOlapExt::parse(&payload).expect("re-parse"),
+            ext
+        );
 
         let bad = XlsPivotPageItemOlapExt {
             hierarchy_index: 0,
@@ -1466,8 +1549,12 @@ mod tests {
     #[test]
     fn field_ext_parses() {
         let flags = VDT_TENSOR_SORT | VDT_MEMBER_PROPERTY_IN_REPORT;
-        let items = [VI_HAS_CHILDREN | VI_OLAP_FILTER_SELECTED, VI_COLLAPSED_MEMBER];
-        let ext = XlsPivotFieldOlapExt::parse(&field_ext_payload(flags, 2, 1, &items)).expect("parse");
+        let items = [
+            VI_HAS_CHILDREN | VI_OLAP_FILTER_SELECTED,
+            VI_COLLAPSED_MEMBER,
+        ];
+        let ext =
+            XlsPivotFieldOlapExt::parse(&field_ext_payload(flags, 2, 1, &items)).expect("parse");
         assert!(ext.tensor_sort);
         assert!(!ext.drilled_level);
         assert!(ext.member_property_in_report);
@@ -1531,9 +1618,15 @@ mod tests {
             ],
         };
         let payload = ext.to_payload().expect("serialize");
-        assert_eq!(XlsPivotFieldOlapExt::parse(&payload).expect("re-parse"), ext);
+        assert_eq!(
+            XlsPivotFieldOlapExt::parse(&payload).expect("re-parse"),
+            ext
+        );
 
-        let bad = XlsPivotFieldOlapExt { hierarchy_index: -2, ..ext };
+        let bad = XlsPivotFieldOlapExt {
+            hierarchy_index: -2,
+            ..ext
+        };
         assert!(bad.to_payload().is_err());
     }
 }

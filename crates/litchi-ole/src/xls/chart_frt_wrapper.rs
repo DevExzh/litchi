@@ -56,7 +56,10 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 /// (MS-XLS 2.5.136), returning the raw flags word.
 fn validate_frt_header_old(data: &[u8], record_type: u16, name: &str) -> XlsResult<u16> {
     if u16::from_le_bytes([data[0], data[1]]) != record_type {
-        return Err(invalid(record_type, format!("{name} FrtHeaderOld.rt mismatch")));
+        return Err(invalid(
+            record_type,
+            format!("{name} FrtHeaderOld.rt mismatch"),
+        ));
     }
     let flags = u16::from_le_bytes([data[2], data[3]]);
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
@@ -138,14 +141,10 @@ impl XlsStartObject {
         let object_instance1 = u16::from_le_bytes([data[8], data[9]]);
         match kind {
             // MS-XLS 2.4.267: MUST equal 0x0000 for YMult and DataLabExt.
-            XlsFrtObjectKind::YMult | XlsFrtObjectKind::DataLabExt
-                if object_instance1 != 0 =>
-            {
+            XlsFrtObjectKind::YMult | XlsFrtObjectKind::DataLabExt if object_instance1 != 0 => {
                 return Err(invalid(
                     START_OBJECT_RECORD_TYPE,
-                    format!(
-                        "StartObject iObjectInstance1 {object_instance1:#06X} is not 0x0000"
-                    ),
+                    format!("StartObject iObjectInstance1 {object_instance1:#06X} is not 0x0000"),
                 ));
             },
             // MS-XLS 2.4.267: an application version for FrtFontList.
@@ -305,8 +304,7 @@ impl XlsFrtWrapper {
         let frt_flags = validate_frt_header_old(data, FRT_WRAPPER_RECORD_TYPE, "FrtWrapper")?;
         // The wrapped record is a complete BIFF record: a 4-byte header
         // (record type + payload length) plus its payload.
-        let wrapped_len = FRT_HEADER_OLD_LEN
-            + usize::from(u16::from_le_bytes([data[6], data[7]]));
+        let wrapped_len = FRT_HEADER_OLD_LEN + usize::from(u16::from_le_bytes([data[6], data[7]]));
         let expected = if wrapped_len < MIN_WRAPPED_LEN {
             // frtWrapperPadding pads the region to 8 bytes.
             FRT_HEADER_OLD_LEN + MIN_WRAPPED_LEN
@@ -335,7 +333,8 @@ impl XlsFrtWrapper {
 
     /// Serialize back to a complete `FrtWrapper` record payload.
     pub fn to_payload(&self) -> Vec<u8> {
-        let mut payload = Vec::with_capacity(FRT_HEADER_OLD_LEN + self.wrapped.len() + self.padding.len());
+        let mut payload =
+            Vec::with_capacity(FRT_HEADER_OLD_LEN + self.wrapped.len() + self.padding.len());
         payload.extend_from_slice(&FRT_WRAPPER_RECORD_TYPE.to_le_bytes());
         payload.extend_from_slice(&self.frt_flags.to_le_bytes());
         payload.extend_from_slice(&self.wrapped);

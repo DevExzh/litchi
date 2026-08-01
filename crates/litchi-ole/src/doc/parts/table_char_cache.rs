@@ -111,7 +111,7 @@ impl TableCharacterCache {
     }
 
     fn parse_bytes_with_max_cp(data: &[u8], maximum_cp: Option<u32>) -> Result<Self> {
-        if data.len() < 4 || (data.len() - 4) % Self::STRIDE != 0 {
+        if data.len() < 4 || !(data.len() - 4).is_multiple_of(Self::STRIDE) {
             return Err(corrupted("PlcfTch length must have form 8n + 4"));
         }
         let count = (data.len() - 4) / Self::STRIDE;
@@ -130,8 +130,9 @@ impl TableCharacterCache {
         let mut entries = Vec::with_capacity(count);
         for (index, &start_cp) in positions[..count].iter().enumerate() {
             let element_start = cp_bytes + index * TableCharInfo::SIZE;
-            let info =
-                TableCharInfo::from_bytes(&data[element_start..element_start + TableCharInfo::SIZE])?;
+            let info = TableCharInfo::from_bytes(
+                &data[element_start..element_start + TableCharInfo::SIZE],
+            )?;
             entries.push(TableCharEntry::new(start_cp, info));
         }
         validate_entries(&entries, terminal_cp, maximum_cp)?;

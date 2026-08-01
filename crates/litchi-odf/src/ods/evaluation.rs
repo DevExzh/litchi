@@ -539,10 +539,9 @@ fn normalize_sheet_name(value: &str) -> Option<String> {
     let mut unescaped = String::with_capacity(unquoted.len());
     let mut characters = unquoted.chars();
     while let Some(character) = characters.next() {
-        if character == '\''
-            && characters.next() != Some('\'') {
-                return None;
-            }
+        if character == '\'' && characters.next() != Some('\'') {
+            return None;
+        }
         unescaped.push(character);
     }
 

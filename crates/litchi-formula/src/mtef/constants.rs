@@ -4,7 +4,7 @@
 //! Based on rtf2latex2e implementation and MTEF specification.
 //!
 //! References:
-//! - http://rtf2latex2e.sourceforge.net/MTEF5.html
+//! - <http://rtf2latex2e.sourceforge.net/MTEF5.html>
 //! - rtf2latex2e source code (eqn_support.h)
 
 // This module documents the format, not just the subset the current reader and

@@ -310,8 +310,8 @@ pub mod drawing_hatch;
 pub mod drawing_layer;
 pub mod drawing_marker;
 pub mod drawing_opacity;
-mod drawing_style_resources;
 pub mod drawing_stroke_dash;
+mod drawing_style_resources;
 /// ODF XML element classes
 pub mod elements;
 mod footnote_separator;
@@ -343,16 +343,16 @@ pub use elements::field::{
     OdfDatabaseTableType, OdfMetaFieldAttribute, OdfMetaFieldContent, OdfMetaFieldElement,
     OdfMetaFieldNode, OdfNoteBodyContent,
 };
-mod chart_properties;
 mod annotation_package;
 mod auto_mark_file;
+mod chart_properties;
 mod data_pilot_package;
-mod ods_definition_package;
 mod dde_connection;
 mod digital_signature;
-mod signature_crypto;
 mod document_scripts;
 mod drawing_page_properties;
+/// Semantic family readers for flat OpenDocument XML documents.
+mod flat;
 mod font_face;
 /// Inert semantic discovery of classic ODF forms and control shapes.
 mod form;
@@ -361,8 +361,6 @@ mod form_package;
 mod formula;
 /// Format-neutral package access for every OpenDocument family.
 mod generic;
-/// Semantic family readers for flat OpenDocument XML documents.
-mod flat;
 mod graphic_properties;
 mod handout_master;
 mod image_map;
@@ -371,9 +369,11 @@ mod master_page;
 /// Shared semantic discovery of images in OpenDocument XML and packages.
 mod media;
 mod notes_configuration;
-mod ruby_family;
+mod ods_definition_package;
 mod rdf_package;
+mod ruby_family;
 mod settings;
+mod signature_crypto;
 mod text_properties;
 mod variable_declaration;
 pub use dde_connection::{OdfDdeConnectionDeclaration, OdfDdeConnectionUse};
@@ -383,9 +383,9 @@ pub use bibliography_configuration::{
 };
 mod data_styles;
 pub use data_styles::*;
+mod embedded_chart;
 /// Inert semantic discovery of embedded OpenDocument and OLE objects.
 mod embedded_object;
-mod embedded_chart;
 mod embedded_package;
 /// OpenDocument database front-end (.odb) support.
 mod odb;
@@ -425,23 +425,21 @@ pub use core::{
     PackageWriter, TemplateMetadata, UserDefinedMetadata, UserDefinedValueType,
 };
 pub use digital_signature::{OdfDigitalSignature, OdfDigitalSignatures, OdfSignatureReference};
-pub use signature_crypto::{
-    OdfCanonicalizationAlgorithm, OdfDocumentSigner, OdfSignatureAlgorithm,
-    OdfSignatureValidity, OdfSignatureVerification,
-};
 pub use document_scripts::{
     OdfDocumentEventListener, OdfDocumentScripts, OdfEmbeddedScript, OdfScriptBinding,
     OdfScriptEventListener, parse_document_scripts,
 };
+pub use signature_crypto::{
+    OdfCanonicalizationAlgorithm, OdfDocumentSigner, OdfSignatureAlgorithm, OdfSignatureValidity,
+    OdfSignatureVerification,
+};
 mod script_package;
-pub use script_package::{OdfScriptResource, OdfScriptResourceKind, OdfScriptResourceSpec};
 pub use annotation_package::{
     OdfAnnotation, OdfAnnotationAnchor, OdfAnnotationInfo, OdfAnnotationPosition,
     OdfAnnotationUpdate,
 };
 pub use auto_mark_file::OdfAlphabeticalIndexAutoMarkFile;
 pub use data_pilot_package::DataPilotTableUpdate;
-pub use ods_definition_package::{DatabaseRangeUpdate, NamedDefinitionUpdate};
 pub use drawing_page_properties::{
     DrawingPageBackgroundSize, DrawingPageColor, DrawingPageDuration, DrawingPageFill,
     DrawingPageFillRule, DrawingPageImageRefPoint, DrawingPageLengthOrPercent,
@@ -452,14 +450,19 @@ pub use drawing_page_properties::{
     DrawingPageTransitionType, DrawingPageVisibility, parse_drawing_page_style_properties,
     set_drawing_page_style_properties_xml,
 };
+pub use embedded_chart::OdfEmbeddedChartStorage;
 pub use embedded_object::{
     OdfEmbeddedObject, OdfEmbeddedObjectKind, OdfEmbeddedObjectPart, OdfEmbeddedObjectSource,
     OdfInlineObjectRoot,
 };
-pub use embedded_chart::OdfEmbeddedChartStorage;
 pub use embedded_package::{
     OdfEmbeddedResource, OdfEmbeddedResourceFile, OdfEmbeddedResourceKind,
     OdfEmbeddedResourceSource,
+};
+pub use flat::{
+    FlatChartDocument, FlatDrawingDocument, FlatImageDocument, FlatMutableChartDocument,
+    FlatMutableDrawingDocument, FlatMutablePresentation, FlatMutableSpreadsheet,
+    FlatMutableTextDocument, FlatPresentation, FlatSpreadsheet, FlatTextDocument,
 };
 pub use font_face::{
     OdfFontFace, OdfFontFaceDeclarations, OdfFontFaceLink, OdfFontFaceSource, OdfFontMetric,
@@ -497,14 +500,9 @@ pub use form::{
 };
 pub use form_package::{OdfAuthoredForm, OdfAuthoredFormControl, OdfAuthoredFormNode};
 pub use formula::builder as mathml;
-pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
 pub use formula::builder::{MathDisplay, MathVariant};
+pub use formula::{FormulaDocument, MathAttribute, MathContent, MathElement, MathElementKind};
 pub use generic::{FlatOpenDocument, OpenDocumentFamily, OpenDocumentPackage};
-pub use flat::{
-    FlatChartDocument, FlatDrawingDocument, FlatImageDocument, FlatMutableChartDocument,
-    FlatMutableDrawingDocument, FlatMutablePresentation, FlatMutableSpreadsheet,
-    FlatMutableTextDocument, FlatPresentation, FlatSpreadsheet, FlatTextDocument,
-};
 pub use graphic_properties::{
     GraphicProperty, GraphicPropertyChild, GraphicPropertyChildKind, GraphicPropertyKind,
     GraphicPropertyNamespace, GraphicPropertyValue, GraphicStyleProperties,
@@ -572,13 +570,14 @@ pub use odb::{
     parse_database_connection_data_xml, replace_database_connection_data_xml,
 };
 pub use odc::{
-    ChartAttribute, ChartAxis, ChartAxisDimension, ChartAxisSpec, ChartAxisUpdate, ChartCachedCell, ChartCachedRow,
-    ChartCachedTable, ChartCachedValue, ChartDataLabelSpec, ChartDataPoint, ChartDataPointSpec,
-    ChartDataSourceLabels, ChartDefinition, ChartDocument, ChartDomainSpec, ChartElement,
-    ChartElementKind, ChartEquationSpec, ChartExtensionAttribute, ChartExtensionElement,
-    ChartExtensions, ChartGrid, ChartGridClass, ChartGridSpec, ChartLegend, ChartLegendPosition,
-    ChartLegendSpec, ChartPlotArea, ChartPlotAreaSpec, ChartRegressionSpec, ChartSeries,
-    ChartSeriesSpec, ChartSeriesUpdate, ChartStyleElement, ChartText, serialize_chart_content,
+    ChartAttribute, ChartAxis, ChartAxisDimension, ChartAxisSpec, ChartAxisUpdate, ChartCachedCell,
+    ChartCachedRow, ChartCachedTable, ChartCachedValue, ChartDataLabelSpec, ChartDataPoint,
+    ChartDataPointSpec, ChartDataSourceLabels, ChartDefinition, ChartDocument, ChartDomainSpec,
+    ChartElement, ChartElementKind, ChartEquationSpec, ChartExtensionAttribute,
+    ChartExtensionElement, ChartExtensions, ChartGrid, ChartGridClass, ChartGridSpec, ChartLegend,
+    ChartLegendPosition, ChartLegendSpec, ChartPlotArea, ChartPlotAreaSpec, ChartRegressionSpec,
+    ChartSeries, ChartSeriesSpec, ChartSeriesUpdate, ChartStyleElement, ChartText,
+    serialize_chart_content,
 };
 pub use odg::{
     DrawingBuilder, DrawingDocument, DrawingLayer, DrawingLayerDisplay, DrawingPage,
@@ -586,9 +585,10 @@ pub use odg::{
 };
 pub use odi::{ImageAttribute, ImageContent, ImageDocument, ImageElement, ImageElementKind};
 pub use odm::{
-    MasterDocument, MasterDocumentBuilder, MasterDocumentElement, MasterSection,
-    MasterSubdocument, MutableMasterDocument,
+    MasterDocument, MasterDocumentBuilder, MasterDocumentElement, MasterSection, MasterSubdocument,
+    MutableMasterDocument,
 };
+pub use ods_definition_package::{DatabaseRangeUpdate, NamedDefinitionUpdate};
 pub use oth::{MutableWebDocument, WebDocument, WebDocumentBuilder};
 pub use outline_style::{
     MAX_OUTLINE_LEVELS, OdfListLevelPositionMode, OdfOutlineAttribute, OdfOutlineLevelStyle,
@@ -638,13 +638,14 @@ pub use paragraph_writing_mode::{
     ParagraphWritingModeProperties, parse_paragraph_style_writing_modes,
     set_paragraph_style_writing_mode_xml,
 };
+pub use rdf_package::{OdfRdfGraph, OdfRdfObject, OdfRdfSubject, OdfRdfTriple};
 pub use ruby_family::{
     RubyAlignment, RubyAnnotation, RubyAnnotations, RubyBase, RubyPosition, RubyProperties,
     RubyStyle, RubyStyles, insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,
     remove_ruby_annotation_xml, remove_ruby_style_xml, replace_ruby_annotation_xml,
     set_ruby_style_xml, wrap_ruby_annotation_xml,
 };
-pub use rdf_package::{OdfRdfGraph, OdfRdfObject, OdfRdfSubject, OdfRdfTriple};
+pub use script_package::{OdfScriptResource, OdfScriptResourceKind, OdfScriptResourceSpec};
 pub use settings::{
     OdfConfigItem, OdfConfigMap, OdfConfigMapEntry, OdfConfigNode, OdfConfigSet, OdfConfigValue,
     OdfSettings,
@@ -702,84 +703,75 @@ pub use odp::{
     PresentationBuilder, PresentationDateTimeDeclaration, PresentationDateTimeSource,
     PresentationDeclarationBinding, PresentationDeclarationTarget, PresentationDeclarations,
     PresentationEffect, PresentationEffectDirection, PresentationEventListener,
-    PresentationFeatureState, PresentationMasterPage, PresentationMeasure,
-    PresentationMeasureUnit, PresentationPageLayout, PresentationPageLayouts,
-    PresentationPageMetadata, PresentationPageMetadataCollection,
-    PresentationPlaceholder, PresentationPlaceholderClass, PresentationSettings,
-    PresentationTextDeclaration, ScriptEventListener, ShapeEventListener, SlideTransition,
-    TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed, TransitionStyle,
-    TransitionType, parse_presentation_page_layouts, parse_presentation_settings,
+    PresentationFeatureState, PresentationMasterPage, PresentationMeasure, PresentationMeasureUnit,
+    PresentationPageLayout, PresentationPageLayouts, PresentationPageMetadata,
+    PresentationPageMetadataCollection, PresentationPlaceholder, PresentationPlaceholderClass,
+    PresentationSettings, PresentationTextDeclaration, ScriptEventListener, ShapeEventListener,
+    SlideTransition, TransitionDirection, TransitionSound, TransitionSoundShow, TransitionSpeed,
+    TransitionStyle, TransitionType, parse_presentation_page_layouts, parse_presentation_settings,
     remove_presentation_page_layout_xml, set_presentation_page_layout_xml,
 };
 pub use ods::{
     AnnotationElement, AnnotationNode, CalculationIteration, CalculationNullDate,
     CalculationSettings, Cell as SCell, CellAnnotation, CellDetective, CellHyperlink,
     CellMatrixSpan, CellMerge, CellRangeSource, CellStyleProtection, CellTextContent, CellValue,
-    Column as SColumn, ColorTransformationType, ConditionalCellStyle,
-    ConditionalCellStyleRule, ConditionalColorScale, ConditionalColorScaleEntry,
-    ConditionalCustomIcon, ConditionalDataBar, ConditionalDataBarEntry, ConditionalDateIs,
-    ConditionalDateType,
-    ConditionalFormat, ConditionalFormatCondition, ConditionalFormatEntryType,
-    ConditionalFormatRule, ConditionalIconSet, ConditionalIconSetEntry, Consolidation,
-    ConsolidationUseLabels, ContentValidation, DataBarAxisPosition,
-    DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
-    DataPilotGrandTotal, DataPilotGrandTotalElement, DataPilotGrandTotalOrientation,
-    DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,
-    DataPilotLayoutInfo, DataPilotLayoutMode, DataPilotLevel, DataPilotMember,
+    ColorTransformationType, Column as SColumn, ConditionalCellStyle, ConditionalCellStyleRule,
+    ConditionalColorScale, ConditionalColorScaleEntry, ConditionalCustomIcon, ConditionalDataBar,
+    ConditionalDataBarEntry, ConditionalDateIs, ConditionalDateType, ConditionalFormat,
+    ConditionalFormatCondition, ConditionalFormatEntryType, ConditionalFormatRule,
+    ConditionalIconSet, ConditionalIconSetEntry, Consolidation, ConsolidationUseLabels,
+    ContentValidation, DataBarAxisPosition, DataPilotDisplayInfo, DataPilotDisplayMemberMode,
+    DataPilotField, DataPilotFieldReference, DataPilotGrandTotal, DataPilotGrandTotalElement,
+    DataPilotGrandTotalOrientation, DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy,
+    DataPilotGroups, DataPilotLayoutInfo, DataPilotLayoutMode, DataPilotLevel, DataPilotMember,
     DataPilotOrientation, DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo,
     DataPilotSortMode, DataPilotSortOrder, DataPilotSource, DataPilotTable, DatabaseFilter,
     DatabaseOrientation, DatabaseRange, DatabaseSort, DatabaseSortKey, DatabaseSource,
     DdeConversionMode, DdeLink, DdeSource, DetectiveDirection, DetectiveHighlightedRange,
     DetectiveOperation, DetectiveOperationKind, EmbeddedNumberBehavior, FilterCondition,
     FilterConditionSource, FilterDataType, FilterExpression, FormulaNamespace, IconSetType,
-    IterationStatus,
-    LabelRange, LabelRangeOrientation, MutableSpreadsheet, NamedDefinition, NamedDefinitionScope,
-    NamedExpression, NamedRange, NamedRangeUsage, ProtectionKey, Row as SRow, Sheet, Sparkline,
-    SparklineAxisType, SparklineColorTransformation, SparklineColors, SparklineComplexColor,
-    SparklineComplexColors, SparklineEmptyCells, SparklineFlags, SparklineGroup, SparklineType,
-    ThemeColorType,
-    SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario, SheetShape,
-    SheetShapeAnchor, SheetStyle,
-    SheetStyleUsage, SheetTableSource, SortOrder, Spreadsheet, SpreadsheetBuilder, OdsWorkbook,
-    TableCellProtectionStyle,
-    SpreadsheetCellContentChange, SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff,
-    SpreadsheetChangeDimension, SpreadsheetChangeInfo, SpreadsheetChangeMetadata,
-    SpreadsheetDeletion, SpreadsheetInsertion, SpreadsheetMovement, SpreadsheetNestedDeletion,
-    SpreadsheetProtection, SpreadsheetTrackedCell, SpreadsheetTrackedCellAddress,
-    SpreadsheetTrackedCellValue, SpreadsheetTrackedChange, SpreadsheetTrackedChanges,
-    SpreadsheetTrackedRangeAddress, SubtotalField, SubtotalRule, SubtotalRules, SubtotalSortGroups,
-    TableGroup, TableRange, TableSourceMode, TableStructure, TableTemplate, TableTemplateAxis,
-    TableTemplateStyle, TableVisibility, ValidationDisplayList, ValidationErrorMacro,
+    IterationStatus, LabelRange, LabelRangeOrientation, MutableSpreadsheet, NamedDefinition,
+    NamedDefinitionScope, NamedExpression, NamedRange, NamedRangeUsage, OdsWorkbook, ProtectionKey,
+    Row as SRow, Sheet, SheetPrintSettings, SheetProtection, SheetProtectionOptions, SheetScenario,
+    SheetShape, SheetShapeAnchor, SheetStyle, SheetStyleUsage, SheetTableSource, SortOrder,
+    Sparkline, SparklineAxisType, SparklineColorTransformation, SparklineColors,
+    SparklineComplexColor, SparklineComplexColors, SparklineEmptyCells, SparklineFlags,
+    SparklineGroup, SparklineType, Spreadsheet, SpreadsheetBuilder, SpreadsheetCellContentChange,
+    SpreadsheetChangeAcceptance, SpreadsheetChangeCutOff, SpreadsheetChangeDimension,
+    SpreadsheetChangeInfo, SpreadsheetChangeMetadata, SpreadsheetDeletion, SpreadsheetInsertion,
+    SpreadsheetMovement, SpreadsheetNestedDeletion, SpreadsheetProtection, SpreadsheetTrackedCell,
+    SpreadsheetTrackedCellAddress, SpreadsheetTrackedCellValue, SpreadsheetTrackedChange,
+    SpreadsheetTrackedChanges, SpreadsheetTrackedRangeAddress, SubtotalField, SubtotalRule,
+    SubtotalRules, SubtotalSortGroups, TableCellProtectionStyle, TableGroup, TableRange,
+    TableSourceMode, TableStructure, TableTemplate, TableTemplateAxis, TableTemplateStyle,
+    TableVisibility, ThemeColorType, ValidationDisplayList, ValidationErrorMacro,
     ValidationErrorMessage, ValidationEventListener, ValidationMessage, ValidationMessageType,
     ValidationPresentationEventListener, ValidationPresentationSound,
     ValidationScriptEventListener, normalize_open_formula,
 };
 pub use odt::{
     AlphabeticalIndexSource, BibliographyIndexSource, ChangeType, Document, DocumentBuilder,
-    HeaderFooter,
-    HeaderFooterColumnRegion, HeaderFooterKind, IllustrationIndexSource, MasterPage, MasterPageChild, MasterPageChildKind,
-    MutableDocument, Note, NoteClass, ObjectIndexSource, OdfFrameAnchor, OdfImageFormat, OdfLength,
-    OdtSectionBlock,
-    OdtPageSequence, OdtTrackedPosition, OdtTrackedStory,
-    PageLayout, PageLayoutAttribute,
-    PageLayoutProperties, PageUsage, ReferenceMark, ReferenceMarkFragments, Ruby, SectionDdeSource,
-    Section, SectionDisplay, SectionSource, TableIndexSource, TableOfContentsSource,
+    HeaderFooter, HeaderFooterColumnRegion, HeaderFooterKind, IllustrationIndexSource, MasterPage,
+    MasterPageChild, MasterPageChildKind, MutableDocument, Note, NoteClass, ObjectIndexSource,
+    OdfFrameAnchor, OdfImageFormat, OdfLength, OdtPageSequence, OdtSectionBlock,
+    OdtTrackedPosition, OdtTrackedStory, PageLayout, PageLayoutAttribute, PageLayoutProperties,
+    PageUsage, ReferenceMark, ReferenceMarkFragments, Ruby, Section, SectionDdeSource,
+    SectionDisplay, SectionSource, TableIndexSource, TableOfContentsSource,
     TextAlphabeticalIndexEntryTemplate, TextAlphabeticalIndexLevel, TextAlphabeticalMarkMetadata,
     TextBibliographyEntryTemplate, TextBibliographyEntryToken, TextBibliographyType, TextIndex,
     TextIndexAttribute, TextIndexBody, TextIndexBodyParagraph, TextIndexBodyTitle,
     TextIndexCaptionSequenceFormat, TextIndexChapterDisplay, TextIndexContent, TextIndexElement,
     TextIndexEntryTemplate, TextIndexEntryToken, TextIndexKind, TextIndexMark,
     TextIndexMarkFragments, TextIndexMarkKind, TextIndexScope, TextIndexSimpleEntryTemplate,
-    TrackChange, TrackedChanges,
-    TextIndexSourceStyles, TextIndexTabStop, TextIndexTitleTemplate, UserIndexSource,
-    insert_database_field_xml, insert_note_xml, insert_reference_mark_xml, insert_text_index_mark_xml,
-    insert_text_index_xml, remove_database_field_xml, remove_reference_mark_xml,
-    remove_note_xml, remove_text_index_mark_xml, remove_text_index_xml, replace_database_field_xml,
-    replace_note_xml, replace_reference_mark_xml, replace_text_index_mark_xml, replace_text_index_xml,
-    mark_tracked_change_range_xml, mark_tracked_deletion_xml, set_tracked_changes_xml,
-    unmark_tracked_change_xml,
-    add_section_xml, clear_sections_xml, remove_section_xml, unwrap_section_xml,
-    update_section_xml, wrap_section_xml,
+    TextIndexSourceStyles, TextIndexTabStop, TextIndexTitleTemplate, TrackChange, TrackedChanges,
+    UserIndexSource, add_section_xml, clear_sections_xml, insert_database_field_xml,
+    insert_note_xml, insert_reference_mark_xml, insert_text_index_mark_xml, insert_text_index_xml,
+    mark_tracked_change_range_xml, mark_tracked_deletion_xml, remove_database_field_xml,
+    remove_note_xml, remove_reference_mark_xml, remove_section_xml, remove_text_index_mark_xml,
+    remove_text_index_xml, replace_database_field_xml, replace_note_xml,
+    replace_reference_mark_xml, replace_text_index_mark_xml, replace_text_index_xml,
+    set_tracked_changes_xml, unmark_tracked_change_xml, unwrap_section_xml, update_section_xml,
+    wrap_section_xml,
 };
 
 // Re-export shapes for presentations

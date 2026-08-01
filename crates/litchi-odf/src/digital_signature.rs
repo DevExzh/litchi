@@ -536,7 +536,7 @@ fn normalize_base64(value: &str, context: &str) -> Result<String> {
         .collect();
     if normalized.is_empty()
         || normalized.len() > MAX_BASE64_BYTES
-        || normalized.len() % 4 != 0
+        || !normalized.len().is_multiple_of(4)
         || normalized
             .bytes()
             .any(|value| !(value.is_ascii_alphanumeric() || matches!(value, b'+' | b'/' | b'=')))

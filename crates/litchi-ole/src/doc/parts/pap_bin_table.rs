@@ -62,7 +62,7 @@ impl PapBinTable {
         stylesheet: Option<&StyleSheet>,
     ) -> Result<Option<Self>> {
         // PlcBtePapx = (n + 1) FCs followed by n four-byte PnFkpPapx values.
-        if plcf_bte_papx_data.len() < 12 || (plcf_bte_papx_data.len() - 4) % 8 != 0 {
+        if plcf_bte_papx_data.len() < 12 || !(plcf_bte_papx_data.len() - 4).is_multiple_of(8) {
             return Ok(None);
         }
         let page_count = (plcf_bte_papx_data.len() - 4) / 8;

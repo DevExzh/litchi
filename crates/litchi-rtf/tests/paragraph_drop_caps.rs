@@ -1,6 +1,6 @@
 use litchi_rtf::{
-    ParagraphDropCap, ParagraphDropCapKind, RtfDocument, RtfWriter, StyleBlock,
-    MAX_PARAGRAPH_DROP_CAP_LINES,
+    MAX_PARAGRAPH_DROP_CAP_LINES, ParagraphDropCap, ParagraphDropCapKind, RtfDocument, RtfWriter,
+    StyleBlock,
 };
 
 fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
@@ -60,14 +60,18 @@ fn body_style_and_default_round_trip_canonically() {
         Some(ParagraphDropCap::new(ParagraphDropCapKind::InText, 4).unwrap())
     );
     let mut first = Vec::new();
-    RtfWriter::new(&mut first).write_document(&document).unwrap();
+    RtfWriter::new(&mut first)
+        .write_document(&document)
+        .unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
     assert!(text.contains(r#"\dropcapli2\dropcapt2"#));
     assert!(text.contains(r#"\dropcapli4\dropcapt1"#));
     let reparsed = RtfDocument::parse_bytes(&first).unwrap();
     assert_eq!(block(&reparsed, "Body").paragraph.drop_cap, Some(expected));
     let mut second = Vec::new();
-    RtfWriter::new(&mut second).write_document(&reparsed).unwrap();
+    RtfWriter::new(&mut second)
+        .write_document(&reparsed)
+        .unwrap();
     assert_eq!(first, second);
 }
 

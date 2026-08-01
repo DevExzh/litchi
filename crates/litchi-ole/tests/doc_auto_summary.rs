@@ -16,7 +16,11 @@ fn parse_auto_summary(relative: &str) -> Option<DocumentAutoSummary> {
     let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
-    let table_name = if fib.which_table_stream() { "1Table" } else { "0Table" };
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
     DocumentAutoSummary::parse(&fib, &table_stream).unwrap()
 }

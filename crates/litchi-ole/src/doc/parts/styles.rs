@@ -727,7 +727,7 @@ fn parse_style_revision(
     kind: StyleKind,
     style_index: u16,
 ) -> Result<StyleRevisionMark> {
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return Err(corrupted(
             "revision-marked style payload is not even-length",
         ));
@@ -1013,10 +1013,10 @@ fn validate_styles(
                 tolerance.record(DocStylesheetDefect::DuplicateStyleName, style.index);
             }
         }
-        if let Some(base) = style.base_style {
-            if base == style.index || styles.get(usize::from(base)).is_none_or(Option::is_none) {
-                return Err(corrupted("style has an invalid base style"));
-            }
+        if let Some(base) = style.base_style
+            && (base == style.index || styles.get(usize::from(base)).is_none_or(Option::is_none))
+        {
+            return Err(corrupted("style has an invalid base style"));
         }
         if styles
             .get(usize::from(style.next_style))
@@ -1024,10 +1024,10 @@ fn validate_styles(
         {
             return Err(corrupted("style has an invalid next style"));
         }
-        if let Some(linked) = style.post_2000.as_ref().and_then(|post| post.linked_style) {
-            if styles.get(usize::from(linked)).is_none_or(Option::is_none) {
-                return Err(corrupted("style has an invalid linked style"));
-            }
+        if let Some(linked) = style.post_2000.as_ref().and_then(|post| post.linked_style)
+            && styles.get(usize::from(linked)).is_none_or(Option::is_none)
+        {
+            return Err(corrupted("style has an invalid linked style"));
         }
     }
 

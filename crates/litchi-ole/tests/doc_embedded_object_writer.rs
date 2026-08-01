@@ -1,8 +1,8 @@
 use litchi_ole::doc::writer::DocWriter;
 use litchi_ole::doc::{DocEmbeddedObjectEditor, DocEmbeddedObjectWriteOptions, Package};
 use litchi_ole::{LegacyOfficeObjectLimits, OleFile, OleWriter};
-use std::io::Cursor;
 use std::fs;
+use std::io::Cursor;
 use std::path::PathBuf;
 
 fn base_doc() -> Vec<u8> {
@@ -35,16 +35,42 @@ fn options(id: u32) -> DocEmbeddedObjectWriteOptions {
 #[test]
 fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     let original = base_doc();
-    let mut editor = DocEmbeddedObjectEditor::open(original, LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor =
+        DocEmbeddedObjectEditor::open(original, LegacyOfficeObjectLimits::default()).unwrap();
     editor.add(options(11)).unwrap();
     editor.add(options(22)).unwrap();
-    assert_eq!(editor.objects().unwrap().iter().map(|value| value.storage_id).collect::<Vec<_>>(), vec![11, 22]);
+    assert_eq!(
+        editor
+            .objects()
+            .unwrap()
+            .iter()
+            .map(|value| value.storage_id)
+            .collect::<Vec<_>>(),
+        vec![11, 22]
+    );
     editor.reorder(&[22, 11]).unwrap();
-    assert_eq!(editor.objects().unwrap().iter().map(|value| value.storage_id).collect::<Vec<_>>(), vec![22, 11]);
+    assert_eq!(
+        editor
+            .objects()
+            .unwrap()
+            .iter()
+            .map(|value| value.storage_id)
+            .collect::<Vec<_>>(),
+        vec![22, 11]
+    );
     let bytes = editor.finish().unwrap();
 
-    let mut reopened = DocEmbeddedObjectEditor::open(bytes, LegacyOfficeObjectLimits::default()).unwrap();
-    assert_eq!(reopened.objects().unwrap().iter().map(|value| value.storage_id).collect::<Vec<_>>(), vec![22, 11]);
+    let mut reopened =
+        DocEmbeddedObjectEditor::open(bytes, LegacyOfficeObjectLimits::default()).unwrap();
+    assert_eq!(
+        reopened
+            .objects()
+            .unwrap()
+            .iter()
+            .map(|value| value.storage_id)
+            .collect::<Vec<_>>(),
+        vec![22, 11]
+    );
     reopened.remove(22).unwrap();
     let bytes = reopened.finish().unwrap();
     let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
@@ -57,7 +83,8 @@ fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
 
 #[test]
 fn malformed_add_and_reorder_leave_editor_state_unchanged() {
-    let mut editor = DocEmbeddedObjectEditor::open(base_doc(), LegacyOfficeObjectLimits::default()).unwrap();
+    let mut editor =
+        DocEmbeddedObjectEditor::open(base_doc(), LegacyOfficeObjectLimits::default()).unwrap();
     editor.add(options(1)).unwrap();
     editor.add(options(2)).unwrap();
     let before = editor.objects().unwrap();
@@ -84,17 +111,27 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
                 let id = 2_000_000 + ordinal as u32;
                 editor.add(options(id)).unwrap();
                 let output = editor.finish().unwrap();
-                let reopened = DocEmbeddedObjectEditor::open(output.clone(), LegacyOfficeObjectLimits::default()).unwrap();
-                assert!(reopened.objects().unwrap().iter().any(|value| value.storage_id == id));
+                let reopened = DocEmbeddedObjectEditor::open(
+                    output.clone(),
+                    LegacyOfficeObjectLimits::default(),
+                )
+                .unwrap();
+                assert!(
+                    reopened
+                        .objects()
+                        .unwrap()
+                        .iter()
+                        .any(|value| value.storage_id == id)
+                );
                 let mut package = Package::from_reader(Cursor::new(output)).unwrap();
                 assert!(!package.document().unwrap().text().unwrap().is_empty());
                 supported += 1;
-            }
+            },
             Err(_) => {
                 // Construction owns no external state and therefore cannot mutate the fixture.
                 assert_eq!(fs::read(&path).unwrap(), original);
                 rejected += 1;
-            }
+            },
         }
     }
     assert_eq!(supported + rejected, 2);

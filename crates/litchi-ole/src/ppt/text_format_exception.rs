@@ -104,8 +104,7 @@ const PF_MASK_BULLET_FLAGS_PRESENCE: u32 = PF_MASK_HAS_BULLET
     | PF_MASK_BULLET_HAS_COLOR
     | PF_MASK_BULLET_HAS_SIZE;
 /// Mask bits that gate the presence of the `wrapFlags` field (MS-PPT 2.9.20).
-const PF_MASK_WRAP_FLAGS_PRESENCE: u32 =
-    PF_MASK_CHAR_WRAP | PF_MASK_WORD_WRAP | PF_MASK_OVERFLOW;
+const PF_MASK_WRAP_FLAGS_PRESENCE: u32 = PF_MASK_CHAR_WRAP | PF_MASK_WORD_WRAP | PF_MASK_OVERFLOW;
 
 // BulletFlags bits (MS-PPT 2.9.22).
 const BULLET_HAS_BULLET: u16 = 0x0001;
@@ -573,9 +572,7 @@ impl PowerPointWrapFlags {
     }
 
     fn to_bits(self) -> u16 {
-        u16::from(self.char_wrap)
-            | u16::from(self.word_wrap) << 1
-            | u16::from(self.overflow) << 2
+        u16::from(self.char_wrap) | u16::from(self.word_wrap) << 1 | u16::from(self.overflow) << 2
     }
 }
 
@@ -1182,7 +1179,10 @@ mod tests {
         assert_eq!(stops[0].alignment, ParagraphTabAlignment::Left);
         assert_eq!(stops[1].position, -40);
         assert_eq!(stops[1].alignment, ParagraphTabAlignment::Decimal);
-        assert_eq!(parsed.font_align(), Some(ParagraphFontAlignment::UpholdFixed));
+        assert_eq!(
+            parsed.font_align(),
+            Some(ParagraphFontAlignment::UpholdFixed)
+        );
         let wrap = parsed.wrap_flags().unwrap();
         assert!(wrap.char_wrap());
         assert!(wrap.word_wrap());

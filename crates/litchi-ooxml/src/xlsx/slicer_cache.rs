@@ -333,13 +333,12 @@ pub fn parse_slicer_cache_definition(xml: &[u8]) -> Result<SlicerCacheDefinition
                     return Err(invalid("unexpected Slicer Cache closing depth"));
                 }
             },
-            Event::Text(text)
-                if capture.is_none() => {
-                    let value = text.decode().map_err(xml_error)?;
-                    if !value.trim().is_empty() {
-                        return Err(invalid("unexpected text in Slicer Cache part"));
-                    }
-                },
+            Event::Text(text) if capture.is_none() => {
+                let value = text.decode().map_err(xml_error)?;
+                if !value.trim().is_empty() {
+                    return Err(invalid("unexpected text in Slicer Cache part"));
+                }
+            },
             Event::CData(_) if capture.is_none() => {
                 return Err(invalid("unexpected CDATA in Slicer Cache part"));
             },
@@ -782,10 +781,12 @@ fn parse_workbook_references(xml: &[u8]) -> Result<Vec<String>> {
                     closed = true;
                 }
             },
-            Event::Text(text) if target_ext_depth.is_some()
-                && !text.decode().map_err(xml_error)?.trim().is_empty() => {
-                    return Err(invalid("text in workbook Slicer Cache extension"));
-                },
+            Event::Text(text)
+                if target_ext_depth.is_some()
+                    && !text.decode().map_err(xml_error)?.trim().is_empty() =>
+            {
+                return Err(invalid("text in workbook Slicer Cache extension"));
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },

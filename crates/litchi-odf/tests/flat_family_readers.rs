@@ -7,18 +7,21 @@ use litchi_odf::{
     FlatSpreadsheet, FlatTextDocument,
 };
 
-const FLAT_TEXT: &str =
-    include_str!("../../../test-data/libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt");
-const FLAT_TEXT_TABLES: &str =
-    include_str!("../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt");
-const FLAT_TEXT_IMAGES: &str =
-    include_str!("../../../test-data/odfdo/tests/samples/images.fodt");
+const FLAT_TEXT: &str = include_str!(
+    "../../../test-data/libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt"
+);
+const FLAT_TEXT_TABLES: &str = include_str!(
+    "../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt"
+);
+const FLAT_TEXT_IMAGES: &str = include_str!("../../../test-data/odfdo/tests/samples/images.fodt");
 const FLAT_SPREADSHEET: &str =
     include_str!("../../../test-data/odfdo/tests/samples/test_flat_lo.fods");
-const FLAT_PRESENTATION: &str =
-    include_str!("../../../test-data/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp");
-const FLAT_DRAWING: &str =
-    include_str!("../../../test-data/libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg");
+const FLAT_PRESENTATION: &str = include_str!(
+    "../../../test-data/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp"
+);
+const FLAT_DRAWING: &str = include_str!(
+    "../../../test-data/libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg"
+);
 
 #[test]
 fn flat_text_document_exposes_paragraphs_and_headings() {
@@ -52,11 +55,12 @@ fn flat_text_document_exposes_paragraphs_and_headings() {
             .any(|paragraph| paragraph.text().unwrap().contains("Cras eu leo sed justo"))
     );
     assert!(headings.len() >= 2);
-    assert!(
-        headings
-            .iter()
-            .any(|heading| heading.text().unwrap().contains("Lorem ipsum dolor sit amet"))
-    );
+    assert!(headings.iter().any(|heading| {
+        heading
+            .text()
+            .unwrap()
+            .contains("Lorem ipsum dolor sit amet")
+    }));
     assert!(
         headings
             .iter()
@@ -149,11 +153,7 @@ fn flat_spreadsheet_expands_repeated_cells() {
         r#"</table:table></office:spreadsheet></office:body></office:document>"#,
     );
     let mut flat = FlatSpreadsheet::from_bytes(xml.as_bytes().to_vec()).unwrap();
-    let sheet = flat
-        .spreadsheet_mut()
-        .sheet_by_name("R")
-        .unwrap()
-        .unwrap();
+    let sheet = flat.spreadsheet_mut().sheet_by_name("R").unwrap().unwrap();
     let rows = sheet.rows().unwrap();
     let cells = rows[0].cells().unwrap();
     assert_eq!(cells.len(), 4);

@@ -345,8 +345,8 @@ mod tests {
     fn allocates_first_free_picture_path() {
         let path = allocate_picture_path("png", |_| false).unwrap();
         assert_eq!(path, "Pictures/image1.png");
-        let path = allocate_picture_path("jpg", |candidate| candidate == "Pictures/image1.jpg")
-            .unwrap();
+        let path =
+            allocate_picture_path("jpg", |candidate| candidate == "Pictures/image1.jpg").unwrap();
         assert_eq!(path, "Pictures/image2.jpg");
         assert!(allocate_picture_path("png", |_| true).is_err());
     }
@@ -366,7 +366,10 @@ mod tests {
         assert_eq!(frame.get_attribute("svg:width"), Some("10cm"));
         let image = &frame.get_children()[0];
         assert_eq!(image.tag_name(), "draw:image");
-        assert_eq!(image.get_attribute("xlink:href"), Some("Pictures/image1.png"));
+        assert_eq!(
+            image.get_attribute("xlink:href"),
+            Some("Pictures/image1.png")
+        );
         let xml = frame.to_xml_string();
         assert!(xml.contains("xlink:actuate=\"onLoad\""));
     }
@@ -387,7 +390,16 @@ mod tests {
         let xml = frame.to_xml_string();
         assert!(xml.contains("a &lt; b"));
         assert!(xml.contains("second &amp; line"));
-        assert!(text_box_frame_element("B", &OdfLength::points(1.0), &OdfLength::points(1.0), OdfFrameAnchor::Page, "").is_ok());
+        assert!(
+            text_box_frame_element(
+                "B",
+                &OdfLength::points(1.0),
+                &OdfLength::points(1.0),
+                OdfFrameAnchor::Page,
+                ""
+            )
+            .is_ok()
+        );
     }
 
     #[test]

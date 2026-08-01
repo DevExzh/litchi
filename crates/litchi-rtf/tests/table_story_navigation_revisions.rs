@@ -7,7 +7,9 @@ use std::borrow::Cow;
 fn round_trip(source: &str) -> RtfDocument<'static> {
     let document = RtfDocument::parse(source).unwrap();
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(&document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
     RtfDocument::parse_bytes(&output).unwrap()
 }
 
@@ -25,12 +27,39 @@ fn outer_cell_retains_navigation_and_both_revision_kinds() {
     assert_eq!(document.revisions().len(), 2);
     let cell = &document.tables()[0].rows()[0].cells()[0];
     assert_eq!(cell.text(), "AnewZ");
-    assert!(cell.story_events().iter().any(|event| matches!(event, CellStoryEvent::NavigationEntry(_))));
-    assert!(cell.story_events().iter().any(|event| matches!(event, CellStoryEvent::RevisionStart(_))));
-    assert!(cell.story_events().iter().any(|event| matches!(event, CellStoryEvent::RevisionDeletion(_))));
-    assert!(matches!(document.navigation_entries()[0], NavigationEntry::TableOfContents(_)));
-    assert!(document.revisions().iter().any(|revision| revision.revision_type == RevisionType::Insertion && revision.content == "new"));
-    assert!(document.revisions().iter().any(|revision| revision.revision_type == RevisionType::Deletion && revision.content == "old"));
+    assert!(
+        cell.story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::NavigationEntry(_)))
+    );
+    assert!(
+        cell.story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::RevisionStart(_)))
+    );
+    assert!(
+        cell.story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::RevisionDeletion(_)))
+    );
+    assert!(matches!(
+        document.navigation_entries()[0],
+        NavigationEntry::TableOfContents(_)
+    ));
+    assert!(
+        document
+            .revisions()
+            .iter()
+            .any(|revision| revision.revision_type == RevisionType::Insertion
+                && revision.content == "new")
+    );
+    assert!(
+        document
+            .revisions()
+            .iter()
+            .any(|revision| revision.revision_type == RevisionType::Deletion
+                && revision.content == "old")
+    );
 }
 
 #[test]
@@ -83,7 +112,11 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
     duplicate.tables_mut()[0].rows_mut()[0].cells_mut()[1]
         .push_navigation_entry_reference(0, 0)
         .unwrap();
-    assert!(RtfWriter::new(Vec::new()).write_document(&duplicate).is_err());
+    assert!(
+        RtfWriter::new(Vec::new())
+            .write_document(&duplicate)
+            .is_err()
+    );
 
     let mut wrong = RtfDocument::parse(
         r#"{\rtf1{\*\revtbl{A;}}\trowd\cellx1000{\intbl{\revised\revauth0 x}\cell}\row}"#,
@@ -94,11 +127,16 @@ fn writer_rejects_unowned_multiple_wrong_kind_and_out_of_range_mutations() {
     cell.push_deletion_revision_reference(0, 0).unwrap();
     assert!(RtfWriter::new(Vec::new()).write_document(&wrong).is_err());
 
-    let mut out_of_range = RtfDocument::parse(r#"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}"#).unwrap();
+    let mut out_of_range =
+        RtfDocument::parse(r#"{\rtf1\trowd\cellx1000{\intbl A\cell}\row}"#).unwrap();
     out_of_range.tables_mut()[0].rows_mut()[0].cells_mut()[0]
         .push_navigation_entry_reference(99, 0)
         .unwrap();
-    assert!(RtfWriter::new(Vec::new()).write_document(&out_of_range).is_err());
+    assert!(
+        RtfWriter::new(Vec::new())
+            .write_document(&out_of_range)
+            .is_err()
+    );
 }
 
 #[test]
@@ -139,13 +177,21 @@ fn atomic_outer_and_nested_mutation_round_trips() {
             },
         )
         .unwrap();
-    let reparsed = round_trip(&String::from_utf8({
-        let mut output = Vec::new();
-        RtfWriter::new(&mut output).write_document(&document).unwrap();
-        output
-    }).unwrap());
+    let reparsed = round_trip(
+        &String::from_utf8({
+            let mut output = Vec::new();
+            RtfWriter::new(&mut output)
+                .write_document(&document)
+                .unwrap();
+            output
+        })
+        .unwrap(),
+    );
     assert_eq!(reparsed.navigation_entries().len(), 1);
     assert_eq!(reparsed.revisions().len(), 1);
-    let nested_cell = &reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0].table.rows()[0].cells()[0];
+    let nested_cell = &reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0]
+        .table
+        .rows()[0]
+        .cells()[0];
     assert_eq!(nested_cell.revision_events().count(), 2);
 }

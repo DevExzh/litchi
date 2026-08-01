@@ -9,9 +9,9 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 }
 
 fn has_page(events: &[StoryEvent], position: usize) -> bool {
-    events.iter().any(
-        |event| matches!(event, StoryEvent::PageBreak(page) if page.position == position),
-    )
+    events
+        .iter()
+        .any(|event| matches!(event, StoryEvent::PageBreak(page) if page.position == position))
 }
 
 #[test]
@@ -51,10 +51,7 @@ fn visible_story_owners_preserve_page_events() {
     assert!(has_page(&document.fields()[0].result_events, 1));
     assert!(has_page(&document.shapes()[0].text_story_events, 1));
     assert!(has_page(&document.annotations()[0].story_events, 1));
-    assert!(has_page(
-        &document.legacy_text_boxes()[0].story_events,
-        1
-    ));
+    assert!(has_page(&document.legacy_text_boxes()[0].story_events, 1));
 
     let output = write(&document);
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
@@ -66,10 +63,7 @@ fn visible_story_owners_preserve_page_events() {
     assert!(has_page(&reparsed.fields()[0].result_events, 1));
     assert!(has_page(&reparsed.shapes()[0].text_story_events, 1));
     assert!(has_page(&reparsed.annotations()[0].story_events, 1));
-    assert!(has_page(
-        &reparsed.legacy_text_boxes()[0].story_events,
-        1
-    ));
+    assert!(has_page(&reparsed.legacy_text_boxes()[0].story_events, 1));
 }
 
 #[test]
@@ -77,26 +71,36 @@ fn table_and_nested_table_page_events_round_trip_in_place() {
     let source = r#"{\rtf1\trowd\cellx5000\intbl\itap1 Before\page After \intbl\itap2 Inner\page Tail\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}{\nonesttables\par}\intbl\itap1 End\cell\row}"#;
     let document = RtfDocument::parse(source).unwrap();
     let outer = &document.tables()[0].rows()[0].cells()[0];
-    assert!(outer.story_events().iter().any(
-        |event| matches!(event, CellStoryEvent::PageBreak(page) if page.position == 6),
-    ));
+    assert!(
+        outer
+            .story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::PageBreak(page) if page.position == 6),)
+    );
     let inner = &outer.nested_tables()[0].table.rows()[0].cells()[0];
-    assert!(inner.story_events().iter().any(
-        |event| matches!(event, CellStoryEvent::PageBreak(page) if page.position == 5),
-    ));
+    assert!(
+        inner
+            .story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::PageBreak(page) if page.position == 5),)
+    );
 
     let output = write(&document);
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     let outer = &reparsed.tables()[0].rows()[0].cells()[0];
     let inner = &outer.nested_tables()[0].table.rows()[0].cells()[0];
-    assert!(outer
-        .story_events()
-        .iter()
-        .any(|event| matches!(event, CellStoryEvent::PageBreak(_))));
-    assert!(inner
-        .story_events()
-        .iter()
-        .any(|event| matches!(event, CellStoryEvent::PageBreak(_))));
+    assert!(
+        outer
+            .story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::PageBreak(_)))
+    );
+    assert!(
+        inner
+            .story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::PageBreak(_)))
+    );
 }
 
 #[test]

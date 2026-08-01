@@ -3,7 +3,7 @@
 use super::package::{PptError, Result};
 use super::records::PptRecord;
 use crate::consts::PptRecordType;
-use crate::smart_tags::{PropertyBagStore, SmartTagLimits};
+use litchi_ole_common::smart_tags::{PropertyBagStore, SmartTagLimits};
 
 /// One smart-tag type declared by the shared property-bag store.
 #[derive(Debug, Clone, PartialEq, Eq)]

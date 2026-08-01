@@ -111,7 +111,12 @@ impl XlsPhoneticFormat {
         phonetic_type: XlsPhoneticType,
         alignment: XlsPhoneticAlignment,
     ) -> Self {
-        Self { font_index, phonetic_type, alignment, unused_flags: 0 }
+        Self {
+            font_index,
+            phonetic_type,
+            alignment,
+            unused_flags: 0,
+        }
     }
 
     pub const fn font_index(&self) -> u16 {
@@ -140,7 +145,12 @@ impl XlsPhoneticRange {
         if last_row < first_row || last_col < first_col {
             return Err(invalid("phonetic range is reversed"));
         }
-        Ok(Self { first_row, last_row, first_col, last_col })
+        Ok(Self {
+            first_row,
+            last_row,
+            first_col,
+            last_col,
+        })
     }
 
     pub const fn first_row(&self) -> u16 {
@@ -195,7 +205,11 @@ impl XlsPhoneticInfo {
             return Err(invalid("phonetic range count exceeds 0x2000"));
         }
         let expected = HEADER_LEN
-            .checked_add(range_count.checked_mul(REF8_LEN).ok_or_else(|| invalid("range overflow"))?)
+            .checked_add(
+                range_count
+                    .checked_mul(REF8_LEN)
+                    .ok_or_else(|| invalid("range overflow"))?,
+            )
             .ok_or_else(|| invalid("range overflow"))?;
         if data.len() != expected {
             return Err(XlsError::InvalidLength {
@@ -289,10 +303,12 @@ mod tests {
         // Reversed range.
         assert!(XlsPhoneticRange::new(5, 2, 0, 1).is_err());
         // Count cap.
-        assert!(XlsPhoneticInfo::try_new(
-            XlsPhoneticFormat::new(0, XlsPhoneticType::Any, XlsPhoneticAlignment::General),
-            vec![XlsPhoneticRange::new(0, 0, 0, 0).unwrap(); MAX_RANGES + 1],
-        )
-        .is_err());
+        assert!(
+            XlsPhoneticInfo::try_new(
+                XlsPhoneticFormat::new(0, XlsPhoneticType::Any, XlsPhoneticAlignment::General),
+                vec![XlsPhoneticRange::new(0, 0, 0, 0).unwrap(); MAX_RANGES + 1],
+            )
+            .is_err()
+        );
     }
 }

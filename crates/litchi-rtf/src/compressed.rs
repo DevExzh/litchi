@@ -1,7 +1,7 @@
 //! Compressed RTF support.
 //!
 //! This module implements the RTF compression algorithm as specified in:
-//! https://msdn.microsoft.com/en-us/library/cc463890(v=exchg.80).aspx
+//! <https://msdn.microsoft.com/en-us/library/cc463890(v=exchg.80).aspx>
 //!
 //! Compressed RTF is commonly used in email attachments and other scenarios
 //! where file size reduction is important.

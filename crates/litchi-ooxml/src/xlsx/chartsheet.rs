@@ -3020,10 +3020,10 @@ fn validate_chartsheet(value: &ChartSheet) -> Result<()> {
             if bases > 1 {
                 return Err(invalid("tab color has multiple base color selectors"));
             }
-            if let Some(rgb) = &color.rgb {
-                if rgb.len() != 8 || !rgb.bytes().all(|b| b.is_ascii_hexdigit()) {
-                    return Err(invalid("tab color rgb must contain eight hex digits"));
-                }
+            if let Some(rgb) = &color.rgb
+                && (rgb.len() != 8 || !rgb.bytes().all(|b| b.is_ascii_hexdigit()))
+            {
+                return Err(invalid("tab color rgb must contain eight hex digits"));
             }
             if color
                 .tint
@@ -3033,14 +3033,13 @@ fn validate_chartsheet(value: &ChartSheet) -> Result<()> {
             }
         }
     }
-    if let Some(protection) = &value.protection {
-        if let Some(password) = &protection.password_hash {
-            if password.len() != 4 || !password.bytes().all(|b| b.is_ascii_hexdigit()) {
-                return Err(invalid(
-                    "chartsheet password hash must contain four hex digits",
-                ));
-            }
-        }
+    if let Some(protection) = &value.protection
+        && let Some(password) = &protection.password_hash
+        && (password.len() != 4 || !password.bytes().all(|b| b.is_ascii_hexdigit()))
+    {
+        return Err(invalid(
+            "chartsheet password hash must contain four hex digits",
+        ));
     }
     if let Some(custom_views) = &value.custom_views {
         if custom_views.is_empty() {

@@ -1,6 +1,6 @@
 use litchi_odf::{
-    Manifest, OdfEncryptionCipher, OdfEncryptionKdf, OdfEncryptionProfile,
-    OdfEncryptionStartKey, OwnedPackage, PackageWriter,
+    Manifest, OdfEncryptionCipher, OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey,
+    OwnedPackage, PackageWriter,
 };
 use std::num::NonZeroU32;
 
@@ -67,12 +67,19 @@ fn emits_typed_manifest_descriptors_and_fresh_randomness() {
     assert_ne!(first, second);
 
     let package = OwnedPackage::from_bytes(first).unwrap();
-    let manifest_xml = String::from_utf8(package.get_file("META-INF/manifest.xml").unwrap()).unwrap();
+    let manifest_xml =
+        String::from_utf8(package.get_file("META-INF/manifest.xml").unwrap()).unwrap();
     let manifest = Manifest::parse(&manifest_xml).unwrap();
     let content = manifest.get_entry("content.xml").unwrap();
     assert_eq!(content.size, Some(CONTENT.len() as u64));
     assert!(content.encryption.as_ref().unwrap().checksum.is_some());
-    assert!(manifest.get_entry("META-INF/custom-metadata.xml").unwrap().encryption.is_none());
+    assert!(
+        manifest
+            .get_entry("META-INF/custom-metadata.xml")
+            .unwrap()
+            .encryption
+            .is_none()
+    );
     assert!(manifest_xml.contains("aes256-cbc"));
     assert!(manifest_xml.contains("PBKDF2"));
     assert!(manifest_xml.contains("sha256-1k"));
@@ -98,25 +105,36 @@ fn rejects_wrong_password_and_ciphertext_tampering() {
 
 #[test]
 fn rejects_invalid_profiles_and_late_configuration_without_mutation() {
-    assert!(OdfEncryptionProfile::new(
-        OdfEncryptionCipher::BlowfishCfb8 { key_size: 3 },
-        OdfEncryptionStartKey::Sha1,
-        OdfEncryptionKdf::Pbkdf2 { iterations: nz(1) },
-    ).is_err());
-    assert!(OdfEncryptionProfile::new(
-        OdfEncryptionCipher::Aes256Gcm,
-        OdfEncryptionStartKey::Sha256,
-        OdfEncryptionKdf::Pbkdf2 { iterations: nz(10_000_001) },
-    ).is_err());
-    assert!(OdfEncryptionProfile::new(
-        OdfEncryptionCipher::Aes256Gcm,
-        OdfEncryptionStartKey::Sha256,
-        OdfEncryptionKdf::Argon2id {
-            iterations: nz(1),
-            memory_kib: nz(262_145),
-            lanes: nz(1),
-        },
-    ).is_err());
+    assert!(
+        OdfEncryptionProfile::new(
+            OdfEncryptionCipher::BlowfishCfb8 { key_size: 3 },
+            OdfEncryptionStartKey::Sha1,
+            OdfEncryptionKdf::Pbkdf2 { iterations: nz(1) },
+        )
+        .is_err()
+    );
+    assert!(
+        OdfEncryptionProfile::new(
+            OdfEncryptionCipher::Aes256Gcm,
+            OdfEncryptionStartKey::Sha256,
+            OdfEncryptionKdf::Pbkdf2 {
+                iterations: nz(10_000_001)
+            },
+        )
+        .is_err()
+    );
+    assert!(
+        OdfEncryptionProfile::new(
+            OdfEncryptionCipher::Aes256Gcm,
+            OdfEncryptionStartKey::Sha256,
+            OdfEncryptionKdf::Argon2id {
+                iterations: nz(1),
+                memory_kib: nz(262_145),
+                lanes: nz(1),
+            },
+        )
+        .is_err()
+    );
 
     let mut writer = PackageWriter::new();
     writer.set_mimetype(MIME).unwrap();
@@ -124,7 +142,11 @@ fn rejects_invalid_profiles_and_late_configuration_without_mutation() {
         .set_encryption(PASSWORD, OdfEncryptionProfile::compatible())
         .unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
-    assert!(writer.set_encryption("replacement", OdfEncryptionProfile::authenticated()).is_err());
+    assert!(
+        writer
+            .set_encryption("replacement", OdfEncryptionProfile::authenticated())
+            .is_err()
+    );
     assert!(writer.clear_encryption().is_err());
     let bytes = writer.finish().unwrap();
     let package = OwnedPackage::from_bytes_with_password(bytes, PASSWORD).unwrap();

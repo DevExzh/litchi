@@ -143,7 +143,7 @@ impl HeadersTable {
     ) -> Result<Vec<HeaderFooterStory>> {
         // Parse as PLCF with element_size = 0 (only CPs, no properties)
         // We need to manually parse this since PlcfParser expects element_size > 0
-        if data.len() < 56 || data.len() % 4 != 0 {
+        if data.len() < 56 || !data.len().is_multiple_of(4) {
             return Err(DocError::Corrupted(
                 "PlcfHdd must contain the six separator and six section story ranges".to_string(),
             ));
@@ -151,7 +151,7 @@ impl HeadersTable {
 
         // Count of CPs = data.len() / 4
         let cp_count = data.len() / 4;
-        if cp_count < 14 || (cp_count - 8) % 6 != 0 {
+        if cp_count < 14 || !(cp_count - 8).is_multiple_of(6) {
             return Err(DocError::Corrupted(
                 "PlcfHdd story count is inconsistent with its section groups".to_string(),
             ));

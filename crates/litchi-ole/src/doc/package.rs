@@ -12,7 +12,7 @@ pub struct DocOpenOptions<'a> {
     pub password: Option<&'a str>,
     /// How non-structural stylesheet defects are treated.
     ///
-    /// Defaults to [`DocLeniency::Strict`], which is the historical behaviour.
+    /// Defaults to [`crate::doc::DocLeniency::Strict`], which is the historical behaviour.
     pub leniency: super::leniency::DocLeniency,
 }
 
@@ -298,12 +298,17 @@ impl<R: Read + Seek> Package<R> {
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
     pub fn custom_xml_data_store(
         &mut self,
-    ) -> crate::custom_xml_data::Result<Option<crate::custom_xml_data::MsoDataStore>> {
-        crate::custom_xml_data::inspect_mso_data_store(&mut self.ole)
+    ) -> litchi_ole_common::custom_xml_data::Result<
+        Option<litchi_ole_common::custom_xml_data::MsoDataStore>,
+    > {
+        litchi_ole_common::custom_xml_data::inspect_mso_data_store(&mut self.ole)
     }
 
     pub fn summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {
-        match self.ole.property_set_stream(&["\u{0005}SummaryInformation"]) {
+        match self
+            .ole
+            .property_set_stream(&["\u{0005}SummaryInformation"])
+        {
             Ok(value) => Ok(Some(value)),
             Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
             Err(error) => Err(error.into()),
@@ -323,8 +328,13 @@ impl<R: Read + Seek> Package<R> {
         )
     }
 
-    pub fn document_summary_information(&mut self) -> Result<Option<litchi_cfb::PropertySetStream>> {
-        match self.ole.property_set_stream(&["\u{0005}DocumentSummaryInformation"]) {
+    pub fn document_summary_information(
+        &mut self,
+    ) -> Result<Option<litchi_cfb::PropertySetStream>> {
+        match self
+            .ole
+            .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
+        {
             Ok(value) => Ok(Some(value)),
             Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
             Err(error) => Err(error.into()),
@@ -332,7 +342,11 @@ impl<R: Read + Seek> Package<R> {
     }
 
     pub fn user_defined_properties(&mut self) -> Result<Option<litchi_cfb::PropertySet>> {
-        Ok(self.document_summary_information()?.and_then(|stream| stream.section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID).cloned()))
+        Ok(self.document_summary_information()?.and_then(|stream| {
+            stream
+                .section(litchi_cfb::USER_DEFINED_PROPERTIES_FMTID)
+                .cloned()
+        }))
     }
 }
 

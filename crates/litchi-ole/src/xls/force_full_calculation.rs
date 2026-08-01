@@ -67,7 +67,8 @@ impl XlsForceFullCalculation {
             )));
         }
         // Boolean (MS-XLS 2.5.14): only 0 and 1 are legal.
-        let force_full = match u32::from_le_bytes(data[12..16].try_into().expect("length checked")) {
+        let force_full = match u32::from_le_bytes(data[12..16].try_into().expect("length checked"))
+        {
             0 => false,
             1 => true,
             other => {

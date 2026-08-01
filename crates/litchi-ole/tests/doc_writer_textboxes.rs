@@ -57,8 +57,8 @@ fn make_png(width: u32, height: u32) -> Vec<u8> {
 }
 
 fn jpeg_fixture() -> Vec<u8> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/images/jpg/abstract4.jpg");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/images/jpg/abstract4.jpg");
     std::fs::read(path).expect("read JPEG fixture")
 }
 
@@ -95,10 +95,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
                 .with_fill(0xFF, 0xFF, 0xCC)
                 .with_line(0x80, 0x00, 0x00),
             FloatingPosition::new(2500, 1200)
-                .with_origins(
-                    ShapeHorizontalOrigin::Page,
-                    ShapeVerticalOrigin::Paragraph,
-                )
+                .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
                 .with_text_wrap(ShapeTextWrap::Square),
             "First box",
         )
@@ -143,7 +140,10 @@ fn text_boxes_round_trip_text_and_shapes() {
     let positions = document.shape_positions();
     assert_eq!(positions.len(), 4);
     let lids: Vec<u32> = positions.iter().map(|anchor| anchor.spa.shape_id).collect();
-    assert_eq!(lids, vec![1026, RECTANGLE_SPID, FIRST_BOX_SPID, SECOND_BOX_SPID]);
+    assert_eq!(
+        lids,
+        vec![1026, RECTANGLE_SPID, FIRST_BOX_SPID, SECOND_BOX_SPID]
+    );
 
     // The first text box keeps its geometry, origins, wrap, and colors.
     let box_spa = &positions[2].spa;

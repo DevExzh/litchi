@@ -67,8 +67,8 @@ fn namespaced_attr(
     local_name: &[u8],
 ) -> Result<Option<String>> {
     for attribute in element.attributes() {
-        let attribute =
-            attribute.map_err(|error| invalid(format!("handout-master attribute error: {error}")))?;
+        let attribute = attribute
+            .map_err(|error| invalid(format!("handout-master attribute error: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == expected_namespace)
             && local.as_ref() == local_name
@@ -113,10 +113,11 @@ pub fn parse_handout_master(xml: &str) -> Result<Option<HandoutMaster>> {
                     if active.is_some() {
                         return Err(invalid("nested style:handout-master element"));
                     }
-                    let page_layout_name = namespaced_attr(&reader, &element, STYLE, b"page-layout-name")?
-                        .ok_or_else(|| {
-                            invalid("style:handout-master is missing style:page-layout-name")
-                        })?;
+                    let page_layout_name =
+                        namespaced_attr(&reader, &element, STYLE, b"page-layout-name")?
+                            .ok_or_else(|| {
+                                invalid("style:handout-master is missing style:page-layout-name")
+                            })?;
                     active = Some((
                         HandoutMaster {
                             page_layout_name,
@@ -159,45 +160,46 @@ pub fn parse_handout_master(xml: &str) -> Result<Option<HandoutMaster>> {
                 }
             },
             Event::Empty(element)
-                if style_element && element.local_name().as_ref() == b"handout-master" => {
-                    if active.is_some() {
-                        return Err(invalid("duplicate style:handout-master element"));
-                    }
-                    let page_layout_name = namespaced_attr(&reader, &element, STYLE, b"page-layout-name")?
-                        .ok_or_else(|| {
-                            invalid("style:handout-master is missing style:page-layout-name")
-                        })?;
-                    return Ok(Some(HandoutMaster {
-                        page_layout_name,
-                        presentation_page_layout_name: namespaced_attr(
-                            &reader,
-                            &element,
-                            PRESENTATION,
-                            b"presentation-page-layout-name",
-                        )?,
-                        drawing_style_name: namespaced_attr(&reader, &element, DRAW, b"style-name")?,
-                        use_header_name: namespaced_attr(
-                            &reader,
-                            &element,
-                            PRESENTATION,
-                            b"use-header-name",
-                        )?,
-                        use_footer_name: namespaced_attr(
-                            &reader,
-                            &element,
-                            PRESENTATION,
-                            b"use-footer-name",
-                        )?,
-                        use_date_time_name: namespaced_attr(
-                            &reader,
-                            &element,
-                            PRESENTATION,
-                            b"use-date-time-name",
-                        )?,
-                        shapes_xml: String::new(),
-                        xml: xml[event_start..event_end].to_string(),
-                    }));
-                },
+                if style_element && element.local_name().as_ref() == b"handout-master" =>
+            {
+                if active.is_some() {
+                    return Err(invalid("duplicate style:handout-master element"));
+                }
+                let page_layout_name =
+                    namespaced_attr(&reader, &element, STYLE, b"page-layout-name")?.ok_or_else(
+                        || invalid("style:handout-master is missing style:page-layout-name"),
+                    )?;
+                return Ok(Some(HandoutMaster {
+                    page_layout_name,
+                    presentation_page_layout_name: namespaced_attr(
+                        &reader,
+                        &element,
+                        PRESENTATION,
+                        b"presentation-page-layout-name",
+                    )?,
+                    drawing_style_name: namespaced_attr(&reader, &element, DRAW, b"style-name")?,
+                    use_header_name: namespaced_attr(
+                        &reader,
+                        &element,
+                        PRESENTATION,
+                        b"use-header-name",
+                    )?,
+                    use_footer_name: namespaced_attr(
+                        &reader,
+                        &element,
+                        PRESENTATION,
+                        b"use-footer-name",
+                    )?,
+                    use_date_time_name: namespaced_attr(
+                        &reader,
+                        &element,
+                        PRESENTATION,
+                        b"use-date-time-name",
+                    )?,
+                    shapes_xml: String::new(),
+                    xml: xml[event_start..event_end].to_string(),
+                }));
+            },
             Event::End(element) => {
                 depth = depth
                     .checked_sub(1)
@@ -208,8 +210,8 @@ pub fn parse_handout_master(xml: &str) -> Result<Option<HandoutMaster>> {
                         && element.local_name().as_ref() == b"handout-master"
                     {
                         let mut master = master;
-                        master.shapes_xml = xml[open_tag_end(&xml[start..event_start])?..]
-                            .to_string();
+                        master.shapes_xml =
+                            xml[open_tag_end(&xml[start..event_start])?..].to_string();
                         master.xml = xml[start..event_end].to_string();
                         return Ok(Some(master));
                     }
@@ -282,7 +284,10 @@ mod tests {
     fn parses_handout_master_attributes_and_shapes() {
         let master = parse_handout_master(STYLES).unwrap().unwrap();
         assert_eq!(master.page_layout_name, "PM0");
-        assert_eq!(master.presentation_page_layout_name.as_deref(), Some("AL0T26"));
+        assert_eq!(
+            master.presentation_page_layout_name.as_deref(),
+            Some("AL0T26")
+        );
         assert_eq!(master.drawing_style_name.as_deref(), Some("Mdp2"));
         assert_eq!(master.use_header_name.as_deref(), Some("hdr1"));
         assert_eq!(master.use_footer_name, None);

@@ -114,11 +114,7 @@ impl ViewRange {
         if self.row_first == self.row_last && self.col_first == self.col_last {
             first
         } else {
-            format!(
-                "{}:{}",
-                first,
-                cell_reference(self.row_last, self.col_last)
-            )
+            format!("{}:{}", first, cell_reference(self.row_last, self.col_last))
         }
     }
 }
@@ -163,7 +159,10 @@ fn parse_view_cell(reference: &str, context: &str) -> XlsbResult<(u32, u32)> {
     if row > crate::xlsb::merged_cells::MAX_MERGED_CELL_ROW
         || col > crate::xlsb::merged_cells::MAX_MERGED_CELL_COLUMN
     {
-        return Err(malformed(context, format!("cell '{reference}' is out of bounds")));
+        return Err(malformed(
+            context,
+            format!("cell '{reference}' is out of bounds"),
+        ));
     }
     Ok((row, col))
 }
@@ -182,7 +181,7 @@ fn zoom_or_default(value: Option<u16>, default: u16, context: &str) -> XlsbResul
 /// Parse a `BrtBeginWsView` record payload ([MS-XLSB] 2.4.307).
 ///
 /// Pane and selection records following the view are attached by
-/// [`read_sheet_views`], not by this function.
+/// `read_sheet_views`, not by this function.
 pub fn parse_ws_view(data: &[u8]) -> XlsbResult<SheetView> {
     let context = "BrtBeginWsView";
     let mut cursor = PayloadCursor::new(data, context);
@@ -241,16 +240,32 @@ pub fn write_ws_view_payload(view: Option<&SheetView>) -> XlsbResult<Vec<u8>> {
             flags |= bit;
         }
     };
-    set_flag(FLAG_WINDOW_PROTECTION, view.and_then(|v| v.window_protection), false);
-    set_flag(FLAG_SHOW_FORMULAS, view.and_then(|v| v.show_formulas), false);
-    set_flag(FLAG_SHOW_GRID_LINES, view.and_then(|v| v.show_grid_lines), true);
+    set_flag(
+        FLAG_WINDOW_PROTECTION,
+        view.and_then(|v| v.window_protection),
+        false,
+    );
+    set_flag(
+        FLAG_SHOW_FORMULAS,
+        view.and_then(|v| v.show_formulas),
+        false,
+    );
+    set_flag(
+        FLAG_SHOW_GRID_LINES,
+        view.and_then(|v| v.show_grid_lines),
+        true,
+    );
     set_flag(
         FLAG_SHOW_ROW_COL_HEADERS,
         view.and_then(|v| v.show_row_col_headers),
         true,
     );
     set_flag(FLAG_SHOW_ZEROS, view.and_then(|v| v.show_zeros), true);
-    set_flag(FLAG_RIGHT_TO_LEFT, view.and_then(|v| v.right_to_left), false);
+    set_flag(
+        FLAG_RIGHT_TO_LEFT,
+        view.and_then(|v| v.right_to_left),
+        false,
+    );
     set_flag(FLAG_TAB_SELECTED, view.and_then(|v| v.tab_selected), true);
     set_flag(FLAG_SHOW_RULER, view.and_then(|v| v.show_ruler), true);
     set_flag(
@@ -268,7 +283,10 @@ pub fn write_ws_view_payload(view: Option<&SheetView>) -> XlsbResult<Vec<u8>> {
         flags |= FLAG_WHITESPACE_HIDDEN;
     }
 
-    let xl_view = view.and_then(|v| v.view_type).map(view_type_to_u32).unwrap_or(0);
+    let xl_view = view
+        .and_then(|v| v.view_type)
+        .map(view_type_to_u32)
+        .unwrap_or(0);
     let (row_top, col_left) = match view.and_then(|v| v.top_left_cell.as_deref()) {
         Some(reference) => parse_view_cell(reference, context)?,
         None => (0, 0),
@@ -290,7 +308,11 @@ pub fn write_ws_view_payload(view: Option<&SheetView>) -> XlsbResult<Vec<u8>> {
     writer.write_u8(color_id as u8)?;
     writer.write_u8(0)?; // reserved2
     writer.write_u16(0)?; // reserved3
-    writer.write_u16(zoom_or_default(view.and_then(|v| v.zoom_scale), 100, context)?)?;
+    writer.write_u16(zoom_or_default(
+        view.and_then(|v| v.zoom_scale),
+        100,
+        context,
+    )?)?;
     writer.write_u16(zoom_or_default(
         view.and_then(|v| v.zoom_scale_normal),
         0,
@@ -384,10 +406,7 @@ pub fn parse_selection(data: &[u8]) -> XlsbResult<SheetSelection> {
     let count = usize::try_from(cursor.read_u32()?)
         .map_err(|_| malformed(context, "sqrfx count overflow"))?;
     if count > MAX_SHEET_VIEW_SELECTION_RANGES {
-        return Err(malformed(
-            context,
-            format!("sqrfx contains {count} ranges"),
-        ));
+        return Err(malformed(context, format!("sqrfx contains {count} ranges")));
     }
     if cursor.remaining() != count * RANGE_LEN {
         return Err(XlsbError::InvalidLength {
@@ -557,9 +576,9 @@ mod tests {
     // BrtSel payload captured from Excel: top-left pane, active cell A1, one
     // single-cell range A1.
     const EXCEL_SEL: [u8; 36] = [
-        0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
     #[test]

@@ -56,8 +56,8 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-mod animation_relationships;
 pub mod actions;
+mod animation_relationships;
 pub mod animations;
 pub mod backgrounds;
 pub mod changes_information;
@@ -84,13 +84,13 @@ pub mod ole_object;
 pub mod package;
 pub mod parts;
 pub mod presentation;
-pub mod presentation_structure;
 pub mod presentation_properties;
+pub mod presentation_structure;
 pub mod protection;
 pub mod revision_information;
 pub mod sections;
-pub mod show_events;
 pub mod shapes;
+pub mod show_events;
 pub mod slide;
 pub mod slide_sync;
 pub mod smartart;
@@ -121,36 +121,25 @@ pub use color_map::{ColorMap, ColorMapOverride, ColorMapSlot, ThemeColorRole};
 pub use comments::{
     PresentationComment, PresentationCommentAuthor, PresentationCommentConformance,
     PresentationComments, SlideCommentList, add_presentation_comment,
-    add_presentation_comment_author, find_presentation_comment,
-    find_presentation_comment_author, load_presentation_comments, parse_comment_authors,
-    parse_slide_comments, remove_presentation_comment, remove_presentation_comment_author,
+    add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
+    load_presentation_comments, parse_comment_authors, parse_slide_comments,
+    remove_presentation_comment, remove_presentation_comment_author,
     reorder_presentation_comment_authors, reorder_presentation_comments,
-    replace_presentation_comment, replace_presentation_comment_author,
-    store_presentation_comments, update_presentation_comment,
-    update_presentation_comment_author, write_comment_authors, write_slide_comments,
+    replace_presentation_comment, replace_presentation_comment_author, store_presentation_comments,
+    update_presentation_comment, update_presentation_comment_author, write_comment_authors,
+    write_slide_comments,
 };
-pub use modern_comment_authors::{
-    add_modern_comment_author, find_modern_comment_author, remove_modern_comment_author,
-    reorder_modern_comment_authors, replace_modern_comment_author,
-    update_modern_comment_author,
-};
-pub use modern_comments::{
-    add_modern_comment, add_modern_comment_reply, find_modern_comment,
-    find_modern_comment_reply, remove_modern_comment, remove_modern_comment_reply,
-    reorder_modern_comments, replace_modern_comment, replace_modern_comment_reply,
-    update_modern_comment, update_modern_comment_reply,
-};
-pub use customshow::{CustomShow, CustomShowList};
 pub use controls::{
     Persistence as ControlPersistence, PptxControlBinary, PptxControlDescriptor, PptxSlideControl,
 };
+pub use customshow::{CustomShow, CustomShowList};
 pub use embedded_fonts::{
     EmbeddedFont, EmbeddedFontConformance, EmbeddedFontFace, EmbeddedFontLicensing,
     EmbeddedFontResource, EmbeddedFontStyle, PresentationEmbeddedFonts, add_embedded_font,
     deobfuscate_embedded_font_data, find_embedded_font, load_embedded_fonts,
     obfuscate_embedded_font_data, parse_embedded_fonts, remove_embedded_font,
-    reorder_embedded_fonts, replace_embedded_font, store_embedded_fonts,
-    update_embedded_font, write_embedded_font_list,
+    reorder_embedded_fonts, replace_embedded_font, store_embedded_fonts, update_embedded_font,
+    write_embedded_font_list,
 };
 pub use extended_guides::{
     ExtendedGuide, ExtendedGuideColor, ExtendedGuideColorKind, ExtendedGuideList,
@@ -159,15 +148,27 @@ pub use extended_guides::{
 pub use format::{ImageFormat, TextFormat};
 pub use handout::{HandoutHeaderFooter, HandoutLayout, HandoutMaster};
 pub use hyperlinks::Hyperlink;
-pub use ink::{INK_CONTENT_TYPE, PptxInkAnnotation, StoredInkAnnotation, store_slide_ink_annotation};
+pub use ink::{
+    INK_CONTENT_TYPE, PptxInkAnnotation, StoredInkAnnotation, store_slide_ink_annotation,
+};
+pub use modern_comment_authors::{
+    add_modern_comment_author, find_modern_comment_author, remove_modern_comment_author,
+    reorder_modern_comment_authors, replace_modern_comment_author, update_modern_comment_author,
+};
+pub use modern_comments::{
+    add_modern_comment, add_modern_comment_reply, find_modern_comment, find_modern_comment_reply,
+    remove_modern_comment, remove_modern_comment_reply, reorder_modern_comments,
+    replace_modern_comment, replace_modern_comment_reply, update_modern_comment,
+    update_modern_comment_reply,
+};
 pub(crate) mod slide_patch;
 pub use laser::{
     LASER_TRACE_EXTENSION_URI, PptxLaserTrace, PptxLaserTracePoint, store_slide_laser_trace,
 };
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
-    PlaceholderSpec, SlideLayoutKind, add_slide_layout, add_slide_master,
-    remove_slide_layout, store_placeholder_shape, validate_master_layout_graph,
+    PlaceholderSpec, SlideLayoutKind, add_slide_layout, add_slide_master, remove_slide_layout,
+    store_placeholder_shape, validate_master_layout_graph,
 };
 pub use media::{Media, MediaFormat, MediaType};
 pub use media_parts::{
@@ -180,12 +181,9 @@ pub use notes::{
     PptxNotesConformance, PptxNotesGraph, PptxNotesMasterResource, PptxNotesSlideResource,
     PptxNotesThemeResource, load_notes_graph, store_notes_graph,
 };
-pub use ole::{
-    PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind,
-};
+pub use ole::{PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind};
 pub use ole_object::{AuthoredOleObject, OleObjectFrame, add_ole_object};
 pub use package::Package;
-pub use vba_project::VbaProject;
 pub use parts::{
     CHART_COLOR_STYLE_CONTENT_TYPE, CHART_COLOR_STYLE_RELATIONSHIP_TYPE, CHART_STYLE_CONTENT_TYPE,
     CHART_STYLE_RELATIONSHIP_TYPE, ChartColorStyleDocument, ChartColorStyleInfo,
@@ -228,20 +226,18 @@ pub use parts::{
 };
 pub use presentation::{PptxChart, PptxTagList, Presentation};
 pub use presentation_properties::{
-    BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget,
-    OpaquePresentationExtension, PresentationColor, PresentationProperties,
-    PresentationPropertyExtension, PrintColorMode, PrintOutput, PrintProperties, ShowMode,
-    ShowProperties, SlideSelection, SlideShowExtension, WebColor, WebProperties, WebScreenSize,
-    load_from_package as load_presentation_properties,
+    BrowserSupport, ColorKind, HtmlPublishProperties, InertHtmlTarget, OpaquePresentationExtension,
+    PresentationColor, PresentationProperties, PresentationPropertyExtension, PrintColorMode,
+    PrintOutput, PrintProperties, ShowMode, ShowProperties, SlideSelection, SlideShowExtension,
+    WebColor, WebProperties, WebScreenSize, load_from_package as load_presentation_properties,
 };
 pub use presentation_structure::{
-    PresentationSlideReference, PresentationStructure, add_custom_show,
-    add_custom_show_slide, add_section, add_section_slide, find_custom_show, find_section,
-    load_presentation_structure, remove_custom_show, remove_custom_show_slide, remove_section,
-    remove_section_slide, reorder_custom_show_slides, reorder_custom_shows,
-    reorder_section_slides, reorder_sections, replace_custom_show, replace_section,
-    store_presentation_structure, synchronize_presentation_structure_after_slide_mutation,
-    update_custom_show, update_section,
+    PresentationSlideReference, PresentationStructure, add_custom_show, add_custom_show_slide,
+    add_section, add_section_slide, find_custom_show, find_section, load_presentation_structure,
+    remove_custom_show, remove_custom_show_slide, remove_section, remove_section_slide,
+    reorder_custom_show_slides, reorder_custom_shows, reorder_section_slides, reorder_sections,
+    replace_custom_show, replace_section, store_presentation_structure,
+    synchronize_presentation_structure_after_slide_mutation, update_custom_show, update_section,
 };
 pub use protection::{
     CryptoAlgorithm, OpenPasswordEncryption, PresentationProtection, ProtectionType,
@@ -279,9 +275,10 @@ pub use transitions::{
     RippleDirection, SlideTransition, SplitDirection, TransitionDirection, TransitionSpeed,
     TransitionType,
 };
+pub use vba_project::VbaProject;
 pub use view_properties::{
     CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
-    OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView,
-    SplitterState, ViewKind, ViewProperties, load_from_package as load_view_properties,
+    OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
+    ViewKind, ViewProperties, load_from_package as load_view_properties,
 };
 pub use writer::{MutablePresentation, MutableShape, MutableSlide};

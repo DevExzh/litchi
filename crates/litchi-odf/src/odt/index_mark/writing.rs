@@ -429,20 +429,19 @@ fn validate_mark(mark: &TextIndexMark) -> Result<()> {
     if mark.kind == TextIndexMarkKind::User && mark.attribute(Some(TEXT), "index-name").is_none() {
         return invalid("user index mark requires text:index-name");
     }
-    if let Some(level) = mark.attribute(Some(TEXT), "outline-level") {
-        if level
+    if let Some(level) = mark.attribute(Some(TEXT), "outline-level")
+        && level
             .parse::<u64>()
             .ok()
             .filter(|value| *value > 0)
             .is_none()
-        {
-            return invalid("index mark outline level must be positive");
-        }
+    {
+        return invalid("index mark outline level must be positive");
     }
-    if let Some(value) = mark.attribute(Some(TEXT), "main-entry") {
-        if !matches!(value, "true" | "false" | "1" | "0") {
-            return invalid("text:main-entry is not an XML boolean");
-        }
+    if let Some(value) = mark.attribute(Some(TEXT), "main-entry")
+        && !matches!(value, "true" | "false" | "1" | "0")
+    {
+        return invalid("text:main-entry is not an XML boolean");
     }
     if mark.kind == TextIndexMarkKind::Bibliography {
         let kind = mark

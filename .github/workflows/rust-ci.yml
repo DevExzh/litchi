@@ -9,6 +9,8 @@ on:
       - '.github/workflows/rust-ci.yml'
       - 'docs/adr/**'
       - 'tools/check_crate_boundaries.py'
+      - 'tools/crate_boundaries.json'
+      - 'tools/test_check_crate_boundaries.py'
     branches:
       - main
   pull_request:
@@ -19,6 +21,8 @@ on:
       - '.github/workflows/rust-ci.yml'
       - 'docs/adr/**'
       - 'tools/check_crate_boundaries.py'
+      - 'tools/crate_boundaries.json'
+      - 'tools/test_check_crate_boundaries.py'
     branches:
       - main
 
@@ -40,6 +44,9 @@ jobs:
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Test dependency-direction gate
+        run: python3 -m unittest tools/test_check_crate_boundaries.py
 
       - name: Check dependency direction
         run: python3 tools/check_crate_boundaries.py
@@ -67,11 +74,12 @@ jobs:
           cargo test
           -p litchi-core
           -p litchi-drawingml
+          -p litchi-ole-common
+          -p litchi-ooxml-common
           -p litchi-sheet
           -p litchi-slide
           -p litchi-word
           -p litchi-xlsx
-          -p litchi-ooxml-common
 
   check-and-clippy:
     name: cargo check + clippy
@@ -104,13 +112,18 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Check Cargo.toml sorting
-        run: cargo sort --check
+        run: cargo sort --workspace --check
 
       - name: Check if code is compilable
-        run: cargo check
+        run: cargo check --workspace --all-targets --all-features
 
       - name: Check if code adheres to best practices
-        run: cargo clippy --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings
+
+      - name: Reject rustdoc warnings
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --all-features --no-deps
 
   test:
     name: cargo test

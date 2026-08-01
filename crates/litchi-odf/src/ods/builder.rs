@@ -5,12 +5,11 @@
 use crate::core::{OdfStructure, PackageWriter};
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellHyperlink, CellRangeSource,
-    CellValue, Column,
-    ConditionalCellStyle, ConditionalFormat, Consolidation, ContentValidation, DataPilotTable,
-    DatabaseRange, DdeLink, LabelRange,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SparklineGroup,
-    SpreadsheetProtection, TableCellProtectionStyle, TableStructure, TableVisibility,
+    CellValue, Column, ConditionalCellStyle, ConditionalFormat, Consolidation, ContentValidation,
+    DataPilotTable, DatabaseRange, DdeLink, LabelRange, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle,
+    SheetTableSource, SparklineGroup, SpreadsheetProtection, TableCellProtectionStyle,
+    TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     conditional_format::{
@@ -38,14 +37,14 @@ use crate::ods::{
         MAX_SPARKLINE_GROUPS_PER_SHEET, validate_sparkline_group, validate_sparkline_groups,
         write_sparkline_groups,
     },
-    style_protection::{
-        rewrite_managed_cell_styles, validate_conditional_style_collection,
-        validate_protection_style_collection, validate_style_name,
-    },
     structure::{
         MAX_EXPANDED_COLUMNS_PER_SHEET, MAX_EXPANDED_ROWS_PER_SHEET, TableStructureAxis,
         validate_sheet_print_settings, validate_table_structure, write_columns,
         write_row_attributes, write_sheet_formatting_attributes, write_table_structure,
+    },
+    style_protection::{
+        rewrite_managed_cell_styles, validate_conditional_style_collection,
+        validate_protection_style_collection, validate_style_name,
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -134,7 +133,11 @@ impl SpreadsheetBuilder {
     ) -> Result<&mut Self> {
         let style_name = style_name.into();
         validate_style_name(&style_name, "common table-cell style name")?;
-        if self.common_table_cell_styles.iter().any(|name| name == &style_name) {
+        if self
+            .common_table_cell_styles
+            .iter()
+            .any(|name| name == &style_name)
+        {
             return Err(litchi_core::Error::InvalidFormat(format!(
                 "duplicate common table-cell style name '{style_name}'"
             )));
@@ -229,13 +232,14 @@ impl SpreadsheetBuilder {
         &mut self,
         style: TableCellProtectionStyle,
     ) -> Result<&mut Self> {
-        if self.table_cell_protection_styles.iter().any(|existing| {
-            existing.style_name == style.style_name
-        }) || self
-            .conditional_cell_styles
+        if self
+            .table_cell_protection_styles
             .iter()
-            .any(|existing| existing.style_name == style.style_name
-                && existing.parent_style_name != style.parent_style_name)
+            .any(|existing| existing.style_name == style.style_name)
+            || self.conditional_cell_styles.iter().any(|existing| {
+                existing.style_name == style.style_name
+                    && existing.parent_style_name != style.parent_style_name
+            })
         {
             return Err(litchi_core::Error::InvalidFormat(format!(
                 "duplicate or incompatible protection style name '{}'",
@@ -288,7 +292,11 @@ impl SpreadsheetBuilder {
             .common_table_cell_styles
             .iter()
             .cloned()
-            .chain(self.conditional_cell_styles.iter().map(|style| style.style_name.clone()))
+            .chain(
+                self.conditional_cell_styles
+                    .iter()
+                    .map(|style| style.style_name.clone()),
+            )
             .chain(styles.iter().map(|style| style.style_name.clone()))
             .collect::<HashSet<_>>();
         for style in styles {
@@ -309,7 +317,9 @@ impl SpreadsheetBuilder {
                         style.style_name
                     )));
                 }
-                let Some(next) = styles.iter().find(|candidate| &candidate.style_name == parent)
+                let Some(next) = styles
+                    .iter()
+                    .find(|candidate| &candidate.style_name == parent)
                 else {
                     break;
                 };
@@ -532,7 +542,9 @@ impl SpreadsheetBuilder {
     }
 
     fn validate_named_definitions(&self) -> Result<()> {
-        crate::ods::named_expression::validate_named_definition_collection(&self.named_definitions)?;
+        crate::ods::named_expression::validate_named_definition_collection(
+            &self.named_definitions,
+        )?;
         for (index, definition) in self.named_definitions.iter().enumerate() {
             definition.validate()?;
             self.validate_scope(definition.scope())?;
@@ -1752,10 +1764,7 @@ impl SpreadsheetBuilder {
     }
 
     /// Append one inert conditional format to the current sheet.
-    pub fn add_sheet_conditional_format(
-        &mut self,
-        format: ConditionalFormat,
-    ) -> Result<&mut Self> {
+    pub fn add_sheet_conditional_format(&mut self, format: ConditionalFormat) -> Result<&mut Self> {
         validate_conditional_format(&format)?;
         if self.sheets.is_empty() {
             self.add_sheet("Sheet1")?;
@@ -1774,10 +1783,7 @@ impl SpreadsheetBuilder {
     ///
     /// Passing an empty collection removes all sparkline groups from the
     /// sheet. Sparklines are stored as typed data and are never rendered.
-    pub fn set_sheet_sparkline_groups(
-        &mut self,
-        groups: Vec<SparklineGroup>,
-    ) -> Result<&mut Self> {
+    pub fn set_sheet_sparkline_groups(&mut self, groups: Vec<SparklineGroup>) -> Result<&mut Self> {
         validate_sparkline_groups(&groups)?;
         if self.sheets.is_empty() {
             self.add_sheet("Sheet1")?;

@@ -1,7 +1,3 @@
-/// Slide parts and related types.
-///
-/// This module contains parts for slides, slide layouts, and slide masters.
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{
     is_presentationml_name, presentation_name, relationship_attribute_value,
@@ -9,6 +5,10 @@ use crate::pptx::namespace::{
 };
 use crate::pptx::shapes::base::{BaseShape, ShapeType};
 use crate::pptx::shapes::textframe::extract_drawingml_text;
+/// Slide parts and related types.
+///
+/// This module contains parts for slides, slide layouts, and slide masters.
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_opc::part::Part;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};

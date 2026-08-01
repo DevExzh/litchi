@@ -1,12 +1,12 @@
+use litchi_ooxml::docx::writer::MutableDocument;
 use litchi_ooxml::docx::{
     AltChunk, AltChunkNamespace, AlternativeFormatData, AlternativeFormatImport,
     AlternativeFormatKind, AlternativeFormatTarget, Package,
 };
-use litchi_ooxml::docx::writer::MutableDocument;
+use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::{BlobPart, Part};
-use litchi_opc::OpcPackage;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -87,7 +87,8 @@ fn generated_internal_formats_have_canonical_content_types_and_reorder() {
         vec![
             (
                 AlternativeFormatKind::WordprocessingMl,
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml".into(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+                    .into(),
             ),
             (AlternativeFormatKind::Html, "text/html".into()),
             (AlternativeFormatKind::Rtf, "application/rtf".into()),
@@ -149,8 +150,18 @@ fn removal_preserves_a_target_still_referenced_by_another_relationship() {
     let mut package = package_with_document(
         xml,
         &[
-            ("rIdA", rt::MS_ALTERNATIVE_FORMAT_IMPORT, "shared.html", false),
-            ("rIdB", rt::MS_ALTERNATIVE_FORMAT_IMPORT, "shared.html", false),
+            (
+                "rIdA",
+                rt::MS_ALTERNATIVE_FORMAT_IMPORT,
+                "shared.html",
+                false,
+            ),
+            (
+                "rIdB",
+                rt::MS_ALTERNATIVE_FORMAT_IMPORT,
+                "shared.html",
+                false,
+            ),
         ],
         &[("/word/shared.html", "text/html", b"shared")],
     );

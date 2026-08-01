@@ -6,11 +6,11 @@ mod mutation;
 mod semantic;
 
 pub use authoring::{
-    ChartCachedCell, ChartCachedRow, ChartCachedTable, ChartCachedValue, ChartDataLabelSpec,
-    ChartDataPointSpec, ChartDefinition, ChartDomainSpec, ChartEquationSpec,
+    ChartAxisSpec, ChartCachedCell, ChartCachedRow, ChartCachedTable, ChartCachedValue,
+    ChartDataLabelSpec, ChartDataPointSpec, ChartDefinition, ChartDomainSpec, ChartEquationSpec,
     ChartExtensionAttribute, ChartExtensionElement, ChartExtensions, ChartGridSpec,
     ChartLegendSpec, ChartPlotAreaSpec, ChartRegressionSpec, ChartSeriesSpec, ChartStyleElement,
-    ChartText, ChartAxisSpec, serialize_chart_content,
+    ChartText, serialize_chart_content,
 };
 pub use document::{ChartAttribute, ChartDocument, ChartElement, ChartElementKind};
 pub use mutation::{ChartAxisUpdate, ChartSeriesUpdate};

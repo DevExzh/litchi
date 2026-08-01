@@ -108,7 +108,7 @@ impl XlsSharedStringIndex {
                 data.len()
             )));
         }
-        if (data.len() - FIXED_PAYLOAD_LEN) % BUCKET_LEN != 0 {
+        if !(data.len() - FIXED_PAYLOAD_LEN).is_multiple_of(BUCKET_LEN) {
             return Err(invalid("ExtSST payload has a partial ISSTInf entry"));
         }
         let actual_bucket_size = u16::from_le_bytes([data[0], data[1]]);

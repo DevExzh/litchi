@@ -541,10 +541,10 @@ fn validate_list(list: &SectionList) -> Result<()> {
     let mut total = 0usize;
     for section in &list.sections {
         validate_section(section)?;
-        if let Some(id) = &section.id {
-            if !section_ids.insert(id) {
-                return Err(invalid("duplicate section GUID"));
-            }
+        if let Some(id) = &section.id
+            && !section_ids.insert(id)
+        {
+            return Err(invalid("duplicate section GUID"));
         }
         total = total
             .checked_add(section.slide_ids.len())

@@ -652,10 +652,7 @@ pub(crate) fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
     }
 }
 
-pub(crate) fn parse_element(
-    start: &BytesStart<'_>,
-    decoder: Decoder,
-) -> Result<AnnotationElement> {
+pub(crate) fn parse_element(start: &BytesStart<'_>, decoder: Decoder) -> Result<AnnotationElement> {
     let name = std::str::from_utf8(start.name().as_ref())
         .map_err(|_| Error::InvalidFormat("invalid UTF-8 in annotation element name".to_string()))?
         .to_string();

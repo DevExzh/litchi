@@ -464,8 +464,7 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                         .checked_sub(1)
                         .ok_or_else(|| Error::InvalidFormat("note stack underflow".to_string()))?;
                 }
-                if active.last().is_some_and(|note| note.depth == 0) {
-                    let finished = active.pop().expect("checked note");
+                if let Some(finished) = active.pop_if(|note| note.depth == 0) {
                     if !finished.citation_seen || !finished.body_seen {
                         return Err(Error::InvalidFormat(
                             "text:note requires citation and body".to_string(),

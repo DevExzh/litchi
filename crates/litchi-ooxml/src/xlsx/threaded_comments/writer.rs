@@ -160,8 +160,14 @@ fn validate_person_list(person_list: &PersonList) -> SheetResult<()> {
     for person in &person_list.persons {
         validate_guid(&person.id, "person ID")?;
         if person.display_name.len() > MAX_THREADED_IDENTITY_BYTES
-            || person.user_id.as_ref().is_some_and(|value| value.len() > MAX_THREADED_IDENTITY_BYTES)
-            || person.provider_id.as_ref().is_some_and(|value| value.len() > MAX_THREADED_IDENTITY_BYTES)
+            || person
+                .user_id
+                .as_ref()
+                .is_some_and(|value| value.len() > MAX_THREADED_IDENTITY_BYTES)
+            || person
+                .provider_id
+                .as_ref()
+                .is_some_and(|value| value.len() > MAX_THREADED_IDENTITY_BYTES)
         {
             return Err(format!("person '{}' has oversized identity metadata", person.id).into());
         }

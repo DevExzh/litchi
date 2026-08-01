@@ -398,7 +398,11 @@ impl DatabaseRange {
             ));
         }
         validate_text("database range name", self.name.as_deref(), true)?;
-        validate_text("database range target address", Some(&self.target_range_address), true)?;
+        validate_text(
+            "database range target address",
+            Some(&self.target_range_address),
+            true,
+        )?;
         crate::ods::data_pilot::parse_data_pilot_range(&self.target_range_address)?;
         if self
             .refresh_delay
@@ -412,7 +416,13 @@ impl DatabaseRange {
         }
         if let Some(filter) = &self.filter {
             validate_filter(filter)?;
-            for address in [filter.target_range_address.as_deref(), filter.condition_source_range_address.as_deref()].into_iter().flatten() {
+            for address in [
+                filter.target_range_address.as_deref(),
+                filter.condition_source_range_address.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 validate_text("database filter range address", Some(address), true)?;
                 crate::ods::data_pilot::parse_data_pilot_range(address)?;
             }
@@ -423,7 +433,9 @@ impl DatabaseRange {
             ));
         }
         if let Some(sort) = &self.sort {
-            if sort.keys.len() > MAX_DATABASE_ITEMS { return too_many("database sort keys"); }
+            if sort.keys.len() > MAX_DATABASE_ITEMS {
+                return too_many("database sort keys");
+            }
             if let Some(address) = &sort.target_range_address {
                 validate_text("database sort target address", Some(address), true)?;
                 crate::ods::data_pilot::parse_data_pilot_range(address)?;
@@ -434,27 +446,45 @@ impl DatabaseRange {
         }
         if let Some(source) = &self.source {
             match source {
-                DatabaseSource::Sql { database_name, statement, .. } => {
+                DatabaseSource::Sql {
+                    database_name,
+                    statement,
+                    ..
+                } => {
                     validate_text("database source name", Some(database_name), true)?;
                     validate_text("database SQL statement", Some(statement), true)?;
                 },
-                DatabaseSource::Table { database_name, table_name } => {
+                DatabaseSource::Table {
+                    database_name,
+                    table_name,
+                } => {
                     validate_text("database source name", Some(database_name), true)?;
                     validate_text("database table name", Some(table_name), true)?;
                 },
-                DatabaseSource::Query { database_name, query_name } => {
+                DatabaseSource::Query {
+                    database_name,
+                    query_name,
+                } => {
                     validate_text("database source name", Some(database_name), true)?;
                     validate_text("database query name", Some(query_name), true)?;
                 },
             }
         }
         if let Some(subtotals) = &self.subtotals {
-            if subtotals.rules.len() > MAX_DATABASE_ITEMS { return too_many("database subtotal rules"); }
+            if subtotals.rules.len() > MAX_DATABASE_ITEMS {
+                return too_many("database subtotal rules");
+            }
             if let Some(groups) = &subtotals.sort_groups {
-                validate_text("subtotal sort data type", groups.data_type.as_deref(), false)?;
+                validate_text(
+                    "subtotal sort data type",
+                    groups.data_type.as_deref(),
+                    false,
+                )?;
             }
             for rule in &subtotals.rules {
-                if rule.fields.len() > MAX_DATABASE_ITEMS { return too_many("database subtotal fields"); }
+                if rule.fields.len() > MAX_DATABASE_ITEMS {
+                    return too_many("database subtotal fields");
+                }
                 for field in &rule.fields {
                     validate_text("database subtotal function", Some(&field.function), true)?;
                 }
@@ -466,32 +496,42 @@ impl DatabaseRange {
 
 pub(crate) fn validate_database_range_collection(ranges: &[DatabaseRange]) -> Result<()> {
     use std::collections::HashSet;
-    if ranges.len() > MAX_DATABASE_RANGES { return too_many("database ranges"); }
+    if ranges.len() > MAX_DATABASE_RANGES {
+        return too_many("database ranges");
+    }
     let mut names = HashSet::new();
     for range in ranges {
         range.validate()?;
         if let Some(name) = &range.name
             && !names.insert(name.as_str())
         {
-            return Err(Error::InvalidFormat(format!("duplicate database range name '{name}'")));
+            return Err(Error::InvalidFormat(format!(
+                "duplicate database range name '{name}'"
+            )));
         }
     }
     Ok(())
 }
 
 fn validate_text(label: &str, value: Option<&str>, required: bool) -> Result<()> {
-    let Some(value) = value else { return Ok(()); };
+    let Some(value) = value else {
+        return Ok(());
+    };
     if required && value.trim().is_empty() {
         return Err(Error::InvalidFormat(format!("{label} must not be empty")));
     }
     if value.len() > MAX_DATABASE_VALUE_BYTES {
-        return Err(Error::InvalidFormat(format!("{label} exceeds {MAX_DATABASE_VALUE_BYTES} bytes")));
+        return Err(Error::InvalidFormat(format!(
+            "{label} exceeds {MAX_DATABASE_VALUE_BYTES} bytes"
+        )));
     }
     Ok(())
 }
 
 fn too_many(label: &str) -> Result<()> {
-    Err(Error::InvalidFormat(format!("{label} exceed the supported resource limit")))
+    Err(Error::InvalidFormat(format!(
+        "{label} exceed the supported resource limit"
+    )))
 }
 
 pub(crate) fn validate_filter(filter: &DatabaseFilter) -> Result<()> {
@@ -526,8 +566,12 @@ fn validate_filter_expression(
         FilterExpression::Condition(condition) => {
             validate_text("filter operator", Some(&condition.operator), true)?;
             validate_text("filter value", Some(&condition.value), false)?;
-            if condition.set_items.len() > MAX_DATABASE_ITEMS { return too_many("filter set items"); }
-            for item in &condition.set_items { validate_text("filter set item", Some(item), false)?; }
+            if condition.set_items.len() > MAX_DATABASE_ITEMS {
+                return too_many("filter set items");
+            }
+            for item in &condition.set_items {
+                validate_text("filter set item", Some(item), false)?;
+            }
             return Ok(());
         },
         FilterExpression::And(children) => (children, FilterParent::And),
@@ -538,7 +582,9 @@ fn validate_filter_expression(
             "filter boolean group cannot be empty".to_string(),
         ));
     }
-    if children.len() > MAX_DATABASE_ITEMS { return too_many("filter expressions"); }
+    if children.len() > MAX_DATABASE_ITEMS {
+        return too_many("filter expressions");
+    }
     if parent == Some(kind) {
         return Err(Error::InvalidFormat(
             "ODF filter groups must alternate AND and OR operators".to_string(),
@@ -552,7 +598,9 @@ fn validate_filter_expression(
 
 pub(crate) fn parse_database_ranges(xml: &str) -> Result<Vec<DatabaseRange>> {
     if xml.len() > 64 * 1_048_576 {
-        return Err(Error::InvalidFormat("database-range XML exceeds 64 MiB".to_string()));
+        return Err(Error::InvalidFormat(
+            "database-range XML exceeds 64 MiB".to_string(),
+        ));
     }
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
@@ -1018,11 +1066,15 @@ pub(crate) fn write_database_ranges(output: &mut String, ranges: &[DatabaseRange
 pub(crate) fn write_database_range_fragment(range: &DatabaseRange) -> Result<String> {
     range.validate()?;
     let mut output = String::with_capacity(512);
-    output.push_str("<table:database-ranges xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">");
+    output.push_str(
+        "<table:database-ranges xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">",
+    );
     write_database_range(&mut output, range);
     output.push_str("</table:database-ranges>");
     let start = output.find('>').expect("generated container") + 1;
-    let end = output.rfind("</table:database-ranges>").expect("generated container end");
+    let end = output
+        .rfind("</table:database-ranges>")
+        .expect("generated container end");
     Ok(output[start..end].to_string())
 }
 

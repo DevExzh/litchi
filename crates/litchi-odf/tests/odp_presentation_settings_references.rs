@@ -7,11 +7,13 @@ fn settings(start: &str, pages: &[&str]) -> PresentationSettings {
     PresentationSettings {
         start_page: Some(start.to_string()),
         show: Some("Review".to_string()),
-        custom_shows: vec![CustomPresentationShow::new(
-            "Review",
-            pages.iter().map(|value| (*value).to_string()).collect(),
-        )
-        .unwrap()],
+        custom_shows: vec![
+            CustomPresentationShow::new(
+                "Review",
+                pages.iter().map(|value| (*value).to_string()).collect(),
+            )
+            .unwrap(),
+        ],
         ..PresentationSettings::default()
     }
 }
@@ -125,7 +127,10 @@ fn fallback_insert_remove_preserves_identity_and_rejects_referenced_removal() {
         before_titles
     );
 
-    assert_eq!(mutable.remove_slide(1).unwrap().title.as_deref(), Some("inserted"));
+    assert_eq!(
+        mutable.remove_slide(1).unwrap().title.as_deref(),
+        Some("inserted")
+    );
     let names = mutable
         .page_metadata()
         .unwrap()
@@ -141,7 +146,11 @@ fn fallback_insert_remove_preserves_identity_and_rejects_referenced_removal() {
 #[test]
 fn explicit_metadata_reindexes_without_losing_page_identity() {
     let mut builder = PresentationBuilder::new();
-    builder.add_slide("alpha").unwrap().add_slide("beta").unwrap();
+    builder
+        .add_slide("alpha")
+        .unwrap()
+        .add_slide("beta")
+        .unwrap();
     let mut pages = metadata(&["Alpha", "Beta"]);
     let mut records = pages.pages().to_vec();
     records[1].xml_id = Some("beta-id".to_string());
@@ -159,7 +168,10 @@ fn explicit_metadata_reindexes_without_losing_page_identity() {
     assert_eq!(pages[1].name.as_deref(), Some("Alpha"));
     assert_eq!(pages[2].name.as_deref(), Some("Beta"));
     assert_eq!(pages[2].xml_id.as_deref(), Some("beta-id"));
-    assert_eq!(mutable.remove_slide(0).unwrap().title.as_deref(), Some("new"));
+    assert_eq!(
+        mutable.remove_slide(0).unwrap().title.as_deref(),
+        Some("new")
+    );
     let pages = mutable.page_metadata().unwrap().pages();
     assert_eq!(pages[0].name.as_deref(), Some("Alpha"));
     assert_eq!(pages[1].name.as_deref(), Some("Beta"));
@@ -176,7 +188,10 @@ fn libreoffice_and_odfpy_lexical_fixtures_parse_save_and_reopen() {
             .unwrap()
             .unwrap();
         assert_eq!(parsed.custom_shows[0].pages.len(), 3);
-        assert_eq!(parsed.custom_shows[0].pages[0], parsed.custom_shows[0].pages[2]);
+        assert_eq!(
+            parsed.custom_shows[0].pages[0],
+            parsed.custom_shows[0].pages[2]
+        );
 
         let page_names = if parsed.start_page.as_deref() == Some("Details") {
             ["Intro", "Details", "Summary"]
@@ -187,7 +202,9 @@ fn libreoffice_and_odfpy_lexical_fixtures_parse_save_and_reopen() {
         for name in page_names {
             builder.add_slide(name).unwrap();
         }
-        builder.set_page_metadata(Some(metadata(&page_names))).unwrap();
+        builder
+            .set_page_metadata(Some(metadata(&page_names)))
+            .unwrap();
         builder.set_settings(Some(parsed.clone())).unwrap();
         let reopened = Presentation::from_bytes(builder.build().unwrap()).unwrap();
         assert_eq!(reopened.settings().unwrap(), Some(parsed));

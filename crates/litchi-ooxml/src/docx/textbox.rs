@@ -17,11 +17,13 @@
 //! Everything is treated as inert metadata: linked OLE objects, scripts, and
 //! style bodies are never interpreted or followed.
 
-use litchi_ooxml_common::xml::{decode_xml_reference, is_drawingml_name, unqualified_attribute_value};
 use crate::docx::drawing::ShapeType;
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::{
+    decode_xml_reference, is_drawingml_name, unqualified_attribute_value,
+};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};

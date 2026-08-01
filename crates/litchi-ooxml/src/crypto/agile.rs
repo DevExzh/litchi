@@ -711,7 +711,7 @@ fn derive_agile_integrity_salt(
     key_salt: &[u8],
     encrypted_hmac_key: &[u8],
 ) -> Result<Vec<u8>> {
-    if encrypted_hmac_key.is_empty() || encrypted_hmac_key.len() % AGILE_BLOCK_SIZE != 0 {
+    if encrypted_hmac_key.is_empty() || !encrypted_hmac_key.len().is_multiple_of(AGILE_BLOCK_SIZE) {
         return Err(OoxmlError::InvalidFormat(
             "invalid Agile encryptedHmacKey length".to_string(),
         ));
@@ -743,7 +743,9 @@ fn verify_agile_integrity(
     encrypted_hmac_value: &[u8],
     encrypted_package: &[u8],
 ) -> Result<()> {
-    if encrypted_hmac_value.is_empty() || encrypted_hmac_value.len() % AGILE_BLOCK_SIZE != 0 {
+    if encrypted_hmac_value.is_empty()
+        || !encrypted_hmac_value.len().is_multiple_of(AGILE_BLOCK_SIZE)
+    {
         return Err(OoxmlError::InvalidFormat(
             "invalid Agile encryptedHmacValue length".to_string(),
         ));
@@ -777,7 +779,7 @@ fn decrypt_hash_input_agile(
     encrypted: &[u8],
     out_len: usize,
 ) -> Result<Vec<u8>> {
-    if encrypted.is_empty() || encrypted.len() % AGILE_BLOCK_SIZE != 0 {
+    if encrypted.is_empty() || !encrypted.len().is_multiple_of(AGILE_BLOCK_SIZE) {
         return Err(OoxmlError::InvalidFormat(
             "invalid Agile encrypted hashInput length".to_string(),
         ));
@@ -816,7 +818,7 @@ fn decrypt_agile_package_stream(
     let stream_size = u64::from_le_bytes(size_bytes) as usize;
     let ciphertext = &encrypted[8..];
 
-    if ciphertext.is_empty() || ciphertext.len() % AGILE_BLOCK_SIZE != 0 {
+    if ciphertext.is_empty() || !ciphertext.len().is_multiple_of(AGILE_BLOCK_SIZE) {
         return Err(OoxmlError::InvalidFormat(
             "Agile EncryptedPackage ciphertext length is not a multiple of block size".to_string(),
         ));

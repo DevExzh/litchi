@@ -399,17 +399,15 @@ fn validate_mark_attributes(
         TEXT_NAMESPACE,
         b"outline-level",
         "index mark",
-    )? {
-        if level
-            .parse::<usize>()
-            .ok()
-            .filter(|level| *level > 0)
-            .is_none()
-        {
-            return Err(Error::InvalidFormat(
-                "text:outline-level must be a positive integer".to_string(),
-            ));
-        }
+    )? && level
+        .parse::<usize>()
+        .ok()
+        .filter(|level| *level > 0)
+        .is_none()
+    {
+        return Err(Error::InvalidFormat(
+            "text:outline-level must be a positive integer".to_string(),
+        ));
     }
     if kind == TextIndexMarkKind::Alphabetical
         && let Some(value) = namespaced_attribute(

@@ -251,7 +251,7 @@ impl DocumentRepairBookmarks {
             let column_bits = match bookmark.column_range {
                 Some((first, limit)) => {
                     BKC_F_COL | u16::from(first) | (u16::from(limit) << BKC_ITC_LIM_SHIFT)
-                }
+                },
                 None => 0,
             };
             let native_bit = if bookmark.is_native { BKC_F_NATIVE } else { 0 };
@@ -285,7 +285,9 @@ fn validate_bookmarks(bookmarks: &[RepairBookmark]) -> Result<()> {
     if bookmarks.len() > usize::from(MAX_REPAIR_BOOKMARKS) {
         return Err(corrupted("repair-bookmark count exceeds 0x7FF0"));
     }
-    if bookmarks.iter().any(|bookmark| bookmark.start > bookmark.end)
+    if bookmarks
+        .iter()
+        .any(|bookmark| bookmark.start > bookmark.end)
         || bookmarks
             .windows(2)
             .any(|pair| pair[0].start > pair[1].start)
@@ -350,7 +352,7 @@ fn parse_descriptions(data: &[u8]) -> Result<Vec<String>> {
 /// `FBKF` structures (MS-DOC 2.8.10 and 2.9.70). Returns one entry per
 /// bookmark plus the ignored trailing CP.
 fn parse_start_plcf(data: &[u8]) -> Result<(Vec<(u32, StartData)>, u32)> {
-    if data.len() < 4 || (data.len() - 4) % (4 + FBKF_SIZE) != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(4 + FBKF_SIZE) {
         return Err(corrupted("PlcfbkfBPRepairs has an invalid byte length"));
     }
     let count = (data.len() - 4) / (4 + FBKF_SIZE);
@@ -392,7 +394,7 @@ fn parse_start_plcf(data: &[u8]) -> Result<(Vec<(u32, StartData)>, u32)> {
 /// Parse `PlcfbklBPRepairs`: a `Plcfbkl`, a PLC of end CPs without data
 /// elements (MS-DOC 2.8.12). The final entry is the ignored trailing CP.
 fn parse_end_plcf(data: &[u8]) -> Result<Vec<u32>> {
-    if data.len() < 4 || data.len() % 4 != 0 {
+    if data.len() < 4 || !data.len().is_multiple_of(4) {
         return Err(corrupted("PlcfbklBPRepairs has an invalid byte length"));
     }
     let mut ends = Vec::with_capacity(data.len() / 4);
@@ -585,11 +587,7 @@ mod tests {
     #[test]
     fn absent_tables_yield_none() {
         let fib = fib_with_pointers(&[]);
-        assert!(
-            DocumentRepairBookmarks::parse(&fib, &[])
-                .unwrap()
-                .is_none()
-        );
+        assert!(DocumentRepairBookmarks::parse(&fib, &[]).unwrap().is_none());
     }
 
     #[test]
@@ -622,7 +620,8 @@ mod tests {
         assert!(DocumentRepairBookmarks::parse(&fib, &table_stream).is_err());
 
         // One end against two starts.
-        let descriptions = description_sttb(&["Repaired bookmark order", "Repaired table bookmark"]);
+        let descriptions =
+            description_sttb(&["Repaired bookmark order", "Repaired table bookmark"]);
         let short_ends = end_plcf()[..8].to_vec();
         let mut table_stream = descriptions.clone();
         let starts_offset = table_stream.len() as u32;

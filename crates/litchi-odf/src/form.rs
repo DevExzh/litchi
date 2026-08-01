@@ -76,11 +76,11 @@ pub use visual_writing::{
     insert_visual_control_xml, remove_visual_control_xml, replace_visual_control_xml,
     visual_controls,
 };
+pub(crate) use writing::property_xml;
 pub use writing::{
     OdfPropertyForm, form_properties, insert_form_property_xml, remove_form_property_xml,
     replace_form_property_xml,
 };
-pub(crate) use writing::property_xml;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const FORM: &str = "urn:oasis:names:tc:opendocument:xmlns:form:1.0";
@@ -1286,10 +1286,10 @@ fn collect_control(
             return Err(err("empty form control ID"));
         }
         let key = (part, scope.clone(), id.to_string());
-        if let Some(previous) = index.insert(key, reference.clone()) {
-            if previous != reference {
-                return Err(err(format!("duplicate form control ID '{id}'")));
-            }
+        if let Some(previous) = index.insert(key, reference.clone())
+            && previous != reference
+        {
+            return Err(err(format!("duplicate form control ID '{id}'")));
         }
     }
     for (position, node) in control.children.iter().enumerate() {

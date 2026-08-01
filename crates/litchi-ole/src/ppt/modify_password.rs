@@ -33,7 +33,7 @@ impl PowerPointModifyPassword {
             || record.version != 0
             || record.instance != 3
             || record.data.len() > MAX_PASSWORD_BYTES
-            || record.data.len() % 2 != 0
+            || !record.data.len().is_multiple_of(2)
         {
             return Err(PptError::Corrupted(
                 "ModifyPasswordAtom has an invalid record header or size".to_string(),

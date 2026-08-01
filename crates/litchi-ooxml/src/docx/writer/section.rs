@@ -93,11 +93,7 @@ impl SectionHeaderFooterReference {
         }
     }
 
-    pub fn owned(
-        kind: WdHeaderFooter,
-        key: impl Into<String>,
-        xml: impl Into<String>,
-    ) -> Self {
+    pub fn owned(kind: WdHeaderFooter, key: impl Into<String>, xml: impl Into<String>) -> Self {
         Self {
             kind,
             relationship_id: None,
@@ -384,10 +380,9 @@ impl PageBorderStyle {
             "threeDEngrave" => Self::ThreeDEngrave,
             "outset" => Self::Outset,
             "inset" => Self::Inset,
-            art
-                if !art.is_empty()
-                    && art.len() <= MAX_PAGE_BORDER_ART_NAME_LEN
-                    && art.bytes().all(|byte| byte.is_ascii_alphanumeric()) =>
+            art if !art.is_empty()
+                && art.len() <= MAX_PAGE_BORDER_ART_NAME_LEN
+                && art.bytes().all(|byte| byte.is_ascii_alphanumeric()) =>
             {
                 Self::Art(art.to_string())
             },
@@ -798,9 +793,10 @@ impl SectionProperties {
                 "endnotePr" => properties.endnotes = Some(parse_note_properties(&raw)?),
                 "type" => {
                     let value = required_attr(&raw, b"val")?;
-                    properties.start_type = Some(WdSectionStart::from_xml(&value).ok_or_else(|| {
-                        OoxmlError::InvalidFormat(format!("invalid section type '{value}'"))
-                    })?);
+                    properties.start_type =
+                        Some(WdSectionStart::from_xml(&value).ok_or_else(|| {
+                            OoxmlError::InvalidFormat(format!("invalid section type '{value}'"))
+                        })?);
                 },
                 "pgSz" => {
                     let attrs = attributes(&raw)?;
@@ -849,16 +845,14 @@ impl SectionProperties {
                 },
                 "titlePg" => properties.title_page = parse_on_off(&raw)?,
                 "textDirection" => {
-                    properties.text_direction = Some(SectionTextDirection::parse(&required_attr(
-                        &raw, b"val",
-                    )?)?);
+                    properties.text_direction =
+                        Some(SectionTextDirection::parse(&required_attr(&raw, b"val")?)?);
                 },
                 "bidi" => properties.bidirectional = parse_on_off(&raw)?,
                 "rtlGutter" => properties.rtl_gutter = parse_on_off(&raw)?,
                 "docGrid" => properties.document_grid = Some(parse_grid(&raw)?),
                 "printerSettings" => {
-                    properties.printer_settings_relationship_id =
-                        Some(required_attr(&raw, b"id")?);
+                    properties.printer_settings_relationship_id = Some(required_attr(&raw, b"id")?);
                 },
                 _ => properties.preserved_unknown_children.push(raw),
             }
@@ -899,10 +893,7 @@ impl SectionProperties {
                     ));
                 }
                 if let Some(part) = &reference.part {
-                    validate_header_footer_xml(
-                        &part.xml,
-                        std::ptr::eq(references, &self.headers),
-                    )?;
+                    validate_header_footer_xml(&part.xml, std::ptr::eq(references, &self.headers))?;
                 }
             }
         }
@@ -943,8 +934,7 @@ impl SectionProperties {
                 }
                 if let Some(color) = &border.color
                     && !(color == "auto"
-                        || (color.len() == 6
-                            && color.bytes().all(|byte| byte.is_ascii_hexdigit())))
+                        || (color.len() == 6 && color.bytes().all(|byte| byte.is_ascii_hexdigit())))
                 {
                     return Err(OoxmlError::InvalidFormat(format!(
                         "invalid page border color '{color}'"
@@ -1109,7 +1099,11 @@ fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> {
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    let expected = if header { b"hdr".as_slice() } else { b"ftr".as_slice() };
+                    let expected = if header {
+                        b"hdr".as_slice()
+                    } else {
+                        b"ftr".as_slice()
+                    };
                     if root
                         || !crate::docx::namespace::is_wordprocessing_namespace(&namespace)
                         || element.local_name().as_ref() != expected
@@ -1123,7 +1117,11 @@ fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> {
                 depth += 1;
             },
             Event::Empty(element) if depth == 0 => {
-                let expected = if header { b"hdr".as_slice() } else { b"ftr".as_slice() };
+                let expected = if header {
+                    b"hdr".as_slice()
+                } else {
+                    b"ftr".as_slice()
+                };
                 if root
                     || !crate::docx::namespace::is_wordprocessing_namespace(&namespace)
                     || element.local_name().as_ref() != expected
@@ -1273,9 +1271,9 @@ fn required_attr(xml: &str, name: &[u8]) -> Result<String> {
 }
 
 fn parse_u32(value: &str, description: &str) -> Result<u32> {
-    value.parse().map_err(|_| {
-        OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'"))
-    })
+    value
+        .parse()
+        .map_err(|_| OoxmlError::InvalidFormat(format!("invalid {description} value '{value}'")))
 }
 
 fn assign_u32(attrs: &[(String, String)], name: &str, slot: &mut u32) -> Result<()> {
@@ -1307,7 +1305,11 @@ fn parse_page_numbering(xml: &str) -> Result<SectionPageNumbering> {
             .map(|value| parse_u32(value, "page number start"))
             .transpose()?,
         chapter_style: attr(&attrs, "chapStyle")
-            .map(|value| value.parse::<u8>().map_err(|_| OoxmlError::InvalidFormat("invalid chapter style".into())))
+            .map(|value| {
+                value
+                    .parse::<u8>()
+                    .map_err(|_| OoxmlError::InvalidFormat("invalid chapter style".into()))
+            })
             .transpose()?,
         chapter_separator: attr(&attrs, "chapSep").map(ToOwned::to_owned),
     })
@@ -1316,9 +1318,14 @@ fn parse_page_numbering(xml: &str) -> Result<SectionPageNumbering> {
 fn parse_columns(xml: &str) -> Result<SectionColumns> {
     let attrs = attributes(xml)?;
     let mut columns = SectionColumns {
-        equal_width: attr(&attrs, "equalWidth").is_none_or(|value| value != "0" && value != "false"),
+        equal_width: attr(&attrs, "equalWidth")
+            .is_none_or(|value| value != "0" && value != "false"),
         count: attr(&attrs, "num")
-            .map(|value| value.parse::<u16>().map_err(|_| OoxmlError::InvalidFormat("invalid section column count".into())))
+            .map(|value| {
+                value
+                    .parse::<u16>()
+                    .map_err(|_| OoxmlError::InvalidFormat("invalid section column count".into()))
+            })
             .transpose()?
             .unwrap_or(1),
         space: attr(&attrs, "space")
@@ -1329,24 +1336,38 @@ fn parse_columns(xml: &str) -> Result<SectionColumns> {
     };
     for (name, raw) in direct_nested_children(xml)? {
         if name != "col" {
-            return Err(OoxmlError::InvalidFormat(format!("invalid child '{name}' in section columns")));
+            return Err(OoxmlError::InvalidFormat(format!(
+                "invalid child '{name}' in section columns"
+            )));
         }
         let attrs = attributes(&raw)?;
         columns.columns.push(SectionColumn {
-            width: parse_u32(attr(&attrs, "w").ok_or_else(|| OoxmlError::InvalidFormat("section column omits width".into()))?, "column width")?,
-            space: attr(&attrs, "space").map(|value| parse_u32(value, "column space")).transpose()?,
+            width: parse_u32(
+                attr(&attrs, "w").ok_or_else(|| {
+                    OoxmlError::InvalidFormat("section column omits width".into())
+                })?,
+                "column width",
+            )?,
+            space: attr(&attrs, "space")
+                .map(|value| parse_u32(value, "column space"))
+                .transpose()?,
         });
     }
     Ok(columns)
 }
 
 fn direct_nested_children(xml: &str) -> Result<Vec<(String, String)>> {
-    let open_end = xml.find('>').ok_or_else(|| OoxmlError::InvalidFormat("invalid section property".into()))?;
+    let open_end = xml
+        .find('>')
+        .ok_or_else(|| OoxmlError::InvalidFormat("invalid section property".into()))?;
     let close = xml.rfind("</").unwrap_or(xml.len());
     if close <= open_end + 1 {
         return Ok(Vec::new());
     }
-    direct_children(&format!("<w:sectPr>{}</w:sectPr>", &xml[open_end + 1..close]))
+    direct_children(&format!(
+        "<w:sectPr>{}</w:sectPr>",
+        &xml[open_end + 1..close]
+    ))
 }
 
 fn parse_note_properties(xml: &str) -> Result<SectionNoteProperties> {
@@ -1363,7 +1384,11 @@ fn parse_note_properties(xml: &str) -> Result<SectionNoteProperties> {
             "numStart" => result.start = Some(parse_u32(&value, "note number start")?),
             "numRestart" => result.restart = Some(NoteNumberRestart::parse(&value)?),
             "pos" => result.position = Some(value),
-            _ => return Err(OoxmlError::InvalidFormat(format!("invalid note property '{name}'"))),
+            _ => {
+                return Err(OoxmlError::InvalidFormat(format!(
+                    "invalid note property '{name}'"
+                )));
+            },
         }
     }
     Ok(result)
@@ -1376,9 +1401,15 @@ fn parse_grid(xml: &str) -> Result<SectionDocumentGrid> {
             .map(DocumentGridType::parse)
             .transpose()?
             .unwrap_or(DocumentGridType::Default),
-        line_pitch: attr(&attrs, "linePitch").map(|value| parse_u32(value, "grid line pitch")).transpose()?,
+        line_pitch: attr(&attrs, "linePitch")
+            .map(|value| parse_u32(value, "grid line pitch"))
+            .transpose()?,
         char_space: attr(&attrs, "charSpace")
-            .map(|value| value.parse::<i32>().map_err(|_| OoxmlError::InvalidFormat("invalid grid character space".into())))
+            .map(|value| {
+                value
+                    .parse::<i32>()
+                    .map_err(|_| OoxmlError::InvalidFormat("invalid grid character space".into()))
+            })
             .transpose()?,
     })
 }
@@ -1424,9 +1455,8 @@ fn parse_page_borders(xml: &str) -> Result<SectionPageBorders> {
 
 fn parse_page_border(xml: &str) -> Result<SectionPageBorder> {
     let attrs = attributes(xml)?;
-    let on_off = |name: &str| {
-        attr(&attrs, name).is_some_and(|value| matches!(value, "1" | "true" | "on"))
-    };
+    let on_off =
+        |name: &str| attr(&attrs, name).is_some_and(|value| matches!(value, "1" | "true" | "on"));
     Ok(SectionPageBorder {
         style: PageBorderStyle::parse(
             attr(&attrs, "val")
@@ -1475,52 +1505,123 @@ fn write_references(
     header: bool,
 ) -> Result<()> {
     if references.is_empty() {
-        let managed = rels.and_then(|rels| if header { rels.get_header_id() } else { rels.get_footer_id() });
+        let managed = rels.and_then(|rels| {
+            if header {
+                rels.get_header_id()
+            } else {
+                rels.get_footer_id()
+            }
+        });
         if let Some(id) = managed {
-            write!(xml, "<w:{element} w:type=\"default\" r:id=\"{}\"/>", escape(id))
-                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            write!(
+                xml,
+                "<w:{element} w:type=\"default\" r:id=\"{}\"/>",
+                escape(id)
+            )
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
         }
         return Ok(());
     }
     for reference in references {
-        let managed = rels.and_then(|rels| if header { rels.get_header_id() } else { rels.get_footer_id() });
-        let owned = reference.part.as_ref().and_then(|part| rels.and_then(|rels| rels.get_section_header_footer_id(&part.key)));
-        let id = reference.relationship_id.as_deref().or(owned).or(managed).ok_or_else(|| {
-            OoxmlError::InvalidFormat(format!("section {element} has no relationship ID"))
-        })?;
-        write!(xml, "<w:{element} w:type=\"{}\" r:id=\"{}\"/>", reference.kind.to_xml(), escape(id))
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        let managed = rels.and_then(|rels| {
+            if header {
+                rels.get_header_id()
+            } else {
+                rels.get_footer_id()
+            }
+        });
+        let owned = reference
+            .part
+            .as_ref()
+            .and_then(|part| rels.and_then(|rels| rels.get_section_header_footer_id(&part.key)));
+        let id = reference
+            .relationship_id
+            .as_deref()
+            .or(owned)
+            .or(managed)
+            .ok_or_else(|| {
+                OoxmlError::InvalidFormat(format!("section {element} has no relationship ID"))
+            })?;
+        write!(
+            xml,
+            "<w:{element} w:type=\"{}\" r:id=\"{}\"/>",
+            reference.kind.to_xml(),
+            escape(id)
+        )
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     Ok(())
 }
 
-fn write_note_properties(xml: &mut String, element: &str, note: &SectionNoteProperties) -> Result<()> {
-    write!(xml, "<w:{element}><w:numFmt w:val=\"{}\"/>", note.format.as_str())
-        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
-    if let Some(start) = note.start { write!(xml, "<w:numStart w:val=\"{start}\"/>").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
-    if let Some(restart) = note.restart { write!(xml, "<w:numRestart w:val=\"{}\"/>", restart.as_str()).map_err(|error| OoxmlError::Xml(error.to_string()))?; }
-    if let Some(position) = &note.position { write!(xml, "<w:pos w:val=\"{}\"/>", escape(position)).map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+fn write_note_properties(
+    xml: &mut String,
+    element: &str,
+    note: &SectionNoteProperties,
+) -> Result<()> {
+    write!(
+        xml,
+        "<w:{element}><w:numFmt w:val=\"{}\"/>",
+        note.format.as_str()
+    )
+    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(start) = note.start {
+        write!(xml, "<w:numStart w:val=\"{start}\"/>")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(restart) = note.restart {
+        write!(xml, "<w:numRestart w:val=\"{}\"/>", restart.as_str())
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(position) = &note.position {
+        write!(xml, "<w:pos w:val=\"{}\"/>", escape(position))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
     write!(xml, "</w:{element}>").map_err(|error| OoxmlError::Xml(error.to_string()))
 }
 
 fn write_page_numbering(xml: &mut String, numbering: &SectionPageNumbering) -> Result<()> {
-    write!(xml, "<w:pgNumType w:fmt=\"{}\"", numbering.format.as_str()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
-    if let Some(start) = numbering.start { write!(xml, " w:start=\"{start}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
-    if let Some(style) = numbering.chapter_style { write!(xml, " w:chapStyle=\"{style}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
-    if let Some(separator) = &numbering.chapter_separator { write!(xml, " w:chapSep=\"{}\"", escape(separator)).map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    write!(xml, "<w:pgNumType w:fmt=\"{}\"", numbering.format.as_str())
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(start) = numbering.start {
+        write!(xml, " w:start=\"{start}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(style) = numbering.chapter_style {
+        write!(xml, " w:chapStyle=\"{style}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(separator) = &numbering.chapter_separator {
+        write!(xml, " w:chapSep=\"{}\"", escape(separator))
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
     xml.push_str("/>");
     Ok(())
 }
 
 fn write_columns(xml: &mut String, columns: &SectionColumns) -> Result<()> {
-    write!(xml, "<w:cols w:equalWidth=\"{}\" w:num=\"{}\"", if columns.equal_width { 1 } else { 0 }, columns.count).map_err(|error| OoxmlError::Xml(error.to_string()))?;
-    if let Some(space) = columns.space { write!(xml, " w:space=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
-    if columns.separator { xml.push_str(" w:sep=\"1\""); }
-    if columns.columns.is_empty() { xml.push_str("/>"); } else {
+    write!(
+        xml,
+        "<w:cols w:equalWidth=\"{}\" w:num=\"{}\"",
+        if columns.equal_width { 1 } else { 0 },
+        columns.count
+    )
+    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(space) = columns.space {
+        write!(xml, " w:space=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if columns.separator {
+        xml.push_str(" w:sep=\"1\"");
+    }
+    if columns.columns.is_empty() {
+        xml.push_str("/>");
+    } else {
         xml.push('>');
         for column in &columns.columns {
-            write!(xml, "<w:col w:w=\"{}\"", column.width).map_err(|error| OoxmlError::Xml(error.to_string()))?;
-            if let Some(space) = column.space { write!(xml, " w:space=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+            write!(xml, "<w:col w:w=\"{}\"", column.width)
+                .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            if let Some(space) = column.space {
+                write!(xml, " w:space=\"{space}\"")
+                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            }
             xml.push_str("/>");
         }
         xml.push_str("</w:cols>");
@@ -1529,9 +1630,16 @@ fn write_columns(xml: &mut String, columns: &SectionColumns) -> Result<()> {
 }
 
 fn write_grid(xml: &mut String, grid: &SectionDocumentGrid) -> Result<()> {
-    write!(xml, "<w:docGrid w:type=\"{}\"", grid.grid_type.as_str()).map_err(|error| OoxmlError::Xml(error.to_string()))?;
-    if let Some(pitch) = grid.line_pitch { write!(xml, " w:linePitch=\"{pitch}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
-    if let Some(space) = grid.char_space { write!(xml, " w:charSpace=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?; }
+    write!(xml, "<w:docGrid w:type=\"{}\"", grid.grid_type.as_str())
+        .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    if let Some(pitch) = grid.line_pitch {
+        write!(xml, " w:linePitch=\"{pitch}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
+    if let Some(space) = grid.char_space {
+        write!(xml, " w:charSpace=\"{space}\"")
+            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+    }
     xml.push_str("/>");
     Ok(())
 }
@@ -1572,8 +1680,7 @@ fn write_page_border(xml: &mut String, name: &str, border: &SectionPageBorder) -
         write!(xml, " w:sz=\"{size}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     if let Some(space) = border.space {
-        write!(xml, " w:space=\"{space}\"")
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        write!(xml, " w:space=\"{space}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     if let Some(color) = &border.color {
         write!(xml, " w:color=\"{}\"", escape(color))
@@ -1596,8 +1703,7 @@ fn write_line_numbering(xml: &mut String, numbering: &SectionLineNumbering) -> R
             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     if let Some(start) = numbering.start {
-        write!(xml, " w:start=\"{start}\"")
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+        write!(xml, " w:start=\"{start}\"").map_err(|error| OoxmlError::Xml(error.to_string()))?;
     }
     if let Some(distance) = numbering.distance {
         write!(xml, " w:distance=\"{distance}\"")
@@ -1629,9 +1735,17 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_and_invalid_section_properties() {
-        assert!(SectionProperties::from_xml("<w:sectPr><w:type w:val=\"nextPage\"/><w:type w:val=\"continuous\"/></w:sectPr>").is_err());
+        assert!(
+            SectionProperties::from_xml(
+                "<w:sectPr><w:type w:val=\"nextPage\"/><w:type w:val=\"continuous\"/></w:sectPr>"
+            )
+            .is_err()
+        );
         let section = SectionProperties {
-            columns: Some(SectionColumns { count: 0, ..SectionColumns::default() }),
+            columns: Some(SectionColumns {
+                count: 0,
+                ..SectionColumns::default()
+            }),
             ..SectionProperties::default()
         };
         assert!(section.validate().is_err());
@@ -1717,7 +1831,9 @@ mod tests {
         );
         let mut output = String::new();
         section.write_xml(&mut output, None).unwrap();
-        assert!(output.contains("<w:pgBorders w:offsetFrom=\"page\" w:zOrder=\"back\" w:display=\"allPages\"/>"));
+        assert!(output.contains(
+            "<w:pgBorders w:offsetFrom=\"page\" w:zOrder=\"back\" w:display=\"allPages\"/>"
+        ));
         assert!(output.contains("<w:lnNumType w:countBy=\"2\"/>"));
     }
 
@@ -1766,12 +1882,31 @@ mod tests {
     #[test]
     fn rejects_malformed_page_layout_properties() {
         // Unknown enum tokens.
-        assert!(SectionProperties::from_xml("<w:sectPr><w:vAlign w:val=\"diagonal\"/></w:sectPr>").is_err());
-        assert!(SectionProperties::from_xml("<w:sectPr><w:lnNumType w:restart=\"weekly\"/></w:sectPr>").is_err());
-        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders w:offsetFrom=\"margin\"/></w:sectPr>").is_err());
+        assert!(
+            SectionProperties::from_xml("<w:sectPr><w:vAlign w:val=\"diagonal\"/></w:sectPr>")
+                .is_err()
+        );
+        assert!(
+            SectionProperties::from_xml("<w:sectPr><w:lnNumType w:restart=\"weekly\"/></w:sectPr>")
+                .is_err()
+        );
+        assert!(
+            SectionProperties::from_xml(
+                "<w:sectPr><w:pgBorders w:offsetFrom=\"margin\"/></w:sectPr>"
+            )
+            .is_err()
+        );
         assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\"/><w:top w:val=\"thick\"/></w:pgBorders></w:sectPr>").is_err());
-        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:diagonal w:val=\"single\"/></w:pgBorders></w:sectPr>").is_err());
-        assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top/></w:pgBorders></w:sectPr>").is_err());
+        assert!(
+            SectionProperties::from_xml(
+                "<w:sectPr><w:pgBorders><w:diagonal w:val=\"single\"/></w:pgBorders></w:sectPr>"
+            )
+            .is_err()
+        );
+        assert!(
+            SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top/></w:pgBorders></w:sectPr>")
+                .is_err()
+        );
         // Out-of-bounds values rejected through validation.
         assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\" w:sz=\"97\"/></w:pgBorders></w:sectPr>").is_err());
         assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\" w:space=\"32\"/></w:pgBorders></w:sectPr>").is_err());
@@ -1779,7 +1914,12 @@ mod tests {
         assert!(SectionProperties::from_xml("<w:sectPr><w:pgBorders><w:top w:val=\"single\" w:color=\"FFF\"/></w:pgBorders></w:sectPr>").is_err());
         // Schema-order violations.
         assert!(SectionProperties::from_xml("<w:sectPr><w:pgNumType w:fmt=\"decimal\"/><w:lnNumType w:countBy=\"5\"/></w:sectPr>").is_err());
-        assert!(SectionProperties::from_xml("<w:sectPr><w:printerSettings r:id=\"rId1\"/><w:docGrid/></w:sectPr>").is_err());
+        assert!(
+            SectionProperties::from_xml(
+                "<w:sectPr><w:printerSettings r:id=\"rId1\"/><w:docGrid/></w:sectPr>"
+            )
+            .is_err()
+        );
         // Empty relationship ID rejected through validation.
         let section = SectionProperties {
             printer_settings_relationship_id: Some(String::new()),

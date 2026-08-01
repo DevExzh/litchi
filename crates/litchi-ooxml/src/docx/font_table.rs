@@ -770,15 +770,14 @@ pub fn store_font_table(
     let mut resources = HashMap::<String, (String, Vec<u8>)>::new();
     for font in &value.fonts {
         for embedded in &font.embedded_fonts {
-            if let Some(part) = table_part {
-                if part.rels().get(&embedded.relationship_id).is_some()
-                    && !old_relationship_ids.contains(&embedded.relationship_id)
-                {
-                    return Err(invalid(format!(
-                        "relationship ID '{}' already exists",
-                        embedded.relationship_id
-                    )));
-                }
+            if let Some(part) = table_part
+                && part.rels().get(&embedded.relationship_id).is_some()
+                && !old_relationship_ids.contains(&embedded.relationship_id)
+            {
+                return Err(invalid(format!(
+                    "relationship ID '{}' already exists",
+                    embedded.relationship_id
+                )));
             }
             let resource = embedded
                 .resource

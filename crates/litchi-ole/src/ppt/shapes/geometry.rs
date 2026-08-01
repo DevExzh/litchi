@@ -187,7 +187,7 @@ impl<'data> VertexData<'data> {
     /// `Some(VertexData)` if data is valid, `None` otherwise
     #[inline]
     pub fn new(data: &'data [u8]) -> Option<Self> {
-        if data.is_empty() || data.len() % 8 != 0 {
+        if data.is_empty() || !data.len().is_multiple_of(8) {
             return None;
         }
 

@@ -299,10 +299,9 @@ fn collect_notes_body_text(shape: &crate::ppt::escher::EscherShape<'_>, text: &m
     if shape
         .placeholder()
         .is_some_and(|placeholder| placeholder.placeholder_type == NOTES_BODY_PLACEHOLDER)
+        && let Some(value) = shape.text().filter(|value| !value.is_empty())
     {
-        if let Some(value) = shape.text().filter(|value| !value.is_empty()) {
-            text.push(value);
-        }
+        text.push(value);
     }
     for child in shape.children() {
         collect_notes_body_text(child, text);

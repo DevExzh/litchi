@@ -541,10 +541,10 @@ fn parse_selected(xml: &[u8]) -> Result<WorksheetProtectionMetadata> {
                 if sheet_protection_depth.is_some() {
                     return Err(invalid("sheetProtection must be empty"));
                 }
-                if let Some((sqref_depth, _)) = sqref_text.as_ref() {
-                    if depth > *sqref_depth {
-                        return Err(invalid("protected-range sqref must contain only text"));
-                    }
+                if let Some((sqref_depth, _)) = sqref_text.as_ref()
+                    && depth > *sqref_depth
+                {
+                    return Err(invalid("protected-range sqref must contain only text"));
                 }
                 if spreadsheet(&namespace) && element.local_name().as_ref() == b"ext" {
                     if attribute(&element, decoder, &resolver, b"uri")?.as_deref()

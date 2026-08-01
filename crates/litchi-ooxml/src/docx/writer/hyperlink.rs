@@ -1,11 +1,11 @@
 //! Hyperlink support for DOCX documents.
 
 use super::field::MutableField;
+use super::revision::RevisionTextMode;
 use super::run::MutableRun;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
-use super::revision::RevisionTextMode;
 
 /// Elements that can appear in a hyperlink.
 #[derive(Debug)]
@@ -105,7 +105,12 @@ impl MutableHyperlink {
     }
 
     /// Serialize the hyperlink to XML in the requested revision text mode.
-    pub(crate) fn to_xml_mode(&self, xml: &mut String, r_id: Option<&str>, mode: RevisionTextMode) -> Result<()> {
+    pub(crate) fn to_xml_mode(
+        &self,
+        xml: &mut String,
+        r_id: Option<&str>,
+        mode: RevisionTextMode,
+    ) -> Result<()> {
         // Start hyperlink element
         if let Some(anchor) = &self.anchor {
             // Internal anchor hyperlink
@@ -139,7 +144,11 @@ impl MutableHyperlink {
         } else if let Some(text) = &self.text {
             // Fallback to simple text (backward compatibility)
             xml.push_str("<w:r><w:rPr><w:rStyle w:val=\"Hyperlink\"/></w:rPr>");
-            let name = if mode == RevisionTextMode::Deleted { "delText" } else { "t" };
+            let name = if mode == RevisionTextMode::Deleted {
+                "delText"
+            } else {
+                "t"
+            };
             write!(xml, "<w:{name}>{}</w:{name}>", escape_xml(text))
                 .map_err(|e| OoxmlError::Xml(e.to_string()))?;
             xml.push_str("</w:r>");

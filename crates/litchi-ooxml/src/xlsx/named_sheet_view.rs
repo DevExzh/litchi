@@ -2222,10 +2222,10 @@ fn parse_condition(
         if dxf.is_some() {
             return Err(invalid("icon sort condition cannot have dxfId"));
         }
-        if let (Some(set), Some(id)) = (icon_set, icon_id) {
-            if set.cardinality().is_some_and(|n| id >= n) {
-                return Err(invalid("iconId is outside icon set"));
-            }
+        if let (Some(set), Some(id)) = (icon_set, icon_id)
+            && set.cardinality().is_some_and(|n| id >= n)
+        {
+            return Err(invalid("iconId is outside icon set"));
         }
     } else if icon_set.is_some() || icon_id.is_some() {
         return Err(invalid(

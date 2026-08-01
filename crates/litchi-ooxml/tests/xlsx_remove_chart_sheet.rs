@@ -18,7 +18,9 @@ fn removed_chartsheet_drops_parts_and_remaps_defined_names() {
     let path = directory.path().join("remove-chartsheet.xlsx");
 
     let mut workbook = Workbook::create().unwrap();
-    workbook.add_chart_sheet("Sales Chart", bar_chart()).unwrap();
+    workbook
+        .add_chart_sheet("Sales Chart", bar_chart())
+        .unwrap();
     workbook.add_worksheet("Sheet2");
     workbook.define_name_local("ScopedChart", "Sheet1!$A$1", 1);
     workbook.define_name_local("ScopedSheet2", "Sheet2!$A$1", 2);

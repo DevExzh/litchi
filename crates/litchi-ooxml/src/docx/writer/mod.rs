@@ -12,8 +12,8 @@ pub mod image;
 pub mod note;
 pub mod ole_object;
 pub mod paragraph;
-pub mod revision;
 pub(crate) mod relmap;
+pub mod revision;
 pub mod run;
 pub mod section;
 pub mod smart_tag;
@@ -55,11 +55,11 @@ pub use image::{ImageFormat, MutableInlineImage};
 pub use paragraph::{ListType, MutableParagraph};
 
 // Re-export run types
-pub use run::{MutableRun, RunContent};
 pub use revision::{
     CellRevisionKind, MutableRevision, RevisionContentControl, RevisionKind, RevisionMetadata,
     RowRevisionKind, TableCellMergeRevisionState, TableRevisionKind,
 };
+pub use run::{MutableRun, RunContent};
 
 // Re-export table types
 pub use table::{CellProperties, MutableCell, MutableRow, MutableTable, TableBorder, TableBorders};

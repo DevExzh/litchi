@@ -63,7 +63,7 @@ fn extract_text_from_container_into(container: &EscherContainer, result: &mut St
 
 /// Extract text from a ClientTextbox record (legacy interface).
 ///
-/// Returns Option<String> for backwards compatibility.
+/// Returns `Option<String>` for backwards compatibility.
 pub fn extract_text_from_textbox(textbox: &EscherRecord) -> Option<String> {
     let mut result = String::with_capacity(256);
     extract_text_from_textbox_into(textbox, &mut result);

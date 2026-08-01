@@ -83,7 +83,9 @@ fn read_position(data: &[u8], record_type: PptRecordType) -> Result<u32> {
             "{record_type:?} is truncated below its position field"
         )));
     }
-    Ok(u32::from_le_bytes(data[..4].try_into().expect("length checked")))
+    Ok(u32::from_le_bytes(
+        data[..4].try_into().expect("length checked"),
+    ))
 }
 
 /// Parse the metacharacter atoms of one text body, in record order.
@@ -139,9 +141,7 @@ pub(crate) fn metachars_from_records<'a>(
                 }
                 let index = record.data[4];
                 if index > MAX_METACHAR_FORMAT_ID {
-                    return Err(corrupted(
-                        "DateTimeMCAtom format ID is outside 0..=12",
-                    ));
+                    return Err(corrupted("DateTimeMCAtom format ID is outside 0..=12"));
                 }
                 PowerPointTextMetachar {
                     position: read_position(&record.data, record.record_type)?,
@@ -164,7 +164,10 @@ pub(crate) fn metachars_from_records<'a>(
                     kind: PowerPointMetacharKind::RtfDateTime,
                     datetime_format: None,
                     rtf_format: Some(
-                        format_bytes[..end].iter().map(|byte| char::from(*byte)).collect(),
+                        format_bytes[..end]
+                            .iter()
+                            .map(|byte| char::from(*byte))
+                            .collect(),
                     ),
                 }
             },

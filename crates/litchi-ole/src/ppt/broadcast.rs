@@ -357,7 +357,7 @@ fn parse_string(record: &PptRecord, descriptor: StringDescriptor) -> Result<Stri
     if record.version != 0
         || record.instance != descriptor.instance
         || record.data.len() > descriptor.max_bytes
-        || record.data.len() % 2 != 0
+        || !record.data.len().is_multiple_of(2)
     {
         return Err(PptError::Corrupted(format!(
             "{} has an invalid record header or size",

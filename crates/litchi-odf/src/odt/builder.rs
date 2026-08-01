@@ -344,9 +344,8 @@ impl DocumentBuilder {
 
     /// Whether another typed paragraph style family already uses this identity.
     fn paragraph_style_identity_taken(&self, name: &Option<String>, is_default: bool) -> bool {
-        let matches = |x_name: &Option<String>, x_default: bool| {
-            *x_name == *name && x_default == is_default
-        };
+        let matches =
+            |x_name: &Option<String>, x_default: bool| *x_name == *name && x_default == is_default;
         self.paragraph_tab_styles
             .iter()
             .any(|x| matches(&x.name, x.is_default_style))
@@ -2489,8 +2488,7 @@ mod tests {
             r#"<text:span text:style-name="Em">漢</text:span><text:span text:style-name="Strong">字</text:span>"#,
         )
         .unwrap();
-        let structured =
-            crate::RubyAnnotation::new(None, structured_base, "かんじ", None).unwrap();
+        let structured = crate::RubyAnnotation::new(None, structured_base, "かんじ", None).unwrap();
         let mut builder = DocumentBuilder::new();
         builder
             .add_rich_paragraph(vec![

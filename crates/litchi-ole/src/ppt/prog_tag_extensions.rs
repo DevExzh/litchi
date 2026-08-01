@@ -370,13 +370,9 @@ impl PowerPoint10SlideBinaryTagExtension {
         // linkedSlideAtom.cLinkedShapes and cannot appear without the atom.
         match &linked_slide {
             Some(atom) => {
-                let data: [u8; 8] = atom
-                    .data
-                    .as_slice()
-                    .try_into()
-                    .map_err(|_| PptError::Corrupted(
-                        "LinkedSlide10Atom payload must be 8 bytes".into(),
-                    ))?;
+                let data: [u8; 8] = atom.data.as_slice().try_into().map_err(|_| {
+                    PptError::Corrupted("LinkedSlide10Atom payload must be 8 bytes".into())
+                })?;
                 let count = i32::from_le_bytes([data[4], data[5], data[6], data[7]]);
                 if count < 0 || linked_shapes.len() != count as usize {
                     return corrupted(
@@ -819,10 +815,7 @@ mod tests {
 
     /// Wrap an extension payload in a `ProgBinaryTag`/`ProgTags` record pair.
     fn prog_tags_record(tag_name: &str, extension_payload: &[u8]) -> (Vec<u8>, PptRecord) {
-        let name: Vec<u8> = tag_name
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect();
+        let name: Vec<u8> = tag_name.encode_utf16().flat_map(u16::to_le_bytes).collect();
         let binary_tag = record_bytes(
             CONTAINER_VERSION,
             0,
@@ -943,9 +936,8 @@ mod tests {
             PptRecordType::RoundTripHeaderFooterDefaults12Atom.as_u16(),
             &[0],
         );
-        let pp12 =
-            PowerPoint12SlideBinaryTagExtension::parse_records(parse_payload(&pp12_payload))
-                .unwrap();
+        let pp12 = PowerPoint12SlideBinaryTagExtension::parse_records(parse_payload(&pp12_payload))
+            .unwrap();
         assert!(pp12.header_footer_defaults.is_some());
         assert_eq!(pp12.to_payload().unwrap(), pp12_payload);
     }
@@ -986,7 +978,9 @@ mod tests {
 
         // Shapes without the linked-slide atom.
         let orphan = atom(0, PptRecordType::LinkedShape10Atom.as_u16(), &[0; 8]);
-        assert!(PowerPoint10SlideBinaryTagExtension::parse_records(parse_payload(&orphan)).is_err());
+        assert!(
+            PowerPoint10SlideBinaryTagExtension::parse_records(parse_payload(&orphan)).is_err()
+        );
 
         // Truncated linked-slide atom.
         let truncated = atom(0, PptRecordType::LinkedSlide10Atom.as_u16(), &[0; 4]);
@@ -1009,10 +1003,10 @@ mod tests {
 
         // PP10 doc: the required GridSpacing10Atom is missing.
         let missing_required = atom(0, PptRecordType::TextMasterStyle10Atom.as_u16(), &[0; 12]);
-        assert!(PowerPoint10DocBinaryTagExtension::parse_records(parse_payload(
-            &missing_required
-        ))
-        .is_err());
+        assert!(
+            PowerPoint10DocBinaryTagExtension::parse_records(parse_payload(&missing_required))
+                .is_err()
+        );
 
         // PP10 doc: a ModifyPasswordAtom where the CopyrightAtom belongs.
         let wrong_instance = [
@@ -1020,10 +1014,10 @@ mod tests {
             cstring(MODIFY_PASSWORD_INSTANCE, "secret"),
         ]
         .concat();
-        assert!(PowerPoint10DocBinaryTagExtension::parse_records(parse_payload(
-            &wrong_instance
-        ))
-        .is_err());
+        assert!(
+            PowerPoint10DocBinaryTagExtension::parse_records(parse_payload(&wrong_instance))
+                .is_err()
+        );
 
         // PP9 slide: any non-TextMasterStyle9Atom record is outside the grammar.
         let foreign = atom(0, PptRecordType::TextDefaults9Atom.as_u16(), &[0; 8]);
@@ -1074,7 +1068,8 @@ mod tests {
     fn slide_scope_dispatch_decodes_pp10_slide_extension() {
         let limits = PowerPointProgTagLimits::default();
         let (_, record) = prog_tags_record("___PPT10", &pp10_slide_payload());
-        let tags = PowerPointProgTags::parse(&record, PowerPointProgTagScope::Slide, limits).unwrap();
+        let tags =
+            PowerPointProgTags::parse(&record, PowerPointProgTagScope::Slide, limits).unwrap();
 
         let extensions = tags.slide_extensions().unwrap();
         let pp10 = extensions.powerpoint10.as_ref().unwrap();
@@ -1087,7 +1082,11 @@ mod tests {
             .binary_tag(PowerPointProgBinaryTagVersion::PowerPoint10)
             .unwrap();
         assert_eq!(
-            tag.slide_extension().unwrap().unwrap().to_payload().unwrap(),
+            tag.slide_extension()
+                .unwrap()
+                .unwrap()
+                .to_payload()
+                .unwrap(),
             pp10_slide_payload()
         );
     }

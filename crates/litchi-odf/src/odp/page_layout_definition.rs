@@ -637,9 +637,10 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                     && local == "presentation-page-layout"
                     && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
                     && parse_layout(&reader, element)?.name == name
-                    && (target.is_some() || open_target.replace((depth, start)).is_some()) {
-                        return invalid("duplicate target presentation page layout");
-                    }
+                    && (target.is_some() || open_target.replace((depth, start)).is_some())
+                {
+                    return invalid("duplicate target presentation page layout");
+                }
                 stack.push(Frame { namespace, local });
             },
             Event::Empty(ref element) => {
@@ -650,9 +651,10 @@ fn mutation_sites(xml: &str, name: &str) -> Result<(Option<XmlSpan>, StylesSite)
                     && local == "presentation-page-layout"
                     && matches!(stack.last(), Some(Frame { namespace: NamespaceKind::Office, local }) if local == "styles")
                     && parse_layout(&reader, element)?.name == name
-                    && (target.replace(XmlSpan { start, end }).is_some() || open_target.is_some()) {
-                        return invalid("duplicate target presentation page layout");
-                    }
+                    && (target.replace(XmlSpan { start, end }).is_some() || open_target.is_some())
+                {
+                    return invalid("duplicate target presentation page layout");
+                }
                 if namespace == NamespaceKind::Office && local == "styles" {
                     if styles_site.is_some() {
                         return invalid("multiple office:styles elements are not supported");

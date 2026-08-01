@@ -66,9 +66,9 @@
 mod builder;
 mod document;
 mod dynamic_text;
+pub(crate) mod frame;
 pub(crate) mod header_footer;
 mod header_footer_content;
-pub(crate) mod frame;
 mod index;
 pub(crate) use index::expanded_attributes;
 mod index_mark;
@@ -90,6 +90,7 @@ pub use dynamic_text::{
     insert_database_field_xml, insert_dynamic_text_field_xml, remove_database_field_xml,
     remove_dynamic_text_field_xml, replace_database_field_xml, replace_dynamic_text_field_xml,
 };
+pub use frame::{OdfFrameAnchor, OdfImageFormat, OdfLength};
 pub use header_footer::{
     HeaderFooter, HeaderFooterKind, MasterPage, MasterPageChild, MasterPageChildKind,
 };
@@ -112,7 +113,6 @@ pub use index_mark::{
     TextAlphabeticalMarkMetadata, TextIndexMark, TextIndexMarkFragments, TextIndexMarkKind,
     insert_text_index_mark_xml, remove_text_index_mark_xml, replace_text_index_mark_xml,
 };
-pub use frame::{OdfFrameAnchor, OdfImageFormat, OdfLength};
 pub use mutable::MutableDocument;
 pub use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub use page_layout::{PageLayout, PageLayoutAttribute, PageLayoutProperties, PageUsage};
@@ -123,12 +123,12 @@ pub use reference_mark::{
 };
 pub use ruby::Ruby;
 pub use section::{
-    OdtSectionBlock, add_section_xml, clear_sections_xml, remove_section_xml,
-    unwrap_section_xml, update_section_xml, wrap_section_xml,
+    OdtSectionBlock, add_section_xml, clear_sections_xml, remove_section_xml, unwrap_section_xml,
+    update_section_xml, wrap_section_xml,
 };
 pub use tracked_changes::{
-    OdtTrackedPosition, OdtTrackedStory, mark_tracked_change_range_xml,
-    mark_tracked_deletion_xml, set_tracked_changes_xml, unmark_tracked_change_xml,
+    OdtTrackedPosition, OdtTrackedStory, mark_tracked_change_range_xml, mark_tracked_deletion_xml,
+    set_tracked_changes_xml, unmark_tracked_change_xml,
 };
 
 // Re-export ODT-specific types for external use

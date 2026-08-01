@@ -64,8 +64,8 @@ impl UimGuidTable {
             return Err(corrupted("PlfguidUim is missing its iMac count"));
         }
         let count = read_u32(data, 0, "PlfguidUim iMac")?;
-        let count = usize::try_from(count)
-            .map_err(|_| corrupted("PlfguidUim iMac is too large"))?;
+        let count =
+            usize::try_from(count).map_err(|_| corrupted("PlfguidUim iMac is too large"))?;
         if count > MAX_UIM_ENTRIES {
             return Err(corrupted("PlfguidUim exceeds one-million-entry cap"));
         }
@@ -74,9 +74,7 @@ impl UimGuidTable {
             .and_then(|value| value.checked_add(4))
             .ok_or_else(|| corrupted("PlfguidUim size overflows"))?;
         if data.len() != expected {
-            return Err(corrupted(
-                "PlfguidUim length does not match its iMac count",
-            ));
+            return Err(corrupted("PlfguidUim length does not match its iMac count"));
         }
         let mut guids = Vec::with_capacity(count);
         for index in 0..count {
@@ -187,7 +185,8 @@ impl Uim {
             text_len: text_len as u32,
             data_len: read_u32(data, 12, "UIM cb")?,
             private_data: read_u32(data, 16, "UIM dwPrivate")?,
-        })    }
+        })
+    }
 
     /// Serialize exactly as decoded.
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
@@ -276,7 +275,7 @@ impl UimTable {
         guid_count: Option<u32>,
         table_stream_len: Option<u32>,
     ) -> Result<Self> {
-        if data.len() < 4 || (data.len() - 4) % ENTRY_STRIDE != 0 {
+        if data.len() < 4 || !(data.len() - 4).is_multiple_of(ENTRY_STRIDE) {
             return Err(corrupted(format!(
                 "Plcfuim length must have form {ENTRY_STRIDE}n + 4"
             )));
@@ -300,7 +299,13 @@ impl UimTable {
             let uim = Uim::from_bytes(&data[element_start..element_start + Uim::SIZE])?;
             entries.push(UimEntry::new(start_cp, uim));
         }
-        validate_entries(&entries, terminal_cp, maximum_cp, guid_count, table_stream_len)?;
+        validate_entries(
+            &entries,
+            terminal_cp,
+            maximum_cp,
+            guid_count,
+            table_stream_len,
+        )?;
         Ok(Self {
             entries,
             terminal_cp,
@@ -460,13 +465,8 @@ fn parse_uim_table(
     let guid_count = guids.map(|table| table.len() as u32);
     let stream_len = u32::try_from(table_stream.len())
         .map_err(|_| corrupted("table stream is too large for UIM bounds"))?;
-    UimTable::parse_bytes_with_limits(
-        data,
-        Some(maximum_cp),
-        guid_count,
-        Some(stream_len),
-    )
-    .map(Some)
+    UimTable::parse_bytes_with_limits(data, Some(maximum_cp), guid_count, Some(stream_len))
+        .map(Some)
 }
 
 #[cfg(test)]
@@ -578,7 +578,11 @@ mod tests {
             100,
             &[
                 (UIM_GUID_FIB_INDEX, 4, guids.len() as u32),
-                (UIM_FIB_INDEX, (4 + guids.len()) as u32, records.len() as u32),
+                (
+                    UIM_FIB_INDEX,
+                    (4 + guids.len()) as u32,
+                    records.len() as u32,
+                ),
             ],
         );
         let tables = TextServicesTables::parse(&fib, &table_stream).unwrap();

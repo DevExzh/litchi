@@ -1,7 +1,7 @@
+use litchi_ole::doc::writer::DocWriter;
 use litchi_ole::doc::{
     FieldStory, FieldType, IndexEntryOption, Package, TableOfAuthoritiesEntryOption,
 };
-use litchi_ole::doc::writer::DocWriter;
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -23,7 +23,12 @@ fn reference_plcf(cps: &[u32], descriptors: &[[u8; 2]]) -> Vec<u8> {
     bytes
 }
 
-type StoryCase = (FieldStory, &'static [u32], &'static [[u8; 2]], &'static [FieldType]);
+type StoryCase = (
+    FieldStory,
+    &'static [u32],
+    &'static [[u8; 2]],
+    &'static [FieldType],
+);
 
 #[test]
 fn apache_poi_reference_plcfs_cover_all_seven_story_tables() {
@@ -264,5 +269,8 @@ fn generated_private_document_discovers_private_fields() {
         private_fields[0].cached_result(),
         Some("cached private payload")
     );
-    assert_eq!(document.private_field_count().unwrap(), private_fields.len());
+    assert_eq!(
+        document.private_field_count().unwrap(),
+        private_fields.len()
+    );
 }

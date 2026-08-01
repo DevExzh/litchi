@@ -17,7 +17,7 @@ async fn minmax_ifs(
     func_name: &str,
     extremum: Extremum,
 ) -> Result<CellValue> {
-    if args.len() < 3 || args.len() % 2 == 0 {
+    if args.len() < 3 || args.len().is_multiple_of(2) {
         return Ok(CellValue::Error(format!(
             "{func_name} expects 3 or more arguments ({func_name_lower} range, criteria_range1, criteria1, ...)",
             func_name_lower = func_name.to_lowercase()
@@ -232,7 +232,7 @@ pub(crate) async fn eval_sumifs(
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    if args.len() < 3 || args.len() % 2 == 0 {
+    if args.len() < 3 || args.len().is_multiple_of(2) {
         return Ok(CellValue::Error(
             "SUMIFS expects 3 or more arguments (sum_range, criteria_range1, criteria1, ...)"
                 .to_string(),
@@ -287,7 +287,7 @@ pub(crate) async fn eval_countifs(
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    if args.len() < 2 || args.len() % 2 != 0 {
+    if args.len() < 2 || !args.len().is_multiple_of(2) {
         return Ok(CellValue::Error(
             "COUNTIFS expects an even number of arguments (criteria_range1, criteria1, ...)"
                 .to_string(),
@@ -345,7 +345,7 @@ pub(crate) async fn eval_averageifs(
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    if args.len() < 3 || args.len() % 2 == 0 {
+    if args.len() < 3 || args.len().is_multiple_of(2) {
         return Ok(CellValue::Error(
             "AVERAGEIFS expects 3 or more arguments (average_range, criteria_range1, criteria1, ...)".to_string(),
         ));

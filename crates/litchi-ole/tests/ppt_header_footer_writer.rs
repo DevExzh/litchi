@@ -1,8 +1,7 @@
 use litchi_ole::ppt::writer::PptWriter;
 use litchi_ole::ppt::{
-    Package, PowerPointHeaderFooter, PowerPointHeaderFooterOptions,
-    PowerPointHeaderFooterParent, PowerPointHeaderFooterParentOrdinal,
-    PowerPointHeaderFooterScope,
+    Package, PowerPointHeaderFooter, PowerPointHeaderFooterOptions, PowerPointHeaderFooterParent,
+    PowerPointHeaderFooterParentOrdinal, PowerPointHeaderFooterScope,
 };
 use std::io::Cursor;
 
@@ -38,9 +37,7 @@ fn writer_attaches_header_footers_to_every_supported_parent() {
     let mut notes = header_footer("Notes footer");
     notes.header = Some("Notes 标题".to_string());
     notes.options.show_header = true;
-    writer
-        .set_notes_and_handouts_header_footer(notes)
-        .unwrap();
+    writer.set_notes_and_handouts_header_footer(notes).unwrap();
     writer
         .set_main_master_header_footer(header_footer("Master footer"))
         .unwrap();
@@ -50,11 +47,7 @@ fn writer_attaches_header_footers_to_every_supported_parent() {
     writer.move_slide(1, 0).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
-    let values = package
-        .presentation()
-        .unwrap()
-        .header_footers()
-        .unwrap();
+    let values = package.presentation().unwrap().header_footers().unwrap();
 
     assert_eq!(values.entries().len(), 4);
     assert_eq!(

@@ -157,13 +157,7 @@ impl Presentation {
                 let cached_metadata =
                     crate::ooxml::metadata::extract_metadata(package.opc_package())
                         .ok()
-                        .and_then(|metadata| {
-                            if metadata.has_data() {
-                                Some(metadata)
-                            } else {
-                                None
-                            }
-                        });
+                        .filter(|metadata| metadata.has_data());
 
                 Ok(Self {
                     inner: PresentationImpl::Pptx(package),
@@ -177,13 +171,11 @@ impl Presentation {
                 })?;
 
                 // Extract Keynote metadata from bundle properties
-                let cached_metadata = doc.metadata().ok().flatten().and_then(|metadata| {
-                    if metadata.has_data() {
-                        Some(metadata)
-                    } else {
-                        None
-                    }
-                });
+                let cached_metadata = doc
+                    .metadata()
+                    .ok()
+                    .flatten()
+                    .filter(|metadata| metadata.has_data());
 
                 Ok(Self {
                     inner: PresentationImpl::Keynote(doc),

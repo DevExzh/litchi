@@ -102,7 +102,11 @@ impl LayoutModes {
             )
         };
         let xnum = |index: usize| {
-            f64::from_le_bytes(data[offset + index..offset + index + 8].try_into().expect("sized"))
+            f64::from_le_bytes(
+                data[offset + index..offset + index + 8]
+                    .try_into()
+                    .expect("sized"),
+            )
         };
         Ok(Self {
             x_mode: mode(0)?,
@@ -130,7 +134,10 @@ impl LayoutModes {
 /// `fFrtRef`/`fFrtAlert` bits that MUST be zero.
 fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> XlsResult<u16> {
     if u16::from_le_bytes([data[0], data[1]]) != record_type {
-        return Err(invalid(record_type, format!("{name} FrtHeader.rt mismatch")));
+        return Err(invalid(
+            record_type,
+            format!("{name} FrtHeader.rt mismatch"),
+        ));
     }
     let flags = u16::from_le_bytes([data[2], data[3]]);
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
@@ -550,6 +557,9 @@ mod tests {
                 .is_err()
         );
         // Undefined layout mode.
-        assert!(XlsCrtLayout12A::parse(&layout12a_record(0, 0, [0; 4], [0, 9, 0, 0], [0.0; 4])).is_err());
+        assert!(
+            XlsCrtLayout12A::parse(&layout12a_record(0, 0, [0; 4], [0, 9, 0, 0], [0.0; 4]))
+                .is_err()
+        );
     }
 }

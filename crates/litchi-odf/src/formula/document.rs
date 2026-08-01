@@ -824,7 +824,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_expanded_attributes_and_excessive_nesting() {        let duplicate = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" xmlns:a="urn:test" xmlns:b="urn:test" a:x="one" b:x="two"/>"#;
+    fn rejects_duplicate_expanded_attributes_and_excessive_nesting() {
+        let duplicate = r#"<math xmlns="http://www.w3.org/1998/Math/MathML" xmlns:a="urn:test" xmlns:b="urn:test" a:x="one" b:x="two"/>"#;
         assert!(FormulaDocument::from_bytes(package(constants::ODF_FORMULA, duplicate)).is_err());
 
         let nested = "<mrow>".repeat(MAX_MATH_DEPTH) + &"</mrow>".repeat(MAX_MATH_DEPTH);

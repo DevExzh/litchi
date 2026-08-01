@@ -218,10 +218,16 @@ pub struct OdfDatabaseKeyColumn {
 }
 impl OdfDatabaseKeyColumn {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: Some(name.into()), related_column_name: None }
+        Self {
+            name: Some(name.into()),
+            related_column_name: None,
+        }
     }
     pub fn foreign(local: impl Into<String>, related: impl Into<String>) -> Self {
-        Self { name: Some(local.into()), related_column_name: Some(related.into()) }
+        Self {
+            name: Some(local.into()),
+            related_column_name: Some(related.into()),
+        }
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -235,19 +241,38 @@ pub struct OdfDatabaseKey {
 }
 impl OdfDatabaseKey {
     pub fn primary(name: Option<String>, columns: Vec<String>) -> Self {
-        Self { name, key_type: OdfDatabaseKeyType::Primary, referenced_table_name: None,
-            update_rule: None, delete_rule: None,
-            column_groups: vec![columns.into_iter().map(OdfDatabaseKeyColumn::new).collect()] }
+        Self {
+            name,
+            key_type: OdfDatabaseKeyType::Primary,
+            referenced_table_name: None,
+            update_rule: None,
+            delete_rule: None,
+            column_groups: vec![columns.into_iter().map(OdfDatabaseKeyColumn::new).collect()],
+        }
     }
     pub fn unique(name: Option<String>, columns: Vec<String>) -> Self {
         let mut value = Self::primary(name, columns);
         value.key_type = OdfDatabaseKeyType::Unique;
         value
     }
-    pub fn foreign(name: Option<String>, table: impl Into<String>, columns: Vec<(String, String)>) -> Self {
-        Self { name, key_type: OdfDatabaseKeyType::Foreign, referenced_table_name: Some(table.into()),
-            update_rule: None, delete_rule: None,
-            column_groups: vec![columns.into_iter().map(|(a, b)| OdfDatabaseKeyColumn::foreign(a, b)).collect()] }
+    pub fn foreign(
+        name: Option<String>,
+        table: impl Into<String>,
+        columns: Vec<(String, String)>,
+    ) -> Self {
+        Self {
+            name,
+            key_type: OdfDatabaseKeyType::Foreign,
+            referenced_table_name: Some(table.into()),
+            update_rule: None,
+            delete_rule: None,
+            column_groups: vec![
+                columns
+                    .into_iter()
+                    .map(|(a, b)| OdfDatabaseKeyColumn::foreign(a, b))
+                    .collect(),
+            ],
+        }
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -265,8 +290,21 @@ pub struct OdfDatabaseIndex {
 }
 impl OdfDatabaseIndex {
     pub fn new(name: impl Into<String>, columns: Vec<String>) -> Self {
-        Self { name: name.into(), catalog_name: None, unique: None, clustered: None,
-            column_groups: vec![columns.into_iter().map(|name| OdfDatabaseIndexColumn { name, ascending: None }).collect()] }
+        Self {
+            name: name.into(),
+            catalog_name: None,
+            unique: None,
+            clustered: None,
+            column_groups: vec![
+                columns
+                    .into_iter()
+                    .map(|name| OdfDatabaseIndexColumn {
+                        name,
+                        ascending: None,
+                    })
+                    .collect(),
+            ],
+        }
     }
 }
 
@@ -298,7 +336,9 @@ impl OdfDatabaseTableDefinition {
         value
     }
     pub fn is_view(&self) -> bool {
-        self.table_type.as_deref().is_some_and(|value| value.eq_ignore_ascii_case("VIEW"))
+        self.table_type
+            .as_deref()
+            .is_some_and(|value| value.eq_ignore_ascii_case("VIEW"))
     }
 }
 
@@ -360,28 +400,43 @@ pub fn set_database_schema_definition_xml(
 }
 
 fn preflight_schema_xml(xml: &str) -> Result<()> {
-    if xml.len() > 64 * 1024 * 1024 { return invalid("database schema XML is too large"); }
+    if xml.len() > 64 * 1024 * 1024 {
+        return invalid("database schema XML is too large");
+    }
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     loop {
-        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid database schema XML: {error}")))?;
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid database schema XML: {error}"))
+            })?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
                 let resolved = namespace(&resolved)?;
                 let local = owned(element.local_name().as_ref())?;
                 if resolved.as_deref() == Some("urn:oasis:names:tc:opendocument:xmlns:script:1.0")
                     || (resolved.as_deref() == Some(OFFICE) && local == "event-listeners")
-                    || (resolved.as_deref() == Some(OFFICE) && local == "scripts" && matches!(event, Event::Start(_)))
-                { return invalid("active content is forbidden in database schema XML"); }
+                    || (resolved.as_deref() == Some(OFFICE)
+                        && local == "scripts"
+                        && matches!(event, Event::Start(_)))
+                {
+                    return invalid("active content is forbidden in database schema XML");
+                }
                 if matches!(event, Event::Start(_)) {
                     depth += 1;
-                    if depth > 256 { return invalid("database schema XML is too deeply nested"); }
+                    if depth > 256 {
+                        return invalid("database schema XML is too deeply nested");
+                    }
                 }
             },
             Event::End(_) => depth = depth.saturating_sub(1),
-            Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => return invalid("DTD, entity references, and processing instructions are forbidden in database schema XML"),
+            Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => {
+                return invalid(
+                    "DTD, entity references, and processing instructions are forbidden in database schema XML",
+                );
+            },
             Event::Eof => break,
             _ => {},
         }
@@ -395,19 +450,31 @@ fn validate_schema_root_order(root: &DatabaseElement) -> Result<()> {
     let mut any = false;
     let mut seen = [false; 6];
     for child in children(root)? {
-        if child.namespace_uri() != Some(DB) { continue; }
+        if child.namespace_uri() != Some(DB) {
+            continue;
+        }
         let rank = match child.local_name() {
-            "data-source" => 0, "forms" => 1, "reports" => 2, "queries" => 3,
-            "table-representations" => 4, "schema-definition" => 5,
+            "data-source" => 0,
+            "forms" => 1,
+            "reports" => 2,
+            "queries" => 3,
+            "table-representations" => 4,
+            "schema-definition" => 5,
             name => return invalid(format!("unexpected db:{name} child in office:database")),
         };
-        if seen[rank] { return invalid(format!("duplicate db:{} child", child.local_name())); }
-        if any && rank < previous { return invalid("database direct children are out of schema order"); }
+        if seen[rank] {
+            return invalid(format!("duplicate db:{} child", child.local_name()));
+        }
+        if any && rank < previous {
+            return invalid("database direct children are out of schema order");
+        }
         seen[rank] = true;
         previous = rank;
         any = true;
     }
-    if !seen[0] { return invalid("database has no data source"); }
+    if !seen[0] {
+        return invalid("database has no data source");
+    }
     Ok(())
 }
 
@@ -489,7 +556,9 @@ fn schema_from_root(root: &DatabaseElement) -> Result<Option<OdfDatabaseSchemaDe
 }
 
 fn validate_schema(schema: &OdfDatabaseSchemaDefinition) -> Result<()> {
-    if schema.tables.len() > MAX_TABLES { return invalid("too many schema tables"); }
+    if schema.tables.len() > MAX_TABLES {
+        return invalid("too many schema tables");
+    }
     let mut budget = Budget::default();
     let mut table_names = HashSet::new();
     for table in &schema.tables {
@@ -500,13 +569,18 @@ fn validate_schema(schema: &OdfDatabaseSchemaDefinition) -> Result<()> {
         optional_string(table.catalog_name.as_deref(), "catalog name", &mut budget)?;
         optional_string(table.schema_name.as_deref(), "schema name", &mut budget)?;
         optional_string(table.table_type.as_deref(), "table type", &mut budget)?;
-        if table.columns.is_empty() { return invalid(format!("schema table '{}' has no columns", table.name)); }
+        if table.columns.is_empty() {
+            return invalid(format!("schema table '{}' has no columns", table.name));
+        }
         let mut columns = HashSet::new();
         for column in &table.columns {
             budget.column()?;
             required_identity(&column.name, "column name", &mut budget)?;
             if !columns.insert(column.name.as_str()) {
-                return invalid(format!("duplicate column '{}' in table '{}'", column.name, table.name));
+                return invalid(format!(
+                    "duplicate column '{}' in table '{}'",
+                    column.name, table.name
+                ));
             }
             optional_string(column.type_name.as_deref(), "column type name", &mut budget)?;
             validate_column_semantics(column)?;
@@ -514,15 +588,27 @@ fn validate_schema(schema: &OdfDatabaseSchemaDefinition) -> Result<()> {
         let mut key_names = HashSet::new();
         let mut primary = false;
         if let Some(keys) = &table.keys {
-            if keys.is_empty() { return invalid("db:keys must not be empty"); }
+            if keys.is_empty() {
+                return invalid("db:keys must not be empty");
+            }
             for key in keys {
                 budget.key()?;
                 if let Some(name) = &key.name {
                     required_identity(name, "key name", &mut budget)?;
-                    if !key_names.insert(name.as_str()) { return invalid(format!("duplicate key '{}' in table '{}'", name, table.name)); }
+                    if !key_names.insert(name.as_str()) {
+                        return invalid(format!(
+                            "duplicate key '{}' in table '{}'",
+                            name, table.name
+                        ));
+                    }
                 }
                 if key.key_type == OdfDatabaseKeyType::Primary {
-                    if primary { return invalid(format!("table '{}' has multiple primary keys", table.name)); }
+                    if primary {
+                        return invalid(format!(
+                            "table '{}' has multiple primary keys",
+                            table.name
+                        ));
+                    }
                     primary = true;
                 }
                 validate_key_shape(table, key, &columns, &mut budget)?;
@@ -530,20 +616,41 @@ fn validate_schema(schema: &OdfDatabaseSchemaDefinition) -> Result<()> {
         }
         let mut index_names = HashSet::new();
         if let Some(indices) = &table.indices {
-            if indices.is_empty() { return invalid("db:indices must not be empty"); }
+            if indices.is_empty() {
+                return invalid("db:indices must not be empty");
+            }
             for index in indices {
                 budget.index()?;
                 required_identity(&index.name, "index name", &mut budget)?;
-                if !index_names.insert(index.name.as_str()) { return invalid(format!("duplicate index '{}' in table '{}'", index.name, table.name)); }
+                if !index_names.insert(index.name.as_str()) {
+                    return invalid(format!(
+                        "duplicate index '{}' in table '{}'",
+                        index.name, table.name
+                    ));
+                }
                 optional_string(index.catalog_name.as_deref(), "index catalog", &mut budget)?;
-                if index.column_groups.is_empty() { return invalid("db:index requires index-columns"); }
+                if index.column_groups.is_empty() {
+                    return invalid("db:index requires index-columns");
+                }
                 let mut used = HashSet::new();
                 for group in &index.column_groups {
-                    if group.is_empty() { return invalid("db:index-columns must not be empty"); }
+                    if group.is_empty() {
+                        return invalid("db:index-columns must not be empty");
+                    }
                     for column in group {
                         required_identity(&column.name, "index column", &mut budget)?;
-                        if !columns.contains(column.name.as_str()) { return invalid(format!("index '{}' references missing column '{}'", index.name, column.name)); }
-                        if !used.insert(column.name.as_str()) { return invalid(format!("index '{}' repeats column '{}'", index.name, column.name)); }
+                        if !columns.contains(column.name.as_str()) {
+                            return invalid(format!(
+                                "index '{}' references missing column '{}'",
+                                index.name, column.name
+                            ));
+                        }
+                        if !used.insert(column.name.as_str()) {
+                            return invalid(format!(
+                                "index '{}' repeats column '{}'",
+                                index.name, column.name
+                            ));
+                        }
                     }
                 }
             }
@@ -551,15 +658,44 @@ fn validate_schema(schema: &OdfDatabaseSchemaDefinition) -> Result<()> {
     }
     for table in &schema.tables {
         for key in table.keys.iter().flatten() {
-            if key.key_type != OdfDatabaseKeyType::Foreign { continue; }
-            let target_name = key.referenced_table_name.as_deref().ok_or_else(|| Error::InvalidFormat(format!("foreign key in '{}' has no referenced table", table.name)))?;
-            let target = schema.tables.iter().find(|candidate| candidate.name == target_name)
-                .ok_or_else(|| Error::InvalidFormat(format!("foreign key in '{}' references missing table '{}'", table.name, target_name)))?;
-            let target_columns: HashSet<&str> = target.columns.iter().map(|column| column.name.as_str()).collect();
+            if key.key_type != OdfDatabaseKeyType::Foreign {
+                continue;
+            }
+            let target_name = key.referenced_table_name.as_deref().ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "foreign key in '{}' has no referenced table",
+                    table.name
+                ))
+            })?;
+            let target = schema
+                .tables
+                .iter()
+                .find(|candidate| candidate.name == target_name)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "foreign key in '{}' references missing table '{}'",
+                        table.name, target_name
+                    ))
+                })?;
+            let target_columns: HashSet<&str> = target
+                .columns
+                .iter()
+                .map(|column| column.name.as_str())
+                .collect();
             for group in &key.column_groups {
                 for pair in group {
-                    let related = pair.related_column_name.as_deref().ok_or_else(|| Error::InvalidFormat(format!("foreign key in '{}' has an unpaired related column", table.name)))?;
-                    if !target_columns.contains(related) { return invalid(format!("foreign key in '{}' references missing column '{}.{}'", table.name, target.name, related)); }
+                    let related = pair.related_column_name.as_deref().ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "foreign key in '{}' has an unpaired related column",
+                            table.name
+                        ))
+                    })?;
+                    if !target_columns.contains(related) {
+                        return invalid(format!(
+                            "foreign key in '{}' references missing column '{}.{}'",
+                            table.name, target.name, related
+                        ));
+                    }
                 }
             }
         }
@@ -567,27 +703,59 @@ fn validate_schema(schema: &OdfDatabaseSchemaDefinition) -> Result<()> {
     Ok(())
 }
 
-fn validate_key_shape(table: &OdfDatabaseTableDefinition, key: &OdfDatabaseKey, columns: &HashSet<&str>, budget: &mut Budget) -> Result<()> {
-    if key.column_groups.is_empty() { return invalid("db:key requires key-columns"); }
+fn validate_key_shape(
+    table: &OdfDatabaseTableDefinition,
+    key: &OdfDatabaseKey,
+    columns: &HashSet<&str>,
+    budget: &mut Budget,
+) -> Result<()> {
+    if key.column_groups.is_empty() {
+        return invalid("db:key requires key-columns");
+    }
     let foreign = key.key_type == OdfDatabaseKeyType::Foreign;
     if foreign {
-        let target = key.referenced_table_name.as_deref().ok_or_else(|| Error::InvalidFormat("foreign key requires referenced table".into()))?;
+        let target = key
+            .referenced_table_name
+            .as_deref()
+            .ok_or_else(|| Error::InvalidFormat("foreign key requires referenced table".into()))?;
         required_identity(target, "referenced table", budget)?;
-    } else if key.referenced_table_name.is_some() || key.update_rule.is_some() || key.delete_rule.is_some() {
+    } else if key.referenced_table_name.is_some()
+        || key.update_rule.is_some()
+        || key.delete_rule.is_some()
+    {
         return invalid("referential attributes are valid only on foreign keys");
     }
     let mut used = HashSet::new();
     for group in &key.column_groups {
-        if group.is_empty() { return invalid("db:key-columns must not be empty"); }
+        if group.is_empty() {
+            return invalid("db:key-columns must not be empty");
+        }
         for pair in group {
-            let local = pair.name.as_deref().ok_or_else(|| Error::InvalidFormat("key column requires a local name".into()))?;
+            let local = pair
+                .name
+                .as_deref()
+                .ok_or_else(|| Error::InvalidFormat("key column requires a local name".into()))?;
             required_identity(local, "key column", budget)?;
-            if !columns.contains(local) { return invalid(format!("key in table '{}' references missing local column '{}'", table.name, local)); }
-            if !used.insert(local) { return invalid(format!("key in table '{}' repeats local column '{}'", table.name, local)); }
+            if !columns.contains(local) {
+                return invalid(format!(
+                    "key in table '{}' references missing local column '{}'",
+                    table.name, local
+                ));
+            }
+            if !used.insert(local) {
+                return invalid(format!(
+                    "key in table '{}' repeats local column '{}'",
+                    table.name, local
+                ));
+            }
             match (foreign, pair.related_column_name.as_deref()) {
                 (true, Some(related)) => required_identity(related, "related column", budget)?,
-                (true, None) => return invalid("foreign key columns require paired related columns"),
-                (false, Some(_)) => return invalid("related columns are valid only on foreign keys"),
+                (true, None) => {
+                    return invalid("foreign key columns require paired related columns");
+                },
+                (false, Some(_)) => {
+                    return invalid("related columns are valid only on foreign keys");
+                },
                 (false, None) => {},
             }
         }
@@ -597,43 +765,104 @@ fn validate_key_shape(table: &OdfDatabaseTableDefinition, key: &OdfDatabaseKey, 
 
 fn validate_column_semantics(column: &OdfDatabaseColumnDefinition) -> Result<()> {
     if column.autoincrement == Some(true) {
-        if !matches!(column.data_type, Some(OdfDatabaseDataType::TinyInt | OdfDatabaseDataType::SmallInt | OdfDatabaseDataType::Integer | OdfDatabaseDataType::BigInt)) {
-            return invalid(format!("autoincrement column '{}' must have an integer type", column.name));
+        if !matches!(
+            column.data_type,
+            Some(
+                OdfDatabaseDataType::TinyInt
+                    | OdfDatabaseDataType::SmallInt
+                    | OdfDatabaseDataType::Integer
+                    | OdfDatabaseDataType::BigInt
+            )
+        ) {
+            return invalid(format!(
+                "autoincrement column '{}' must have an integer type",
+                column.name
+            ));
         }
-        if column.default_value.is_some() || column.nullable == Some(OdfDatabaseNullable::Nullable) {
-            return invalid(format!("autoincrement column '{}' cannot be nullable or have a default", column.name));
+        if column.default_value.is_some() || column.nullable == Some(OdfDatabaseNullable::Nullable)
+        {
+            return invalid(format!(
+                "autoincrement column '{}' cannot be nullable or have a default",
+                column.name
+            ));
         }
     }
-    if column.empty_allowed == Some(true) && !matches!(column.data_type, None | Some(OdfDatabaseDataType::Char | OdfDatabaseDataType::VarChar | OdfDatabaseDataType::LongVarChar | OdfDatabaseDataType::Clob)) {
-        return invalid(format!("non-character column '{}' cannot allow empty strings", column.name));
+    if column.empty_allowed == Some(true)
+        && !matches!(
+            column.data_type,
+            None | Some(
+                OdfDatabaseDataType::Char
+                    | OdfDatabaseDataType::VarChar
+                    | OdfDatabaseDataType::LongVarChar
+                    | OdfDatabaseDataType::Clob
+            )
+        )
+    {
+        return invalid(format!(
+            "non-character column '{}' cannot allow empty strings",
+            column.name
+        ));
     }
     if let (Some(data_type), Some(value)) = (column.data_type, column.default_value.as_ref()) {
         let compatible = match data_type {
-            OdfDatabaseDataType::Bit | OdfDatabaseDataType::Boolean => matches!(value, OdfDatabaseColumnValue::Boolean(_)),
-            OdfDatabaseDataType::TinyInt | OdfDatabaseDataType::SmallInt | OdfDatabaseDataType::Integer | OdfDatabaseDataType::BigInt | OdfDatabaseDataType::Float | OdfDatabaseDataType::Real | OdfDatabaseDataType::Double | OdfDatabaseDataType::Numeric | OdfDatabaseDataType::Decimal => matches!(value, OdfDatabaseColumnValue::Float(_) | OdfDatabaseColumnValue::Percentage(_) | OdfDatabaseColumnValue::Currency { .. }),
-            OdfDatabaseDataType::Char | OdfDatabaseDataType::VarChar | OdfDatabaseDataType::LongVarChar | OdfDatabaseDataType::Clob => matches!(value, OdfDatabaseColumnValue::String(_)),
-            OdfDatabaseDataType::Date | OdfDatabaseDataType::Timestamp => matches!(value, OdfDatabaseColumnValue::Date(_)),
+            OdfDatabaseDataType::Bit | OdfDatabaseDataType::Boolean => {
+                matches!(value, OdfDatabaseColumnValue::Boolean(_))
+            },
+            OdfDatabaseDataType::TinyInt
+            | OdfDatabaseDataType::SmallInt
+            | OdfDatabaseDataType::Integer
+            | OdfDatabaseDataType::BigInt
+            | OdfDatabaseDataType::Float
+            | OdfDatabaseDataType::Real
+            | OdfDatabaseDataType::Double
+            | OdfDatabaseDataType::Numeric
+            | OdfDatabaseDataType::Decimal => matches!(
+                value,
+                OdfDatabaseColumnValue::Float(_)
+                    | OdfDatabaseColumnValue::Percentage(_)
+                    | OdfDatabaseColumnValue::Currency { .. }
+            ),
+            OdfDatabaseDataType::Char
+            | OdfDatabaseDataType::VarChar
+            | OdfDatabaseDataType::LongVarChar
+            | OdfDatabaseDataType::Clob => matches!(value, OdfDatabaseColumnValue::String(_)),
+            OdfDatabaseDataType::Date | OdfDatabaseDataType::Timestamp => {
+                matches!(value, OdfDatabaseColumnValue::Date(_))
+            },
             OdfDatabaseDataType::Time => matches!(value, OdfDatabaseColumnValue::Time(_)),
             _ => false,
         };
-        if !compatible { return invalid(format!("default value does not match the type of column '{}'", column.name)); }
+        if !compatible {
+            return invalid(format!(
+                "default value does not match the type of column '{}'",
+                column.name
+            ));
+        }
     }
     Ok(())
 }
 
 fn required_identity(value: &str, label: &str, budget: &mut Budget) -> Result<()> {
-    if value.is_empty() { return invalid(format!("schema {label} must not be empty")); }
+    if value.is_empty() {
+        return invalid(format!("schema {label} must not be empty"));
+    }
     budget.string(label, value)?;
-    if !value.chars().all(xml_char) { return invalid(format!("schema {label} contains an invalid XML character")); }
+    if !value.chars().all(xml_char) {
+        return invalid(format!("schema {label} contains an invalid XML character"));
+    }
     Ok(())
 }
 fn optional_string(value: Option<&str>, label: &str, budget: &mut Budget) -> Result<()> {
-    if let Some(value) = value { required_identity(value, label, budget)?; }
+    if let Some(value) = value {
+        required_identity(value, label, budget)?;
+    }
     Ok(())
 }
 fn xml_char(ch: char) -> bool {
-    matches!(ch, '\u{9}' | '\u{A}' | '\u{D}') || ('\u{20}'..='\u{D7FF}').contains(&ch)
-        || ('\u{E000}'..='\u{FFFD}').contains(&ch) || ('\u{10000}'..='\u{10FFFF}').contains(&ch)
+    matches!(ch, '\u{9}' | '\u{A}' | '\u{D}')
+        || ('\u{20}'..='\u{D7FF}').contains(&ch)
+        || ('\u{E000}'..='\u{FFFD}').contains(&ch)
+        || ('\u{10000}'..='\u{10FFFF}').contains(&ch)
 }
 
 fn parse_table(e: &DatabaseElement, b: &mut Budget) -> Result<OdfDatabaseTableDefinition> {

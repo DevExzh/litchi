@@ -9,10 +9,10 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
-atoi_simd     = { workspace = true }
 aes           = { workspace = true }
 aes-gcm       = { workspace = true }
 argon2        = { workspace = true }
+atoi_simd     = { workspace = true }
 base64        = { workspace = true }
 bergshamra-c14n = { workspace = true }
 blowfish      = { workspace = true }
@@ -23,21 +23,21 @@ flate2        = { workspace = true }
 hmac          = { workspace = true }
 litchi-core   = { workspace = true, features = ["odf"] }
 memchr        = { workspace = true }
-pbkdf2        = { workspace = true }
 p256          = { workspace = true }
+pbkdf2        = { workspace = true }
 phf           = { workspace = true }
 quick-xml     = { workspace = true }
 rand          = { workspace = true }
+rsa           = { workspace = true }
 sha1          = { workspace = true }
 sha2          = { workspace = true }
 signature     = { workspace = true }
 smallvec      = { workspace = true }
 soapberry-zip = { workspace = true }
 subtle        = { workspace = true }
+x509-cert     = { workspace = true }
 xml-minifier  = { workspace = true }
 zeroize       = { workspace = true }
-x509-cert     = { workspace = true }
-rsa           = { workspace = true }
 
 [dev-dependencies]
 litchi-eval = { workspace = true }

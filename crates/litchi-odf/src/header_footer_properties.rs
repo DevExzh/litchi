@@ -830,19 +830,19 @@ fn replace_in_wrapper(wrapper: &str, property: &str) -> Result<String> {
             Event::Empty(e)
                 if depth == 1
                     && style_element
-                    && e.local_name().as_ref() == b"header-footer-properties"
-                => {
-                    let mut out = wrapper.to_string();
-                    out.replace_range(event_start..event_end, property);
-                    return Ok(out);
-                },
+                    && e.local_name().as_ref() == b"header-footer-properties" =>
+            {
+                let mut out = wrapper.to_string();
+                out.replace_range(event_start..event_end, property);
+                return Ok(out);
+            },
             Event::End(_) => {
-                if let Some(begin) = start {
-                    if depth == 2 {
-                        let mut out = wrapper.to_string();
-                        out.replace_range(begin..event_end, property);
-                        return Ok(out);
-                    }
+                if let Some(begin) = start
+                    && depth == 2
+                {
+                    let mut out = wrapper.to_string();
+                    out.replace_range(begin..event_end, property);
+                    return Ok(out);
                 }
                 depth = depth.saturating_sub(1)
             },

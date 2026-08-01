@@ -1,10 +1,10 @@
+use crate::custom_xml_data::is_st_guid;
 /// Content control support for Word documents.
 ///
 /// Content controls are structured regions in a document that can contain
 /// specific types of content (text, dates, lists, etc.).
 use crate::docx::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use crate::error::{OoxmlError, Result};
-use crate::custom_xml_data::is_st_guid;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -355,7 +355,9 @@ pub fn validate_data_binding_values(
     const MAX_BINDING_BYTES: usize = 64 * 1024;
     if xpath.is_empty()
         || xpath.len() > MAX_BINDING_BYTES
-        || xpath.chars().any(|character| character == '\0' || character.is_control() && !character.is_whitespace())
+        || xpath.chars().any(|character| {
+            character == '\0' || character.is_control() && !character.is_whitespace()
+        })
     {
         return Err(OoxmlError::InvalidFormat(
             "content-control XPath is empty or exceeds lexical limits".to_string(),

@@ -500,15 +500,14 @@ fn parse_part(xml: &str, part: OdfNamedExpressionPart) -> Result<OdfNamedExpress
                     }
                 }
             },
-            Event::Text(ref text)
-                if (definition.is_some() || group.is_some()) => {
-                    let value = text.decode().map_err(|error| {
-                        make_error(format!("invalid named-expression text: {error}"))
-                    })?;
-                    if !value.trim().is_empty() {
-                        return invalid("named definition elements must have empty content");
-                    }
-                },
+            Event::Text(ref text) if (definition.is_some() || group.is_some()) => {
+                let value = text.decode().map_err(|error| {
+                    make_error(format!("invalid named-expression text: {error}"))
+                })?;
+                if !value.trim().is_empty() {
+                    return invalid("named definition elements must have empty content");
+                }
+            },
             Event::CData(_) if definition.is_some() || group.is_some() => {
                 return invalid("CDATA is not allowed in named definitions");
             },

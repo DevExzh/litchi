@@ -2,8 +2,8 @@ use std::io::Cursor;
 
 use litchi_ole::xls::shapes::extract_shapes_from_workbook;
 use litchi_ole::xls::writer::{
-    XlsPivotTableConfig, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind,
-    XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite, XlsWriter,
+    XlsPivotTableConfig, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine,
+    XlsShapeText, XlsShapeTextRun, XlsShapeWrite, XlsWriter,
 };
 
 fn anchor() -> XlsShapeAnchor {
@@ -73,11 +73,15 @@ fn primitives_emit_exact_client_record_order_and_parse_after_write() {
     let records = records(&stream);
     let relevant = records
         .iter()
-        .filter_map(|(kind, _)| matches!(*kind, 0x00EB | 0x00EC | 0x005D | 0x01B6 | 0x003C).then_some(*kind))
+        .filter_map(|(kind, _)| {
+            matches!(*kind, 0x00EB | 0x00EC | 0x005D | 0x01B6 | 0x003C).then_some(*kind)
+        })
         .collect::<Vec<_>>();
     assert_eq!(
         relevant,
-        vec![0x00EB, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x01B6, 0x003C, 0x003C]
+        vec![
+            0x00EB, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x01B6, 0x003C, 0x003C
+        ]
     );
     assert!(records.iter().all(|(_, data)| data.len() <= 8224));
 
@@ -124,7 +128,10 @@ fn all_safe_primitive_types_use_unique_shape_and_object_ids() {
     assert_eq!(object_ids, vec![1, 2, 3, 4, 5]);
     let parsed = extract_shapes_from_workbook(&stream).unwrap();
     assert_eq!(
-        parsed.iter().map(|shape| shape.shape_id).collect::<Vec<_>>(),
+        parsed
+            .iter()
+            .map(|shape| shape.shape_id)
+            .collect::<Vec<_>>(),
         vec![1025, 1026, 1027, 1028, 1029]
     );
 }
@@ -167,7 +174,10 @@ fn mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster() {
     writer.add_comment(sheet, 1, 1, "A", "note").unwrap();
 
     let records = records(&write(&mut writer));
-    assert_eq!(records.iter().filter(|(kind, _)| *kind == 0x00EB).count(), 1);
+    assert_eq!(
+        records.iter().filter(|(kind, _)| *kind == 0x00EB).count(),
+        1
+    );
     let drawing_group = records.iter().find(|(kind, _)| *kind == 0x00EB).unwrap();
     assert_eq!(drawing_group.1.len(), 90);
     let object_ids = records
@@ -200,9 +210,11 @@ fn shape_mutations_reject_malformed_input_and_are_atomic() {
     let mut line = XlsShapeWrite::new(XlsShapeKind::Line, anchor());
     line.text = Some(XlsShapeText::new("unsupported"));
     assert!(writer.add_shape(sheet, line).is_err());
-    assert!(records(&write(&mut writer))
-        .iter()
-        .all(|(kind, _)| *kind != 0x00EC && *kind != 0x005D));
+    assert!(
+        records(&write(&mut writer))
+            .iter()
+            .all(|(kind, _)| *kind != 0x00EC && *kind != 0x005D)
+    );
 }
 
 #[test]

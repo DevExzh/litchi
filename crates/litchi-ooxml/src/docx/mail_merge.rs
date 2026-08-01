@@ -1101,10 +1101,10 @@ fn validate_model(value: &MailMergeSettings) -> Result<()> {
     if value.active_record < 1 {
         return Err(invalid("activeRecord must be at least 1"));
     }
-    if let Some(odso) = &value.odso {
-        if odso.field_maps.len() > MAX_FIELD_MAPS {
-            return Err(invalid("too many odso field maps"));
-        }
+    if let Some(odso) = &value.odso
+        && odso.field_maps.len() > MAX_FIELD_MAPS
+    {
+        return Err(invalid("too many odso field maps"));
     }
     Ok(())
 }

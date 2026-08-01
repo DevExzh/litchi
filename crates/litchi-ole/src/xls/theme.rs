@@ -42,12 +42,18 @@ impl XlsTheme {
         if contents.is_empty() {
             return Err(invalid("custom theme must carry theme contents"));
         }
-        Ok(Self { version: THEME_VERSION_CUSTOM, contents: Some(contents) })
+        Ok(Self {
+            version: THEME_VERSION_CUSTOM,
+            contents: Some(contents),
+        })
     }
 
     /// The application default theme.
     pub fn default_theme() -> Self {
-        Self { version: THEME_VERSION_DEFAULT, contents: None }
+        Self {
+            version: THEME_VERSION_DEFAULT,
+            contents: None,
+        }
     }
 
     /// Raw `dwThemeVersion` theme type.
@@ -86,8 +92,7 @@ impl XlsTheme {
                     found: continuation.len(),
                 });
             }
-            if u16::from_le_bytes([continuation[0], continuation[1]])
-                != CONTINUE_FRT12_RECORD_TYPE
+            if u16::from_le_bytes([continuation[0], continuation[1]]) != CONTINUE_FRT12_RECORD_TYPE
             {
                 return Err(invalid(format!(
                     "Theme continuation {index} is not a ContinueFrt12 record"
@@ -95,7 +100,11 @@ impl XlsTheme {
             }
             contents.extend_from_slice(&continuation[FRT_HEADER_LEN..]);
         }
-        let contents = if contents.is_empty() { None } else { Some(contents) };
+        let contents = if contents.is_empty() {
+            None
+        } else {
+            Some(contents)
+        };
         if version == THEME_VERSION_CUSTOM && contents.is_none() {
             return Err(invalid("custom theme must carry theme contents"));
         }

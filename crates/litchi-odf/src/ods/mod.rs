@@ -92,12 +92,12 @@ mod evaluation;
 /// OpenFormula parsing and support
 pub mod formula;
 mod hyperlink;
-mod rich_text;
 mod label_range;
 mod mutable;
 pub(crate) mod named_expression;
 pub(crate) mod parser;
 mod protection;
+mod rich_text;
 mod row;
 mod scenario;
 mod shape;
@@ -127,10 +127,10 @@ pub use consolidation::{Consolidation, ConsolidationUseLabels};
 pub use data_pilot::{
     DataPilotDisplayInfo, DataPilotDisplayMemberMode, DataPilotField, DataPilotFieldReference,
     DataPilotGrandTotal, DataPilotGrandTotalElement, DataPilotGrandTotalOrientation,
-    DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups,
-    DataPilotLayoutInfo, DataPilotLayoutMode, DataPilotLevel, DataPilotMember,
-    DataPilotOrientation, DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo,
-    DataPilotSortMode, DataPilotSortOrder, DataPilotSource, DataPilotTable,
+    DataPilotGroup, DataPilotGroupBoundary, DataPilotGroupBy, DataPilotGroups, DataPilotLayoutInfo,
+    DataPilotLayoutMode, DataPilotLevel, DataPilotMember, DataPilotOrientation,
+    DataPilotReferenceMemberType, DataPilotReferenceType, DataPilotSortInfo, DataPilotSortMode,
+    DataPilotSortOrder, DataPilotSource, DataPilotTable,
 };
 pub use data_validation::{
     ContentValidation, ValidationDisplayList, ValidationErrorMacro, ValidationErrorMessage,
@@ -150,7 +150,6 @@ pub use detective::{
 };
 pub use evaluation::{OdsWorkbook, normalize_open_formula};
 pub use hyperlink::CellHyperlink;
-pub use rich_text::CellTextContent;
 pub use label_range::{LabelRange, LabelRangeOrientation};
 pub use mutable::MutableSpreadsheet;
 pub use named_expression::{
@@ -160,6 +159,7 @@ pub use named_expression::{
 pub use protection::{
     ProtectionKey, SheetProtection, SheetProtectionOptions, SpreadsheetProtection,
 };
+pub use rich_text::CellTextContent;
 pub use row::Row;
 pub use scenario::SheetScenario;
 pub use shape::{SheetShape, SheetShapeAnchor};

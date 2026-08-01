@@ -219,9 +219,9 @@ pub(crate) fn sign_package(unsigned: &[u8], signer: &OdfDocumentSigner) -> Resul
         signer.algorithm.uri()
     );
     for name in &names {
-        let bytes = archive
-            .read(name)
-            .map_err(|_| format_error(format!("unable to read ODF signature reference '{name}'")))?;
+        let bytes = archive.read(name).map_err(|_| {
+            format_error(format!("unable to read ODF signature reference '{name}'"))
+        })?;
         let transform = if is_xml_path(name) && !archive.is_stored(name).unwrap_or(false) {
             Some(signer.canonicalization)
         } else {
@@ -298,8 +298,7 @@ fn verify_one(
     signed_info_xml: &str,
 ) -> Result<OdfSignatureVerification> {
     let algorithm = OdfSignatureAlgorithm::parse(&signature.signature_method);
-    let canonicalization =
-        OdfCanonicalizationAlgorithm::parse(&signature.canonicalization_method);
+    let canonicalization = OdfCanonicalizationAlgorithm::parse(&signature.canonicalization_method);
     let certificates = signature
         .x509_certificates
         .iter()
@@ -366,10 +365,7 @@ fn verify_one(
                 return invalid("missing or duplicate same-document signature reference");
             }
             if reference.transforms.is_empty() {
-                canonicalize_fragment(
-                    &elements[0],
-                    OdfCanonicalizationAlgorithm::InclusiveXml10,
-                )?
+                canonicalize_fragment(&elements[0], OdfCanonicalizationAlgorithm::InclusiveXml10)?
             } else {
                 apply_transforms(elements[0].as_bytes(), &reference.transforms)?
             }
@@ -417,10 +413,7 @@ fn apply_transforms(bytes: &[u8], transforms: &[String]) -> Result<Vec<u8>> {
     }
 }
 
-fn digest_input_canonical_xml(
-    bytes: &[u8],
-    mode: OdfCanonicalizationAlgorithm,
-) -> Result<Vec<u8>> {
+fn digest_input_canonical_xml(bytes: &[u8], mode: OdfCanonicalizationAlgorithm) -> Result<Vec<u8>> {
     let xml = std::str::from_utf8(bytes).map_err(|_| format_error("C14N input is not UTF-8"))?;
     canonicalize_fragment(xml, mode)
 }
@@ -429,10 +422,7 @@ fn digest_canonical_xml(xml: &str, mode: OdfCanonicalizationAlgorithm) -> Result
     Ok(Sha256::digest(canonicalize_fragment(xml, mode)?).to_vec())
 }
 
-fn digest_canonical_xml_bytes(
-    xml: &[u8],
-    mode: OdfCanonicalizationAlgorithm,
-) -> Result<Vec<u8>> {
+fn digest_canonical_xml_bytes(xml: &[u8], mode: OdfCanonicalizationAlgorithm) -> Result<Vec<u8>> {
     Ok(Sha256::digest(digest_input_canonical_xml(xml, mode)?).to_vec())
 }
 
@@ -594,9 +584,11 @@ fn decode_package_uri(uri: &str) -> Result<String> {
             index += 1;
         }
     }
-    let path = String::from_utf8(decoded)
-        .map_err(|_| format_error("signature URI is not valid UTF-8"))?;
-    if path.split('/').any(|segment| matches!(segment, "" | "." | ".."))
+    let path =
+        String::from_utf8(decoded).map_err(|_| format_error("signature URI is not valid UTF-8"))?;
+    if path
+        .split('/')
+        .any(|segment| matches!(segment, "" | "." | ".."))
         || path.contains('\\')
         || path.contains(':')
     {
@@ -617,12 +609,13 @@ fn extract_elements(xml: &str, local: &str, id: Option<&str>) -> Result<Vec<Stri
             .map_err(|_| format_error("invalid signature XML while selecting signed nodes"))?
         {
             Event::Start(element) => {
-                let local_matches = local.is_empty() || element.local_name().as_ref() == local.as_bytes();
+                let local_matches =
+                    local.is_empty() || element.local_name().as_ref() == local.as_bytes();
                 let id_matches = if let Some(id) = id {
                     let mut matched = false;
                     for attribute in element.attributes().with_checks(true) {
-                        let attribute = attribute
-                            .map_err(|_| format_error("invalid signed-node attribute"))?;
+                        let attribute =
+                            attribute.map_err(|_| format_error("invalid signed-node attribute"))?;
                         if matches!(attribute.key.as_ref(), b"Id" | b"ID" | b"id")
                             && attribute.value.as_ref() == id.as_bytes()
                         {
@@ -636,14 +629,15 @@ fn extract_elements(xml: &str, local: &str, id: Option<&str>) -> Result<Vec<Stri
                 if local_matches && id_matches {
                     let mut depth = 1usize;
                     while depth != 0 {
-                        match reader.read_event().map_err(|_| {
-                            format_error("invalid signed-node XML")
-                        })? {
+                        match reader
+                            .read_event()
+                            .map_err(|_| format_error("invalid signed-node XML"))?
+                        {
                             Event::Start(_) => depth += 1,
                             Event::End(_) => depth -= 1,
                             Event::Eof => return invalid("incomplete signed-node XML"),
                             Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
-                                return invalid("active XML is prohibited in signed nodes")
+                                return invalid("active XML is prohibited in signed nodes");
                             },
                             _ => {},
                         }
@@ -655,7 +649,7 @@ fn extract_elements(xml: &str, local: &str, id: Option<&str>) -> Result<Vec<Stri
                 }
             },
             Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
-                return invalid("active XML is prohibited in signatures")
+                return invalid("active XML is prohibited in signatures");
             },
             Event::Eof => break,
             _ => {},
@@ -665,7 +659,9 @@ fn extract_elements(xml: &str, local: &str, id: Option<&str>) -> Result<Vec<Stri
 }
 
 fn inject_known_namespaces(fragment: &mut String, inherited_default_ds: bool) {
-    let Some(end) = fragment.find('>') else { return };
+    let Some(end) = fragment.find('>') else {
+        return;
+    };
     let start = &fragment[..end];
     let mut declarations = String::new();
     if inherited_default_ds && !start.contains("xmlns=") {

@@ -8,12 +8,11 @@ use crate::core::{
 };
 use crate::ods::{
     CalculationSettings, Cell, CellAnnotation, CellDetective, CellHyperlink, CellRangeSource,
-    CellValue, Column,
-    ConditionalCellStyle, ConditionalFormat, Consolidation, ContentValidation, DataPilotTable,
-    DatabaseRange, DdeLink, LabelRange,
-    NamedDefinition, NamedDefinitionScope, NamedExpression, NamedRange, Row, Sheet,
-    SheetPrintSettings, SheetScenario, SheetStyle, SheetTableSource, SparklineGroup, Spreadsheet,
-    SpreadsheetProtection, TableCellProtectionStyle, TableStructure, TableVisibility,
+    CellValue, Column, ConditionalCellStyle, ConditionalFormat, Consolidation, ContentValidation,
+    DataPilotTable, DatabaseRange, DdeLink, LabelRange, NamedDefinition, NamedDefinitionScope,
+    NamedExpression, NamedRange, Row, Sheet, SheetPrintSettings, SheetScenario, SheetStyle,
+    SheetTableSource, SparklineGroup, Spreadsheet, SpreadsheetProtection, TableCellProtectionStyle,
+    TableStructure, TableVisibility,
     calculation::write_calculation_settings,
     cell::{merge_cell_range, unmerge_cell_range},
     conditional_format::{
@@ -48,8 +47,9 @@ use crate::ods::{
     },
     style_protection::{
         PreservedXmlFragment, common_table_cell_style_names, extract_automatic_styles,
-        extract_font_face_decls, rewrite_managed_cell_styles, validate_conditional_style_collection,
-        validate_protection_style_collection, validate_protection_style_document,
+        extract_font_face_decls, rewrite_managed_cell_styles,
+        validate_conditional_style_collection, validate_protection_style_collection,
+        validate_protection_style_document,
     },
 };
 use litchi_core::{Metadata, Result, xml::escape_xml};
@@ -478,10 +478,7 @@ impl MutableSpreadsheet {
         Ok(Some(removed))
     }
 
-    fn commit_protection_styles(
-        &mut self,
-        candidate: Vec<TableCellProtectionStyle>,
-    ) -> Result<()> {
+    fn commit_protection_styles(&mut self, candidate: Vec<TableCellProtectionStyle>) -> Result<()> {
         validate_protection_style_collection(&candidate)?;
         for style in &candidate {
             if let Some(conditional) = self
@@ -755,7 +752,9 @@ impl MutableSpreadsheet {
     }
 
     fn validate_named_definitions(&self) -> Result<()> {
-        crate::ods::named_expression::validate_named_definition_collection(&self.named_definitions)?;
+        crate::ods::named_expression::validate_named_definition_collection(
+            &self.named_definitions,
+        )?;
         for (index, definition) in self.named_definitions.iter().enumerate() {
             definition.validate()?;
             self.validate_scope(definition.scope())?;
@@ -1846,8 +1845,7 @@ impl MutableSpreadsheet {
         let sheet = self.sheets.get_mut(sheet_index).ok_or_else(|| {
             litchi_core::Error::InvalidFormat(format!("Sheet index {sheet_index} out of bounds"))
         })?;
-        Ok((index < sheet.sparkline_groups.len())
-            .then(|| sheet.sparkline_groups.remove(index)))
+        Ok((index < sheet.sparkline_groups.len()).then(|| sheet.sparkline_groups.remove(index)))
     }
 
     /// Add an inert image to a sheet's `table:shapes` container.
@@ -1924,7 +1922,9 @@ impl MutableSpreadsheet {
             // Picture numbering is global: a stem taken by any supported
             // extension blocks the whole index.
             let taken = |path: &str| {
-                self.pending_images.iter().any(|pending| pending.path == path)
+                self.pending_images
+                    .iter()
+                    .any(|pending| pending.path == path)
                     || self
                         .source_package
                         .as_ref()
@@ -2215,9 +2215,7 @@ impl MutableSpreadsheet {
     }
 
     /// Return the authored spreadsheet change-tracking state, when present.
-    pub fn tracked_changes(
-        &self,
-    ) -> Option<&super::tracked_changes::SpreadsheetTrackedChanges> {
+    pub fn tracked_changes(&self) -> Option<&super::tracked_changes::SpreadsheetTrackedChanges> {
         self.tracked_changes.as_ref()
     }
 
@@ -2307,10 +2305,7 @@ impl MutableSpreadsheet {
     /// Generate content.xml from current state.
     fn generate_content_xml(&self) -> Result<String> {
         let mut body = String::new();
-        super::tracked_changes::write_tracked_changes(
-            &mut body,
-            self.tracked_changes.as_ref(),
-        )?;
+        super::tracked_changes::write_tracked_changes(&mut body, self.tracked_changes.as_ref())?;
         write_calculation_settings(&mut body, self.calculation_settings.as_ref())?;
         write_content_validations(&mut body, &self.content_validations);
         write_label_ranges(&mut body, &self.label_ranges)?;
@@ -3448,7 +3443,11 @@ mod tests {
         let width = crate::odt::OdfLength::centimeters(1.0);
         let height = crate::odt::OdfLength::centimeters(1.0);
         // Unsupported payload formats are rejected.
-        assert!(mutable.insert_image(0, 0, 0, b"BM bitmap", &width, &height).is_err());
+        assert!(
+            mutable
+                .insert_image(0, 0, 0, b"BM bitmap", &width, &height)
+                .is_err()
+        );
         // Sheet and cell bounds are enforced.
         assert!(
             mutable
@@ -3457,12 +3456,26 @@ mod tests {
         );
         assert!(
             mutable
-                .insert_image(0, MAX_EXPANDED_ROWS_PER_SHEET, 0, b"\x89PNG\r\n\x1a\n", &width, &height)
+                .insert_image(
+                    0,
+                    MAX_EXPANDED_ROWS_PER_SHEET,
+                    0,
+                    b"\x89PNG\r\n\x1a\n",
+                    &width,
+                    &height
+                )
                 .is_err()
         );
         assert!(
             mutable
-                .insert_image(0, 0, MAX_EXPANDED_COLUMNS_PER_SHEET, b"\x89PNG\r\n\x1a\n", &width, &height)
+                .insert_image(
+                    0,
+                    0,
+                    MAX_EXPANDED_COLUMNS_PER_SHEET,
+                    b"\x89PNG\r\n\x1a\n",
+                    &width,
+                    &height
+                )
                 .is_err()
         );
         // Nothing was staged by the rejected inserts.

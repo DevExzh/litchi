@@ -132,13 +132,7 @@ fn parse_part(
                         );
                     }
                     register_reference(
-                        &reader,
-                        element,
-                        part,
-                        scope,
-                        references,
-                        scopes,
-                        aggregate,
+                        &reader, element, part, scope, references, scopes, aggregate,
                     )?;
                     pending = Some(PendingElement { depth: depth + 1 });
                 }
@@ -195,13 +189,7 @@ fn parse_part(
                         );
                     }
                     register_reference(
-                        &reader,
-                        element,
-                        part,
-                        scope,
-                        references,
-                        scopes,
-                        aggregate,
+                        &reader, element, part, scope, references, scopes, aggregate,
                     )?;
                 }
                 if let Some(active) = scope.as_mut()
@@ -214,7 +202,10 @@ fn parse_part(
                 }
             },
             Event::End(_) => {
-                if pending.as_ref().is_some_and(|pending| pending.depth == depth) {
+                if pending
+                    .as_ref()
+                    .is_some_and(|pending| pending.depth == depth)
+                {
                     pending = None;
                 }
                 if scope.as_ref().is_some_and(|active| active.depth == depth) {
@@ -228,9 +219,9 @@ fn parse_part(
                     .ok_or_else(|| make_error("auto-mark-file XML frame stack underflow"))?;
             },
             Event::Text(ref text) => {
-                let value = text.decode().map_err(|error| {
-                    make_error(format!("invalid auto-mark-file text: {error}"))
-                })?;
+                let value = text
+                    .decode()
+                    .map_err(|error| make_error(format!("invalid auto-mark-file text: {error}")))?;
                 if pending.is_some() && !value.is_empty() {
                     return invalid("text:alphabetical-index-auto-mark-file must be empty");
                 }
@@ -269,9 +260,7 @@ fn register_reference(
         return invalid("duplicate text:alphabetical-index-auto-mark-file in one office:text");
     }
     if scope.last_rank >= RANK_OTHER_CONTENT {
-        return invalid(
-            "text:alphabetical-index-auto-mark-file must precede document content",
-        );
+        return invalid("text:alphabetical-index-auto-mark-file must precede document content");
     }
     scope.seen_auto_mark_file = true;
 
@@ -280,14 +269,16 @@ fn register_reference(
     let href = required_nonempty(&attributes, XLINK, "href")?;
     match get(&attributes, XLINK, "type") {
         Some("simple") => {},
-        _ => return invalid("text:alphabetical-index-auto-mark-file requires xlink:type=\"simple\""),
+        _ => {
+            return invalid(
+                "text:alphabetical-index-auto-mark-file requires xlink:type=\"simple\"",
+            );
+        },
     }
 
     let scope_value = OdfVariableScope::Body(OdfVariableBody::Text);
     if !scopes.insert((part, scope_value.clone())) {
-        return invalid(
-            "duplicate text:alphabetical-index-auto-mark-file in one document part",
-        );
+        return invalid("duplicate text:alphabetical-index-auto-mark-file in one document part");
     }
     if references.len() >= MAX_OCCURRENCES {
         return invalid(format!(
@@ -337,12 +328,9 @@ fn collect_attributes(
 fn reject_unexpected(attributes: &Attributes) -> Result<()> {
     let allowed = [(XLINK, "href"), (XLINK, "type")];
     for (namespace, local) in attributes.keys() {
-        if !allowed
-            .iter()
-            .any(|(allowed_namespace, allowed_local)| {
-                namespace == allowed_namespace && local == allowed_local
-            })
-            && matches!(namespace.as_str(), OFFICE | TEXT | XLINK)
+        if !allowed.iter().any(|(allowed_namespace, allowed_local)| {
+            namespace == allowed_namespace && local == allowed_local
+        }) && matches!(namespace.as_str(), OFFICE | TEXT | XLINK)
         {
             return invalid(format!(
                 "unexpected auto-mark-file attribute {namespace}:{local}"
@@ -439,10 +427,16 @@ mod tests {
     #[test]
     fn rejects_missing_or_invalid_xlink_metadata() {
         assert!(parse(r#"<t:alphabetical-index-auto-mark-file xlink:type="simple"/>"#).is_err());
-        assert!(parse(r#"<t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href=""/>"#).is_err());
+        assert!(
+            parse(r#"<t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href=""/>"#)
+                .is_err()
+        );
         assert!(parse(r#"<t:alphabetical-index-auto-mark-file xlink:href="a.sdi"/>"#).is_err());
         assert!(
-            parse(r#"<t:alphabetical-index-auto-mark-file xlink:type="extended" xlink:href="a.sdi"/>"#).is_err()
+            parse(
+                r#"<t:alphabetical-index-auto-mark-file xlink:type="extended" xlink:href="a.sdi"/>"#
+            )
+            .is_err()
         );
         assert!(
             parse(r#"<t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="a.sdi" o:track-changes="true"/>"#).is_err()
@@ -474,7 +468,10 @@ mod tests {
         );
         // Wrong namespace spelling of the element.
         assert!(
-            parse(r#"<o:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="a.sdi"/>"#).is_err()
+            parse(
+                r#"<o:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="a.sdi"/>"#
+            )
+            .is_err()
         );
     }
 }

@@ -1,6 +1,3 @@
-use litchi_ooxml_common::xml::{
-    decode_xml_reference, extract_omml_formulas, omml_formula_xml, scan_omml_formula_ranges,
-};
 use crate::docx::drawing::{DrawingObject, parse_drawing_objects};
 use crate::docx::hyperlink::Hyperlink;
 use crate::docx::image::{InlineImage, parse_inline_images};
@@ -17,6 +14,9 @@ use crate::error::{OoxmlError, Result};
 /// Paragraph and Run structures for Word documents.
 use litchi_core::VerticalPosition;
 use litchi_core::XmlSlice;
+use litchi_ooxml_common::xml::{
+    decode_xml_reference, extract_omml_formulas, omml_formula_xml, scan_omml_formula_ranges,
+};
 use litchi_opc::rel::Relationships;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, QName, ResolveResult};
@@ -472,7 +472,7 @@ impl Paragraph {
         }
     }
 
-    /// Create a Paragraph from an Arc<Vec<u8>> and byte range.
+    /// Create a Paragraph from an `Arc<Vec<u8>>` and byte range.
     ///
     /// This is a convenience method for arena-based parsing.
     #[inline]

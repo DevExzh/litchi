@@ -915,8 +915,8 @@ impl MutableWorksheet {
     /// Column widths are character-width units of the workbook's normal font
     /// (`col@width`, ECMA-376 §18.3.1.13). Without font metrics this uses
     /// the same character-count heuristic as Excel's "best fit": the longest
-    /// display text in the column plus [`AUTO_SIZE_PADDING_CHARS`], clamped
-    /// to [`MAX_COLUMN_WIDTH_CHARS`]. Rich-text cells are measured as the
+    /// display text in the column plus `AUTO_SIZE_PADDING_CHARS`, clamped
+    /// to `MAX_COLUMN_WIDTH_CHARS`. Rich-text cells are measured as the
     /// sum of their run texts (ECMA-376 §18.4.4); formula cells are measured
     /// by their cached result when present, otherwise by the formula text.
     ///

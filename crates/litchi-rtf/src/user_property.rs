@@ -135,7 +135,8 @@ impl UserPropertyDateTime {
                 "RTF date user property is outside its valid range".to_string(),
             ));
         }
-        let leap = self.year % 4 == 0 && (self.year % 100 != 0 || self.year % 400 == 0);
+        let leap = self.year.is_multiple_of(4)
+            && (!self.year.is_multiple_of(100) || self.year.is_multiple_of(400));
         let max_day = match self.month {
             2 if leap => 29,
             2 => 28,
@@ -295,11 +296,12 @@ impl<'a> UserPropertyValue<'a> {
                     "RTF date user-property lexical and typed values disagree".to_string(),
                 ))
             },
-            Self::Unknown { type_code: 3 | 5 | 11 | 30 | 64, .. } => {
-                Err(RtfError::MalformedDocument(
-                    "known RTF user-property type cannot use Unknown".to_string(),
-                ))
-            },
+            Self::Unknown {
+                type_code: 3 | 5 | 11 | 30 | 64,
+                ..
+            } => Err(RtfError::MalformedDocument(
+                "known RTF user-property type cannot use Unknown".to_string(),
+            )),
             _ => Ok(()),
         }
     }

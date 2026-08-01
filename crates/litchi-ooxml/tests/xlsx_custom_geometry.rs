@@ -6,9 +6,9 @@ use litchi_ooxml::xlsx::writer::XlsxShapeSpec;
 use litchi_ooxml::xlsx::{
     Workbook, XlsxAdjustHandle, XlsxAdjustValue, XlsxCellMarker, XlsxConnectionSite,
     XlsxCustomGeometry, XlsxDrawingObject, XlsxEditAs, XlsxEmu, XlsxGeometryFormula,
-    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle,
-    XlsxPathCommand, XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxShapeAnchor,
-    XlsxXyAdjustHandle, parse_drawing_shapes,
+    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
+    XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxShapeAnchor, XlsxXyAdjustHandle,
+    parse_drawing_shapes,
 };
 
 const XDR_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -56,7 +56,10 @@ fn two_cell() -> XlsxShapeAnchor {
 /// path with every command kind plus non-default path attributes.
 fn full_geometry() -> XlsxCustomGeometry {
     XlsxCustomGeometry {
-        adjust_values: vec![XlsxGeometryGuide::new("adj1", XlsxGeometryFormula::literal(50))],
+        adjust_values: vec![XlsxGeometryGuide::new(
+            "adj1",
+            XlsxGeometryFormula::literal(50),
+        )],
         guides: vec![
             XlsxGeometryGuide::new("x1", "*/ adj1 21600 100".parse().unwrap()),
             XlsxGeometryGuide::new("y1", "pin 0 x1 21600".parse().unwrap()),
@@ -98,9 +101,7 @@ fn full_geometry() -> XlsxCustomGeometry {
         paths: vec![
             XlsxGeometryPath::new(21_600, 21_600)
                 .with_command(XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(0, 10_800)))
-                .with_command(XlsxPathCommand::LineTo(XlsxGeometryPoint::new(
-                    10_800, 0,
-                )))
+                .with_command(XlsxPathCommand::LineTo(XlsxGeometryPoint::new(10_800, 0)))
                 .with_command(XlsxPathCommand::ArcTo {
                     width_radius: value(10_800),
                     height_radius: value(10_800),
@@ -169,7 +170,10 @@ fn parses_custom_geometry_from_drawing_xml() {
 
     assert_eq!(
         geometry.adjust_values,
-        vec![XlsxGeometryGuide::new("adj1", XlsxGeometryFormula::literal(50))]
+        vec![XlsxGeometryGuide::new(
+            "adj1",
+            XlsxGeometryFormula::literal(50)
+        )]
     );
     assert_eq!(
         geometry.guides,
@@ -365,7 +369,10 @@ fn validation_rejects_invalid_authored_geometry() {
     assert!(worksheet.add_shape(empty).is_err());
 
     let numeric_guide = XlsxCustomGeometry::new()
-        .with_adjust_value(XlsxGeometryGuide::new("123", XlsxGeometryFormula::literal(1)))
+        .with_adjust_value(XlsxGeometryGuide::new(
+            "123",
+            XlsxGeometryFormula::literal(1),
+        ))
         .with_path(
             XlsxGeometryPath::new(0, 0)
                 .with_command(XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(0, 0))),

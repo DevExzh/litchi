@@ -147,9 +147,9 @@ pub fn parse_custom_xml_transform(
     let start =
         usize::try_from(offset).map_err(|_| corrupted("fcCustomXForm offset exceeds usize"))?;
     let end = start
-        .checked_add(usize::try_from(length).map_err(|_| {
-            corrupted("fcCustomXForm length exceeds usize")
-        })?)
+        .checked_add(
+            usize::try_from(length).map_err(|_| corrupted("fcCustomXForm length exceeds usize"))?,
+        )
         .ok_or_else(|| corrupted("fcCustomXForm range overflows"))?;
     let data = table_stream
         .get(start..end)
@@ -190,17 +190,15 @@ fn parse_xsdr(data: &[u8]) -> Result<(XmlSchemaReference, usize)> {
 
 /// Parse a 16-bit length-prefixed UTF-16 string that is not null-terminated
 /// (MS-DOC 2.9.352), advancing `offset` past it.
-fn parse_length_prefixed_string(
-    data: &[u8],
-    offset: &mut usize,
-    field: &str,
-) -> Result<String> {
+fn parse_length_prefixed_string(data: &[u8], offset: &mut usize, field: &str) -> Result<String> {
     let chars = usize::from(read_u16(data, *offset, field)?);
     let start = *offset + 2;
     let end = start
-        .checked_add(chars.checked_mul(2).ok_or_else(|| {
-            corrupted(format!("{field} byte length overflows"))
-        })?)
+        .checked_add(
+            chars
+                .checked_mul(2)
+                .ok_or_else(|| corrupted(format!("{field} byte length overflows")))?,
+        )
         .ok_or_else(|| corrupted(format!("{field} range overflows")))?;
     let bytes = data
         .get(start..end)
@@ -222,7 +220,8 @@ fn parse_string_table(data: &[u8], offset: &mut usize, name: &str) -> Result<Vec
     if count > MAX_SIGNED_COUNT {
         return Err(corrupted(format!("{name} cData is negative")));
     }
-    let count = usize::try_from(count).map_err(|_| corrupted(format!("{name} count exceeds usize")))?;
+    let count =
+        usize::try_from(count).map_err(|_| corrupted(format!("{name} count exceeds usize")))?;
     let extra = usize::from(read_u16(data, *offset + 6, "STTB cbExtra")?);
     let minimum_entry = 2usize
         .checked_add(extra)
@@ -239,9 +238,11 @@ fn parse_string_table(data: &[u8], offset: &mut usize, name: &str) -> Result<Vec
         let chars = usize::from(read_u16(data, cursor, "STTB cchData")?);
         let start = cursor + 2;
         let end = start
-            .checked_add(chars.checked_mul(2).ok_or_else(|| {
-                corrupted(format!("{name} string byte length overflows"))
-            })?)
+            .checked_add(
+                chars
+                    .checked_mul(2)
+                    .ok_or_else(|| corrupted(format!("{name} string byte length overflows")))?,
+            )
             .ok_or_else(|| corrupted(format!("{name} string range overflows")))?;
         let bytes = data
             .get(start..end)
@@ -375,10 +376,7 @@ mod tests {
             xsdr("urn:two", "urn:manifest", &["only"], &[]),
         ]);
         set_fib_pointer(&mut fib_data, HPLXSDR, 0, table.len() as u32);
-        (
-            FileInformationBlock::parse(&fib_data).unwrap(),
-            table,
-        )
+        (FileInformationBlock::parse(&fib_data).unwrap(), table)
     }
 
     #[test]

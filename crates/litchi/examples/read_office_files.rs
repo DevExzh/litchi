@@ -242,7 +242,7 @@ fn demo_pptx_reading() -> Result<(), Box<dyn std::error::Error>> {
                 // Extract text
                 let text = slide.text()?;
                 let preview = if text.len() > 80 {
-                    format!("{}...", &text[..80].replace('\n', " "))
+                    format!("{}...", text[..80].replace('\n', " "))
                 } else {
                     text.replace('\n', " ")
                 };

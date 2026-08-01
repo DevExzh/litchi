@@ -240,7 +240,8 @@ fn parse_infos(data: &[u8]) -> Result<Vec<StructuredTagInfo>> {
     if count > MAX_TAGS {
         return Err(corrupted("SttbfBkmkSdt contains too many entries"));
     }
-    let count = usize::try_from(count).map_err(|_| corrupted("SttbfBkmkSdt count exceeds usize"))?;
+    let count =
+        usize::try_from(count).map_err(|_| corrupted("SttbfBkmkSdt count exceeds usize"))?;
     if count > (data.len() - 8) / MIN_ENTRY_SIZE {
         return Err(corrupted(
             "SttbfBkmkSdt byte length does not match its count",
@@ -315,7 +316,8 @@ fn parse_sdti(data: &[u8]) -> Result<(StructuredTagInfo, usize)> {
     let placeholder_end = offset
         .checked_add(placeholder_bytes)
         .ok_or_else(|| corrupted("SDTI placeholder range overflows"))?;
-    let placeholder = parse_terminated_string(data, offset, placeholder_end, "SDTI xszPlaceholder")?;
+    let placeholder =
+        parse_terminated_string(data, offset, placeholder_end, "SDTI xszPlaceholder")?;
 
     Ok((
         StructuredTagInfo {
@@ -418,7 +420,7 @@ fn parse_end_plcf(data: &[u8]) -> Result<Vec<(u32, EndData)>> {
 }
 
 fn plcf_count(data: &[u8], property_size: usize, name: &str) -> Result<usize> {
-    if data.len() < 4 || (data.len() - 4) % (4 + property_size) != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(4 + property_size) {
         return Err(corrupted(format!("{name} has an invalid byte length")));
     }
     Ok((data.len() - 4) / (4 + property_size))
@@ -544,7 +546,12 @@ mod tests {
         ]);
         let infos_offset = table.len() as u32;
         table.extend_from_slice(&infos);
-        set_fib_pointer(&mut fib_data, STTBF_BKMK_SDT, infos_offset, infos.len() as u32);
+        set_fib_pointer(
+            &mut fib_data,
+            STTBF_BKMK_SDT,
+            infos_offset,
+            infos.len() as u32,
+        );
 
         let starts_offset = table.len();
         for cp in [1u32, 2, 11] {

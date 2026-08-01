@@ -185,10 +185,7 @@ pub(crate) fn validate_presentation_page_references(
     }
     for show in &settings.custom_shows {
         for name in &show.pages {
-            validate_reference(
-                name,
-                &format!("custom presentation show '{}'", show.name),
-            )?;
+            validate_reference(name, &format!("custom presentation show '{}'", show.name))?;
         }
     }
     Ok(())

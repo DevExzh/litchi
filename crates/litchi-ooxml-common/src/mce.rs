@@ -453,74 +453,72 @@ fn start(
     c.preserve_attributes.extend(local_preserve_attributes);
     c.opaque = caps.extensions.contains(&name);
 
-    if let Some(parent) = st.last_mut() {
-        if let Mode::Alt {
+    if let Some(parent) = st.last_mut()
+        && let Mode::Alt {
             choices,
             selected,
             fallback,
         } = &mut parent.mode
-        {
-            if name.namespace != MCE_NAMESPACE {
-                return Err(bad("non-MCE AlternateContent child"));
-            }
-            let (active, mode) = match name.local_name.as_str() {
-                "Choice" => {
-                    if *fallback {
-                        return Err(bad("Choice after Fallback"));
-                    }
-                    *choices += 1;
-                    if *choices > lim.max_choices_per_alternate {
-                        return Err(limit("choices"));
-                    }
-                    let req =
-                        attr(&raw, "Requires")?.ok_or_else(|| bad("Choice lacks Requires"))?;
-                    let mut ok = true;
-                    let mut count = 0;
-                    for p in req.split_whitespace() {
-                        if !valid_ncname(p) {
-                            return Err(bad("invalid Requires prefix"));
-                        }
-                        count += 1;
-                        ok &= caps.understands(
-                            c.ns.get(p)
-                                .ok_or_else(|| bad(format!("unbound Requires {p}")))?,
-                        )
-                    }
-                    if count == 0 {
-                        return Err(bad("empty Requires"));
-                    }
-                    let a = parent.active && !*selected && ok;
-                    if a {
-                        *selected = true;
-                        rep.selected_choices += 1
-                    }
-                    (a, Mode::Branch)
-                },
-                "Fallback" => {
-                    if *fallback {
-                        return Err(bad("duplicate Fallback"));
-                    }
-                    *fallback = true;
-                    let a = parent.active && !*selected;
-                    if a {
-                        *selected = true;
-                        rep.selected_fallbacks += 1
-                    }
-                    (a, Mode::Branch)
-                },
-                _ => return Err(bad("invalid AlternateContent child")),
-            };
-            return close(
-                st,
-                Frame {
-                    ctx: c,
-                    mode,
-                    active,
-                },
-                empty,
-                out,
-            );
+    {
+        if name.namespace != MCE_NAMESPACE {
+            return Err(bad("non-MCE AlternateContent child"));
         }
+        let (active, mode) = match name.local_name.as_str() {
+            "Choice" => {
+                if *fallback {
+                    return Err(bad("Choice after Fallback"));
+                }
+                *choices += 1;
+                if *choices > lim.max_choices_per_alternate {
+                    return Err(limit("choices"));
+                }
+                let req = attr(&raw, "Requires")?.ok_or_else(|| bad("Choice lacks Requires"))?;
+                let mut ok = true;
+                let mut count = 0;
+                for p in req.split_whitespace() {
+                    if !valid_ncname(p) {
+                        return Err(bad("invalid Requires prefix"));
+                    }
+                    count += 1;
+                    ok &= caps.understands(
+                        c.ns.get(p)
+                            .ok_or_else(|| bad(format!("unbound Requires {p}")))?,
+                    )
+                }
+                if count == 0 {
+                    return Err(bad("empty Requires"));
+                }
+                let a = parent.active && !*selected && ok;
+                if a {
+                    *selected = true;
+                    rep.selected_choices += 1
+                }
+                (a, Mode::Branch)
+            },
+            "Fallback" => {
+                if *fallback {
+                    return Err(bad("duplicate Fallback"));
+                }
+                *fallback = true;
+                let a = parent.active && !*selected;
+                if a {
+                    *selected = true;
+                    rep.selected_fallbacks += 1
+                }
+                (a, Mode::Branch)
+            },
+            _ => return Err(bad("invalid AlternateContent child")),
+        };
+        return close(
+            st,
+            Frame {
+                ctx: c,
+                mode,
+                active,
+            },
+            empty,
+            out,
+        );
     }
     let mut active = parent_active;
     let mode = if name.namespace == MCE_NAMESPACE {

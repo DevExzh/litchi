@@ -196,9 +196,7 @@ impl DocumentFormatConsistencyMarks {
 
         let mut used_end_indexes = HashSet::with_capacity(starts.len());
         let mut marks = Vec::with_capacity(starts.len());
-        for (start_index, ((start, start_data), info)) in
-            starts.iter().zip(&infos).enumerate()
-        {
+        for (start_index, ((start, start_data), info)) in starts.iter().zip(&infos).enumerate() {
             let end_index = usize::from(start_data.end_index);
             if end_index >= ends.len() || !used_end_indexes.insert(end_index) {
                 return Err(corrupted(
@@ -341,7 +339,9 @@ fn parse_start_plcf(data: &[u8]) -> Result<Vec<(u32, StartData)>> {
         let property = properties + index * 6;
         let bkc = read_u16(data, property + 2, "format consistency-checker BKC")?;
         if bkc & BKC_F_PUB != 0 {
-            return Err(corrupted("format consistency-checker BKC fPub must be zero"));
+            return Err(corrupted(
+                "format consistency-checker BKC fPub must be zero",
+            ));
         }
         let column_range = if bkc & BKC_F_COL != 0 {
             let first = (bkc & BKC_ITC_FIRST_MASK) as u8;
@@ -390,7 +390,7 @@ fn parse_end_plcf(data: &[u8]) -> Result<Vec<(u32, EndData)>> {
 }
 
 fn plcf_count(data: &[u8], property_size: usize, name: &str) -> Result<usize> {
-    if data.len() < 4 || (data.len() - 4) % (4 + property_size) != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(4 + property_size) {
         return Err(corrupted(format!("{name} has an invalid byte length")));
     }
     Ok((data.len() - 4) / (4 + property_size))
@@ -501,7 +501,12 @@ mod tests {
         ]);
         let infos_offset = table.len() as u32;
         table.extend_from_slice(&infos);
-        set_fib_pointer(&mut fib_data, STTBF_BKMK_FCC, infos_offset, infos.len() as u32);
+        set_fib_pointer(
+            &mut fib_data,
+            STTBF_BKMK_FCC,
+            infos_offset,
+            infos.len() as u32,
+        );
 
         let starts_offset = table.len();
         for cp in [1u32, 2, 11] {
@@ -637,9 +642,7 @@ mod tests {
         assert!(parse_infos(&info_table(&[dpcid(7, 12, 0, 0)])).is_err());
 
         // Duplicate ids.
-        assert!(
-            parse_infos(&info_table(&[dpcid(7, 0, 0, 0), dpcid(7, 2, 0, 0)])).is_err()
-        );
+        assert!(parse_infos(&info_table(&[dpcid(7, 0, 0, 0), dpcid(7, 2, 0, 0)])).is_err());
 
         // Wrong cchData.
         let mut wrong_chars = info_table(&[dpcid(7, 0, 0, 0)]);

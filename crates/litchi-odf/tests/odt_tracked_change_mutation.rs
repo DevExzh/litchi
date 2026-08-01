@@ -13,7 +13,11 @@ fn change(id: &str, kind: ChangeType) -> TrackChange {
         change_type: kind,
         style_name: (kind == ChangeType::FormatChange).then(|| "Changed Style".to_string()),
         merge_last_paragraph: (kind == ChangeType::Deletion).then_some(false),
-        content: if kind == ChangeType::Deletion { "deleted 😀 text\nnext".to_string() } else { Default::default() },
+        content: if kind == ChangeType::Deletion {
+            "deleted 😀 text\nnext".to_string()
+        } else {
+            Default::default()
+        },
     }
 }
 
@@ -36,16 +40,13 @@ fn marks_a_styled_span_inside_a_table_cell_without_rewriting_markup() {
     };
     let mut end = start.clone();
     end.character = 3;
-    let marked = mark_tracked_change_range_xml(&with_declaration, "insert_1", &start, &end)
-        .unwrap();
+    let marked =
+        mark_tracked_change_range_xml(&with_declaration, "insert_1", &start, &end).unwrap();
     assert!(marked.contains(r#"<text:span text:style-name="Em">😀B"#));
     assert!(marked.contains("text:change-start"));
     assert!(marked.contains("text:change-end"));
 
-    let duplicate_xml_id = marked.replace(
-        "<text:p>",
-        "<text:p xml:id=\"insert_1\">",
-    );
+    let duplicate_xml_id = marked.replace("<text:p>", "<text:p xml:id=\"insert_1\">");
     assert!(set_tracked_changes_xml(&duplicate_xml_id, Some(&tracked)).is_err());
 }
 
@@ -118,7 +119,10 @@ fn declaration_and_marker_mutations_roll_back_atomically() {
             .mark_tracked_change_range("format_1", position(0, 2), position(0, 5))
             .is_err()
     );
-    assert_eq!(document.tracked_changes().unwrap().changes[0].content, "bcd");
+    assert_eq!(
+        document.tracked_changes().unwrap().changes[0].content,
+        "bcd"
+    );
 
     assert!(
         document
@@ -126,7 +130,9 @@ fn declaration_and_marker_mutations_roll_back_atomically() {
             .is_err()
     );
     let mut duplicate = declarations();
-    duplicate.changes.push(change("insert_1", ChangeType::Insertion));
+    duplicate
+        .changes
+        .push(change("insert_1", ChangeType::Insertion));
     assert!(document.set_tracked_changes(duplicate).is_err());
     assert_eq!(document.tracked_changes().unwrap().changes.len(), 3);
 
@@ -136,12 +142,20 @@ fn declaration_and_marker_mutations_roll_back_atomically() {
             .is_err()
     );
     assert_eq!(
-        document.tracked_changes().unwrap().protection_key.as_deref(),
+        document
+            .tracked_changes()
+            .unwrap()
+            .protection_key
+            .as_deref(),
         Some("YWJj")
     );
 
     document.unmark_tracked_change("insert_1").unwrap();
-    assert!(document.tracked_changes().unwrap().changes[0].content.is_empty());
+    assert!(
+        document.tracked_changes().unwrap().changes[0]
+            .content
+            .is_empty()
+    );
     let removed = document.remove_tracked_change("format_1").unwrap();
     assert_eq!(removed.id, "format_1");
     document.clear_tracked_changes().unwrap();

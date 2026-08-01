@@ -980,7 +980,7 @@ pub struct XlsRrTabId {
 impl XlsRrTabId {
     /// Parse the record payload, an array of 2-byte sheet identifiers.
     pub fn parse_payload(data: &[u8]) -> XlsResult<Self> {
-        if data.len() % 2 != 0 {
+        if !data.len().is_multiple_of(2) {
             return Err(invalid(
                 RR_TAB_ID_RECORD_TYPE,
                 "RRTabId payload has an odd byte count",
@@ -1447,15 +1447,15 @@ impl XlsRrdChgCell {
             XlsRevisionCellContent::BoolError => Some(2),
             XlsRevisionCellContent::RichExtendedString | XlsRevisionCellContent::Formula => None,
         };
-        if let Some(expected) = expected_old_size {
-            if old_value_size != expected {
-                return Err(invalid(
-                    RRD_CHG_CELL_RECORD_TYPE,
-                    format!(
-                        "RRDChgCell cbOldVal is {old_value_size}; expected {expected} for the old content type"
-                    ),
-                ));
-            }
+        if let Some(expected) = expected_old_size
+            && old_value_size != expected
+        {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                format!(
+                    "RRDChgCell cbOldVal is {old_value_size}; expected {expected} for the old content type"
+                ),
+            ));
         }
         if old_content == XlsRevisionCellContent::Formula && old_value_size < MIN_FORMULA_VALUE_LEN
         {

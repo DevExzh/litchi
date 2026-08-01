@@ -324,7 +324,7 @@ impl Brush {
     ///
     /// Returns either a color value, "none", or a pattern reference.
     /// For hatched brushes, returns a pattern reference that must be
-    /// defined in the SVG <defs> section.
+    /// defined in the SVG `<defs>` section.
     pub fn to_svg_fill(&self) -> String {
         match self.style {
             BrushStyle::Null => "none".to_string(),
@@ -357,7 +357,7 @@ impl Brush {
     /// Generate SVG pattern definition for hatched brush
     ///
     /// This should be called to generate the pattern definition that goes
-    /// in the <defs> section of the SVG document.
+    /// in the `<defs>` section of the SVG document.
     ///
     /// # Arguments
     /// * `pattern_id` - Unique ID for this pattern

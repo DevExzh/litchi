@@ -43,11 +43,7 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 /// Validate an `FrtHeader` (MS-XLS 2.5.135): the `rt` field and the
 /// `fFrtRef`/`fFrtAlert` bits that MUST be zero, returning the raw flags
 /// word and reserved bytes.
-fn validate_frt_header(
-    data: &[u8],
-    record_type: u16,
-    name: &str,
-) -> XlsResult<(u16, [u8; 8])> {
+fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> XlsResult<(u16, [u8; 8])> {
     if data.len() < FRT_HEADER_LEN {
         return Err(XlsError::InvalidLength {
             expected: FRT_HEADER_LEN,
@@ -55,7 +51,10 @@ fn validate_frt_header(
         });
     }
     if u16::from_le_bytes([data[0], data[1]]) != record_type {
-        return Err(invalid(record_type, format!("{name} FrtHeader.rt mismatch")));
+        return Err(invalid(
+            record_type,
+            format!("{name} FrtHeader.rt mismatch"),
+        ));
     }
     let flags = u16::from_le_bytes([data[2], data[3]]);
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
@@ -64,7 +63,10 @@ fn validate_frt_header(
             format!("{name} FrtHeader.grbitFrt {flags:#06X} sets fFrtRef or fFrtAlert"),
         ));
     }
-    Ok((flags, data[4..FRT_HEADER_LEN].try_into().expect("length checked")))
+    Ok((
+        flags,
+        data[4..FRT_HEADER_LEN].try_into().expect("length checked"),
+    ))
 }
 
 /// Typed `DataLabExt` record content (MS-XLS 2.4.75): the beginning of an
@@ -160,8 +162,11 @@ impl XlsDataLabExtContents {
                 found: data.len(),
             });
         }
-        let (frt_flags, frt_reserved) =
-            validate_frt_header(data, DATA_LAB_EXT_CONTENTS_RECORD_TYPE, "DataLabExtContents")?;
+        let (frt_flags, frt_reserved) = validate_frt_header(
+            data,
+            DATA_LAB_EXT_CONTENTS_RECORD_TYPE,
+            "DataLabExtContents",
+        )?;
         let separator_len = u16::from_le_bytes([data[14], data[15]]);
         // MS-XLS 2.5.295: st MUST exist if and only if cch is greater than
         // zero; MS-XLS 2.5.296: rgb holds cch or 2*cch bytes.
@@ -268,7 +273,10 @@ impl XlsDataLabExtContents {
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
                 .collect()
         } else {
-            self.separator_bytes.iter().map(|byte| u16::from(*byte)).collect()
+            self.separator_bytes
+                .iter()
+                .map(|byte| u16::from(*byte))
+                .collect()
         };
         String::from_utf16(&units).unwrap_or_default()
     }
@@ -303,7 +311,10 @@ mod tests {
         // Reserved header bytes round-trip verbatim.
         let mut reserved = bytes.clone();
         reserved[4..FRT_HEADER_LEN].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(XlsDataLabExt::parse(&reserved).unwrap().to_payload(), reserved);
+        assert_eq!(
+            XlsDataLabExt::parse(&reserved).unwrap().to_payload(),
+            reserved
+        );
     }
 
     #[test]

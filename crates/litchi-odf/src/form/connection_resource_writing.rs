@@ -339,19 +339,15 @@ fn scan_document(xml: &str) -> Result<ScanResult> {
                 if active_resource
                     .as_ref()
                     .is_some_and(|active| active.depth == depth)
-                {
-                    if let Some(index) = active_resource
+                    && let Some(index) = active_resource
                         .take()
                         .and_then(|active| active.result_index)
-                    {
-                        result.resources[index].end = end;
-                    }
-                }
-                if active_forms
-                    .last()
-                    .is_some_and(|index| result.forms[*index].depth == depth)
                 {
-                    let index = active_forms.pop().expect("checked above");
+                    result.resources[index].end = end;
+                }
+                if let Some(index) =
+                    active_forms.pop_if(|index| result.forms[*index].depth == depth)
+                {
                     result.forms[index].end_start = start;
                     result.forms[index].end = end;
                 }
@@ -368,12 +364,12 @@ fn scan_document(xml: &str) -> Result<ScanResult> {
                 }
                 if let Some(form_index) =
                     direct_form_parent(&active_forms, &result.forms, stack.len())
+                    && result.forms[form_index].has_resource
+                    && !value.trim().is_empty()
                 {
-                    if result.forms[form_index].has_resource && !value.trim().is_empty() {
-                        return Err(Error::InvalidFormat(
-                            "form:connection-resource must be the final form child".to_string(),
-                        ));
-                    }
+                    return Err(Error::InvalidFormat(
+                        "form:connection-resource must be the final form child".to_string(),
+                    ));
                 }
             },
             Event::CData(ref data) => {

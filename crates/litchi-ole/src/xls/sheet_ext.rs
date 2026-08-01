@@ -151,12 +151,19 @@ impl XlsSheetExt {
         } else {
             None
         };
-        Ok(Self { tab_color, optional })
+        Ok(Self {
+            tab_color,
+            optional,
+        })
     }
 
     /// Serialize back to a complete `SheetExt` record payload.
     pub(crate) fn to_payload(&self) -> Vec<u8> {
-        let cb = if self.optional.is_some() { CB_WITH_OPTIONAL } else { CB_BASE };
+        let cb = if self.optional.is_some() {
+            CB_WITH_OPTIONAL
+        } else {
+            CB_BASE
+        };
         let mut payload = Vec::with_capacity(cb as usize);
         // FrtHeader: rt, grbitFrt (0), reserved (0).
         payload.extend_from_slice(&SHEET_EXT_RECORD_TYPE.to_le_bytes());
@@ -179,7 +186,10 @@ impl XlsSheetExt {
 
     /// Construct a record carrying only a base tab color (writer path).
     pub(crate) fn from_tab_color(tab_color: Option<u8>) -> Self {
-        Self { tab_color, optional: None }
+        Self {
+            tab_color,
+            optional: None,
+        }
     }
 }
 

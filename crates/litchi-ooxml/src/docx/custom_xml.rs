@@ -1,8 +1,8 @@
+use crate::custom_xml_data::CustomXmlConformance;
 /// Custom XML parts support for Word documents.
 ///
 /// Custom XML parts allow storing arbitrary XML data within a Word document.
 use crate::error::Result;
-use crate::custom_xml_data::CustomXmlConformance;
 use litchi_opc::PackURI;
 use litchi_opc::part::Part;
 use std::collections::HashMap;

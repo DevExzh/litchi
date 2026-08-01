@@ -48,5 +48,8 @@ fn inserted_worksheet_keeps_workbook_order_after_round_trip() {
     // The inserted sheet keeps its own content at its new position.
     let inserted = reopened.worksheet_by_index(2).unwrap();
     let marker = inserted.cell_value(1, 1).unwrap();
-    assert_eq!(marker.as_ref(), &litchi_core::sheet::CellValue::String("marker".into()));
+    assert_eq!(
+        marker.as_ref(),
+        &litchi_core::sheet::CellValue::String("marker".into())
+    );
 }

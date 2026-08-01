@@ -1,9 +1,9 @@
 //! Strict OPC core-properties metadata extraction.
 
-use litchi_ooxml_common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use chrono::{DateTime, Utc};
 use litchi_core::Metadata;
+use litchi_ooxml_common::xml::decode_xml_reference;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use quick_xml::{

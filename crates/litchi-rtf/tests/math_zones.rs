@@ -30,7 +30,10 @@ fn parses_inline_fraction_with_properties_and_round_trips() {
     };
     assert_eq!(fraction.kind, MathStructureKind::Fraction);
     let properties = fraction.properties.as_ref().unwrap();
-    assert_eq!(properties.kind, MathPropertiesKind::Structure(MathStructureKind::Fraction));
+    assert_eq!(
+        properties.kind,
+        MathPropertiesKind::Structure(MathStructureKind::Fraction)
+    );
     assert_eq!(properties.properties.len(), 1);
     assert_eq!(properties.properties[0].name, MathPropertyName::Type);
     assert_eq!(properties.properties[0].value, "bar");
@@ -52,10 +55,8 @@ fn parses_inline_fraction_with_properties_and_round_trips() {
 
 #[test]
 fn parses_display_zone_with_paragraph_properties() {
-    let document = RtfDocument::parse(
-        r"{\rtf1{\mmathPara{\mmathParaPr{\mjc centerGroup}}{\mr x}}}",
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r"{\rtf1{\mmathPara{\mmathParaPr{\mjc centerGroup}}{\mr x}}}").unwrap();
     let zones = document.math_zones();
     assert_eq!(zones.len(), 1);
     assert_eq!(zones[0].kind, MathZoneKind::Display);
@@ -141,10 +142,9 @@ fn skips_mmath_pict_fallback_and_accepts_momath_aliases() {
 
 #[test]
 fn coexists_with_body_markup_positions() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1 ab{\mmath{\mr 1}}cd{\*\bkmkstart bm}ef{\*\bkmkend bm}}"#,
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r#"{\rtf1 ab{\mmath{\mr 1}}cd{\*\bkmkstart bm}ef{\*\bkmkend bm}}"#)
+            .unwrap();
     assert_eq!(document.text(), "abcdef");
     assert_eq!(document.math_zones()[0].position, 2);
     let bookmark = &document.bookmarks().bookmarks()[0];
@@ -183,9 +183,7 @@ fn typed_constructors_validate_structure() {
     // A fraction requires numerator and denominator children.
     assert!(MathStructure::new(MathStructureKind::Fraction, None, Vec::new()).is_err());
     // Property values reject control characters.
-    assert!(
-        litchi_rtf::MathProperty::new(MathPropertyName::Type, Cow::Borrowed("ba\rr")).is_err()
-    );
+    assert!(litchi_rtf::MathProperty::new(MathPropertyName::Type, Cow::Borrowed("ba\rr")).is_err());
 }
 
 #[test]
@@ -243,7 +241,10 @@ fn parses_matrix_columns_and_argument_properties() {
     assert_eq!(matrix_pr.matrix_columns.len(), 2);
     let first_column = matrix_pr.matrix_columns[0].properties.as_ref().unwrap();
     assert_eq!(first_column.kind, MathPropertiesKind::MatrixColumn);
-    assert_eq!(first_column.properties[0].name, MathPropertyName::MatrixCellCount);
+    assert_eq!(
+        first_column.properties[0].name,
+        MathPropertyName::MatrixCellCount
+    );
     assert_eq!(first_column.properties[0].value, "2");
     assert_eq!(
         first_column.properties[1].name,
@@ -299,7 +300,8 @@ fn rejects_misplaced_matrix_columns_and_argument_properties() {
 fn typed_constructors_validate_new_property_scopes() {
     use litchi_rtf::{MathProperties, MathProperty};
     use std::borrow::Cow;
-    let argument_size = MathProperty::new(MathPropertyName::ArgumentSize, Cow::Borrowed("2")).unwrap();
+    let argument_size =
+        MathProperty::new(MathPropertyName::ArgumentSize, Cow::Borrowed("2")).unwrap();
     // \margSz is only permitted inside \margPr.
     assert!(
         MathProperties::new(

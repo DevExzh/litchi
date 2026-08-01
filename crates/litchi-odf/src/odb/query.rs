@@ -1202,7 +1202,8 @@ pub(super) fn validate_date(value: &str) -> Result<()> {
     for byte in year {
         year_mod_400 = (year_mod_400 * 10 + u16::from(byte - b'0')) % 400;
     }
-    let leap = year_mod_400 % 4 == 0 && (year_mod_400 % 100 != 0 || year_mod_400 == 0);
+    let leap =
+        year_mod_400.is_multiple_of(4) && (!year_mod_400.is_multiple_of(100) || year_mod_400 == 0);
     let max_day = match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,

@@ -11,9 +11,9 @@ use litchi_odf::{
     Document, DocumentBuilder, FlatTextDocument, MutableDocument, OdfButtonControl,
     OdfCheckboxControl, OdfCheckboxState, OdfComboItem, OdfComboboxControl, OdfControlForm,
     OdfFixedTextControl, OdfFormControlKind, OdfFormNode, OdfGenericForm, OdfHiddenControl,
-    OdfInteractiveForm, OdfListOption, OdfListboxControl, OdfRadioControl,
-    OdfSelectionForm, OdfTextControl, OdfTypedValueControl,
-    OdfTypedValueControlKind, OdfTypedValueForm, OdfVisualForm,
+    OdfInteractiveForm, OdfListOption, OdfListboxControl, OdfRadioControl, OdfSelectionForm,
+    OdfTextControl, OdfTypedValueControl, OdfTypedValueControlKind, OdfTypedValueForm,
+    OdfVisualForm,
 };
 
 /// Flat text document holding one form with every common control kind.
@@ -161,7 +161,10 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     assert_eq!(controls[0].name.as_deref(), Some("Name"));
     assert_eq!(controls[0].current_value.as_deref(), Some("Ada"));
     assert_eq!(controls[2].current_state.as_deref(), Some("checked"));
-    assert_eq!(controls[2].label.as_deref(), Some("Subscribe to newsletter"));
+    assert_eq!(
+        controls[2].label.as_deref(),
+        Some("Subscribe to newsletter")
+    );
     assert_eq!(controls[4].current_value.as_deref(), Some("Paris"));
     assert_eq!(controls[6].current_selected, Some(true));
     assert_eq!(controls[8].value.as_deref(), Some("inert-token"));
@@ -245,10 +248,7 @@ fn builder_authored_forms_round_trip_the_package() {
         mutable.generic_form_controls().unwrap(),
         generic_form().controls
     );
-    assert_eq!(
-        mutable.visual_controls().unwrap(),
-        visual_form().controls
-    );
+    assert_eq!(mutable.visual_controls().unwrap(), visual_form().controls);
 }
 
 #[test]

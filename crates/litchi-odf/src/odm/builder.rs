@@ -314,7 +314,9 @@ fn unique_section(
 }
 
 pub(crate) fn validate_xml_part(xml: Option<&str>, name: &str) -> Result<()> {
-    let Some(xml) = xml else { return Ok(()); };
+    let Some(xml) = xml else {
+        return Ok(());
+    };
     if xml.len() > 64 * 1024 * 1024 {
         return Err(Error::InvalidFormat(format!("{name} exceeds 64 MiB")));
     }
@@ -322,9 +324,10 @@ pub(crate) fn validate_xml_part(xml: Option<&str>, name: &str) -> Result<()> {
     let mut buffer = Vec::new();
     let mut roots = 0usize;
     loop {
-        match reader.read_event_into(&mut buffer).map_err(|error| {
-            Error::InvalidFormat(format!("invalid {name}: {error}"))
-        })? {
+        match reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid {name}: {error}")))?
+        {
             Event::Start(_) => roots += usize::from(reader.buffer_position() > 0 && roots == 0),
             Event::Empty(_) if roots == 0 => roots = 1,
             Event::DocType(_) | Event::PI(_) => {
@@ -347,8 +350,13 @@ fn validate_auxiliary_path(path: &str) -> Result<()> {
     if path.is_empty()
         || path.starts_with('/')
         || path.ends_with('/')
-        || path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
-        || matches!(path, "mimetype" | "content.xml" | "styles.xml" | "meta.xml" | "settings.xml")
+        || path
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+        || matches!(
+            path,
+            "mimetype" | "content.xml" | "styles.xml" | "meta.xml" | "settings.xml"
+        )
     {
         return Err(Error::InvalidFormat(format!(
             "unsafe or reserved master package path '{path}'"
@@ -369,7 +377,10 @@ pub(crate) fn write_master_package(
     encryption: Option<(String, OdfEncryptionProfile)>,
     signer: Option<OdfDocumentSigner>,
 ) -> Result<Vec<u8>> {
-    if !matches!(mimetype, constants::ODF_MASTER | constants::ODF_MASTER_TEMPLATE) {
+    if !matches!(
+        mimetype,
+        constants::ODF_MASTER | constants::ODF_MASTER_TEMPLATE
+    ) {
         return Err(Error::InvalidFormat(
             "invalid master document MIME type".to_string(),
         ));

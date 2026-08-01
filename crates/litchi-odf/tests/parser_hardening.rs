@@ -223,10 +223,7 @@ fn ods_misplaced_but_wellformed_inputs_do_not_panic() {
     bytes.insert(bytes.len() / 2, 0xFF);
     exercise_ods(bytes);
     // A UTF-16 document is rejected without a panic.
-    let utf16: Vec<u8> = ODS_SEED
-        .encode_utf16()
-        .flat_map(u16::to_le_bytes)
-        .collect();
+    let utf16: Vec<u8> = ODS_SEED.encode_utf16().flat_map(u16::to_le_bytes).collect();
     exercise_ods(utf16);
 }
 
@@ -267,7 +264,9 @@ fn odt_malformed_inputs_yield_typed_errors() {
     );
     // A non-Boolean text:protected value.
     assert_odt_typed_error(
-        odt_body(r#"<text:section text:name="s" text:protected="maybe"><text:p>x</text:p></text:section>"#),
+        odt_body(
+            r#"<text:section text:name="s" text:protected="maybe"><text:p>x</text:p></text:section>"#,
+        ),
         "invalid section boolean",
     );
     // A protection key without text:protected is a write-time validation
@@ -294,7 +293,9 @@ fn odt_misplaced_but_wellformed_inputs_do_not_panic() {
     let nested = "<text:span>".repeat(200) + &"</text:span>".repeat(200);
     exercise_odt(odt_body(&nested));
     // Unknown foreign elements inside text are ignored or typed errors.
-    exercise_odt(odt_body(r#"<text:p><foo:bar xmlns:foo="urn:example"/>text</text:p>"#));
+    exercise_odt(odt_body(
+        r#"<text:p><foo:bar xmlns:foo="urn:example"/>text</text:p>"#,
+    ));
     // An empty document body.
     exercise_odt(odt_body(""));
     // Invalid UTF-8 is a typed error, never a panic.

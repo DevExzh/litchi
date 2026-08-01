@@ -143,9 +143,7 @@ pub use document_origin::{
     DocumentAutoFormatType, DocumentOrigin, DocumentOriginMetadata, HtmlEmailVersion,
 };
 pub use document_output_settings::DocumentOutputSettings;
-pub use document_print_layout_settings::{
-    DocumentPrintLayoutSettings, MAX_DOCUMENT_GUTTER_TWIPS,
-};
+pub use document_print_layout_settings::{DocumentPrintLayoutSettings, MAX_DOCUMENT_GUTTER_TWIPS};
 pub use document_privacy_policies::DocumentPrivacyPolicies;
 pub use document_processing_settings::{
     AbstractNumberingCleanupStatus, DocumentEventMask, DocumentProcessingSettings,
@@ -182,31 +180,26 @@ pub use field::CompareField;
 pub use field::{
     ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AutoNumberField,
     AutoNumberFieldKind, AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption,
-    BibliographyField,
-    BarcodeDisplayField, BarcodeDisplayFieldKind, BarcodeField, BibliographyOption,
-    BidiOutlineField, BodyStoryEvent, CitationField,
-    CitationOption, ColumnBreak, DatabaseField, DdeField, DdeFieldKind,
-    DdeRepresentation, DocumentContextField, DocumentContextFieldKind, DocumentInformationField,
-    DocumentInformationFieldKind, DocumentPropertyField, DocumentVariableField, EquationField,
-    EmbedField, ExternalIncludeField, ExternalIncludeOption, Field, FieldCodeError,
-    FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType, FormulaField,
-    GoToButtonField, HyperlinkCode, HyperlinkField, IfField, InfoField,
-    IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption,
+    BarcodeDisplayField, BarcodeDisplayFieldKind, BarcodeField, BibliographyField,
+    BibliographyOption, BidiOutlineField, BodyStoryEvent, CitationField, CitationOption,
+    ColumnBreak, DatabaseField, DdeField, DdeFieldKind, DdeRepresentation, DocumentContextField,
+    DocumentContextFieldKind, DocumentInformationField, DocumentInformationFieldKind,
+    DocumentPropertyField, DocumentVariableField, EmbedField, EquationField, ExternalIncludeField,
+    ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
+    FieldSwitch, FieldType, FormulaField, GoToButtonField, HyperlinkCode, HyperlinkField, IfField,
+    IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption, InfoField,
     LegacyFormField, LegacyFormFieldKind, LinkField, LinkFormatting, LinkResultOption,
-    ListNumberField, MacroButtonField,
-    MailMergeConditionalControlField,
+    ListNumberField, MacroButtonField, MailMergeConditionalControlField,
     MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
-    MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
-    MailMergeRecipientFieldKind, MergeField,
-    PageBreak, ParsedFieldCode, PrintField, PrivateField, PromptField, PromptFieldKind,
+    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
+    MergeField, PageBreak, ParsedFieldCode, PrintField, PrivateField, PromptField, PromptFieldKind,
     QuoteField, ReferenceCode, ReferenceField, ReferenceFieldKind, ReferencedDocumentField,
     SectionBreak, SequenceField, SetField, ShapeField, SoftBreak, SoftBreakKind, StoryEvent,
-    StoryField,
-    StyleReferenceField, StyleReferenceFieldOption, SymbolField, TableOfAuthoritiesEntryField,
-    TableOfAuthoritiesEntryOption,
-    TableOfAuthoritiesField, TableOfAuthoritiesOption, TableOfContentsEntryField,
-    TableOfContentsEntryOption, TableOfContentsField, TableOfContentsOption, UserIdentityField,
-    UserIdentityFieldKind, UserIdentityFormatting, parse_field_code,
+    StoryField, StyleReferenceField, StyleReferenceFieldOption, SymbolField,
+    TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
+    TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
+    TableOfContentsField, TableOfContentsOption, UserIdentityField, UserIdentityFieldKind,
+    UserIdentityFormatting, parse_field_code,
 };
 pub use field::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
 pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
@@ -305,25 +298,24 @@ pub use shape::{
     Fill, FillType, GradientDirection, MAX_SHAPE_PROPERTY_BINARY_BYTES, OfficeArtColor,
     OfficeArtOpacity, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
     ShapeHorizontalAnchor, ShapeHyperlink, ShapeLine, ShapeProperty, ShapeResult,
-    ShapeRotationDegrees,
-    ShapeThemeColor, ShapeThemeValue, ShapeTwips, ShapeType, ShapeVerticalAnchor, ShapeWrapSide,
-    ShapeWrapStyle, ShapeZOrder, StoryDrawing, WrapMode,
+    ShapeRotationDegrees, ShapeThemeColor, ShapeThemeValue, ShapeTwips, ShapeType,
+    ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing, WrapMode,
 };
 pub use style_list_filter::{DocumentStyleListFilter, DocumentStyleSortMethod};
 pub use stylesheet::{Style, StyleSheet, StyleType, TableStyleConditionalFormatting};
 pub use table::{
     Cell, CellNestedTable, CellRevision, CellRevisionKind, CellStoryEvent, CellStoryReference,
-    FloatingTablePosition, TableCellCoordinate, TableCellPath,
-    MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_DISTANCE_TWIPS,
-    MAX_TABLE_GEOMETRY_TWIPS, MAX_TABLE_NESTING_DEPTH, MAX_TABLE_ROW_INDEX,
-    MAX_TABLE_WIDTH_PERCENT, Row, Table, TableAutoformatFlag, TableAutoformatFlags,
-    TableCellBorderSide, TableCellBorders, TableCellLayout, TableCellMergeAxis, TableCellMergeRole,
-    TableCellMergeState, TableCellTextFlow, TableCellVerticalAlignment, TableDistanceKind,
-    TableDistanceScope, TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances,
-    TableHorizontalPosition, TableHorizontalReference, TableIndent, TableIndentUnit,
-    TablePreferredWidth, TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex,
-    TableRowBanding, TableRowBorderSide, TableRowBorders, TableRowCellDefaults, TableRowGeometry,
-    TableRowHeight, TableRowLayout, TableShading, TableSideDistance, TableStyleBorderSide,
+    FloatingTablePosition, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW,
+    MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_GEOMETRY_TWIPS, MAX_TABLE_NESTING_DEPTH,
+    MAX_TABLE_ROW_INDEX, MAX_TABLE_WIDTH_PERCENT, Row, Table, TableAutoformatFlag,
+    TableAutoformatFlags, TableCellBorderSide, TableCellBorders, TableCellCoordinate,
+    TableCellLayout, TableCellMergeAxis, TableCellMergeRole, TableCellMergeState, TableCellPath,
+    TableCellTextFlow, TableCellVerticalAlignment, TableDistanceKind, TableDistanceScope,
+    TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances, TableHorizontalPosition,
+    TableHorizontalReference, TableIndent, TableIndentUnit, TablePreferredWidth,
+    TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex, TableRowBanding,
+    TableRowBorderSide, TableRowBorders, TableRowCellDefaults, TableRowGeometry, TableRowHeight,
+    TableRowLayout, TableShading, TableSideDistance, TableStyleBorderSide,
     TableStyleDefaultBorders, TableVerticalPosition, TableVerticalReference, TableWrapDistances,
 };
 pub use theme::DocumentTheme;
@@ -331,11 +323,11 @@ pub use types::{
     Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
     AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
     DocumentElement, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font, FontFamily,
-    FontPitch, FontRef,
-    FontTable, FontTheme, Formatting, Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph,
-    ParagraphContent, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
-    ParagraphLineBreaking, ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping,
-    RevisionMetadata, Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
+    FontPitch, FontRef, FontTable, FontTheme, Formatting, Indentation,
+    MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphContent, ParagraphDropCap,
+    ParagraphDropCapKind, ParagraphFontAlignment, ParagraphLineBreaking,
+    ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata, Run,
+    Spacing, StyleBlock, TextDirection, UnderlineStyle,
 };
 pub use user_property::{UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue};
 pub use window_caption::{DocumentWindowCaption, MAX_WINDOW_CAPTION_BYTES};

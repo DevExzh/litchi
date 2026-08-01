@@ -2,10 +2,10 @@
 //!
 //! This module provides types for working with comments in PPTX files.
 
-use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
 use litchi_core::xml::escape_xml;
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use litchi_opc::part::Part;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;

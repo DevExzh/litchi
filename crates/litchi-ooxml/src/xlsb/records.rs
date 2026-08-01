@@ -106,7 +106,7 @@ impl<R: Read> Iterator for XlsbRecordIter<R> {
 }
 
 /// XLSB record types (matching MS-XLSB specification)
-/// Reference: [MS-XLSB] https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/
+/// Reference: [MS-XLSB] <https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/>
 #[allow(dead_code)]
 pub mod record_types {
     // Basic cell records

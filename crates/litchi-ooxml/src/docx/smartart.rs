@@ -473,8 +473,7 @@ fn scan_document_xml(
                 }
             },
             Event::End(_) => {
-                if frames.last().is_some_and(|frame| frame.0 == depth) {
-                    let (_, anchor) = frames.pop().expect("frame checked above");
+                if let Some((_, anchor)) = frames.pop_if(|frame| frame.0 == depth) {
                     anchors.push(
                         anchor.ok_or_else(|| invalid("SmartArt graphicData lacks relIds child"))?,
                     );

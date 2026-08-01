@@ -453,15 +453,15 @@ fn overlay_style_defaults(target: &mut TableStyleDefaults, source: TableStyleDef
 }
 
 fn apply_style_defaults(cell: &mut CellProperties, style: TableStyleDefaults) {
-    if !cell.direct_style.vertical_alignment {
-        if let Some(value) = style.vertical_alignment {
-            cell.vertical_alignment = value;
-        }
+    if !cell.direct_style.vertical_alignment
+        && let Some(value) = style.vertical_alignment
+    {
+        cell.vertical_alignment = value;
     }
-    if !cell.direct_style.no_wrap {
-        if let Some(value) = style.no_wrap {
-            cell.no_wrap = value;
-        }
+    if !cell.direct_style.no_wrap
+        && let Some(value) = style.no_wrap
+    {
+        cell.no_wrap = value;
     }
     if !cell.direct_style.padding_top {
         cell.padding_top = style.padding_top.map(|value| value as i16);
@@ -534,13 +534,11 @@ fn apply_style_border(
     direct: bool,
     border_type: Option<super::parts::tap::BorderType>,
 ) {
-    if !direct {
-        if let Some(style) = style {
-            *target = match style {
-                TableStyleBorder::NoBorder => None,
-                TableStyleBorder::Border(border) => Some(border),
-            };
-        }
+    if !direct && let Some(style) = style {
+        *target = match style {
+            TableStyleBorder::NoBorder => None,
+            TableStyleBorder::Border(border) => Some(border),
+        };
     }
     if let (Some(target), Some(border_type)) = (target, border_type) {
         target.border_type = border_type;

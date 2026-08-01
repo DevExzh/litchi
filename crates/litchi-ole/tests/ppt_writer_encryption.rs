@@ -52,7 +52,10 @@ fn persist_mappings(document: &[u8], offset: usize) -> BTreeMap<u32, u32> {
 fn assert_round_trip(profile: PptEncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
     let bytes = write(profile, password, picture);
     let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
-    assert!(matches!(package.presentation(), Err(PptError::PasswordRequired)));
+    assert!(matches!(
+        package.presentation(),
+        Err(PptError::PasswordRequired)
+    ));
     assert!(matches!(
         package.presentation_with_options(PptOpenOptions {
             password: Some("wrong")
@@ -88,8 +91,22 @@ fn cryptoapi_profiles_round_trip_and_emit_exact_bootstrap() {
         );
         let user_edit_offset =
             u32::from_le_bytes(current_user[16..20].try_into().unwrap()) as usize;
-        assert_eq!(u16::from_le_bytes(document[user_edit_offset + 2..user_edit_offset + 4].try_into().unwrap()), 4085);
-        assert_eq!(u32::from_le_bytes(document[user_edit_offset + 4..user_edit_offset + 8].try_into().unwrap()), 32);
+        assert_eq!(
+            u16::from_le_bytes(
+                document[user_edit_offset + 2..user_edit_offset + 4]
+                    .try_into()
+                    .unwrap()
+            ),
+            4085
+        );
+        assert_eq!(
+            u32::from_le_bytes(
+                document[user_edit_offset + 4..user_edit_offset + 8]
+                    .try_into()
+                    .unwrap()
+            ),
+            32
+        );
         let directory_offset = u32::from_le_bytes(
             document[user_edit_offset + 20..user_edit_offset + 24]
                 .try_into()
@@ -102,9 +119,26 @@ fn cryptoapi_profiles_round_trip_and_emit_exact_bootstrap() {
         );
         let mappings = persist_mappings(&document, directory_offset);
         let session_offset = mappings[&session_id] as usize;
-        assert_eq!(u16::from_le_bytes(document[session_offset + 2..session_offset + 4].try_into().unwrap()), 12052);
-        assert_eq!(&document[session_offset + 8..session_offset + 16], &[2, 0, 2, 0, 12, 0, 0, 0]);
-        assert_eq!(u32::from_le_bytes(document[session_offset + 36..session_offset + 40].try_into().unwrap()), u32::from(key_bits));
+        assert_eq!(
+            u16::from_le_bytes(
+                document[session_offset + 2..session_offset + 4]
+                    .try_into()
+                    .unwrap()
+            ),
+            12052
+        );
+        assert_eq!(
+            &document[session_offset + 8..session_offset + 16],
+            &[2, 0, 2, 0, 12, 0, 0, 0]
+        );
+        assert_eq!(
+            u32::from_le_bytes(
+                document[session_offset + 36..session_offset + 40]
+                    .try_into()
+                    .unwrap()
+            ),
+            u32::from(key_bits)
+        );
         assert_ne!(u16::from_le_bytes(document[2..4].try_into().unwrap()), 1000);
     }
 }
@@ -128,8 +162,7 @@ fn pictures_salts_and_atomic_profile_validation_are_covered() {
         let user = u32::from_le_bytes(current[16..20].try_into().unwrap()) as usize;
         let directory =
             u32::from_le_bytes(document[user + 20..user + 24].try_into().unwrap()) as usize;
-        let session =
-            u32::from_le_bytes(document[user + 36..user + 40].try_into().unwrap());
+        let session = u32::from_le_bytes(document[user + 36..user + 40].try_into().unwrap());
         let offset = persist_mappings(document, directory)[&session] as usize;
         let header_size =
             u32::from_le_bytes(document[offset + 16..offset + 20].try_into().unwrap()) as usize;
@@ -145,12 +178,16 @@ fn pictures_salts_and_atomic_profile_validation_are_covered() {
     writer
         .set_password("kept", PptEncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();
-    assert!(writer
-        .set_password("", PptEncryptionProfile::CryptoApiRc4 { key_bits: 40 })
-        .is_err());
-    assert!(writer
-        .set_password("bad", PptEncryptionProfile::CryptoApiRc4 { key_bits: 41 })
-        .is_err());
+    assert!(
+        writer
+            .set_password("", PptEncryptionProfile::CryptoApiRc4 { key_bits: 40 })
+            .is_err()
+    );
+    assert!(
+        writer
+            .set_password("bad", PptEncryptionProfile::CryptoApiRc4 { key_bits: 41 })
+            .is_err()
+    );
     assert_eq!(
         writer.encryption_profile(),
         Some(PptEncryptionProfile::CryptoApiRc4 { key_bits: 128 })

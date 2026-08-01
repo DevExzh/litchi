@@ -178,7 +178,11 @@ pub fn over(base: MathElement, overscript: MathElement) -> MathElement {
 }
 
 /// A `munderover` with base, underscript, and overscript.
-pub fn under_over(base: MathElement, underscript: MathElement, overscript: MathElement) -> MathElement {
+pub fn under_over(
+    base: MathElement,
+    underscript: MathElement,
+    overscript: MathElement,
+) -> MathElement {
     row_schemata("munderover", [base, underscript, overscript])
 }
 
@@ -191,7 +195,12 @@ fn row_schemata<const N: usize>(local_name: &str, children: [MathElement; N]) ->
 }
 
 /// An `mfenced` with explicit open/close characters and separators.
-pub fn fenced(children: Vec<MathElement>, open: &str, close: &str, separators: &str) -> MathElement {
+pub fn fenced(
+    children: Vec<MathElement>,
+    open: &str,
+    close: &str,
+    separators: &str,
+) -> MathElement {
     let mut element = element("mfenced");
     for child in children {
         element.push_child(child);
@@ -259,7 +268,10 @@ mod tests {
         let formula = document_root(
             semantics(
                 row(vec![
-                    superscript(identifier_with_variant("x", MathVariant::Italic), number("2")),
+                    superscript(
+                        identifier_with_variant("x", MathVariant::Italic),
+                        number("2"),
+                    ),
                     operator("+"),
                     fraction(number("1"), root(identifier("x"), number("3"))),
                     under_over(operator("∑"), identifier("i"), number("n")),
@@ -289,12 +301,7 @@ mod tests {
 
     #[test]
     fn builds_fenced_table_and_literal_tokens() {
-        let fenced = fenced(
-            vec![identifier("a"), identifier("b")],
-            "[",
-            "]",
-            ",",
-        );
+        let fenced = fenced(vec![identifier("a"), identifier("b")], "[", "]", ",");
         assert_eq!(fenced.local_name(), "mfenced");
         assert_eq!(fenced.attribute(None, "open"), Some("["));
         assert_eq!(fenced.attribute(None, "separators"), Some(","));
@@ -305,7 +312,10 @@ mod tests {
         ]);
         assert_eq!(table.children().count(), 2);
         let first_cell = table.children().next().unwrap().children().next().unwrap();
-        assert_eq!(first_cell.kind(), super::super::document::MathElementKind::TableCell);
+        assert_eq!(
+            first_cell.kind(),
+            super::super::document::MathElementKind::TableCell
+        );
 
         let literal = string_literal("hello", "«", "»");
         assert_eq!(literal.attribute(None, "lquote"), Some("«"));

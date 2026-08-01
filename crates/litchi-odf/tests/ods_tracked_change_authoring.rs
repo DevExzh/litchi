@@ -55,11 +55,13 @@ fn complete_change_set() -> SpreadsheetTrackedChanges {
     let mut deletion_metadata = metadata("ct2");
     deletion_metadata.acceptance = SpreadsheetChangeAcceptance::Accepted;
     deletion_metadata.dependencies.push("ct1".to_string());
-    deletion_metadata.deletions.push(SpreadsheetNestedDeletion::CellContent {
-        change_id: Some("ct1".to_string()),
-        address: Some(address(0, 0, 0)),
-        cell: Some(previous_cell()),
-    });
+    deletion_metadata
+        .deletions
+        .push(SpreadsheetNestedDeletion::CellContent {
+            change_id: Some("ct1".to_string()),
+            address: Some(address(0, 0, 0)),
+            cell: Some(previous_cell()),
+        });
     deletion_metadata
         .deletions
         .push(SpreadsheetNestedDeletion::Change {
@@ -138,7 +140,10 @@ fn authors_every_variant_and_reopens_the_package() {
     let SpreadsheetTrackedChange::CellContent(cell) = &reopened.changes[3] else {
         panic!("expected cell-content change");
     };
-    assert_eq!(cell.previous.style_name.as_deref(), Some("Historical & Style"));
+    assert_eq!(
+        cell.previous.style_name.as_deref(),
+        Some("Historical & Style")
+    );
     assert_eq!(cell.previous.display_text, "人民币 & <旧值>\n第二行");
 }
 
@@ -158,7 +163,10 @@ fn mutations_are_atomic_when_references_or_cycles_are_invalid() {
     assert_eq!(mutable.tracked_changes().unwrap().changes.len(), 4);
 
     assert!(mutable.remove_tracked_change("ct1").is_err());
-    assert_eq!(mutable.tracked_changes().unwrap().changes[0].metadata().id, "ct1");
+    assert_eq!(
+        mutable.tracked_changes().unwrap().changes[0].metadata().id,
+        "ct1"
+    );
 
     let mut first = metadata("a");
     first.dependencies.push("b".to_string());

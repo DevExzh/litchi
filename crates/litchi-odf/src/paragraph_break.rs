@@ -378,9 +378,7 @@ fn break_attributes(
                 properties.number_lines = Some(parse_bool(&value, "text:number-lines")?);
             },
             (Ns::Text, b"line-number") => {
-                let number: u64 = value
-                    .parse()
-                    .map_err(|_| bad("invalid text:line-number"))?;
+                let number: u64 = value.parse().map_err(|_| bad("invalid text:line-number"))?;
                 properties.line_number = Some(number);
             },
             // Other paragraph-properties attributes are owned by sibling modules.
@@ -547,7 +545,9 @@ fn replace_span(xml: &str, span: &Span, value: &str) -> String {
 }
 fn expand_span(xml: &str, span: &Span, value: &str) -> Result<String> {
     let raw = &xml[span.start..span.end];
-    let slash = raw.rfind("/>").ok_or_else(|| bad("invalid empty element"))?;
+    let slash = raw
+        .rfind("/>")
+        .ok_or_else(|| bad("invalid empty element"))?;
     Ok(replace_span(
         xml,
         span,

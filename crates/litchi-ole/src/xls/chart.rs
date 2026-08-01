@@ -439,8 +439,8 @@ impl XlsChart {
             }
         }
         for axis in &self.axes {
-            if let Some(scale) = &axis.scale {
-                if ![
+            if let Some(scale) = &axis.scale
+                && (![
                     scale.minimum,
                     scale.maximum,
                     scale.major,
@@ -451,10 +451,9 @@ impl XlsChart {
                 .all(f64::is_finite)
                     || scale.maximum < scale.minimum
                     || scale.major < 0.0
-                    || scale.minor < 0.0
-                {
-                    return invalid(VALUE_RANGE, "axis scale is not finite or ordered");
-                }
+                    || scale.minor < 0.0)
+            {
+                return invalid(VALUE_RANGE, "axis scale is not finite or ordered");
             }
             let mut line_order = None;
             for line in &axis.lines {
@@ -1179,12 +1178,12 @@ fn parse_workbook_charts(input: &[u8], limits: XlsChartLimits) -> XlsResult<Vec<
         let mut index = 0;
         while index < records.len() {
             let value = records[index];
-            if value.kind == OBJ {
-                if let Some(id) = parse_chart_object(
+            if value.kind == OBJ
+                && let Some(id) = parse_chart_object(
                     &input[sheet.start + value.body_start..sheet.start + value.body_end],
-                )? {
-                    chart_objects.push((id, sheet.start + value.start, sheet.start + value.end));
-                }
+                )?
+            {
+                chart_objects.push((id, sheet.start + value.start, sheet.start + value.end));
             }
             if value.kind == BOF
                 && is_chart_bof(
@@ -1369,14 +1368,14 @@ fn parse_chart(input: &[u8], sheet_count: usize, limits: XlsChartLimits) -> XlsR
                 }
             },
             CRT_LINE | DROP_BAR => {
-                if let Some(group) = chart.groups.last_mut() {
-                    if matches!(group.kind, XlsChartGroupKind::Line { .. }) {
-                        let flags = match group.kind {
-                            XlsChartGroupKind::Line { flags } => flags,
-                            _ => 0,
-                        };
-                        group.kind = XlsChartGroupKind::Stock { flags };
-                    }
+                if let Some(group) = chart.groups.last_mut()
+                    && matches!(group.kind, XlsChartGroupKind::Line { .. })
+                {
+                    let flags = match group.kind {
+                        XlsChartGroupKind::Line { flags } => flags,
+                        _ => 0,
+                    };
+                    group.kind = XlsChartGroupKind::Stock { flags };
                 }
             },
             AXIS => {

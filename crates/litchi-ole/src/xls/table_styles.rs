@@ -814,13 +814,13 @@ impl TableStylesCollector {
     }
 
     fn close_family(&mut self) -> XlsResult<()> {
-        if let Some(style) = &self.current_style {
-            if style.elements.len() != style.declared_element_count as usize {
-                return Err(invalid(
-                    TABLE_STYLE_ELEMENT_RECORD_TYPE,
-                    "TABLESTYLES ended before the declared element count was satisfied",
-                ));
-            }
+        if let Some(style) = &self.current_style
+            && style.elements.len() != style.declared_element_count as usize
+        {
+            return Err(invalid(
+                TABLE_STYLE_ELEMENT_RECORD_TYPE,
+                "TABLESTYLES ended before the declared element count was satisfied",
+            ));
         }
         self.finish_current_style()?;
         self.family_closed = true;

@@ -52,7 +52,12 @@ fn parses_every_token() {
         ));
         let set = parse_paragraph_style_alignments(&xml).unwrap();
         assert_eq!(
-            set.get("P").unwrap().properties.as_ref().unwrap().text_align,
+            set.get("P")
+                .unwrap()
+                .properties
+                .as_ref()
+                .unwrap()
+                .text_align,
             Some(expect)
         );
     }
@@ -203,9 +208,11 @@ fn mutation_replaces_inserts_and_strips_owned_attributes() {
     let reparsed = parse_paragraph_style_alignments(&updated).unwrap();
     assert!(reparsed.get("C").unwrap().properties.is_some());
     // Nothing to strip and no properties element: unchanged.
-    let unchanged =
-        set_paragraph_style_alignment_xml(&bare, &ParagraphStyleAlignment::named("B", None).unwrap())
-            .unwrap();
+    let unchanged = set_paragraph_style_alignment_xml(
+        &bare,
+        &ParagraphStyleAlignment::named("B", None).unwrap(),
+    )
+    .unwrap();
     assert_eq!(unchanged, bare);
 }
 
@@ -220,7 +227,9 @@ fn builder_package_round_trip() {
     )
     .unwrap();
     let mut builder = DocumentBuilder::new();
-    builder.add_paragraph_alignment_style(style.clone()).unwrap();
+    builder
+        .add_paragraph_alignment_style(style.clone())
+        .unwrap();
     assert!(
         builder
             .add_paragraph_alignment_style(ParagraphStyleAlignment::named("Body", None).unwrap())

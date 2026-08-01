@@ -1,7 +1,7 @@
 use litchi_ooxml::docx::{
-    MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType,
-    MailMergeDestination, MailMergeFieldMap, MailMergeFieldMappingType, MailMergeRecipient,
-    MailMergeRecipients, MailMergeSettings, MailMergeSource, MailMergeTarget, Package,
+    MailMergeConformance, MailMergeDataSourceObject, MailMergeDataType, MailMergeDestination,
+    MailMergeFieldMap, MailMergeFieldMappingType, MailMergeRecipient, MailMergeRecipients,
+    MailMergeSettings, MailMergeSource, MailMergeTarget, Package,
 };
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -16,8 +16,7 @@ fn settings_model() -> MailMergeSettings {
         .set_column(Some(0))
         .set_dynamic_address(true);
     let mut odso = MailMergeDataSourceObject::new();
-    odso
-        .set_table(Some("Sheet1$".into()))
+    odso.set_table(Some("Sheet1$".into()))
         .set_source_type(Some("spreadsheet".into()))
         .set_first_row_header(true)
         .add_field_map(field);
@@ -133,7 +132,11 @@ fn strict_relationships_and_settings_order_are_emitted() {
         .rels()
         .get(merge.data_source_relationship_id().unwrap())
         .unwrap();
-    assert!(source_rel.reltype().starts_with("http://purl.oclc.org/ooxml/"));
+    assert!(
+        source_rel
+            .reltype()
+            .starts_with("http://purl.oclc.org/ooxml/")
+    );
     let xml = std::str::from_utf8(settings_part.blob()).unwrap();
     assert!(xml.contains("http://purl.oclc.org/ooxml/wordprocessingml/main"));
     assert!(xml.find("<w:mailMerge").unwrap() < xml.find("<w:defaultTabStop").unwrap());
@@ -143,7 +146,10 @@ fn strict_relationships_and_settings_order_are_emitted() {
 fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
     let mut package = Package::new().unwrap();
     let settings_uri = PackURI::new("/word/settings.xml").unwrap();
-    let settings_part = package.opc_package_mut().get_part_mut(&settings_uri).unwrap();
+    let settings_part = package
+        .opc_package_mut()
+        .get_part_mut(&settings_uri)
+        .unwrap();
     let original = std::str::from_utf8(settings_part.blob()).unwrap();
     let marked = original.replace(
         "</w:settings>",
@@ -166,7 +172,11 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
         .unwrap()
         .blob()
         .to_vec();
-    assert!(std::str::from_utf8(&before_xml).unwrap().contains(r#"keep="exact""#));
+    assert!(
+        std::str::from_utf8(&before_xml)
+            .unwrap()
+            .contains(r#"keep="exact""#)
+    );
 
     let mut invalid = settings_model();
     invalid.set_active_record(0);
@@ -182,7 +192,14 @@ fn unrelated_settings_xml_is_preserved_and_invalid_updates_are_atomic() {
             .is_err()
     );
     assert_eq!(package.opc_package().part_count(), before_count);
-    assert_eq!(package.opc_package().get_part(&settings_uri).unwrap().blob(), before_xml);
+    assert_eq!(
+        package
+            .opc_package()
+            .get_part(&settings_uri)
+            .unwrap()
+            .blob(),
+        before_xml
+    );
 }
 
 #[test]
@@ -213,7 +230,8 @@ fn clear_preserves_an_internal_source_still_shared_elsewhere() {
     let mut footer = BlobPart::new(
         footer_uri.clone(),
         ct::WML_FOOTER.to_string(),
-        br#"<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#.to_vec(),
+        br#"<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+            .to_vec(),
     );
     footer.rels_mut().add_relationship(
         "urn:test:shared".into(),

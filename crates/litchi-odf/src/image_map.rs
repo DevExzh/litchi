@@ -155,11 +155,17 @@ pub struct ImageMap {
 fn parse_link_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-) -> Result<(Option<String>, Option<String>, Option<String>, bool, Option<String>)> {
-    if let Some(link_type) = namespaced_attr(reader, element, XLINK, b"type")? {
-        if link_type != "simple" {
-            return Err(invalid("image-map xlink:type must be 'simple'"));
-        }
+) -> Result<(
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    bool,
+    Option<String>,
+)> {
+    if let Some(link_type) = namespaced_attr(reader, element, XLINK, b"type")?
+        && link_type != "simple"
+    {
+        return Err(invalid("image-map xlink:type must be 'simple'"));
     }
     let show = match namespaced_attr(reader, element, XLINK, b"show")?.as_deref() {
         None => None,
@@ -207,9 +213,12 @@ pub fn parse_image_maps(xml: &str) -> Result<Vec<ImageMap>> {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("image-map parsing error: {error}")))?;
-        let draw_element = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == DRAW);
-        let svg_element = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == SVG);
-        let office_element = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == OFFICE);
+        let draw_element =
+            matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == DRAW);
+        let svg_element =
+            matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == SVG);
+        let office_element =
+            matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == OFFICE);
         let event = event.into_owned();
         let event_end = reader.buffer_position() as usize;
         match event {
@@ -386,8 +395,7 @@ pub fn parse_image_maps(xml: &str) -> Result<Vec<ImageMap>> {
                             && local == b"event-listeners"
                         {
                             let start = area.listeners_start.take().expect("listeners start");
-                            area.area.event_listeners_xml =
-                                Some(xml[start..event_end].to_string());
+                            area.area.event_listeners_xml = Some(xml[start..event_end].to_string());
                         }
                     }
                     area.depth = area
@@ -481,7 +489,10 @@ mod tests {
         assert_eq!(map.areas[0].target_frame_name.as_deref(), Some("_blank"));
         assert_eq!(map.areas[0].name.as_deref(), Some("r1"));
         assert!(!map.areas[0].no_href);
-        assert_eq!(map.areas[0].title_xml.as_deref(), Some("<svg:title>Area A</svg:title>"));
+        assert_eq!(
+            map.areas[0].title_xml.as_deref(),
+            Some("<svg:title>Area A</svg:title>")
+        );
 
         let ImageMapAreaShape::Circle { cx, r, .. } = &map.areas[1].shape else {
             panic!()
@@ -490,7 +501,10 @@ mod tests {
         assert!(map.areas[1].no_href);
         assert!(map.areas[1].href.is_none());
 
-        let ImageMapAreaShape::Polygon { view_box, points, .. } = &map.areas[2].shape else {
+        let ImageMapAreaShape::Polygon {
+            view_box, points, ..
+        } = &map.areas[2].shape
+        else {
             panic!()
         };
         assert_eq!(view_box, "0 0 100 100");
@@ -529,10 +543,7 @@ mod tests {
         );
         assert!(parse_image_maps(&bad).is_err());
         // Nested image map.
-        let bad = DOCUMENT.replace(
-            "<draw:area-circle",
-            "<draw:image-map><draw:area-circle",
-        );
+        let bad = DOCUMENT.replace("<draw:area-circle", "<draw:image-map><draw:area-circle");
         assert!(parse_image_maps(&bad).is_err());
     }
 }

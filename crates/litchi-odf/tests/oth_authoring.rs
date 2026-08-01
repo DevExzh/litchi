@@ -59,7 +59,10 @@ fn create_web_template_from_scratch_round_trips() {
 #[test]
 fn build_document_returns_validated_web_document() {
     let mut builder = WebDocumentBuilder::new();
-    builder.builder_mut().add_paragraph("Only paragraph").unwrap();
+    builder
+        .builder_mut()
+        .add_paragraph("Only paragraph")
+        .unwrap();
     let document = builder.build_document().unwrap();
     assert_eq!(document.document().paragraph_count().unwrap(), 1);
     assert_eq!(document.text().unwrap(), "Only paragraph");
@@ -89,7 +92,10 @@ fn convert_existing_text_document_to_web_template() {
 #[test]
 fn open_edit_save_reopen_round_trip() {
     let mut builder = WebDocumentBuilder::new();
-    builder.builder_mut().add_heading("Draft heading", 1).unwrap();
+    builder
+        .builder_mut()
+        .add_heading("Draft heading", 1)
+        .unwrap();
     builder.builder_mut().add_paragraph("Keep me").unwrap();
     let document = builder.build_document().unwrap();
 
@@ -114,7 +120,10 @@ fn open_edit_save_reopen_round_trip() {
 #[test]
 fn to_mutable_leaves_original_template_untouched() {
     let mut builder = WebDocumentBuilder::new();
-    builder.builder_mut().add_paragraph("Original text").unwrap();
+    builder
+        .builder_mut()
+        .add_paragraph("Original text")
+        .unwrap();
     let bytes = builder.build().unwrap();
     let document = WebDocument::from_bytes(bytes.clone()).unwrap();
 
@@ -124,7 +133,13 @@ fn to_mutable_leaves_original_template_untouched() {
         .update_paragraph(0, "Changed copy")
         .unwrap();
     let changed = mutable.to_bytes().unwrap();
-    assert!(WebDocument::from_bytes(changed).unwrap().text().unwrap().contains("Changed copy"));
+    assert!(
+        WebDocument::from_bytes(changed)
+            .unwrap()
+            .text()
+            .unwrap()
+            .contains("Changed copy")
+    );
 
     // The original template is byte-identical and unchanged.
     assert_eq!(document.as_bytes(), bytes.as_slice());

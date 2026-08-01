@@ -24,6 +24,7 @@ litchi-cfb      = { workspace = true }
 litchi-core     = { workspace = true, features = ["ole"] }
 litchi-formula  = { workspace = true, optional = true }
 litchi-imgconv  = { workspace = true, optional = true }
+litchi-ole-common = { workspace = true }
 litchi-opc      = { workspace = true }
 md-5            = { workspace = true }
 once_cell       = { workspace = true }

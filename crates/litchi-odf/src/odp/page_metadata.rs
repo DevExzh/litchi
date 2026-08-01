@@ -157,10 +157,10 @@ impl PresentationPageMetadataCollection {
                     page.slide_index
                 )));
             }
-            if let Some(id) = page.xml_id.as_deref().or(page.draw_id.as_deref()) {
-                if !ids.insert(id) {
-                    return Err(invalid(format!("duplicate presentation page ID '{id}'")));
-                }
+            if let Some(id) = page.xml_id.as_deref().or(page.draw_id.as_deref())
+                && !ids.insert(id)
+            {
+                return Err(invalid(format!("duplicate presentation page ID '{id}'")));
             }
         }
         Ok(())
@@ -201,7 +201,9 @@ pub(crate) fn metadata_after_page_insert(
     insert_index: usize,
 ) -> Result<PresentationPageMetadataCollection> {
     if insert_index > slide_count {
-        return Err(invalid("presentation page insertion index is out of bounds"));
+        return Err(invalid(
+            "presentation page insertion index is out of bounds",
+        ));
     }
     let new_count = slide_count
         .checked_add(1)

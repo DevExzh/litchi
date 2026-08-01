@@ -25,7 +25,8 @@ fn package_with_legacy_note() -> (OpcPackage, PackURI, PackURI, PackURI) {
     let mut workbook = BlobPart::new(
         workbook_name,
         ct::SML_SHEET_MAIN.into(),
-        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#.to_vec(),
+        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+            .to_vec(),
     );
     workbook.relate_to("worksheets/sheet1.xml", rt::WORKSHEET);
     let mut worksheet = BlobPart::new(
@@ -143,7 +144,10 @@ fn package_crud_keeps_threads_people_and_legacy_notes_consistent() {
         length: 6,
     });
     let first_part = add_threaded_comment(&mut package, &worksheet, first).unwrap();
-    assert_ne!(first_part.part_name, "/xl/threadedComments/threadedComment1.xml");
+    assert_ne!(
+        first_part.part_name,
+        "/xl/threadedComments/threadedComment1.xml"
+    );
     add_threaded_comment(
         &mut package,
         &worksheet,
@@ -169,17 +173,19 @@ fn package_crud_keeps_threads_people_and_legacy_notes_consistent() {
     );
     assert!(remove_threaded_comment(&mut package, &worksheet, "B2", COMMENT_A).is_err());
     assert!(remove_threaded_comment_person(&mut package, PERSON_B).is_err());
-    assert!(add_threaded_comment(
-        &mut package,
-        &worksheet,
-        root(
-            "{77777777-7777-4777-8777-777777777777}",
-            "{88888888-8888-4888-8888-888888888888}",
-            "D4",
-            "unresolved"
+    assert!(
+        add_threaded_comment(
+            &mut package,
+            &worksheet,
+            root(
+                "{77777777-7777-4777-8777-777777777777}",
+                "{88888888-8888-4888-8888-888888888888}",
+                "D4",
+                "unresolved"
+            )
         )
-    )
-    .is_err());
+        .is_err()
+    );
 
     update_threaded_comment(&mut package, &worksheet, "B2", COMMENT_A, |comment| {
         comment.text = Some("Updated".into());
@@ -230,9 +236,20 @@ fn package_crud_keeps_threads_people_and_legacy_notes_consistent() {
     assert!(package.get_part(&threaded_part).is_ok());
     assert!(remove_threaded_comment_person(&mut package, PERSON_A).unwrap());
 
-    assert_eq!(package.get_part(&legacy_comments).unwrap().blob(), legacy_comments_blob);
-    assert_eq!(package.get_part(&legacy_vml).unwrap().blob(), legacy_vml_blob);
-    assert!(load_threaded_comment_graph(&package).unwrap().worksheets.is_empty());
+    assert_eq!(
+        package.get_part(&legacy_comments).unwrap().blob(),
+        legacy_comments_blob
+    );
+    assert_eq!(
+        package.get_part(&legacy_vml).unwrap().blob(),
+        legacy_vml_blob
+    );
+    assert!(
+        load_threaded_comment_graph(&package)
+            .unwrap()
+            .worksheets
+            .is_empty()
+    );
 }
 
 #[test]
@@ -249,21 +266,22 @@ fn failed_timestamp_and_identity_mutations_are_atomic() {
     )
     .unwrap();
     let graph_before = load_threaded_comment_graph(&package).unwrap();
-    assert!(update_threaded_comment(&mut package, &worksheet, "A1", COMMENT_A, |comment| {
-        comment.date_time = Some("not-a-timestamp".into());
-    })
-    .is_err());
-    assert!(update_threaded_comment_person(&mut package, PERSON_A, |person| {
-        person.id = PERSON_B.into();
-    })
-    .is_err());
+    assert!(
+        update_threaded_comment(&mut package, &worksheet, "A1", COMMENT_A, |comment| {
+            comment.date_time = Some("not-a-timestamp".into());
+        })
+        .is_err()
+    );
+    assert!(
+        update_threaded_comment_person(&mut package, PERSON_A, |person| {
+            person.id = PERSON_B.into();
+        })
+        .is_err()
+    );
     let graph_after = load_threaded_comment_graph(&package).unwrap();
     assert_eq!(
         graph_after.worksheets[0].comments.comments[0].text,
         graph_before.worksheets[0].comments.comments[0].text
     );
-    assert_eq!(
-        graph_after.persons.unwrap().persons.persons[0].id,
-        PERSON_A
-    );
+    assert_eq!(graph_after.persons.unwrap().persons.persons[0].id, PERSON_A);
 }

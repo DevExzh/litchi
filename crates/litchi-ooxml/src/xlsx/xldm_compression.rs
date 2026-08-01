@@ -703,7 +703,7 @@ pub fn compress_xldm_huffman_strings(
                 if bit_count / 8 >= limits.max_output_bytes {
                     return Err(XldmCodecError::LimitExceeded("max_output_bytes"));
                 }
-                if bit_count % 8 == 0 {
+                if bit_count.is_multiple_of(8) {
                     buffer.push(0);
                 }
                 let bit = ((code.bits >> shift) & 1) as u8;
@@ -858,7 +858,7 @@ pub fn compress_xldm_xpress_block_literals(
         .checked_add(31)
         .ok_or(XldmCodecError::IntegerOverflow)?
         / 32;
-    let terminal_group = usize::from(input.len() % 32 == 0);
+    let terminal_group = usize::from(input.len().is_multiple_of(32));
     let capacity = input
         .len()
         .checked_add(
@@ -884,7 +884,7 @@ pub fn compress_xldm_xpress_block_literals(
         output.extend_from_slice(&flags.to_le_bytes());
         output.extend_from_slice(group);
     }
-    if input.len() % 32 == 0 {
+    if input.len().is_multiple_of(32) {
         output.extend_from_slice(&u32::MAX.to_le_bytes());
     }
     Ok(output)
@@ -1034,15 +1034,14 @@ mod tests {
 
         for field_bits in 0..=64u8 {
             for bit_offset in 0..64u8 {
-                let expected =
-                    if field_bits == 0
-                        || field_bits == 64
-                        || u16::from(field_bits) + u16::from(bit_offset) > 64
-                    {
-                        0
-                    } else {
-                        !(((1u64 << field_bits) - 1) << bit_offset)
-                    };
+                let expected = if field_bits == 0
+                    || field_bits == 64
+                    || u16::from(field_bits) + u16::from(bit_offset) > 64
+                {
+                    0
+                } else {
+                    !(((1u64 << field_bits) - 1) << bit_offset)
+                };
                 assert_eq!(
                     xldm_no_split_compression_mask(field_bits, bit_offset),
                     Some(expected)
@@ -1196,10 +1195,10 @@ mod tests {
 
     fn example_huffman_table() -> [u8; 128] {
         let mut lengths = [0u8; 256];
-        for symbol in [b'F', b'M', b'a', b'm'] {
+        for symbol in *b"FMam" {
             lengths[usize::from(symbol)] = 3;
         }
-        for symbol in [b'e', b'l'] {
+        for symbol in *b"el" {
             lengths[usize::from(symbol)] = 2;
         }
         let mut packed = [0u8; 128];

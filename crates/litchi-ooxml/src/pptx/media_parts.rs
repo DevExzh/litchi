@@ -175,13 +175,14 @@ fn collect_pictures(
     conformance: SlideMediaConformance,
     output: &mut Vec<SlideMediaPicture>,
 ) -> Result<()> {
-    if node.namespace == conformance.pml() && node.name == "pic" {
-        if let Some(picture) = parse_picture(node, conformance)? {
-            if output.len() == MAX_MEDIA {
-                return Err(limit("media count"));
-            }
-            output.push(picture);
+    if node.namespace == conformance.pml()
+        && node.name == "pic"
+        && let Some(picture) = parse_picture(node, conformance)?
+    {
+        if output.len() == MAX_MEDIA {
+            return Err(limit("media count"));
         }
+        output.push(picture);
     }
     for child in &node.children {
         collect_pictures(child, conformance, output)?;
@@ -790,10 +791,10 @@ fn validate_value(value: &SlideMediaList, require_resources: bool) -> Result<()>
         }
         bounded(&picture.name)?;
         validate_id(&picture.relationship_id)?;
-        if let Some(transform) = picture.transform {
-            if transform.width <= 0 || transform.height <= 0 {
-                return Err(invalid("media transform width and height must be positive"));
-            }
+        if let Some(transform) = picture.transform
+            && (transform.width <= 0 || transform.height <= 0)
+        {
+            return Err(invalid("media transform width and height must be positive"));
         }
         if require_resources && picture.resource.is_none() {
             return Err(invalid("media resource is required for package storage"));

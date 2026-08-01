@@ -133,33 +133,33 @@ fn render_marker(
     let mut output = String::with_capacity(template.len());
     let mut chars = template.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '%' {
-            if let Some(next @ '1'..='9') = chars.peek().copied() {
-                chars.next();
-                let referenced = next.to_digit(10).expect("digit checked") as u8 - 1;
-                if referenced <= properties.level {
-                    let level = numbering.resolve_level(properties.num_id, referenced)?;
-                    let value = counters[usize::from(referenced)].unwrap_or(level.start);
-                    let format = if current.legal {
-                        &NumberFormat::Decimal
-                    } else {
-                        &level.format
-                    };
-                    match format_number(value, format) {
-                        Some(rendered) => output.push_str(&rendered),
-                        None => {
-                            return Ok(ListMarker::UnsupportedFormat {
-                                format: format.as_str().to_owned(),
-                                value,
-                            });
-                        },
-                    }
+        if ch == '%'
+            && let Some(next @ '1'..='9') = chars.peek().copied()
+        {
+            chars.next();
+            let referenced = next.to_digit(10).expect("digit checked") as u8 - 1;
+            if referenced <= properties.level {
+                let level = numbering.resolve_level(properties.num_id, referenced)?;
+                let value = counters[usize::from(referenced)].unwrap_or(level.start);
+                let format = if current.legal {
+                    &NumberFormat::Decimal
+                } else {
+                    &level.format
+                };
+                match format_number(value, format) {
+                    Some(rendered) => output.push_str(&rendered),
+                    None => {
+                        return Ok(ListMarker::UnsupportedFormat {
+                            format: format.as_str().to_owned(),
+                            value,
+                        });
+                    },
                 }
-                if output.len() > MAX_LABEL_BYTES {
-                    return Err(invalid("expanded list label exceeds the output limit"));
-                }
-                continue;
             }
+            if output.len() > MAX_LABEL_BYTES {
+                return Err(invalid("expanded list label exceeds the output limit"));
+            }
+            continue;
         }
         output.push(ch);
         if output.len() > MAX_LABEL_BYTES {

@@ -6,7 +6,9 @@
 #![cfg(feature = "imgconv")]
 
 use litchi_ole::doc::shapes::extract_drawing_shapes;
-use litchi_ole::doc::writer::{DocDrawingShape, DocShapeKind, DocPicture, DocWriter, FloatingPosition};
+use litchi_ole::doc::writer::{
+    DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition,
+};
 use litchi_ole::doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_ole::escher::EscherShapeType;
 use std::io::{Cursor, Write};
@@ -55,8 +57,8 @@ fn make_png(width: u32, height: u32) -> Vec<u8> {
 }
 
 fn jpeg_fixture() -> Vec<u8> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/images/jpg/abstract4.jpg");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/images/jpg/abstract4.jpg");
     std::fs::read(path).expect("read JPEG fixture")
 }
 
@@ -86,10 +88,7 @@ fn write_doc_with_shapes(jpeg_bytes: &[u8]) -> Vec<u8> {
                 .with_fill(0xFF, 0x00, 0x00)
                 .with_line(0x00, 0x00, 0xFF),
             FloatingPosition::new(2000, 1000)
-                .with_origins(
-                    ShapeHorizontalOrigin::Page,
-                    ShapeVerticalOrigin::Paragraph,
-                )
+                .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
                 .with_text_wrap(ShapeTextWrap::Square),
         )
         .unwrap();

@@ -105,7 +105,7 @@
 //! # Reference
 //!
 //! - [MS-XLSB]: Excel Binary File Format (.xlsb) Structure Specification
-//!   https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/
+//!   <https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/>
 
 /// Error types for XLSB parsing
 mod error;
@@ -166,20 +166,20 @@ pub mod conditional_formatting;
 /// PivotCache definition stream parsing (MS-XLSB 2.1.7.38)
 pub mod pivot;
 
-/// Lossless PivotTable definition parts (MS-XLSB 2.1.7.40)
-pub mod pivot_view;
 /// Typed, inert External Link data (MS-XLSB 2.1.7.25)
 pub mod external_link;
 mod external_link_write;
+/// Lossless PivotTable definition parts (MS-XLSB 2.1.7.40)
+pub mod pivot_view;
 
+pub mod connections;
 /// Table (ListObject) stream parsing (MS-XLSB 2.1.7.51)
 pub mod table;
-pub mod connections;
 pub(crate) mod walker;
 
+mod chart_resources;
 /// Chart sheet stream parsing (MS-XLSB 2.1.7.7)
 pub mod chartsheet;
-mod chart_resources;
 
 /// SpreadsheetDrawing XML inventory for XLSB Drawings parts (MS-XLSB 2.1.7.23)
 pub mod drawing;
@@ -200,18 +200,17 @@ pub use data_validation::{DataValidation, DataValidationRecordKind, DataValidati
 pub use drawing::{
     CHART_GRAPHIC_DATA_URI, XlsbDrawing, XlsbDrawingAnchor, XlsbDrawingAnchorKind,
     XlsbDrawingCellMarker, XlsbDrawingEmuPoint, XlsbDrawingEmuSize, XlsbDrawingGraphicFrame,
-    XlsbDrawingNonVisual, XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage, XlsbSheetDrawing,
-    parse_drawing_part,
+    XlsbDrawingNonVisual, XlsbDrawingObject, XlsbEmbeddedChart, XlsbEmbeddedImage,
+    XlsbSheetDrawing, parse_drawing_part,
 };
 pub use drawing_image::{XlsbWorksheetImage, XlsbWorksheetImageFormat};
 pub use error::{XlsbError, XlsbResult};
 pub use external_link::{
-    MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
-    MAX_XLSB_EXTERNAL_CACHED_VALUES, XlsbDdeItem, XlsbExternalAreaReference,
-    XlsbExternalCachedValue, XlsbExternalCellLocation, XlsbExternalCellReference,
-    XlsbExternalDefinedName, XlsbExternalErrorValue, XlsbExternalLink, XlsbExternalLinkKind,
-    XlsbExternalNameFormula, XlsbExternalNameFormulaKind, XlsbExternalSheetRange,
-    XlsbExternalValueMatrix, XlsbOleItem,
+    MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS, MAX_XLSB_EXTERNAL_CACHED_VALUES,
+    XlsbDdeItem, XlsbExternalAreaReference, XlsbExternalCachedValue, XlsbExternalCellLocation,
+    XlsbExternalCellReference, XlsbExternalDefinedName, XlsbExternalErrorValue, XlsbExternalLink,
+    XlsbExternalLinkKind, XlsbExternalNameFormula, XlsbExternalNameFormulaKind,
+    XlsbExternalSheetRange, XlsbExternalValueMatrix, XlsbOleItem,
 };
 pub use pivot::{
     CalculatedItem, CalculatedMember, CalculatedMemberExt14, PivotCacheConsolidationPage,

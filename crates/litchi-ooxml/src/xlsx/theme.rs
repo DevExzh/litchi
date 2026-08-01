@@ -11,8 +11,8 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result as SheetResult};
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 const DRAWINGML: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 
@@ -212,7 +212,9 @@ impl XlsxTheme {
                     if drawingml && local == b"theme" {
                         name = unqualified_attribute_value(&element, b"name", decoder)?;
                     } else if drawingml && local == b"clrScheme" {
-                        color_scheme_name = unqualified_attribute_value(&element, b"name", decoder)?.unwrap_or_default();
+                        color_scheme_name =
+                            unqualified_attribute_value(&element, b"name", decoder)?
+                                .unwrap_or_default();
                         slot_index = Some(0);
                     } else if drawingml && local == b"fmtScheme" {
                         fmt_start = Some(event_start);
@@ -253,19 +255,23 @@ impl XlsxTheme {
                         }
                     } else if let Some(index) = slot_index.as_mut() {
                         if drawingml && local == b"srgbClr" {
-                            let value = unqualified_attribute_value(&element, b"val", decoder)?.ok_or_else(|| {
-                                invalid("a:srgbClr is missing its val attribute")
-                            })?;
-                            colors[*index] =
-                                Some(ThemeColorValue::Srgb(parse_hex_rgb(&value, "a:srgbClr val")?));
+                            let value = unqualified_attribute_value(&element, b"val", decoder)?
+                                .ok_or_else(|| invalid("a:srgbClr is missing its val attribute"))?;
+                            colors[*index] = Some(ThemeColorValue::Srgb(parse_hex_rgb(
+                                &value,
+                                "a:srgbClr val",
+                            )?));
                             *index += 1;
                         } else if drawingml && local == b"sysClr" {
-                            let color_name = unqualified_attribute_value(&element, b"val", decoder)?.ok_or_else(|| {
-                                invalid("a:sysClr is missing its val attribute")
-                            })?;
-                            let last = unqualified_attribute_value(&element, b"lastClr", decoder)?.ok_or_else(|| {
-                                invalid("a:sysClr is missing its lastClr attribute")
-                            })?;
+                            let color_name =
+                                unqualified_attribute_value(&element, b"val", decoder)?
+                                    .ok_or_else(|| {
+                                        invalid("a:sysClr is missing its val attribute")
+                                    })?;
+                            let last = unqualified_attribute_value(&element, b"lastClr", decoder)?
+                                .ok_or_else(|| {
+                                    invalid("a:sysClr is missing its lastClr attribute")
+                                })?;
                             colors[*index] = Some(ThemeColorValue::System {
                                 name: color_name,
                                 last_rgb: parse_hex_rgb(&last, "a:sysClr lastClr")?,
@@ -280,8 +286,8 @@ impl XlsxTheme {
                     if fmt_depth > 0 {
                         fmt_depth -= 1;
                         if fmt_depth == 0 && drawingml && local == b"fmtScheme" {
-                            format_scheme_xml = xml[fmt_start.expect("fmt start")..event_end]
-                                .to_string();
+                            format_scheme_xml =
+                                xml[fmt_start.expect("fmt start")..event_end].to_string();
                         }
                     } else if drawingml && local == b"clrScheme" {
                         slot_index = None;
@@ -329,7 +335,6 @@ impl XlsxTheme {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,19 +374,33 @@ mod tests {
         assert_eq!(theme.minor_font(), Some("Calibri"));
         assert_eq!(theme.rgb(ThemeColorSlot::Dk1), [0, 0, 0]);
         assert_eq!(theme.rgb(ThemeColorSlot::Accent1), [0x4F, 0x81, 0xBD]);
-        assert_eq!(theme.rgb(ThemeColorSlot::FollowedHyperlink), [0x80, 0, 0x80]);
+        assert_eq!(
+            theme.rgb(ThemeColorSlot::FollowedHyperlink),
+            [0x80, 0, 0x80]
+        );
         assert_eq!(
             theme.color(ThemeColorSlot::Dk1),
-            &ThemeColorValue::System { name: "windowText".to_string(), last_rgb: [0, 0, 0] }
+            &ThemeColorValue::System {
+                name: "windowText".to_string(),
+                last_rgb: [0, 0, 0]
+            }
         );
-        assert_eq!(theme.color(ThemeColorSlot::Lt2), &ThemeColorValue::Srgb([0xEE, 0xEC, 0xE1]));
-        assert_eq!(theme.format_scheme_xml(), "<a:fmtScheme name=\"Office\"><a:fillStyleLst/></a:fmtScheme>");
+        assert_eq!(
+            theme.color(ThemeColorSlot::Lt2),
+            &ThemeColorValue::Srgb([0xEE, 0xEC, 0xE1])
+        );
+        assert_eq!(
+            theme.format_scheme_xml(),
+            "<a:fmtScheme name=\"Office\"><a:fillStyleLst/></a:fmtScheme>"
+        );
     }
 
     #[test]
     fn rejects_malformed_themes() {
         // Wrong slot order.
-        let bad = THEME.replace("<a:lt1>", "<a:dk2>").replace("</a:lt1>", "</a:dk2>");
+        let bad = THEME
+            .replace("<a:lt1>", "<a:dk2>")
+            .replace("</a:lt1>", "</a:dk2>");
         assert!(XlsxTheme::parse(&bad).is_err());
         // Missing a slot.
         let bad = THEME.replace("<a:folHlink><a:srgbClr val=\"800080\"/></a:folHlink>", "");

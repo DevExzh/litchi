@@ -291,7 +291,9 @@ mod tests {
     #[test]
     fn accepts_field_bounds_and_preserves_reserved_bits() {
         for (position, pie2, gap) in [(0, 5, 0), (32000, 200, 500)] {
-            assert!(XlsBopPop::parse(&record(0x01, 0, 0, [position, 0, pie2, gap], 0.0, 0)).is_ok());
+            assert!(
+                XlsBopPop::parse(&record(0x01, 0, 0, [position, 0, pie2, gap], 0.0, 0)).is_ok()
+            );
         }
         // The 15 reserved flags bits MUST be ignored but round-trip verbatim.
         let bytes = record(0x02, 0, 0x0003, [0, 0, 5, 0], 0.0, 0xFFFE);

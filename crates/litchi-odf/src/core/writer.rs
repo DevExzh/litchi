@@ -5,10 +5,10 @@
 //!
 //! Uses soapberry-zip for high-performance ZIP writing.
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use litchi_core::{Error, Result, xml::escape_xml};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::collections::HashSet;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use zeroize::Zeroizing;
 
 use super::encryption::{OdfEncryptionProfile, encrypt_entry};
@@ -315,11 +315,7 @@ impl PackageWriter {
     }
 
     /// Add a directory entry to the generated manifest without a ZIP payload.
-    pub(crate) fn add_manifest_directory(
-        &mut self,
-        path: &str,
-        media_type: &str,
-    ) -> Result<()> {
+    pub(crate) fn add_manifest_directory(&mut self, path: &str, media_type: &str) -> Result<()> {
         if !path.ends_with('/') || path.starts_with('/') || path.contains("..") {
             return Err(Error::InvalidFormat(
                 "invalid embedded-object manifest directory".to_string(),
@@ -450,7 +446,8 @@ impl PackageWriter {
             .map_err(|e| Error::ZipError(e.to_string()))?;
 
         // Finish ZIP archive and return bytes
-        let bytes = self.zip_writer
+        let bytes = self
+            .zip_writer
             .finish_to_bytes()
             .map_err(|e| Error::ZipError(e.to_string()))?;
         if let Some(signer) = &self.document_signer {
@@ -525,9 +522,7 @@ fn write_manifest_entry(xml: &mut String, entry: &ManifestEntry) {
 
     let (start_name, start_size) = match encryption.start_key {
         ManifestStartKeyGeneration::Sha1 => ("SHA1", 20),
-        ManifestStartKeyGeneration::Sha256 => {
-            ("http://www.w3.org/2001/04/xmlenc#sha256", 32)
-        },
+        ManifestStartKeyGeneration::Sha256 => ("http://www.w3.org/2001/04/xmlenc#sha256", 32),
     };
     xml.push_str("<manifest:start-key-generation manifest:start-key-generation-name=\"");
     xml.push_str(start_name);
@@ -539,7 +534,9 @@ fn write_manifest_entry(xml: &mut String, entry: &ManifestEntry) {
             iterations,
             key_size,
         } => {
-            xml.push_str("<manifest:key-derivation manifest:key-derivation-name=\"PBKDF2\" manifest:salt=\"");
+            xml.push_str(
+                "<manifest:key-derivation manifest:key-derivation-name=\"PBKDF2\" manifest:salt=\"",
+            );
             xml.push_str(&BASE64_STANDARD.encode(salt));
             xml.push_str(&format!(
                 "\" manifest:iteration-count=\"{}\" manifest:key-size=\"{key_size}\"/>",
@@ -883,15 +880,17 @@ mod encrypted_copy_tests {
             .set_encryption("new-password", OdfEncryptionProfile::compatible())
             .unwrap();
         destination.copy_auxiliary_files_from(&source).unwrap();
-        let rewritten = OwnedPackage::from_bytes_with_password(
-            destination.finish().unwrap(),
-            "new-password",
-        )
-        .unwrap();
+        let rewritten =
+            OwnedPackage::from_bytes_with_password(destination.finish().unwrap(), "new-password")
+                .unwrap();
         assert_eq!(
             rewritten.get_file("Pictures/asset.bin").unwrap(),
             b"encrypted auxiliary bytes"
         );
-        assert!(!rewritten.has_file("META-INF/documentsignatures.xml").unwrap());
+        assert!(
+            !rewritten
+                .has_file("META-INF/documentsignatures.xml")
+                .unwrap()
+        );
     }
 }

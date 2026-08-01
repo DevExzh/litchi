@@ -807,16 +807,15 @@ impl XlsbWorkbook {
                 }
             }
             if let Some((&col_first, &(col_last, _))) = active.range(..=range.col_last).next_back()
+                && col_last >= range.col_first
             {
-                if col_last >= range.col_first {
-                    return Err(crate::xlsb::error::XlsbError::InvalidCellReference(
-                        format!(
-                            "merged range {} overlaps an existing range beginning in column {}",
-                            range.to_range_string(),
-                            col_first
-                        ),
-                    ));
-                }
+                return Err(crate::xlsb::error::XlsbError::InvalidCellReference(
+                    format!(
+                        "merged range {} overlaps an existing range beginning in column {}",
+                        range.to_range_string(),
+                        col_first
+                    ),
+                ));
             }
             active.insert(range.col_first, (range.col_last, range.row_last));
             expirations.push(Reverse((range.row_last, range.col_first)));

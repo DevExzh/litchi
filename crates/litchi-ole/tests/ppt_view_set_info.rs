@@ -55,7 +55,11 @@ fn reads_normal_view_set_info_from_real_presentations() {
 
 #[test]
 fn reads_notes_text_view_info_from_real_presentations() {
-    for name in ["headers_footers.ppt", "basic_test_ppt_file.ppt", "datetime.ppt"] {
+    for name in [
+        "headers_footers.ppt",
+        "basic_test_ppt_file.ppt",
+        "datetime.ppt",
+    ] {
         let mut package = Package::open(fixture(name)).unwrap();
         if let Some(notes) = package
             .presentation()

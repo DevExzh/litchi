@@ -1,9 +1,9 @@
+use crate::error::{OoxmlError, Result};
+use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
 /// Presentation part - the main part in a .pptx package.
 ///
 /// Corresponds to `/ppt/presentation.xml` in the package.
 use litchi_ooxml_common::xml::unqualified_attribute_value;
-use crate::error::{OoxmlError, Result};
-use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
 use litchi_opc::part::Part;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;

@@ -1391,10 +1391,10 @@ fn validate_cache_set(caches: &[WorkbookTimelineCache]) -> Result<()> {
                 "Timeline Cache UIDs must be specified on all caches or none",
             ));
         }
-        if let Some(uid) = &cache.definition.uid {
-            if !uids.insert(uid.to_ascii_lowercase()) {
-                return Err(invalid("duplicate Timeline Cache UID"));
-            }
+        if let Some(uid) = &cache.definition.uid
+            && !uids.insert(uid.to_ascii_lowercase())
+        {
+            return Err(invalid("duplicate Timeline Cache UID"));
         }
     }
     Ok(())
@@ -1465,10 +1465,10 @@ fn validate_global_timelines(values: &[WorksheetTimelines]) -> Result<()> {
                 "timeline UIDs must be specified on all views or none",
             ));
         }
-        if let Some(uid) = &view.uid {
-            if !uids.insert(uid.to_ascii_lowercase()) {
-                return Err(invalid("duplicate timeline UID"));
-            }
+        if let Some(uid) = &view.uid
+            && !uids.insert(uid.to_ascii_lowercase())
+        {
+            return Err(invalid("duplicate timeline UID"));
         }
     }
     Ok(())
@@ -2186,7 +2186,7 @@ fn decimal_sub_one(value: &mut String) {
 }
 fn is_leap_year(year: &XsdYear) -> bool {
     let value = year.astronomical_mod_400();
-    value % 4 == 0 && (value % 100 != 0 || value == 0)
+    value.is_multiple_of(4) && (!value.is_multiple_of(100) || value == 0)
 }
 fn days_in_month(year: &XsdYear, month: u8) -> u8 {
     match month {
@@ -2431,9 +2431,9 @@ fn add_strings(total: &mut usize, size: usize) -> Result<()> {
 }
 fn resolved(value: ResolveResult<'_>) -> Result<String> {
     match value {
-        ResolveResult::Bound(Namespace(value)) => Ok(std::str::from_utf8(value)
-            .map_err(xml_error)?
-            .to_owned()),
+        ResolveResult::Bound(Namespace(value)) => {
+            Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+        },
         ResolveResult::Unbound => Ok(String::new()),
         ResolveResult::Unknown(prefix) => Err(invalid(format!(
             "unbound XML prefix '{}'",

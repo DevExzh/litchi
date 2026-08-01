@@ -46,7 +46,10 @@ fn list_level_metadata_round_trips_through_the_writer() {
         r"\levelprevspace",
         r"\leveltemplateid1234",
     ] {
-        assert!(serialized.contains(marker), "missing {marker} in {serialized}");
+        assert!(
+            serialized.contains(marker),
+            "missing {marker} in {serialized}"
+        );
     }
 
     let reparsed = RtfDocument::parse(&serialized).unwrap();

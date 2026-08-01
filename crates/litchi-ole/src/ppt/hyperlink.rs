@@ -636,7 +636,7 @@ fn decode_macro_name(data: &[u8], max_bytes: usize) -> Result<String> {
     if data.len() > max_bytes {
         return corrupted("MacroNameAtom exceeds the configured size limit");
     }
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return corrupted("MacroNameAtom length must be even");
     }
     let units = data

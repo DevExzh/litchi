@@ -22,13 +22,15 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use litchi_ooxml_common::xml::{decode_xml_reference, is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::relationship_attribute_value;
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::shape_geometry::XlsxCustomGeometry;
 use crate::xlsx::shape_geometry::parse::{CustomGeometryBuilder, GeometryElement};
 use crate::xlsx::worksheet::WorksheetInfo;
+use litchi_ooxml_common::xml::{
+    decode_xml_reference, is_drawingml_name, unqualified_attribute_value,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, Part};
 

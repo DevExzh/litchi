@@ -3910,9 +3910,8 @@ impl<'a> Lexer<'a> {
                 .ok_or_else(|| RtfError::InvalidUnicode("Incomplete hex escape".to_string()))?;
             // A mutation or split multi-byte scalar yields non-ASCII bytes
             // here; treat them as an invalid escape rather than a slice panic.
-            let hex = std::str::from_utf8(pair).map_err(|_| {
-                RtfError::InvalidUnicode("Invalid hex escape".to_string())
-            })?;
+            let hex = std::str::from_utf8(pair)
+                .map_err(|_| RtfError::InvalidUnicode("Invalid hex escape".to_string()))?;
             self.pos += 2;
             let byte = u8::from_str_radix(hex, 16)
                 .map_err(|_| RtfError::InvalidUnicode(format!("Invalid hex escape: {hex}")))?;
@@ -4256,10 +4255,7 @@ mod tests {
         let mut lexer = Lexer::new(input, &arena);
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 1);
-        assert!(matches!(
-            tokens[0],
-            Token::Control(ControlWord::Page(None))
-        ));
+        assert!(matches!(tokens[0], Token::Control(ControlWord::Page(None))));
     }
 
     #[test]

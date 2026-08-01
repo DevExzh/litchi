@@ -12,11 +12,11 @@
 //! generated: Word and LibreOffice re-render the diagram from the layout and
 //! data parts when it is absent.
 
+use crate::diagrams::DGM_NAMESPACE;
 use crate::diagrams::model::{
     SmartArt, generate_smartart_colors_xml, generate_smartart_data_xml,
     generate_smartart_layout_xml, generate_smartart_quickstyle_xml,
 };
-use crate::diagrams::DGM_NAMESPACE;
 use crate::error::{OoxmlError, Result};
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_core::xml::escape_xml;
@@ -101,7 +101,7 @@ impl MutableSmartArt {
     /// Wrap a built [`SmartArt`] for authoring.
     ///
     /// Validates the diagram: it must contain at least one node, and the node
-    /// tree is bounded to [`MAX_DIAGRAM_NODES`] nodes and [`MAX_DIAGRAM_DEPTH`]
+    /// tree is bounded to `MAX_DIAGRAM_NODES` nodes and `MAX_DIAGRAM_DEPTH`
     /// levels.
     pub fn new(smartart: SmartArt) -> Result<Self> {
         validate_smartart(&smartart)?;
@@ -173,8 +173,7 @@ impl MutableSmartArt {
     pub(crate) fn to_xml(&self, xml: &mut String, rel_ids: Option<&SmartArtRelIds>) -> Result<()> {
         if self.anchor_key.is_empty() {
             return Err(OoxmlError::InvalidFormat(
-                "SmartArt has no anchor key; add it via MutableDocument::add_smart_art"
-                    .to_string(),
+                "SmartArt has no anchor key; add it via MutableDocument::add_smart_art".to_string(),
             ));
         }
         let placeholder = |part: &str| format!("{{{{SMARTART_{part}_{}}}}}", self.anchor_key);
@@ -226,11 +225,8 @@ fn validate_smartart(smartart: &SmartArt) -> Result<()> {
         ));
     }
     let mut nodes = 0usize;
-    let mut stack: Vec<(&crate::diagrams::model::DiagramNode, u32)> = smartart
-        .nodes
-        .iter()
-        .map(|node| (node, 1))
-        .collect();
+    let mut stack: Vec<(&crate::diagrams::model::DiagramNode, u32)> =
+        smartart.nodes.iter().map(|node| (node, 1)).collect();
     while let Some((node, depth)) = stack.pop() {
         nodes += 1;
         if nodes > MAX_DIAGRAM_NODES || depth > MAX_DIAGRAM_DEPTH {
@@ -246,8 +242,8 @@ fn validate_smartart(smartart: &SmartArt) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagrams::model::{DiagramNode, SmartArtBuilder};
     use crate::diagrams::DiagramType;
+    use crate::diagrams::model::{DiagramNode, SmartArtBuilder};
 
     fn built() -> SmartArt {
         SmartArtBuilder::new(DiagramType::Process)

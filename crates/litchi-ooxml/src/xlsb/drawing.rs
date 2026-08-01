@@ -11,9 +11,9 @@
 //! the other formats ([`crate::charts`]), including chart external data,
 //! user-shapes, and extension resources; external targets are never fetched.
 
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::xlsb::error::XlsbResult;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::Decoder;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -403,7 +403,11 @@ impl PendingObject {
             return Ok(());
         }
         if self.kind == ObjectKind::GraphicFrame
-            && litchi_ooxml_common::xml::is_drawingml_name(namespace, element.name(), b"graphicData")
+            && litchi_ooxml_common::xml::is_drawingml_name(
+                namespace,
+                element.name(),
+                b"graphicData",
+            )
         {
             if self.content_uri.is_some() {
                 return Err(invalid("graphic frame has multiple graphicData elements"));

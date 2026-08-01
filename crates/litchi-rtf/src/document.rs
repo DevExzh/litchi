@@ -380,7 +380,9 @@ impl<'a> RtfDocument<'a> {
                 class_name: Cow::Owned(object.class_name.into_owned()),
                 name: Cow::Owned(object.name.into_owned()),
                 alias: object.alias.map(|alias| Cow::Owned(alias.into_owned())),
-                section: object.section.map(|section| Cow::Owned(section.into_owned())),
+                section: object
+                    .section
+                    .map(|section| Cow::Owned(section.into_owned())),
                 time: object.time,
                 class_id: Cow::Owned(object.class_id.into_owned()),
                 width: object.width,
@@ -730,10 +732,7 @@ impl<'a> RtfDocument<'a> {
         &mut self.tables
     }
 
-    fn table_cell_mut(
-        &mut self,
-        path: &crate::TableCellPath,
-    ) -> RtfResult<&mut crate::Cell<'a>> {
+    fn table_cell_mut(&mut self, path: &crate::TableCellPath) -> RtfResult<&mut crate::Cell<'a>> {
         let root = path.root;
         let mut cell = self
             .tables
@@ -741,7 +740,9 @@ impl<'a> RtfDocument<'a> {
             .and_then(|table| table.rows_mut().get_mut(root.row_index))
             .and_then(|row| row.cells_mut().get_mut(root.cell_index))
             .ok_or_else(|| {
-                RtfError::MalformedDocument("RTF table-cell path is outside the document".to_string())
+                RtfError::MalformedDocument(
+                    "RTF table-cell path is outside the document".to_string(),
+                )
             })?;
         for coordinate in &path.nested {
             cell = cell
@@ -3208,9 +3209,11 @@ impl<'a> RtfDocument<'a> {
             ));
         }
         let aggregate = entry.text_bytes().and_then(|initial| {
-            self.navigation_entries.iter().try_fold(initial, |size, existing| {
-                size.checked_add(existing.text_bytes()?)
-            })
+            self.navigation_entries
+                .iter()
+                .try_fold(initial, |size, existing| {
+                    size.checked_add(existing.text_bytes()?)
+                })
         });
         if aggregate.is_none_or(|size| {
             size > super::navigation_entry::MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES
@@ -3231,7 +3234,12 @@ impl<'a> RtfDocument<'a> {
         entry: super::navigation_entry::NavigationEntry<'a>,
     ) -> RtfResult<usize> {
         let position = entry.position();
-        if self.table_cell_mut(path)?.text().get(position..position).is_none() {
+        if self
+            .table_cell_mut(path)?
+            .text()
+            .get(position..position)
+            .is_none()
+        {
             return Err(RtfError::MalformedDocument(
                 "RTF navigation-entry position is outside its table-cell story".to_string(),
             ));
@@ -3429,14 +3437,26 @@ impl<'a> RtfDocument<'a> {
 
     /// Recursively find a body, background, grouped, or text-story shape by name.
     pub fn find_shape_by_name(&self, name: &str) -> Option<&super::shape::Shape<'_>> {
-        self.shapes.iter().find_map(|shape| shape.find_by_name(name))
-            .or_else(|| self.shape_groups.iter().find_map(|group| group.find_shape_by_name(name)))
+        self.shapes
+            .iter()
+            .find_map(|shape| shape.find_by_name(name))
+            .or_else(|| {
+                self.shape_groups
+                    .iter()
+                    .find_map(|group| group.find_shape_by_name(name))
+            })
     }
 
     /// Recursively find a body, background, grouped, or text-story shape by `shplid`.
     pub fn find_shape_by_id(&self, id: i32) -> Option<&super::shape::Shape<'_>> {
-        self.shapes.iter().find_map(|shape| shape.find_by_id(id))
-            .or_else(|| self.shape_groups.iter().find_map(|group| group.find_shape_by_id(id)))
+        self.shapes
+            .iter()
+            .find_map(|shape| shape.find_by_id(id))
+            .or_else(|| {
+                self.shape_groups
+                    .iter()
+                    .find_map(|group| group.find_shape_by_id(id))
+            })
     }
 
     /// Exact source order of root shapes and shape groups in the body story.
@@ -3449,10 +3469,12 @@ impl<'a> RtfDocument<'a> {
     }
 
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
-        self.body_story_events.iter().filter_map(|event| match event {
-            crate::BodyStoryEvent::PageBreak(page_break) => Some(page_break),
-            _ => None,
-        })
+        self.body_story_events
+            .iter()
+            .filter_map(|event| match event {
+                crate::BodyStoryEvent::PageBreak(page_break) => Some(page_break),
+                _ => None,
+            })
     }
 
     /// Nonrequired (soft) break markers in body source order.
@@ -3460,10 +3482,12 @@ impl<'a> RtfDocument<'a> {
     /// The markers are passive Galley-view layout metadata; no pagination is
     /// computed from them.
     pub fn soft_breaks(&self) -> impl Iterator<Item = &crate::SoftBreak> {
-        self.body_story_events.iter().filter_map(|event| match event {
-            crate::BodyStoryEvent::SoftBreak(soft_break) => Some(soft_break),
-            _ => None,
-        })
+        self.body_story_events
+            .iter()
+            .filter_map(|event| match event {
+                crate::BodyStoryEvent::SoftBreak(soft_break) => Some(soft_break),
+                _ => None,
+            })
     }
 
     /// Explicit main-story section boundaries in source order.
@@ -3471,10 +3495,12 @@ impl<'a> RtfDocument<'a> {
     /// A boundary with `next_section == None` starts an inherited section that
     /// has no separately retained section definition.
     pub fn section_breaks(&self) -> impl Iterator<Item = &crate::SectionBreak> {
-        self.body_story_events.iter().filter_map(|event| match event {
-            crate::BodyStoryEvent::SectionBreak(section_break) => Some(section_break),
-            _ => None,
-        })
+        self.body_story_events
+            .iter()
+            .filter_map(|event| match event {
+                crate::BodyStoryEvent::SectionBreak(section_break) => Some(section_break),
+                _ => None,
+            })
     }
 
     pub fn push_page_break(&mut self, position: usize) -> RtfResult<()> {
@@ -3484,9 +3510,9 @@ impl<'a> RtfDocument<'a> {
                 "RTF page-break position is not a UTF-8 body boundary".to_string(),
             ));
         }
-        self.insert_body_story_event(crate::BodyStoryEvent::PageBreak(
-            crate::PageBreak::new(position),
-        ))
+        self.insert_body_story_event(crate::BodyStoryEvent::PageBreak(crate::PageBreak::new(
+            position,
+        )))
     }
 
     pub fn clear_page_breaks(&mut self) {
@@ -3495,10 +3521,12 @@ impl<'a> RtfDocument<'a> {
     }
 
     pub fn column_breaks(&self) -> impl Iterator<Item = &crate::ColumnBreak> {
-        self.body_story_events.iter().filter_map(|event| match event {
-            crate::BodyStoryEvent::ColumnBreak(column_break) => Some(column_break),
-            _ => None,
-        })
+        self.body_story_events
+            .iter()
+            .filter_map(|event| match event {
+                crate::BodyStoryEvent::ColumnBreak(column_break) => Some(column_break),
+                _ => None,
+            })
     }
 
     pub fn push_column_break(&mut self, position: usize) -> RtfResult<()> {
@@ -3508,9 +3536,9 @@ impl<'a> RtfDocument<'a> {
                 "RTF column-break position is not a UTF-8 body boundary".to_string(),
             ));
         }
-        self.insert_body_story_event(crate::BodyStoryEvent::ColumnBreak(
-            crate::ColumnBreak::new(position),
-        ))
+        self.insert_body_story_event(crate::BodyStoryEvent::ColumnBreak(crate::ColumnBreak::new(
+            position,
+        )))
     }
 
     pub fn clear_column_breaks(&mut self) {
@@ -3579,13 +3607,23 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically replace a non-background root shape without relocating its body anchor.
-    pub fn replace_shape(&mut self, index: usize, replacement: super::shape::Shape<'a>) -> RtfResult<super::shape::Shape<'a>> {
-        let current = self.shapes.get(index).ok_or_else(|| RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds")))?;
+    pub fn replace_shape(
+        &mut self,
+        index: usize,
+        replacement: super::shape::Shape<'a>,
+    ) -> RtfResult<super::shape::Shape<'a>> {
+        let current = self.shapes.get(index).ok_or_else(|| {
+            RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))
+        })?;
         if self.background_shape_index == Some(index) || replacement.is_background {
-            return Err(RtfError::MalformedDocument("RTF background shape must use set_background_shape".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF background shape must use set_background_shape".to_string(),
+            ));
         }
         if replacement.position != current.position {
-            return Err(RtfError::MalformedDocument("RTF shape replacement cannot relocate its body anchor".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF shape replacement cannot relocate its body anchor".to_string(),
+            ));
         }
         replacement.validate()?;
         let old = std::mem::replace(&mut self.shapes[index], replacement);
@@ -3594,20 +3632,46 @@ impl<'a> RtfDocument<'a> {
 
     /// Atomically remove one non-background root shape and repair every stored index.
     pub fn remove_shape(&mut self, index: usize) -> RtfResult<super::shape::Shape<'a>> {
-        if index >= self.shapes.len() { return Err(RtfError::MalformedDocument(format!("RTF shape index {index} is out of bounds"))); }
-        if self.background_shape_index == Some(index) { return Err(RtfError::MalformedDocument("RTF background shape must use clear_background_shape".to_string())); }
+        if index >= self.shapes.len() {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF shape index {index} is out of bounds"
+            )));
+        }
+        if self.background_shape_index == Some(index) {
+            return Err(RtfError::MalformedDocument(
+                "RTF background shape must use clear_background_shape".to_string(),
+            ));
+        }
         let mut shapes = self.shapes.clone();
         let mut order = self.drawing_order.clone();
         let mut events = self.body_story_events.clone();
         let removed = shapes.remove(index);
-        order.retain(|drawing| !matches!(drawing, crate::StoryDrawing::Shape(value) if *value == index));
+        order.retain(
+            |drawing| !matches!(drawing, crate::StoryDrawing::Shape(value) if *value == index),
+        );
         events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) if *value == index));
-        for drawing in &mut order { if let crate::StoryDrawing::Shape(value) = drawing && *value > index { *value -= 1; } }
-        for event in &mut events { if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) = event && *value > index { *value -= 1; } }
+        for drawing in &mut order {
+            if let crate::StoryDrawing::Shape(value) = drawing
+                && *value > index
+            {
+                *value -= 1;
+            }
+        }
+        for event in &mut events {
+            if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(value)) = event
+                && *value > index
+            {
+                *value -= 1;
+            }
+        }
         self.shapes = shapes;
         self.drawing_order = order;
         self.body_story_events = events;
-        if let Some(background) = &mut self.background_shape_index && *background > index { *background -= 1; }
+        if let Some(background) = &mut self.background_shape_index
+            && *background > index
+        {
+            *background -= 1;
+        }
         Ok(removed)
     }
 
@@ -3869,24 +3933,55 @@ impl<'a> RtfDocument<'a> {
     }
 
     /// Atomically replace a root group without relocating its body anchor.
-    pub fn replace_shape_group(&mut self, index: usize, replacement: super::shape::ShapeGroup<'a>) -> RtfResult<super::shape::ShapeGroup<'a>> {
-        let current = self.shape_groups.get(index).ok_or_else(|| RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds")))?;
-        if replacement.position != current.position { return Err(RtfError::MalformedDocument("RTF shape-group replacement cannot relocate its body anchor".to_string())); }
+    pub fn replace_shape_group(
+        &mut self,
+        index: usize,
+        replacement: super::shape::ShapeGroup<'a>,
+    ) -> RtfResult<super::shape::ShapeGroup<'a>> {
+        let current = self.shape_groups.get(index).ok_or_else(|| {
+            RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds"))
+        })?;
+        if replacement.position != current.position {
+            return Err(RtfError::MalformedDocument(
+                "RTF shape-group replacement cannot relocate its body anchor".to_string(),
+            ));
+        }
         replacement.validate()?;
-        Ok(std::mem::replace(&mut self.shape_groups[index], replacement))
+        Ok(std::mem::replace(
+            &mut self.shape_groups[index],
+            replacement,
+        ))
     }
 
     /// Atomically remove one root group and repair every stored index.
     pub fn remove_shape_group(&mut self, index: usize) -> RtfResult<super::shape::ShapeGroup<'a>> {
-        if index >= self.shape_groups.len() { return Err(RtfError::MalformedDocument(format!("RTF shape-group index {index} is out of bounds"))); }
+        if index >= self.shape_groups.len() {
+            return Err(RtfError::MalformedDocument(format!(
+                "RTF shape-group index {index} is out of bounds"
+            )));
+        }
         let mut groups = self.shape_groups.clone();
         let mut order = self.drawing_order.clone();
         let mut events = self.body_story_events.clone();
         let removed = groups.remove(index);
-        order.retain(|drawing| !matches!(drawing, crate::StoryDrawing::ShapeGroup(value) if *value == index));
+        order.retain(
+            |drawing| !matches!(drawing, crate::StoryDrawing::ShapeGroup(value) if *value == index),
+        );
         events.retain(|event| !matches!(event, crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) if *value == index));
-        for drawing in &mut order { if let crate::StoryDrawing::ShapeGroup(value) = drawing && *value > index { *value -= 1; } }
-        for event in &mut events { if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) = event && *value > index { *value -= 1; } }
+        for drawing in &mut order {
+            if let crate::StoryDrawing::ShapeGroup(value) = drawing
+                && *value > index
+            {
+                *value -= 1;
+            }
+        }
+        for event in &mut events {
+            if let crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(value)) = event
+                && *value > index
+            {
+                *value -= 1;
+            }
+        }
         self.shape_groups = groups;
         self.drawing_order = order;
         self.body_story_events = events;
@@ -3896,14 +3991,23 @@ impl<'a> RtfDocument<'a> {
     /// Reorder root drawings at the same body anchor without moving unrelated story content.
     pub fn move_drawing(&mut self, from: usize, to: usize) -> RtfResult<()> {
         if from >= self.drawing_order.len() || to >= self.drawing_order.len() {
-            return Err(RtfError::MalformedDocument("RTF drawing reorder index is out of bounds".to_string()));
+            return Err(RtfError::MalformedDocument(
+                "RTF drawing reorder index is out of bounds".to_string(),
+            ));
         }
-        if from == to { return Ok(()); }
+        if from == to {
+            return Ok(());
+        }
         let start = from.min(to);
         let end = from.max(to);
         let anchor = self.root_drawing_position(self.drawing_order[from]);
-        if self.drawing_order[start..=end].iter().any(|drawing| self.root_drawing_position(*drawing) != anchor) {
-            return Err(RtfError::MalformedDocument("RTF drawings at different body anchors cannot be reordered".to_string()));
+        if self.drawing_order[start..=end]
+            .iter()
+            .any(|drawing| self.root_drawing_position(*drawing) != anchor)
+        {
+            return Err(RtfError::MalformedDocument(
+                "RTF drawings at different body anchors cannot be reordered".to_string(),
+            ));
         }
         let mut order = self.drawing_order.clone();
         let drawing = order.remove(from);
@@ -3911,16 +4015,25 @@ impl<'a> RtfDocument<'a> {
         let mut events = self.body_story_events.clone();
         let mut next = order.iter().copied();
         for event in &mut events {
-            if let crate::BodyStoryEvent::Drawing(drawing) = event { *drawing = next.next().expect("drawing event count matches order"); }
+            if let crate::BodyStoryEvent::Drawing(drawing) = event {
+                *drawing = next.next().expect("drawing event count matches order");
+            }
         }
-        if next.next().is_some() { return Err(RtfError::MalformedDocument("RTF drawing event order is incomplete".to_string())); }
+        if next.next().is_some() {
+            return Err(RtfError::MalformedDocument(
+                "RTF drawing event order is incomplete".to_string(),
+            ));
+        }
         self.drawing_order = order;
         self.body_story_events = events;
         Ok(())
     }
 
     fn root_drawing_position(&self, drawing: crate::StoryDrawing) -> usize {
-        match drawing { crate::StoryDrawing::Shape(index) => self.shapes[index].position, crate::StoryDrawing::ShapeGroup(index) => self.shape_groups[index].position }
+        match drawing {
+            crate::StoryDrawing::Shape(index) => self.shapes[index].position,
+            crate::StoryDrawing::ShapeGroup(index) => self.shape_groups[index].position,
+        }
     }
 
     /// Remove all root shape groups.
@@ -3952,9 +4065,7 @@ impl<'a> RtfDocument<'a> {
                 | crate::BodyStoryEvent::Field(_)
                 | crate::BodyStoryEvent::PageBreak(_)
                 | crate::BodyStoryEvent::ColumnBreak(_)
-                | crate::BodyStoryEvent::SectionBreak(_) => {
-                    self.body_story_event_position(*event)
-                },
+                | crate::BodyStoryEvent::SectionBreak(_) => self.body_story_event_position(*event),
                 _ => None,
             })
     }
@@ -4341,9 +4452,7 @@ impl<'a> RtfDocument<'a> {
                 .binary_value
                 .map(|value| Cow::Owned(value.into_owned())),
             theme_value: property.theme_value,
-            hyperlink: property
-                .hyperlink
-                .map(crate::ShapeHyperlink::into_owned),
+            hyperlink: property.hyperlink.map(crate::ShapeHyperlink::into_owned),
         }
     }
 
@@ -4746,9 +4855,12 @@ impl<'a> RtfDocument<'a> {
                 "RTF revision author is missing from or does not match revtbl".to_string(),
             ));
         }
-        let total = self.revisions.iter().try_fold(revision.content.len(), |total, existing| {
-            total.checked_add(existing.content.len())
-        });
+        let total = self
+            .revisions
+            .iter()
+            .try_fold(revision.content.len(), |total, existing| {
+                total.checked_add(existing.content.len())
+            });
         if total.is_none_or(|total| total > super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES) {
             return Err(RtfError::MalformedDocument(
                 "RTF aggregate revision text exceeds the safety limit".to_string(),

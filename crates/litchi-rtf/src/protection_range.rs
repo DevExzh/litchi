@@ -54,7 +54,7 @@ impl<'a> ProtectionRange<'a> {
             ));
         }
         if self.id.len() > MAX_PROTECTION_RANGE_ID_BYTES
-            || self.id.len() % 2 != 0
+            || !self.id.len().is_multiple_of(2)
             || !self.id.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
             return Err(RtfError::MalformedDocument(

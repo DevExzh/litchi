@@ -561,7 +561,7 @@ fn parse_cstring_atom(
         instance,
         "programmable tag CString",
     )?;
-    if record.data.is_empty() || record.data.len() % 2 != 0 {
+    if record.data.is_empty() || !record.data.len().is_multiple_of(2) {
         return corrupted("Programmable tag CString length must be positive and even");
     }
     let count = record.data.len() / 2;

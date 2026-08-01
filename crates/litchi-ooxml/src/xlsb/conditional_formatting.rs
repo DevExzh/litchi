@@ -763,10 +763,11 @@ impl ConditionalFormatIcon {
             if self.index == -1 {
                 return Ok(());
             }
-        } else if let Ok(icon_set) = u8::try_from(self.icon_set) {
-            if icon_set <= 19 && (0..icon_count14(icon_set) as i32).contains(&self.index) {
-                return Ok(());
-            }
+        } else if let Ok(icon_set) = u8::try_from(self.icon_set)
+            && icon_set <= 19
+            && (0..icon_count14(icon_set) as i32).contains(&self.index)
+        {
+            return Ok(());
         }
         Err(invalid("BrtCFIcon", "invalid icon set or index"))
     }

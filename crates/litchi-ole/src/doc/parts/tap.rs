@@ -389,36 +389,39 @@ pub(crate) fn matching_table_style_conditions(
         && !matches_left;
 
     let mut conditions = Vec::with_capacity(5);
-    if !matches_header && !matches_footer && !flags.contains(TableLookFlags::NO_ROW_BANDING) {
-        if let Some(size) = row.style_defaults.horizontal_band_size {
-            let preceding = rows[..row_position]
-                .iter()
-                .enumerate()
-                .filter(|(index, row)| {
-                    !flags.contains(TableLookFlags::HEADER_ROW)
-                        || !(*index == 0 || row.is_header_row)
-                })
-                .count();
-            conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
-                TableStyleCondition::OddRowBand
-            } else {
-                TableStyleCondition::EvenRowBand
-            });
-        }
+    if !matches_header
+        && !matches_footer
+        && !flags.contains(TableLookFlags::NO_ROW_BANDING)
+        && let Some(size) = row.style_defaults.horizontal_band_size
+    {
+        let preceding = rows[..row_position]
+            .iter()
+            .enumerate()
+            .filter(|(index, row)| {
+                !flags.contains(TableLookFlags::HEADER_ROW) || !(*index == 0 || row.is_header_row)
+            })
+            .count();
+        conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
+            TableStyleCondition::OddRowBand
+        } else {
+            TableStyleCondition::EvenRowBand
+        });
     }
-    if !matches_left && !matches_right && !flags.contains(TableLookFlags::NO_COLUMN_BANDING) {
-        if let Some(size) = row.style_defaults.vertical_band_size {
-            let preceding = if flags.contains(TableLookFlags::HEADER_COLUMN) && logical_index > 0 {
-                logical_index - 1
-            } else {
-                logical_index
-            };
-            conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
-                TableStyleCondition::OddColumnBand
-            } else {
-                TableStyleCondition::EvenColumnBand
-            });
-        }
+    if !matches_left
+        && !matches_right
+        && !flags.contains(TableLookFlags::NO_COLUMN_BANDING)
+        && let Some(size) = row.style_defaults.vertical_band_size
+    {
+        let preceding = if flags.contains(TableLookFlags::HEADER_COLUMN) && logical_index > 0 {
+            logical_index - 1
+        } else {
+            logical_index
+        };
+        conditions.push(if (preceding / usize::from(size)) % 2 == 0 {
+            TableStyleCondition::OddColumnBand
+        } else {
+            TableStyleCondition::EvenColumnBand
+        });
     }
     if matches_left {
         conditions.push(TableStyleCondition::FirstColumn);

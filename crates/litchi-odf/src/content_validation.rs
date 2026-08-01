@@ -202,10 +202,10 @@ impl OdfContentValidation {
                 OdfValidationFailure::Macro {
                     event_listeners, ..
                 } => {
-                    if let Some(value) = event_listeners {
-                        if value.0.len() > MAX_CAPTURE_BYTES {
-                            return invalid("validation event listeners exceed 1 MiB");
-                        }
+                    if let Some(value) = event_listeners
+                        && value.0.len() > MAX_CAPTURE_BYTES
+                    {
+                        return invalid("validation event listeners exceed 1 MiB");
                     }
                 },
             }

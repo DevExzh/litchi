@@ -35,10 +35,7 @@ fn parses_overlapping_id_paired_ranges_and_round_trips() {
 
 #[test]
 fn unclosed_range_extends_to_body_end_and_unmatched_end_is_ignored() {
-    let document = RtfDocument::parse(
-        r"{\rtf1 ab{\*\protend ff}{\*\protstart 01}cd}",
-    )
-    .unwrap();
+    let document = RtfDocument::parse(r"{\rtf1 ab{\*\protend ff}{\*\protstart 01}cd}").unwrap();
     assert_eq!(document.text(), "abcd");
     let ranges = document.protection_ranges();
     assert_eq!(ranges.len(), 1);

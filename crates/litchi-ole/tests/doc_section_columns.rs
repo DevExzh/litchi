@@ -36,7 +36,10 @@ fn equal_columns_rtl_and_vertical_flow_round_trip() {
     writer.set_section_text_flow(SectionTextFlow::VerticalNonAsian);
     assert_eq!(writer.section_columns(), Some(&layout));
     assert!(writer.section_right_to_left());
-    assert_eq!(writer.section_text_flow(), SectionTextFlow::VerticalNonAsian);
+    assert_eq!(
+        writer.section_text_flow(),
+        SectionTextFlow::VerticalNonAsian
+    );
 
     let section = round_trip(&mut writer);
     assert_eq!(section.columns, layout);
@@ -80,36 +83,42 @@ fn mutation_rejects_invalid_counts_widths_and_spacing_dependencies() {
     );
     assert!(SectionColumnLayout::even(45, 720, false).is_err());
     assert!(SectionColumnLayout::even(2, 31_681, false).is_err());
-    assert!(SectionColumnLayout::unequal(
-        vec![SectionColumn {
-            width_twips: 717,
-            spacing_after_twips: None,
-        }],
-        false,
-    )
-    .is_err());
-    assert!(SectionColumnLayout::unequal(
-        vec![
-            SectionColumn {
-                width_twips: 1_000,
+    assert!(
+        SectionColumnLayout::unequal(
+            vec![SectionColumn {
+                width_twips: 717,
                 spacing_after_twips: None,
-            },
-            SectionColumn {
+            }],
+            false,
+        )
+        .is_err()
+    );
+    assert!(
+        SectionColumnLayout::unequal(
+            vec![
+                SectionColumn {
+                    width_twips: 1_000,
+                    spacing_after_twips: None,
+                },
+                SectionColumn {
+                    width_twips: 1_000,
+                    spacing_after_twips: None,
+                },
+            ],
+            false,
+        )
+        .is_err()
+    );
+    assert!(
+        SectionColumnLayout::unequal(
+            vec![SectionColumn {
                 width_twips: 1_000,
-                spacing_after_twips: None,
-            },
-        ],
-        false,
-    )
-    .is_err());
-    assert!(SectionColumnLayout::unequal(
-        vec![SectionColumn {
-            width_twips: 1_000,
-            spacing_after_twips: Some(100),
-        }],
-        false,
-    )
-    .is_err());
+                spacing_after_twips: Some(100),
+            }],
+            false,
+        )
+        .is_err()
+    );
 
     let mut writer = DocWriter::new();
     writer

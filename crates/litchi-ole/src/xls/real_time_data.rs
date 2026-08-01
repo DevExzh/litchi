@@ -71,8 +71,7 @@ fn decode_chars(bytes: &[u8], wide: bool) -> XlsResult<String> {
             .chunks_exact(2)
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
-        String::from_utf16(&units)
-            .map_err(|_| invalid("RTD string is not valid UTF-16LE"))
+        String::from_utf16(&units).map_err(|_| invalid("RTD string is not valid UTF-16LE"))
     } else {
         Ok(bytes.iter().map(|&byte| char::from(byte)).collect())
     }
@@ -154,7 +153,7 @@ impl XlsRealTimeData {
 
         // rgRTDE: the rest of the payload in 6-byte RTDEItem entries.
         let remaining = &data[offset..];
-        if remaining.len() % RTD_E_ITEM_LEN != 0 {
+        if !remaining.len().is_multiple_of(RTD_E_ITEM_LEN) {
             return Err(invalid("RealTimeData rgRTDE size is not a multiple of 6"));
         }
         let cells = remaining
@@ -176,7 +175,9 @@ impl XlsRealTimeData {
             let prefix_len = usize::try_from(common_prefix_len)
                 .map_err(|_| invalid("RealTimeData ichSamePrefix overflows"))?;
             if prefix_len > previous.chars().count() {
-                return Err(invalid("RealTimeData ichSamePrefix exceeds the previous topic"));
+                return Err(invalid(
+                    "RealTimeData ichSamePrefix exceeds the previous topic",
+                ));
             }
             let mut topic = String::with_capacity(prefix_len + stored.len());
             topic.extend(previous.chars().take(prefix_len));
@@ -289,7 +290,10 @@ fn write_segmented_topic(out: &mut Vec<u8>, segments: &[String]) -> XlsResult<()
             "RTD topic sub-string exceeds 65535 characters".to_string(),
         ));
     }
-    let char_total: usize = segments.iter().map(|segment| biff_char_count(segment)).sum();
+    let char_total: usize = segments
+        .iter()
+        .map(|segment| biff_char_count(segment))
+        .sum();
     out.extend_from_slice(&(char_total as u32).to_le_bytes());
     out.push(if wide { HIGH_BYTE } else { 0u8 });
     for segment in segments {
@@ -324,12 +328,12 @@ fn parse_segmented_topic(data: &[u8]) -> XlsResult<(Vec<String>, usize)> {
     while chars_read < char_total {
         // Each sub-string starts with a count: 1 byte compressed, 2 wide.
         let count_len = if wide { 2 } else { 1 };
-        let count_bytes = data.get(offset..offset + count_len).ok_or(
-            XlsError::InvalidLength {
+        let count_bytes = data
+            .get(offset..offset + count_len)
+            .ok_or(XlsError::InvalidLength {
                 expected: offset + count_len,
                 found: data.len(),
-            },
-        )?;
+            })?;
         let segment_chars = if wide {
             usize::from(read_u16(count_bytes, 0))
         } else {
@@ -375,7 +379,9 @@ fn parse_rtd_oper(data: &[u8]) -> XlsResult<(XlsRtdValue, usize)> {
                 found: data.len(),
             })?;
             Ok((
-                XlsRtdValue::Number(f64::from_le_bytes(bytes.try_into().expect("length checked"))),
+                XlsRtdValue::Number(f64::from_le_bytes(
+                    bytes.try_into().expect("length checked"),
+                )),
                 12,
             ))
         },
@@ -410,7 +416,9 @@ fn parse_rtd_oper(data: &[u8]) -> XlsResult<(XlsRtdValue, usize)> {
             };
             Ok((variant, 8))
         },
-        other => Err(invalid(format!("unknown RTDOper.grbit value 0x{other:08X}"))),
+        other => Err(invalid(format!(
+            "unknown RTDOper.grbit value 0x{other:08X}"
+        ))),
     }
 }
 
@@ -427,12 +435,10 @@ fn parse_rtd_oper_str(data: &[u8]) -> XlsResult<(String, usize)> {
         .map_err(|_| invalid("RTDOperStr.cchRTDOperStr overflows"))?;
     let wide = data[4] & HIGH_BYTE != 0;
     let byte_len = if wide { char_count * 2 } else { char_count };
-    let bytes = data
-        .get(5..5 + byte_len)
-        .ok_or(XlsError::InvalidLength {
-            expected: 5 + byte_len,
-            found: data.len(),
-        })?;
+    let bytes = data.get(5..5 + byte_len).ok_or(XlsError::InvalidLength {
+        expected: 5 + byte_len,
+        found: data.len(),
+    })?;
     Ok((decode_chars(bytes, wide)?, 5 + byte_len))
 }
 
@@ -489,8 +495,16 @@ mod tests {
         assert_eq!(
             rtd.cells,
             vec![
-                XlsRtdCell { row: 1, column: 2, sheet_index: 0 },
-                XlsRtdCell { row: 3, column: 4, sheet_index: 1 },
+                XlsRtdCell {
+                    row: 1,
+                    column: 2,
+                    sheet_index: 0
+                },
+                XlsRtdCell {
+                    row: 3,
+                    column: 4,
+                    sheet_index: 1
+                },
             ]
         );
     }
@@ -664,7 +678,11 @@ mod tests {
                 ],
                 topic: "PROG.IDSTOCKMSFT".to_string(),
                 value: XlsRtdValue::Text("58.25".to_string()),
-                cells: vec![XlsRtdCell { row: 1, column: 2, sheet_index: 0 }],
+                cells: vec![XlsRtdCell {
+                    row: 1,
+                    column: 2,
+                    sheet_index: 0,
+                }],
             },
             XlsRealTimeData {
                 common_prefix_len: 0,
@@ -679,8 +697,16 @@ mod tests {
                 topic: "ABC".to_string(),
                 value: XlsRtdValue::Boolean(true),
                 cells: vec![
-                    XlsRtdCell { row: 0, column: 0, sheet_index: 0 },
-                    XlsRtdCell { row: 65535, column: 255, sheet_index: 3 },
+                    XlsRtdCell {
+                        row: 0,
+                        column: 0,
+                        sheet_index: 0,
+                    },
+                    XlsRtdCell {
+                        row: 65535,
+                        column: 255,
+                        sheet_index: 3,
+                    },
                 ],
             },
         ];

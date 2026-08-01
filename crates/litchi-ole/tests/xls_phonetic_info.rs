@@ -28,7 +28,10 @@ fn phonetic_info_round_trips() {
     )
     .unwrap();
     let workbook = XlsWorkbook::new(Cursor::new(written_workbook(Some(info.clone())))).unwrap();
-    assert_eq!(workbook.xls_worksheet(0).unwrap().phonetic_info(), Some(&info));
+    assert_eq!(
+        workbook.xls_worksheet(0).unwrap().phonetic_info(),
+        Some(&info)
+    );
 }
 
 #[test]
@@ -43,7 +46,10 @@ fn long_range_list_round_trips_across_continues() {
     )
     .unwrap();
     let workbook = XlsWorkbook::new(Cursor::new(written_workbook(Some(info.clone())))).unwrap();
-    assert_eq!(workbook.xls_worksheet(0).unwrap().phonetic_info(), Some(&info));
+    assert_eq!(
+        workbook.xls_worksheet(0).unwrap().phonetic_info(),
+        Some(&info)
+    );
 }
 
 #[test]

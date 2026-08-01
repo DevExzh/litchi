@@ -503,10 +503,11 @@ fn parse_part(
                     return invalid("bibliography configuration cannot contain text");
                 }
             },
-            Event::CData(ref value) if (active.is_some() || pending_sort_key.is_some())
-                && !value.is_empty() => {
-                    return invalid("bibliography configuration cannot contain CDATA");
-                },
+            Event::CData(ref value)
+                if (active.is_some() || pending_sort_key.is_some()) && !value.is_empty() =>
+            {
+                return invalid("bibliography configuration cannot contain CDATA");
+            },
             Event::GeneralRef(_) if active.is_some() || pending_sort_key.is_some() => {
                 return invalid("bibliography configuration cannot contain entity references");
             },

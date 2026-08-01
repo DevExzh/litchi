@@ -1044,8 +1044,7 @@ impl DocWriter {
         profile: DocEncryptionProfile,
     ) -> Result<(), DocWriteError> {
         let password = Zeroizing::new(password.into());
-        validate_writer_password(profile, password.as_str())
-            .map_err(DocWriteError::InvalidData)?;
+        validate_writer_password(profile, password.as_str()).map_err(DocWriteError::InvalidData)?;
         self.encryption = Some(DocWriterEncryption { profile, password });
         Ok(())
     }
@@ -1103,10 +1102,7 @@ impl DocWriter {
     ///
     /// Character positions use the concatenated DOC document-part coordinate
     /// space. The final CP ceiling is validated when output is generated.
-    pub fn set_proofing_table(
-        &mut self,
-        table: ProofingStateTable,
-    ) -> Option<ProofingStateTable> {
+    pub fn set_proofing_table(&mut self, table: ProofingStateTable) -> Option<ProofingStateTable> {
         self.proofing_tables.set(table)
     }
 
@@ -1121,10 +1117,7 @@ impl DocWriter {
     }
 
     /// Remove and return one configured proofing table.
-    pub fn clear_proofing_table(
-        &mut self,
-        feature: ProofingFeature,
-    ) -> Option<ProofingStateTable> {
+    pub fn clear_proofing_table(&mut self, feature: ProofingFeature) -> Option<ProofingStateTable> {
         self.proofing_tables.remove(feature)
     }
 
@@ -3013,7 +3006,9 @@ impl DocWriter {
                     let anchor_kind = self
                         .header_anchors
                         .iter()
-                        .find(|anchor| anchor.slot == i && anchor.paragraph_index == paragraph_index)
+                        .find(|anchor| {
+                            anchor.slot == i && anchor.paragraph_index == paragraph_index
+                        })
                         .map(|anchor| anchor.kind);
                     if let Some(kind) = anchor_kind {
                         shape_anchor_cps.push((header_cp + story_chars, kind));
@@ -3056,11 +3051,12 @@ impl DocWriter {
                         // pointing at the picture's Data-stream block.
                         let mut grpprl = build_chpx_grpprl(formatting, font_builder);
                         if let Some(FloatingAnchorKind::Picture(pic_index)) = anchor_kind {
-                            let pic_offset = header_pic_offsets.get(pic_index as usize).ok_or_else(|| {
-                                DocWriteError::InvalidData(format!(
-                                    "DOC header picture index {pic_index} is out of range"
-                                ))
-                            })?;
+                            let pic_offset =
+                                header_pic_offsets.get(pic_index as usize).ok_or_else(|| {
+                                    DocWriteError::InvalidData(format!(
+                                        "DOC header picture index {pic_index} is out of range"
+                                    ))
+                                })?;
                             grpprl.extend_from_slice(&SPRM_C_PIC_LOCATION.to_le_bytes());
                             grpprl.extend_from_slice(&pic_offset.to_le_bytes());
                         }
@@ -3544,7 +3540,11 @@ impl DocWriter {
                             "DOC Data stream exceeds 32-bit FC space".to_string(),
                         )
                     })?;
-                    super::images::write_picture_block(&entry.picture, entry.shape_id, &mut data_stream);
+                    super::images::write_picture_block(
+                        &entry.picture,
+                        entry.shape_id,
+                        &mut data_stream,
+                    );
                     if entry.floating.is_some() {
                         floating_anchors.push((
                             current_cp + para_chars,
@@ -3814,9 +3814,9 @@ impl DocWriter {
                     .shape_anchor_cps
                     .iter()
                     .filter_map(|&(_, kind)| match kind {
-                        FloatingAnchorKind::Shape(index) => self.header_shapes[index as usize]
-                            .text
-                            .as_deref(),
+                        FloatingAnchorKind::Shape(index) => {
+                            self.header_shapes[index as usize].text.as_deref()
+                        },
                         FloatingAnchorKind::Picture(_) => None,
                     })
                     .collect()
@@ -4199,9 +4199,10 @@ impl DocWriter {
                             content: super::images::FloatingShapeContent::Picture(&entry.picture),
                             width_twips: entry.picture.width_twips(),
                             height_twips: entry.picture.height_twips(),
-                            position: entry.floating.as_ref().expect(
-                                "floating anchors are only recorded for floating pictures",
-                            ),
+                            position: entry
+                                .floating
+                                .as_ref()
+                                .expect("floating anchors are only recorded for floating pictures"),
                             text: None,
                         }
                     },
@@ -4247,9 +4248,10 @@ impl DocWriter {
                                 ),
                                 width_twips: entry.picture.width_twips(),
                                 height_twips: entry.picture.height_twips(),
-                                position: entry.floating.as_ref().expect(
-                                    "header pictures always have a floating position",
-                                ),
+                                position: entry
+                                    .floating
+                                    .as_ref()
+                                    .expect("header pictures always have a floating position"),
                                 text: None,
                             }
                         },
@@ -4258,11 +4260,8 @@ impl DocWriter {
             if !txbx_start_cps.is_empty() {
                 let txbx_shape_ids: Vec<u32> =
                     textbox_shapes.iter().map(|entry| entry.shape_id).collect();
-                let plcf_txbx = super::shapes::build_plcf_txbx_txt(
-                    &txbx_shape_ids,
-                    &txbx_start_cps,
-                    ccp_txbx,
-                );
+                let plcf_txbx =
+                    super::shapes::build_plcf_txbx_txt(&txbx_shape_ids, &txbx_start_cps, ccp_txbx);
                 fib.set_plcftxbx_txt(table_offset, plcf_txbx.len() as u32);
                 table_stream.extend_from_slice(&plcf_txbx);
                 table_offset = table_stream.len() as u32;
@@ -7169,9 +7168,11 @@ mod tests {
         );
         assert!(smart_tags.tags[0].is_native);
         assert_eq!(
-            smart_tags.store.as_ref().unwrap().resolve_property(
-                smart_tags.tags[0].property_bag.properties[0]
-            ),
+            smart_tags
+                .store
+                .as_ref()
+                .unwrap()
+                .resolve_property(smart_tags.tags[0].property_bag.properties[0]),
             Some(("city", "東京"))
         );
         assert_eq!(
@@ -7788,7 +7789,10 @@ mod header_kind_tests {
         assert_eq!(DocHeaderKind::FirstPage.slot(), HEADER_SLOT_FIRST);
         // The writer's slot assignment matches the MS-DOC PlcfHdd layout:
         // even header 6, odd header 7, first-page header 10.
-        assert_eq!((HEADER_SLOT_EVEN, HEADER_SLOT_ODD, HEADER_SLOT_FIRST), (6, 7, 10));
+        assert_eq!(
+            (HEADER_SLOT_EVEN, HEADER_SLOT_ODD, HEADER_SLOT_FIRST),
+            (6, 7, 10)
+        );
     }
 
     #[test]

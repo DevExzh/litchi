@@ -1023,7 +1023,11 @@ mod tests {
     fn sample_color_scale() -> ConditionalColorScale {
         ConditionalColorScale::new(vec![
             ConditionalColorScaleEntry::new(ConditionalFormatEntryType::Minimum, "0", "#ff0000"),
-            ConditionalColorScaleEntry::new(ConditionalFormatEntryType::Percentile, "50", "#ffff00"),
+            ConditionalColorScaleEntry::new(
+                ConditionalFormatEntryType::Percentile,
+                "50",
+                "#ffff00",
+            ),
             ConditionalColorScaleEntry::new(ConditionalFormatEntryType::Maximum, "0", "#00ff00"),
         ])
     }
@@ -1099,7 +1103,9 @@ mod tests {
         assert!(xml.contains(
             r#"<calcext:formatting-entry calcext:value="33" calcext:greater-equal="false" calcext:type="percent"/>"#
         ));
-        assert!(xml.contains(r#"<calcext:date-is calcext:style="Recent" calcext:date="last-7-days"/>"#));
+        assert!(
+            xml.contains(r#"<calcext:date-is calcext:style="Recent" calcext:date="last-7-days"/>"#)
+        );
         assert!(xml.ends_with("</calcext:conditional-formats>"));
     }
 
@@ -1112,9 +1118,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_ranges_rules_and_blank_values() {
-        assert!(
-            ConditionalFormat::new(Vec::new(), vec![sample_condition().into()]).is_err()
-        );
+        assert!(ConditionalFormat::new(Vec::new(), vec![sample_condition().into()]).is_err());
         assert!(ConditionalFormat::new(vec![".A1".to_string()], Vec::new()).is_err());
         assert!(
             ConditionalFormat::new(
@@ -1133,9 +1137,11 @@ mod tests {
         assert!(
             ConditionalFormat::new(
                 vec![".A1".to_string()],
-                vec![ConditionalFormatCondition::new("x", "S")
-                    .with_base_cell_address(" A1 ")
-                    .into()],
+                vec![
+                    ConditionalFormatCondition::new("x", "S")
+                        .with_base_cell_address(" A1 ")
+                        .into()
+                ],
             )
             .is_err()
         );
@@ -1172,11 +1178,13 @@ mod tests {
         );
         // Data bars require exactly two limit entries and numeric lengths.
         assert!(
-            format(ConditionalDataBar::new(vec![ConditionalDataBarEntry::new(
-                ConditionalFormatEntryType::AutomaticMinimum,
-                "0",
-            )])
-            .into())
+            format(
+                ConditionalDataBar::new(vec![ConditionalDataBarEntry::new(
+                    ConditionalFormatEntryType::AutomaticMinimum,
+                    "0",
+                )])
+                .into()
+            )
             .is_err()
         );
         assert!(
@@ -1191,7 +1199,9 @@ mod tests {
             .is_err()
         );
         // Icon sets require entries; date rules require a style.
-        assert!(format(ConditionalIconSet::new(IconSetType::FiveBoxes, Vec::new()).into()).is_err());
+        assert!(
+            format(ConditionalIconSet::new(IconSetType::FiveBoxes, Vec::new()).into()).is_err()
+        );
         assert!(format(ConditionalDateIs::new(ConditionalDateType::Today, "").into()).is_err());
     }
 

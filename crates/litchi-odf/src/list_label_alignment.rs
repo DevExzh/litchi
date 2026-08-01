@@ -342,28 +342,27 @@ pub fn parse_list_level_label_alignments(xml: &str) -> Result<ListLevelLabelAlig
                     list = Some((depth, name, kind, HashSet::new()));
                     continue;
                 }
-                if let Some((ld, _, _, seen)) = list.as_mut() {
-                    if depth == *ld + 1
-                        && c.0 == Ns::Text
-                        && matches!(
-                            c.1.as_slice(),
-                            b"list-level-style-number"
-                                | b"list-level-style-bullet"
-                                | b"list-level-style-image"
-                                | b"outline-level-style"
-                        )
-                    {
-                        let mut a = attrs(&r, ver, &e)?;
-                        let n = one(&mut a, Ns::Text, b"level")
-                            .ok_or_else(|| bad("list level missing text:level"))?
-                            .parse::<u16>()
-                            .map_err(|_| bad("invalid text:level"))?;
-                        if !(1..=MAX_LEVEL).contains(&n) || !seen.insert(n) {
-                            return Err(bad("invalid or duplicate list level"));
-                        }
-                        level = Some((depth, n, false, false));
-                        continue;
+                if let Some((ld, _, _, seen)) = list.as_mut()
+                    && depth == *ld + 1
+                    && c.0 == Ns::Text
+                    && matches!(
+                        c.1.as_slice(),
+                        b"list-level-style-number"
+                            | b"list-level-style-bullet"
+                            | b"list-level-style-image"
+                            | b"outline-level-style"
+                    )
+                {
+                    let mut a = attrs(&r, ver, &e)?;
+                    let n = one(&mut a, Ns::Text, b"level")
+                        .ok_or_else(|| bad("list level missing text:level"))?
+                        .parse::<u16>()
+                        .map_err(|_| bad("invalid text:level"))?;
+                    if !(1..=MAX_LEVEL).contains(&n) || !seen.insert(n) {
+                        return Err(bad("invalid or duplicate list level"));
                     }
+                    level = Some((depth, n, false, false));
+                    continue;
                 }
                 if let Some((d, _, props, align)) = level.as_mut() {
                     if depth == *d + 1 && c.0 == Ns::Style && c.1 == b"list-level-properties" {
@@ -567,10 +566,10 @@ pub(crate) fn replace_list_level_label_alignment_xml(
             Ok(Event::End(_)) => {
                 let end = r.buffer_position() as usize;
                 let d = stack.len();
-                if let Some((s, 0, depth)) = found {
-                    if d == depth {
-                        found = Some((s, end, 0));
-                    }
+                if let Some((s, 0, depth)) = found
+                    && d == depth
+                {
+                    found = Some((s, end, 0));
                 }
                 if level.as_ref().is_some_and(|x| x.0 == d) {
                     level = None

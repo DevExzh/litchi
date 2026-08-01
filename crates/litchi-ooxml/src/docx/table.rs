@@ -172,7 +172,7 @@ impl Table {
         }
     }
 
-    /// Create a Table from an Arc<Vec<u8>> and byte range (zero-copy).
+    /// Create a Table from an `Arc<Vec<u8>>` and byte range (zero-copy).
     #[inline]
     pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
         Self {

@@ -10,7 +10,9 @@ fn value(value: i64) -> XlsxAdjustValue {
 fn triangle_path() -> XlsxGeometryPath {
     XlsxGeometryPath::new(21_600, 21_600)
         .with_command(XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(10_800, 0)))
-        .with_command(XlsxPathCommand::LineTo(XlsxGeometryPoint::new(21_600, 21_600)))
+        .with_command(XlsxPathCommand::LineTo(XlsxGeometryPoint::new(
+            21_600, 21_600,
+        )))
         .with_command(XlsxPathCommand::LineTo(XlsxGeometryPoint::new(0, 21_600)))
         .with_command(XlsxPathCommand::Close)
 }
@@ -99,7 +101,10 @@ fn path_fill_mode_tokens_round_trip() {
 #[test]
 fn validation_accepts_a_complete_geometry() {
     let geometry = XlsxCustomGeometry {
-        adjust_values: vec![XlsxGeometryGuide::new("adj1", XlsxGeometryFormula::literal(50))],
+        adjust_values: vec![XlsxGeometryGuide::new(
+            "adj1",
+            XlsxGeometryFormula::literal(50),
+        )],
         guides: vec![XlsxGeometryGuide::new(
             "x1",
             "*/ adj1 21600 100".parse().unwrap(),
@@ -139,14 +144,19 @@ fn validation_accepts_a_complete_geometry() {
 fn validation_rejects_an_empty_path_list() {
     let geometry = XlsxCustomGeometry::new();
     let error = validate_custom_geometry(&geometry).unwrap_err();
-    assert!(error.contains("at least one path"), "unexpected error: {error}");
+    assert!(
+        error.contains("at least one path"),
+        "unexpected error: {error}"
+    );
 }
 
 #[test]
 fn validation_rejects_invalid_guide_names() {
     for name in ["", "has space", "123", "-45"] {
-        let geometry = triangle_geometry()
-            .with_adjust_value(XlsxGeometryGuide::new(name, XlsxGeometryFormula::literal(1)));
+        let geometry = triangle_geometry().with_adjust_value(XlsxGeometryGuide::new(
+            name,
+            XlsxGeometryFormula::literal(1),
+        ));
         assert!(
             validate_custom_geometry(&geometry).is_err(),
             "guide name '{name}' should be rejected"
@@ -164,11 +174,10 @@ fn validation_rejects_out_of_range_values() {
     negative_path.paths[0].height = -1;
     assert!(validate_custom_geometry(&negative_path).is_err());
 
-    let out_of_range_point = triangle_geometry().with_path(
-        XlsxGeometryPath::new(0, 0).with_command(XlsxPathCommand::MoveTo(
-            XlsxGeometryPoint::new(MAX_COORDINATE + 1, 0),
-        )),
-    );
+    let out_of_range_point =
+        triangle_geometry().with_path(XlsxGeometryPath::new(0, 0).with_command(
+            XlsxPathCommand::MoveTo(XlsxGeometryPoint::new(MAX_COORDINATE + 1, 0)),
+        ));
     assert!(validate_custom_geometry(&out_of_range_point).is_err());
 
     let out_of_range_angle = triangle_geometry().with_path(

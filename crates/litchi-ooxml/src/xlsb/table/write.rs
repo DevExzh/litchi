@@ -7,9 +7,7 @@
 
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::records::record_types as rt;
-use crate::xlsb::table::model::{
-    XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableStyleInfo,
-};
+use crate::xlsb::table::model::{XlsbTable, XlsbTableColumn, XlsbTableFormula, XlsbTableStyleInfo};
 use crate::xlsb::writer::RecordWriter;
 
 /// `DXFId` value meaning no differential formatting (MS-XLSB 2.5.38).
@@ -216,9 +214,7 @@ pub(crate) fn write_list_parts<W: std::io::Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xlsb::table::model::{
-        XlsbTableRange, XlsbTableTotalsRowFunction, XlsbTableType,
-    };
+    use crate::xlsb::table::model::{XlsbTableRange, XlsbTableTotalsRowFunction, XlsbTableType};
     use crate::xlsb::table::parse_table_part;
 
     fn sample_table() -> XlsbTable {
@@ -310,7 +306,9 @@ mod tests {
         let mut stream = Vec::new();
         let mut writer = RecordWriter::new(&mut stream);
         writer.write_record(rt::BEGIN_SHEET, &[]).unwrap();
-        writer.write_record(rt::BEGIN_LIST_PARTS, &2u32.to_le_bytes()).unwrap();
+        writer
+            .write_record(rt::BEGIN_LIST_PARTS, &2u32.to_le_bytes())
+            .unwrap();
         for rel_id in ["rId5", "rId9"] {
             let mut payload = Vec::new();
             write_wide_string(&mut payload, rel_id);

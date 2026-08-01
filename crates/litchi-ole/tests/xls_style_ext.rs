@@ -1,9 +1,7 @@
 //! Round-trip tests for the BIFF8 StyleExt record (cell-style extensions).
 
 use litchi_ole::xls::writer::XlsWriter;
-use litchi_ole::xls::{
-    XlsStyleCategory, XlsStyleExt, XlsWorkbook,
-};
+use litchi_ole::xls::{XlsStyleCategory, XlsStyleExt, XlsWorkbook};
 use litchi_ole::xls::{XlsXfProperties, XlsXfProperty};
 use std::io::Cursor;
 

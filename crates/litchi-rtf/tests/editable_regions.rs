@@ -10,7 +10,8 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_nested_editable_regions_and_round_trips() {
-    let document = RtfDocument::parse(r"{\rtf1 a\ebcstart b\ebcstart c\ebcend d\ebcend e}").unwrap();
+    let document =
+        RtfDocument::parse(r"{\rtf1 a\ebcstart b\ebcstart c\ebcend d\ebcend e}").unwrap();
     assert_eq!(document.text(), "abcde");
     let regions = document.editable_regions();
     assert_eq!(regions.len(), 2);

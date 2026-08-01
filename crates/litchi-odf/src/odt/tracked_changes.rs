@@ -1,16 +1,16 @@
 //! Validation and deterministic serialization for text change declarations.
 
 use super::parser::{ChangeType, TrackChange, TrackedChanges};
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use litchi_core::{Error, Result};
-use std::collections::HashSet;
-use std::ops::Range;
-use quick_xml::events::Event;
-use quick_xml::reader::NsReader;
 use crate::elements::xml::{
     OFFICE_NAMESPACE, TEXT_NAMESPACE, XML_NAMESPACE, is_bound, namespaced_attribute,
 };
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use litchi_core::{Error, Result};
+use quick_xml::events::Event;
+use quick_xml::reader::NsReader;
+use std::collections::HashSet;
+use std::ops::Range;
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 
@@ -400,7 +400,10 @@ pub fn set_tracked_changes_xml(xml: &str, tracked: Option<&TrackedChanges>) -> R
         (Some(span), None) => apply_tracked_edits(xml, vec![(span, String::new())])?,
         (None, Some(fragment)) => apply_tracked_edits(
             xml,
-            vec![(sites.office_text_open_end..sites.office_text_open_end, fragment)],
+            vec![(
+                sites.office_text_open_end..sites.office_text_open_end,
+                fragment,
+            )],
         )?,
         (None, None) => xml.to_string(),
     };
@@ -520,9 +523,12 @@ fn validate_authored_tracked_xml(xml: &str) -> Result<TrackedChanges> {
     let sites = scan_mutable_tracked_xml(xml)?;
     let mut stack = Vec::<&str>::new();
     for marker in &sites.markers {
-        let kind = types
-            .get(marker.id.as_str())
-            .ok_or_else(|| make_error(format!("change marker references unknown ID '{}'", marker.id)))?;
+        let kind = types.get(marker.id.as_str()).ok_or_else(|| {
+            make_error(format!(
+                "change marker references unknown ID '{}'",
+                marker.id
+            ))
+        })?;
         match marker.kind {
             MarkerKind::Point => {
                 if *kind != ChangeType::Deletion {
@@ -564,9 +570,7 @@ fn resolve_story_position(stories: &[StorySite], position: &OdtTrackedPosition) 
         .copied()
         .flatten()
         .ok_or_else(|| {
-            make_error(
-                "tracked-change offset is out of bounds or would split an XML text control",
-            )
+            make_error("tracked-change offset is out of bounds or would split an XML text control")
         })
 }
 
@@ -609,7 +613,9 @@ fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
         match event {
             Event::Start(ref element) => {
                 validate_mutable_xml_id(&reader, element, &mut xml_ids)?;
-                depth = depth.checked_add(1).ok_or_else(|| make_error("XML depth overflow"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| make_error("XML depth overflow"))?;
                 if depth > 4096 {
                     return invalid("mutable tracked-change XML nesting exceeds 4096");
                 }
@@ -659,7 +665,13 @@ fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
                     }
                     if text_element {
                         scan_marker(&reader, element, local.as_ref(), span.clone(), &mut markers)?;
-                        append_text_control_boundaries(&reader, element, local.as_ref(), span.end, active_story.as_mut())?;
+                        append_text_control_boundaries(
+                            &reader,
+                            element,
+                            local.as_ref(),
+                            span.end,
+                            active_story.as_mut(),
+                        )?;
                     }
                 }
             },
@@ -679,7 +691,7 @@ fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
                     let raw = xml
                         .get(span.clone())
                         .and_then(|value| value.strip_prefix("<![CDATA["))
-                        .and_then(|value| value.strip_suffix("]]>") )
+                        .and_then(|value| value.strip_suffix("]]>"))
                         .ok_or_else(|| make_error("invalid CDATA event span"))?;
                     let count = raw.chars().count();
                     for _ in 1..count {
@@ -692,7 +704,10 @@ fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
             },
             Event::End(ref element) => {
                 let local = element.local_name();
-                if active_story.as_ref().is_some_and(|story| story.depth == depth) {
+                if active_story
+                    .as_ref()
+                    .is_some_and(|story| story.depth == depth)
+                {
                     let mut story = active_story.take().expect("checked active story");
                     if let Some(last) = story.boundaries.last_mut() {
                         *last = Some(span.start);
@@ -713,7 +728,9 @@ fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
                     annotation_depth = None;
                 }
                 update_table_end(table_element, local.as_ref(), &mut table);
-                depth = depth.checked_sub(1).ok_or_else(|| make_error("XML stack underflow"))?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| make_error("XML stack underflow"))?;
             },
             Event::DocType(_) | Event::PI(_) => {
                 return invalid("DTD and processing instructions are not allowed");
@@ -724,8 +741,8 @@ fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
         previous_end = event_end;
         buffer.clear();
     }
-    let office_text_open_end = office_text_open_end
-        .ok_or_else(|| make_error("document has no office:text body"))?;
+    let office_text_open_end =
+        office_text_open_end.ok_or_else(|| make_error("document has no office:text body"))?;
     Ok(XmlSites {
         office_text_open_end,
         tracked_changes,
@@ -750,11 +767,20 @@ fn validate_mutable_xml_id(
 
 fn next_story(table: &mut Option<TableContext>, body: &mut usize) -> Result<OdtTrackedStory> {
     if let Some(table) = table {
-        let row = table.row.ok_or_else(|| make_error("table paragraph is outside a row"))?;
-        let cell = table.cell.ok_or_else(|| make_error("table paragraph is outside a cell"))?;
+        let row = table
+            .row
+            .ok_or_else(|| make_error("table paragraph is outside a row"))?;
+        let cell = table
+            .cell
+            .ok_or_else(|| make_error("table paragraph is outside a cell"))?;
         let paragraph = table.next_paragraph;
         table.next_paragraph = table.next_paragraph.saturating_add(1);
-        Ok(OdtTrackedStory::TableCell { table: table.table, row, cell, paragraph })
+        Ok(OdtTrackedStory::TableCell {
+            table: table.table,
+            row,
+            cell,
+            paragraph,
+        })
     } else {
         let index = *body;
         *body = body.saturating_add(1);
@@ -783,15 +809,19 @@ fn update_table_start(
             });
             *next_table = next_table.saturating_add(1);
         },
-        b"table-row" => if let Some(value) = table {
-            value.row = Some(value.next_row);
-            value.next_row = value.next_row.saturating_add(1);
-            value.next_cell = 0;
+        b"table-row" => {
+            if let Some(value) = table {
+                value.row = Some(value.next_row);
+                value.next_row = value.next_row.saturating_add(1);
+                value.next_cell = 0;
+            }
         },
-        b"table-cell" | b"covered-table-cell" => if let Some(value) = table {
-            value.cell = Some(value.next_cell);
-            value.next_cell = value.next_cell.saturating_add(1);
-            value.next_paragraph = 0;
+        b"table-cell" | b"covered-table-cell" => {
+            if let Some(value) = table {
+                value.cell = Some(value.next_cell);
+                value.next_cell = value.next_cell.saturating_add(1);
+                value.next_paragraph = 0;
+            }
         },
         _ => {},
     }
@@ -803,8 +833,16 @@ fn update_table_end(table_element: bool, local: &[u8], table: &mut Option<TableC
     }
     match local {
         b"table" => *table = None,
-        b"table-row" => if let Some(value) = table { value.row = None; },
-        b"table-cell" | b"covered-table-cell" => if let Some(value) = table { value.cell = None; },
+        b"table-row" => {
+            if let Some(value) = table {
+                value.row = None;
+            }
+        },
+        b"table-cell" | b"covered-table-cell" => {
+            if let Some(value) = table {
+                value.cell = None;
+            }
+        },
         _ => {},
     }
 }
@@ -822,8 +860,14 @@ fn scan_marker(
         b"change-end" => MarkerKind::End,
         _ => return Ok(()),
     };
-    let id = namespaced_attribute(reader, element, TEXT_NAMESPACE, b"change-id", "change marker")?
-        .ok_or_else(|| make_error("change marker requires text:change-id"))?;
+    let id = namespaced_attribute(
+        reader,
+        element,
+        TEXT_NAMESPACE,
+        b"change-id",
+        "change marker",
+    )?
+    .ok_or_else(|| make_error("change marker requires text:change-id"))?;
     markers.push(MarkerSite { id, kind, span });
     Ok(())
 }
@@ -833,7 +877,9 @@ fn append_raw_text_boundaries(
     span: Range<usize>,
     boundaries: &mut Vec<Option<usize>>,
 ) -> Result<()> {
-    let raw = xml.get(span.clone()).ok_or_else(|| make_error("invalid text event span"))?;
+    let raw = xml
+        .get(span.clone())
+        .ok_or_else(|| make_error("invalid text event span"))?;
     let mut index = 0usize;
     while index < raw.len() {
         if raw.as_bytes()[index] == b'&' {
@@ -861,11 +907,17 @@ fn append_text_control_boundaries(
     event_end: usize,
     story: Option<&mut ActiveStory>,
 ) -> Result<()> {
-    let Some(story) = story else { return Ok(()); };
+    let Some(story) = story else {
+        return Ok(());
+    };
     let count = match local {
         b"tab" | b"line-break" => 1,
         b"s" => namespaced_attribute(reader, element, TEXT_NAMESPACE, b"c", "text:s")?
-            .map(|value| value.parse::<usize>().map_err(|_| make_error("invalid text:s count")))
+            .map(|value| {
+                value
+                    .parse::<usize>()
+                    .map_err(|_| make_error("invalid text:s count"))
+            })
             .transpose()?
             .unwrap_or(1),
         _ => return Ok(()),
@@ -879,12 +931,13 @@ fn append_text_control_boundaries(
     Ok(())
 }
 
-fn apply_tracked_edits(
-    xml: &str,
-    mut edits: Vec<(Range<usize>, String)>,
-) -> Result<String> {
+fn apply_tracked_edits(xml: &str, mut edits: Vec<(Range<usize>, String)>) -> Result<String> {
     edits.sort_by(|left, right| {
-        right.0.start.cmp(&left.0.start).then_with(|| right.0.end.cmp(&left.0.end))
+        right
+            .0
+            .start
+            .cmp(&left.0.start)
+            .then_with(|| right.0.end.cmp(&left.0.end))
     });
     let mut output = xml.to_string();
     let mut previous = xml.len();

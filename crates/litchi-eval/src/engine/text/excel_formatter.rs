@@ -82,7 +82,7 @@ impl ExcelDateTime {
         let year = 1600 + year_days_400 * 400 + year_days_100 * 100 + year_days_4 * 4 + year_days_1;
         days += 1;
 
-        if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+        if year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400)) {
             months[1] = 29;
         }
 

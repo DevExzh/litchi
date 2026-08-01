@@ -46,12 +46,21 @@ const STANDARD_PART_NAMESPACES: [(&str, &str); 16] = [
     ("text", "urn:oasis:names:tc:opendocument:xmlns:text:1.0"),
     ("table", "urn:oasis:names:tc:opendocument:xmlns:table:1.0"),
     ("draw", "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"),
-    ("fo", "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"),
+    (
+        "fo",
+        "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0",
+    ),
     ("xlink", "http://www.w3.org/1999/xlink"),
     ("dc", "http://purl.org/dc/elements/1.1/"),
     ("meta", "urn:oasis:names:tc:opendocument:xmlns:meta:1.0"),
-    ("number", "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"),
-    ("svg", "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"),
+    (
+        "number",
+        "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0",
+    ),
+    (
+        "svg",
+        "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0",
+    ),
     ("chart", "urn:oasis:names:tc:opendocument:xmlns:chart:1.0"),
     ("dr3d", "urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0"),
     ("form", "urn:oasis:names:tc:opendocument:xmlns:form:1.0"),
@@ -350,8 +359,8 @@ fn root_namespace_decls(root: &quick_xml::events::BytesStart<'_>) -> Result<Vec<
 /// `flatwrapperN` candidates are tried before giving up with an error; a
 /// crafted document must never reach a panic here.
 fn wrapper_prefix(decls: &[(String, String)]) -> Result<(String, Option<String>)> {
-    let office_uri = std::str::from_utf8(OFFICE_NAMESPACE)
-        .expect("office namespace URI is valid UTF-8");
+    let office_uri =
+        std::str::from_utf8(OFFICE_NAMESPACE).expect("office namespace URI is valid UTF-8");
     let candidates = WRAPPER_PREFIXES
         .iter()
         .map(|prefix| (*prefix).to_string())
@@ -383,7 +392,9 @@ fn synthesize_package(flat: &FlatOpenDocument) -> Result<Vec<u8>> {
     if !sections.styles.is_empty() {
         writer.add_file(
             constants::ODF_STYLES,
-            sections.render("document-styles", &sections.styles).as_bytes(),
+            sections
+                .render("document-styles", &sections.styles)
+                .as_bytes(),
         )?;
     }
     if !sections.meta.is_empty() {
@@ -473,9 +484,8 @@ fn non_empty_section(candidate: Option<&str>) -> Option<&str> {
 /// declarations the mutated part roots added are merged into the flat root.
 fn splice_package_into_flat(flat: &FlatOpenDocument, package_bytes: Vec<u8>) -> Result<Vec<u8>> {
     let package = OwnedPackage::from_bytes(package_bytes)?;
-    let content_xml = package_xml_part(&package, constants::ODF_CONTENT)?.ok_or_else(|| {
-        Error::InvalidFormat("mutated package has no content.xml".to_string())
-    })?;
+    let content_xml = package_xml_part(&package, constants::ODF_CONTENT)?
+        .ok_or_else(|| Error::InvalidFormat("mutated package has no content.xml".to_string()))?;
     let styles_xml = package_xml_part(&package, constants::ODF_STYLES)?;
     let meta_xml = package_xml_part(&package, constants::ODF_META)?;
 
@@ -493,12 +503,19 @@ fn splice_package_into_flat(flat: &FlatOpenDocument, package_bytes: Vec<u8>) -> 
     let content_map: Vec<(&str, &str)> = content
         .sections
         .iter()
-        .map(|section| (section.local.as_str(), &content_xml[section.start..section.end]))
+        .map(|section| {
+            (
+                section.local.as_str(),
+                &content_xml[section.start..section.end],
+            )
+        })
         .collect();
     let styles_map: Vec<(&str, &str)> = styles
         .as_ref()
         .map(|scan| {
-            let xml = styles_xml.as_deref().expect("styles scan implies styles XML");
+            let xml = styles_xml
+                .as_deref()
+                .expect("styles scan implies styles XML");
             scan.sections
                 .iter()
                 .map(|section| (section.local.as_str(), &xml[section.start..section.end]))
@@ -550,9 +567,7 @@ fn splice_package_into_flat(flat: &FlatOpenDocument, package_bytes: Vec<u8>) -> 
     }
     let mut added_locals: HashSet<&str> = HashSet::new();
     for (local, slice) in content_map.iter().chain(styles_map.iter()) {
-        if original_locals.contains(local)
-            || !added_locals.insert(local)
-            || is_empty_element(slice)
+        if original_locals.contains(local) || !added_locals.insert(local) || is_empty_element(slice)
         {
             continue;
         }
@@ -567,11 +582,7 @@ fn splice_package_into_flat(flat: &FlatOpenDocument, package_bytes: Vec<u8>) -> 
     }
 
     // Merge namespace declarations the mutated part roots introduced.
-    let mut decl_keys: HashSet<&str> = original
-        .decls
-        .iter()
-        .map(|(key, _)| key.as_str())
-        .collect();
+    let mut decl_keys: HashSet<&str> = original.decls.iter().map(|(key, _)| key.as_str()).collect();
     let mut extra_decls = String::new();
     for scan in [Some(&content), styles.as_ref(), meta.as_ref()]
         .into_iter()
@@ -1088,7 +1099,10 @@ impl FlatChartDocument {
     /// The packaged [`ChartDocument`](crate::ChartDocument) is itself the
     /// mutable model, so the conversion only carries the flat source over.
     pub fn into_mutable(self) -> Result<FlatMutableChartDocument> {
-        Ok(FlatMutableChartDocument::from_flat(self.flat, self.document))
+        Ok(FlatMutableChartDocument::from_flat(
+            self.flat,
+            self.document,
+        ))
     }
 
     /// Clone this flat chart into an atomic mutable flat chart.
@@ -1124,8 +1138,14 @@ mod tests {
         assert_eq!(sections.settings.len(), 1);
 
         let content = sections.render("document-content", &sections.content);
-        assert!(content.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-content"));
-        assert!(content.contains("xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\""));
+        assert!(
+            content.starts_with(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<office:document-content"
+            )
+        );
+        assert!(
+            content.contains("xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"")
+        );
         assert!(content.ends_with("</office:document-content>\n"));
         assert!(content.contains("<office:body><office:text/></office:body>"));
     }
@@ -1141,7 +1161,10 @@ mod tests {
         assert_eq!(sections.wrapper_prefix, "officeflat");
         let content = sections.render("document-content", &sections.content);
         assert!(content.contains("<officeflat:document-content"));
-        assert!(content.contains("xmlns:officeflat=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\""));
+        assert!(
+            content
+                .contains("xmlns:officeflat=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"")
+        );
     }
 
     #[test]
@@ -1157,10 +1180,17 @@ mod tests {
 
         // Every candidate bound: an error, not a panic.
         let decls: Vec<(String, String)> = (0..MAX_WRAPPER_PREFIX_ATTEMPTS + 4)
-            .map(|index| (format!("xmlns:flatwrapper{index}"), "urn:example:foreign".to_string()))
-            .chain(WRAPPER_PREFIXES.iter().map(|prefix| {
-                (format!("xmlns:{prefix}"), "urn:example:foreign".to_string())
-            }))
+            .map(|index| {
+                (
+                    format!("xmlns:flatwrapper{index}"),
+                    "urn:example:foreign".to_string(),
+                )
+            })
+            .chain(
+                WRAPPER_PREFIXES
+                    .iter()
+                    .map(|prefix| (format!("xmlns:{prefix}"), "urn:example:foreign".to_string())),
+            )
             .collect();
         assert!(wrapper_prefix(&decls).is_err());
     }

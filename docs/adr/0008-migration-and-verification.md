@@ -1154,6 +1154,32 @@ edit/resave/reverse-read path on that build. It does not certify merge styling,
 structural row/column shifts, grouped formulas, every producer normalization,
 other Office applications or builds, or performance.
 
+The twenty-third implementation slice starts the binary Office dependency
+split by introducing `litchi-ole-common`. Shared Custom XML Data Storage and
+MS-OSHARED smart-tag property-bag records now live below the DOC, PPT, and XLS
+semantic models and are consumed directly by the legacy migration host. The
+old host modules are removed rather than retained as public compatibility
+re-exports. The extracted crate has a deliberately narrow internal dependency
+ceiling of `litchi-cfb` and `litchi-core`; it contains no concrete binary format
+model, async runtime, or peer-format dependency. Custom XML schema references
+remain inert metadata, XML reads are resource bounded, smart-tag indexes and
+code pages are validated, and malformed GUID input returns a typed error
+instead of relying on an unreachable branch.
+
+The dependency fence is now a complete checked-in policy rather than a partial
+set of hard-coded exceptions. It inventories every direct workspace crate and
+every normal, optional, development, renamed, and target-specific internal
+edge. Canonical downward edges and ordered migration debt are distinct; every
+debt item has a reason and exit condition. CI rejects unclassified edges,
+cycles, concrete peer-format coupling, upward common-crate dependencies,
+runtime dependencies in neutral crates, unaudited manifests, newly introduced
+core format debt, and stale debt whose underlying edge or feature has already
+been removed. This gate makes the remaining monolith dependencies visible and
+removable one at a time; it does not make either monolith part of the target
+architecture. The same workflow denies compiler, Clippy, and rustdoc warnings
+across every workspace target with the complete feature set so test-, example-,
+and documentation-only regressions cannot hide behind default library builds.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

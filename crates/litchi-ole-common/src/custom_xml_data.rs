@@ -176,9 +176,9 @@ impl FromStr for CustomXmlItemId {
                 b'0'..=b'9' => byte - b'0',
                 b'a'..=b'f' => byte - b'a' + 10,
                 b'A'..=b'F' => byte - b'A' + 10,
-                _ => unreachable!("validated hexadecimal digit"),
+                _ => return Err(invalid("itemID contains a non-hexadecimal digit")),
             };
-            if nibble % 2 == 0 {
+            if nibble.is_multiple_of(2) {
                 bytes[nibble / 2] = value << 4;
             } else {
                 bytes[nibble / 2] |= value;

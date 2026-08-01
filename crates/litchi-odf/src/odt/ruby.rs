@@ -224,8 +224,7 @@ pub(crate) fn parse_rubies(xml: &str) -> Result<Vec<Ruby>> {
                         Error::InvalidFormat("ruby element stack underflow".to_string())
                     })?;
                 }
-                if active.last().is_some_and(|ruby| ruby.depth == 0) {
-                    let finished = active.pop().expect("checked ruby");
+                if let Some(finished) = active.pop_if(|ruby| ruby.depth == 0) {
                     if !finished.base_seen || !finished.text_seen {
                         return Err(Error::InvalidFormat(
                             "text:ruby requires base and text".to_string(),

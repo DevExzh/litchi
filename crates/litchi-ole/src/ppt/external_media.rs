@@ -488,7 +488,7 @@ fn parse_path(record: &PptRecord) -> Result<String> {
     if record.version != 0
         || record.instance != 0
         || record.record_type_raw != PptRecordType::CString.as_u16()
-        || record.data.len() % 2 != 0
+        || !record.data.len().is_multiple_of(2)
         || record.data.len() / 2 > MAX_PATH_UNITS
     {
         return corrupted("UncOrLocalPathAtom has an invalid header or size");

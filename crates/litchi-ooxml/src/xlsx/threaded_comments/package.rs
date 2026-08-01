@@ -8,9 +8,8 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 use super::{
-    Person, PersonList, ThreadedComment, ThreadedComments, read_persons,
-    read_threaded_comments, validate_threaded_timestamp, write_persons,
-    write_threaded_comments,
+    Person, PersonList, ThreadedComment, ThreadedComments, read_persons, read_threaded_comments,
+    validate_threaded_timestamp, write_persons, write_threaded_comments,
 };
 
 /// The workbook-level persons part and its relationship identity.
@@ -63,11 +62,9 @@ pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<Threaded
     let mut worksheets = Vec::with_capacity(worksheet_names.len());
     for worksheet_name in worksheet_names {
         let worksheet = package.get_part(&worksheet_name)?;
-        let Some((relationship_id, part_name)) = one_internal_relationship(
-            worksheet,
-            rt::THREADED_COMMENTS,
-            "threaded comments",
-        )? else {
+        let Some((relationship_id, part_name)) =
+            one_internal_relationship(worksheet, rt::THREADED_COMMENTS, "threaded comments")?
+        else {
             continue;
         };
         let comments = read_threaded_comments(package, &worksheet_name)?
@@ -80,7 +77,10 @@ pub fn load_threaded_comment_graph(package: &OpcPackage) -> SheetResult<Threaded
         });
     }
     worksheets.sort_by(|left, right| left.worksheet_part_name.cmp(&right.worksheet_part_name));
-    let graph = ThreadedCommentGraph { persons, worksheets };
+    let graph = ThreadedCommentGraph {
+        persons,
+        worksheets,
+    };
     validate_threaded_comment_graph(&graph)?;
     Ok(graph)
 }
@@ -91,7 +91,12 @@ pub fn find_threaded_comment_person(
 ) -> SheetResult<Option<Person>> {
     Ok(load_threaded_comment_graph(package)?
         .persons
-        .and_then(|part| part.persons.persons.into_iter().find(|person| person.id == person_id)))
+        .and_then(|part| {
+            part.persons
+                .persons
+                .into_iter()
+                .find(|person| person.id == person_id)
+        }))
 }
 
 pub fn add_threaded_comment_person(
@@ -100,7 +105,10 @@ pub fn add_threaded_comment_person(
 ) -> SheetResult<WorkbookPersonPart> {
     let mut graph = load_threaded_comment_graph(package)?;
     if graph.persons.as_ref().is_some_and(|part| {
-        part.persons.persons.iter().any(|candidate| candidate.id == person.id)
+        part.persons
+            .persons
+            .iter()
+            .any(|candidate| candidate.id == person.id)
     }) {
         return Err(format!("duplicate threaded-comment person ID '{}'", person.id).into());
     }
@@ -118,7 +126,9 @@ pub fn add_threaded_comment_person(
     let part = WorkbookPersonPart {
         relationship_id: relationship_id.clone(),
         part_name: part_name.to_string(),
-        persons: PersonList { persons: vec![person] },
+        persons: PersonList {
+            persons: vec![person],
+        },
     };
     graph.persons = Some(part.clone());
     validate_threaded_comment_graph(&graph)?;
@@ -128,12 +138,15 @@ pub fn add_threaded_comment_person(
         ct::SML_PERSONS.into(),
         xml,
     )))?;
-    package.get_part_mut(&workbook_name)?.rels_mut().add_relationship(
-        rt::PERSONS.into(),
-        part_name.relative_ref(workbook_name.base_uri()),
-        relationship_id,
-        false,
-    );
+    package
+        .get_part_mut(&workbook_name)?
+        .rels_mut()
+        .add_relationship(
+            rt::PERSONS.into(),
+            part_name.relative_ref(workbook_name.base_uri()),
+            relationship_id,
+            false,
+        );
     let _ = package.clear_digital_signatures();
     Ok(part)
 }
@@ -147,8 +160,15 @@ where
     F: FnOnce(&mut Person),
 {
     let mut graph = load_threaded_comment_graph(package)?;
-    let Some(mut part) = graph.persons.clone() else { return Ok(false); };
-    let Some(person) = part.persons.persons.iter_mut().find(|person| person.id == person_id) else {
+    let Some(mut part) = graph.persons.clone() else {
+        return Ok(false);
+    };
+    let Some(person) = part
+        .persons
+        .persons
+        .iter_mut()
+        .find(|person| person.id == person_id)
+    else {
         return Ok(false);
     };
     update(person);
@@ -177,8 +197,15 @@ pub fn remove_threaded_comment_person(
     person_id: &str,
 ) -> SheetResult<bool> {
     let mut graph = load_threaded_comment_graph(package)?;
-    let Some(mut part) = graph.persons.clone() else { return Ok(false); };
-    let Some(index) = part.persons.persons.iter().position(|person| person.id == person_id) else {
+    let Some(mut part) = graph.persons.clone() else {
+        return Ok(false);
+    };
+    let Some(index) = part
+        .persons
+        .persons
+        .iter()
+        .position(|person| person.id == person_id)
+    else {
         return Ok(false);
     };
     if graph.worksheets.iter().any(|sheet| {
@@ -221,7 +248,9 @@ pub fn reorder_threaded_comment_persons(
 ) -> SheetResult<Vec<Person>> {
     let mut graph = load_threaded_comment_graph(package)?;
     let Some(mut part) = graph.persons.clone() else {
-        if ordered_person_ids.is_empty() { return Ok(Vec::new()); }
+        if ordered_person_ids.is_empty() {
+            return Ok(Vec::new());
+        }
         return Err("threaded-comment persons part is missing".into());
     };
     let ordered = reorder_by_id(
@@ -248,12 +277,19 @@ pub fn find_threaded_comment(
         .worksheets
         .iter()
         .find(|sheet| sheet.worksheet_part_name == worksheet_part_name.to_string())
-    else { return Ok(None); };
-    Ok(sheet.comments.comments.iter().find(|comment| {
-        comment.id == comment_id
-            && resolved_cell_ref(&sheet.comments, comment)
-                .is_some_and(|resolved| resolved == cell_ref)
-    }).cloned())
+    else {
+        return Ok(None);
+    };
+    Ok(sheet
+        .comments
+        .comments
+        .iter()
+        .find(|comment| {
+            comment.id == comment_id
+                && resolved_cell_ref(&sheet.comments, comment)
+                    .is_some_and(|resolved| resolved == cell_ref)
+        })
+        .cloned())
 }
 
 pub fn add_threaded_comment(
@@ -263,7 +299,11 @@ pub fn add_threaded_comment(
 ) -> SheetResult<WorksheetThreadedCommentPart> {
     let mut graph = load_threaded_comment_graph(package)?;
     if graph.worksheets.iter().any(|sheet| {
-        sheet.comments.comments.iter().any(|candidate| candidate.id == comment.id)
+        sheet
+            .comments
+            .comments
+            .iter()
+            .any(|candidate| candidate.id == comment.id)
     }) {
         return Err(format!("duplicate threaded-comment ID '{}'", comment.id).into());
     }
@@ -289,7 +329,9 @@ pub fn add_threaded_comment(
         worksheet_part_name: worksheet_part_name.to_string(),
         relationship_id: relationship_id.clone(),
         part_name: part_name.to_string(),
-        comments: ThreadedComments { comments: vec![comment] },
+        comments: ThreadedComments {
+            comments: vec![comment],
+        },
     };
     graph.worksheets.push(part.clone());
     validate_threaded_comment_graph(&graph)?;
@@ -299,12 +341,15 @@ pub fn add_threaded_comment(
         ct::SML_THREADED_COMMENTS.into(),
         xml,
     )))?;
-    package.get_part_mut(worksheet_part_name)?.rels_mut().add_relationship(
-        rt::THREADED_COMMENTS.into(),
-        part_name.relative_ref(worksheet_part_name.base_uri()),
-        relationship_id,
-        false,
-    );
+    package
+        .get_part_mut(worksheet_part_name)?
+        .rels_mut()
+        .add_relationship(
+            rt::THREADED_COMMENTS.into(),
+            part_name.relative_ref(worksheet_part_name.base_uri()),
+            relationship_id,
+            false,
+        );
     let _ = package.clear_digital_signatures();
     Ok(part)
 }
@@ -341,7 +386,9 @@ where
         .worksheets
         .iter()
         .position(|sheet| sheet.worksheet_part_name == worksheet_part_name.to_string())
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     let Some(comment_index) = graph.worksheets[sheet_index]
         .comments
         .comments
@@ -351,7 +398,9 @@ where
                 && resolved_cell_ref(&graph.worksheets[sheet_index].comments, comment)
                     .is_some_and(|resolved| resolved == cell_ref)
         })
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     update(&mut graph.worksheets[sheet_index].comments.comments[comment_index]);
     if graph.worksheets[sheet_index].comments.comments[comment_index].id != comment_id {
         return Err("threaded-comment update cannot change its ID".into());
@@ -392,7 +441,9 @@ pub fn remove_threaded_comment(
         .worksheets
         .iter()
         .position(|sheet| sheet.worksheet_part_name == worksheet_part_name.to_string())
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     let Some(comment_index) = graph.worksheets[sheet_index]
         .comments
         .comments
@@ -402,7 +453,9 @@ pub fn remove_threaded_comment(
                 && resolved_cell_ref(&graph.worksheets[sheet_index].comments, comment)
                     .is_some_and(|resolved| resolved == cell_ref)
         })
-    else { return Ok(false); };
+    else {
+        return Ok(false);
+    };
     if graph.worksheets[sheet_index]
         .comments
         .comments
@@ -411,7 +464,10 @@ pub fn remove_threaded_comment(
     {
         return Err("cannot remove a threaded-comment root while replies remain".into());
     }
-    graph.worksheets[sheet_index].comments.comments.remove(comment_index);
+    graph.worksheets[sheet_index]
+        .comments
+        .comments
+        .remove(comment_index);
     if !graph.worksheets[sheet_index].comments.comments.is_empty() {
         validate_threaded_comment_graph(&graph)?;
         let part = graph.worksheets[sheet_index].clone();
@@ -444,7 +500,9 @@ pub fn reorder_threaded_comments(
         .iter()
         .position(|sheet| sheet.worksheet_part_name == worksheet_part_name.to_string())
     else {
-        if ordered_comment_ids.is_empty() { return Ok(Vec::new()); }
+        if ordered_comment_ids.is_empty() {
+            return Ok(Vec::new());
+        }
         return Err("worksheet has no threaded-comments part".into());
     };
     let ordered = reorder_by_id(
@@ -468,7 +526,11 @@ pub fn validate_threaded_comment_graph(graph: &ThreadedCommentGraph) -> SheetRes
         .map(|part| &part.persons)
         .unwrap_or(&empty_persons);
     write_persons(persons)?;
-    let person_ids: HashSet<&str> = persons.persons.iter().map(|person| person.id.as_str()).collect();
+    let person_ids: HashSet<&str> = persons
+        .persons
+        .iter()
+        .map(|person| person.id.as_str())
+        .collect();
     let mut comment_ids = HashSet::new();
     let mut mention_ids = HashSet::new();
     for sheet in &graph.worksheets {
@@ -476,28 +538,49 @@ pub fn validate_threaded_comment_graph(graph: &ThreadedCommentGraph) -> SheetRes
         let mut root_cells = HashSet::new();
         for comment in &sheet.comments.comments {
             if !comment_ids.insert(comment.id.as_str()) {
-                return Err(format!("duplicate workbook threaded-comment ID '{}'", comment.id).into());
+                return Err(
+                    format!("duplicate workbook threaded-comment ID '{}'", comment.id).into(),
+                );
             }
             if !person_ids.contains(comment.person_id.as_str()) {
-                return Err(format!("threaded comment '{}' references missing person '{}'", comment.id, comment.person_id).into());
+                return Err(format!(
+                    "threaded comment '{}' references missing person '{}'",
+                    comment.id, comment.person_id
+                )
+                .into());
             }
             validate_threaded_timestamp(comment.date_time.as_deref())?;
             if comment.parent_id.is_none() {
                 let cell = comment.cell_ref.as_deref().ok_or_else(|| {
-                    format!("threaded-comment root '{}' is missing its cell reference", comment.id)
+                    format!(
+                        "threaded-comment root '{}' is missing its cell reference",
+                        comment.id
+                    )
                 })?;
                 if !root_cells.insert(cell) {
-                    return Err(format!("worksheet has multiple threaded-comment roots at {cell}").into());
+                    return Err(
+                        format!("worksheet has multiple threaded-comment roots at {cell}").into(),
+                    );
                 }
             } else if comment.cell_ref.is_some() {
-                return Err(format!("threaded-comment reply '{}' must not carry a cell reference", comment.id).into());
+                return Err(format!(
+                    "threaded-comment reply '{}' must not carry a cell reference",
+                    comment.id
+                )
+                .into());
             }
             for mention in &comment.mentions {
                 if !person_ids.contains(mention.mention_person_id.as_str()) {
-                    return Err(format!("mention '{}' references missing person '{}'", mention.mention_id, mention.mention_person_id).into());
+                    return Err(format!(
+                        "mention '{}' references missing person '{}'",
+                        mention.mention_id, mention.mention_person_id
+                    )
+                    .into());
                 }
                 if !mention_ids.insert(mention.mention_id.as_str()) {
-                    return Err(format!("duplicate workbook mention ID '{}'", mention.mention_id).into());
+                    return Err(
+                        format!("duplicate workbook mention ID '{}'", mention.mention_id).into(),
+                    );
                 }
             }
         }
@@ -508,9 +591,18 @@ pub fn validate_threaded_comment_graph(graph: &ThreadedCommentGraph) -> SheetRes
             .filter(|comment| comment.parent_id.is_none())
             .map(|comment| comment.id.as_str())
             .collect();
-        for reply in sheet.comments.comments.iter().filter(|comment| comment.parent_id.is_some()) {
+        for reply in sheet
+            .comments
+            .comments
+            .iter()
+            .filter(|comment| comment.parent_id.is_some())
+        {
             if !roots.contains(reply.parent_id.as_deref().expect("filtered")) {
-                return Err(format!("threaded-comment reply '{}' must reference a root in the same worksheet", reply.id).into());
+                return Err(format!(
+                    "threaded-comment reply '{}' must reference a root in the same worksheet",
+                    reply.id
+                )
+                .into());
             }
         }
     }
@@ -545,7 +637,9 @@ fn one_internal_relationship(
         .rels()
         .iter()
         .filter(|relationship| relationship.reltype() == relationship_type);
-    let Some(relationship) = found.next() else { return Ok(None); };
+    let Some(relationship) = found.next() else {
+        return Ok(None);
+    };
     if found.next().is_some() {
         return Err(format!("part has multiple {description} relationships").into());
     }
@@ -594,9 +688,11 @@ where
     }
     let mut ordered = Vec::with_capacity(ordered_ids.len());
     for requested in ordered_ids {
-        ordered.push(remaining.remove(requested).ok_or_else(|| {
-            format!("unknown or duplicate {description} ID '{requested}'")
-        })?);
+        ordered.push(
+            remaining
+                .remove(requested)
+                .ok_or_else(|| format!("unknown or duplicate {description} ID '{requested}'"))?,
+        );
     }
     if !remaining.is_empty() {
         return Err(format!("{description} reorder must contain every ID").into());
@@ -606,20 +702,24 @@ where
 
 fn next_person_part_name(package: &OpcPackage) -> SheetResult<PackURI> {
     let canonical = PackURI::new("/xl/persons/person.xml")?;
-    if package.get_part(&canonical).is_err() { return Ok(canonical); }
+    if package.get_part(&canonical).is_err() {
+        return Ok(canonical);
+    }
     for suffix in 1..=65_537u32 {
         let candidate = PackURI::new(format!("/xl/persons/person{suffix}.xml"))?;
-        if package.get_part(&candidate).is_err() { return Ok(candidate); }
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
     }
     Err("no free persons part name".into())
 }
 
 fn next_threaded_comment_part_name(package: &OpcPackage) -> SheetResult<PackURI> {
     for suffix in 1..=65_537u32 {
-        let candidate = PackURI::new(format!(
-            "/xl/threadedComments/threadedComment{suffix}.xml"
-        ))?;
-        if package.get_part(&candidate).is_err() { return Ok(candidate); }
+        let candidate = PackURI::new(format!("/xl/threadedComments/threadedComment{suffix}.xml"))?;
+        if package.get_part(&candidate).is_err() {
+            return Ok(candidate);
+        }
     }
     Err("no free threaded-comments part name".into())
 }
@@ -627,17 +727,25 @@ fn next_threaded_comment_part_name(package: &OpcPackage) -> SheetResult<PackURI>
 fn next_relationship_id(owner: &dyn Part, prefix: &str) -> SheetResult<String> {
     for suffix in 1..=65_537u32 {
         let candidate = format!("{prefix}{suffix}");
-        if owner.rels().get(&candidate).is_none() { return Ok(candidate); }
+        if owner.rels().get(&candidate).is_none() {
+            return Ok(candidate);
+        }
     }
     Err(format!("no free {prefix} relationship ID").into())
 }
 
 fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
-    package.iter_parts().any(|part| part.rels().iter().any(|relationship| {
+    package.iter_parts().any(|part| {
+        part.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|part_name| part_name == *target)
+        })
+    }) || package.rels().iter().any(|relationship| {
         !relationship.is_external()
-            && relationship.target_partname().is_ok_and(|part_name| part_name == *target)
-    })) || package.rels().iter().any(|relationship| {
-        !relationship.is_external()
-            && relationship.target_partname().is_ok_and(|part_name| part_name == *target)
+            && relationship
+                .target_partname()
+                .is_ok_and(|part_name| part_name == *target)
     })
 }

@@ -121,9 +121,7 @@ impl XlsChart3d {
         }
         let gap = u16::from_le_bytes([data[10], data[11]]);
         if gap > MAX_GAP {
-            return Err(invalid(format!(
-                "Chart3d pcGap {gap} exceeds {MAX_GAP}"
-            )));
+            return Err(invalid(format!("Chart3d pcGap {gap} exceeds {MAX_GAP}")));
         }
         Ok(Self {
             rotation,

@@ -10,7 +10,6 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::RichTextRun;
 use crate::xlsx::cell::Cell;
@@ -26,6 +25,7 @@ use crate::xlsx::worksheet::{
     AutoFilter, ColumnInfo, ConditionalFormatRule, DataValidationRule, PageBreak, PageSetup,
     RowInfo,
 };
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 
 const MAX_EXCEL_COLUMN: u32 = 16_384;
 const MAX_SORT_CONDITIONS: usize = 64;

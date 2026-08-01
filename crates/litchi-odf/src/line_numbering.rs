@@ -287,10 +287,12 @@ pub fn parse_line_numbering_configuration(
                 if depth > MAX_XML_DEPTH {
                     return invalid(format!("ODF XML exceeds the {MAX_XML_DEPTH} depth limit"));
                 }
-                if namespace == NamespaceKind::Office && element.local_name().as_ref() == b"styles"
-                    && styles_content_depth.replace(depth).is_some() {
-                        return invalid("ODF XML contains nested office:styles elements");
-                    }
+                if namespace == NamespaceKind::Office
+                    && element.local_name().as_ref() == b"styles"
+                    && styles_content_depth.replace(depth).is_some()
+                {
+                    return invalid("ODF XML contains nested office:styles elements");
+                }
             },
             Event::End(element) => {
                 if namespace == NamespaceKind::Office

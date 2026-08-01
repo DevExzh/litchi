@@ -8,7 +8,9 @@ use litchi_rtf::{
 
 fn write(document: &RtfDocument<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    RtfWriter::new(&mut output).write_document(document).unwrap();
+    RtfWriter::new(&mut output)
+        .write_document(document)
+        .unwrap();
     output
 }
 
@@ -16,7 +18,10 @@ fn named(name: &'static str, id: i32) -> Shape<'static> {
     let mut shape = Shape::new(ShapeType::Rectangle);
     shape.name = Cow::Borrowed(name);
     shape.info.push(ShapeGroupInfo::ShapeId(id));
-    shape.properties.push(ShapeProperty::new(Cow::Borrowed("wzName"), Cow::Borrowed(name)));
+    shape.properties.push(ShapeProperty::new(
+        Cow::Borrowed("wzName"),
+        Cow::Borrowed(name),
+    ));
     shape
 }
 
@@ -29,18 +34,36 @@ fn document_shape_find_replace_remove_and_reorder_are_atomic() {
     second.position = document.text().len();
     assert_eq!(document.add_shape(first).unwrap(), 0);
     assert_eq!(document.add_shape(second).unwrap(), 1);
-    assert_eq!(document.find_shape_by_name("second").unwrap().shape_id(), Some(42));
+    assert_eq!(
+        document.find_shape_by_name("second").unwrap().shape_id(),
+        Some(42)
+    );
     assert_eq!(document.find_shape_by_id(41).unwrap().name, "first");
 
     document.move_drawing(1, 0).unwrap();
-    assert_eq!(document.drawing_order(), &[StoryDrawing::Shape(1), StoryDrawing::Shape(0)]);
+    assert_eq!(
+        document.drawing_order(),
+        &[StoryDrawing::Shape(1), StoryDrawing::Shape(0)]
+    );
     let mut replacement = named("updated", 41);
     replacement.position = document.text().len();
     replacement.geometry.set_z_order(ShapeZOrder::new(9));
     document.replace_shape(0, replacement).unwrap();
-    assert_eq!(document.find_shape_by_name("updated").unwrap().geometry.z_order_value(), ShapeZOrder::new(9));
+    assert_eq!(
+        document
+            .find_shape_by_name("updated")
+            .unwrap()
+            .geometry
+            .z_order_value(),
+        ShapeZOrder::new(9)
+    );
 
-    let before: Vec<_> = document.shapes().iter().cloned().map(Shape::into_owned).collect();
+    let before: Vec<_> = document
+        .shapes()
+        .iter()
+        .cloned()
+        .map(Shape::into_owned)
+        .collect();
     let mut relocated = named("bad", 9);
     relocated.position = 0;
     assert!(document.replace_shape(0, relocated).is_err());
@@ -56,8 +79,14 @@ fn document_shape_find_replace_remove_and_reorder_are_atomic() {
 #[test]
 fn typed_units_anchors_and_nested_group_mutation_round_trip() {
     let mut root = ShapeGroup::new();
-    root.geometry = ShapeGeometry::from_twips(ShapeTwips::new(10), ShapeTwips::new(20), ShapeTwips::new(300), ShapeTwips::new(400));
-    root.geometry.set_rotation_degrees(ShapeRotationDegrees::new(15));
+    root.geometry = ShapeGeometry::from_twips(
+        ShapeTwips::new(10),
+        ShapeTwips::new(20),
+        ShapeTwips::new(300),
+        ShapeTwips::new(400),
+    );
+    root.geometry
+        .set_rotation_degrees(ShapeRotationDegrees::new(15));
     root.info.extend([
         ShapeGroupInfo::horizontal_anchor(ShapeHorizontalAnchor::Margin),
         ShapeGroupInfo::vertical_anchor(ShapeVerticalAnchor::Paragraph),
@@ -71,8 +100,14 @@ fn typed_units_anchors_and_nested_group_mutation_round_trip() {
     root.remove_shape(1).unwrap();
     assert_eq!(root.find_shape_by_id(3).unwrap().name, "replacement");
     assert_eq!(root.geometry.x_twips(), ShapeTwips::new(10));
-    assert_eq!(root.info[0].as_horizontal_anchor(), Some(ShapeHorizontalAnchor::Margin));
-    assert_eq!(root.info[1].as_vertical_anchor(), Some(ShapeVerticalAnchor::Paragraph));
+    assert_eq!(
+        root.info[0].as_horizontal_anchor(),
+        Some(ShapeHorizontalAnchor::Margin)
+    );
+    assert_eq!(
+        root.info[1].as_vertical_anchor(),
+        Some(ShapeVerticalAnchor::Paragraph)
+    );
     assert_eq!(root.info[2].as_wrap(), Some(ShapeWrapStyle::Tight));
     assert_eq!(root.info[3].as_wrap_side(), Some(ShapeWrapSide::Right));
 
@@ -80,19 +115,39 @@ fn typed_units_anchors_and_nested_group_mutation_round_trip() {
     root.position = document.text().len();
     document.add_shape_group(root).unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
-    assert_eq!(reparsed.shape_groups()[0].find_shape_by_name("replacement").unwrap().shape_id(), Some(3));
+    assert_eq!(
+        reparsed.shape_groups()[0]
+            .find_shape_by_name("replacement")
+            .unwrap()
+            .shape_id(),
+        Some(3)
+    );
 }
 
 #[test]
 fn libreoffice_fixture_mutates_without_interpreting_picture_or_ole_payloads() {
-    let source = include_bytes!("../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/shpz-dhgt.rtf");
+    let source = include_bytes!(
+        "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/shpz-dhgt.rtf"
+    );
     let mut document = RtfDocument::parse_bytes(source).unwrap();
-    let index = document.shapes().iter().position(|shape| shape.shape_id().is_some()).unwrap();
+    let index = document
+        .shapes()
+        .iter()
+        .position(|shape| shape.shape_id().is_some())
+        .unwrap();
     let mut replacement = document.shapes()[index].clone().into_owned();
-    replacement.set_property(ShapeProperty::new(Cow::Borrowed("litchiUnknownProperty"), Cow::Borrowed("opaque"))).unwrap();
+    replacement
+        .set_property(ShapeProperty::new(
+            Cow::Borrowed("litchiUnknownProperty"),
+            Cow::Borrowed("opaque"),
+        ))
+        .unwrap();
     document.replace_shape(index, replacement).unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
-    assert_eq!(reparsed.shapes()[index].property("litchiUnknownProperty"), Some("opaque"));
+    assert_eq!(
+        reparsed.shapes()[index].property("litchiUnknownProperty"),
+        Some("opaque")
+    );
 }
 
 #[test]

@@ -180,16 +180,14 @@ impl TextBoxBreakTable {
         textbox_count: Option<u32>,
     ) -> Result<Self> {
         let name = kind.name();
-        if data.len() < 4 || (data.len() - 4) % ENTRY_STRIDE != 0 {
+        if data.len() < 4 || !(data.len() - 4).is_multiple_of(ENTRY_STRIDE) {
             return Err(corrupted(format!(
                 "{name} length must have form {ENTRY_STRIDE}n + 4"
             )));
         }
         let count = (data.len() - 4) / ENTRY_STRIDE;
         if count > MAX_TBKD_ENTRIES {
-            return Err(corrupted(format!(
-                "{name} exceeds one-million-entry cap"
-            )));
+            return Err(corrupted(format!("{name} exceeds one-million-entry cap")));
         }
         let cp_bytes = count
             .checked_add(1)
@@ -203,9 +201,8 @@ impl TextBoxBreakTable {
         let mut entries = Vec::with_capacity(count);
         for (index, &start_cp) in positions[..count].iter().enumerate() {
             let element_start = cp_bytes + index * TextBoxBreak::SIZE;
-            let break_info = TextBoxBreak::from_bytes(
-                &data[element_start..element_start + TextBoxBreak::SIZE],
-            )?;
+            let break_info =
+                TextBoxBreak::from_bytes(&data[element_start..element_start + TextBoxBreak::SIZE])?;
             entries.push(TextBoxBreakEntry::new(start_cp, break_info));
         }
         validate_entries(kind, &entries, terminal_cp, maximum_cp, textbox_count)?;
@@ -263,9 +260,7 @@ fn validate_entries(
 ) -> Result<()> {
     let name = kind.name();
     if entries.len() > MAX_TBKD_ENTRIES {
-        return Err(corrupted(format!(
-            "{name} exceeds one-million-entry cap"
-        )));
+        return Err(corrupted(format!("{name} exceeds one-million-entry cap")));
     }
     let mut previous = None;
     for (index, entry) in entries.iter().enumerate() {
@@ -274,12 +269,10 @@ fn validate_entries(
                 "{name} CP {index} exceeds signed CP range"
             )));
         }
-        if let Some(value) = previous {
-            if entry.start_cp <= value {
-                return Err(corrupted(format!(
-                    "{name} CPs are not strictly increasing"
-                )));
-            }
+        if let Some(value) = previous
+            && entry.start_cp <= value
+        {
+            return Err(corrupted(format!("{name} CPs are not strictly increasing")));
         }
         previous = Some(entry.start_cp);
     }
@@ -304,9 +297,7 @@ fn validate_entries(
     for entry in &entries[..associated] {
         let itxbxs = entry.break_info.itxbxs();
         if itxbxs < 0 {
-            return Err(corrupted(format!(
-                "{name} has a negative FTXBXS index"
-            )));
+            return Err(corrupted(format!("{name} has a negative FTXBXS index")));
         }
         if textbox_count.is_some_and(|count| itxbxs as u32 >= count) {
             return Err(corrupted(format!(
@@ -374,13 +365,8 @@ fn parse_fib_table(
         .map(|(_, length)| length as usize)
         .filter(|length| *length >= 4 && (*length - 4) % (4 + FTXBXS_LEN) == 0)
         .map(|length| ((length - 4) / (4 + FTXBXS_LEN)) as u32);
-    TextBoxBreakTable::parse_bytes_with_limits(
-        kind,
-        data,
-        Some(kind.story_end(fib)),
-        textbox_count,
-    )
-    .map(Some)
+    TextBoxBreakTable::parse_bytes_with_limits(kind, data, Some(kind.story_end(fib)), textbox_count)
+        .map(Some)
 }
 
 #[cfg(test)]
@@ -413,7 +399,11 @@ mod tests {
 
     #[test]
     fn break_table_parses_and_round_trips() {
-        let breaks = [TextBoxBreak::new(0), TextBoxBreak::new(1), TextBoxBreak::new(-1)];
+        let breaks = [
+            TextBoxBreak::new(0),
+            TextBoxBreak::new(1),
+            TextBoxBreak::new(-1),
+        ];
         let bytes = plc_bytes(&[0, 5, 9], 12, &breaks);
         let table = TextBoxBreakTable::parse_bytes(TextBoxBreakKind::Main, &bytes).unwrap();
         assert_eq!(table.len(), 3);

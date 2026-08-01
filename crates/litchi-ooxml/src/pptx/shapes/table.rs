@@ -1,7 +1,7 @@
-/// Table shape implementation for PowerPoint presentations.
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::shapes::textframe::{extract_drawingml_text, scan_drawingml_element_ranges};
+/// Table shape implementation for PowerPoint presentations.
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -255,15 +255,24 @@ fn parse_table_properties(xml_bytes: &[u8]) -> Result<Option<TableProperties>> {
                             .map(|prefix| prefix.into_inner().to_vec()),
                     );
                 }
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| OoxmlError::InvalidFormat("table XML is too deep".to_string()))?;
-                if depth == 1 && !matches_drawingml_name(&namespace, element.name(), b"tbl", &fragment_prefix) {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("table XML is too deep".to_string())
+                })?;
+                if depth == 1
+                    && !matches_drawingml_name(&namespace, element.name(), b"tbl", &fragment_prefix)
+                {
                     // Not a table fragment (for example a bare a:tc); no
                     // properties are reported.
                     return Ok(None);
                 }
-                if depth == 2 && matches_drawingml_name(&namespace, element.name(), b"tblPr", &fragment_prefix) {
+                if depth == 2
+                    && matches_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        b"tblPr",
+                        &fragment_prefix,
+                    )
+                {
                     if properties.is_some() {
                         return Err(OoxmlError::InvalidFormat(
                             "table has multiple tblPr elements".to_string(),
@@ -280,7 +289,12 @@ fn parse_table_properties(xml_bytes: &[u8]) -> Result<Option<TableProperties>> {
                     });
                     properties_depth = Some(depth);
                 } else if properties_depth == Some(depth - 1)
-                    && matches_drawingml_name(&namespace, element.name(), b"tableStyleId", &fragment_prefix)
+                    && matches_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        b"tableStyleId",
+                        &fragment_prefix,
+                    )
                     && style_id_depth.replace(depth).is_some()
                 {
                     return Err(OoxmlError::InvalidFormat(
@@ -297,13 +311,22 @@ fn parse_table_properties(xml_bytes: &[u8]) -> Result<Option<TableProperties>> {
                             .map(|prefix| prefix.into_inner().to_vec()),
                     );
                 }
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| OoxmlError::InvalidFormat("table XML is too deep".to_string()))?;
-                if child_depth == 1 && !matches_drawingml_name(&namespace, element.name(), b"tbl", &fragment_prefix) {
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("table XML is too deep".to_string())
+                })?;
+                if child_depth == 1
+                    && !matches_drawingml_name(&namespace, element.name(), b"tbl", &fragment_prefix)
+                {
                     return Ok(None);
                 }
-                if child_depth == 2 && matches_drawingml_name(&namespace, element.name(), b"tblPr", &fragment_prefix) {
+                if child_depth == 2
+                    && matches_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        b"tblPr",
+                        &fragment_prefix,
+                    )
+                {
                     if properties.is_some() {
                         return Err(OoxmlError::InvalidFormat(
                             "table has multiple tblPr elements".to_string(),
@@ -333,7 +356,12 @@ fn parse_table_properties(xml_bytes: &[u8]) -> Result<Option<TableProperties>> {
                     ));
                 }
                 if style_id_depth == Some(depth)
-                    && matches_drawingml_name(&namespace, element.name(), b"tableStyleId", &fragment_prefix)
+                    && matches_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        b"tableStyleId",
+                        &fragment_prefix,
+                    )
                 {
                     let style_id = style_id_text.trim();
                     if style_id.is_empty() {
@@ -348,7 +376,12 @@ fn parse_table_properties(xml_bytes: &[u8]) -> Result<Option<TableProperties>> {
                     style_id_text.clear();
                 }
                 if properties_depth == Some(depth)
-                    && matches_drawingml_name(&namespace, element.name(), b"tblPr", &fragment_prefix)
+                    && matches_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        b"tblPr",
+                        &fragment_prefix,
+                    )
                 {
                     properties_depth = None;
                 }

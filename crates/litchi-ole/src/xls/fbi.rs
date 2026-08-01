@@ -46,9 +46,7 @@ impl XlsFontScaleBasis {
         match value {
             0x0000 => Ok(Self::ChartArea),
             0x0001 => Ok(Self::PlotArea),
-            other => Err(invalid(format!(
-                "Fbi scab {other:#06X} is not a Boolean"
-            ))),
+            other => Err(invalid(format!("Fbi scab {other:#06X} is not a Boolean"))),
         }
     }
 }

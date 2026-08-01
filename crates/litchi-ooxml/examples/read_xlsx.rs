@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for row in min_r..=row_end {
             for col in min_c..=col_end {
                 match ws.cell_value(row, col) {
-                    Ok(value) => print!("  ({},{})={:?}", row, col, &*value),
+                    Ok(value) => print!("  ({},{})={:?}", row, col, *value),
                     Err(err) => print!("  ({},{})=<err: {}>", row, col, err),
                 }
             }

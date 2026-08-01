@@ -1,10 +1,10 @@
+use crate::error::{OoxmlError, Result};
+use crate::pptx::namespace::is_presentationml_name;
+use crate::pptx::shapes::textframe::TextFrame;
 /// Base shape types for PowerPoint presentations.
 use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, unqualified_attribute_value,
 };
-use crate::error::{OoxmlError, Result};
-use crate::pptx::namespace::is_presentationml_name;
-use crate::pptx::shapes::textframe::TextFrame;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;

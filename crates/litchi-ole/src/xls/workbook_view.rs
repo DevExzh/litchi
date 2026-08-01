@@ -266,7 +266,7 @@ impl WorkbookViewCollector {
 }
 
 fn parse_rr_tab_id(data: &[u8]) -> XlsResult<Vec<u16>> {
-    if data.is_empty() || data.len() % 2 != 0 || data.len() > MAX_RR_TAB_IDS * 2 {
+    if data.is_empty() || !data.len().is_multiple_of(2) || data.len() > MAX_RR_TAB_IDS * 2 {
         return invalid(
             RR_TAB_ID_RECORD_TYPE,
             "RRTabId payload must contain 1..=4112 identifiers",

@@ -13,13 +13,15 @@ use super::field::MutableField;
 use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::ole_object::MutableOleObject;
+use super::revision::{
+    MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode,
+};
 use super::run::MutableRun;
+use super::section::SectionProperties;
+use super::smart_tag::MutableSmartTag;
 use super::smartart::MutableSmartArt;
 use super::textbox::MutableTextBox;
 use super::vml_shape::MutableVmlShape;
-use super::revision::{MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode};
-use super::section::SectionProperties;
-use super::smart_tag::MutableSmartTag;
 
 /// Elements that can appear in a paragraph.
 #[derive(Debug)]
@@ -128,8 +130,12 @@ impl ParagraphElement {
                 xml.push_str("</w:r>");
                 Ok(())
             },
-            Self::SmartTag(tag) => tag.write_placeholder_mode(xml, hyperlink_index, image_index, mode),
-            Self::Revision(revision) => revision.write_placeholder(xml, hyperlink_index, image_index),
+            Self::SmartTag(tag) => {
+                tag.write_placeholder_mode(xml, hyperlink_index, image_index, mode)
+            },
+            Self::Revision(revision) => {
+                revision.write_placeholder(xml, hyperlink_index, image_index)
+            },
         }
     }
 
@@ -140,7 +146,13 @@ impl ParagraphElement {
         hyperlink_index: &mut usize,
         image_index: &mut usize,
     ) -> Result<()> {
-        self.write_with_rels_mode(xml, rel_mapper, hyperlink_index, image_index, RevisionTextMode::Normal)
+        self.write_with_rels_mode(
+            xml,
+            rel_mapper,
+            hyperlink_index,
+            image_index,
+            RevisionTextMode::Normal,
+        )
     }
 
     pub(crate) fn write_with_rels_mode(
@@ -227,8 +239,12 @@ impl ParagraphElement {
                 xml.push_str("</w:r>");
                 Ok(())
             },
-            Self::SmartTag(tag) => tag.write_with_rels_mode(xml, rel_mapper, hyperlink_index, image_index, mode),
-            Self::Revision(revision) => revision.write_with_rels(xml, rel_mapper, hyperlink_index, image_index),
+            Self::SmartTag(tag) => {
+                tag.write_with_rels_mode(xml, rel_mapper, hyperlink_index, image_index, mode)
+            },
+            Self::Revision(revision) => {
+                revision.write_with_rels(xml, rel_mapper, hyperlink_index, image_index)
+            },
         }
     }
 
@@ -311,10 +327,7 @@ impl MutableParagraph {
     }
 
     /// Parse and add an inline Office Math equation.
-    pub fn add_inline_office_math_xml(
-        &mut self,
-        xml: impl Into<String>,
-    ) -> Result<&mut Self> {
+    pub fn add_inline_office_math_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
         let equation = OfficeMath::from_xml(xml)?;
         Ok(self.add_inline_office_math(equation))
     }
@@ -328,10 +341,7 @@ impl MutableParagraph {
     }
 
     /// Parse and add a display Office Math equation.
-    pub fn add_display_office_math_xml(
-        &mut self,
-        xml: impl Into<String>,
-    ) -> Result<&mut Self> {
+    pub fn add_display_office_math_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
         let equation = OfficeMath::from_xml(xml)?;
         Ok(self.add_display_office_math(equation))
     }
@@ -344,10 +354,7 @@ impl MutableParagraph {
     }
 
     /// Parse and add a fully specified display-math paragraph.
-    pub fn add_office_math_paragraph_xml(
-        &mut self,
-        xml: impl Into<String>,
-    ) -> Result<&mut Self> {
+    pub fn add_office_math_paragraph_xml(&mut self, xml: impl Into<String>) -> Result<&mut Self> {
         let paragraph = OfficeMathParagraph::from_xml(xml)?;
         Ok(self.add_office_math_paragraph(paragraph))
     }
@@ -525,7 +532,9 @@ impl MutableParagraph {
         metadata: RevisionMetadata,
     ) -> &mut MutableRevision {
         self.elements
-            .push(ParagraphElement::Revision(MutableRevision::new(kind, metadata)));
+            .push(ParagraphElement::Revision(MutableRevision::new(
+                kind, metadata,
+            )));
         match self.elements.last_mut() {
             Some(ParagraphElement::Revision(revision)) => revision,
             _ => unreachable!(),
@@ -663,7 +672,10 @@ impl MutableParagraph {
         xml.push_str("<w:p>");
 
         // Write paragraph properties
-        if self.style.is_some() || self.properties.has_properties() || self.property_change.is_some() {
+        if self.style.is_some()
+            || self.properties.has_properties()
+            || self.property_change.is_some()
+        {
             xml.push_str("<w:pPr>");
 
             if let Some(ref style) = self.style {
@@ -820,7 +832,10 @@ impl MutableParagraph {
         xml.push_str("<w:p>");
 
         // Write paragraph properties (same as to_xml)
-        if self.style.is_some() || self.properties.has_properties() || self.property_change.is_some() {
+        if self.style.is_some()
+            || self.properties.has_properties()
+            || self.property_change.is_some()
+        {
             xml.push_str("<w:pPr>");
 
             if let Some(ref style) = self.style {
@@ -1007,33 +1022,83 @@ impl ParagraphProperties {
         style: Option<&str>,
         rel_mapper: Option<&crate::docx::writer::relmap::RelationshipMapper>,
     ) -> Result<()> {
-        if let Some(style) = style { write!(xml, "<w:pStyle w:val=\"{}\"/>", escape_xml(style))?; }
-        if let Some(alignment) = self.alignment { write!(xml, "<w:jc w:val=\"{}\"/>", alignment.as_str())?; }
-        if let Some(n) = &self.numbering { write!(xml, "<w:numPr><w:ilvl w:val=\"{}\"/><w:numId w:val=\"{}\"/></w:numPr>", n.ilvl, n.num_id)?; }
-        if self.space_before.is_some() || self.space_after.is_some() || self.line_spacing.is_some() {
+        if let Some(style) = style {
+            write!(xml, "<w:pStyle w:val=\"{}\"/>", escape_xml(style))?;
+        }
+        if let Some(alignment) = self.alignment {
+            write!(xml, "<w:jc w:val=\"{}\"/>", alignment.as_str())?;
+        }
+        if let Some(n) = &self.numbering {
+            write!(
+                xml,
+                "<w:numPr><w:ilvl w:val=\"{}\"/><w:numId w:val=\"{}\"/></w:numPr>",
+                n.ilvl, n.num_id
+            )?;
+        }
+        if self.space_before.is_some() || self.space_after.is_some() || self.line_spacing.is_some()
+        {
             xml.push_str("<w:spacing");
-            if let Some(v) = self.space_before { write!(xml, " w:before=\"{v}\"")?; }
-            if let Some(v) = self.space_after { write!(xml, " w:after=\"{v}\"")?; }
+            if let Some(v) = self.space_before {
+                write!(xml, " w:before=\"{v}\"")?;
+            }
+            if let Some(v) = self.space_after {
+                write!(xml, " w:after=\"{v}\"")?;
+            }
             if let Some(v) = &self.line_spacing {
-                let (line, rule) = match v { LineSpacing::Single => (240, "auto"), LineSpacing::OneAndHalf => (360, "auto"), LineSpacing::Double => (480, "auto"), LineSpacing::Multiple(f) => ((*f * 240.0) as u32, "auto"), LineSpacing::Exact(f) => ((*f * 20.0) as u32, "exact"), LineSpacing::AtLeast(f) => ((*f * 20.0) as u32, "atLeast") };
+                let (line, rule) = match v {
+                    LineSpacing::Single => (240, "auto"),
+                    LineSpacing::OneAndHalf => (360, "auto"),
+                    LineSpacing::Double => (480, "auto"),
+                    LineSpacing::Multiple(f) => ((*f * 240.0) as u32, "auto"),
+                    LineSpacing::Exact(f) => ((*f * 20.0) as u32, "exact"),
+                    LineSpacing::AtLeast(f) => ((*f * 20.0) as u32, "atLeast"),
+                };
                 write!(xml, " w:line=\"{line}\" w:lineRule=\"{rule}\"")?;
             }
             xml.push_str("/>");
         }
-        if self.indent_left.is_some() || self.indent_right.is_some() || self.indent_first_line.is_some() {
+        if self.indent_left.is_some()
+            || self.indent_right.is_some()
+            || self.indent_first_line.is_some()
+        {
             xml.push_str("<w:ind");
-            if let Some(v) = self.indent_left { write!(xml, " w:left=\"{v}\"")?; }
-            if let Some(v) = self.indent_right { write!(xml, " w:right=\"{v}\"")?; }
-            if let Some(v) = self.indent_first_line { if v >= 0 { write!(xml, " w:firstLine=\"{v}\"")?; } else { write!(xml, " w:hanging=\"{}\"", -v)?; } }
+            if let Some(v) = self.indent_left {
+                write!(xml, " w:left=\"{v}\"")?;
+            }
+            if let Some(v) = self.indent_right {
+                write!(xml, " w:right=\"{v}\"")?;
+            }
+            if let Some(v) = self.indent_first_line {
+                if v >= 0 {
+                    write!(xml, " w:firstLine=\"{v}\"")?;
+                } else {
+                    write!(xml, " w:hanging=\"{}\"", -v)?;
+                }
+            }
             xml.push_str("/>");
         }
         if !self.tab_stops.is_empty() {
             xml.push_str("<w:tabs>");
-            for tab in &self.tab_stops { write!(xml, "<w:tab w:val=\"{}\" w:pos=\"{}\"", escape_xml(&tab.alignment), tab.position)?; if let Some(leader) = &tab.leader { write!(xml, " w:leader=\"{}\"", escape_xml(leader))?; } xml.push_str("/>"); }
+            for tab in &self.tab_stops {
+                write!(
+                    xml,
+                    "<w:tab w:val=\"{}\" w:pos=\"{}\"",
+                    escape_xml(&tab.alignment),
+                    tab.position
+                )?;
+                if let Some(leader) = &tab.leader {
+                    write!(xml, " w:leader=\"{}\"", escape_xml(leader))?;
+                }
+                xml.push_str("/>");
+            }
             xml.push_str("</w:tabs>");
         }
-        if let Some(v) = &self.division_id { write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(v))?; }
-        if let Some(section) = &self.section { section.write_xml(xml, rel_mapper)?; }
+        if let Some(v) = &self.division_id {
+            write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(v))?;
+        }
+        if let Some(section) = &self.section {
+            section.write_xml(xml, rel_mapper)?;
+        }
         Ok(())
     }
 }
@@ -1059,8 +1124,8 @@ pub enum ListType {
 #[cfg(test)]
 mod tests {
     use super::MutableParagraph;
-    use crate::docx::{OfficeMath, Paragraph};
     use crate::docx::writer::relmap::RelationshipMapper;
+    use crate::docx::{OfficeMath, Paragraph};
 
     #[test]
     fn writes_paragraph_division_id_for_reader_round_trip() {
@@ -1109,8 +1174,7 @@ mod tests {
     #[test]
     fn writes_and_reopens_inline_and_display_office_math() {
         let inline = OfficeMath::text("x + y");
-        let display = OfficeMath::from_xml("<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>")
-            .unwrap();
+        let display = OfficeMath::from_xml("<m:oMath><m:r><m:t>z</m:t></m:r></m:oMath>").unwrap();
         let mut paragraph = MutableParagraph::new();
         paragraph.add_run_with_text("before ");
         paragraph.add_inline_office_math(inline.clone());
@@ -1127,7 +1191,11 @@ mod tests {
         assert_eq!(parsed.display_office_math().unwrap(), vec![display]);
 
         let count = paragraph.element_count();
-        assert!(paragraph.add_inline_office_math_xml("<m:notMath/>").is_err());
+        assert!(
+            paragraph
+                .add_inline_office_math_xml("<m:notMath/>")
+                .is_err()
+        );
         assert_eq!(paragraph.element_count(), count);
     }
 }

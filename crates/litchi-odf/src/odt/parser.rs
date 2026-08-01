@@ -692,7 +692,7 @@ fn validate_protection_key(value: &str) -> Result<()> {
             ));
         }
     }
-    if symbols == 0 || symbols % 4 != 0 || padding > 2 {
+    if symbols == 0 || !symbols.is_multiple_of(4) || padding > 2 {
         return Err(Error::InvalidFormat(
             "text:protection-key is not base64Binary".to_string(),
         ));
@@ -1654,8 +1654,7 @@ fn parse_sections(content: &str) -> Result<Vec<Section>> {
                         Error::InvalidFormat("section element stack underflow".to_string())
                     })?;
                 }
-                if active.last().is_some_and(|section| section.depth == 0) {
-                    let section = active.pop().expect("checked active section");
+                if let Some(section) = active.pop_if(|section| section.depth == 0) {
                     sections.push((section.order, section.section));
                 }
             },

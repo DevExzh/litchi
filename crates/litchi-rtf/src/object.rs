@@ -204,15 +204,9 @@ impl<'a> EmbeddedObject<'a> {
             .len()
             .checked_add(self.name.len())
             .and_then(|size| size.checked_add(self.class_id.len()))
+            .and_then(|size| size.checked_add(self.alias.as_ref().map_or(0, |alias| alias.len())))
             .and_then(|size| {
-                size.checked_add(
-                    self.alias.as_ref().map_or(0, |alias| alias.len()),
-                )
-            })
-            .and_then(|size| {
-                size.checked_add(
-                    self.section.as_ref().map_or(0, |section| section.len()),
-                )
+                size.checked_add(self.section.as_ref().map_or(0, |section| section.len()))
             })
             .and_then(|size| size.checked_add(self.result_text.len()))
             .ok_or_else(|| {

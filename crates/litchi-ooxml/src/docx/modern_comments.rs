@@ -1018,10 +1018,10 @@ fn write_extension_list(out: &mut String, list: &ModernCommentExtensionList) {
 fn validate_extension_list(list: &ModernCommentExtensionList) -> Result<()> {
     enforce_count("modern comment extension", list.extensions.len())?;
     for extension in &list.extensions {
-        if let Some(uri) = &extension.uri {
-            if uri != &normalize_xsd_token(uri) {
-                return invalid("extension uri is not a normalized xsd:token".into());
-            }
+        if let Some(uri) = &extension.uri
+            && uri != &normalize_xsd_token(uri)
+        {
+            return invalid("extension uri is not a normalized xsd:token".into());
         }
         if extension.child_xml.len() > MAX_MODERN_COMMENT_PART_BYTES {
             return invalid("extension child XML exceeds the part-size bound".into());

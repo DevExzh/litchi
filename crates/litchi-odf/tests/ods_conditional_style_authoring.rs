@@ -31,8 +31,7 @@ fn builder_and_mutable_conditional_styles_have_stable_packaged_roundtrips() {
     );
 
     let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
-    let replacement =
-        ConditionalCellStyle::new("ce1", vec![rule("of:cell-content()<=10", "Blue")]);
+    let replacement = ConditionalCellStyle::new("ce1", vec![rule("of:cell-content()<=10", "Blue")]);
     assert_eq!(
         mutable
             .replace_conditional_cell_style(replacement.clone())
@@ -69,8 +68,10 @@ fn validation_failures_are_atomic_and_conditions_remain_inert() {
     );
     assert!(builder.create_conditional_cell_style(invalid).is_err());
     assert_eq!(builder.conditional_cell_styles(), [valid]);
-    assert!(builder
-        .create_conditional_cell_style(ConditionalCellStyle::new("", vec![]))
-        .is_err());
+    assert!(
+        builder
+            .create_conditional_cell_style(ConditionalCellStyle::new("", vec![]))
+            .is_err()
+    );
     assert_eq!(builder.conditional_cell_styles().len(), 1);
 }

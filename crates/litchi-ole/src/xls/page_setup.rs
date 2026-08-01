@@ -490,7 +490,8 @@ impl XlsHeaderFooter {
             validate_header_footer_text(text)?;
         }
         if (!self.diff_odd_even && (!self.even_header.is_empty() || !self.even_footer.is_empty()))
-            || (!self.diff_first && (!self.first_header.is_empty() || !self.first_footer.is_empty()))
+            || (!self.diff_first
+                && (!self.first_header.is_empty() || !self.first_footer.is_empty()))
         {
             return Err(invalid(
                 HEADER_FOOTER_RECORD_TYPE,
@@ -598,7 +599,8 @@ fn write_no_cch_string(out: &mut Vec<u8>, text: &str) {
     }
 }
 
-fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {    if data.len() != 2 {
+fn parse_bool(data: &[u8], record_type: u16) -> XlsResult<bool> {
+    if data.len() != 2 {
         return Err(invalid(
             record_type,
             format!("Boolean payload must be 2 bytes, found {}", data.len()),
@@ -1219,19 +1221,28 @@ mod tests {
         let mut strings = Vec::new();
         strings.push(0);
         strings.extend_from_slice(b"EH");
-        assert!(XlsHeaderFooter::parse(&header_footer_record(0x000C, [2, 0, 0, 0], &strings)).is_err());
+        assert!(
+            XlsHeaderFooter::parse(&header_footer_record(0x000C, [2, 0, 0, 0], &strings)).is_err()
+        );
         // Character count above the 255-unit limit.
-        assert!(XlsHeaderFooter::parse(&header_footer_record(0x000F, [256, 0, 0, 0], &[])).is_err());
+        assert!(
+            XlsHeaderFooter::parse(&header_footer_record(0x000F, [256, 0, 0, 0], &[])).is_err()
+        );
         // Trailing garbage after the declared strings.
         assert!(XlsHeaderFooter::parse(&header_footer_record(0x000C, [0, 0, 0, 0], &[0])).is_err());
         // Truncated string payload.
-        assert!(XlsHeaderFooter::parse(&header_footer_record(0x0001, [3, 0, 0, 0], &[0, b'E'])).is_err());
+        assert!(
+            XlsHeaderFooter::parse(&header_footer_record(0x0001, [3, 0, 0, 0], &[0, b'E']))
+                .is_err()
+        );
     }
 
     #[test]
     fn header_footer_builder_validates_and_serializes() {
         let mut value = XlsHeaderFooter::default();
-        value.set_even("&LEven".to_string(), "&CFooter".to_string()).unwrap();
+        value
+            .set_even("&LEven".to_string(), "&CFooter".to_string())
+            .unwrap();
         value.set_first("First".to_string(), String::new()).unwrap();
         value.set_scale_with_doc(true);
         value.set_align_margins(true);

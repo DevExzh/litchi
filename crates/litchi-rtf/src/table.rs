@@ -1461,16 +1461,16 @@ impl<'a> Cell<'a> {
             ));
         }
         self.story_events
-            .push(CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(position)));
+            .push(CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
+                position,
+            )));
         Ok(())
     }
     pub fn clear_column_breaks(&mut self) {
         self.story_events
             .retain(|event| !matches!(event, CellStoryEvent::ColumnBreak(_)));
     }
-    pub fn navigation_entry_references(
-        &self,
-    ) -> impl Iterator<Item = &CellStoryReference> {
+    pub fn navigation_entry_references(&self) -> impl Iterator<Item = &CellStoryReference> {
         self.story_events.iter().filter_map(|event| match event {
             CellStoryEvent::NavigationEntry(reference) => Some(reference),
             _ => None,

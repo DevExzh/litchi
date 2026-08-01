@@ -97,10 +97,7 @@ pub(crate) fn replace_embedded_chart(
     let _ = open_embedded_chart(package, content, styles, index)?;
     let chart_content = serialize_chart_content(definition)?;
     match &object.source {
-        OdfEmbeddedObjectSource::PackageSubdocument {
-            content_path,
-            ..
-        } => rebuild_package(
+        OdfEmbeddedObjectSource::PackageSubdocument { content_path, .. } => rebuild_package(
             package,
             content,
             vec![Addition {
@@ -122,7 +119,14 @@ pub(crate) fn replace_embedded_chart(
             })?;
             let inline = content_to_inline(&chart_content)?;
             let updated = splice(content, start, end, &inline)?;
-            rebuild_package(package, &updated, Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            rebuild_package(
+                package,
+                &updated,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            )
         },
         _ => invalid("selected object is not a replaceable embedded chart"),
     }
@@ -138,9 +142,9 @@ pub(crate) fn remove_embedded_chart(
     let object = select_chart_object(&current_objects, index)?;
     let _ = open_embedded_chart(package, content, styles, index)?;
     let spans = locate_objects(content)?;
-    let span = spans.get(index).ok_or_else(|| {
-        Error::InvalidFormat("embedded-object scanner/span mismatch".to_string())
-    })?;
+    let span = spans
+        .get(index)
+        .ok_or_else(|| Error::InvalidFormat("embedded-object scanner/span mismatch".to_string()))?;
     let updated = splice(content, span.start, span.end, "")?;
     let mut excluded_prefixes = Vec::new();
     if let OdfEmbeddedObjectSource::PackageSubdocument { root_path, .. } = &object.source {
@@ -193,7 +197,10 @@ pub(crate) fn add_embedded_chart(
             )
         },
         OdfEmbeddedChartStorage::InlineXml => (
-            format!("<draw:object>{}</draw:object>", content_to_inline(&chart_content)?),
+            format!(
+                "<draw:object>{}</draw:object>",
+                content_to_inline(&chart_content)?
+            ),
             Vec::new(),
             Vec::new(),
         ),
@@ -229,9 +236,9 @@ fn objects(
 }
 
 fn select_chart_object(objects: &[OdfEmbeddedObject], index: usize) -> Result<&OdfEmbeddedObject> {
-    let object = objects
-        .get(index)
-        .ok_or_else(|| Error::InvalidFormat(format!("embedded-object index {index} is out of bounds")))?;
+    let object = objects.get(index).ok_or_else(|| {
+        Error::InvalidFormat(format!("embedded-object index {index} is out of bounds"))
+    })?;
     if object.part != OdfEmbeddedObjectPart::Content
         || object.kind != OdfEmbeddedObjectKind::Object
         || object.class_id.is_some()
@@ -241,9 +248,15 @@ fn select_chart_object(objects: &[OdfEmbeddedObject], index: usize) -> Result<&O
         || object.applet_name.is_some()
         || object.mime_type.is_some()
         || !object.parameters.is_empty()
-        || object.link_type.as_deref().is_some_and(|value| value != "simple")
+        || object
+            .link_type
+            .as_deref()
+            .is_some_and(|value| value != "simple")
         || object.show.as_deref().is_some_and(|value| value != "embed")
-        || object.actuate.as_deref().is_some_and(|value| value != "onLoad")
+        || object
+            .actuate
+            .as_deref()
+            .is_some_and(|value| value != "onLoad")
     {
         return invalid("selected object has active, external, or unsupported metadata");
     }
@@ -258,8 +271,13 @@ fn open_subdocument(
     let media_type = media_type.ok_or_else(|| {
         Error::InvalidFormat("embedded chart root has no manifest media type".to_string())
     })?;
-    if !matches!(media_type, constants::ODF_CHART | constants::ODF_CHART_TEMPLATE) {
-        return invalid(format!("embedded chart root has invalid media type '{media_type}'"));
+    if !matches!(
+        media_type,
+        constants::ODF_CHART | constants::ODF_CHART_TEMPLATE
+    ) {
+        return invalid(format!(
+            "embedded chart root has invalid media type '{media_type}'"
+        ));
     }
     let package = source.package()?;
     if package.manifest().has_encrypted_entries() {
@@ -292,11 +310,17 @@ fn open_subdocument(
         total = total.checked_add(bytes.len()).ok_or_else(|| {
             Error::InvalidFormat("embedded chart byte count overflow".to_string())
         })?;
-        if total > MAX_EMBEDDED_BYTES || (relative == "content.xml" && bytes.len() > MAX_CONTENT_BYTES) {
+        if total > MAX_EMBEDDED_BYTES
+            || (relative == "content.xml" && bytes.len() > MAX_CONTENT_BYTES)
+        {
             return invalid("embedded chart exceeds package size limits");
         }
         let entry_media = package.manifest().get_media_type(&path).unwrap_or_else(|| {
-            if relative.ends_with(".xml") { "text/xml" } else { "application/octet-stream" }
+            if relative.ends_with(".xml") {
+                "text/xml"
+            } else {
+                "application/octet-stream"
+            }
         });
         writer.add_file_with_media_type(relative, &bytes, entry_media)?;
     }
@@ -319,13 +343,15 @@ fn inline_chart_mimetype(xml: &str) -> Result<String> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader.read_resolved_event_into(&mut buffer).map_err(|error| {
-            Error::InvalidFormat(format!("invalid inline chart XML: {error}"))
-        })?;
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid inline chart XML: {error}")))?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element) => {
-                if namespace != NamespaceKind::Office || element.local_name().as_ref() != b"document" {
+                if namespace != NamespaceKind::Office
+                    || element.local_name().as_ref() != b"document"
+                {
                     return invalid("inline chart root must be office:document");
                 }
                 let media_type = namespaced_attribute(
@@ -336,11 +362,12 @@ fn inline_chart_mimetype(xml: &str) -> Result<String> {
                     "inline chart root",
                 )?
                 .ok_or_else(|| {
-                    Error::InvalidFormat(
-                        "inline chart root is missing office:mimetype".to_string(),
-                    )
+                    Error::InvalidFormat("inline chart root is missing office:mimetype".to_string())
                 })?;
-                if !matches!(media_type.as_str(), constants::ODF_CHART | constants::ODF_CHART_TEMPLATE) {
+                if !matches!(
+                    media_type.as_str(),
+                    constants::ODF_CHART | constants::ODF_CHART_TEMPLATE
+                ) {
                     return invalid(format!(
                         "inline chart root has invalid office:mimetype '{media_type}'"
                     ));
@@ -349,10 +376,11 @@ fn inline_chart_mimetype(xml: &str) -> Result<String> {
             },
             Event::DocType(_) => return invalid("DTDs are not allowed in inline charts"),
             Event::Empty(_) => return invalid("inline chart document root cannot be empty"),
-            Event::Text(value) if {
-                let bytes: &[u8] = value.as_ref();
-                bytes.iter().all(u8::is_ascii_whitespace)
-            } => {},
+            Event::Text(value)
+                if {
+                    let bytes: &[u8] = value.as_ref();
+                    bytes.iter().all(u8::is_ascii_whitespace)
+                } => {},
             Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("inline chart has no document root"),
             _ => return invalid("invalid content before inline chart root"),
@@ -376,7 +404,9 @@ fn rename_document_root(
     replacement_local: &str,
     added_attribute: Option<(&str, &str)>,
 ) -> Result<String> {
-    let mut root_start = xml.find('<').ok_or_else(|| Error::InvalidFormat("chart XML has no root".to_string()))?;
+    let mut root_start = xml
+        .find('<')
+        .ok_or_else(|| Error::InvalidFormat("chart XML has no root".to_string()))?;
     if xml[root_start..].starts_with("<?xml") {
         let declaration_end = xml[root_start..]
             .find("?>")
@@ -395,9 +425,13 @@ fn rename_document_root(
     let qname = &xml[root_start + 1..name_end];
     let (prefix, local) = qname.rsplit_once(':').unwrap_or(("", qname));
     if local != expected_local {
-        return invalid(format!("expected office:{expected_local} inline chart root"));
+        return invalid(format!(
+            "expected office:{expected_local} inline chart root"
+        ));
     }
-    let close_start = xml.rfind("</").ok_or_else(|| Error::InvalidFormat("chart root is not closed".to_string()))?;
+    let close_start = xml
+        .rfind("</")
+        .ok_or_else(|| Error::InvalidFormat("chart root is not closed".to_string()))?;
     let close_name_end = xml[close_start + 2..]
         .find('>')
         .map(|offset| close_start + 2 + offset)
@@ -442,7 +476,10 @@ pub(crate) fn rebuild_package(
     writer.set_mimetype(&source.mimetype()?)?;
     writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
     if source.has_file(constants::ODF_STYLES)? {
-        writer.add_file(constants::ODF_STYLES, &source.get_file(constants::ODF_STYLES)?)?;
+        writer.add_file(
+            constants::ODF_STYLES,
+            &source.get_file(constants::ODF_STYLES)?,
+        )?;
     }
     if source.has_file(constants::ODF_META)? {
         writer.add_file(constants::ODF_META, &source.get_file(constants::ODF_META)?)?;
@@ -452,9 +489,11 @@ pub(crate) fn rebuild_package(
     }
     let mut addition_bytes = 0usize;
     for addition in additions {
-        addition_bytes = addition_bytes.checked_add(addition.bytes.len()).ok_or_else(|| {
-            Error::InvalidFormat("embedded chart addition size overflow".to_string())
-        })?;
+        addition_bytes = addition_bytes
+            .checked_add(addition.bytes.len())
+            .ok_or_else(|| {
+                Error::InvalidFormat("embedded chart addition size overflow".to_string())
+            })?;
         if addition_bytes > MAX_EMBEDDED_BYTES {
             return invalid("embedded chart additions exceed size limit");
         }
@@ -491,16 +530,24 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
     let mut spans = Vec::new();
     loop {
         let event_start = position(&reader)?;
-        let (namespace, event) = reader.read_resolved_event_into(&mut buffer).map_err(|error| {
-            Error::InvalidFormat(format!("invalid embedded chart host XML: {error}"))
-        })?;
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid embedded chart host XML: {error}"))
+            })?;
         let namespace = namespace_kind(&namespace);
         let event_end = position(&reader)?;
         match event {
             Event::Start(element) => {
                 if is_object(namespace, element.local_name().as_ref()) {
-                    if active.is_some() { return invalid("nested embedded objects are not supported"); }
-                    active = Some(Active { depth, start: event_start, payload: None });
+                    if active.is_some() {
+                        return invalid("nested embedded objects are not supported");
+                    }
+                    active = Some(Active {
+                        depth,
+                        start: event_start,
+                        payload: None,
+                    });
                 } else if let Some(object) = active.as_mut()
                     && depth == object.depth + 1
                     && namespace == NamespaceKind::Office
@@ -508,16 +555,25 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
                 {
                     object.payload = Some((depth, event_start, 0));
                 }
-                depth = depth.checked_add(1).ok_or_else(|| Error::InvalidFormat("XML depth overflow".to_string()))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("XML depth overflow".to_string()))?;
             },
-            Event::Empty(element)
-                if is_object(namespace, element.local_name().as_ref()) => {
-                    spans.push(ObjectSpan { start: event_start, end: event_end, inline_payload: None });
-                },
+            Event::Empty(element) if is_object(namespace, element.local_name().as_ref()) => {
+                spans.push(ObjectSpan {
+                    start: event_start,
+                    end: event_end,
+                    inline_payload: None,
+                });
+            },
             Event::End(element) => {
-                depth = depth.checked_sub(1).ok_or_else(|| Error::InvalidFormat("XML depth underflow".to_string()))?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("XML depth underflow".to_string()))?;
                 if let Some(object) = active.as_mut()
-                    && object.payload.is_some_and(|(payload_depth, _, _)| payload_depth == depth)
+                    && object
+                        .payload
+                        .is_some_and(|(payload_depth, _, _)| payload_depth == depth)
                     && namespace == NamespaceKind::Office
                     && element.local_name().as_ref() == b"document"
                     && let Some((payload_depth, start, _)) = object.payload
@@ -531,7 +587,9 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
                     spans.push(ObjectSpan {
                         start: object.start,
                         end: event_end,
-                        inline_payload: object.payload.and_then(|(_, start, end)| (end != 0).then_some((start, end))),
+                        inline_payload: object
+                            .payload
+                            .and_then(|(_, start, end)| (end != 0).then_some((start, end))),
                     });
                 }
             },
@@ -540,11 +598,17 @@ pub(crate) fn locate_objects(xml: &str) -> Result<Vec<ObjectSpan>> {
         }
         buffer.clear();
     }
-    if active.is_some() { return invalid("unterminated embedded object"); }
+    if active.is_some() {
+        return invalid("unterminated embedded object");
+    }
     Ok(spans)
 }
 
-pub(crate) fn insert_at_host(xml: &str, host: EmbeddedChartHost<'_>, frame: &str) -> Result<String> {
+pub(crate) fn insert_at_host(
+    xml: &str,
+    host: EmbeddedChartHost<'_>,
+    frame: &str,
+) -> Result<String> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -555,15 +619,19 @@ pub(crate) fn insert_at_host(xml: &str, host: EmbeddedChartHost<'_>, frame: &str
     let mut matches = 0usize;
     loop {
         let event_start = position(&reader)?;
-        let (namespace, event) = reader.read_resolved_event_into(&mut buffer).map_err(|error| {
-            Error::InvalidFormat(format!("invalid embedded chart host XML: {error}"))
-        })?;
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid embedded chart host XML: {error}"))
+            })?;
         let namespace = namespace_kind(&namespace);
         match event {
             Event::Start(element) => {
                 if host_matches(&reader, namespace, &element, &host)? {
                     matches += 1;
-                    if matches > 1 { return invalid("embedded chart host name is ambiguous"); }
+                    if matches > 1 {
+                        return invalid("embedded chart host name is ambiguous");
+                    }
                     target_depth = Some(depth);
                 } else if matches == 1
                     && target_depth.is_some_and(|value| depth == value + 1)
@@ -572,14 +640,17 @@ pub(crate) fn insert_at_host(xml: &str, host: EmbeddedChartHost<'_>, frame: &str
                 {
                     shapes_depth = Some(depth);
                 }
-                depth = depth.checked_add(1).ok_or_else(|| Error::InvalidFormat("XML depth overflow".to_string()))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("XML depth overflow".to_string()))?;
             },
-            Event::Empty(element)
-                if host_matches(&reader, namespace, &element, &host)? => {
-                    return invalid("embedded chart host must not be self-closing");
-                },
+            Event::Empty(element) if host_matches(&reader, namespace, &element, &host)? => {
+                return invalid("embedded chart host must not be self-closing");
+            },
             Event::End(element) => {
-                depth = depth.checked_sub(1).ok_or_else(|| Error::InvalidFormat("XML depth underflow".to_string()))?;
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("XML depth underflow".to_string()))?;
                 if shapes_depth == Some(depth)
                     && namespace == NamespaceKind::Table
                     && element.local_name().as_ref() == b"shapes"
@@ -597,24 +668,30 @@ pub(crate) fn insert_at_host(xml: &str, host: EmbeddedChartHost<'_>, frame: &str
         }
         buffer.clear();
     }
-    if matches != 1 { return invalid("embedded chart host was not found"); }
+    if matches != 1 {
+        return invalid("embedded chart host was not found");
+    }
     match host {
         EmbeddedChartHost::Sheet(_) => {
             if let Some(position) = shapes_end {
                 splice(xml, position, position, frame)
             } else {
-                let wrapper = format!("<table:shapes xmlns:table=\"{TABLE_URI}\">{frame}</table:shapes>");
-                let position = target_end.ok_or_else(|| Error::InvalidFormat("sheet host end is missing".to_string()))?;
+                let wrapper =
+                    format!("<table:shapes xmlns:table=\"{TABLE_URI}\">{frame}</table:shapes>");
+                let position = target_end
+                    .ok_or_else(|| Error::InvalidFormat("sheet host end is missing".to_string()))?;
                 splice(xml, position, position, &wrapper)
             }
         },
         EmbeddedChartHost::Text => {
             let wrapper = format!("<text:p xmlns:text=\"{TEXT_URI}\">{frame}</text:p>");
-            let position = target_end.ok_or_else(|| Error::InvalidFormat("text host end is missing".to_string()))?;
+            let position = target_end
+                .ok_or_else(|| Error::InvalidFormat("text host end is missing".to_string()))?;
             splice(xml, position, position, &wrapper)
         },
         EmbeddedChartHost::Page(_) => {
-            let position = target_end.ok_or_else(|| Error::InvalidFormat("page host end is missing".to_string()))?;
+            let position = target_end
+                .ok_or_else(|| Error::InvalidFormat("page host end is missing".to_string()))?;
             splice(xml, position, position, frame)
         },
     }
@@ -627,7 +704,9 @@ fn host_matches(
     host: &EmbeddedChartHost<'_>,
 ) -> Result<bool> {
     match host {
-        EmbeddedChartHost::Text => Ok(namespace == NamespaceKind::Office && element.local_name().as_ref() == b"text"),
+        EmbeddedChartHost::Text => {
+            Ok(namespace == NamespaceKind::Office && element.local_name().as_ref() == b"text")
+        },
         EmbeddedChartHost::Sheet(name) => Ok(namespace == NamespaceKind::Table
             && element.local_name().as_ref() == b"table"
             && attribute(reader, element, TABLE_NS, b"name")?.as_deref() == Some(*name)),
@@ -637,12 +716,20 @@ fn host_matches(
     }
 }
 
-fn attribute(reader: &NsReader<&[u8]>, element: &BytesStart<'_>, ns: &[u8], local: &[u8]) -> Result<Option<String>> {
+fn attribute(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    ns: &[u8],
+    local: &[u8],
+) -> Result<Option<String>> {
     namespaced_attribute(reader, element, ns, local, "embedded chart host")
 }
 fn is_object(namespace: NamespaceKind, local: &[u8]) -> bool {
     namespace == NamespaceKind::Draw
-        && matches!(local, b"object" | b"object-ole" | b"applet" | b"plugin" | b"floating-frame")
+        && matches!(
+            local,
+            b"object" | b"object-ole" | b"applet" | b"plugin" | b"floating-frame"
+        )
 }
 fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
@@ -653,13 +740,20 @@ fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     }
 }
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_| Error::InvalidFormat("XML position exceeds platform limits".to_string()))
+    usize::try_from(reader.buffer_position())
+        .map_err(|_| Error::InvalidFormat("XML position exceeds platform limits".to_string()))
 }
 pub(crate) fn splice(xml: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
-    if start > end || end > xml.len() || !xml.is_char_boundary(start) || !xml.is_char_boundary(end) {
+    if start > end || end > xml.len() || !xml.is_char_boundary(start) || !xml.is_char_boundary(end)
+    {
         return invalid("invalid embedded chart XML splice range");
     }
     let mut out = String::with_capacity(xml.len() - (end - start) + replacement.len());
-    out.push_str(&xml[..start]); out.push_str(replacement); out.push_str(&xml[end..]); Ok(out)
+    out.push_str(&xml[..start]);
+    out.push_str(replacement);
+    out.push_str(&xml[end..]);
+    Ok(out)
 }
-fn invalid<T>(message: impl Into<String>) -> Result<T> { Err(Error::InvalidFormat(message.into())) }
+fn invalid<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidFormat(message.into()))
+}

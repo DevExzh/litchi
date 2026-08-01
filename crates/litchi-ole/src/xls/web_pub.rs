@@ -246,10 +246,12 @@ impl XlsWebPub {
         let (title, used) = parse_web_pub_string(&data[offset..])?;
         offset += used;
         let chart_shape_id = if source == XlsWebSourceType::Chart {
-            let raw = data.get(offset..offset + 4).ok_or(XlsError::InvalidLength {
-                expected: offset + 4,
-                found: data.len(),
-            })?;
+            let raw = data
+                .get(offset..offset + 4)
+                .ok_or(XlsError::InvalidLength {
+                    expected: offset + 4,
+                    found: data.len(),
+                })?;
             offset += 4;
             Some(read_u32(raw, 0))
         } else {
@@ -396,12 +398,10 @@ fn parse_web_pub_string(data: &[u8]) -> XlsResult<(String, usize)> {
     }
     let wide = data[2] & HIGH_BYTE != 0;
     let byte_len = if wide { char_count * 2 } else { char_count };
-    let bytes = data
-        .get(3..3 + byte_len)
-        .ok_or(XlsError::InvalidLength {
-            expected: 3 + byte_len,
-            found: data.len(),
-        })?;
+    let bytes = data.get(3..3 + byte_len).ok_or(XlsError::InvalidLength {
+        expected: 3 + byte_len,
+        found: data.len(),
+    })?;
     let text = if wide {
         let units: Vec<u16> = bytes
             .chunks_exact(2)
@@ -461,9 +461,7 @@ mod tests {
         fn build(self) -> Vec<u8> {
             let mut tail = Vec::new();
             if self.tws > 0x04 && self.tws != 0xFF {
-                tail.extend_from_slice(&web_pub_string(
-                    self.source_name.as_deref().unwrap_or(""),
-                ));
+                tail.extend_from_slice(&web_pub_string(self.source_name.as_deref().unwrap_or("")));
             }
             tail.extend_from_slice(&web_pub_string(&self.file_destination));
             tail.extend_from_slice(&web_pub_string(&self.div_id));
@@ -509,7 +507,10 @@ mod tests {
         assert!(pub_record.single_file);
         assert_eq!(pub_record.style_id, 0x1122_3344);
         assert_eq!(pub_record.source_name, None);
-        assert_eq!(pub_record.file_destination, "https://example.com/report.mht");
+        assert_eq!(
+            pub_record.file_destination,
+            "https://example.com/report.mht"
+        );
         assert_eq!(pub_record.div_id, "bookmarks");
         assert_eq!(pub_record.title, "Quarterly report");
         assert_eq!(pub_record.chart_shape_id, None);

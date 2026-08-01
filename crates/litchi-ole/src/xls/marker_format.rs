@@ -248,13 +248,7 @@ impl XlsMarkerFormat {
 mod tests {
     use super::*;
 
-    fn record(
-        kind: u16,
-        flags: u16,
-        icv_fore: u16,
-        icv_back: u16,
-        size: u32,
-    ) -> Vec<u8> {
+    fn record(kind: u16, flags: u16, icv_fore: u16, icv_back: u16, size: u32) -> Vec<u8> {
         let mut data = Vec::new();
         data.extend_from_slice(&[0xFF, 0x00, 0x00, 0x00]);
         data.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0x00]);

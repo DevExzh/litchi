@@ -206,7 +206,7 @@ impl<'a> Reader<'a> {
 
 /// Decode a UTF-16LE string that must occupy `bytes` exactly.
 fn decode_utf16(bytes: &[u8], context: &str) -> Result<String> {
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return Err(corrupted(format!("{context} has an odd byte length")));
     }
     let units: Vec<u16> = bytes
@@ -938,7 +938,7 @@ pub struct SortColumnAndDirection {
 
 impl SortColumnAndDirection {
     fn parse_list(data: &[u8]) -> Result<Vec<Self>> {
-        if data.len() % SORT_KEY_LEN != 0 {
+        if !data.len().is_multiple_of(SORT_KEY_LEN) {
             return Err(corrupted("sort key list has a partial item"));
         }
         if data.len() / SORT_KEY_LEN > MAX_SORT_KEYS {
@@ -2052,4 +2052,3 @@ mod tests {
         assert!(DocumentMailMerge::parse(&fib, &pms_new).is_err());
     }
 }
-

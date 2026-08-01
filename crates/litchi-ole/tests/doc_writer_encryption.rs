@@ -26,7 +26,10 @@ fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
 fn assert_round_trip(profile: DocEncryptionProfile, password: &str) -> Vec<u8> {
     let bytes = encrypted_document(profile, password);
     let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
-    assert!(matches!(package.document(), Err(DocError::PasswordRequired)));
+    assert!(matches!(
+        package.document(),
+        Err(DocError::PasswordRequired)
+    ));
     assert!(matches!(
         package.document_with_options(DocOpenOptions {
             password: Some("wrong"),
@@ -53,8 +56,14 @@ fn assert_round_trip(profile: DocEncryptionProfile, password: &str) -> Vec<u8> {
 fn all_profiles_round_trip_all_document_streams_and_exact_headers() {
     let xor = assert_round_trip(DocEncryptionProfile::WordXorObfuscation, "abc");
     let (word, table, data) = streams(&xor);
-    assert_eq!(u16::from_le_bytes(word[10..12].try_into().unwrap()) & 0x8100, 0x8100);
-    assert_eq!(u32::from_le_bytes(word[14..18].try_into().unwrap()), 0x514a_cc1a);
+    assert_eq!(
+        u16::from_le_bytes(word[10..12].try_into().unwrap()) & 0x8100,
+        0x8100
+    );
+    assert_eq!(
+        u32::from_le_bytes(word[14..18].try_into().unwrap()),
+        0x514a_cc1a
+    );
     assert!(table.iter().any(|byte| *byte != 0));
     assert_eq!(data, vec![0u8; data.len()]);
 
@@ -72,8 +81,14 @@ fn all_profiles_round_trip_all_document_streams_and_exact_headers() {
         let (word, table, data) = streams(&bytes);
         let header_len = u32::from_le_bytes(word[14..18].try_into().unwrap()) as usize;
         assert_eq!(&table[..8], &[2, 0, 2, 0, 4, 0, 0, 0]);
-        assert_eq!(u32::from_le_bytes(table[28..32].try_into().unwrap()), u32::from(key_bits));
-        assert_eq!(header_len, 12 + u32::from_le_bytes(table[8..12].try_into().unwrap()) as usize + 60);
+        assert_eq!(
+            u32::from_le_bytes(table[28..32].try_into().unwrap()),
+            u32::from(key_bits)
+        );
+        assert_eq!(
+            header_len,
+            12 + u32::from_le_bytes(table[8..12].try_into().unwrap()) as usize + 60
+        );
         assert!(data.iter().any(|byte| *byte != 0));
     }
 }
@@ -90,18 +105,21 @@ fn salts_are_nondeterministic_and_setter_validation_is_atomic() {
     writer
         .set_password("kept", DocEncryptionProfile::OfficeBinaryRc4)
         .unwrap();
-    assert!(writer
-        .set_password("", DocEncryptionProfile::WordXorObfuscation)
-        .is_err());
-    assert!(writer
-        .set_password(
-            "abcdefghijklmnop",
-            DocEncryptionProfile::WordXorObfuscation,
-        )
-        .is_err());
-    assert!(writer
-        .set_password("bad", DocEncryptionProfile::CryptoApiRc4 { key_bits: 41 })
-        .is_err());
+    assert!(
+        writer
+            .set_password("", DocEncryptionProfile::WordXorObfuscation)
+            .is_err()
+    );
+    assert!(
+        writer
+            .set_password("abcdefghijklmnop", DocEncryptionProfile::WordXorObfuscation,)
+            .is_err()
+    );
+    assert!(
+        writer
+            .set_password("bad", DocEncryptionProfile::CryptoApiRc4 { key_bits: 41 })
+            .is_err()
+    );
     assert_eq!(
         writer.encryption_profile(),
         Some(DocEncryptionProfile::OfficeBinaryRc4)

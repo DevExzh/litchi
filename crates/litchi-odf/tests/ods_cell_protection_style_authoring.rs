@@ -25,7 +25,10 @@ fn every_protection_value_round_trips_through_builder_and_mutable_packages() {
     }
     builder.set_cell_style_name(0, 0, "p1").unwrap();
     let mut spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
-    assert_eq!(spreadsheet.table_cell_protection_styles().len(), values.len());
+    assert_eq!(
+        spreadsheet.table_cell_protection_styles().len(),
+        values.len()
+    );
     let cell = spreadsheet.sheets().unwrap()[0].rows[0].cells[0].clone();
     assert_eq!(
         spreadsheet.cell_style_protection(&cell).unwrap(),
@@ -87,9 +90,7 @@ fn combined_conditional_and_protection_style_survives_replace_and_remove() {
     );
 
     let mut mutable = MutableSpreadsheet::from_spreadsheet(reopened).unwrap();
-    mutable
-        .remove_table_cell_protection_style("combo")
-        .unwrap();
+    mutable.remove_table_cell_protection_style("combo").unwrap();
     let reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.conditional_cell_styles().len(), 1);
     assert!(reopened.table_cell_protection_styles().is_empty());
@@ -104,17 +105,21 @@ fn malformed_names_parents_duplicates_and_failed_replacements_are_atomic() {
     builder
         .create_table_cell_protection_style(valid.clone())
         .unwrap();
-    assert!(builder
-        .create_table_cell_protection_style(TableCellProtectionStyle::new(
-            "",
-            CellStyleProtection::None,
-        ))
-        .is_err());
-    assert!(builder
-        .replace_table_cell_protection_style(
-            TableCellProtectionStyle::new("p", CellStyleProtection::FormulaHidden)
-                .with_parent_style_name("Missing"),
-        )
-        .is_err());
+    assert!(
+        builder
+            .create_table_cell_protection_style(TableCellProtectionStyle::new(
+                "",
+                CellStyleProtection::None,
+            ))
+            .is_err()
+    );
+    assert!(
+        builder
+            .replace_table_cell_protection_style(
+                TableCellProtectionStyle::new("p", CellStyleProtection::FormulaHidden)
+                    .with_parent_style_name("Missing"),
+            )
+            .is_err()
+    );
     assert_eq!(builder.table_cell_protection_styles(), [valid]);
 }

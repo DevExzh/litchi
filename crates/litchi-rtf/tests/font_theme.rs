@@ -32,7 +32,10 @@ fn theme_font_selectors_round_trip() {
 
         let output = write(&document);
         let serialized = String::from_utf8(output).unwrap();
-        assert!(serialized.contains(control), "missing {control} in {serialized}");
+        assert!(
+            serialized.contains(control),
+            "missing {control} in {serialized}"
+        );
 
         let reparsed = RtfDocument::parse(&serialized).unwrap();
         assert_eq!(reparsed.font_table().get(0).unwrap().theme, Some(*theme));

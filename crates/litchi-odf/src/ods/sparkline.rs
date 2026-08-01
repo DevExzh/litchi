@@ -345,7 +345,10 @@ pub(crate) const COMPLEX_COLOR_SLOTS: [&str; 8] = [
 
 impl SparklineComplexColors {
     /// The slot for an element name, or `None` when it is not a complex color.
-    pub(crate) fn slot_mut(&mut self, element_name: &str) -> Option<&mut Option<SparklineComplexColor>> {
+    pub(crate) fn slot_mut(
+        &mut self,
+        element_name: &str,
+    ) -> Option<&mut Option<SparklineComplexColor>> {
         Some(match element_name {
             "sparkline-series-complex-color" => &mut self.series,
             "sparkline-negative-complex-color" => &mut self.negative,
@@ -869,9 +872,7 @@ mod tests {
         // Groups require at least one sparkline.
         assert!(validate_sparkline_group(&SparklineGroup::new(Vec::new())).is_err());
         // Sparklines require a cell address and at least one data range.
-        assert!(
-            validate_sparkline(&Sparkline::new("", vec![".A1".to_string()])).is_err()
-        );
+        assert!(validate_sparkline(&Sparkline::new("", vec![".A1".to_string()])).is_err());
         assert!(validate_sparkline(&Sparkline::new(" A1", vec![".A1".to_string()])).is_err());
         assert!(validate_sparkline(&Sparkline::new(".A1", Vec::new())).is_err());
         // Colors must be #RRGGBB and numbers must be numeric.

@@ -258,13 +258,12 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
                     _ => return Err(invalid("unexpected Slicers closing depth")),
                 }
             },
-            Event::Text(text)
-                if extension_start.is_none() => {
-                    let value = text.decode().map_err(xml_error)?;
-                    if !value.trim().is_empty() {
-                        return Err(invalid("unexpected text in Slicers part"));
-                    }
-                },
+            Event::Text(text) if extension_start.is_none() => {
+                let value = text.decode().map_err(xml_error)?;
+                if !value.trim().is_empty() {
+                    return Err(invalid("unexpected text in Slicers part"));
+                }
+            },
             Event::CData(_) if extension_start.is_none() => {
                 return Err(invalid("unexpected CDATA in Slicers part"));
             },

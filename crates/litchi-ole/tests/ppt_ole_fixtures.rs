@@ -20,13 +20,19 @@ fn bundled_poi_ole_presentations_expose_inert_metadata_and_storage() {
             .ole_objects()
             .expect("parse external-object list")
             .expect("fixture has external-object list");
-        assert!(!objects.objects.is_empty(), "{name} has no typed OLE objects");
+        assert!(
+            !objects.objects.is_empty(),
+            "{name} has no typed OLE objects"
+        );
         for object in &objects.objects {
             let storage = presentation
                 .ole_storage(object.persist_id())
                 .expect("resolve inert ExOleObjStg")
                 .expect("OLE object has persisted storage");
-            assert!(!storage.data.is_empty(), "{name} has empty persisted storage");
+            assert!(
+                !storage.data.is_empty(),
+                "{name} has empty persisted storage"
+            );
         }
     }
 }

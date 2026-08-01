@@ -567,7 +567,7 @@ fn parse_owners(data: &[u8]) -> Result<Vec<String>> {
 }
 
 fn parse_text_cps(data: &[u8], comment_count: usize, subdoc_len: u32) -> Result<Vec<u32>> {
-    if data.len() % 4 != 0 || data.len() / 4 != comment_count + 2 {
+    if !data.len().is_multiple_of(4) || data.len() / 4 != comment_count + 2 {
         return Err(DocError::Corrupted(
             "PlcfandTxt CP count does not match PlcfandRef".to_string(),
         ));
@@ -608,7 +608,7 @@ fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
 }
 
 fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return Err(DocError::Corrupted(format!(
             "{field} contains a partial UTF-16 code unit"
         )));

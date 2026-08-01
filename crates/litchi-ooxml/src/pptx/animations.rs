@@ -962,7 +962,7 @@ impl NormalizedTime {
     }
 
     fn normalized(mut numerator: u64, mut scale: u64) -> Self {
-        while scale > 1 && numerator % 10 == 0 {
+        while scale > 1 && numerator.is_multiple_of(10) {
             numerator /= 10;
             scale /= 10;
         }
@@ -2599,10 +2599,10 @@ impl TimingParser {
         }
 
         if let Some(pending) = self.pending_template.as_mut() {
-            if let Some(root_depth) = pending.root_depth {
-                if depth > root_depth {
-                    return Ok(());
-                }
+            if let Some(root_depth) = pending.root_depth
+                && depth > root_depth
+            {
+                return Ok(());
             }
             if let Some(time_list_depth) = pending.time_list_depth {
                 if depth == time_list_depth + 1 {
@@ -3288,12 +3288,7 @@ impl TimingParser {
         }
 
         if is_presentationml_name(namespace, name, b"cTn") {
-            if self
-                .pending
-                .last()
-                .is_some_and(|pending| pending.depth == depth)
-            {
-                let mut pending = self.pending.pop().expect("pending animation checked above");
+            if let Some(mut pending) = self.pending.pop_if(|pending| pending.depth == depth) {
                 pending.animation.shape_id = pending
                     .target
                     .ok_or_else(|| invalid("preset animation has no shape target"))?;
@@ -3733,8 +3728,7 @@ fn parse_recursive_timing_tree(xml: &str) -> Result<AnimationTimingTree> {
                 if child_lists.last().is_some_and(|(d, _)| *d == depth) {
                     child_lists.pop();
                 }
-                if frames.last().is_some_and(|frame| frame.depth == depth) {
-                    let frame = frames.pop().expect("checked above");
+                if let Some(frame) = frames.pop_if(|frame| frame.depth == depth) {
                     let child = AnimationTimingChild::Node(frame.node);
                     if let Some(parent) = frames.last_mut() {
                         if frame.sub_node {

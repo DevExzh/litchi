@@ -48,6 +48,7 @@ litchi-iwa       = { version = "0.0.1", path = "crates/litchi-iwa" }
 litchi-markdown  = { version = "0.0.1", path = "crates/litchi-markdown" }
 litchi-odf       = { version = "0.0.1", path = "crates/litchi-odf" }
 litchi-ole       = { version = "0.0.1", path = "crates/litchi-ole" }
+litchi-ole-common = { version = "0.0.1", path = "crates/litchi-ole-common" }
 litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
 litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
 litchi-opc       = { version = "0.0.1", path = "crates/litchi-opc" }
@@ -97,9 +98,9 @@ sxd-xpath     = "0.4"
 tempfile      = "3"
 thiserror     = "2.0"
 tokio         = { version = "1", features = ["full"] }
+unicode-normalization = "0.1"
 url           = "2.5"
 urlencoding   = "2.1"
-unicode-normalization = "0.1"
 x509-cert     = { version = "0.2", features = ["pem"] }
 xml-minifier     = { path = "crates/xml-minifier" }
 zerocopy      = { version = "0.8", features = ["std"] }

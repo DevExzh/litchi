@@ -65,7 +65,9 @@ fn worksheet_web_pub_round_trips_through_writer_and_reader() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     writer.write_number(sheet, 1, 2, 3.5).unwrap();
-    writer.add_sheet_web_publication(sheet, publication.clone()).unwrap();
+    writer
+        .add_sheet_web_publication(sheet, publication.clone())
+        .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
@@ -78,7 +80,11 @@ fn worksheet_web_pub_round_trips_through_writer_and_reader() {
 #[test]
 fn worksheet_web_pub_rejects_unknown_sheet() {
     let mut writer = XlsWriter::new();
-    assert!(writer.add_sheet_web_publication(0, range_publication()).is_err());
+    assert!(
+        writer
+            .add_sheet_web_publication(0, range_publication())
+            .is_err()
+    );
 }
 
 #[test]
@@ -91,5 +97,11 @@ fn workbook_without_web_pub_has_none() {
 
     let workbook = XlsWorkbook::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.web_publications().is_empty());
-    assert!(workbook.xls_worksheet(0).unwrap().web_publications().is_empty());
+    assert!(
+        workbook
+            .xls_worksheet(0)
+            .unwrap()
+            .web_publications()
+            .is_empty()
+    );
 }

@@ -793,14 +793,12 @@ impl MutableXlsbWorksheet {
                 array_range,
                 ..
             } = &mut cell.value
-            {
-                if array_range
+                && array_range
                     .as_ref()
                     .is_some_and(|range| ranges.contains(range))
-                {
-                    *is_array = false;
-                    *array_range = None;
-                }
+            {
+                *is_array = false;
+                *array_range = None;
             }
         }
     }
@@ -1197,8 +1195,7 @@ impl MutableXlsbWorksheet {
             self.image_bytes
                 .checked_add(image.data().len())
                 .ok_or(XlsbError::InvalidLength {
-                    expected:
-                        crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
+                    expected: crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES,
                     found: usize::MAX,
                 })?;
         if total_bytes > crate::xlsb::drawing_image::MAX_XLSB_WORKSHEET_IMAGE_TOTAL_BYTES {
@@ -1243,10 +1240,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Add a standard DrawingML shape or text box.
-    pub fn add_shape(
-        &mut self,
-        shape: crate::xlsx::writer::XlsxShapeSpec,
-    ) -> XlsbResult<()> {
+    pub fn add_shape(&mut self, shape: crate::xlsx::writer::XlsxShapeSpec) -> XlsbResult<()> {
         shape
             .validate(self.drawing_shape_count())
             .map_err(XlsbError::InvalidFormula)?;
@@ -1273,10 +1267,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Remove one top-level shape.
-    pub fn remove_shape(
-        &mut self,
-        index: usize,
-    ) -> XlsbResult<crate::xlsx::writer::XlsxShapeSpec> {
+    pub fn remove_shape(&mut self, index: usize) -> XlsbResult<crate::xlsx::writer::XlsxShapeSpec> {
         if index >= self.shapes.len() {
             return Err(XlsbError::InvalidFormula(format!(
                 "shape index {index} is out of bounds for {} shapes",
@@ -1289,10 +1280,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Add a nested DrawingML shape group.
-    pub fn add_group(
-        &mut self,
-        group: crate::xlsx::writer::XlsxGroupSpec,
-    ) -> XlsbResult<()> {
+    pub fn add_group(&mut self, group: crate::xlsx::writer::XlsxGroupSpec) -> XlsbResult<()> {
         group
             .validate(self.drawing_shape_count())
             .map_err(XlsbError::InvalidFormula)?;
@@ -1306,10 +1294,7 @@ impl MutableXlsbWorksheet {
     }
 
     /// Remove one top-level shape group.
-    pub fn remove_group(
-        &mut self,
-        index: usize,
-    ) -> XlsbResult<crate::xlsx::writer::XlsxGroupSpec> {
+    pub fn remove_group(&mut self, index: usize) -> XlsbResult<crate::xlsx::writer::XlsxGroupSpec> {
         if index >= self.groups.len() {
             return Err(XlsbError::InvalidFormula(format!(
                 "group index {index} is out of bounds for {} groups",
@@ -1769,9 +1754,8 @@ impl MutableXlsbWorksheet {
         writer.write_record(record_types::BEGIN_WS_VIEWS, &[])?;
 
         // BrtBeginWsView (30 bytes according to spec)
-        let view_data = crate::xlsb::sheet_view::write_ws_view_payload(
-            configured.then_some(&view),
-        )?;
+        let view_data =
+            crate::xlsb::sheet_view::write_ws_view_payload(configured.then_some(&view))?;
         writer.write_record(record_types::BEGIN_WS_VIEW, &view_data)?;
 
         if let Some(pane) = view.pane.as_ref() {

@@ -21,14 +21,14 @@ fn package(content: &str) -> Vec<u8> {
     );
     let entries: [(&str, &[u8]); 11] = [
         ("content.xml", content.as_bytes()),
-        ("settings.xml", b"<settings keep='yes'/>") ,
-        ("styles.xml", b"<styles keep='yes'/>") ,
-        ("meta.xml", b"<meta keep='yes'/>") ,
+        ("settings.xml", b"<settings keep='yes'/>"),
+        ("styles.xml", b"<styles keep='yes'/>"),
+        ("meta.xml", b"<meta keep='yes'/>"),
         ("database/data", b"opaque database bytes"),
-        ("forms/Form1/content.xml", b"<form keep='yes'/>") ,
-        ("reports/Report1/content.xml", b"<report keep='yes'/>") ,
-        ("Basic/Standard/script-lb.xml", b"<basic inert='yes'/>") ,
-        ("Dialogs/dialog-lc.xml", b"<dialogs keep='yes'/>") ,
+        ("forms/Form1/content.xml", b"<form keep='yes'/>"),
+        ("reports/Report1/content.xml", b"<report keep='yes'/>"),
+        ("Basic/Standard/script-lb.xml", b"<basic inert='yes'/>"),
+        ("Dialogs/dialog-lc.xml", b"<dialogs keep='yes'/>"),
         ("unknown.bin", b"unknown bytes"),
         ("META-INF/manifest.xml", manifest.as_bytes()),
     ];
@@ -109,7 +109,10 @@ fn packaged_query_insert_replace_remove_preserves_every_unrelated_part() {
     ]
     .map(|path| (path, database.get_file(path).unwrap()));
 
-    assert_eq!(database.set_queries(Some(&recursive_queries())).unwrap(), None);
+    assert_eq!(
+        database.set_queries(Some(&recursive_queries())).unwrap(),
+        None
+    );
     let parsed = database.queries().unwrap().unwrap();
     assert_eq!(parsed, recursive_queries());
     let xml = String::from_utf8(database.get_file("content.xml").unwrap()).unwrap();
@@ -140,10 +143,9 @@ fn packaged_query_insert_replace_remove_preserves_every_unrelated_part() {
 
 #[test]
 fn mutates_real_libreoffice_query_package_without_touching_embedded_resources() {
-    let bytes = include_bytes!(
-        "../../../test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb"
-    )
-    .to_vec();
+    let bytes =
+        include_bytes!("../../../test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb")
+            .to_vec();
     let bytes = remove_empty_scripts_from_fixture(bytes);
     let mut database = DatabaseDocument::from_bytes(bytes).unwrap();
     let embedded = database

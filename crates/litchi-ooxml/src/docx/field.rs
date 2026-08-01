@@ -1,9 +1,9 @@
+use crate::error::{OoxmlError, Result};
 /// Field support for reading fields from Word documents.
 ///
 /// This module provides types and methods for accessing fields in Word documents.
 /// Fields are dynamic content like page numbers, dates, formulas, and cross-references.
 use litchi_ooxml_common::xml::decode_xml_reference;
-use crate::error::{OoxmlError, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
@@ -2841,8 +2841,8 @@ impl DocumentContextFieldKind {
             Self::Section,
             Self::SectionPages,
         ]
-            .into_iter()
-            .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
+        .into_iter()
+        .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
     }
 }
 
@@ -4033,9 +4033,7 @@ impl AutoNumberFieldKind {
     fn from_instruction(instruction: &str) -> Option<Self> {
         [Self::AutoNum, Self::AutoNumLegal, Self::AutoNumOutline]
             .into_iter()
-            .find(|kind| {
-                field_instruction_remainder(instruction, kind.field_keyword()).is_some()
-            })
+            .find(|kind| field_instruction_remainder(instruction, kind.field_keyword()).is_some())
     }
 }
 
@@ -4460,9 +4458,7 @@ impl ReferenceField {
             match switch.name {
                 'd' if kind == ReferenceFieldKind::Reference => {
                     let separator = switch.argument.ok_or_else(|| {
-                        OoxmlError::InvalidFormat(
-                            "REF \\d switch requires a separator".to_string(),
-                        )
+                        OoxmlError::InvalidFormat("REF \\d switch requires a separator".to_string())
                     })?;
                     options.push(ReferenceFieldOption::SequencePageSeparator(separator));
                 },
@@ -5100,8 +5096,7 @@ pub struct PrintField {
 
 impl PrintField {
     fn from_field(field: &Field) -> Result<Option<Self>> {
-        let Some(printer_instructions) =
-            field_instruction_remainder(field.instruction(), "PRINT")
+        let Some(printer_instructions) = field_instruction_remainder(field.instruction(), "PRINT")
         else {
             return Ok(None);
         };
@@ -5167,8 +5162,7 @@ pub struct EmbedField {
 
 impl EmbedField {
     fn from_field(field: &Field) -> Result<Option<Self>> {
-        let Some(object_instructions) =
-            field_instruction_remainder(field.instruction(), "EMBED")
+        let Some(object_instructions) = field_instruction_remainder(field.instruction(), "EMBED")
         else {
             return Ok(None);
         };
@@ -5380,8 +5374,7 @@ pub struct ShapeField {
 
 impl ShapeField {
     fn from_field(field: &Field) -> Result<Option<Self>> {
-        let Some(opaque_instructions) =
-            field_instruction_remainder(field.instruction(), "SHAPE")
+        let Some(opaque_instructions) = field_instruction_remainder(field.instruction(), "SHAPE")
         else {
             return Ok(None);
         };
@@ -5557,8 +5550,7 @@ pub struct PrivateField {
 
 impl PrivateField {
     fn from_field(field: &Field) -> Result<Option<Self>> {
-        let Some(opaque_instructions) =
-            field_instruction_remainder(field.instruction(), "PRIVATE")
+        let Some(opaque_instructions) = field_instruction_remainder(field.instruction(), "PRIVATE")
         else {
             return Ok(None);
         };
@@ -6224,8 +6216,7 @@ impl TableOfContentsEntryField {
                 "TC field instruction exceeds {MAX_TABLE_OF_CONTENTS_ENTRY_FIELD_INSTRUCTION_BYTES} bytes"
             )));
         }
-        let Some((entry, switches)) =
-            parse_field_operand_and_switches(field.instruction(), "TC")?
+        let Some((entry, switches)) = parse_field_operand_and_switches(field.instruction(), "TC")?
         else {
             unreachable!("table-of-contents entry recognition and parsing must agree");
         };
@@ -7149,18 +7140,17 @@ fn parse_dde_operands_and_switches(
 fn parse_external_include_operands_and_switches(
     instruction: &str,
 ) -> Result<Option<(IncludeFieldKind, String, Option<String>, Vec<FieldSwitch>)>> {
-    let (kind, field_type) =
-        if field_instruction_remainder(instruction, "INCLUDETEXT").is_some() {
-            (IncludeFieldKind::Text, "INCLUDETEXT")
-        } else if field_instruction_remainder(instruction, "INCLUDE").is_some() {
-            (IncludeFieldKind::Text, "INCLUDE")
-        } else if field_instruction_remainder(instruction, "INCLUDEPICTURE").is_some() {
-            (IncludeFieldKind::Picture, "INCLUDEPICTURE")
-        } else if field_instruction_remainder(instruction, "IMPORT").is_some() {
-            (IncludeFieldKind::Picture, "IMPORT")
-        } else {
-            return Ok(None);
-        };
+    let (kind, field_type) = if field_instruction_remainder(instruction, "INCLUDETEXT").is_some() {
+        (IncludeFieldKind::Text, "INCLUDETEXT")
+    } else if field_instruction_remainder(instruction, "INCLUDE").is_some() {
+        (IncludeFieldKind::Text, "INCLUDE")
+    } else if field_instruction_remainder(instruction, "INCLUDEPICTURE").is_some() {
+        (IncludeFieldKind::Picture, "INCLUDEPICTURE")
+    } else if field_instruction_remainder(instruction, "IMPORT").is_some() {
+        (IncludeFieldKind::Picture, "IMPORT")
+    } else {
+        return Ok(None);
+    };
     let remainder =
         field_instruction_remainder(instruction, field_type).expect("recognized include field");
     let mut characters = remainder.chars().peekable();
@@ -7205,7 +7195,9 @@ fn parse_external_link_operands_and_switches(
     let application_type = parse_next_field_argument(&mut characters, field_type)?
         .filter(|value| !value.is_empty())
         .ok_or_else(|| {
-            OoxmlError::InvalidFormat(format!("{field_type} field is missing its application type"))
+            OoxmlError::InvalidFormat(format!(
+                "{field_type} field is missing its application type"
+            ))
         })?;
     let source = parse_next_field_argument(&mut characters, field_type)?
         .filter(|value| !value.is_empty())
@@ -8410,10 +8402,7 @@ mod tests {
         }
 
         let too_long = Field::new(
-            format!(
-                "REF {}",
-                "x".repeat(MAX_REFERENCE_FIELD_INSTRUCTION_BYTES)
-            ),
+            format!("REF {}", "x".repeat(MAX_REFERENCE_FIELD_INSTRUCTION_BYTES)),
             None,
             false,
         );
@@ -8617,10 +8606,7 @@ mod tests {
     #[test]
     fn rejects_oversized_equation_fields_without_parsing_them() {
         let too_long = Field::new(
-            format!(
-                "EQ {}",
-                "x".repeat(MAX_EQUATION_FIELD_INSTRUCTION_BYTES)
-            ),
+            format!("EQ {}", "x".repeat(MAX_EQUATION_FIELD_INSTRUCTION_BYTES)),
             None,
             false,
         );
@@ -8836,10 +8822,7 @@ mod tests {
         }
 
         let too_long = Field::new(
-            format!(
-                "SYMBOL {}",
-                "x".repeat(MAX_SYMBOL_FIELD_INSTRUCTION_BYTES)
-            ),
+            format!("SYMBOL {}", "x".repeat(MAX_SYMBOL_FIELD_INSTRUCTION_BYTES)),
             None,
             false,
         );
@@ -9039,7 +9022,10 @@ mod tests {
         );
         assert_eq!(heading.unknown_switches().len(), 2);
         assert_eq!(heading.unknown_switches()[0].name(), '*');
-        assert_eq!(heading.unknown_switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(
+            heading.unknown_switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
         assert_eq!(heading.unknown_switches()[1].name(), 'q');
         assert_eq!(heading.unknown_switches()[1].argument(), Some("opaque"));
         assert_eq!(heading.cached_result(), Some("Cached heading"));
@@ -9123,8 +9109,7 @@ mod tests {
         assert!(fill_in.is_dirty());
         assert!(fill_in.is_locked());
 
-        let default_only =
-            Field::new(r#"FILLIN \d "recent response" \o"#.to_string(), None, false);
+        let default_only = Field::new(r#"FILLIN \d "recent response" \o"#.to_string(), None, false);
         let default_only = default_only.prompt_field().unwrap().unwrap();
         assert_eq!(default_only.kind(), PromptFieldKind::FillIn);
         assert_eq!(default_only.bookmark(), None);
@@ -9604,17 +9589,19 @@ mod tests {
         assert!(legacy_picture_field.is_include_picture());
         let legacy_picture = legacy_picture_field.external_include().unwrap().unwrap();
         assert_eq!(legacy_picture.kind(), IncludeFieldKind::Picture);
-        assert_eq!(
-            legacy_picture.source(),
-            "file:///C:/no-contact/legacy.wmf"
-        );
+        assert_eq!(legacy_picture.source(), "file:///C:/no-contact/legacy.wmf");
         assert_eq!(legacy_picture.bookmark(), None);
         assert!(legacy_picture.omits_picture_data());
         assert_eq!(
             legacy_picture.options(),
-            &[ExternalIncludeOption::Converter("GraphicsFilter".to_string())]
+            &[ExternalIncludeOption::Converter(
+                "GraphicsFilter".to_string()
+            )]
         );
-        assert_eq!(legacy_picture.cached_result(), Some("cached legacy picture"));
+        assert_eq!(
+            legacy_picture.cached_result(),
+            Some("cached legacy picture")
+        );
 
         assert!(
             Field::new("INCLUDETEXT".to_string(), None, false)
@@ -10224,11 +10211,7 @@ mod tests {
         assert!(extracted[3].document_context().unwrap().is_none());
 
         for (instruction, kind, switch_name) in [
-            (
-                r"FILENAME \p",
-                DocumentContextFieldKind::FileName,
-                'p',
-            ),
+            (r"FILENAME \p", DocumentContextFieldKind::FileName, 'p'),
             (
                 r"TEMPLATE \* MERGEFORMAT",
                 DocumentContextFieldKind::Template,
@@ -10244,11 +10227,7 @@ mod tests {
                 DocumentContextFieldKind::Time,
                 '@',
             ),
-            (
-                r"PAGE \* MERGEFORMAT",
-                DocumentContextFieldKind::Page,
-                '*',
-            ),
+            (r"PAGE \* MERGEFORMAT", DocumentContextFieldKind::Page, '*'),
             (
                 r"FILESIZE \* MERGEFORMAT",
                 DocumentContextFieldKind::FileSize,
@@ -10553,7 +10532,10 @@ mod tests {
         assert!(!fields[3].is_embed_field());
 
         let worksheet = fields[0].embed_field().unwrap().unwrap();
-        assert_eq!(worksheet.object_instructions(), r#"Excel.Sheet.12 \* MERGEFORMAT"#);
+        assert_eq!(
+            worksheet.object_instructions(),
+            r#"Excel.Sheet.12 \* MERGEFORMAT"#
+        );
         assert_eq!(worksheet.cached_result(), Some("cached worksheet object"));
         assert!(worksheet.is_dirty());
         assert!(worksheet.is_locked());
@@ -10610,10 +10592,7 @@ mod tests {
         assert!(ean13.is_locked());
 
         let code_39 = fields[1].barcode_field().unwrap().unwrap();
-        assert_eq!(
-            code_39.barcode_instructions(),
-            r#""ABC-123" CODE39 \d"#
-        );
+        assert_eq!(code_39.barcode_instructions(), r#""ABC-123" CODE39 \d"#);
         assert_eq!(code_39.cached_result(), Some("cached Code39 barcode"));
         assert!(code_39.is_dirty());
         assert!(code_39.is_locked());
@@ -10657,19 +10636,13 @@ mod tests {
 
         let outline = fields[0].bidi_outline_field().unwrap().unwrap();
         assert_eq!(outline.opaque_instructions(), r#"\* MERGEFORMAT"#);
-        assert_eq!(
-            outline.cached_result(),
-            Some("cached bidi outline number")
-        );
+        assert_eq!(outline.cached_result(), Some("cached bidi outline number"));
         assert!(outline.is_dirty());
         assert!(outline.is_locked());
 
         let bare = fields[1].bidi_outline_field().unwrap().unwrap();
         assert_eq!(bare.opaque_instructions(), "");
-        assert_eq!(
-            bare.cached_result(),
-            Some("cached bare bidi outline")
-        );
+        assert_eq!(bare.cached_result(), Some("cached bare bidi outline"));
         assert!(bare.is_dirty());
         assert!(bare.is_locked());
         assert!(fields[2].bidi_outline_field().unwrap().is_none());
@@ -10718,10 +10691,7 @@ mod tests {
         assert!(fields[2].shape_field().unwrap().is_none());
 
         let too_long = Field::new(
-            format!(
-                "SHAPE {}",
-                "x".repeat(MAX_SHAPE_FIELD_INSTRUCTION_BYTES)
-            ),
+            format!("SHAPE {}", "x".repeat(MAX_SHAPE_FIELD_INSTRUCTION_BYTES)),
             None,
             false,
         );
@@ -10821,10 +10791,7 @@ mod tests {
 
         let bare = fields[1].private_field().unwrap().unwrap();
         assert_eq!(bare.opaque_instructions(), "");
-        assert_eq!(
-            bare.cached_result(),
-            Some("cached bare private payload")
-        );
+        assert_eq!(bare.cached_result(), Some("cached bare private payload"));
         assert!(bare.is_dirty());
         assert!(bare.is_locked());
         assert!(fields[2].private_field().unwrap().is_none());
@@ -10870,10 +10837,7 @@ mod tests {
 
         let bare = fields[1].database_field().unwrap().unwrap();
         assert_eq!(bare.opaque_instructions(), "");
-        assert_eq!(
-            bare.cached_result(),
-            Some("cached bare database table")
-        );
+        assert_eq!(bare.cached_result(), Some("cached bare database table"));
         assert!(bare.is_dirty());
         assert!(bare.is_locked());
         assert!(fields[2].database_field().unwrap().is_none());
@@ -10913,7 +10877,10 @@ mod tests {
         assert_eq!(glossary.entry_name(), "Legacy Clause");
         assert_eq!(glossary.unknown_switches().len(), 2);
         assert_eq!(glossary.unknown_switches()[0].name(), '*');
-        assert_eq!(glossary.unknown_switches()[0].argument(), Some("MERGEFORMAT"));
+        assert_eq!(
+            glossary.unknown_switches()[0].argument(),
+            Some("MERGEFORMAT")
+        );
         assert_eq!(glossary.unknown_switches()[1].name(), 'q');
         assert_eq!(glossary.unknown_switches()[1].argument(), Some("opaque"));
         assert_eq!(glossary.cached_result(), Some("cached glossary entry"));

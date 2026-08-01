@@ -166,7 +166,8 @@ impl PivotCacheDateTime {
     }
 
     fn validate(self) -> XlsResult<()> {
-        let leap = self.year % 4 == 0 && (self.year % 100 != 0 || self.year % 400 == 0);
+        let leap = self.year.is_multiple_of(4)
+            && (!self.year.is_multiple_of(100) || self.year.is_multiple_of(400));
         let max_day = match self.month {
             1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
             4 | 6 | 9 | 11 => 30,
@@ -1443,7 +1444,7 @@ impl PageFieldEntry {
 /// Each entry is 6 bytes: `(isxvi: u16, isxvd: u16, idObj: u16)`.
 /// The number of entries is `data.len() / 6`.
 pub fn parse_sxpi(data: &[u8]) -> XlsResult<Vec<PageFieldEntry>> {
-    if data.len() % 6 != 0 {
+    if !data.len().is_multiple_of(6) {
         return Err(cache_invalid(
             SXPI_TYPE,
             "SXPI length is not a multiple of six",
@@ -1472,7 +1473,7 @@ pub enum PivotAxisField {
 }
 
 pub fn parse_sxivd(data: &[u8]) -> XlsResult<Vec<PivotAxisField>> {
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return Err(cache_invalid(SXIVD_TYPE, "SXIVD length must be even"));
     }
     data.chunks_exact(2)
@@ -1543,14 +1544,14 @@ fn parse_sxli(
     expected_lines: usize,
     max_indices: usize,
 ) -> XlsResult<Vec<PivotLayoutLine>> {
-    if expected_lines == 0 || data.len() % expected_lines != 0 {
+    if expected_lines == 0 || !data.len().is_multiple_of(expected_lines) {
         return Err(cache_invalid(
             SXLI_TYPE,
             "SXLI byte length is inconsistent with its declared line count",
         ));
     }
     let line_size = data.len() / expected_lines;
-    if line_size < 8 || (line_size - 8) % 2 != 0 {
+    if line_size < 8 || !(line_size - 8).is_multiple_of(2) {
         return Err(cache_invalid(
             SXLI_TYPE,
             "SXLI has an invalid fixed line size",

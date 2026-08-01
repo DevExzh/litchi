@@ -2,19 +2,16 @@
 
 use crate::{OpcPackage, PackURI, Part, Relationships, TargetMode};
 use base64::Engine;
+use p256::ecdsa::{
+    Signature as EcdsaSignature, SigningKey as EcdsaSigningKey, VerifyingKey as EcdsaVerifyingKey,
+};
 use quick_xml::{
     Reader,
     events::{BytesStart, Event},
 };
-use p256::ecdsa::{
-    Signature as EcdsaSignature, SigningKey as EcdsaSigningKey,
-    VerifyingKey as EcdsaVerifyingKey,
-};
 use rsa::{
     BigUint, RsaPrivateKey, RsaPublicKey,
-    pkcs1v15::{
-        Signature as RsaSignature, SigningKey as RsaSigningKey, VerifyingKey,
-    },
+    pkcs1v15::{Signature as RsaSignature, SigningKey as RsaSigningKey, VerifyingKey},
     pkcs8::{DecodePrivateKey, DecodePublicKey},
     traits::PublicKeyParts,
 };
@@ -23,8 +20,7 @@ use sha2_legacy::{Digest, Sha256, Sha384, Sha512};
 use signature::{SignatureEncoding, Signer, Verifier};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt,
-    str,
+    fmt, str,
 };
 use subtle::ConstantTimeEq;
 use thiserror::Error;
@@ -364,7 +360,10 @@ pub fn author_detached_signature(
             )
         })
         .collect::<String>();
-    let signing_time = signer.signing_time.as_deref().unwrap_or("1970-01-01T00:00:00Z");
+    let signing_time = signer
+        .signing_time
+        .as_deref()
+        .unwrap_or("1970-01-01T00:00:00Z");
     let package_object = format!(
         "<Object xmlns=\"{DS}\" xmlns:mdssi=\"{MDSSI}\" Id=\"idPackageObject\"><Manifest>{manifest}</Manifest><SignatureProperties><SignatureProperty Id=\"idSignatureTime\" Target=\"#idPackageSignature\"><mdssi:SignatureTime><mdssi:Format>YYYY-MM-DDThh:mm:ssTZD</mdssi:Format><mdssi:Value>{}</mdssi:Value></mdssi:SignatureTime></SignatureProperty></SignatureProperties></Object>",
         escape_text_string(signing_time)
@@ -387,7 +386,8 @@ pub fn author_detached_signature(
     let canonical = canonicalize_authored(&signed_info, mode)?;
     let value = match &signer.material {
         SigningMaterial::Rsa(key) => {
-            let signature: RsaSignature = RsaSigningKey::<Sha256>::new(key.as_ref().clone()).sign(&canonical);
+            let signature: RsaSignature =
+                RsaSigningKey::<Sha256>::new(key.as_ref().clone()).sign(&canonical);
             signature.to_vec()
         },
         SigningMaterial::Ecdsa(key) => {
@@ -430,7 +430,9 @@ pub fn verify_detached_signature(
     let signature_algorithm = document.attr(signature_method, "Algorithm")?;
     sha1_policy(signature_algorithm, policy)?;
     if !matches!(signature_algorithm, RSA_SHA1 | RSA_SHA256 | ECDSA_SHA256) {
-        return Err(DigitalSignatureError::UnsupportedAlgorithm(signature_algorithm.into()));
+        return Err(DigitalSignatureError::UnsupportedAlgorithm(
+            signature_algorithm.into(),
+        ));
     }
     let manifests = document.descendants(document.root, DS, "Manifest");
     if manifests.len() != 1 {
@@ -440,7 +442,10 @@ pub fn verify_detached_signature(
     }
     let mut expected = HashMap::new();
     for reference in references {
-        if expected.insert(reference.uri.as_str(), reference.data.as_slice()).is_some() {
+        if expected
+            .insert(reference.uri.as_str(), reference.data.as_slice())
+            .is_some()
+        {
             return Err(DigitalSignatureError::InvalidGraph(format!(
                 "duplicate expected reference {}",
                 reference.uri
@@ -480,9 +485,7 @@ pub fn verify_detached_signature(
     }
     for reference in signed_references {
         let uri = document.attr(reference, "URI")?;
-        if !matches!(uri, "#idPackageObject" | "#idOfficeObject")
-            || !seen.insert(uri.to_string())
-        {
+        if !matches!(uri, "#idPackageObject" | "#idOfficeObject") || !seen.insert(uri.to_string()) {
             return Err(DigitalSignatureError::InvalidXml(format!(
                 "invalid or duplicate SignedInfo reference {uri}"
             )));
@@ -501,17 +504,26 @@ pub fn verify_detached_signature(
         )?;
         push_certificate(&mut certificates, &der, policy)?;
     }
-    let encoded_value = document.text(document.required_child(document.root, DS, "SignatureValue")?)?;
-    let value = decode64(&encoded_value, policy.max_signature_part_bytes, "SignatureValue")?;
+    let encoded_value =
+        document.text(document.required_child(document.root, DS, "SignatureValue")?)?;
+    let value = decode64(
+        &encoded_value,
+        policy.max_signature_part_bytes,
+        "SignatureValue",
+    )?;
     let signature_valid = match signature_algorithm {
         RSA_SHA1 | RSA_SHA256 => {
             let key = extract_key(&document, &certificates, policy)?;
             let signature = RsaSignature::try_from(value.as_slice())
                 .map_err(|error| DigitalSignatureError::InvalidKey(error.to_string()))?;
             if signature_algorithm == RSA_SHA1 {
-                VerifyingKey::<Sha1>::new(key).verify(&signed_bytes, &signature).is_ok()
+                VerifyingKey::<Sha1>::new(key)
+                    .verify(&signed_bytes, &signature)
+                    .is_ok()
             } else {
-                VerifyingKey::<Sha256>::new(key).verify(&signed_bytes, &signature).is_ok()
+                VerifyingKey::<Sha256>::new(key)
+                    .verify(&signed_bytes, &signature)
+                    .is_ok()
             }
         },
         ECDSA_SHA256 => {
@@ -577,7 +589,11 @@ fn verify_detached_reference(
     let actual = match algorithm {
         SHA1 => Sha1::digest(data).to_vec(),
         SHA256 => Sha256::digest(data).to_vec(),
-        _ => return Err(DigitalSignatureError::UnsupportedAlgorithm(algorithm.into())),
+        _ => {
+            return Err(DigitalSignatureError::UnsupportedAlgorithm(
+                algorithm.into(),
+            ));
+        },
     };
     Ok((
         ReferenceVerification {
@@ -677,7 +693,10 @@ pub fn verify_package(
             "signature origin has no signature relationships".into(),
         ));
     }
-    for part in package.iter_parts().filter(|part| is_signature_infrastructure(*part)) {
+    for part in package
+        .iter_parts()
+        .filter(|part| is_signature_infrastructure(*part))
+    {
         if !reachable.contains(part.partname()) {
             return Err(DigitalSignatureError::InvalidGraph(format!(
                 "orphan or spoofed signature infrastructure part {}",
@@ -888,8 +907,10 @@ fn validate_manifest_coverage(
             match transforms.as_slice() {
                 [Transform::Relationships(actual_ids)]
                     if actual_ids.iter().all(|id| expected_ids.contains(id)) => {},
-                [Transform::Relationships(actual_ids), Transform::Canonical(_)]
-                    if actual_ids.iter().all(|id| expected_ids.contains(id)) => {},
+                [
+                    Transform::Relationships(actual_ids),
+                    Transform::Canonical(_),
+                ] if actual_ids.iter().all(|id| expected_ids.contains(id)) => {},
                 _ => {
                     return Err(DigitalSignatureError::InvalidGraph(format!(
                         "RelationshipTransform for {uri} selects an unknown relationship or has an invalid transform chain"
@@ -1345,11 +1366,13 @@ fn validate_signing_time(value: &str) -> Result<()> {
             || (bytes.len() >= 25
                 && matches!(bytes.get(bytes.len() - 6), Some(b'+') | Some(b'-'))
                 && bytes.get(bytes.len() - 3) == Some(&b':')));
-    if !structural || !bytes.iter().enumerate().all(|(index, byte)| {
-        byte.is_ascii_digit()
-            || matches!(index, 4 | 7 | 10 | 13 | 16)
-            || matches!(*byte, b'Z' | b'+' | b'-' | b':' | b'.')
-    }) {
+    if !structural
+        || !bytes.iter().enumerate().all(|(index, byte)| {
+            byte.is_ascii_digit()
+                || matches!(index, 4 | 7 | 10 | 13 | 16)
+                || matches!(*byte, b'Z' | b'+' | b'-' | b':' | b'.')
+        })
+    {
         return Err(DigitalSignatureError::InvalidXml(
             "signing time must be an ISO 8601 date-time with a timezone".into(),
         ));
@@ -1358,10 +1381,7 @@ fn validate_signing_time(value: &str) -> Result<()> {
 }
 
 /// Add a signature while preserving existing signatures.
-pub fn add_package_signature(
-    package: &mut OpcPackage,
-    signer: &PackageSigner,
-) -> Result<PackURI> {
+pub fn add_package_signature(package: &mut OpcPackage, signer: &PackageSigner) -> Result<PackURI> {
     let existing = verify_package(package, &SignatureVerificationPolicy::compatibility())?;
     if existing.iter().any(|verification| {
         verification.package_integrity != VerificationStatus::Valid
@@ -1480,7 +1500,10 @@ fn build_signature(package: &OpcPackage, signer: &PackageSigner) -> Result<Vec<u
         CanonicalizationMethod::Exclusive => EXCLUSIVE_C14N,
     };
     let manifest = build_manifest(package)?;
-    let signing_time = signer.signing_time.as_deref().unwrap_or("1970-01-01T00:00:00Z");
+    let signing_time = signer
+        .signing_time
+        .as_deref()
+        .unwrap_or("1970-01-01T00:00:00Z");
     let object = format!(
         "<Object xmlns=\"{DS}\" xmlns:mdssi=\"{MDSSI}\" Id=\"idPackageObject\"><Manifest>{manifest}</Manifest><SignatureProperties><SignatureProperty Id=\"idSignatureTime\" Target=\"#idPackageSignature\"><mdssi:SignatureTime><mdssi:Format>YYYY-MM-DDThh:mm:ssTZD</mdssi:Format><mdssi:Value>{}</mdssi:Value></mdssi:SignatureTime></SignatureProperty></SignatureProperties></Object>",
         escape_text_string(signing_time)
@@ -1498,7 +1521,8 @@ fn build_signature(package: &OpcPackage, signer: &PackageSigner) -> Result<Vec<u
     let signed_bytes = canonicalize_authored(&signed_info, mode)?;
     let signature_value = match &signer.material {
         SigningMaterial::Rsa(key) => {
-            let signature: RsaSignature = RsaSigningKey::<Sha256>::new(key.as_ref().clone()).sign(&signed_bytes);
+            let signature: RsaSignature =
+                RsaSigningKey::<Sha256>::new(key.as_ref().clone()).sign(&signed_bytes);
             signature.to_vec()
         },
         SigningMaterial::Ecdsa(key) => {
@@ -1535,7 +1559,12 @@ fn build_key_info(signer: &PackageSigner) -> String {
     let certificates = signer
         .certificates
         .iter()
-        .map(|certificate| format!("<X509Certificate>{}</X509Certificate>", encode64(certificate)))
+        .map(|certificate| {
+            format!(
+                "<X509Certificate>{}</X509Certificate>",
+                encode64(certificate)
+            )
+        })
         .collect::<String>();
     format!("<KeyInfo>{key_value}<X509Data>{certificates}</X509Data></KeyInfo>")
 }
@@ -2419,10 +2448,12 @@ mod tests {
                 && report.certificate_trust == CertificateTrust::NotEvaluated
         }));
         package.clear_digital_signatures().unwrap();
-        assert!(package
-            .verify_digital_signatures(&SignatureVerificationPolicy::strict())
-            .unwrap()
-            .is_empty());
+        assert!(
+            package
+                .verify_digital_signatures(&SignatureVerificationPolicy::strict())
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -2437,7 +2468,10 @@ mod tests {
         let verification = package
             .verify_digital_signatures(&SignatureVerificationPolicy::strict())
             .unwrap();
-        assert_eq!(verification[0].package_integrity, VerificationStatus::Invalid);
+        assert_eq!(
+            verification[0].package_integrity,
+            VerificationStatus::Invalid
+        );
         assert_eq!(verification[0].signature_value, VerificationStatus::Valid);
 
         let mut signer = p256_signer();
@@ -2455,9 +2489,7 @@ mod tests {
         let before = spoofed.part_count();
         assert!(spoofed.add_digital_signature(&p256_signer()).is_err());
         assert_eq!(spoofed.part_count(), before);
-        assert!(!spoofed.contains_part(
-            &PackURI::new("/_xmlsignatures/sig1.xml").unwrap()
-        ));
+        assert!(!spoofed.contains_part(&PackURI::new("/_xmlsignatures/sig1.xml").unwrap()));
     }
 
     #[test]
@@ -2516,14 +2548,18 @@ mod tests {
         wrong_key_package.add_digital_signature(&signer).unwrap();
         let signature_uri = PackURI::new("/_xmlsignatures/sig1.xml").unwrap();
         let correct_key = match &signer.material {
-            SigningMaterial::Ecdsa(key) => encode64(key.verifying_key().to_encoded_point(false).as_bytes()),
+            SigningMaterial::Ecdsa(key) => {
+                encode64(key.verifying_key().to_encoded_point(false).as_bytes())
+            },
             SigningMaterial::Rsa(_) => unreachable!(),
         };
         let wrong_signer = PackageSigner::ecdsa_p256_sha256(
             EcdsaSigningKey::from_bytes((&[9u8; 32]).into()).unwrap(),
         );
         let wrong_key = match &wrong_signer.material {
-            SigningMaterial::Ecdsa(key) => encode64(key.verifying_key().to_encoded_point(false).as_bytes()),
+            SigningMaterial::Ecdsa(key) => {
+                encode64(key.verifying_key().to_encoded_point(false).as_bytes())
+            },
             SigningMaterial::Rsa(_) => unreachable!(),
         };
         let xml = String::from_utf8(
@@ -2545,7 +2581,9 @@ mod tests {
         assert_eq!(verification[0].signature_value, VerificationStatus::Invalid);
 
         let mut relationship_spoof = authored_package();
-        relationship_spoof.add_digital_signature(&p256_signer()).unwrap();
+        relationship_spoof
+            .add_digital_signature(&p256_signer())
+            .unwrap();
         let xml = String::from_utf8(
             relationship_spoof
                 .get_part(&signature_uri)
@@ -2560,28 +2598,26 @@ mod tests {
             .unwrap()
             .set_blob(xml.into_bytes());
         assert!(matches!(
-            relationship_spoof
-                .verify_digital_signatures(&SignatureVerificationPolicy::strict()),
+            relationship_spoof.verify_digital_signatures(&SignatureVerificationPolicy::strict()),
             Err(DigitalSignatureError::InvalidGraph(_))
         ));
 
         let mut path_spoof = authored_package();
         path_spoof.add_digital_signature(&p256_signer()).unwrap();
-        let xml = String::from_utf8(
-            path_spoof
-                .get_part(&signature_uri)
-                .unwrap()
-                .blob()
-                .to_vec(),
-        )
-        .unwrap()
-        .replace("/document.xml?ContentType=", "/../document.xml?ContentType=");
+        let xml = String::from_utf8(path_spoof.get_part(&signature_uri).unwrap().blob().to_vec())
+            .unwrap()
+            .replace(
+                "/document.xml?ContentType=",
+                "/../document.xml?ContentType=",
+            );
         path_spoof
             .get_part_mut(&signature_uri)
             .unwrap()
             .set_blob(xml.into_bytes());
-        assert!(path_spoof
-            .verify_digital_signatures(&SignatureVerificationPolicy::strict())
-            .is_err());
+        assert!(
+            path_spoof
+                .verify_digital_signatures(&SignatureVerificationPolicy::strict())
+                .is_err()
+        );
     }
 }

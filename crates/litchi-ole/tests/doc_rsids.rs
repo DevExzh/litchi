@@ -18,7 +18,11 @@ fn reads_plrsid_from_a_word_produced_document() {
     let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
-    let table_name = if fib.which_table_stream() { "1Table" } else { "0Table" };
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
 
     let rsids = DocumentRsids::parse(&fib, &table_stream)
@@ -46,7 +50,11 @@ fn documents_without_plrsid_report_none() {
     let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
-    let table_name = if fib.which_table_stream() { "1Table" } else { "0Table" };
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
     // Whether this old file carries the table is implementation-defined; the
     // parser must at least not error on it.

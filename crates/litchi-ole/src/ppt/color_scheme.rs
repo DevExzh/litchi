@@ -172,13 +172,11 @@ impl PowerPointColorSchemeAtom {
             }
             let atom = Self::parse(child)?;
             if atom.kind == PowerPointColorSchemeAtomKind::SlideScheme
-                && atoms
-                    .iter()
-                    .any(|existing: &Self| existing.kind == PowerPointColorSchemeAtomKind::SlideScheme)
+                && atoms.iter().any(|existing: &Self| {
+                    existing.kind == PowerPointColorSchemeAtomKind::SlideScheme
+                })
             {
-                return corrupted(
-                    "container contains more than one SlideSchemeColorSchemeAtom",
-                );
+                return corrupted("container contains more than one SlideSchemeColorSchemeAtom");
             }
             atoms.push(atom);
         }
@@ -293,10 +291,14 @@ mod tests {
         assert_eq!(atoms.len(), 2);
         assert_eq!(atoms[0].kind, PowerPointColorSchemeAtomKind::SlideScheme);
 
-        assert!(PowerPointColorSchemeAtom::collect(&container(vec![slide.clone(), slide])).is_err());
-        assert!(PowerPointColorSchemeAtom::collect(&container(Vec::new()))
-            .unwrap()
-            .is_empty());
+        assert!(
+            PowerPointColorSchemeAtom::collect(&container(vec![slide.clone(), slide])).is_err()
+        );
+        assert!(
+            PowerPointColorSchemeAtom::collect(&container(Vec::new()))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

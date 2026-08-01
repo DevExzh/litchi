@@ -90,7 +90,7 @@ pub(crate) fn context_for_password(
     salt: &[u8; 16],
     key_bits: usize,
 ) -> Result<CryptoApiContext, CryptoApiError> {
-    if !(40..=128).contains(&key_bits) || key_bits % 8 != 0 {
+    if !(40..=128).contains(&key_bits) || !key_bits.is_multiple_of(8) {
         return Err(CryptoApiError::UnsupportedAlgorithm);
     }
     let password_bytes = Zeroizing::new(

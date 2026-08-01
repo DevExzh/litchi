@@ -127,7 +127,7 @@ impl<'data> BlipStoreEntry<'data> {
 
             // Name is stored as UTF-16 LE (2 bytes per character)
             let name_bytes = &data[name_start..name_end];
-            if name_len % 2 != 0 {
+            if !name_len.is_multiple_of(2) {
                 return Err(Error::ParseError(
                     "Invalid BSE name length (not UTF-16)".into(),
                 ));

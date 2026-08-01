@@ -36,7 +36,10 @@ fn parses_inherits_restores_and_pard_resets_exact_values() {
     assert_eq!(inner.foreground_color, Some(0));
     assert_eq!(inner.background_color, Some(0));
     assert_eq!(block(&document, "Tail").paragraph.shading, outer);
-    assert_eq!(block(&document, "Reset").paragraph.shading, Shading::default());
+    assert_eq!(
+        block(&document, "Reset").paragraph.shading,
+        Shading::default()
+    );
     assert_eq!(block(&document, "Visible").paragraph.shading, outer);
 }
 
@@ -93,11 +96,13 @@ fn rejects_missing_negative_and_out_of_range_values_but_keeps_destinations_inert
         assert!(RtfDocument::parse(source).is_err(), "{source}");
     }
 
-    let inert = RtfDocument::parse(
-        r"{\rtf1{\*\unknown\shading10001\cfpat65536\cbpat-1 hidden}Visible}",
-    )
-    .unwrap();
-    assert_eq!(block(&inert, "Visible").paragraph.shading, Shading::default());
+    let inert =
+        RtfDocument::parse(r"{\rtf1{\*\unknown\shading10001\cfpat65536\cbpat-1 hidden}Visible}")
+            .unwrap();
+    assert_eq!(
+        block(&inert, "Visible").paragraph.shading,
+        Shading::default()
+    );
 }
 
 #[test]

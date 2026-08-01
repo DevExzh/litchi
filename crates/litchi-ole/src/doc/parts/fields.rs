@@ -686,12 +686,12 @@ pub(crate) fn non_plcf_field_texts(story: FieldStory, text: &str) -> Vec<NonPlcf
                 });
             },
             FIELD_SEPARATOR_CHARACTER => {
-                if let Some(field) = open_fields.last_mut() {
-                    if field.separator_cp.is_none() {
-                        field.separator_cp = Some(cp);
-                        field.separator_start_byte = Some(byte_index);
-                        field.result_start_byte = Some(next_byte);
-                    }
+                if let Some(field) = open_fields.last_mut()
+                    && field.separator_cp.is_none()
+                {
+                    field.separator_cp = Some(cp);
+                    field.separator_start_byte = Some(byte_index);
+                    field.result_start_byte = Some(next_byte);
                 }
             },
             FIELD_END_CHARACTER => {
@@ -8389,7 +8389,7 @@ impl FieldStoryTable {
         if data.len() > MAX_PLCFLD_BYTES {
             return Err(corrupted("Plcfld exceeds the allocation limit"));
         }
-        if data.len() < CP_SIZE || (data.len() - CP_SIZE) % (CP_SIZE + FLD_SIZE) != 0 {
+        if data.len() < CP_SIZE || !(data.len() - CP_SIZE).is_multiple_of(CP_SIZE + FLD_SIZE) {
             return Err(corrupted("Plcfld has an invalid byte length"));
         }
         let marker_count = (data.len() - CP_SIZE) / (CP_SIZE + FLD_SIZE);

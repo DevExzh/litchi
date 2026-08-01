@@ -53,7 +53,10 @@ fn invalid(record_type: u16, message: impl Into<String>) -> XlsError {
 /// `fFrtRef`/`fFrtAlert` bits that MUST be zero.
 fn validate_frt_header(data: &[u8], record_type: u16, name: &str) -> XlsResult<u16> {
     if u16::from_le_bytes([data[0], data[1]]) != record_type {
-        return Err(invalid(record_type, format!("{name} FrtHeader.rt mismatch")));
+        return Err(invalid(
+            record_type,
+            format!("{name} FrtHeader.rt mismatch"),
+        ));
     }
     let flags = u16::from_le_bytes([data[2], data[3]]);
     if flags & FRT_FLAGS_FORBIDDEN != 0 {
@@ -129,7 +132,8 @@ impl XlsShapePropsStream {
                 found: data.len(),
             });
         }
-        let frt_flags = validate_frt_header(data, SHAPE_PROPS_STREAM_RECORD_TYPE, "ShapePropsStream")?;
+        let frt_flags =
+            validate_frt_header(data, SHAPE_PROPS_STREAM_RECORD_TYPE, "ShapePropsStream")?;
         let stream = read_stream(
             data,
             Self::HEADER_LEN - CB_LEN,
@@ -315,7 +319,10 @@ mod tests {
 
         // Empty streams are legal.
         let empty = record(TEXT_PROPS_STREAM_RECORD_TYPE, &[], 0, b"");
-        assert_eq!(XlsTextPropsStream::parse(&empty).unwrap().to_payload(), empty);
+        assert_eq!(
+            XlsTextPropsStream::parse(&empty).unwrap().to_payload(),
+            empty
+        );
     }
 
     #[test]

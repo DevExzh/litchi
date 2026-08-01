@@ -8,15 +8,16 @@ use litchi_odf::{
     OpenDocumentFamily, Shape,
 };
 
-const FLAT_TEXT: &str =
-    include_str!("../../../test-data/libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt");
+const FLAT_TEXT: &str = include_str!(
+    "../../../test-data/libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt"
+);
 const FLAT_SPREADSHEET: &str =
     include_str!("../../../test-data/libreoffice-core/sc/qa/unit/data/draw-image-link.fods");
 const FLAT_SPREADSHEET_DDE: &str = include_str!("fixtures/odfpy-sheet-dde-source.fods");
-const FLAT_PRESENTATION: &str =
-    include_str!("../../../test-data/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp");
-const FLAT_DRAWING: &str =
-    include_str!("../../../test-data/odf/drawing/fill-image-inline.fodg");
+const FLAT_PRESENTATION: &str = include_str!(
+    "../../../test-data/libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp"
+);
+const FLAT_DRAWING: &str = include_str!("../../../test-data/odf/drawing/fill-image-inline.fodg");
 
 const FLAT_DRAWING_WITH_SHAPE: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?>"#,
@@ -156,7 +157,10 @@ fn flat_spreadsheet_odfpy_fixture_edit_round_trips() {
     assert!(output.contains("never/contacted.ods"));
 
     // `to_mutable` leaves the original wrapper usable.
-    assert_eq!(document.flat_document().family(), OpenDocumentFamily::Spreadsheet);
+    assert_eq!(
+        document.flat_document().family(),
+        OpenDocumentFamily::Spreadsheet
+    );
 
     let mut reopened = FlatSpreadsheet::from_bytes(bytes).unwrap();
     let sheet = reopened
@@ -210,8 +214,7 @@ fn flat_unmodified_read_only_save_stays_byte_exact() {
     }
     let spreadsheet = FlatSpreadsheet::from_bytes(FLAT_SPREADSHEET.as_bytes().to_vec()).unwrap();
     assert_eq!(spreadsheet.to_bytes(), FLAT_SPREADSHEET.as_bytes());
-    let presentation =
-        FlatPresentation::from_bytes(FLAT_PRESENTATION.as_bytes().to_vec()).unwrap();
+    let presentation = FlatPresentation::from_bytes(FLAT_PRESENTATION.as_bytes().to_vec()).unwrap();
     assert_eq!(presentation.to_bytes(), FLAT_PRESENTATION.as_bytes());
 }
 

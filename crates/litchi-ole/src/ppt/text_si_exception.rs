@@ -113,7 +113,9 @@ impl PowerPointTextSpecialInfoDefaults {
                 return Err(corrupted(format!("TextSIException {name} is truncated")));
             };
             offset += 2;
-            Ok(Some(u16::from_le_bytes(bytes.try_into().expect("length checked"))))
+            Ok(Some(u16::from_le_bytes(
+                bytes.try_into().expect("length checked"),
+            )))
         };
         let spelling = take_u16(MASK_SPELL, "spellInfo")?
             .map(|raw| {
@@ -135,7 +137,11 @@ impl PowerPointTextSpecialInfoDefaults {
                 "TextSIException mask does not consume its payload exactly",
             ));
         }
-        Ok(Self { spelling, language, alternate_language })
+        Ok(Self {
+            spelling,
+            language,
+            alternate_language,
+        })
     }
 
     /// Serialize the complete record, including its header.
@@ -153,9 +159,7 @@ impl PowerPointTextSpecialInfoDefaults {
         let mut data = Vec::with_capacity(14);
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&TEXT_SPECIAL_INFO_DEFAULT_TYPE.to_le_bytes());
-        data.extend_from_slice(
-            &(4 + 2 * mask.count_ones()).to_le_bytes(),
-        );
+        data.extend_from_slice(&(4 + 2 * mask.count_ones()).to_le_bytes());
         data.extend_from_slice(&mask.to_le_bytes());
         if let Some(spelling) = self.spelling {
             let raw = u16::from(spelling.error) | (u16::from(spelling.clean) << 1);
@@ -196,9 +200,13 @@ impl PowerPointOutlineTextRef {
             || record.version != 0
             || record.data.len() != 4
         {
-            return Err(corrupted("OutlineTextRefAtom has an invalid header or length"));
+            return Err(corrupted(
+                "OutlineTextRefAtom has an invalid header or length",
+            ));
         }
-        Self::new(i32::from_le_bytes(record.data[..4].try_into().expect("length checked")))
+        Self::new(i32::from_le_bytes(
+            record.data[..4].try_into().expect("length checked"),
+        ))
     }
 }
 
@@ -283,7 +291,12 @@ mod tests {
             data: 5i32.to_le_bytes().to_vec(),
             children: Vec::new(),
         };
-        assert_eq!(PowerPointOutlineTextRef::parse_record(&record).unwrap().get(), 5);
+        assert_eq!(
+            PowerPointOutlineTextRef::parse_record(&record)
+                .unwrap()
+                .get(),
+            5
+        );
 
         let mut negative = record.clone();
         negative.data = (-1i32).to_le_bytes().to_vec();

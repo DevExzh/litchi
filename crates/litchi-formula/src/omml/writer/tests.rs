@@ -430,9 +430,7 @@ fn roundtrip_subsup() {
 
 #[test]
 fn roundtrip_radical() {
-    assert_roundtrip(
-        "<m:oMath><m:rad><m:e><m:r><m:t>x</m:t></m:r></m:e></m:rad></m:oMath>",
-    );
+    assert_roundtrip("<m:oMath><m:rad><m:e><m:r><m:t>x</m:t></m:r></m:e></m:rad></m:oMath>");
 }
 
 #[test]
@@ -543,16 +541,12 @@ fn roundtrip_group_char() {
 
 #[test]
 fn roundtrip_phantom() {
-    assert_roundtrip(
-        "<m:oMath><m:phant><m:e><m:r><m:t>x</m:t></m:r></m:e></m:phant></m:oMath>",
-    );
+    assert_roundtrip("<m:oMath><m:phant><m:e><m:r><m:t>x</m:t></m:r></m:e></m:phant></m:oMath>");
 }
 
 #[test]
 fn roundtrip_box() {
-    assert_roundtrip(
-        "<m:oMath><m:box><m:e><m:r><m:t>x</m:t></m:r></m:e></m:box></m:oMath>",
-    );
+    assert_roundtrip("<m:oMath><m:box><m:e><m:r><m:t>x</m:t></m:r></m:e></m:box></m:oMath>");
 }
 
 #[test]

@@ -37,7 +37,7 @@ impl ShapeHorizontalOrigin {
             other => {
                 return Err(DocError::InvalidFormat(format!(
                     "Invalid SPA horizontal origin: {other}"
-                )))
+                )));
             },
         })
     }
@@ -63,7 +63,7 @@ impl ShapeVerticalOrigin {
             other => {
                 return Err(DocError::InvalidFormat(format!(
                     "Invalid SPA vertical origin: {other}"
-                )))
+                )));
             },
         })
     }
@@ -98,7 +98,7 @@ impl ShapeTextWrap {
             other => {
                 return Err(DocError::InvalidFormat(format!(
                     "Invalid SPA text wrap style: {other}"
-                )))
+                )));
             },
         })
     }
@@ -127,7 +127,7 @@ impl ShapeWrapSide {
             other => {
                 return Err(DocError::InvalidFormat(format!(
                     "Invalid SPA wrap side: {other}"
-                )))
+                )));
             },
         })
     }
@@ -172,7 +172,9 @@ impl Spa {
     /// Parse one 26-byte Spa structure.
     pub fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < SPA_LEN {
-            return Err(DocError::InvalidFormat("Spa structure too short".to_string()));
+            return Err(DocError::InvalidFormat(
+                "Spa structure too short".to_string(),
+            ));
         }
         let read_i32 = |offset: usize| -> i32 {
             i32::from_le_bytes(data[offset..offset + 4].try_into().unwrap_or([0; 4]))
@@ -184,9 +186,8 @@ impl Spa {
         let bottom = read_i32(16);
         let flags = u16::from_le_bytes(data[20..22].try_into().unwrap_or([0; 2]));
 
-        let masked = |shift: u16, width: u16| -> u8 {
-            ((flags >> shift) & ((1u16 << width) - 1)) as u8
-        };
+        let masked =
+            |shift: u16, width: u16| -> u8 { ((flags >> shift) & ((1u16 << width) - 1)) as u8 };
 
         Ok(Self {
             shape_id,
@@ -259,7 +260,7 @@ pub struct ShapeAnchor {
 pub fn parse_plcf_spa(data: &[u8]) -> Result<Vec<ShapeAnchor>> {
     // lcb = 4 * (n + 1) + SPA_LEN * n  =>  n = (lcb - 4) / (4 + SPA_LEN)
     let stride = 4 + SPA_LEN;
-    if data.len() < 4 || (data.len() - 4) % stride != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(stride) {
         return Err(DocError::InvalidFormat(
             "Invalid PlcfSpa length".to_string(),
         ));
@@ -267,11 +268,7 @@ pub fn parse_plcf_spa(data: &[u8]) -> Result<Vec<ShapeAnchor>> {
     let count = (data.len() - 4) / stride;
     let mut anchors = Vec::with_capacity(count);
     for index in 0..count {
-        let cp = u32::from_le_bytes(
-            data[index * 4..index * 4 + 4]
-                .try_into()
-                .unwrap_or([0; 4]),
-        );
+        let cp = u32::from_le_bytes(data[index * 4..index * 4 + 4].try_into().unwrap_or([0; 4]));
         let spa_start = (count + 1) * 4 + index * SPA_LEN;
         let spa = Spa::parse(&data[spa_start..spa_start + SPA_LEN])?;
         anchors.push(ShapeAnchor { cp, spa });
@@ -303,7 +300,10 @@ mod tests {
     fn spa_parse_reads_all_fields() {
         let spa = Spa::parse(&sample_spa_bytes()).unwrap();
         assert_eq!(spa.shape_id, 1029);
-        assert_eq!((spa.left, spa.top, spa.right, spa.bottom), (3060, 720, 4560, 1845));
+        assert_eq!(
+            (spa.left, spa.top, spa.right, spa.bottom),
+            (3060, 720, 4560, 1845)
+        );
         assert_eq!(spa.width(), 1500);
         assert_eq!(spa.height(), 1125);
         assert_eq!(spa.horizontal_origin, ShapeHorizontalOrigin::Column);

@@ -104,17 +104,22 @@ pub struct XlsFullColorExt {
 
 impl XlsFullColorExt {
     /// A color; `Automatic` and `NotSet` colors must carry a zero value.
-    pub fn try_new(
-        color_type: XlsFullColorType,
-        tint: i16,
-        value: u32,
-    ) -> XlsResult<Self> {
-        if matches!(color_type, XlsFullColorType::Automatic | XlsFullColorType::NotSet)
-            && value != 0
+    pub fn try_new(color_type: XlsFullColorType, tint: i16, value: u32) -> XlsResult<Self> {
+        if matches!(
+            color_type,
+            XlsFullColorType::Automatic | XlsFullColorType::NotSet
+        ) && value != 0
         {
-            return Err(invalid("automatic and not-set colors must carry a zero value"));
+            return Err(invalid(
+                "automatic and not-set colors must carry a zero value",
+            ));
         }
-        Ok(Self { color_type, tint, value, unused: [0; 8] })
+        Ok(Self {
+            color_type,
+            tint,
+            value,
+            unused: [0; 8],
+        })
     }
 
     pub const fn color_type(&self) -> XlsFullColorType {
@@ -140,10 +145,14 @@ impl XlsFullColorExt {
             value: u32::from_le_bytes(data[4..8].try_into().expect("length checked")),
             unused: data[8..16].try_into().expect("length checked"),
         };
-        if matches!(value.color_type, XlsFullColorType::Automatic | XlsFullColorType::NotSet)
-            && value.value != 0
+        if matches!(
+            value.color_type,
+            XlsFullColorType::Automatic | XlsFullColorType::NotSet
+        ) && value.value != 0
         {
-            return Err(invalid("automatic and not-set colors must carry a zero value"));
+            return Err(invalid(
+                "automatic and not-set colors must carry a zero value",
+            ));
         }
         Ok(value)
     }
@@ -215,7 +224,10 @@ impl XlsExtProp {
     }
 
     fn parse(ext_type: u16, data: &[u8]) -> Self {
-        let unknown = || Self::Unknown { ext_type, data: data.to_vec() };
+        let unknown = || Self::Unknown {
+            ext_type,
+            data: data.to_vec(),
+        };
         let color = |build: fn(XlsFullColorExt) -> Self| {
             XlsFullColorExt::parse(data).map_or_else(|_| unknown(), build)
         };
@@ -262,15 +274,19 @@ impl XlsExtProp {
             return Err(invalid("XFExtGradient is truncated"));
         }
         let gradient = XlsXfGradient::parse(&data[..GRADIENT_LEN])?;
-        let stop_count =
-            u32::from_le_bytes(data[GRADIENT_LEN..GRADIENT_LEN + 4].try_into().expect("sliced"))
-                as usize;
+        let stop_count = u32::from_le_bytes(
+            data[GRADIENT_LEN..GRADIENT_LEN + 4]
+                .try_into()
+                .expect("sliced"),
+        ) as usize;
         if stop_count > MAX_GRADIENT_STOPS {
             return Err(invalid("XFExtGradient stop count exceeds 256"));
         }
         let expected = GRADIENT_LEN + 4 + stop_count * GRAD_STOP_LEN;
         if data.len() != expected {
-            return Err(invalid("XFExtGradient stop count does not match its payload"));
+            return Err(invalid(
+                "XFExtGradient stop count does not match its payload",
+            ));
         }
         let mut stops = Vec::with_capacity(stop_count);
         for chunk in data[GRADIENT_LEN + 4..].chunks_exact(GRAD_STOP_LEN) {
@@ -339,7 +355,10 @@ impl XlsXfExt {
         if properties.len() > MAX_EXT_PROPS {
             return Err(invalid("XFExt property count exceeds the resource cap"));
         }
-        Ok(Self { xf_index, properties })
+        Ok(Self {
+            xf_index,
+            properties,
+        })
     }
 
     /// Index of the `XF` record these properties extend.
@@ -382,7 +401,9 @@ impl XlsXfExt {
             if size < 4 {
                 return Err(invalid("ExtProp size is smaller than its header"));
             }
-            let end = offset.checked_add(size).ok_or_else(|| invalid("ExtProp overflow"))?;
+            let end = offset
+                .checked_add(size)
+                .ok_or_else(|| invalid("ExtProp overflow"))?;
             let blob = data
                 .get(offset + 4..end)
                 .ok_or_else(|| invalid("truncated ExtProp data"))?;
@@ -390,9 +411,14 @@ impl XlsXfExt {
             offset = end;
         }
         if offset != data.len() {
-            return Err(invalid("XFExt property count does not consume its payload exactly"));
+            return Err(invalid(
+                "XFExt property count does not consume its payload exactly",
+            ));
         }
-        Ok(Self { xf_index, properties })
+        Ok(Self {
+            xf_index,
+            properties,
+        })
     }
 
     /// Serialize back to a complete `XFExt` record payload.
@@ -409,8 +435,8 @@ impl XlsXfExt {
         payload.extend_from_slice(&(self.properties.len() as u16).to_le_bytes());
         for property in &self.properties {
             let blob = property.data_bytes()?;
-            let size = u16::try_from(4 + blob.len())
-                .map_err(|_| invalid("ExtProp size exceeds u16"))?;
+            let size =
+                u16::try_from(4 + blob.len()).map_err(|_| invalid("ExtProp size exceeds u16"))?;
             payload.extend_from_slice(&property.ext_type().to_le_bytes());
             payload.extend_from_slice(&size.to_le_bytes());
             payload.extend_from_slice(&blob);
@@ -457,7 +483,10 @@ mod tests {
         let parsed = XlsXfExt::parse(&data).unwrap();
         assert_eq!(parsed.xf_index(), 21);
         match parsed.properties() {
-            [XlsExtProp::FillForegroundColor(color), XlsExtProp::Indent(12)] => {
+            [
+                XlsExtProp::FillForegroundColor(color),
+                XlsExtProp::Indent(12),
+            ] => {
                 assert_eq!(color.color_type(), XlsFullColorType::Theme);
                 assert_eq!(color.tint(), -2);
                 assert_eq!(color.value(), 1);
@@ -477,7 +506,10 @@ mod tests {
         )
         .unwrap();
         let stop = XlsXfGradientStop::try_new(0.5, color).unwrap();
-        let property = XlsExtProp::FillGradient { gradient, stops: vec![stop] };
+        let property = XlsExtProp::FillGradient {
+            gradient,
+            stops: vec![stop],
+        };
         let mut blob = property.data_bytes().unwrap();
         let mut entry = Vec::new();
         entry.extend_from_slice(&EXT_FILL_GRADIENT.to_le_bytes());
@@ -505,7 +537,16 @@ mod tests {
         let parsed = XlsXfExt::parse(&data).unwrap();
         assert!(matches!(
             parsed.properties(),
-            [XlsExtProp::Unknown { ext_type: 0x00F0, .. }, XlsExtProp::Unknown { ext_type: EXT_FONT_SCHEME, .. }]
+            [
+                XlsExtProp::Unknown {
+                    ext_type: 0x00F0,
+                    ..
+                },
+                XlsExtProp::Unknown {
+                    ext_type: EXT_FONT_SCHEME,
+                    ..
+                }
+            ]
         ));
         assert_eq!(parsed.to_payload().unwrap(), data);
     }

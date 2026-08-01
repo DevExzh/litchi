@@ -5,7 +5,7 @@
 
 use super::fib::FileInformationBlock;
 use crate::doc::package::{DocError, Result};
-use crate::smart_tags::{PropertyBagStore, SmartTagLimits, SmartTagPropertyBag};
+use litchi_ole_common::smart_tags::{PropertyBagStore, SmartTagLimits, SmartTagPropertyBag};
 use std::collections::{BTreeMap, HashSet};
 
 const STTBF_BKMK_FACTOID: usize = 114;
@@ -195,7 +195,10 @@ impl DocumentSmartTags {
     }
 
     /// Resolve the type declaration associated with a tag.
-    pub fn tag_type(&self, tag: &DocumentSmartTag) -> Option<&crate::smart_tags::SmartTagType> {
+    pub fn tag_type(
+        &self,
+        tag: &DocumentSmartTag,
+    ) -> Option<&litchi_ole_common::smart_tags::SmartTagType> {
         self.store.as_ref()?.tag_type(tag.property_bag.type_id)
     }
 }
@@ -360,7 +363,7 @@ fn parse_recognizer_ranges(data: &[u8], document_end: u32) -> Result<Vec<SmartTa
 }
 
 fn plcf_count(data: &[u8], property_size: usize, name: &str) -> Result<usize> {
-    if data.len() < 4 || (data.len() - 4) % (4 + property_size) != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(4 + property_size) {
         return Err(corrupted(format!("{name} has an invalid byte length")));
     }
     Ok((data.len() - 4) / (4 + property_size))

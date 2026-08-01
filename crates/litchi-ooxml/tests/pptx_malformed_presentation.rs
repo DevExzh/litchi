@@ -229,5 +229,8 @@ fn transition_excessive_nesting_depth_is_rejected() {
     blob.extend_from_slice(b"</p:ext>".repeat(100_000).as_slice());
     blob.extend_from_slice(b"</p:transition></p:sld>");
     let (_, _, transition) = exercise_slide(&blob);
-    assert!(transition.is_err(), "deeply nested transition XML was accepted");
+    assert!(
+        transition.is_err(),
+        "deeply nested transition XML was accepted"
+    );
 }

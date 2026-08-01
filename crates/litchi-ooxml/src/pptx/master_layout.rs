@@ -20,8 +20,8 @@
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::{SlideLayoutPart, SlideMasterPart};
 use litchi_core::xml::escape_xml;
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::OpcPackage;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::{BlobPart, Part};
 use quick_xml::Reader;
@@ -391,7 +391,11 @@ pub fn add_slide_layout(
         });
     }
     let references = SlideMasterPart::from_part(master_part)?.slide_layout_references()?;
-    let layout_id = allocate_id(references.iter().filter_map(|reference| reference.layout_id()))?;
+    let layout_id = allocate_id(
+        references
+            .iter()
+            .filter_map(|reference| reference.layout_id()),
+    )?;
     let master_xml = master_part.blob().to_vec();
 
     let layout_index = next_part_index(package, "/ppt/slideLayouts/slideLayout", ".xml")?;
@@ -501,13 +505,17 @@ pub fn store_placeholder_shape(
         SlideLayoutPart::from_part(part)?.placeholders()?
     };
     let found = placeholders.iter().any(|shape| {
-        shape.placeholder_type().is_ok_and(|kind| kind == spec.kind.as_str())
+        shape
+            .placeholder_type()
+            .is_ok_and(|kind| kind == spec.kind.as_str())
             && shape
                 .placeholder_index()
                 .is_ok_and(|index| index.unwrap_or(0) == spec.effective_index())
     });
     if !found {
-        return Err(invalid("read-side placeholder inventory lost the authored shape"));
+        return Err(invalid(
+            "read-side placeholder inventory lost the authored shape",
+        ));
     }
     invalidate_signatures(package)?;
     Ok(())
@@ -535,9 +543,13 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &str) -> 
             continue;
         }
         for relationship in part.rels().iter() {
-            if matches!(relationship.reltype(), rt::SLIDE_LAYOUT | STRICT_SLIDE_LAYOUT_REL)
-                && !relationship.is_external()
-                && relationship.target_partname().is_ok_and(|target| target == layout_uri)
+            if matches!(
+                relationship.reltype(),
+                rt::SLIDE_LAYOUT | STRICT_SLIDE_LAYOUT_REL
+            ) && !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|target| target == layout_uri)
             {
                 return Err(invalid(format!(
                     "slide layout '{layout_part_name}' is still referenced by slide '{}'",
@@ -558,7 +570,9 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &str) -> 
                 continue;
             };
             if !relationship.is_external()
-                && relationship.target_partname().is_ok_and(|target| target == layout_uri)
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|target| target == layout_uri)
             {
                 if owner.is_some() {
                     return Err(invalid(format!(
@@ -623,7 +637,10 @@ pub fn validate_master_layout_graph(package: &OpcPackage) -> Result<()> {
             ))
         })?;
         if relationship.is_external()
-            || !matches!(relationship.reltype(), rt::SLIDE_MASTER | STRICT_SLIDE_MASTER_REL)
+            || !matches!(
+                relationship.reltype(),
+                rt::SLIDE_MASTER | STRICT_SLIDE_MASTER_REL
+            )
         {
             return Err(OoxmlError::InvalidRelationship(format!(
                 "relationship '{relationship_id}' is not an internal slide-master relationship"
@@ -651,7 +668,10 @@ pub fn validate_master_layout_graph(package: &OpcPackage) -> Result<()> {
     Ok(())
 }
 
-fn validate_master_layouts(package: &OpcPackage, master_part: &dyn litchi_opc::part::Part) -> Result<()> {
+fn validate_master_layouts(
+    package: &OpcPackage,
+    master_part: &dyn litchi_opc::part::Part,
+) -> Result<()> {
     let references = SlideMasterPart::from_part(master_part)?.slide_layout_references()?;
     for reference in &references {
         let relationship_id = reference.relationship_id();
@@ -661,7 +681,10 @@ fn validate_master_layouts(package: &OpcPackage, master_part: &dyn litchi_opc::p
             ))
         })?;
         if relationship.is_external()
-            || !matches!(relationship.reltype(), rt::SLIDE_LAYOUT | STRICT_SLIDE_LAYOUT_REL)
+            || !matches!(
+                relationship.reltype(),
+                rt::SLIDE_LAYOUT | STRICT_SLIDE_LAYOUT_REL
+            )
         {
             return Err(OoxmlError::InvalidRelationship(format!(
                 "relationship '{relationship_id}' is not an internal slide-layout relationship"
@@ -683,7 +706,10 @@ fn validate_master_layouts(package: &OpcPackage, master_part: &dyn litchi_opc::p
         // master that references it.
         let mut back_reference = None;
         for candidate in layout_part.rels().iter() {
-            if matches!(candidate.reltype(), rt::SLIDE_MASTER | STRICT_SLIDE_MASTER_REL) {
+            if matches!(
+                candidate.reltype(),
+                rt::SLIDE_MASTER | STRICT_SLIDE_MASTER_REL
+            ) {
                 if back_reference.is_some() {
                     return Err(OoxmlError::InvalidRelationship(format!(
                         "slide layout '{layout_name}' has multiple slide-master relationships"
@@ -752,7 +778,11 @@ fn push_text_style_levels(xml: &mut String) {
 }
 
 /// Serialize a new slide layout part.
-fn layout_xml(kind: SlideLayoutKind, name: &str, placeholders: &[PlaceholderSpec]) -> Result<String> {
+fn layout_xml(
+    kind: SlideLayoutKind,
+    name: &str,
+    placeholders: &[PlaceholderSpec],
+) -> Result<String> {
     let mut xml = String::with_capacity(2048);
     xml.push_str(XML_DECL);
     let _ = write!(
@@ -767,9 +797,13 @@ fn layout_xml(kind: SlideLayoutKind, name: &str, placeholders: &[PlaceholderSpec
         let shape_id = FIRST_SHAPE_ID + offset as u32;
         xml.push_str(&placeholder_shape_xml(shape_id, spec, false));
     }
-    xml.push_str("</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>");
+    xml.push_str(
+        "</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>",
+    );
     if xml.len() > MAX_PART_XML_BYTES {
-        return Err(invalid("generated slide layout exceeds the part size limit"));
+        return Err(invalid(
+            "generated slide layout exceeds the part size limit",
+        ));
     }
     Ok(xml)
 }
@@ -779,7 +813,11 @@ fn layout_xml(kind: SlideLayoutKind, name: &str, placeholders: &[PlaceholderSpec
 /// When `declare_namespaces` is set the shape carries its own `xmlns`
 /// declarations so it can be patched into a part with unknown prefix
 /// bindings.
-fn placeholder_shape_xml(shape_id: u32, spec: &PlaceholderSpec, declare_namespaces: bool) -> String {
+fn placeholder_shape_xml(
+    shape_id: u32,
+    spec: &PlaceholderSpec,
+    declare_namespaces: bool,
+) -> String {
     let name = spec
         .name
         .clone()
@@ -861,7 +899,8 @@ fn scan_element_span(xml: &[u8], target: &str, depth: usize) -> Result<Option<El
                 if nodes > MAX_SCAN_NODES || stack.len() >= MAX_SCAN_DEPTH {
                     return Err(invalid("part XML resource limit exceeded"));
                 }
-                let local = String::from_utf8_lossy(local_name(element.name().as_ref())).into_owned();
+                let local =
+                    String::from_utf8_lossy(local_name(element.name().as_ref())).into_owned();
                 stack.push((before, local));
             },
             Ok(Event::Empty(element)) => {
@@ -927,9 +966,8 @@ fn insert_id_list_entry(
         }
         return insert_bytes(xml, span.close_start, entry.as_bytes());
     }
-    let wrapped = format!(
-        "<p:{list_local} xmlns:p=\"{P_NS}\" xmlns:r=\"{R_NS}\">{entry}</p:{list_local}>"
-    );
+    let wrapped =
+        format!("<p:{list_local} xmlns:p=\"{P_NS}\" xmlns:r=\"{R_NS}\">{entry}</p:{list_local}>");
     let offset = match anchor {
         IdListAnchor::AfterRootStart => root_start_end(xml)?,
         IdListAnchor::AfterElement(anchor_local) => {
@@ -1187,7 +1225,8 @@ fn shape_id_within(bytes: &[u8]) -> Result<u32> {
                 if local_name(element.name().as_ref()) == b"cNvPr" =>
             {
                 for attribute in element.attributes().with_checks(true) {
-                    let attribute = attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    let attribute =
+                        attribute.map_err(|error| OoxmlError::Xml(error.to_string()))?;
                     if attribute.key.as_ref() == b"id" {
                         let value = std::str::from_utf8(attribute.value.as_ref())
                             .map_err(|error| OoxmlError::Xml(error.to_string()))?;
@@ -1420,25 +1459,19 @@ fn theme_target_for_new_master(
             continue;
         }
         for relationship in part.rels().iter() {
-            if relationship.reltype() == rt::THEME && !relationship.is_external() {
-                if let Ok(target) = relationship.target_partname() {
-                    if package.get_part(&target).is_ok() {
-                        return Ok((
-                            relative_target(master_dir, target.as_str())?,
-                            None,
-                        ));
-                    }
-                }
+            if relationship.reltype() == rt::THEME
+                && !relationship.is_external()
+                && let Ok(target) = relationship.target_partname()
+                && package.get_part(&target).is_ok()
+            {
+                return Ok((relative_target(master_dir, target.as_str())?, None));
             }
         }
     }
     // Otherwise reuse any existing theme part.
     for part in package.iter_parts() {
         if part.content_type() == ct::OFC_THEME {
-            return Ok((
-                relative_target(master_dir, part.partname().as_str())?,
-                None,
-            ));
+            return Ok((relative_target(master_dir, part.partname().as_str())?, None));
         }
     }
     // Otherwise author a fresh theme part from the default template.
@@ -1525,9 +1558,9 @@ fn require_placeholders(placeholders: &[PlaceholderSpec]) -> Result<()> {
 }
 
 fn invalidate_signatures(package: &mut OpcPackage) -> Result<()> {
-    package
-        .clear_digital_signatures()
-        .map_err(|error| OoxmlError::Other(format!("cannot invalidate package signatures: {error}")))
+    package.clear_digital_signatures().map_err(|error| {
+        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
+    })
 }
 
 // ============================================================================
@@ -1567,7 +1600,12 @@ mod tests {
             )
             .unwrap();
         let blank_layout = package
-            .add_slide_layout(&master.part_name, SlideLayoutKind::Blank, "Custom Blank", &[])
+            .add_slide_layout(
+                &master.part_name,
+                SlideLayoutKind::Blank,
+                "Custom Blank",
+                &[],
+            )
             .unwrap();
         assert!(title_layout.layout_id >= MIN_MASTER_OR_LAYOUT_ID);
         assert!(blank_layout.layout_id >= MIN_MASTER_OR_LAYOUT_ID);
@@ -1602,9 +1640,7 @@ mod tests {
 
         let authored = masters
             .iter()
-            .find(|candidate| {
-                candidate.part().part().partname().as_str() == master.part_name
-            })
+            .find(|candidate| candidate.part().part().partname().as_str() == master.part_name)
             .expect("authored master must resolve through the presentation");
 
         // Default text styles: title/body/other with nine levels each.
@@ -1674,8 +1710,7 @@ mod tests {
         let default_master = masters
             .iter()
             .find(|candidate| {
-                candidate.part().part().partname().as_str()
-                    == "/ppt/slideMasters/slideMaster1.xml"
+                candidate.part().part().partname().as_str() == "/ppt/slideMasters/slideMaster1.xml"
             })
             .unwrap();
         assert_eq!(default_master.slide_layouts().unwrap().len(), 11);
@@ -1693,7 +1728,15 @@ mod tests {
         package.validate_master_layout_graph().unwrap();
 
         let reopened = roundtrip(&package);
-        assert_eq!(reopened.presentation().unwrap().slide_masters().unwrap().len(), 4);
+        assert_eq!(
+            reopened
+                .presentation()
+                .unwrap()
+                .slide_masters()
+                .unwrap()
+                .len(),
+            4
+        );
         reopened.validate_master_layout_graph().unwrap();
     }
 
@@ -1743,12 +1786,7 @@ mod tests {
         // Master part name pointing at a non-master part.
         assert!(
             package
-                .add_slide_layout(
-                    "/ppt/presentation.xml",
-                    SlideLayoutKind::Blank,
-                    "Nope",
-                    &[],
-                )
+                .add_slide_layout("/ppt/presentation.xml", SlideLayoutKind::Blank, "Nope", &[],)
                 .is_err()
         );
         // Placeholder authoring on a part that is not a master or layout.

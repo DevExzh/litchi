@@ -45,10 +45,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
                 .with_fill(0xEE, 0xEE, 0xFF)
                 .with_line(0x40, 0x40, 0x40),
             FloatingPosition::new(1000, 500)
-                .with_origins(
-                    ShapeHorizontalOrigin::Page,
-                    ShapeVerticalOrigin::Paragraph,
-                )
+                .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
                 .with_text_wrap(ShapeTextWrap::None)
                 .behind_text(true),
             "Watermark\nDraft",

@@ -45,7 +45,10 @@ fn content_rsid_markers_round_trip_through_the_writer() {
         r"\sectrsid46",
         r"\tblrsid47",
     ] {
-        assert!(serialized.contains(marker), "missing {marker} in {serialized}");
+        assert!(
+            serialized.contains(marker),
+            "missing {marker} in {serialized}"
+        );
     }
 
     let reparsed = RtfDocument::parse(&serialized).unwrap();

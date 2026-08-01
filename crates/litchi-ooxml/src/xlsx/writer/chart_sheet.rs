@@ -109,9 +109,7 @@ pub(crate) fn validate_sheet_name(name: &str) -> SheetResult<()> {
         return Err("sheet name 'History' is reserved by Excel".into());
     }
     if name.starts_with('\'') || name.ends_with('\'') {
-        return Err(
-            format!("sheet name '{name}' must not start or end with an apostrophe").into(),
-        );
+        return Err(format!("sheet name '{name}' must not start or end with an apostrophe").into());
     }
     Ok(())
 }

@@ -116,8 +116,14 @@ impl MasterSubdocument {
                 "master subdocument requires a non-empty inert href".to_string(),
             ));
         }
-        if self.xlink_type.as_deref().is_some_and(|value| value != "simple")
-            || self.xlink_show.as_deref().is_some_and(|value| value != "embed")
+        if self
+            .xlink_type
+            .as_deref()
+            .is_some_and(|value| value != "simple")
+            || self
+                .xlink_show
+                .as_deref()
+                .is_some_and(|value| value != "embed")
         {
             return Err(Error::InvalidFormat(
                 "master subdocument requires simple/embed XLink behavior".to_string(),
@@ -259,10 +265,7 @@ impl MasterDocument {
     }
 
     /// Open and validate an encrypted master package.
-    pub fn open_with_password(
-        path: impl AsRef<Path>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
         Self::from_bytes_with_password(std::fs::read(path)?, password)
     }
 
@@ -382,9 +385,10 @@ pub(crate) fn validate_master_content_xml(
     let mut buffer = Vec::new();
     let mut ids = std::collections::HashSet::new();
     loop {
-        match reader.read_event_into(&mut buffer).map_err(|error| {
-            Error::InvalidFormat(format!("invalid master XML: {error}"))
-        })? {
+        match reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid master XML: {error}")))?
+        {
             Event::Start(element) | Event::Empty(element) => {
                 if element_matches(&reader, &element, TEXT_NAMESPACE, "section") {
                     let parsed_section = parse_section(&reader, &element)?;
@@ -434,11 +438,16 @@ fn element_matches(
 fn validate_xml_id(value: &str) -> Result<()> {
     let mut chars = value.chars();
     let Some(first) = chars.next() else {
-        return Err(Error::InvalidFormat("master xml:id cannot be empty".to_string()));
+        return Err(Error::InvalidFormat(
+            "master xml:id cannot be empty".to_string(),
+        ));
     };
     if !(first == '_' || first.is_alphabetic())
         || chars.any(|character| {
-            !(character == '_' || character == '-' || character == '.' || character.is_alphanumeric())
+            !(character == '_'
+                || character == '-'
+                || character == '.'
+                || character.is_alphanumeric())
         })
     {
         return Err(Error::InvalidFormat(format!(

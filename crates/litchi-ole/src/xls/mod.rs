@@ -295,27 +295,26 @@ mod pivot_olap;
 /// routing-slip records (`DocRoute`, `RecipName`).
 mod user_routing;
 
+#[forbid(unsafe_code)]
+mod pivot_editor;
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 pub mod pivot_table;
-#[forbid(unsafe_code)]
-mod pivot_editor;
 pub use pivot_editor::XlsPivotViewEditor;
 mod ole_object;
 pub use ole_object::{
-    XlsCheckState, XlsDropDownStyle, XlsEditBoxValidation, XlsFormControl, XlsFtCblsData,
-    XlsFtCmo, XlsFtEdoData, XlsFtGboData, XlsFtLbsData, XlsFtPictFmla, XlsFtPioGrbit,
-    XlsFtRboData, XlsFtSbs, XlsLbsDropData, XlsLbsItem, XlsListBehaviorClass,
-    XlsListSelectionType, XlsObjSubrecord, XlsObjectType, XlsOleObjectEditor,
-    XlsOleObjectRecord,
+    XlsCheckState, XlsDropDownStyle, XlsEditBoxValidation, XlsFormControl, XlsFtCblsData, XlsFtCmo,
+    XlsFtEdoData, XlsFtGboData, XlsFtLbsData, XlsFtPictFmla, XlsFtPioGrbit, XlsFtRboData, XlsFtSbs,
+    XlsLbsDropData, XlsLbsItem, XlsListBehaviorClass, XlsListSelectionType, XlsObjSubrecord,
+    XlsObjectType, XlsOleObjectEditor, XlsOleObjectRecord,
 };
 pub use pivot_table::{
     PageFieldEntry, PivotAdditionalExtension, PivotAxis, PivotAxisField, PivotCache,
     PivotCacheDateGroupUnit, PivotCacheDateGrouping, PivotCacheDateTime,
     PivotCacheDiscreteGrouping, PivotCacheError, PivotCacheField, PivotCacheGrouping,
     PivotCacheItem, PivotCacheNumericGrouping, PivotDataItem, PivotFunction, PivotItemType,
-    PivotLayoutLine, PivotPageSelection, PivotQueryTag, PivotSourceType, PivotTable, PivotViewDef, PivotViewEx9,
-    PivotViewExtension, PivotViewField, PivotViewFieldExtension, PivotViewItem,
+    PivotLayoutLine, PivotPageSelection, PivotQueryTag, PivotSourceType, PivotTable, PivotViewDef,
+    PivotViewEx9, PivotViewExtension, PivotViewField, PivotViewFieldExtension, PivotViewItem,
 };
 
 /// Sheet protection parsing (PROTECT, OBJECTPROTECT, SCENPROTECT, PASSWORD)
@@ -335,17 +334,32 @@ pub use autofilter12::{
     XlsAutoFilter12FormatKind, XlsAutoFilter12Icon, XlsAutoFilter12IconSet,
     XlsAutoFilter12Operator, XlsAutoFilter12Value, XlsTableAutoFilter12,
 };
+pub use axes_used::{XlsAxesUsed, XlsAxesUsedCount, XlsAxisGroupPosition, XlsAxisParent};
+pub use background_picture::{XlsBackgroundImage, XlsBackgroundImageFormat};
+pub use backup::XlsBackup;
+pub use book_ext::{
+    XlsBookExt, XlsBookExtConditional11, XlsBookExtConditional12, XlsFactoidDisplay,
+};
+pub use bop_pop::{XlsBopPop, XlsBopPopSplit, XlsBopPopSubtype};
+pub use bop_pop_custom::XlsBopPopCustom;
 pub use border_fill::{XlsBorderSide, XlsBorderStyle, XlsCellBorders, XlsCellFill, XlsFillPattern};
 pub use calculation::{
     XlsCalculationMode, XlsMultithreadedCalculation, XlsReferenceMode, XlsWorkbookCalculation,
     XlsWorksheetCalculation,
 };
+pub use cell::XlsCell;
+pub use cell_watch::XlsCellWatch;
 pub use chart::*;
+pub use chart_3d::XlsChart3d;
+pub use chart_3d_bar_shape::{XlsChart3DBarShape, XlsChart3DRiserShape, XlsChart3DTaper};
 pub use chart_frt::{
     XlsCatLab, XlsCatLabAlignment, XlsChartBlockObjectKind, XlsChartFrtInfo, XlsChartFrtVersion,
     XlsChartFutureRecordRange, XlsEndBlock, XlsStartBlock,
 };
-pub use cell::XlsCell;
+pub use chart_frt_wrapper::{XlsEndObject, XlsFrtObjectKind, XlsFrtWrapper, XlsStartObject};
+pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
+pub use chart_markers::{XlsBegin, XlsEnd, XlsPlotArea};
+pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
 pub use comments::CommentVisibility;
 pub use conditional_format::{
     XlsConditionalAlignment, XlsConditionalBorder, XlsConditionalComparison,
@@ -358,6 +372,15 @@ pub use consolidation::{
     XlsConsolidation, XlsConsolidationBuiltInName, XlsConsolidationFile, XlsConsolidationFunction,
     XlsConsolidationRange, XlsConsolidationSource,
 };
+pub use crt_line_link::{XlsCrtLine, XlsCrtLineKind, XlsCrtLink};
+pub use crt_ml_frt::XlsCrtMlFrt;
+pub use custom_view::{
+    XlsChartSheetCustomViewBegin, XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay,
+    XlsCustomViewTopLeft, XlsSheetCustomView, XlsSheetCustomViewBegin, XlsSheetCustomViewEnd,
+    XlsWorkbookCustomView,
+};
+pub use data_label_ext::{XlsDataLabExt, XlsDataLabExtContents};
+pub use data_table::{XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange};
 pub use data_validation::{
     XlsDataValidationErrorStyle, XlsDataValidationFormula, XlsDataValidationImeMode,
     XlsDataValidationKind, XlsDataValidationOperator, XlsDataValidationRange,
@@ -372,19 +395,25 @@ pub use differential_format::{
     XlsXfFontScheme, XlsXfFontWeight, XlsXfGradient, XlsXfGradientStop, XlsXfProperties,
     XlsXfProperty,
 };
+pub use encryption::XlsEncryptionProfile;
+pub use ent_ex_u2::XlsEntExU2;
 pub use environment::{XlsLinkUpdateMode, XlsObjectDisplayMode, XlsWorkbookEnvironment};
 pub use error::{XlsEncryptionKind, XlsError, XlsResult};
-pub use encryption::XlsEncryptionProfile;
 pub use external_link::{
     XlsDdeOleValueMatrix, XlsExternalCacheRow, XlsExternalCachedError, XlsExternalCachedValue,
     XlsExternalClipboardFormat, XlsExternalLinks, XlsExternalName, XlsExternalNameBody,
     XlsExternalSheet, XlsExternalSheetReference, XlsExternalWorkbook, XlsSupportingBook,
 };
+pub use fbi::{XlsFbi, XlsFontScaleBasis};
 pub use font::{XlsFont, XlsFontCharset, XlsFontEscapement, XlsFontFamily, XlsFontUnderline};
+pub use force_full_calculation::XlsForceFullCalculation;
 pub use formula_errors::{
     XlsFormulaErrorChecks, XlsFormulaErrorFeature, XlsFormulaErrorHeader, XlsFormulaErrorRange,
 };
+pub use frame::{XlsFrame, XlsFrameType};
 pub use function_group::{XlsBuiltInFunctionCategories, XlsFunctionGroups};
+pub use header_footer_picture::XlsHeaderFooterPicture;
+pub use interface_records::{XlsInterfaceEnd, XlsInterfaceHdr};
 pub use layout::{XlsColumnLayout, XlsRowLayout};
 pub use leniency::{XlsFormattingDefect, XlsLeniency, XlsToleranceReport, XlsToleratedDefect};
 pub use list_object::{
@@ -396,66 +425,42 @@ pub use list_object::{
     XlsWebReadingOrder, XlsWebTableField, XlsWebTableMetadata, XlsXmlColumnMapping, XlsXmlDataType,
     XlsXmlTableField, XlsXmlTableMetadata,
 };
+pub use marker_format::{XlsChartRgb, XlsDataMarkerKind, XlsMarkerFormat};
+pub use mdx_metadata::{
+    XlsCubeFunction, XlsKpiProperty, XlsMdb, XlsMdtInfo, XlsMdtInfoFlags, XlsMdxKpi,
+    XlsMdxMetadata, XlsMdxMetadataDir, XlsMdxMetadataRecord, XlsMdxProp, XlsMdxSet,
+    XlsMdxSetSortOrder, XlsMdxTuple,
+};
 pub use number_format::{
     XlsDateSystem, XlsEffectiveExtendedFormat, XlsExtendedFormat, XlsExtendedFormatApplications,
     XlsExtendedFormatKind, XlsFormatting, XlsNumberFormat,
 };
+pub use object_link::{XlsObjectLink, XlsObjectLinkTarget};
 pub use page_setup::{
     XlsHeaderFooter, XlsPageBreak, XlsPageSetup, XlsPrintComments, XlsPrintErrors, XlsPrintOrder,
     XlsPrintOrientation, XlsPrintSetup,
 };
 pub use palette::{XlsColor, XlsPalette};
-pub use print_flags::{XlsGridSet, XlsPrintRowCol};
-pub use crt_ml_frt::XlsCrtMlFrt;
-pub use chart_layout::{XlsCrtLayout12, XlsCrtLayout12A, XlsCrtLayout12Mode};
-pub use chart_3d_bar_shape::{XlsChart3DBarShape, XlsChart3DRiserShape, XlsChart3DTaper};
-pub use chart_frt_wrapper::{XlsEndObject, XlsFrtObjectKind, XlsFrtWrapper, XlsStartObject};
-pub use crt_line_link::{XlsCrtLine, XlsCrtLineKind, XlsCrtLink};
-pub use marker_format::{XlsChartRgb, XlsDataMarkerKind, XlsMarkerFormat};
-pub use object_link::{XlsObjectLink, XlsObjectLinkTarget};
+pub use phonetic_info::{
+    XlsPhoneticAlignment, XlsPhoneticFormat, XlsPhoneticInfo, XlsPhoneticRange, XlsPhoneticType,
+};
 pub use pie_format::XlsPieFormat;
-pub use ser_parent::XlsSerParent;
-pub use uses_elfs::XlsUsesElfs;
-pub use ent_ex_u2::XlsEntExU2;
-pub use fbi::{XlsFbi, XlsFontScaleBasis};
-pub use ser_aux_err_bar::{XlsErrorBarDirection, XlsErrorBarSource, XlsSerAuxErrBar};
-pub use ser_aux_trend::{XlsSerAuxTrend, XlsTrendlineKind};
-pub use ser_fmt::XlsSerFmt;
-pub use axes_used::{XlsAxesUsed, XlsAxesUsedCount, XlsAxisGroupPosition, XlsAxisParent};
-pub use bop_pop::{XlsBopPop, XlsBopPopSplit, XlsBopPopSubtype};
-pub use chart_markers::{XlsBegin, XlsEnd, XlsPlotArea};
-pub use bop_pop_custom::XlsBopPopCustom;
-pub use chart_3d::XlsChart3d;
-pub use data_label_ext::{XlsDataLabExt, XlsDataLabExtContents};
-pub use frame::{XlsFrame, XlsFrameType};
+pub use pivot_olap::{
+    XlsHiddenMemberSet, XlsPivotFieldOlapExt, XlsPivotHierarchy, XlsPivotHierarchyAxis,
+    XlsPivotItemOlapFlags, XlsPivotPageItemOlapExt, XlsPivotViewOlapHeader,
+};
 pub use plot_growth::{XlsFixedPoint, XlsPlotGrowth};
-pub use scl::XlsScl;
-pub use chart_property_stream::{XlsRichTextStream, XlsShapePropsStream, XlsTextPropsStream};
-pub use force_full_calculation::XlsForceFullCalculation;
-pub use backup::XlsBackup;
-pub use background_picture::{XlsBackgroundImage, XlsBackgroundImageFormat};
-pub use cell_watch::XlsCellWatch;
-pub use header_footer_picture::XlsHeaderFooterPicture;
-pub use interface_records::{XlsInterfaceEnd, XlsInterfaceHdr};
+pub use print_flags::{XlsGridSet, XlsPrintRowCol};
 pub use printer_driver::XlsPrinterDriverData;
-pub use sxview_link::XlsSXViewLink;
 pub use query_table::{
     XlsHtmlFormatting, XlsOleDbConnection, XlsQueryParameter, XlsQueryParameterType,
     XlsQuerySource, XlsQueryTable, XlsTextCodePage, XlsTextDelimiter, XlsTextField,
     XlsTextFieldFormat, XlsTextQuery,
 };
 pub use real_time_data::{XlsRealTimeData, XlsRtdCell, XlsRtdValue};
-pub use mdx_metadata::{
-    XlsCubeFunction, XlsKpiProperty, XlsMdb, XlsMdtInfo, XlsMdtInfoFlags, XlsMdxKpi,
-    XlsMdxMetadata, XlsMdxMetadataDir, XlsMdxMetadataRecord, XlsMdxProp, XlsMdxSet,
-    XlsMdxSetSortOrder, XlsMdxTuple,
-};
-pub use pivot_olap::{
-    XlsHiddenMemberSet, XlsPivotFieldOlapExt, XlsPivotHierarchy, XlsPivotHierarchyAxis,
-    XlsPivotItemOlapFlags, XlsPivotPageItemOlapExt, XlsPivotViewOlapHeader,
-};
-pub use user_routing::{
-    XlsCUsr, XlsCbUsr, XlsDocRoute, XlsRecipName, XlsRoutingDelivery, XlsUsrInfo,
+pub use records::{
+    PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
+    SharedStringProperties,
 };
 pub use revision_log::{
     REVISION_LOG_STREAM_NAME, XlsOpaqueRevisionRecord, XlsRevision, XlsRevisionChange,
@@ -468,34 +473,17 @@ pub use revision_records::{
     XlsRrdChgCell, XlsRrdConflict, XlsRrdHead, XlsRrdInfo, XlsRrdInsDel, XlsRrdMove,
     XlsRrdRenSheet, XlsRrdUserView, XlsShortDtr, XlsUsrExcl,
 };
-pub use web_pub::{XlsWebPageType, XlsWebPub, XlsWebPubRange, XlsWebSourceType};
-pub use records::{
-    PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedStringFormatRun,
-    SharedStringProperties,
-};
 pub use row_block_index::{
     XlsDbCellRecord, XlsIndexedRow, XlsRowBlock, XlsRowBlockIndex, XlsWorksheetIndexRecord,
 };
 pub use scenario::{XlsScenario, XlsScenarioCell, XlsScenarioManager, XlsScenarioRange};
+pub use scl::XlsScl;
+pub use ser_aux_err_bar::{XlsErrorBarDirection, XlsErrorBarSource, XlsSerAuxErrBar};
+pub use ser_aux_trend::{XlsSerAuxTrend, XlsTrendlineKind};
+pub use ser_fmt::XlsSerFmt;
+pub use ser_parent::XlsSerParent;
 pub use shapes::XlsShape;
 pub use shared_string_index::{XlsSharedStringBucket, XlsSharedStringIndex};
-pub use xf_ext::{XlsExtProp, XlsFullColorExt, XlsFullColorType, XlsXfExt};
-pub use style_ext::{XlsStyleCategory, XlsStyleExt};
-pub use theme::XlsTheme;
-pub use phonetic_info::{
-    XlsPhoneticAlignment, XlsPhoneticFormat, XlsPhoneticInfo, XlsPhoneticRange, XlsPhoneticType,
-};
-pub use custom_view::{
-    XlsChartSheetCustomViewBegin, XlsCustomViewHiddenRows, XlsCustomViewNoteDisplay,
-    XlsCustomViewTopLeft, XlsSheetCustomView, XlsSheetCustomViewBegin, XlsSheetCustomViewEnd,
-    XlsWorkbookCustomView,
-};
-pub use data_table::{
-    XlsDataTable, XlsDataTableInputCell, XlsDataTableKind, XlsDataTableRange,
-};
-pub use book_ext::{
-    XlsBookExt, XlsBookExtConditional11, XlsBookExtConditional12, XlsFactoidDisplay,
-};
 pub use sheet_ext::{XlsSheetExt, XlsSheetExtOptional};
 pub use sheet_layout::XlsWorksheetLayout;
 pub use sheet_metadata::{XlsSheetKind, XlsSheetMetadata, XlsSheetVisibility};
@@ -504,12 +492,20 @@ pub use sort_data::{
     XlsSortCondition, XlsSortData, XlsSortIcon, XlsSortIconSet, XlsSortMethod, XlsSortOn,
     XlsSortOrientation, XlsSortParent, XlsSortRange, parse_sort_data,
 };
+pub use style_ext::{XlsStyleCategory, XlsStyleExt};
+pub use sxview_link::XlsSXViewLink;
 pub use table_styles::{
     XlsDifferentialFormatId, XlsTableStyle, XlsTableStyleElement, XlsTableStyleRegion,
     XlsTableStyles,
 };
+pub use theme::XlsTheme;
+pub use user_routing::{
+    XlsCUsr, XlsCbUsr, XlsDocRoute, XlsRecipName, XlsRoutingDelivery, XlsUsrInfo,
+};
+pub use uses_elfs::XlsUsesElfs;
 pub use vba::{XlsVbaMetadata, XlsVbaProjectStorage};
 pub use view::{XlsPane, XlsPaneType, XlsSelection, XlsSelectionRange, XlsWorksheetView};
+pub use web_pub::{XlsWebPageType, XlsWebPub, XlsWebPubRange, XlsWebSourceType};
 pub use workbook::{XlsOpenOptions, XlsWorkbook};
 pub use workbook_view::{XlsWorkbookView, XlsWorkbookWindow};
 pub use worksheet::XlsWorksheet;
@@ -517,3 +513,4 @@ pub use writer::{
     XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeKind, XlsShapeLine, XlsShapeText,
     XlsShapeTextRun, XlsShapeWrite, XlsWriter,
 };
+pub use xf_ext::{XlsExtProp, XlsFullColorExt, XlsFullColorType, XlsXfExt};

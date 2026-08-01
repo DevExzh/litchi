@@ -972,18 +972,20 @@ fn validate_scalar_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
         },
         "XMColumnSegment" => ranged("Mask", 0, 2)?,
         "XMColumnSegmentStats"
-            if parse_i64(required_property(object, "RLESortOrder")?, "RLESortOrder")? != -1 => {
-                return Err(XldmMetadataError::new(
-                    "XMColumnSegmentStats.RLESortOrder MUST be -1",
-                ));
-            },
+            if parse_i64(required_property(object, "RLESortOrder")?, "RLESortOrder")? != -1 =>
+        {
+            return Err(XldmMetadataError::new(
+                "XMColumnSegmentStats.RLESortOrder MUST be -1",
+            ));
+        },
         "XMRLECompressionInfo"
             if parse_bool(
                 required_property(object, "SegmentNeedsResizing")?,
                 "SegmentNeedsResizing",
-            )? => {
-                return Err(XldmMetadataError::new("SegmentNeedsResizing MUST be false"));
-            },
+            )? =>
+        {
+            return Err(XldmMetadataError::new("SegmentNeedsResizing MUST be false"));
+        },
         _ => {},
     }
     Ok(())
@@ -1065,12 +1067,12 @@ fn validate_nested_constraints(object: &XldmMetadataObject) -> XldmMetadataResul
                     "XMRelationshipIndexSparseDIDs"
                         | "XMRelationshipIndexDenseDIDs"
                         | "XMRelationshipIndex123DIDs"
-                ))
-            => {
-                return Err(XldmMetadataError::new(
-                    "XMRelationship requires one relationship index object",
-                ));
-            },
+                )) =>
+        {
+            return Err(XldmMetadataError::new(
+                "XMRelationship requires one relationship index object",
+            ));
+        },
         "XMColumnSegment" => require_member_classes(
             object,
             &[

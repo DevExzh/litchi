@@ -431,12 +431,12 @@ fn parse_setup(
     }
     setup.printer_settings_relationship_id =
         relationship_attribute_value(element, b"id", decoder, resolver)?;
-    if let Some(id) = setup.printer_settings_relationship_id.as_ref() {
-        if id.is_empty() || id.len() > MAX_RELATIONSHIP_ID_BYTES {
-            return Err(invalid(
-                "invalid pageSetup printer-settings relationship id",
-            ));
-        }
+    if let Some(id) = setup.printer_settings_relationship_id.as_ref()
+        && (id.is_empty() || id.len() > MAX_RELATIONSHIP_ID_BYTES)
+    {
+        return Err(invalid(
+            "invalid pageSetup printer-settings relationship id",
+        ));
     }
     Ok(setup)
 }

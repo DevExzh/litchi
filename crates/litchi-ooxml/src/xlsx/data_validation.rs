@@ -1,8 +1,8 @@
 //! Immutable static XLSX data-validation read model.
 
-use litchi_ooxml_common::xml::decode_xml_reference;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape::escape_xml;
+use litchi_ooxml_common::xml::decode_xml_reference;
 use litchi_ooxml_common::{ExpandedName, MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::Writer;
 use quick_xml::encoding::Decoder;

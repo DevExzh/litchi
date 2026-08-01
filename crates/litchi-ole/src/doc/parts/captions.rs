@@ -367,9 +367,9 @@ impl CaptionLabelTable {
         let mut offset = 6usize;
         for index in 0..count {
             let (label, next) = parse_string(data, offset, MAX_LABEL_UNITS, "SttbfCaption", index)?;
-            let extra = data
-                .get(next..next + CAPI_SIZE)
-                .ok_or_else(|| corrupted(format!("SttbfCaption entry {index} CAPI is truncated")))?;
+            let extra = data.get(next..next + CAPI_SIZE).ok_or_else(|| {
+                corrupted(format!("SttbfCaption entry {index} CAPI is truncated"))
+            })?;
             definitions.push(CaptionDefinition::try_new(
                 label,
                 CaptionInfo::from_bytes(extra)?,
@@ -433,7 +433,8 @@ impl AutoCaptionTable {
         let mut entries = Vec::with_capacity(count);
         let mut offset = 6usize;
         for index in 0..count {
-            let (prog_id, next) = parse_string(data, offset, u16::MAX as usize, "SttbfAutoCaption", index)?;
+            let (prog_id, next) =
+                parse_string(data, offset, u16::MAX as usize, "SttbfAutoCaption", index)?;
             let caption_index = read_u16(
                 data,
                 next,
@@ -491,10 +492,14 @@ impl CaptionTables {
         let captions = parse_fib_table(fib, table_stream, CAPTION_FIB_INDEX, "SttbfCaption")?
             .map(CaptionLabelTable::parse_bytes)
             .transpose()?;
-        let auto_captions =
-            parse_fib_table(fib, table_stream, AUTO_CAPTION_FIB_INDEX, "SttbfAutoCaption")?
-                .map(AutoCaptionTable::parse_bytes)
-                .transpose()?;
+        let auto_captions = parse_fib_table(
+            fib,
+            table_stream,
+            AUTO_CAPTION_FIB_INDEX,
+            "SttbfAutoCaption",
+        )?
+        .map(AutoCaptionTable::parse_bytes)
+        .transpose()?;
         if let Some(auto_captions) = &auto_captions {
             let caption_count = captions.as_ref().map_or(0, CaptionLabelTable::len);
             for (index, entry) in auto_captions.entries().iter().enumerate() {
@@ -534,7 +539,8 @@ fn parse_fib_table<'a>(
     if length == 0 {
         return Ok(None);
     }
-    let start = usize::try_from(offset).map_err(|_| corrupted(format!("{name} offset is too large")))?;
+    let start =
+        usize::try_from(offset).map_err(|_| corrupted(format!("{name} offset is too large")))?;
     let length =
         usize::try_from(length).map_err(|_| corrupted(format!("{name} length is too large")))?;
     let end = start
@@ -642,7 +648,10 @@ mod tests {
         let definitions = [
             caption("Equation", simple_info()),
             caption("Figure", chapter_info()),
-            caption("Table", CaptionInfo::new(CaptionLocation::Below, None, true, 1)),
+            caption(
+                "Table",
+                CaptionInfo::new(CaptionLocation::Below, None, true, 1),
+            ),
         ];
         let bytes = caption_sttb(&definitions);
         let table = CaptionLabelTable::parse_bytes(&bytes).unwrap();
@@ -748,18 +757,28 @@ mod tests {
 
     #[test]
     fn parses_both_tables_through_fib_with_index_bounds() {
-        let captions = caption_sttb(&[caption("Equation", simple_info()), caption("Figure", chapter_info())]);
+        let captions = caption_sttb(&[
+            caption("Equation", simple_info()),
+            caption("Figure", chapter_info()),
+        ]);
         let auto = auto_caption_sttb(&[AutoCaptionEntry::new("Equation.3".to_string(), 1)]);
         let mut table_stream = vec![0u8; 16];
         table_stream.extend_from_slice(&captions);
         table_stream.extend_from_slice(&auto);
         let fib = fib_with_pointers(&[
             (CAPTION_FIB_INDEX, 16, captions.len() as u32),
-            (AUTO_CAPTION_FIB_INDEX, (16 + captions.len()) as u32, auto.len() as u32),
+            (
+                AUTO_CAPTION_FIB_INDEX,
+                (16 + captions.len()) as u32,
+                auto.len() as u32,
+            ),
         ]);
         let tables = CaptionTables::parse(&fib, &table_stream).unwrap();
         assert_eq!(tables.captions().unwrap().len(), 2);
-        assert_eq!(tables.auto_captions().unwrap().entries()[0].caption_index(), 1);
+        assert_eq!(
+            tables.auto_captions().unwrap().entries()[0].caption_index(),
+            1
+        );
     }
 
     #[test]
@@ -770,7 +789,11 @@ mod tests {
         table_stream.extend_from_slice(&auto);
         let fib = fib_with_pointers(&[
             (CAPTION_FIB_INDEX, 0, captions.len() as u32),
-            (AUTO_CAPTION_FIB_INDEX, captions.len() as u32, auto.len() as u32),
+            (
+                AUTO_CAPTION_FIB_INDEX,
+                captions.len() as u32,
+                auto.len() as u32,
+            ),
         ]);
         assert!(CaptionTables::parse(&fib, &table_stream).is_err());
         // AutoCaption entries without any label table are also rejected.
@@ -791,6 +814,11 @@ mod tests {
         assert!(CaptionTables::parse(&fib, &captions).is_err());
         // Zero-length pointers mean the table is absent.
         let fib = fib_with_pointers(&[(CAPTION_FIB_INDEX, 4, 0)]);
-        assert!(CaptionTables::parse(&fib, &captions).unwrap().captions().is_none());
+        assert!(
+            CaptionTables::parse(&fib, &captions)
+                .unwrap()
+                .captions()
+                .is_none()
+        );
     }
 }

@@ -511,7 +511,9 @@ fn replace_span(xml: &str, span: &Span, value: &str) -> String {
 }
 fn expand_span(xml: &str, span: &Span, value: &str) -> Result<String> {
     let raw = &xml[span.start..span.end];
-    let slash = raw.rfind("/>").ok_or_else(|| bad("invalid empty element"))?;
+    let slash = raw
+        .rfind("/>")
+        .ok_or_else(|| bad("invalid empty element"))?;
     Ok(replace_span(
         xml,
         span,

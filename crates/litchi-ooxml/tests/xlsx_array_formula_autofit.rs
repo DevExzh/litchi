@@ -26,7 +26,10 @@ fn array_formulas_and_auto_sized_columns_survive_save_and_reopen() {
         .unwrap();
     let xml = std::str::from_utf8(worksheet_part.blob()).unwrap();
     assert!(xml.contains(r#"<f t="array" ref="A1:A3">ROW(A1:A3)*2</f>"#));
-    assert!(xml.contains(r#"width="22""#), "auto-sized column width: {xml}");
+    assert!(
+        xml.contains(r#"width="22""#),
+        "auto-sized column width: {xml}"
+    );
 
     let reopened = Workbook::open(&path).unwrap();
     let formulas = reopened.worksheet_array_formulas(0).unwrap();

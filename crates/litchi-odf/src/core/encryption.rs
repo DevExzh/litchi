@@ -39,7 +39,9 @@ pub enum OdfEncryptionCipher {
     Aes192Gcm,
     Aes256Gcm,
     /// Legacy Blowfish CFB8 with a key size in bytes from 4 through 56.
-    BlowfishCfb8 { key_size: u16 },
+    BlowfishCfb8 {
+        key_size: u16,
+    },
 }
 
 impl OdfEncryptionCipher {
@@ -63,7 +65,9 @@ pub enum OdfEncryptionStartKey {
 /// Password-based key derivation settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OdfEncryptionKdf {
-    Pbkdf2 { iterations: NonZeroU32 },
+    Pbkdf2 {
+        iterations: NonZeroU32,
+    },
     Argon2id {
         iterations: NonZeroU32,
         memory_kib: NonZeroU32,
@@ -86,7 +90,11 @@ impl OdfEncryptionProfile {
         start_key: OdfEncryptionStartKey,
         kdf: OdfEncryptionKdf,
     ) -> Result<Self> {
-        let profile = Self { cipher, start_key, kdf };
+        let profile = Self {
+            cipher,
+            start_key,
+            kdf,
+        };
         profile.validate()?;
         Ok(profile)
     }
@@ -157,11 +165,11 @@ impl OdfEncryptionProfile {
                     "Argon2id parameters exceed supported resource limits".to_string(),
                 ))
             },
-            OdfEncryptionKdf::Argon2id { .. } if !matches!(key_size, 16 | 24 | 32) => Err(
-                Error::InvalidFormat(
+            OdfEncryptionKdf::Argon2id { .. } if !matches!(key_size, 16 | 24 | 32) => {
+                Err(Error::InvalidFormat(
                     "Argon2id derived key size must be 16, 24, or 32 bytes".to_string(),
-                ),
-            ),
+                ))
+            },
             _ => Ok(()),
         }
     }
@@ -179,10 +187,8 @@ pub(crate) fn encrypt_entry(
         ));
     }
 
-    let mut encoder = flate2::write::DeflateEncoder::new(
-        Vec::new(),
-        flate2::Compression::default(),
-    );
+    let mut encoder =
+        flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
     encoder.write_all(plaintext)?;
     let compressed = encoder.finish()?;
 
@@ -290,7 +296,9 @@ fn encrypt_compressed(
             let encrypted = Encryptor::<$aes>::new_from_slices(key, &iv)
                 .map_err(|_| Error::InvalidFormat("Invalid AES-CBC key or IV".to_string()))?
                 .encrypt_padded::<NoPadding>(&mut padded, padded_len)
-                .map_err(|_| Error::InvalidFormat("Unable to encrypt ODF AES-CBC entry".to_string()))?
+                .map_err(|_| {
+                    Error::InvalidFormat("Unable to encrypt ODF AES-CBC entry".to_string())
+                })?
                 .to_vec();
             (encrypted, ManifestEncryptionAlgorithm::$variant { iv })
         }};
@@ -302,13 +310,9 @@ fn encrypt_compressed(
             let cipher = <$aes>::new_from_slice(key)
                 .map_err(|_| Error::InvalidFormat("Invalid AES-GCM key".to_string()))?;
             let mut encrypted = iv.to_vec();
-            encrypted.extend(
-                cipher
-                    .encrypt(&Nonce::from(iv), compressed)
-                    .map_err(|_| {
-                        Error::InvalidFormat("Unable to encrypt ODF AES-GCM entry".to_string())
-                    })?,
-            );
+            encrypted.extend(cipher.encrypt(&Nonce::from(iv), compressed).map_err(|_| {
+                Error::InvalidFormat("Unable to encrypt ODF AES-GCM entry".to_string())
+            })?);
             (encrypted, ManifestEncryptionAlgorithm::$variant { iv })
         }};
     }
@@ -365,7 +369,7 @@ pub(crate) fn decrypt_entry(
         ManifestEncryptionAlgorithm::Aes128Cbc { .. }
             | ManifestEncryptionAlgorithm::Aes192Cbc { .. }
             | ManifestEncryptionAlgorithm::Aes256Cbc { .. }
-    ) && ciphertext.len() % 16 != 0
+    ) && !ciphertext.len().is_multiple_of(16)
     {
         return Err(encryption_failure());
     }

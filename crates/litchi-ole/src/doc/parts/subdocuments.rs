@@ -152,7 +152,10 @@ impl DocumentSubdocuments {
         if wkb_data.is_none() && fnm_data.is_none() {
             return Ok(None);
         }
-        let referenced_files = fnm_data.map(parse_sttb_fnm).transpose()?.unwrap_or_default();
+        let referenced_files = fnm_data
+            .map(parse_sttb_fnm)
+            .transpose()?
+            .unwrap_or_default();
         let subdocuments = match wkb_data {
             Some(data) => {
                 if fnm_data.is_none() {
@@ -161,7 +164,7 @@ impl DocumentSubdocuments {
                     ));
                 }
                 parse_plcf_wkb(data, fib.get_main_doc_range().1, &referenced_files)?
-            }
+            },
             None => Vec::new(),
         };
         Ok(Some(DocumentSubdocuments {
@@ -225,13 +228,17 @@ fn parse_sttb_fnm(data: &[u8]) -> Result<Vec<ReferencedFileName>> {
         let path = String::from_utf16(&units)
             .map_err(|_| corrupted("SttbFnm file name is invalid UTF-16"))?;
         let fnif = data
-            .get(end..end.checked_add(FNIF_LEN).ok_or_else(|| {
-                corrupted("SttbFnm FNIF range overflows")
-            })?)
+            .get(
+                end..end
+                    .checked_add(FNIF_LEN)
+                    .ok_or_else(|| corrupted("SttbFnm FNIF range overflows"))?,
+            )
             .ok_or_else(|| corrupted("SttbFnm FNIF is truncated"))?;
         let fnpi = Fnpi::from_raw(u16::from_le_bytes([fnif[0], fnif[1]]));
         if fnpi.file_type() != FNPI_TYPE_MAIL_MERGE && fnpi.file_type() != FNPI_TYPE_SUBDOCUMENT {
-            return Err(corrupted("SttbFnm FNIF fnpt is not a defined file name type"));
+            return Err(corrupted(
+                "SttbFnm FNIF fnpt is not a defined file name type",
+            ));
         }
         if fnpi.identifier() == FNPI_NIL_IDENTIFIER {
             return Err(corrupted("SttbFnm FNIF fnpd is the reserved nil value"));
@@ -246,7 +253,7 @@ fn parse_sttb_fnm(data: &[u8]) -> Result<Vec<ReferencedFileName>> {
                 return Err(corrupted(
                     "SttbFnm FNIF ichRelative exceeds the file name length",
                 ));
-            }
+            },
         };
         let fnfb = fnif[3];
         let is_non_file_system_path = fnfb & FNFB_NON_FILE_SYS != 0;
@@ -279,7 +286,7 @@ fn parse_plcf_wkb(
     main_document_chars: u32,
     referenced_files: &[ReferencedFileName],
 ) -> Result<Vec<Subdocument>> {
-    if data.len() < 4 || (data.len() - 4) % (4 + WKB_LEN) != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(4 + WKB_LEN) {
         return Err(corrupted("PlcfWKB has an invalid byte length"));
     }
     let count = (data.len() - 4) / (4 + WKB_LEN);
@@ -591,11 +598,24 @@ mod tests {
         assert!(parse_sttb_fnm(&sttb_fnm(&[("a.doc", 5, 0, 5, 0)])).is_err());
         // A non-file-system path must not be marked FAT/NTFS valid.
         assert!(
-            parse_sttb_fnm(&sttb_fnm(&[("a.doc", 5, 0, 0xFF, FNFB_NON_FILE_SYS | FNFB_FAT)]))
-                .is_err()
+            parse_sttb_fnm(&sttb_fnm(&[(
+                "a.doc",
+                5,
+                0,
+                0xFF,
+                FNFB_NON_FILE_SYS | FNFB_FAT
+            )]))
+            .is_err()
         );
         assert!(
-            parse_sttb_fnm(&sttb_fnm(&[("http://x/a.doc", 5, 0, 0xFF, FNFB_NON_FILE_SYS)])).is_ok()
+            parse_sttb_fnm(&sttb_fnm(&[(
+                "http://x/a.doc",
+                5,
+                0,
+                0xFF,
+                FNFB_NON_FILE_SYS
+            )]))
+            .is_ok()
         );
     }
 

@@ -122,10 +122,10 @@ impl XlsXfColor {
         if tint == i16::MIN {
             return Err(invalid("XFPropColor tint cannot equal -32768"));
         }
-        if let XlsXfColorSource::Indexed(index) = source {
-            if !matches!(index, 0..=65 | 72) {
-                return Err(invalid(format!("invalid indexed XF color {index}")));
-            }
+        if let XlsXfColorSource::Indexed(index) = source
+            && !matches!(index, 0..=65 | 72)
+        {
+            return Err(invalid(format!("invalid indexed XF color {index}")));
         }
         let ignored_index = match source {
             XlsXfColorSource::Indexed(index) => index,
@@ -1328,7 +1328,7 @@ fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> XlsResult<()> {
 }
 
 fn decode_utf16(data: &[u8], field: &str) -> XlsResult<String> {
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return Err(invalid(format!("{field} has an odd byte length")));
     }
     let units = data

@@ -1,11 +1,11 @@
 //! Read-only SpreadsheetML external-workbook link metadata and cached values.
 
-use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::namespace::{is_spreadsheetml_name, relationship_attribute_value};
 use litchi_ooxml_common::external_link::{
     EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, is_external_workbook_relationship,
 };
+use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{PackURI, Part};

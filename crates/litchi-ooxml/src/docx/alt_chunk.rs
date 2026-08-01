@@ -98,9 +98,9 @@ impl AltChunk {
         let relationship_id = relationship_id.into();
         if relationship_id.is_empty()
             || relationship_id.len() > 255
-            || !relationship_id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b':'))
+            || !relationship_id.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b':')
+            })
         {
             return Err(OoxmlError::InvalidFormat(
                 "altChunk relationship ID is not a safe XML identifier".to_string(),

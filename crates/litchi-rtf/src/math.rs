@@ -223,7 +223,9 @@ impl<'a> MathProperty<'a> {
 
     pub(crate) fn validate(&self) -> RtfResult<()> {
         if self.value.len() > MAX_MATH_PROPERTY_VALUE_BYTES {
-            return Err(malformed("RTF math property value exceeds the safety limit"));
+            return Err(malformed(
+                "RTF math property value exceeds the safety limit",
+            ));
         }
         if self.value.contains(['\0', '\r', '\n']) {
             return Err(malformed(
@@ -383,9 +385,7 @@ impl<'a> MathProperties<'a> {
                 .into_iter()
                 .map(MathMatrixColumn::into_owned)
                 .collect(),
-            control: self
-                .control
-                .map(|control| Box::new(control.into_owned())),
+            control: self.control.map(|control| Box::new(control.into_owned())),
         }
     }
 }
@@ -522,23 +522,17 @@ impl MathStructureKind {
 
 fn validate_objects(objects: &[MathObject<'_>], depth: usize) -> RtfResult<()> {
     if depth > MAX_MATH_DEPTH {
-        return Err(malformed(
-            "RTF math nesting depth exceeds the safety limit",
-        ));
+        return Err(malformed("RTF math nesting depth exceeds the safety limit"));
     }
     if objects.len() > MAX_MATH_OBJECTS_PER_CONTAINER {
-        return Err(malformed(
-            "RTF math object count exceeds the safety limit",
-        ));
+        return Err(malformed("RTF math object count exceeds the safety limit"));
     }
     for object in objects {
         match object {
             MathObject::Structure(structure) => structure.validate_at(depth)?,
             MathObject::Run(run) => {
                 if run.text.len() > MAX_MATH_RUN_TEXT_BYTES {
-                    return Err(malformed(
-                        "RTF math run text exceeds the safety limit",
-                    ));
+                    return Err(malformed("RTF math run text exceeds the safety limit"));
                 }
                 if let Some(properties) = &run.properties {
                     if properties.kind != MathPropertiesKind::Run {
@@ -614,16 +608,13 @@ impl<'a> MathStructure<'a> {
                 }
                 for child in &self.children {
                     let MathStructureChild::Element(element) = child else {
-                        return Err(malformed(
-                            "RTF matrix rows may occur only inside a matrix",
-                        ));
+                        return Err(malformed("RTF matrix rows may occur only inside a matrix"));
                     };
                     validate_element(element, depth + 1)?;
                 }
             },
             None if self.kind == MathStructureKind::Matrix => {
-                if self.children.is_empty()
-                    || self.children.len() > MAX_MATH_OBJECTS_PER_CONTAINER
+                if self.children.is_empty() || self.children.len() > MAX_MATH_OBJECTS_PER_CONTAINER
                 {
                     return Err(malformed(
                         "RTF math matrix must contain at least one row within the safety limit",
@@ -631,9 +622,7 @@ impl<'a> MathStructure<'a> {
                 }
                 for child in &self.children {
                     let MathStructureChild::MatrixRow(row) = child else {
-                        return Err(malformed(
-                            "RTF math matrix may contain only matrix rows",
-                        ));
+                        return Err(malformed("RTF math matrix may contain only matrix rows"));
                     };
                     if row.cells.is_empty() || row.cells.len() > MAX_MATH_OBJECTS_PER_CONTAINER {
                         return Err(malformed(
@@ -652,8 +641,7 @@ impl<'a> MathStructure<'a> {
             },
             None => {
                 // Delimiter and equation array: one or more \me arguments.
-                if self.children.is_empty()
-                    || self.children.len() > MAX_MATH_OBJECTS_PER_CONTAINER
+                if self.children.is_empty() || self.children.len() > MAX_MATH_OBJECTS_PER_CONTAINER
                 {
                     return Err(malformed(
                         "RTF math structure must contain at least one argument within the safety limit",
@@ -661,9 +649,7 @@ impl<'a> MathStructure<'a> {
                 }
                 for child in &self.children {
                     let MathStructureChild::Element(element) = child else {
-                        return Err(malformed(
-                            "RTF matrix rows may occur only inside a matrix",
-                        ));
+                        return Err(malformed("RTF matrix rows may occur only inside a matrix"));
                     };
                     if element.role != MathElementRole::Element {
                         return Err(malformed(
@@ -704,7 +690,11 @@ impl<'a> MathElement<'a> {
         MathElement {
             role: self.role,
             argument_properties: self.argument_properties.map(MathProperties::into_owned),
-            content: self.content.into_iter().map(MathObject::into_owned).collect(),
+            content: self
+                .content
+                .into_iter()
+                .map(MathObject::into_owned)
+                .collect(),
         }
     }
 }
@@ -712,7 +702,11 @@ impl<'a> MathElement<'a> {
 impl<'a> MathMatrixRow<'a> {
     pub(crate) fn into_owned(self) -> MathMatrixRow<'static> {
         MathMatrixRow {
-            cells: self.cells.into_iter().map(MathElement::into_owned).collect(),
+            cells: self
+                .cells
+                .into_iter()
+                .map(MathElement::into_owned)
+                .collect(),
         }
     }
 }
@@ -780,7 +774,11 @@ impl<'a> MathZone<'a> {
         MathZone {
             kind: self.kind,
             paragraph_properties: self.paragraph_properties.map(MathProperties::into_owned),
-            content: self.content.into_iter().map(MathObject::into_owned).collect(),
+            content: self
+                .content
+                .into_iter()
+                .map(MathObject::into_owned)
+                .collect(),
             position: self.position,
         }
     }

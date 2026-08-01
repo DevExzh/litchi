@@ -687,7 +687,7 @@ impl<'a> SstCursor<'a> {
             let wanted = count as usize - characters.len();
             let chunk_characters = available_characters.min(wanted);
 
-            if high_byte && self.remaining() % 2 != 0 && chunk_characters < wanted {
+            if high_byte && !self.remaining().is_multiple_of(2) && chunk_characters < wanted {
                 return Err(XlsError::InvalidData(
                     "a UTF-16 shared string is split inside a code unit".to_string(),
                 ));

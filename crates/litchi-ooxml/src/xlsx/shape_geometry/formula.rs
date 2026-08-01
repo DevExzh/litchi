@@ -359,5 +359,7 @@ fn take_operands<const COUNT: usize>(
 }
 
 fn invalid_formula(text: &str, reason: &str) -> OoxmlError {
-    OoxmlError::InvalidFormat(format!("geometry guide formula '{text}' is invalid: {reason}"))
+    OoxmlError::InvalidFormat(format!(
+        "geometry guide formula '{text}' is invalid: {reason}"
+    ))
 }

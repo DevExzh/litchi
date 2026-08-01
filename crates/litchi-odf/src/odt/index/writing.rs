@@ -1539,10 +1539,11 @@ fn validate_index(index: &TextIndex) -> Result<()> {
             boolean(value, name)?;
         }
     }
-    if let Some(value) = source.attribute(Some(TEXT), "index-scope") {
-        if value != "document" && value != "chapter" {
-            return invalid("invalid text:index-scope");
-        }
+    if let Some(value) = source.attribute(Some(TEXT), "index-scope")
+        && value != "document"
+        && value != "chapter"
+    {
+        return invalid("invalid text:index-scope");
     }
     let source_children = structural_children(source)?;
     let mut phase = 0u8;
@@ -1880,10 +1881,10 @@ fn validate_caption_index(
     if let Some(value) = source.attribute(Some(TEXT), "use-caption") {
         boolean(value, "text:use-caption")?;
     }
-    if let Some(value) = source.attribute(Some(TEXT), "caption-sequence-format") {
-        if !["text", "category-and-value", "caption"].contains(&value) {
-            return invalid("invalid text:caption-sequence-format");
-        }
+    if let Some(value) = source.attribute(Some(TEXT), "caption-sequence-format")
+        && !["text", "category-and-value", "caption"].contains(&value)
+    {
+        return invalid("invalid text:caption-sequence-format");
     }
     validate_single_template_children(source, entry_name)
 }
@@ -2015,10 +2016,11 @@ fn validate_root_attrs(root: &TextIndexElement) -> Result<()> {
 }
 
 fn validate_scope_and_relative(source: &TextIndexElement) -> Result<()> {
-    if let Some(value) = source.attribute(Some(TEXT), "index-scope") {
-        if value != "document" && value != "chapter" {
-            return invalid("invalid text:index-scope");
-        }
+    if let Some(value) = source.attribute(Some(TEXT), "index-scope")
+        && value != "document"
+        && value != "chapter"
+    {
+        return invalid("invalid text:index-scope");
     }
     if let Some(value) = source.attribute(Some(TEXT), "relative-tab-stop-position") {
         boolean(value, "text:relative-tab-stop-position")?;
@@ -2125,8 +2127,8 @@ fn validate_token(element: &TextIndexElement, link_depth: &mut usize) -> Result<
             if let Some(value) = element.attribute(Some(TEXT), "outline-level") {
                 parse_positive(value, "chapter outline level")?;
             }
-            if let Some(value) = element.attribute(Some(TEXT), "display") {
-                if ![
+            if let Some(value) = element.attribute(Some(TEXT), "display")
+                && ![
                     "name",
                     "number",
                     "number-and-name",
@@ -2134,9 +2136,8 @@ fn validate_token(element: &TextIndexElement, link_depth: &mut usize) -> Result<
                     "plain-number-and-name",
                 ]
                 .contains(&value)
-                {
-                    return invalid("invalid text:index-entry-chapter display");
-                }
+            {
+                return invalid("invalid text:index-entry-chapter display");
             }
             empty(element)?;
         },
@@ -2184,10 +2185,10 @@ fn validate_token(element: &TextIndexElement, link_depth: &mut usize) -> Result<
                 Some("left") => validate_length(required_attr(element, STYLE, "position")?)?,
                 _ => return invalid("tab stop requires style:type left or right"),
             }
-            if let Some(leader) = element.attribute(Some(STYLE), "leader-char") {
-                if leader.chars().count() != 1 {
-                    return invalid("style:leader-char must be one character");
-                }
+            if let Some(leader) = element.attribute(Some(STYLE), "leader-char")
+                && leader.chars().count() != 1
+            {
+                return invalid("style:leader-char must be one character");
             }
             empty(element)?;
         },

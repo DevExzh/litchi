@@ -2,8 +2,7 @@ use std::io::Cursor;
 
 use litchi_ole::xls::XlsWorkbook;
 use litchi_ole::xls::writer::{
-    PivotCacheValue, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotTableConfig,
-    XlsWriter,
+    PivotCacheValue, XlsPivotDataItemConfig, XlsPivotFieldConfig, XlsPivotTableConfig, XlsWriter,
 };
 
 const SXVIEW: u16 = 0x00B0;

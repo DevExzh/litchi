@@ -556,12 +556,12 @@ fn validate_block(
             return Err(invalid("metadata record type index is out of range"));
         }
         let ty = &types[record.type_index as usize - 1];
-        if let Some(cell) = cell {
-            if ty.behavior.cell_metadata != cell {
-                return Err(invalid(
-                    "metadata record type does not match cell/value store",
-                ));
-            }
+        if let Some(cell) = cell
+            && ty.behavior.cell_metadata != cell
+        {
+            return Err(invalid(
+                "metadata record type does not match cell/value store",
+            ));
         }
         let store = future
             .iter()

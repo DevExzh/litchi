@@ -74,11 +74,15 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML node count"))?;
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit("XML node count"))?;
                 if nodes > MAX_XML_NODES {
                     return Err(limit("XML node count"));
                 }
-                depth = depth.checked_add(1).ok_or_else(|| limit("slide XML depth"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| limit("slide XML depth"))?;
                 if depth > MAX_XML_DEPTH {
                     return Err(limit("slide XML depth"));
                 }
@@ -98,7 +102,9 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
                 }
             },
             Event::Empty(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML node count"))?;
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit("XML node count"))?;
                 if nodes > MAX_XML_NODES {
                     return Err(limit("XML node count"));
                 }
@@ -110,8 +116,7 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
                     }
                     root_seen = true;
                 }
-                if depth + 1 == 2 && is_presentationml_name(&namespace, element.name(), b"extLst")
-                {
+                if depth + 1 == 2 && is_presentationml_name(&namespace, element.name(), b"extLst") {
                     // Empty `<p:extLst/>`: remember its range for expansion.
                     if ext_lst_depth.replace(usize::MAX).is_some() {
                         return Err(invalid("slide has multiple extension lists"));

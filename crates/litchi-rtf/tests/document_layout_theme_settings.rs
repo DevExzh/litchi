@@ -63,14 +63,15 @@ fn omission_is_distinct_from_explicit_zero_languages() {
 #[test]
 fn typed_apis_round_trip_in_stable_order_and_clear_without_side_effects() {
     let mut document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
-    document.set_print_layout_settings(DocumentPrintLayoutSettings {
-        facing_pages: false,
-        mirror_margins: false,
-        document_gutter_twips: None,
-        parallel_gutter: true,
-        two_logical_pages_per_physical_page: true,
-    })
-    .unwrap();
+    document
+        .set_print_layout_settings(DocumentPrintLayoutSettings {
+            facing_pages: false,
+            mirror_margins: false,
+            document_gutter_twips: None,
+            parallel_gutter: true,
+            two_logical_pages_per_physical_page: true,
+        })
+        .unwrap();
     document.set_theme_languages(DocumentThemeLanguages {
         primary: Some(LanguageId::new(65535).unwrap()),
         east_asian: Some(LanguageId::new(1041).unwrap()),

@@ -8,8 +8,8 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFormat, Styles};
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 const SPREADSHEETML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SPREADSHEETML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";

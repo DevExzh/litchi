@@ -235,7 +235,8 @@ impl DocumentParser {
                             // Complete a top-level numbered paragraph
                             if let Some((tag, element)) = element_stack.pop()
                                 && tag == "text:numbered-paragraph"
-                                && let Ok(para) = super::text::NumberedParagraph::from_element(element)
+                                && let Ok(para) =
+                                    super::text::NumberedParagraph::from_element(element)
                             {
                                 elements.push(DocumentOrderElement::NumberedParagraph(para));
                             }

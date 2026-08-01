@@ -237,7 +237,9 @@ impl ParagraphLineSpacing {
             ));
         }
         if let Some(value) = self.font_independent_line_spacing {
-            xml.push_str(&format!(r#" style:font-independent-line-spacing="{value}""#));
+            xml.push_str(&format!(
+                r#" style:font-independent-line-spacing="{value}""#
+            ));
         }
         if let Some(value) = self.text_autospace {
             xml.push_str(&format!(r#" style:text-autospace="{}""#, value.xml()));

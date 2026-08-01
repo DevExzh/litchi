@@ -36,7 +36,10 @@ fn extended_underline_styles_round_trip() {
 
         let output = write(&document);
         let serialized = String::from_utf8(output).unwrap();
-        assert!(serialized.contains(control), "missing {control} in {serialized}");
+        assert!(
+            serialized.contains(control),
+            "missing {control} in {serialized}"
+        );
 
         let reparsed = RtfDocument::parse(&serialized).unwrap();
         assert_eq!(
@@ -49,7 +52,8 @@ fn extended_underline_styles_round_trip() {
 
 #[test]
 fn underline_color_round_trips() {
-    let source = r"{\rtf1\ansi{\colortbl;\red0\green0\blue255;\red255\green0\blue0;}\uldb\ulc2 Text\par}";
+    let source =
+        r"{\rtf1\ansi{\colortbl;\red0\green0\blue255;\red255\green0\blue0;}\uldb\ulc2 Text\par}";
     let document = RtfDocument::parse(source).unwrap();
     let block = &document.blocks()[0];
     assert_eq!(block.formatting.underline_color, Some(2));

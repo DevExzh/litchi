@@ -526,16 +526,15 @@ impl XlsbWorkbookWriter {
                 )));
             }
             validate_defined_name(&named_range.name)?;
-            if let Some(sheet_id) = named_range.sheet_id {
-                if usize::try_from(sheet_id)
+            if let Some(sheet_id) = named_range.sheet_id
+                && usize::try_from(sheet_id)
                     .ok()
                     .is_none_or(|index| index >= self.sheet_order.len())
-                {
-                    return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
-                        "defined name {} has invalid sheet scope {sheet_id}",
-                        named_range.name
-                    )));
-                }
+            {
+                return Err(crate::xlsb::error::XlsbError::InvalidFormula(format!(
+                    "defined name {} has invalid sheet scope {sheet_id}",
+                    named_range.name
+                )));
             }
             let formula = named_range.formula.as_ref().ok_or_else(|| {
                 crate::xlsb::error::XlsbError::InvalidFormula(format!(
@@ -3328,12 +3327,10 @@ mod tests {
             writer
                 .write_record(record_types::END_SX_LOCATION, &[])
                 .unwrap();
-            writer
-                .write_record(record_types::END_SX_VIEW, &[])
-                .unwrap();
+            writer.write_record(record_types::END_SX_VIEW, &[]).unwrap();
         }
-        let view =
-            crate::xlsb::pivot_view::XlsbPivotTableViewPart::from_bytes(view_bytes.clone()).unwrap();
+        let view = crate::xlsb::pivot_view::XlsbPivotTableViewPart::from_bytes(view_bytes.clone())
+            .unwrap();
 
         let chart = WorksheetChart::line_chart(
             "Revenue",
@@ -3384,7 +3381,9 @@ mod tests {
         assert_eq!(reader.pivot_views().len(), 1);
         assert_eq!(reader.pivot_views()[0].name(), view_name);
         assert_eq!(reader.pivot_views()[0].cache_id(), 1);
-        let drawing = reader.sheet_drawing(0).expect("pivot chart drawing missing");
+        let drawing = reader
+            .sheet_drawing(0)
+            .expect("pivot chart drawing missing");
         let source = drawing.charts[0]
             .chart
             .pivot_source
@@ -3495,7 +3494,10 @@ mod tests {
         data.add_chart(worksheet_chart).unwrap();
         workbook.add_worksheet(data);
         workbook
-            .add_chart_sheet(MutableXlsbChartSheet::new("Linked Chart", chart_sheet_chart))
+            .add_chart_sheet(MutableXlsbChartSheet::new(
+                "Linked Chart",
+                chart_sheet_chart,
+            ))
             .unwrap();
 
         let mut output = Cursor::new(Vec::new());
@@ -3542,7 +3544,12 @@ mod tests {
         }
 
         let chart_sheet_chart = &reader.sheet_drawing(1).unwrap().charts[0];
-        match &chart_sheet_chart.external_data_part.as_ref().unwrap().target {
+        match &chart_sheet_chart
+            .external_data_part
+            .as_ref()
+            .unwrap()
+            .target
+        {
             ChartExternalDataTarget::Linked { target } => {
                 assert_eq!(target, "https://example.test/data.xlsx");
             },

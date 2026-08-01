@@ -350,15 +350,14 @@ fn resolve_properties(
     })?;
     if let Some(existing_owner) =
         owners.insert(properties_part_name.clone(), data_part.partname().clone())
+        && existing_owner != *data_part.partname()
     {
-        if existing_owner != *data_part.partname() {
-            return invalid(format!(
-                "custom XML properties part '{}' is shared by '{}' and '{}'",
-                properties_part_name.as_str(),
-                existing_owner.as_str(),
-                data_part.partname().as_str()
-            ));
-        }
+        return invalid(format!(
+            "custom XML properties part '{}' is shared by '{}' and '{}'",
+            properties_part_name.as_str(),
+            existing_owner.as_str(),
+            data_part.partname().as_str()
+        ));
     }
     let properties = if let Some(properties) = cache.get(&properties_part_name) {
         properties.clone()
@@ -383,13 +382,13 @@ fn resolve_properties(
         }
         let properties = parse_custom_xml_properties(part.blob())?;
         let key = properties.item_id.to_ascii_lowercase();
-        if let Some(existing) = property_ids.insert(key, properties_part_name.clone()) {
-            if existing != properties_part_name {
-                return invalid(format!(
-                    "duplicate custom XML itemID '{}'",
-                    properties.item_id
-                ));
-            }
+        if let Some(existing) = property_ids.insert(key, properties_part_name.clone())
+            && existing != properties_part_name
+        {
+            return invalid(format!(
+                "duplicate custom XML itemID '{}'",
+                properties.item_id
+            ));
         }
         cache.insert(properties_part_name.clone(), properties.clone());
         properties

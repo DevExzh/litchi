@@ -354,7 +354,7 @@ impl ScenarioCollector {
 }
 
 fn parse_scen_man(data: &[u8]) -> XlsResult<ScenarioManagerHeader> {
-    if data.len() < 8 || (data.len() - 8) % 8 != 0 {
+    if data.len() < 8 || !(data.len() - 8).is_multiple_of(8) {
         return invalid(SCEN_MAN_RECORD_TYPE, "ScenMan payload length is invalid");
     }
     let declared = read_i16(data, 0);

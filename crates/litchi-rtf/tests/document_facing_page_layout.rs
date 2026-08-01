@@ -1,6 +1,4 @@
-use litchi_rtf::{
-    DocumentPrintLayoutSettings, RtfDocument, RtfWriter, MAX_DOCUMENT_GUTTER_TWIPS,
-};
+use litchi_rtf::{DocumentPrintLayoutSettings, MAX_DOCUMENT_GUTTER_TWIPS, RtfDocument, RtfWriter};
 
 fn write(document: &RtfDocument<'_>) -> Result<Vec<u8>, std::io::Error> {
     let mut output = Vec::new();
@@ -10,10 +8,9 @@ fn write(document: &RtfDocument<'_>) -> Result<Vec<u8>, std::io::Error> {
 
 #[test]
 fn parses_toggle_flag_and_global_gutter() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1\facingp\margmirror\gutter720\gutterprl\twoonone Body}"#,
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r#"{\rtf1\facingp\margmirror\gutter720\gutterprl\twoonone Body}"#)
+            .unwrap();
     assert_eq!(
         *document.print_layout_settings(),
         DocumentPrintLayoutSettings {
@@ -41,8 +38,7 @@ fn global_gutter_is_inherited_and_guttersxn_overrides_after_reset() {
     assert_eq!(document.sections()[1].properties.margin_gutter, 720);
     assert_eq!(document.sections()[2].properties.margin_gutter, 0);
 
-    let serializable =
-        RtfDocument::parse(r#"{\rtf1\gutter720\sectd\guttersxn360 First}"#).unwrap();
+    let serializable = RtfDocument::parse(r#"{\rtf1\gutter720\sectd\guttersxn360 First}"#).unwrap();
     let reparsed = RtfDocument::parse_bytes(&write(&serializable).unwrap()).unwrap();
     assert_eq!(
         reparsed.print_layout_settings(),
@@ -62,15 +58,19 @@ fn public_setters_are_atomic_and_writer_rejects_direct_invalid_values() {
         two_logical_pages_per_physical_page: true,
     };
     document.set_print_layout_settings(valid).unwrap();
-    assert!(document
-        .set_document_gutter_twips(Some(MAX_DOCUMENT_GUTTER_TWIPS + 1))
-        .is_err());
+    assert!(
+        document
+            .set_document_gutter_twips(Some(MAX_DOCUMENT_GUTTER_TWIPS + 1))
+            .is_err()
+    );
     assert_eq!(*document.print_layout_settings(), valid);
 
     let mut settings = valid;
-    assert!(settings
-        .set_document_gutter_twips(Some(MAX_DOCUMENT_GUTTER_TWIPS + 1))
-        .is_err());
+    assert!(
+        settings
+            .set_document_gutter_twips(Some(MAX_DOCUMENT_GUTTER_TWIPS + 1))
+            .is_err()
+    );
     assert_eq!(settings, valid);
 
     let invalid = DocumentPrintLayoutSettings {
@@ -84,12 +84,18 @@ fn public_setters_are_atomic_and_writer_rejects_direct_invalid_values() {
     let mut invalid_document = RtfDocument::parse(r#"{\rtf1 Body}"#).unwrap();
     let mut invalid_settings = *invalid_document.print_layout_settings();
     invalid_settings.document_gutter_twips = Some(MAX_DOCUMENT_GUTTER_TWIPS + 1);
-    assert!(invalid_document.set_print_layout_settings(invalid_settings).is_err());
+    assert!(
+        invalid_document
+            .set_print_layout_settings(invalid_settings)
+            .is_err()
+    );
 
     let mut output = Vec::new();
-    assert!(RtfWriter::new(&mut output)
-        .write_document_print_layout_settings(&invalid)
-        .is_err());
+    assert!(
+        RtfWriter::new(&mut output)
+            .write_document_print_layout_settings(&invalid)
+            .is_err()
+    );
 }
 
 #[test]
@@ -117,7 +123,10 @@ fn writer_uses_canonical_order_and_round_trips() {
         assert!(serialized.find(pair[0]).unwrap() < serialized.find(pair[1]).unwrap());
     }
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
-    assert_eq!(reparsed.print_layout_settings(), document.print_layout_settings());
+    assert_eq!(
+        reparsed.print_layout_settings(),
+        document.print_layout_settings()
+    );
     assert_eq!(reparsed.text(), "Body");
 }
 
@@ -159,7 +168,10 @@ fn destination_controls_never_leak_into_document_settings() {
         r#"{\rtf1{\*\unknown\facingp\margmirror\gutter720 Hidden}Body}"#,
     ] {
         if let Ok(document) = RtfDocument::parse(source) {
-            assert!(document.print_layout_settings().is_empty(), "leaked {source}");
+            assert!(
+                document.print_layout_settings().is_empty(),
+                "leaked {source}"
+            );
         }
     }
 }
@@ -197,8 +209,8 @@ fn bundled_libreoffice_fixtures_round_trip_layout_settings() {
             "rhbz1065629.rtf" => assert!(settings.facing_pages),
             _ => unreachable!(),
         }
-        let output = write(&document)
-            .unwrap_or_else(|error| panic!("failed to write {name}: {error}"));
+        let output =
+            write(&document).unwrap_or_else(|error| panic!("failed to write {name}: {error}"));
         let reparsed = RtfDocument::parse_bytes(&output)
             .unwrap_or_else(|error| panic!("failed to reparse {name}: {error}"));
         assert_eq!(*reparsed.print_layout_settings(), settings, "{name}");

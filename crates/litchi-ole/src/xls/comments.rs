@@ -560,13 +560,13 @@ fn parse_txo(data: &[u8], object_id: u16) -> XlsResult<PendingTxo> {
         if run_byte_count != 0 {
             return invalid("empty TXO text must have zero run bytes".to_string());
         }
-    } else if run_byte_count < 16 || run_byte_count % 8 != 0 {
+    } else if run_byte_count < 16 || !run_byte_count.is_multiple_of(8) {
         return invalid(format!(
             "non-empty TXO run size must be a multiple of 8 and at least 16, got {run_byte_count}"
         ));
     }
     let formula_size = u16_at(data, 16)? as usize;
-    if formula_size % 2 != 0 {
+    if !formula_size.is_multiple_of(2) {
         return invalid(format!("TXO ObjFmla size must be even, got {formula_size}"));
     }
     let expected = 18usize
@@ -642,7 +642,7 @@ fn parse_txo_runs(data: &[u8], character_count: u16) -> XlsResult<Vec<XlsComment
     if data.is_empty() {
         return Ok(Vec::new());
     }
-    if data.len() < 16 || data.len() % 8 != 0 {
+    if data.len() < 16 || !data.len().is_multiple_of(8) {
         return invalid("invalid TxORuns byte count".to_string());
     }
     let run_count = data.len() / 8 - 1;

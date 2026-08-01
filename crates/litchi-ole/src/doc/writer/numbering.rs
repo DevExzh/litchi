@@ -217,7 +217,7 @@ impl ListStructure {
     /// Serialize to LSTF structure (fixed 28 bytes, per MS-DOC spec).
     ///
     /// This does NOT include the variable-length LVL data — use
-    /// [`levels_to_bytes`] for that.
+    /// [`Self::levels_to_bytes`] for that.
     pub fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes_with_metadata(None)
     }

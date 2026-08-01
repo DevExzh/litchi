@@ -200,7 +200,13 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
         )
         .unwrap();
     unwrap.unwrap_section("Wrapper").unwrap();
-    assert_eq!(Document::from_bytes(unwrap.to_bytes().unwrap()).unwrap().text().unwrap(), "keep me");
+    assert_eq!(
+        Document::from_bytes(unwrap.to_bytes().unwrap())
+            .unwrap()
+            .text()
+            .unwrap(),
+        "keep me"
+    );
 
     let mut remove = MutableDocument::new();
     remove.add_paragraph("delete me").unwrap();
@@ -212,5 +218,11 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
         )
         .unwrap();
     remove.remove_section("Wrapper").unwrap();
-    assert!(Document::from_bytes(remove.to_bytes().unwrap()).unwrap().text().unwrap().is_empty());
+    assert!(
+        Document::from_bytes(remove.to_bytes().unwrap())
+            .unwrap()
+            .text()
+            .unwrap()
+            .is_empty()
+    );
 }

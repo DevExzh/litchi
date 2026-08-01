@@ -916,12 +916,11 @@ impl<R: Read + Seek> XlsWorkbook<R> {
             list_object_collector.feed_record(record.header.record_type, &record.data)?;
             let query_table_consumed =
                 query_table_collector.feed_record(record.header.record_type, &record.data);
-            if !query_table_consumed {
-                if let Some(sort_data) =
+            if !query_table_consumed
+                && let Some(sort_data) =
                     sort_data_collector.feed_record(record.header.record_type, &record.data)?
-                {
-                    worksheet.set_sort_data(sort_data);
-                }
+            {
+                worksheet.set_sort_data(sort_data);
             }
             row_block_index_collector.feed_record(
                 record_position,
@@ -980,16 +979,12 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         if let CellRecord::Formula {
                             row, col, formula, ..
                         } = &formula
+                            && let Some(anchor) = ptg_exp_anchor(formula)
+                            && let Some(rendered) = shared_formulas
+                                .get(&anchor)
+                                .and_then(|template| template.render(formula_context, *row, *col))
                         {
-                            if let Some(anchor) = ptg_exp_anchor(formula) {
-                                if let Some(rendered) =
-                                    shared_formulas.get(&anchor).and_then(|template| {
-                                        template.render(formula_context, *row, *col)
-                                    })
-                                {
-                                    cell.set_rendered_formula(Some(rendered));
-                                }
-                            }
+                            cell.set_rendered_formula(Some(rendered));
                         }
                         worksheet.add_cell(cell);
                     }
@@ -1165,9 +1160,8 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                         if let CellRecord::Formula {
                             row, col, formula, ..
                         } = &cell_record
-                        {
-                            if let Some(anchor) = ptg_exp_anchor(formula) {
-                                if let Some(rendered) = shared_formulas
+                            && let Some(anchor) = ptg_exp_anchor(formula)
+                                && let Some(rendered) = shared_formulas
                                     .get(&anchor)
                                     .and_then(|template| {
                                         template.render(formula_context, *row, *col)
@@ -1175,8 +1169,6 @@ impl<R: Read + Seek> XlsWorkbook<R> {
                                 {
                                     cell.set_rendered_formula(Some(rendered));
                                 }
-                            }
-                        }
                         worksheet.add_cell(cell);
                     }
                 }
@@ -1374,8 +1366,10 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
     pub fn custom_xml_data_store(
         &mut self,
-    ) -> crate::custom_xml_data::Result<Option<crate::custom_xml_data::MsoDataStore>> {
-        crate::custom_xml_data::inspect_mso_data_store(&mut self.ole_file)
+    ) -> litchi_ole_common::custom_xml_data::Result<
+        Option<litchi_ole_common::custom_xml_data::MsoDataStore>,
+    > {
+        litchi_ole_common::custom_xml_data::inspect_mso_data_store(&mut self.ole_file)
     }
 
     pub fn summary_information(&mut self) -> XlsResult<Option<litchi_cfb::PropertySetStream>> {
@@ -1707,13 +1701,13 @@ impl<R: Read + Seek> XlsWorkbook<R> {
     /// Case-insensitive name lookup with sheet-local-before-workbook precedence.
     /// Duplicate definitions use the last matching `Lbl` record.
     pub fn defined_name(&self, name: &str, sheet_index: Option<usize>) -> Option<&XlsDefinedName> {
-        if let Some(sheet_index) = sheet_index {
-            if let Some(local) = self.defined_names.iter().rev().find(|defined_name| {
+        if let Some(sheet_index) = sheet_index
+            && let Some(local) = self.defined_names.iter().rev().find(|defined_name| {
                 defined_name.scope == XlsNameScope::Worksheet(sheet_index)
                     && names_equal(&defined_name.name, name)
-            }) {
-                return Some(local);
-            }
+            })
+        {
+            return Some(local);
         }
         self.defined_names.iter().rev().find(|defined_name| {
             defined_name.scope == XlsNameScope::Workbook && names_equal(&defined_name.name, name)

@@ -105,16 +105,16 @@ pub struct ParagraphFlowProperties {
 impl ParagraphFlowProperties {
     pub fn validate(&self) -> Result<()> {
         for (n, k) in [(self.widows, "fo:widows"), (self.orphans, "fo:orphans")] {
-            if let Some(n) = n {
-                if n > MAX_COUNT {
-                    return Err(bad(format!("{k} out of range")));
-                }
+            if let Some(n) = n
+                && n > MAX_COUNT
+            {
+                return Err(bad(format!("{k} out of range")));
             }
         }
-        if let Some(HyphenationLadder::Lines(n)) = self.hyphenation_ladder_count {
-            if !(1..=MAX_COUNT).contains(&n) {
-                return Err(bad("hyphenation ladder count out of range"));
-            }
+        if let Some(HyphenationLadder::Lines(n)) = self.hyphenation_ladder_count
+            && !(1..=MAX_COUNT).contains(&n)
+        {
+            return Err(bad("hyphenation ladder count out of range"));
         }
         Ok(())
     }
@@ -203,10 +203,10 @@ impl ParagraphStyleFlow {
             (None, true) => {},
             _ => return Err(bad("invalid paragraph flow style identity")),
         }
-        if let Some(n) = &self.parent_style_name {
-            if self.is_default_style || n.is_empty() || n.len() > MAX_VALUE {
-                return Err(bad("invalid parent style name"));
-            }
+        if let Some(n) = &self.parent_style_name
+            && (self.is_default_style || n.is_empty() || n.len() > MAX_VALUE)
+        {
+            return Err(bad("invalid parent style name"));
         }
         if let Some(p) = &self.properties {
             p.validate()?

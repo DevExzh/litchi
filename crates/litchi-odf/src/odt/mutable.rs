@@ -1806,9 +1806,8 @@ impl MutableDocument {
 
     /// Atomically replace the declaration table and policy metadata.
     pub fn set_tracked_changes(&mut self, tracked: crate::odt::TrackedChanges) -> Result<()> {
-        let updated = self.with_content_xml(|xml| {
-            crate::odt::set_tracked_changes_xml(xml, Some(&tracked))
-        })?;
+        let updated =
+            self.with_content_xml(|xml| crate::odt::set_tracked_changes_xml(xml, Some(&tracked)))?;
         self.content_xml = Some(updated);
         Ok(())
     }
@@ -1924,9 +1923,8 @@ impl MutableDocument {
 
     /// Remove every marker for one declaration while retaining its live text.
     pub fn unmark_tracked_change(&mut self, change_id: &str) -> Result<()> {
-        let updated = self.with_content_xml(|xml| {
-            crate::odt::unmark_tracked_change_xml(xml, change_id)
-        })?;
+        let updated =
+            self.with_content_xml(|xml| crate::odt::unmark_tracked_change_xml(xml, change_id))?;
         self.content_xml = Some(updated);
         Ok(())
     }
@@ -1945,9 +1943,8 @@ impl MutableDocument {
 
     /// Atomically update section metadata/source while preserving enclosed XML bytes.
     pub fn update_section(&mut self, name: &str, replacement: &crate::Section) -> Result<()> {
-        let updated = self.with_content_xml(|xml| {
-            crate::update_section_xml(xml, name, replacement)
-        })?;
+        let updated =
+            self.with_content_xml(|xml| crate::update_section_xml(xml, name, replacement))?;
         self.content_xml = Some(updated);
         Ok(())
     }
@@ -1980,9 +1977,8 @@ impl MutableDocument {
         start: crate::OdtSectionBlock,
         end: crate::OdtSectionBlock,
     ) -> Result<()> {
-        let updated = self.with_content_xml(|xml| {
-            crate::wrap_section_xml(xml, section, &start, &end)
-        })?;
+        let updated =
+            self.with_content_xml(|xml| crate::wrap_section_xml(xml, section, &start, &end))?;
         self.content_xml = Some(updated);
         Ok(())
     }
@@ -2495,7 +2491,9 @@ impl MutableDocument {
             // Picture numbering is global: a stem taken by any supported
             // extension blocks the whole index.
             let taken = |path: &str| {
-                self.pending_images.iter().any(|pending| pending.path == path)
+                self.pending_images
+                    .iter()
+                    .any(|pending| pending.path == path)
                     || self
                         .source_package
                         .as_ref()
@@ -3494,8 +3492,26 @@ mod tests {
             .unwrap();
         assert_eq!(path, "Pictures/image1.png");
         doc.add_paragraph("After image").unwrap();
-        assert!(doc.insert_image(99, &png, &OdfLength::points(1.0), &OdfLength::points(1.0), OdfFrameAnchor::Page).is_err());
-        assert!(doc.insert_image(0, b"not-an-image", &OdfLength::points(1.0), &OdfLength::points(1.0), OdfFrameAnchor::Page).is_err());
+        assert!(
+            doc.insert_image(
+                99,
+                &png,
+                &OdfLength::points(1.0),
+                &OdfLength::points(1.0),
+                OdfFrameAnchor::Page
+            )
+            .is_err()
+        );
+        assert!(
+            doc.insert_image(
+                0,
+                b"not-an-image",
+                &OdfLength::points(1.0),
+                &OdfLength::points(1.0),
+                OdfFrameAnchor::Page
+            )
+            .is_err()
+        );
 
         let round_trip = Document::from_bytes(doc.to_bytes().unwrap()).unwrap();
         // Text content survives around the frame.
@@ -3520,10 +3536,22 @@ mod tests {
 
         let mut doc = MutableDocument::new();
         let first = doc
-            .insert_image(0, &minimal_png(), &OdfLength::points(8.0), &OdfLength::points(8.0), OdfFrameAnchor::Page)
+            .insert_image(
+                0,
+                &minimal_png(),
+                &OdfLength::points(8.0),
+                &OdfLength::points(8.0),
+                OdfFrameAnchor::Page,
+            )
             .unwrap();
         let second = doc
-            .insert_image(1, &minimal_jpeg(), &OdfLength::points(8.0), &OdfLength::points(8.0), OdfFrameAnchor::Page)
+            .insert_image(
+                1,
+                &minimal_jpeg(),
+                &OdfLength::points(8.0),
+                &OdfLength::points(8.0),
+                OdfFrameAnchor::Page,
+            )
             .unwrap();
         assert_eq!(first, "Pictures/image1.png");
         assert_eq!(second, "Pictures/image2.jpg");
@@ -3531,7 +3559,10 @@ mod tests {
         let round_trip = Document::from_bytes(doc.to_bytes().unwrap()).unwrap();
         let images = round_trip.images().unwrap();
         assert_eq!(images.len(), 2);
-        let mut paths: Vec<_> = images.iter().filter_map(|image| image.package_path()).collect();
+        let mut paths: Vec<_> = images
+            .iter()
+            .filter_map(|image| image.package_path())
+            .collect();
         paths.sort_unstable();
         assert_eq!(paths, ["Pictures/image1.png", "Pictures/image2.jpg"]);
     }
@@ -3571,7 +3602,9 @@ mod tests {
         bytes.extend_from_slice(&[0x1f, 0x15, 0xc4, 0x89]);
         bytes.extend_from_slice(&[0, 0, 0, 11]);
         bytes.extend_from_slice(b"IDAT");
-        bytes.extend_from_slice(&[0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d]);
+        bytes.extend_from_slice(&[
+            0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d,
+        ]);
         bytes.extend_from_slice(&[0x0a, 0x2d, 0xb4]);
         bytes.extend_from_slice(&[0, 0, 0, 0]);
         bytes.extend_from_slice(b"IEND");

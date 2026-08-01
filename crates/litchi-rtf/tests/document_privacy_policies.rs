@@ -76,8 +76,9 @@ fn typed_api_round_trips_in_specification_order_and_clears_passively() {
 
 #[test]
 fn parses_bundled_libreoffice_privacy_policy_producer_fixture() {
-    let fixture =
-        include_bytes!("../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf");
+    let fixture = include_bytes!(
+        "../../../test-data/libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf"
+    );
     let document = RtfDocument::parse_bytes(fixture).unwrap();
     assert!(document.privacy_policies().remove_personal_information);
     assert!(document.privacy_policies().remove_date_time_information);

@@ -137,7 +137,7 @@ pub fn write_sst<W: Write>(writer: &mut W, strings: &[String], cst_total: u32) -
                     continue;
                 }
                 // ensure even number of bytes
-                if can_write % 2 != 0 {
+                if !can_write.is_multiple_of(2) {
                     if can_write == 1 {
                         // no space for a full char
                         flush(writer, &mut buffer, first_record)?;

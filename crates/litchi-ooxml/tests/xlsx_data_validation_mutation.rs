@@ -13,9 +13,7 @@ fn seed_package(path: &std::path::Path, worksheet_xml: &str) {
     let base = directory.path().join("base.xlsx");
     Workbook::create().unwrap().save(&base).unwrap();
     let mut package = OpcPackage::open(&base).unwrap();
-    let part = package
-        .get_part_mut(&PackURI::new(SHEET).unwrap())
-        .unwrap();
+    let part = package.get_part_mut(&PackURI::new(SHEET).unwrap()).unwrap();
     part.set_blob(worksheet_xml.as_bytes().to_vec());
     part.rels_mut().add_relationship(
         rt::HYPERLINK.to_string(),
@@ -41,7 +39,8 @@ fn typed_collections() -> Vec<DataValidationCollection> {
         .unwrap();
     core.set_show_error_message(true);
     core.set_error_title(Some("Bounds".to_string())).unwrap();
-    core.set_error(Some("Choose 1 through 10".to_string())).unwrap();
+    core.set_error(Some("Choose 1 through 10".to_string()))
+        .unwrap();
 
     let mut modern = ParsedDataValidation::new(
         DataValidationSource::Office2010,
@@ -57,9 +56,7 @@ fn typed_collections() -> Vec<DataValidationCollection> {
         )))
         .unwrap();
     modern
-        .set_uid(Some(
-            "{11111111-2222-3333-4444-555555555555}".to_string(),
-        ))
+        .set_uid(Some("{11111111-2222-3333-4444-555555555555}".to_string()))
         .unwrap();
 
     let mut core_collection =
@@ -105,9 +102,18 @@ fn mutates_packaged_core_and_x14_without_rebuilding_unrelated_content() {
     );
     let parsed = parse_data_validation_collections(first_part.blob()).unwrap();
     assert_eq!(parsed.len(), 2);
-    assert_eq!(parsed.iter().map(|value| value.validations().len()).sum::<usize>(), 2);
+    assert_eq!(
+        parsed
+            .iter()
+            .map(|value| value.validations().len())
+            .sum::<usize>(),
+        2
+    );
     assert_eq!(parsed[0].x_window(), Some(12));
-    assert_eq!(parsed[1].validations()[0].uid(), Some("{11111111-2222-3333-4444-555555555555}"));
+    assert_eq!(
+        parsed[1].validations()[0].uid(),
+        Some("{11111111-2222-3333-4444-555555555555}")
+    );
 }
 
 #[test]
@@ -127,9 +133,16 @@ fn emits_strict_core_and_office2010_extensions() {
     let package = OpcPackage::open(&output).unwrap();
     let part = package.get_part(&PackURI::new(SHEET).unwrap()).unwrap();
     let xml = std::str::from_utf8(part.blob()).unwrap();
-    assert!(xml.contains(r#"<dataValidations xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main""#));
+    assert!(
+        xml.contains(r#"<dataValidations xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main""#)
+    );
     assert!(xml.contains("<x14:dataValidations"));
-    assert_eq!(parse_data_validation_collections(part.blob()).unwrap().len(), 2);
+    assert_eq!(
+        parse_data_validation_collections(part.blob())
+            .unwrap()
+            .len(),
+        2
+    );
 }
 
 #[test]
@@ -140,13 +153,18 @@ fn rejects_spoofed_namespace_and_constraints_without_queuing_changes() {
     let xml = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:f="urn:fake"><sheetData/><f:dataValidations><f:dataValidation sqref="A1"/></f:dataValidations></worksheet>"#;
     seed_package(&input, xml);
     let mut workbook = Workbook::open(&input).unwrap();
-    assert!(workbook
-        .replace_worksheet_data_validations(0, typed_collections())
-        .is_err());
+    assert!(
+        workbook
+            .replace_worksheet_data_validations(0, typed_collections())
+            .is_err()
+    );
     workbook.save(&output).unwrap();
     let package = OpcPackage::open(&output).unwrap();
     assert_eq!(
-        package.get_part(&PackURI::new(SHEET).unwrap()).unwrap().blob(),
+        package
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
         xml.as_bytes()
     );
     assert!(DataValidationSqref::parse("XFE1").is_err());
@@ -157,11 +175,12 @@ fn rejects_spoofed_namespace_and_constraints_without_queuing_changes() {
     );
     assert!(rule.set_prompt(Some("x".repeat(256))).is_err());
     let collection = DataValidationCollection::new(DataValidationSource::Core, vec![rule]).unwrap();
-    assert!(litchi_ooxml::xlsx::validate_data_validation_collections(&[
-        collection.clone(),
-        collection,
-    ])
-    .is_err());
+    assert!(
+        litchi_ooxml::xlsx::validate_data_validation_collections(
+            &[collection.clone(), collection,]
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -182,7 +201,10 @@ fn failed_save_restores_parts_and_typed_writer_round_trips() {
     let package = OpcPackage::open(&output).unwrap();
     assert_eq!(
         parse_data_validation_collections(
-            package.get_part(&PackURI::new(SHEET).unwrap()).unwrap().blob()
+            package
+                .get_part(&PackURI::new(SHEET).unwrap())
+                .unwrap()
+                .blob()
         )
         .unwrap()
         .len(),
@@ -200,7 +222,10 @@ fn failed_save_restores_parts_and_typed_writer_round_trips() {
     let package = OpcPackage::open(&writer_path).unwrap();
     assert_eq!(
         parse_data_validation_collections(
-            package.get_part(&PackURI::new(SHEET).unwrap()).unwrap().blob()
+            package
+                .get_part(&PackURI::new(SHEET).unwrap())
+                .unwrap()
+                .blob()
         )
         .unwrap()
         .len(),

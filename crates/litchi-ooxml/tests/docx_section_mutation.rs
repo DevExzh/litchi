@@ -1,6 +1,4 @@
-use litchi_ooxml::docx::{
-    Package, SectionProperties, WdHeaderFooter, WdSectionStart,
-};
+use litchi_ooxml::docx::{Package, SectionProperties, WdHeaderFooter, WdSectionStart};
 use std::io::Cursor;
 
 const TRANSITIONAL: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test"><w:body><w:p><w:pPr><w:sectPr><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><mc:AlternateContent><mc:Fallback><x:opaque x:value="keep"/></mc:Fallback></mc:AlternateContent></w:sectPr></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body></w:document>"#;
@@ -32,7 +30,12 @@ fn accepts_strict_sections_and_rejects_malformed_body_final_placement() {
     let strict = r#"<s:document xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:body><s:p/><s:sectPr><s:type s:val="oddPage"/></s:sectPr></s:body></s:document>"#;
     let document = litchi_ooxml::docx::MutableDocument::from_xml(strict).unwrap();
     assert_eq!(document.section().start_type, Some(WdSectionStart::OddPage));
-    assert!(document.to_xml().unwrap().contains("<s:type s:val=\"oddPage\"/>"));
+    assert!(
+        document
+            .to_xml()
+            .unwrap()
+            .contains("<s:type s:val=\"oddPage\"/>")
+    );
 
     let nonfinal = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr/><w:p/></w:body></w:document>"#;
     assert!(litchi_ooxml::docx::MutableDocument::from_xml(nonfinal).is_err());

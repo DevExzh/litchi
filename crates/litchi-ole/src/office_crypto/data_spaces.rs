@@ -25,7 +25,9 @@ use super::property_integrity::{
     SUMMARY_INFORMATION_STREAM, checksum_matches, parse_encrypted_property_stream_info,
 };
 use super::sensitivity_labels::{SensitivityLabelList, parse_label_info};
-use crate::custom_xml_data::{DataStorePromotion, MsoDataStore, inspect_mso_data_store};
+use litchi_ole_common::custom_xml_data::{
+    DataStorePromotion, MsoDataStore, inspect_mso_data_store,
+};
 
 const HEADER_LENGTH: u32 = 8;
 const TRANSFORM_TYPE: u32 = 1;
@@ -1601,20 +1603,20 @@ mod tests {
                 ),
             )
             .unwrap();
-        let custom_properties = crate::custom_xml_data::CustomXmlDataProperties {
+        let custom_properties = litchi_ole_common::custom_xml_data::CustomXmlDataProperties {
             item_id: "{11111111-2222-3333-4444-555555555555}".parse().unwrap(),
             schema_references: vec!["urn:test".to_string()],
         };
-        let custom_item = crate::custom_xml_data::CustomXmlDataItem::new(
+        let custom_item = litchi_ole_common::custom_xml_data::CustomXmlDataItem::new(
             custom_properties.item_id.storage_name(),
             br#"<test xmlns="urn:test"/>"#.to_vec(),
             custom_properties,
         )
         .unwrap();
-        crate::custom_xml_data::write_mso_data_store(
+        litchi_ole_common::custom_xml_data::write_mso_data_store(
             &mut writer,
-            &crate::custom_xml_data::MsoDataStore::new(
-                crate::custom_xml_data::DataStorePromotion::Modified,
+            &litchi_ole_common::custom_xml_data::MsoDataStore::new(
+                litchi_ole_common::custom_xml_data::DataStorePromotion::Modified,
                 vec![custom_item],
             )
             .unwrap(),
@@ -1641,7 +1643,7 @@ mod tests {
         let custom_xml = graph.custom_xml_data_store.unwrap();
         assert_eq!(
             custom_xml.promotion,
-            crate::custom_xml_data::DataStorePromotion::Modified
+            litchi_ole_common::custom_xml_data::DataStorePromotion::Modified
         );
         assert_eq!(custom_xml.items().len(), 1);
     }
@@ -1720,21 +1722,21 @@ mod tests {
 
     #[test]
     fn rejects_custom_xml_promotion_without_irm() {
-        let store = crate::custom_xml_data::MsoDataStore::new(
-            crate::custom_xml_data::DataStorePromotion::Redundant,
+        let store = litchi_ole_common::custom_xml_data::MsoDataStore::new(
+            litchi_ole_common::custom_xml_data::DataStorePromotion::Redundant,
             Vec::new(),
         )
         .unwrap();
         assert!(validate_custom_xml_promotion(Some(&store), None).is_err());
 
         let mut writer = OleWriter::new();
-        crate::custom_xml_data::write_mso_data_store(&mut writer, &store).unwrap();
+        litchi_ole_common::custom_xml_data::write_mso_data_store(&mut writer, &store).unwrap();
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
         let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
         assert!(inspect_data_spaces(&mut ole).is_err());
 
-        let unspecified = crate::custom_xml_data::MsoDataStore::default();
+        let unspecified = litchi_ole_common::custom_xml_data::MsoDataStore::default();
         assert!(validate_custom_xml_promotion(Some(&unspecified), None).is_ok());
     }
 }

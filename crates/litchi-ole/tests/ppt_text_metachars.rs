@@ -43,7 +43,9 @@ fn reads_datetime_metachars_with_format_ids() {
         .collect::<Vec<_>>();
     assert_eq!(date_times.len(), 13);
     assert!(date_times.iter().all(|value| {
-        value.datetime_format().is_some_and(|format| format.get() <= 12)
+        value
+            .datetime_format()
+            .is_some_and(|format| format.get() <= 12)
     }));
     assert!(values.iter().all(|value| value.rtf_format().is_none()));
 }

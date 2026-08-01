@@ -51,14 +51,16 @@ pub(crate) fn validate_writer_encryption(
                     "BIFF8 XOR passwords cannot exceed 15 ANSI characters".to_string(),
                 ));
             }
-            if password.chars().any(|character| u32::from(character) > 0xff) {
+            if password
+                .chars()
+                .any(|character| u32::from(character) > 0xff)
+            {
                 return Err(XlsError::InvalidData(
                     "BIFF8 XOR passwords must contain only ANSI characters".to_string(),
                 ));
             }
         },
-        XlsEncryptionProfile::OfficeBinaryRc4
-        | XlsEncryptionProfile::CryptoApiRc4 { .. } => {
+        XlsEncryptionProfile::OfficeBinaryRc4 | XlsEncryptionProfile::CryptoApiRc4 { .. } => {
             if password.encode_utf16().count() > 255 {
                 return Err(XlsError::InvalidData(
                     "BIFF8 RC4 passwords cannot exceed 255 UTF-16 code units".to_string(),
@@ -70,8 +72,7 @@ pub(crate) fn validate_writer_encryption(
         && (!(40..=128).contains(&key_bits) || key_bits % 8 != 0)
     {
         return Err(XlsError::InvalidData(
-            "CryptoAPI RC4 key length must be a multiple of 8 from 40 through 128 bits"
-                .to_string(),
+            "CryptoAPI RC4 key length must be a multiple of 8 from 40 through 128 bits".to_string(),
         ));
     }
     Ok(())
@@ -265,7 +266,9 @@ fn random_16(field: &str) -> XlsResult<Zeroizing<[u8; 16]>> {
     Ok(value)
 }
 
-fn prepare_writer_material(encryption: &XlsWriterEncryption) -> XlsResult<WriterEncryptionMaterial> {
+fn prepare_writer_material(
+    encryption: &XlsWriterEncryption,
+) -> XlsResult<WriterEncryptionMaterial> {
     validate_writer_encryption(&encryption.password, encryption.profile)?;
     match encryption.profile {
         XlsEncryptionProfile::XorObfuscation => {
@@ -352,9 +355,9 @@ fn inspect_clear_workbook(workbook: &[u8]) -> XlsResult<ClearWorkbookPlan> {
             workbook[position + 2],
             workbook[position + 3],
         ]));
-        let record_end = header_end.checked_add(data_len).ok_or_else(|| {
-            XlsError::InvalidData("BIFF record length overflow".to_string())
-        })?;
+        let record_end = header_end
+            .checked_add(data_len)
+            .ok_or_else(|| XlsError::InvalidData("BIFF record length overflow".to_string()))?;
         if record_end > workbook.len() {
             return Err(XlsError::InvalidData(format!(
                 "generated BIFF record 0x{sid:04x} extends beyond the Workbook stream"
@@ -362,7 +365,10 @@ fn inspect_clear_workbook(workbook: &[u8]) -> XlsResult<ClearWorkbookPlan> {
         }
         let in_globals = globals_eof.is_none();
         if position == 0 {
-            if sid != BOF_SID || data_len < 4 || workbook[header_end + 2..header_end + 4] != 0x0005u16.to_le_bytes() {
+            if sid != BOF_SID
+                || data_len < 4
+                || workbook[header_end + 2..header_end + 4] != 0x0005u16.to_le_bytes()
+            {
                 return Err(XlsError::InvalidData(
                     "generated Workbook stream does not begin with a workbook-globals BOF"
                         .to_string(),
@@ -406,7 +412,8 @@ fn inspect_clear_workbook(workbook: &[u8]) -> XlsResult<ClearWorkbookPlan> {
         ));
     }
     for &payload in &boundsheet_payloads {
-        let target = u32::from_le_bytes(workbook[payload..payload + 4].try_into().unwrap()) as usize;
+        let target =
+            u32::from_le_bytes(workbook[payload..payload + 4].try_into().unwrap()) as usize;
         if target < globals_eof || !record_positions.contains(&target) {
             return Err(XlsError::InvalidData(
                 "BOUNDSHEET8 references an invalid substream offset".to_string(),
@@ -434,9 +441,11 @@ pub(crate) fn encrypt_workbook_for_write(
     let filepass_len = u16::try_from(material.filepass.len()).map_err(|_| {
         XlsError::InvalidData("FILEPASS payload exceeds the BIFF8 record limit".to_string())
     })?;
-    let shift = material.filepass.len().checked_add(4).ok_or_else(|| {
-        XlsError::InvalidData("FILEPASS record size overflow".to_string())
-    })?;
+    let shift = material
+        .filepass
+        .len()
+        .checked_add(4)
+        .ok_or_else(|| XlsError::InvalidData("FILEPASS record size overflow".to_string()))?;
     for payload in plan.boundsheet_payloads {
         let target = u32::from_le_bytes(workbook[payload..payload + 4].try_into().unwrap());
         let shifted = target
@@ -575,7 +584,9 @@ pub(crate) fn prepare_workbook_stream(
                     let password = password.ok_or(XlsError::PasswordRequired)?;
                     let secret = verify_binary_rc4_password(&filepass, password)?
                         .ok_or(XlsError::InvalidPassword)?;
-                    cipher = Some(WorkbookCipher::BinaryRc4(Box::new(BinaryRc4Stream::new(secret))));
+                    cipher = Some(WorkbookCipher::BinaryRc4(Box::new(BinaryRc4Stream::new(
+                        secret,
+                    ))));
                 },
                 FilePassRecord::CryptoApi(header) => {
                     let password = password.ok_or(XlsError::PasswordRequired)?;

@@ -6,8 +6,8 @@ use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::paragraph::ParagraphElement;
 use super::relmap::RelationshipMapper;
-use super::run::MutableRun;
 use super::revision::RevisionTextMode;
+use super::run::MutableRun;
 use crate::error::{OoxmlError, Result};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as _;
@@ -173,7 +173,13 @@ impl MutableSmartTag {
         &self.attributes
     }
 
-    pub(crate) fn write_placeholder_mode(&self, xml: &mut String, hyperlink_index: &mut usize, image_index: &mut usize, mode: RevisionTextMode) -> Result<()> {
+    pub(crate) fn write_placeholder_mode(
+        &self,
+        xml: &mut String,
+        hyperlink_index: &mut usize,
+        image_index: &mut usize,
+        mode: RevisionTextMode,
+    ) -> Result<()> {
         self.write_start(xml)?;
         for element in &self.elements {
             element.write_placeholder_mode(xml, hyperlink_index, image_index, mode)?;
@@ -182,7 +188,14 @@ impl MutableSmartTag {
         Ok(())
     }
 
-    pub(crate) fn write_with_rels_mode(&self, xml: &mut String, rel_mapper: &RelationshipMapper, hyperlink_index: &mut usize, image_index: &mut usize, mode: RevisionTextMode) -> Result<()> {
+    pub(crate) fn write_with_rels_mode(
+        &self,
+        xml: &mut String,
+        rel_mapper: &RelationshipMapper,
+        hyperlink_index: &mut usize,
+        image_index: &mut usize,
+        mode: RevisionTextMode,
+    ) -> Result<()> {
         self.write_start(xml)?;
         for element in &self.elements {
             element.write_with_rels_mode(xml, rel_mapper, hyperlink_index, image_index, mode)?;

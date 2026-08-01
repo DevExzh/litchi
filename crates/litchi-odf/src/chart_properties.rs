@@ -1462,9 +1462,10 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &ChartStyleRecord) -
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"chart-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some() {
-                        return Err(bad("duplicate style:chart-properties"));
-                    }
+                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                {
+                    return Err(bad("duplicate style:chart-properties"));
+                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;

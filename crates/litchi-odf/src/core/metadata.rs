@@ -478,8 +478,10 @@ impl MetaXmlPatch {
             MetaFieldEdit::between(expected.author.as_deref(), current.author.as_deref());
         self.subject =
             MetaFieldEdit::between(expected.subject.as_deref(), current.subject.as_deref());
-        self.description =
-            MetaFieldEdit::between(expected.description.as_deref(), current.description.as_deref());
+        self.description = MetaFieldEdit::between(
+            expected.description.as_deref(),
+            current.description.as_deref(),
+        );
         self.keywords =
             MetaFieldEdit::between(expected.keywords.as_deref(), current.keywords.as_deref());
         self
@@ -649,7 +651,10 @@ impl MetaNamespacePrefixes {
         match binding {
             Some(prefix) if prefix.is_empty() => (local_name.to_string(), None),
             Some(prefix) => (format!("{prefix}:{local_name}"), None),
-            None => (format!("{fallback_prefix}:{local_name}"), Some(namespace_uri)),
+            None => (
+                format!("{fallback_prefix}:{local_name}"),
+                Some(namespace_uri),
+            ),
         }
     }
 }

@@ -13,10 +13,7 @@ fn removed_worksheet_drops_part_and_remaps_defined_names() {
     workbook.define_name("Global", "Sheet1!$A$1");
     workbook.define_name_local("Scoped2", "Sheet2!$A$1", 1);
     workbook.define_name_local("Scoped3", "Sheet3!$A$1", 2);
-    workbook
-        .worksheet_mut(2)
-        .unwrap()
-        .set_print_area("A1:B2");
+    workbook.worksheet_mut(2).unwrap().set_print_area("A1:B2");
 
     let removed = workbook.remove_worksheet(1).unwrap();
     assert_eq!(removed.name(), "Sheet2");

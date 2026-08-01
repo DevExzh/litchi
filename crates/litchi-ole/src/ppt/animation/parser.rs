@@ -2696,7 +2696,7 @@ fn parse_build_atom(record: &PptRecord, expected: BuildKind) -> Result<BuildAtom
 
 fn parse_paragraph_build(record: &PptRecord) -> Result<ParagraphBuild> {
     require_container(record, PptRecordType::ParaBuild, 0, "ParaBuild")?;
-    if record.children.len() < 4 || (record.children.len() - 2) % 2 != 0 {
+    if record.children.len() < 4 || !(record.children.len() - 2).is_multiple_of(2) {
         return Err(PptError::Corrupted(
             "ParaBuild requires two atoms followed by level/time-node pairs".to_string(),
         ));

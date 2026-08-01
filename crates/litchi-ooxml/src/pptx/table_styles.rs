@@ -9,8 +9,8 @@
 //! each one defines. Cell style payloads (fills, borders, text styles) are
 //! retained as presence metadata only and are never resolved or rendered.
 
-use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::encoding::Decoder;
@@ -178,7 +178,8 @@ impl TableStyleList {
                         return Err(limit("table styles XML attribute count"));
                     }
                     if depth == 1 {
-                        if saw_root || !is_drawingml_name(&namespace, element.name(), b"tblStyleLst")
+                        if saw_root
+                            || !is_drawingml_name(&namespace, element.name(), b"tblStyleLst")
                         {
                             return Err(invalid(
                                 "table styles part must have one DrawingML tblStyleLst root",
@@ -189,7 +190,8 @@ impl TableStyleList {
                             unqualified_attribute_value(&element, b"def", decoder)?,
                             "default table style ID",
                         )?;
-                    } else if depth == 2 && is_drawingml_name(&namespace, element.name(), b"tblStyle")
+                    } else if depth == 2
+                        && is_drawingml_name(&namespace, element.name(), b"tblStyle")
                     {
                         if list.styles.len() >= MAX_STYLES {
                             return Err(limit("table style count"));
@@ -212,7 +214,8 @@ impl TableStyleList {
                         return Err(limit("table styles XML attribute count"));
                     }
                     if child_depth == 1 {
-                        if saw_root || !is_drawingml_name(&namespace, element.name(), b"tblStyleLst")
+                        if saw_root
+                            || !is_drawingml_name(&namespace, element.name(), b"tblStyleLst")
                         {
                             return Err(invalid(
                                 "table styles part must have one DrawingML tblStyleLst root",
@@ -327,10 +330,12 @@ fn record_part_style(
 /// Load the presentation's table styles part, if the package declares one.
 pub(crate) fn load_table_styles(package: &OpcPackage) -> Result<Option<TableStyleList>> {
     let presentation = package.main_document_part()?;
-    let mut found = presentation
-        .rels()
-        .iter()
-        .filter(|rel| matches!(rel.reltype(), rt::TABLE_STYLES | STRICT_TABLE_STYLES_RELATIONSHIP));
+    let mut found = presentation.rels().iter().filter(|rel| {
+        matches!(
+            rel.reltype(),
+            rt::TABLE_STYLES | STRICT_TABLE_STYLES_RELATIONSHIP
+        )
+    });
     let Some(rel) = found.next() else {
         return Ok(None);
     };
@@ -354,10 +359,10 @@ pub(crate) fn load_table_styles(package: &OpcPackage) -> Result<Option<TableStyl
 }
 
 fn bounded_optional(value: Option<String>, what: &str) -> Result<Option<String>> {
-    if let Some(value) = &value {
-        if value.len() > MAX_ATTRIBUTE_BYTES {
-            return Err(limit(what));
-        }
+    if let Some(value) = &value
+        && value.len() > MAX_ATTRIBUTE_BYTES
+    {
+        return Err(limit(what));
     }
     Ok(value)
 }
@@ -431,7 +436,11 @@ mod tests {
         let xml = r#"<a:tblStyleLst xmlns:a="http://purl.oclc.org/ooxml/drawingml/main"><a:tblStyle styleId="{S}"><a:seCell/></a:tblStyle></a:tblStyleLst>"#;
         let list = TableStyleList::parse(xml.as_bytes()).unwrap();
         assert!(list.default_style_id.is_none());
-        assert!(list.find("{S}").unwrap().has(TableStylePartKind::SouthEastCell));
+        assert!(
+            list.find("{S}")
+                .unwrap()
+                .has(TableStylePartKind::SouthEastCell)
+        );
     }
 
     #[test]

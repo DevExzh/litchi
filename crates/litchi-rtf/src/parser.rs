@@ -931,15 +931,13 @@ fn fit_text(value: Option<i32>) -> RtfResult<crate::FitText> {
     })
 }
 
-fn emphasis_mark(
-    mark: crate::EmphasisMark,
-    value: Option<i32>,
-) -> RtfResult<crate::EmphasisMark> {
+fn emphasis_mark(mark: crate::EmphasisMark, value: Option<i32>) -> RtfResult<crate::EmphasisMark> {
     require_parameterless(value, mark.control_word())?;
     Ok(mark)
 }
 
-fn paper_source_bin(value: Option<i32>, name: &str) -> RtfResult<u16> {    let value = value.ok_or_else(|| {
+fn paper_source_bin(value: Option<i32>, name: &str) -> RtfResult<u16> {
+    let value = value.ok_or_else(|| {
         RtfError::MalformedDocument(format!("RTF {name} control requires a numeric parameter"))
     })?;
     u16::try_from(value).map_err(|_| {
@@ -2499,7 +2497,9 @@ impl<'a> Parser<'a> {
                         "RTF custom XML attribute destinations must be starred".to_string(),
                     ));
                 },
-                Token::Control(ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd) => {
+                Token::Control(
+                    ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd,
+                ) => {
                     return Err(RtfError::MalformedDocument(
                         "RTF protection-range destinations must be starred".to_string(),
                     ));
@@ -5683,12 +5683,11 @@ impl<'a> Parser<'a> {
             ));
         }
 
-        let previous_event_revision = state.revision_event_id.and_then(|event_id| {
-            self.revision_event_indices.get(event_id).copied().flatten()
-        });
-        let event_continues_previous = previous_event_revision.is_some_and(|index| {
-            Some(index) == self.revisions.len().checked_sub(1)
-        });
+        let previous_event_revision = state
+            .revision_event_id
+            .and_then(|event_id| self.revision_event_indices.get(event_id).copied().flatten());
+        let event_continues_previous = previous_event_revision
+            .is_some_and(|index| Some(index) == self.revisions.len().checked_sub(1));
         if event_continues_previous
             && let Some(previous) = self.revisions.last_mut()
             && previous.revision_type == revision_type
@@ -5732,9 +5731,7 @@ impl<'a> Parser<'a> {
         if let Some(event_id) = state.revision_event_id {
             self.revision_event_indices[event_id] = Some(self.revisions.len() - 1);
         }
-        if (state.in_table || state.table_nesting_level >= 2)
-            && previous_event_revision.is_none()
-        {
+        if (state.in_table || state.table_nesting_level >= 2) && previous_event_revision.is_none() {
             let index = self.revisions.len() - 1;
             let event = match revision_type {
                 super::annotation::RevisionType::Insertion => {
@@ -5825,10 +5822,7 @@ impl<'a> Parser<'a> {
             let position = self.current_story_position()?;
             self.push_cell_story_event(
                 state.table_nesting_level,
-                crate::CellStoryEvent::RevisionEnd(crate::CellStoryReference {
-                    index,
-                    position,
-                }),
+                crate::CellStoryEvent::RevisionEnd(crate::CellStoryReference { index, position }),
             )
         } else {
             self.body_story_events
@@ -5848,9 +5842,7 @@ impl<'a> Parser<'a> {
         {
             self.record_revision_end(id)?;
         }
-        if (state.in_table || state.table_nesting_level >= level)
-            && state.revision_type.is_some()
-        {
+        if (state.in_table || state.table_nesting_level >= level) && state.revision_type.is_some() {
             self.current_state_mut()?.revision_event_id = None;
         }
         Ok(())
@@ -7891,11 +7883,8 @@ impl<'a> Parser<'a> {
                 state.formatting.color_ref = *c as ColorRef;
             },
             ControlWord::ColorBackground(value) => {
-                state.formatting.background_color = Some(Self::required_character_value(
-                    *value,
-                    "cb",
-                    u16::MAX,
-                )?);
+                state.formatting.background_color =
+                    Some(Self::required_character_value(*value, "cb", u16::MAX)?);
             },
 
             // Character formatting
@@ -8065,11 +8054,14 @@ impl<'a> Parser<'a> {
                 state.paragraph.revision.date = Some(*value);
             },
             ControlWord::OutlineLevel(value) => {
-                let level = u8::try_from(*value).ok().filter(|level| *level <= 9).ok_or_else(|| {
-                    RtfError::MalformedDocument(
-                        "RTF outline level must be between 0 and 9".to_string(),
-                    )
-                })?;
+                let level = u8::try_from(*value)
+                    .ok()
+                    .filter(|level| *level <= 9)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF outline level must be between 0 and 9".to_string(),
+                        )
+                    })?;
                 state.paragraph.outline_level = Some(level);
             },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
@@ -8788,9 +8780,7 @@ impl<'a> Parser<'a> {
             },
             ControlWord::TableDefaultCellWidthValue(param) => {
                 let value = param.ok_or_else(|| {
-                    RtfError::MalformedDocument(
-                        "RTF tscellwidth requires a parameter".to_string(),
-                    )
+                    RtfError::MalformedDocument("RTF tscellwidth requires a parameter".to_string())
                 })?;
                 if state.table_default_width_value.replace(value).is_some() {
                     return Err(RtfError::MalformedDocument(
@@ -9190,7 +9180,8 @@ impl<'a> Parser<'a> {
 
     fn bind_pending_section_break(&mut self, section_index: usize) {
         for event in self.body_story_events.iter_mut().rev() {
-            if let ParsedBodyStoryEvent::Resolved(crate::BodyStoryEvent::SectionBreak(boundary)) = event
+            if let ParsedBodyStoryEvent::Resolved(crate::BodyStoryEvent::SectionBreak(boundary)) =
+                event
                 && boundary.next_section.is_none()
             {
                 boundary.next_section = Some(section_index);
@@ -9346,10 +9337,10 @@ impl<'a> Parser<'a> {
             if let Some(overridden) = self.section_gutter_overrides.last_mut() {
                 *overridden = false;
             }
-        } else if matches!(control, ControlWord::MarginGutter(_)) {
-            if let Some(overridden) = self.section_gutter_overrides.last_mut() {
-                *overridden = true;
-            }
+        } else if matches!(control, ControlWord::MarginGutter(_))
+            && let Some(overridden) = self.section_gutter_overrides.last_mut()
+        {
+            *overridden = true;
         }
         let section = self.sections.last_mut().ok_or_else(|| {
             RtfError::ParserError("failed to create RTF section state".to_string())
@@ -12332,7 +12323,7 @@ impl<'a> Parser<'a> {
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     if encoded.is_empty()
-                        || encoded.len() % 2 != 0
+                        || !encoded.len().is_multiple_of(2)
                         || !encoded.bytes().all(|byte| byte.is_ascii_hexdigit())
                     {
                         return Err(RtfError::MalformedDocument(
@@ -13984,7 +13975,11 @@ impl<'a> Parser<'a> {
                         match control {
                             ControlWord::TableStyleRowDefaults(param) => {
                                 require_parameterless(*param, "tsrowd")?;
-                                set_style_once!("tsrowd", table_conditional.row_defaults_marker, true);
+                                set_style_once!(
+                                    "tsrowd",
+                                    table_conditional.row_defaults_marker,
+                                    true
+                                );
                             },
                             ControlWord::TableStyleFirstRow(param) => {
                                 require_parameterless(*param, "tscfirstrow")?;
@@ -13996,7 +13991,11 @@ impl<'a> Parser<'a> {
                             },
                             ControlWord::TableStyleFirstColumn(param) => {
                                 require_parameterless(*param, "tscfirstcol")?;
-                                set_style_once!("tscfirstcol", table_conditional.first_column, true);
+                                set_style_once!(
+                                    "tscfirstcol",
+                                    table_conditional.first_column,
+                                    true
+                                );
                             },
                             ControlWord::TableStyleLastColumn(param) => {
                                 require_parameterless(*param, "tsclastcol")?;
@@ -14004,27 +14003,53 @@ impl<'a> Parser<'a> {
                             },
                             ControlWord::TableStyleBandHorizontalOdd(param) => {
                                 require_parameterless(*param, "tscbandhorzodd")?;
-                                set_style_once!("tscbandhorzodd", table_conditional.band_horizontal_odd, true);
+                                set_style_once!(
+                                    "tscbandhorzodd",
+                                    table_conditional.band_horizontal_odd,
+                                    true
+                                );
                             },
                             ControlWord::TableStyleBandHorizontalEven(param) => {
                                 require_parameterless(*param, "tscbandhorzeven")?;
-                                set_style_once!("tscbandhorzeven", table_conditional.band_horizontal_even, true);
+                                set_style_once!(
+                                    "tscbandhorzeven",
+                                    table_conditional.band_horizontal_even,
+                                    true
+                                );
                             },
                             ControlWord::TableStyleBandVerticalOdd(param) => {
                                 require_parameterless(*param, "tscbandvertodd")?;
-                                set_style_once!("tscbandvertodd", table_conditional.band_vertical_odd, true);
+                                set_style_once!(
+                                    "tscbandvertodd",
+                                    table_conditional.band_vertical_odd,
+                                    true
+                                );
                             },
                             ControlWord::TableStyleBandVerticalEven(param) => {
                                 require_parameterless(*param, "tscbandverteven")?;
-                                set_style_once!("tscbandverteven", table_conditional.band_vertical_even, true);
+                                set_style_once!(
+                                    "tscbandverteven",
+                                    table_conditional.band_vertical_even,
+                                    true
+                                );
                             },
                             ControlWord::TableStyleBandSizeHorizontal(param) => {
-                                let value = Self::required_character_value(*param, "tscbandsh", u16::MAX)?;
-                                set_style_once!("tscbandsh", table_conditional.horizontal_band_size, Some(value));
+                                let value =
+                                    Self::required_character_value(*param, "tscbandsh", u16::MAX)?;
+                                set_style_once!(
+                                    "tscbandsh",
+                                    table_conditional.horizontal_band_size,
+                                    Some(value)
+                                );
                             },
                             ControlWord::TableStyleBandSizeVertical(param) => {
-                                let value = Self::required_character_value(*param, "tscbandsv", u16::MAX)?;
-                                set_style_once!("tscbandsv", table_conditional.vertical_band_size, Some(value));
+                                let value =
+                                    Self::required_character_value(*param, "tscbandsv", u16::MAX)?;
+                                set_style_once!(
+                                    "tscbandsv",
+                                    table_conditional.vertical_band_size,
+                                    Some(value)
+                                );
                             },
                             _ => unreachable!(),
                         }
@@ -14634,14 +14659,10 @@ impl<'a> Parser<'a> {
         let side = state.paragraph_border_side;
         if let Some(style) = Self::table_border_style(control) {
             let side = side.ok_or_else(|| {
-                RtfError::MalformedDocument(
-                    "RTF paragraph border style has no segment".to_string(),
-                )
+                RtfError::MalformedDocument("RTF paragraph border style has no segment".to_string())
             })?;
             Self::apply_paragraph_border_side(state, side, |border| {
-                if border.style != crate::BorderStyle::None
-                    && style != crate::BorderStyle::None
-                {
+                if border.style != crate::BorderStyle::None && style != crate::BorderStyle::None {
                     return Err(RtfError::MalformedDocument(
                         "duplicate RTF paragraph border style".to_string(),
                     ));
@@ -14715,25 +14736,34 @@ impl<'a> Parser<'a> {
         control: &ControlWord<'_>,
     ) -> RtfResult<bool> {
         match control {
-            ControlWord::Shading(value) => state.paragraph.shading.set_amount(Some(
-                Self::required_character_value(*value, "shading", 10_000)?,
-            ))?,
-            ControlWord::ForegroundPattern(value) => state
-                .paragraph
-                .shading
-                .set_foreground_color(Some(Self::required_character_value(
-                    *value,
-                    "cfpat",
-                    u16::MAX,
-                )?)),
-            ControlWord::BackgroundPattern(value) => state
-                .paragraph
-                .shading
-                .set_background_color(Some(Self::required_character_value(
-                    *value,
-                    "cbpat",
-                    u16::MAX,
-                )?)),
+            ControlWord::Shading(value) => {
+                state
+                    .paragraph
+                    .shading
+                    .set_amount(Some(Self::required_character_value(
+                        *value, "shading", 10_000,
+                    )?))?
+            },
+            ControlWord::ForegroundPattern(value) => {
+                state
+                    .paragraph
+                    .shading
+                    .set_foreground_color(Some(Self::required_character_value(
+                        *value,
+                        "cfpat",
+                        u16::MAX,
+                    )?))
+            },
+            ControlWord::BackgroundPattern(value) => {
+                state
+                    .paragraph
+                    .shading
+                    .set_background_color(Some(Self::required_character_value(
+                        *value,
+                        "cbpat",
+                        u16::MAX,
+                    )?))
+            },
             _ => return Ok(false),
         }
         Ok(true)
@@ -14775,11 +14805,8 @@ impl<'a> Parser<'a> {
                 state.formatting.color_ref = *value as ColorRef;
             },
             ControlWord::ColorBackground(value) => {
-                state.formatting.background_color = Some(Self::required_character_value(
-                    *value,
-                    "cb",
-                    u16::MAX,
-                )?);
+                state.formatting.background_color =
+                    Some(Self::required_character_value(*value, "cb", u16::MAX)?);
             },
             ControlWord::Highlight(value) => {
                 state.formatting.highlight_color = Some(*value as ColorRef);
@@ -14804,9 +14831,7 @@ impl<'a> Parser<'a> {
             ControlWord::UnderlineWords => state.formatting.underline = UnderlineStyle::Words,
             ControlWord::UnderlineThick => state.formatting.underline = UnderlineStyle::Thick,
             ControlWord::UnderlineWave => state.formatting.underline = UnderlineStyle::Wave,
-            ControlWord::UnderlineHairline => {
-                state.formatting.underline = UnderlineStyle::Hairline
-            },
+            ControlWord::UnderlineHairline => state.formatting.underline = UnderlineStyle::Hairline,
             ControlWord::UnderlineThickDotted => {
                 state.formatting.underline = UnderlineStyle::ThickDotted
             },
@@ -14822,9 +14847,7 @@ impl<'a> Parser<'a> {
             ControlWord::UnderlineThickLongDash => {
                 state.formatting.underline = UnderlineStyle::ThickLongDash
             },
-            ControlWord::UnderlineLongDash => {
-                state.formatting.underline = UnderlineStyle::LongDash
-            },
+            ControlWord::UnderlineLongDash => state.formatting.underline = UnderlineStyle::LongDash,
             ControlWord::UnderlineHeavyWave => {
                 state.formatting.underline = UnderlineStyle::HeavyWave
             },
@@ -14975,11 +14998,14 @@ impl<'a> Parser<'a> {
                 state.paragraph.revision.date = Some(*value);
             },
             ControlWord::OutlineLevel(value) => {
-                let level = u8::try_from(*value).ok().filter(|level| *level <= 9).ok_or_else(|| {
-                    RtfError::MalformedDocument(
-                        "RTF outline level must be between 0 and 9".to_string(),
-                    )
-                })?;
+                let level = u8::try_from(*value)
+                    .ok()
+                    .filter(|level| *level <= 9)
+                    .ok_or_else(|| {
+                        RtfError::MalformedDocument(
+                            "RTF outline level must be between 0 and 9".to_string(),
+                        )
+                    })?;
                 state.paragraph.outline_level = Some(level);
             },
             ControlWord::LeftAlign => state.paragraph.alignment = Alignment::Left,
@@ -15186,10 +15212,7 @@ impl<'a> Parser<'a> {
             _ => return Ok(false),
         }
         if let (Some(kind), Some(lines)) = (state.drop_cap_kind, state.drop_cap_lines) {
-            state.paragraph.drop_cap = Some(crate::ParagraphDropCap::new(
-                kind,
-                u16::from(lines),
-            )?);
+            state.paragraph.drop_cap = Some(crate::ParagraphDropCap::new(kind, u16::from(lines))?);
         }
         Ok(true)
     }
@@ -16506,9 +16529,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
         let name = pending.take().ok_or_else(|| {
-            RtfError::MalformedDocument(
-                "RTF custom XML attribute value has no name".to_string(),
-            )
+            RtfError::MalformedDocument("RTF custom XML attribute value has no name".to_string())
         })?;
         if attributes.len() >= crate::custom_xml::MAX_CUSTOM_XML_ATTRIBUTES_PER_TAG {
             return Err(RtfError::MalformedDocument(
@@ -16609,7 +16630,11 @@ impl<'a> Parser<'a> {
                 },
                 None => return Err(RtfError::UnexpectedEof),
                 _ => {
-                    let context = if is_open { "tag name" } else { "close tag name" };
+                    let context = if is_open {
+                        "tag name"
+                    } else {
+                        "close tag name"
+                    };
                     if !self.consume_destination_text_token(
                         &mut name,
                         &mut unicode_skip,
@@ -16724,9 +16749,7 @@ impl<'a> Parser<'a> {
             crate::custom_xml::MAX_CUSTOM_XML_ATTRIBUTE_VALUE_BYTES,
         )?;
         let tag = self.open_custom_xml_tags.last_mut().ok_or_else(|| {
-            RtfError::MalformedDocument(
-                "RTF custom XML attribute has no open tag".to_string(),
-            )
+            RtfError::MalformedDocument("RTF custom XML attribute has no open tag".to_string())
         })?;
         Self::push_custom_xml_attribute(
             &mut tag.attributes,
@@ -17193,8 +17216,7 @@ impl<'a> Parser<'a> {
                 },
                 _ => {
                     return Err(RtfError::MalformedDocument(
-                        "RTF math structure contains ungrouped, binary, or active data"
-                            .to_string(),
+                        "RTF math structure contains ungrouped, binary, or active data".to_string(),
                     ));
                 },
             }
@@ -17337,10 +17359,9 @@ impl<'a> Parser<'a> {
                             "RTF math run contains an unsupported group".to_string(),
                         ));
                     }
-                    properties = Some(self.parse_math_properties_group(
-                        crate::MathPropertiesKind::Run,
-                        depth,
-                    )?);
+                    properties = Some(
+                        self.parse_math_properties_group(crate::MathPropertiesKind::Run, depth)?,
+                    );
                 },
                 Some(Token::Control(ControlWord::MathPropertyNormalText(_))) => {
                     normal_text = true;
@@ -17420,9 +17441,11 @@ impl<'a> Parser<'a> {
                         )?));
                     },
                     Some(Token::Control(ControlWord::MathMatrixColumns)) => {
-                        if kind != crate::MathPropertiesKind::Structure(
-                            crate::MathStructureKind::Matrix,
-                        ) || saw_matrix_columns
+                        if kind
+                            != crate::MathPropertiesKind::Structure(
+                                crate::MathStructureKind::Matrix,
+                            )
+                            || saw_matrix_columns
                         {
                             return Err(RtfError::MalformedDocument(
                                 "RTF math matrix columns are misplaced".to_string(),
@@ -17432,8 +17455,7 @@ impl<'a> Parser<'a> {
                         matrix_columns = self.parse_math_matrix_columns(depth)?;
                     },
                     Some(Token::Control(property_control)) => {
-                        let Some((name, param)) = Self::math_property_name(property_control)
-                        else {
+                        let Some((name, param)) = Self::math_property_name(property_control) else {
                             return Err(RtfError::MalformedDocument(
                                 "RTF math destination contains an unsupported property".to_string(),
                             ));
@@ -17493,8 +17515,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::MathMatrixColumn))
                     ) {
                         return Err(RtfError::MalformedDocument(
-                            "RTF math matrix columns may contain only mmc destinations"
-                                .to_string(),
+                            "RTF math matrix columns may contain only mmc destinations".to_string(),
                         ));
                     }
                     columns.push(self.parse_math_matrix_column(depth)?);
@@ -17525,10 +17546,7 @@ impl<'a> Parser<'a> {
 
     /// Parse one matrix column destination (`\mmc`); `self.pos` is at its
     /// opening brace.
-    fn parse_math_matrix_column(
-        &mut self,
-        depth: usize,
-    ) -> RtfResult<crate::MathMatrixColumn<'a>> {
+    fn parse_math_matrix_column(&mut self, depth: usize) -> RtfResult<crate::MathMatrixColumn<'a>> {
         self.pos += 2; // opening brace and mmc control
         let mut properties = None;
         loop {
@@ -17724,12 +17742,11 @@ impl<'a> Parser<'a> {
                 crate::BodyStoryEvent::ProtectionRangeStart(self.next_protection_range_order),
             ));
             self.next_protection_range_order += 1;
-            self.open_protection_ranges.entry(id).or_default().push(range);
-        } else if let Some(open) = self
-            .open_protection_ranges
-            .get_mut(&id)
-            .and_then(Vec::pop)
-        {
+            self.open_protection_ranges
+                .entry(id)
+                .or_default()
+                .push(range);
+        } else if let Some(open) = self.open_protection_ranges.get_mut(&id).and_then(Vec::pop) {
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
                 crate::BodyStoryEvent::ProtectionRangeEnd(open.order),
             ));
@@ -17922,7 +17939,10 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let value: String = value.chars().filter(|c| !matches!(c, '\r' | '\n')).collect();
+        let value: String = value
+            .chars()
+            .filter(|c| !matches!(c, '\r' | '\n'))
+            .collect();
         crate::DocumentKinsoku::validate_characters(
             if following { "following" } else { "leading" },
             &value,
@@ -19313,9 +19333,7 @@ impl<'a> Parser<'a> {
                     }
                     object.section = Some(Cow::Owned(self.parse_object_text_destination()?));
                 },
-                Token::OpenBrace
-                    if self.nested_control_word() == Some(ControlWord::ObjectTime) =>
-                {
+                Token::OpenBrace if self.nested_control_word() == Some(ControlWord::ObjectTime) => {
                     if !matches!(
                         self.tokens.get(self.pos + 1),
                         Some(Token::Control(ControlWord::IgnorableDestination))
@@ -20032,8 +20050,7 @@ impl<'a> Parser<'a> {
                         text_drawing_order,
                         text_story_events,
                         text_background_color,
-                    ) =
-                        self.parse_shape_text_destination()?;
+                    ) = self.parse_shape_text_destination()?;
                     shape.text = Cow::Owned(text);
                     shape.text_shapes = text_shapes;
                     shape.text_shape_groups = text_shape_groups;
@@ -20417,8 +20434,7 @@ impl<'a> Parser<'a> {
                     if let Some(observed) = observed_background {
                         if observed != current {
                             return Err(RtfError::MalformedDocument(
-                                "RTF shape text has multiple visible background colors"
-                                    .to_string(),
+                                "RTF shape text has multiple visible background colors".to_string(),
                             ));
                         }
                     } else {
@@ -20505,7 +20521,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::Unicode(code))) => {
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
-                    observe_background!(decoded.chars().any(|character| !character.is_whitespace()));
+                    observe_background!(
+                        decoded.chars().any(|character| !character.is_whitespace())
+                    );
                     text.push_str(&decoded);
                 },
                 Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
@@ -20525,16 +20543,17 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
                     let decoded = control_symbol_text(control).unwrap_or_default();
-                    observe_background!(decoded.chars().any(|character| !character.is_whitespace()));
+                    observe_background!(
+                        decoded.chars().any(|character| !character.is_whitespace())
+                    );
                     text.push_str(decoded);
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::ColorBackground(value))) => {
                     *background_stack
                         .last_mut()
-                        .expect("shape-text background state") = Some(
-                        Self::required_character_value(*value, "cb", u16::MAX)?,
-                    );
+                        .expect("shape-text background state") =
+                        Some(Self::required_character_value(*value, "cb", u16::MAX)?);
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::Plain)) => {
@@ -20545,7 +20564,9 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Text(value)) => {
                     let decoded = self.decode_transport_text(value)?;
-                    observe_background!(decoded.chars().any(|character| !character.is_whitespace()));
+                    observe_background!(
+                        decoded.chars().any(|character| !character.is_whitespace())
+                    );
                     text.push_str(&decoded);
                     self.pos += 1;
                 },
@@ -20797,11 +20818,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Control(ControlWord::ShapeHyperlink))
                     ) =>
                 {
-                    if depth != 0
-                        || part.is_some()
-                        || !seen_name
-                        || hyperlink.is_some()
-                    {
+                    if depth != 0 || part.is_some() || !seen_name || hyperlink.is_some() {
                         return Err(RtfError::MalformedDocument(
                             "RTF hl must be the single direct hyperlink group after sn in sp"
                                 .to_string(),
@@ -21753,9 +21770,7 @@ impl<'a> Parser<'a> {
                     })?;
                     let text_box = crate::LegacyTextBox {
                         text: Cow::Borrowed(self.arena.alloc_str(&text) as &str),
-                        shapes: std::mem::take(&mut builder.shapes)
-                            .into_iter()
-                            .collect(),
+                        shapes: std::mem::take(&mut builder.shapes).into_iter().collect(),
                         shape_groups: std::mem::take(&mut builder.shape_groups)
                             .into_iter()
                             .collect(),
@@ -21946,7 +21961,9 @@ impl<'a> Parser<'a> {
                     require_parameterless(*param, "page")?;
                     builder
                         .story_events
-                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(text.len())));
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            text.len(),
+                        )));
                     self.pos += 1;
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
@@ -23439,9 +23456,7 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        Ok(Cow::Owned(
-            value.trim_end_matches(['\r', '\n']).to_string(),
-        ))
+        Ok(Cow::Owned(value.trim_end_matches(['\r', '\n']).to_string()))
     }
 
     fn skip_picture_property_whitespace(&mut self) {
@@ -24450,9 +24465,10 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                         pending_paragraph_break = false;
                     }
-                    self.current_hf_story_events.push(crate::StoryEvent::PageBreak(
-                        crate::PageBreak::new(self.current_hf_story_offset),
-                    ));
+                    self.current_hf_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_hf_story_offset,
+                        )));
                 },
                 Token::Control(ControlWord::Tab) => {
                     inert_section_format = false;
@@ -24655,9 +24671,10 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                         *pending_paragraph_break = false;
                     }
-                    self.current_hf_story_events.push(crate::StoryEvent::PageBreak(
-                        crate::PageBreak::new(self.current_hf_story_offset),
-                    ));
+                    self.current_hf_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_hf_story_offset,
+                        )));
                 },
                 Some(Token::Control(ControlWord::Unicode(code))) => {
                     if *pending_paragraph_break {
@@ -24788,9 +24805,10 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::Page(param)) => {
                     require_parameterless(*param, "page")?;
                     self.pos += 1;
-                    self.current_note_story_events.push(crate::StoryEvent::PageBreak(
-                        crate::PageBreak::new(self.current_note_buffer.len()),
-                    ));
+                    self.current_note_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_note_buffer.len(),
+                        )));
                 },
                 Token::Control(ControlWord::Unicode(code)) => {
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
@@ -24914,9 +24932,10 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::Page(param))) => {
                     require_parameterless(*param, "page")?;
                     self.pos += 1;
-                    self.current_note_story_events.push(crate::StoryEvent::PageBreak(
-                        crate::PageBreak::new(self.current_note_buffer.len()),
-                    ));
+                    self.current_note_story_events
+                        .push(crate::StoryEvent::PageBreak(crate::PageBreak::new(
+                            self.current_note_buffer.len(),
+                        )));
                 },
                 Some(Token::Control(ControlWord::Unicode(code))) => {
                     let code = *code;

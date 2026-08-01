@@ -137,9 +137,11 @@ impl DocumentEmbeddedFonts {
         let count = usize::from(count);
         if count > 0 {
             let entries_end = entry_offset
-                .checked_add(count.checked_mul(TTMBD_LEN).ok_or_else(|| {
-                    corrupted("SttbTtmbd element range overflows")
-                })?)
+                .checked_add(
+                    count
+                        .checked_mul(TTMBD_LEN)
+                        .ok_or_else(|| corrupted("SttbTtmbd element range overflows"))?,
+                )
                 .ok_or_else(|| corrupted("SttbTtmbd element range overflows"))?;
             if entry_offset < HEADER_LEN || entries_end > data.len() {
                 return Err(corrupted("SttbTtmbd element array is truncated"));
@@ -199,10 +201,7 @@ mod tests {
     fn parses_embedded_font_entries() {
         let data = sttb_ttmbd(
             HEADER_LEN as u16,
-            &[
-                (4096, 3, 0x0003, 0),
-                (8192, 5, 0x0000, WHOLE_FONT),
-            ],
+            &[(4096, 3, 0x0003, 0), (8192, 5, 0x0000, WHOLE_FONT)],
         );
         let parsed = DocumentEmbeddedFonts::parse_bytes(&data).unwrap();
         assert_eq!(parsed.fonts().len(), 2);
@@ -242,11 +241,10 @@ mod tests {
             DocumentEmbeddedFonts::parse_bytes(&sttb_ttmbd(10, &[(0, 0, 0, WHOLE_FONT)])).is_err()
         );
         // Negative font-table index.
-        assert!(DocumentEmbeddedFonts::parse_bytes(&sttb_ttmbd(
-            10,
-            &[(4096, 0x8000, 0, WHOLE_FONT)]
-        ))
-        .is_err());
+        assert!(
+            DocumentEmbeddedFonts::parse_bytes(&sttb_ttmbd(10, &[(4096, 0x8000, 0, WHOLE_FONT)]))
+                .is_err()
+        );
         // Element array shorter than ibstMac declares.
         let mut truncated = sttb_ttmbd(10, &[(4096, 0, 0, WHOLE_FONT)]);
         truncated.truncate(HEADER_LEN + 4);

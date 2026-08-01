@@ -24,12 +24,27 @@ fn parses_group_inheritance_restoration_plain_and_last_wins() {
     ))
     .unwrap();
 
-    assert_eq!(block(&document, "Zero").formatting.background_color, Some(0));
-    assert_eq!(block(&document, "Inner").formatting.background_color, Some(2));
-    assert_eq!(block(&document, "Tail").formatting.background_color, Some(0));
-    assert_eq!(block(&document, "Last").formatting.background_color, Some(3));
+    assert_eq!(
+        block(&document, "Zero").formatting.background_color,
+        Some(0)
+    );
+    assert_eq!(
+        block(&document, "Inner").formatting.background_color,
+        Some(2)
+    );
+    assert_eq!(
+        block(&document, "Tail").formatting.background_color,
+        Some(0)
+    );
+    assert_eq!(
+        block(&document, "Last").formatting.background_color,
+        Some(3)
+    );
     assert_eq!(block(&document, "Reset").formatting.background_color, None);
-    assert_eq!(block(&document, "Visible").formatting.background_color, Some(3));
+    assert_eq!(
+        block(&document, "Visible").formatting.background_color,
+        Some(3)
+    );
 }
 
 #[test]
@@ -52,7 +67,10 @@ fn character_style_and_body_round_trip_in_canonical_color_order() {
     let once = write(&document);
     assert!(once.contains(r"\cf1\cb2\highlight3"));
     let reparsed = RtfDocument::parse(&once).unwrap();
-    assert_eq!(block(&reparsed, "Body").formatting.background_color, Some(2));
+    assert_eq!(
+        block(&reparsed, "Body").formatting.background_color,
+        Some(2)
+    );
     assert_eq!(write(&reparsed), once);
 }
 
@@ -72,10 +90,7 @@ fn rejects_missing_negative_overflow_and_unrepresentable_shape_runs() {
         r"{\rtf1\cb Missing}",
         r"{\rtf1\cb-1 Negative}",
         r"{\rtf1\cb65536 Overflow}",
-        concat!(
-            r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 one",
-            r"\cb2 two}}}}"
-        ),
+        concat!(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 one", r"\cb2 two}}}}"),
     ] {
         assert!(RtfDocument::parse(source).is_err(), "{source}");
     }
@@ -105,13 +120,9 @@ fn parses_libreoffice_producer_fragment_and_round_trips_uniform_shape_text() {
         Some(1)
     );
 
-    let shape = RtfDocument::parse(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 uniform}}}}")
-        .unwrap();
+    let shape = RtfDocument::parse(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 uniform}}}}").unwrap();
     assert_eq!(
-        shape.shapes()[0]
-            .text_formatting
-            .unwrap()
-            .background_color,
+        shape.shapes()[0].text_formatting.unwrap().background_color,
         Some(1)
     );
     let serialized = write(&shape);

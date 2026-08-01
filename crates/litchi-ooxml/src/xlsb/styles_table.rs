@@ -14,7 +14,7 @@ use std::io::Read;
 /// Font information
 ///
 /// Fields ordered for optimal memory layout: String (24 bytes), f64 (8 bytes),
-/// Option<u32> (8 bytes), then bools (1 byte each, but padded).
+/// `Option<u32>` (8 bytes), then bools (1 byte each, but padded).
 #[derive(Debug, Clone)]
 pub struct Font {
     pub name: String,

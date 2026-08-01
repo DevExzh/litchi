@@ -65,7 +65,7 @@ impl XlsWorksheetIndexRecord {
                 ),
             ));
         }
-        if (data.len() - INDEX_FIXED_LEN) % 4 != 0 {
+        if !(data.len() - INDEX_FIXED_LEN).is_multiple_of(4) {
             return Err(invalid(
                 INDEX_RECORD_TYPE,
                 "INDEX has a partial DBCell pointer",
@@ -194,7 +194,7 @@ impl XlsDbCellRecord {
                 ),
             ));
         }
-        if (data.len() - 4) % 2 != 0 {
+        if !(data.len() - 4).is_multiple_of(2) {
             return Err(invalid(
                 DBCELL_RECORD_TYPE,
                 "DBCELL has a partial rgdb offset",
@@ -698,13 +698,13 @@ impl RowBlockIndexCollector {
             .flat_map(|block| block.indexed_rows.iter())
             .map(|row| u32::from(row.row))
             .max();
-        if let (Some(first), Some(last)) = (first_data_row, last_data_row) {
-            if (index.first_data_row, index.last_data_row_exclusive) != (first, last + 1) {
-                return Err(invalid(
-                    INDEX_RECORD_TYPE,
-                    "INDEX row bounds do not match indexed cell rows",
-                ));
-            }
+        if let (Some(first), Some(last)) = (first_data_row, last_data_row)
+            && (index.first_data_row, index.last_data_row_exclusive) != (first, last + 1)
+        {
+            return Err(invalid(
+                INDEX_RECORD_TYPE,
+                "INDEX row bounds do not match indexed cell rows",
+            ));
         }
         Ok(Some(XlsRowBlockIndex {
             index_record_position,

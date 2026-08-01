@@ -1358,8 +1358,8 @@ impl DocumentContextFieldKind {
             Self::Section,
             Self::SectionPages,
         ]
-            .into_iter()
-            .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
+        .into_iter()
+        .find(|kind| keyword.eq_ignore_ascii_case(kind.field_keyword()))
     }
 }
 
@@ -5113,9 +5113,7 @@ impl<'a> Field<'a> {
             {
                 FieldType::BidiOutline
             },
-            ParsedFieldCode::Other { ref keyword, .. }
-                if keyword.eq_ignore_ascii_case("SHAPE") =>
-            {
+            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("SHAPE") => {
                 FieldType::Shape
             },
             ParsedFieldCode::Other { ref keyword, .. }
@@ -5307,7 +5305,9 @@ impl<'a> Field<'a> {
             ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("QUOTE") => {
                 FieldType::Quote
             },
-            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("SYMBOL") => {
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("SYMBOL") =>
+            {
                 FieldType::Symbol
             },
             ParsedFieldCode::Other { ref keyword, .. }
@@ -5315,7 +5315,9 @@ impl<'a> Field<'a> {
             {
                 FieldType::AutoNumber
             },
-            ParsedFieldCode::Other { ref keyword, .. } if keyword.eq_ignore_ascii_case("LISTNUM") => {
+            ParsedFieldCode::Other { ref keyword, .. }
+                if keyword.eq_ignore_ascii_case("LISTNUM") =>
+            {
                 FieldType::ListNumber
             },
             ParsedFieldCode::Other { ref keyword, .. }
@@ -6674,11 +6676,17 @@ impl<'a> Field<'a> {
     }
 
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
-        push_story_page_break(&mut self.result_events, self.result.as_ref(), position, "field result")
+        push_story_page_break(
+            &mut self.result_events,
+            self.result.as_ref(),
+            position,
+            "field result",
+        )
     }
 
     pub fn clear_page_breaks(&mut self) {
-        self.result_events.retain(|event| !matches!(event, StoryEvent::PageBreak(_)));
+        self.result_events
+            .retain(|event| !matches!(event, StoryEvent::PageBreak(_)));
     }
 
     /// Return inert metadata when this is a well-formed `HYPERLINK` field.
@@ -7413,9 +7421,7 @@ fn external_include_parts(instruction: &str) -> Option<ExternalIncludeParts<'_>>
     })
 }
 
-fn referenced_document_field_parts(
-    instruction: &str,
-) -> Option<ReferencedDocumentFieldParts<'_>> {
+fn referenced_document_field_parts(instruction: &str) -> Option<ReferencedDocumentFieldParts<'_>> {
     let mut tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
     if !keyword.value.eq_ignore_ascii_case("RD") {
@@ -7434,7 +7440,9 @@ fn referenced_document_field_parts(
     let mut index = 0;
     while index < tokens.len() {
         let name = switch_name(&tokens[index])?;
-        let value = tokens.get(index + 1).filter(|token| is_field_operand(token));
+        let value = tokens
+            .get(index + 1)
+            .filter(|token| is_field_operand(token));
         if name.eq_ignore_ascii_case("f") {
             if relative_path || value.is_some() {
                 return None;
@@ -8948,8 +8956,7 @@ fn sequence_field_parts<'a>(
     {
         return None;
     }
-    let tail =
-        after_bookmark.trim_matches(|character: char| character.is_ascii_whitespace());
+    let tail = after_bookmark.trim_matches(|character: char| character.is_ascii_whitespace());
     Some((identifier, Some(bookmark), tail))
 }
 
@@ -8963,9 +8970,7 @@ fn formula_field_formula(instruction: &str) -> Option<&str> {
     (!formula.is_empty()).then_some(formula)
 }
 
-fn quote_field_parts<'a>(
-    instruction: &'a str,
-) -> Option<(Cow<'a, str>, Vec<FieldSwitch<'a>>)> {
+fn quote_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>, Vec<FieldSwitch<'a>>)> {
     let tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
     if !keyword.value.eq_ignore_ascii_case("QUOTE") {
@@ -8992,9 +8997,7 @@ fn quote_field_parts<'a>(
     Some((text, switches))
 }
 
-fn symbol_field_parts<'a>(
-    instruction: &'a str,
-) -> Option<(Cow<'a, str>, Vec<FieldSwitch<'a>>)> {
+fn symbol_field_parts<'a>(instruction: &'a str) -> Option<(Cow<'a, str>, Vec<FieldSwitch<'a>>)> {
     let tokens = tokenize(instruction).ok()?;
     let keyword = tokens.first()?;
     if !keyword.value.eq_ignore_ascii_case("SYMBOL") {
@@ -9601,7 +9604,10 @@ mod tests {
 
         assert_eq!(field.field_type, FieldType::MacroButton);
         let macro_button = field.macro_button().unwrap();
-        assert_eq!(macro_button.instruction(), r#"MACROBUTTON NoMacro "Click here""#);
+        assert_eq!(
+            macro_button.instruction(),
+            r#"MACROBUTTON NoMacro "Click here""#
+        );
         assert_eq!(macro_button.macro_name(), "NoMacro");
         assert_eq!(macro_button.display_text(), Some("Click here"));
         assert_eq!(macro_button.cached_result(), Some("Click here"));
@@ -9611,11 +9617,20 @@ mod tests {
         assert_eq!(macro_button.position(), 4);
 
         let multiword = Field::parse_instruction("MACROBUTTON NoMacro Click here now");
-        assert_eq!(multiword.macro_button().unwrap().display_text(), Some("Click here now"));
-        assert!(Field::parse_instruction("MACROBUTTON").macro_button().is_none());
-        assert!(Field::parse_instruction(r#"MACROBUTTON "" "button""#)
-            .macro_button()
-            .is_none());
+        assert_eq!(
+            multiword.macro_button().unwrap().display_text(),
+            Some("Click here now")
+        );
+        assert!(
+            Field::parse_instruction("MACROBUTTON")
+                .macro_button()
+                .is_none()
+        );
+        assert!(
+            Field::parse_instruction(r#"MACROBUTTON "" "button""#)
+                .macro_button()
+                .is_none()
+        );
     }
 
     #[test]
@@ -9888,9 +9903,11 @@ mod tests {
             Field::parse_instruction("BIDIOUTLINES").field_type,
             FieldType::Unknown
         );
-        assert!(Field::parse_instruction("BIDIOUTLINES")
-            .bidi_outline_field()
-            .is_none());
+        assert!(
+            Field::parse_instruction("BIDIOUTLINES")
+                .bidi_outline_field()
+                .is_none()
+        );
         let too_long = Field::new(
             FieldType::BidiOutline,
             Cow::Owned(format!("BIDIOUTLINE {}", "x".repeat(MAX_INSTRUCTION_LEN))),
@@ -9993,10 +10010,7 @@ mod tests {
 
         let too_long = Field::new(
             FieldType::FormText,
-            Cow::Owned(format!(
-                "FORMTEXT {}",
-                "x".repeat(MAX_INSTRUCTION_LEN)
-            )),
+            Cow::Owned(format!("FORMTEXT {}", "x".repeat(MAX_INSTRUCTION_LEN))),
             Cow::Borrowed(""),
         );
         assert!(too_long.legacy_form_field().is_none());
@@ -10037,10 +10051,7 @@ mod tests {
 
         let too_long = Field::new(
             FieldType::Private,
-            Cow::Owned(format!(
-                "PRIVATE {}",
-                "x".repeat(MAX_INSTRUCTION_LEN)
-            )),
+            Cow::Owned(format!("PRIVATE {}", "x".repeat(MAX_INSTRUCTION_LEN))),
             Cow::Borrowed(""),
         );
         assert!(too_long.private_field().is_none());
@@ -10223,7 +10234,10 @@ mod tests {
 
         assert_eq!(field.field_type, FieldType::Dde);
         let dde = field.dde_link().unwrap();
-        assert_eq!(dde.instruction(), r#"DDE Excel "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \p \* MERGEFORMAT"#);
+        assert_eq!(
+            dde.instruction(),
+            r#"DDE Excel "C:\\no-contact\\source.xlsx" "Sheet1!R1C1:R4C4" \a \p \* MERGEFORMAT"#
+        );
         assert_eq!(dde.kind(), DdeFieldKind::Dde);
         assert_eq!(dde.application(), "Excel");
         assert_eq!(dde.source(), r"C:\no-contact\source.xlsx");
@@ -10258,7 +10272,11 @@ mod tests {
         assert!(omit_graphics.omits_graphic_data());
 
         assert!(Field::parse_instruction("DDE").dde_link().is_none());
-        assert!(Field::parse_instruction(r"DDE Excel \p").dde_link().is_none());
+        assert!(
+            Field::parse_instruction(r"DDE Excel \p")
+                .dde_link()
+                .is_none()
+        );
         assert!(
             Field::parse_instruction(r"DDE Excel source \p unexpected")
                 .dde_link()
@@ -11058,8 +11076,7 @@ mod tests {
 
     #[test]
     fn document_variable_fields_preserve_names_without_resolution() {
-        let mut field =
-            Field::parse_instruction(r#"DOCVARIABLE "Customer Region" \* MERGEFORMAT"#);
+        let mut field = Field::parse_instruction(r#"DOCVARIABLE "Customer Region" \* MERGEFORMAT"#);
         field.result = Cow::Borrowed("cached region");
         field.status = FieldStatus {
             dirty: true,
@@ -11131,10 +11148,7 @@ mod tests {
         assert_eq!(property.position(), 4);
         assert_eq!(property.switches().len(), 2);
         assert_eq!(property.switches()[0].name, "*");
-        assert_eq!(
-            property.switches()[0].value.as_deref(),
-            Some("MERGEFORMAT")
-        );
+        assert_eq!(property.switches()[0].value.as_deref(), Some("MERGEFORMAT"));
         assert_eq!(property.switches()[1].name, "@");
         assert_eq!(
             property.switches()[1].value.as_deref(),
@@ -11249,9 +11263,11 @@ mod tests {
             Field::parse_instruction("INFOS TITLE").field_type,
             FieldType::Unknown
         );
-        assert!(Field::parse_instruction(r#"TITLE "Stored title override""#)
-            .info_field()
-            .is_none());
+        assert!(
+            Field::parse_instruction(r#"TITLE "Stored title override""#)
+                .info_field()
+                .is_none()
+        );
         let too_long = Field::new(
             FieldType::Info,
             Cow::Owned(format!("INFO {}", "x".repeat(MAX_INSTRUCTION_LEN))),
@@ -11262,8 +11278,7 @@ mod tests {
 
     #[test]
     fn document_information_fields_preserve_kinds_without_reading_or_calculating_values() {
-        let mut field =
-            Field::parse_instruction(r#"TITLE \* MERGEFORMAT \@ "opaque format""#);
+        let mut field = Field::parse_instruction(r#"TITLE \* MERGEFORMAT \@ "opaque format""#);
         field.result = Cow::Borrowed("cached title");
         field.status = FieldStatus {
             dirty: true,
@@ -11551,7 +11566,10 @@ mod tests {
         assert_eq!(without_header.data_source(), "recipients.csv");
         assert_eq!(without_header.header_source(), None);
         assert_eq!(without_header.switches()[0].name, "q");
-        assert_eq!(without_header.switches()[0].value.as_deref(), Some("opaque"));
+        assert_eq!(
+            without_header.switches()[0].value.as_deref(),
+            Some("opaque")
+        );
 
         assert!(Field::parse_instruction("DATA").mail_merge_data().is_none());
         assert!(
@@ -11599,7 +11617,10 @@ mod tests {
             database_field.opaque_instructions(),
             r#"\d "unavailable.csv" \c "DSN=NeverConnect" \s "SELECT * FROM Customers" \h"#
         );
-        assert_eq!(database_field.cached_result(), Some("cached database table"));
+        assert_eq!(
+            database_field.cached_result(),
+            Some("cached database table")
+        );
         assert!(database_field.is_dirty());
         assert!(database_field.is_locked());
         assert_eq!(database_field.owner(), FieldOwner::Body);
@@ -11615,10 +11636,7 @@ mod tests {
 
         let too_long = Field::new(
             FieldType::Database,
-            Cow::Owned(format!(
-                "DATABASE {}",
-                "x".repeat(MAX_INSTRUCTION_LEN)
-            )),
+            Cow::Owned(format!("DATABASE {}", "x".repeat(MAX_INSTRUCTION_LEN))),
             Cow::Borrowed(""),
         );
         assert!(too_long.database_field().is_none());
@@ -12052,7 +12070,8 @@ mod tests {
 
     #[test]
     fn quote_fields_preserve_cached_text_without_inserting_or_transforming_it() {
-        let mut quote = Field::parse_instruction(r#"QUOTE "Stored literal" \* MERGEFORMAT \# "000""#);
+        let mut quote =
+            Field::parse_instruction(r#"QUOTE "Stored literal" \* MERGEFORMAT \# "000""#);
         quote.result = Cow::Borrowed("cached literal");
         quote.status = FieldStatus {
             dirty: true,
@@ -12073,7 +12092,10 @@ mod tests {
         assert_eq!(quote_field.position(), 4);
         assert_eq!(quote_field.switches().len(), 2);
         assert_eq!(quote_field.switches()[0].name, "*");
-        assert_eq!(quote_field.switches()[0].value.as_deref(), Some("MERGEFORMAT"));
+        assert_eq!(
+            quote_field.switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
         assert_eq!(quote_field.switches()[1].name, "#");
         assert_eq!(quote_field.switches()[1].value.as_deref(), Some("000"));
 
@@ -12091,7 +12113,9 @@ mod tests {
             r#"QUOTE "unterminated"#,
         ] {
             assert!(
-                Field::parse_instruction(instruction).quote_field().is_none(),
+                Field::parse_instruction(instruction)
+                    .quote_field()
+                    .is_none(),
                 "{instruction}"
             );
         }
@@ -12103,8 +12127,7 @@ mod tests {
 
     #[test]
     fn symbol_fields_preserve_cached_metadata_without_mapping_codes_or_inserting_glyphs() {
-        let mut symbol =
-            Field::parse_instruction(r#"SYMBOL 0xA9 \f "Symbol" \s 12 \u"#);
+        let mut symbol = Field::parse_instruction(r#"SYMBOL 0xA9 \f "Symbol" \s 12 \u"#);
         symbol.result = Cow::Borrowed("cached copyright");
         symbol.status = FieldStatus {
             dirty: true,
@@ -12146,7 +12169,9 @@ mod tests {
             r#"SYMBOL 0xA9 \f "unterminated"#,
         ] {
             assert!(
-                Field::parse_instruction(instruction).symbol_field().is_none(),
+                Field::parse_instruction(instruction)
+                    .symbol_field()
+                    .is_none(),
                 "{instruction}"
             );
         }
@@ -12158,8 +12183,7 @@ mod tests {
 
     #[test]
     fn automatic_number_fields_preserve_cached_metadata_without_calculating_numbers_or_layout() {
-        let mut automatic =
-            Field::parse_instruction(r#"AUTONUM \s "." \* MERGEFORMAT"#);
+        let mut automatic = Field::parse_instruction(r#"AUTONUM \s "." \* MERGEFORMAT"#);
         automatic.result = Cow::Borrowed("7.");
         automatic.status = FieldStatus {
             dirty: true,
@@ -12255,10 +12279,7 @@ mod tests {
         assert_eq!(numbered.switches()[1].name, "s");
         assert_eq!(numbered.switches()[1].value.as_deref(), Some("3"));
         assert_eq!(numbered.switches()[2].name, "*");
-        assert_eq!(
-            numbered.switches()[2].value.as_deref(),
-            Some("MERGEFORMAT")
-        );
+        assert_eq!(numbered.switches()[2].value.as_deref(), Some("MERGEFORMAT"));
 
         let outline = Field::parse_instruction(r#"listnum "Outline Default" \l 4"#);
         assert_eq!(outline.field_type, FieldType::ListNumber);
@@ -12766,7 +12787,10 @@ mod tests {
         let fields = document.document_information_fields();
         assert_eq!(document.document_information_field_count(), 1);
         assert_eq!(fields.len(), 1);
-        assert_eq!(fields[0].kind(), DocumentInformationFieldKind::NumberOfWords);
+        assert_eq!(
+            fields[0].kind(),
+            DocumentInformationFieldKind::NumberOfWords
+        );
         assert_eq!(fields[0].cached_result(), Some("cached words"));
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
@@ -12796,7 +12820,10 @@ mod tests {
         assert_eq!(fields[1].kind(), DocumentContextFieldKind::Template);
         assert_eq!(fields[1].cached_result(), Some("cached template"));
         assert_eq!(fields[1].switches()[0].name, "*");
-        assert_eq!(fields[1].switches()[0].value.as_deref(), Some("MERGEFORMAT"));
+        assert_eq!(
+            fields[1].switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
         assert_eq!(document.text(), "Before Middle After");
     }
 
@@ -12815,7 +12842,10 @@ mod tests {
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
         assert_eq!(fields[0].switches()[0].name, "*");
-        assert_eq!(fields[0].switches()[0].value.as_deref(), Some("MERGEFORMAT"));
+        assert_eq!(
+            fields[0].switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
     }
 
     #[test]
@@ -12838,10 +12868,7 @@ mod tests {
             assert!(field.is_dirty());
             assert!(field.is_locked());
             assert_eq!(field.switches()[0].name, "*");
-            assert_eq!(
-                field.switches()[0].value.as_deref(),
-                Some("MERGEFORMAT")
-            );
+            assert_eq!(field.switches()[0].value.as_deref(), Some("MERGEFORMAT"));
         }
     }
 
@@ -12860,7 +12887,10 @@ mod tests {
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
         assert_eq!(fields[0].switches()[0].name, "*");
-        assert_eq!(fields[0].switches()[0].value.as_deref(), Some("MERGEFORMAT"));
+        assert_eq!(
+            fields[0].switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
         assert_eq!(document.text(), "Before After");
     }
 
@@ -12923,16 +12953,10 @@ mod tests {
             fields[0].object_instructions(),
             r#"Excel.Sheet.12 \* MERGEFORMAT"#
         );
-        assert_eq!(
-            fields[0].cached_result(),
-            Some("cached worksheet object")
-        );
+        assert_eq!(fields[0].cached_result(), Some("cached worksheet object"));
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
-        assert_eq!(
-            fields[1].object_instructions(),
-            r#""Equation.DSMT4" \d"#
-        );
+        assert_eq!(fields[1].object_instructions(), r#""Equation.DSMT4" \d"#);
         assert_eq!(fields[1].cached_result(), Some("cached equation object"));
         assert!(fields[1].is_dirty());
         assert!(fields[1].is_locked());
@@ -12956,10 +12980,7 @@ mod tests {
         assert_eq!(fields[0].cached_result(), Some("cached EAN13 barcode"));
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
-        assert_eq!(
-            fields[1].barcode_instructions(),
-            r#""ABC-123" CODE39 \d"#
-        );
+        assert_eq!(fields[1].barcode_instructions(), r#""ABC-123" CODE39 \d"#);
         assert_eq!(fields[1].cached_result(), Some("cached Code39 barcode"));
         assert!(fields[1].is_dirty());
         assert!(fields[1].is_locked());
@@ -12984,10 +13005,7 @@ mod tests {
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
         assert_eq!(fields[1].opaque_instructions(), "");
-        assert_eq!(
-            fields[1].cached_result(),
-            Some("cached bare bidi outline")
-        );
+        assert_eq!(fields[1].cached_result(), Some("cached bare bidi outline"));
         assert!(fields[1].is_dirty());
         assert!(fields[1].is_locked());
         assert_eq!(document.text(), "Before After");
@@ -13008,7 +13026,10 @@ mod tests {
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
         assert_eq!(fields[1].opaque_instructions(), "");
-        assert_eq!(fields[1].cached_result(), Some("cached bare drawing anchor"));
+        assert_eq!(
+            fields[1].cached_result(),
+            Some("cached bare drawing anchor")
+        );
         assert!(fields[1].is_dirty());
         assert!(fields[1].is_locked());
         assert_eq!(document.text(), "Before After");
@@ -13160,7 +13181,10 @@ mod tests {
         assert!(fields[0].is_dirty());
         assert!(fields[0].is_locked());
         assert_eq!(fields[0].switches()[0].name, "*");
-        assert_eq!(fields[0].switches()[0].value.as_deref(), Some("MERGEFORMAT"));
+        assert_eq!(
+            fields[0].switches()[0].value.as_deref(),
+            Some("MERGEFORMAT")
+        );
         assert_eq!(fields[1].data_source(), "recipients.csv");
         assert_eq!(fields[1].header_source(), None);
         assert_eq!(fields[1].cached_result(), Some("cached bare source"));
@@ -13509,18 +13533,12 @@ mod tests {
         assert_eq!(links[0].source(), "missing.xlsx");
         assert_eq!(links[0].item(), Some("Sheet1!A1"));
         assert!(links[0].requests_automatic_updates());
-        assert_eq!(
-            links[0].representation(),
-            Some(DdeRepresentation::Picture)
-        );
+        assert_eq!(links[0].representation(), Some(DdeRepresentation::Picture));
         assert_eq!(links[0].cached_result(), Some("cached DDE"));
         assert!(links[0].is_dirty());
         assert_eq!(links[1].kind(), DdeFieldKind::DdeAuto);
         assert_eq!(links[1].item(), Some("Sheet1!A2"));
-        assert_eq!(
-            links[1].representation(),
-            Some(DdeRepresentation::Text)
-        );
+        assert_eq!(links[1].representation(), Some(DdeRepresentation::Text));
         assert_eq!(links[1].cached_result(), Some("cached auto"));
         assert_eq!(document.text(), "Before Middle After");
     }
@@ -13840,16 +13858,15 @@ mod tests {
 
     #[test]
     fn parses_libreoffice_internal_hyperlink_fixtures() {
-        let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/rtf");
+        let fixture_root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/rtf");
         for (fixture, expected) in [
             ("fdo86750.rtf", "anchor"),
             ("tdf134614_toc_indent.rtf", "_Toc1"),
         ] {
-            let document = crate::RtfDocument::from_bytes(
-                &std::fs::read(fixture_root.join(fixture)).unwrap(),
-            )
-            .unwrap();
+            let document =
+                crate::RtfDocument::from_bytes(&std::fs::read(fixture_root.join(fixture)).unwrap())
+                    .unwrap();
             assert!(
                 document.fields().iter().any(|field| {
                     field.extract_bookmark().as_deref() == Some(expected)

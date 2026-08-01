@@ -40,10 +40,20 @@ fn parses_table_style_conditional_formatting_and_round_trips() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     for control in [
-        "\\tsrowd", "\\tscfirstrow", "\\tsclastrow", "\\tscfirstcol", "\\tsclastcol",
-        "\\tscbandhorzodd", "\\tscbandverteven", "\\tscbandsh2", "\\tscbandsv3",
+        "\\tsrowd",
+        "\\tscfirstrow",
+        "\\tsclastrow",
+        "\\tscfirstcol",
+        "\\tsclastcol",
+        "\\tscbandhorzodd",
+        "\\tscbandverteven",
+        "\\tscbandsh2",
+        "\\tscbandsv3",
     ] {
-        assert!(serialized.contains(control), "missing {control} in {serialized}");
+        assert!(
+            serialized.contains(control),
+            "missing {control} in {serialized}"
+        );
     }
 
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
@@ -58,10 +68,9 @@ fn parses_table_style_conditional_formatting_and_round_trips() {
 
 #[test]
 fn table_style_without_conditional_metadata_stays_empty() {
-    let document = RtfDocument::parse(
-        r#"{\rtf1\ansi{\stylesheet{\ql Normal;}{\*\ts16\b Table List;}}Body}"#,
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r#"{\rtf1\ansi{\stylesheet{\ql Normal;}{\*\ts16\b Table List;}}Body}"#)
+            .unwrap();
     let style = document
         .stylesheet()
         .styles()
@@ -71,7 +80,11 @@ fn table_style_without_conditional_metadata_stays_empty() {
     assert!(style.table_conditional.is_empty());
 
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
-    assert!(reparsed.stylesheet().styles()[1].table_conditional.is_empty());
+    assert!(
+        reparsed.stylesheet().styles()[1]
+            .table_conditional
+            .is_empty()
+    );
 }
 
 #[test]

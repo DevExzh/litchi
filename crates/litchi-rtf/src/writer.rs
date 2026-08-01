@@ -324,9 +324,7 @@ impl<W: Write> RtfWriter<W> {
                     if section_break.next_section == Some(0)
             )
         });
-        if !first_section_is_boundary_scoped
-            && let Some(section) = doc.sections().first()
-        {
+        if !first_section_is_boundary_scoped && let Some(section) = doc.sections().first() {
             self.write_section_with_fields(section, doc.fields())?;
         }
 
@@ -430,28 +428,64 @@ impl<W: Write> RtfWriter<W> {
             match *event {
                 crate::BodyStoryEvent::NavigationEntry(index) => {
                     let owner = navigation_owners.get_mut(index).ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::InvalidInput, "RTF body navigation index is out of range")
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body navigation index is out of range",
+                        )
                     })?;
                     *owner = owner.checked_add(1).ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::InvalidInput, "RTF navigation ownership overflow")
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF navigation ownership overflow",
+                        )
                     })?;
                 },
                 crate::BodyStoryEvent::RevisionStart(index) => {
-                    let revision = doc.revisions().get(index).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF body revision index is out of range"))?;
-                    if revision.revision_type != RevisionType::Insertion || std::mem::replace(&mut body_starts[index], true) {
-                        return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF body revision start has the wrong kind or is duplicated"));
+                    let revision = doc.revisions().get(index).ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body revision index is out of range",
+                        )
+                    })?;
+                    if revision.revision_type != RevisionType::Insertion
+                        || std::mem::replace(&mut body_starts[index], true)
+                    {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body revision start has the wrong kind or is duplicated",
+                        ));
                     }
                 },
                 crate::BodyStoryEvent::RevisionEnd(index) => {
-                    let revision = doc.revisions().get(index).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF body revision index is out of range"))?;
-                    if revision.revision_type != RevisionType::Insertion || std::mem::replace(&mut body_ends[index], true) {
-                        return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF body revision end has the wrong kind or is duplicated"));
+                    let revision = doc.revisions().get(index).ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body revision index is out of range",
+                        )
+                    })?;
+                    if revision.revision_type != RevisionType::Insertion
+                        || std::mem::replace(&mut body_ends[index], true)
+                    {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body revision end has the wrong kind or is duplicated",
+                        ));
                     }
                 },
                 crate::BodyStoryEvent::RevisionDeletion(index) => {
-                    let revision = doc.revisions().get(index).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF body revision index is out of range"))?;
-                    if revision.revision_type != RevisionType::Deletion || std::mem::replace(&mut body_deletions[index], true) {
-                        return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF body deletion has the wrong kind or is duplicated"));
+                    let revision = doc.revisions().get(index).ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body revision index is out of range",
+                        )
+                    })?;
+                    if revision.revision_type != RevisionType::Deletion
+                        || std::mem::replace(&mut body_deletions[index], true)
+                    {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body deletion has the wrong kind or is duplicated",
+                        ));
                     }
                 },
                 _ => {},
@@ -465,12 +499,19 @@ impl<W: Write> RtfWriter<W> {
             };
             if owned {
                 let valid = match revision.revision_type {
-                    RevisionType::Insertion => body_starts[index] && body_ends[index] && !body_deletions[index],
-                    RevisionType::Deletion => body_deletions[index] && !body_starts[index] && !body_ends[index],
+                    RevisionType::Insertion => {
+                        body_starts[index] && body_ends[index] && !body_deletions[index]
+                    },
+                    RevisionType::Deletion => {
+                        body_deletions[index] && !body_starts[index] && !body_ends[index]
+                    },
                     _ => false,
                 };
                 if !valid {
-                    return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF body revision ownership is incomplete or conflicting"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF body revision ownership is incomplete or conflicting",
+                    ));
                 }
                 revision_owners[index] = 1;
             }
@@ -485,10 +526,16 @@ impl<W: Write> RtfWriter<W> {
             )?;
         }
         if navigation_owners.iter().any(|owners| *owners != 1) {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "every RTF navigation entry must be owned by exactly one story"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "every RTF navigation entry must be owned by exactly one story",
+            ));
         }
         if revision_owners.iter().any(|owners| *owners != 1) {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "every RTF revision must be owned by exactly one story"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "every RTF revision must be owned by exactly one story",
+            ));
         }
         Ok(())
     }
@@ -508,40 +555,87 @@ impl<W: Write> RtfWriter<W> {
                 for event in cell.story_events() {
                     match *event {
                         crate::CellStoryEvent::NavigationEntry(reference) => {
-                            let entry = navigation_entries.get(reference.index).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell navigation index is out of range"))?;
-                            if entry.position() != reference.position || cell.text().get(reference.position..reference.position).is_none() {
-                                return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell navigation anchor is invalid"));
+                            let entry =
+                                navigation_entries.get(reference.index).ok_or_else(|| {
+                                    io::Error::new(
+                                        io::ErrorKind::InvalidInput,
+                                        "RTF table-cell navigation index is out of range",
+                                    )
+                                })?;
+                            if entry.position() != reference.position
+                                || cell
+                                    .text()
+                                    .get(reference.position..reference.position)
+                                    .is_none()
+                            {
+                                return Err(io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF table-cell navigation anchor is invalid",
+                                ));
                             }
                             let owners = &mut navigation_owners[reference.index];
-                            *owners = owners.checked_add(1).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF navigation ownership overflow"))?;
+                            *owners = owners.checked_add(1).ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF navigation ownership overflow",
+                                )
+                            })?;
                         },
                         crate::CellStoryEvent::RevisionStart(reference) => {
-                            let revision = revisions.get(reference.index).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell revision index is out of range"))?;
+                            let revision = revisions.get(reference.index).ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF table-cell revision index is out of range",
+                                )
+                            })?;
                             if revision.revision_type != RevisionType::Insertion
                                 || revision.position != reference.position
-                                || cell.text().get(revision.position..revision.range_end) != Some(revision.content.as_ref())
+                                || cell.text().get(revision.position..revision.range_end)
+                                    != Some(revision.content.as_ref())
                                 || std::mem::replace(&mut starts[reference.index], true)
                             {
-                                return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell revision start is invalid, duplicated, or has the wrong kind"));
+                                return Err(io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF table-cell revision start is invalid, duplicated, or has the wrong kind",
+                                ));
                             }
                         },
                         crate::CellStoryEvent::RevisionEnd(reference) => {
-                            let revision = revisions.get(reference.index).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell revision index is out of range"))?;
+                            let revision = revisions.get(reference.index).ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF table-cell revision index is out of range",
+                                )
+                            })?;
                             if revision.revision_type != RevisionType::Insertion
                                 || revision.range_end != reference.position
                                 || std::mem::replace(&mut ends[reference.index], true)
                             {
-                                return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell revision end is invalid, duplicated, or has the wrong kind"));
+                                return Err(io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF table-cell revision end is invalid, duplicated, or has the wrong kind",
+                                ));
                             }
                         },
                         crate::CellStoryEvent::RevisionDeletion(reference) => {
-                            let revision = revisions.get(reference.index).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell revision index is out of range"))?;
+                            let revision = revisions.get(reference.index).ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF table-cell revision index is out of range",
+                                )
+                            })?;
                             if revision.revision_type != RevisionType::Deletion
                                 || revision.position != reference.position
-                                || cell.text().get(reference.position..reference.position).is_none()
+                                || cell
+                                    .text()
+                                    .get(reference.position..reference.position)
+                                    .is_none()
                                 || std::mem::replace(&mut deletions[reference.index], true)
                             {
-                                return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell deletion is invalid, duplicated, or has the wrong kind"));
+                                return Err(io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF table-cell deletion is invalid, duplicated, or has the wrong kind",
+                                ));
                             }
                         },
                         _ => {},
@@ -551,14 +645,27 @@ impl<W: Write> RtfWriter<W> {
                     let touched = starts[index] || ends[index] || deletions[index];
                     if touched {
                         let valid = match revision.revision_type {
-                            RevisionType::Insertion => starts[index] && ends[index] && !deletions[index],
-                            RevisionType::Deletion => deletions[index] && !starts[index] && !ends[index],
+                            RevisionType::Insertion => {
+                                starts[index] && ends[index] && !deletions[index]
+                            },
+                            RevisionType::Deletion => {
+                                deletions[index] && !starts[index] && !ends[index]
+                            },
                             _ => false,
                         };
                         if !valid {
-                            return Err(io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell revision ownership is incomplete or conflicting"));
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF table-cell revision ownership is incomplete or conflicting",
+                            ));
                         }
-                        revision_owners[index] = revision_owners[index].checked_add(1).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF revision ownership overflow"))?;
+                        revision_owners[index] =
+                            revision_owners[index].checked_add(1).ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF revision ownership overflow",
+                                )
+                            })?;
                     }
                 }
                 for nested in cell.nested_tables() {
@@ -2084,14 +2191,14 @@ impl<W: Write> RtfWriter<W> {
                         .unwrap_or_else(|_| u8::from(entry.start_at_override.is_some()))
                 }))),
             )?;
-            if entry.levels.is_empty() {
-                if let Some(start_at) = entry.start_at_override {
-                    self.write_str("{")?;
-                    self.write_control_word("lfolevel", None)?;
-                    self.write_control_word("listoverridestartat", None)?;
-                    self.write_control_word("levelstartat", Some(start_at))?;
-                    self.write_str("}")?;
-                }
+            if entry.levels.is_empty()
+                && let Some(start_at) = entry.start_at_override
+            {
+                self.write_str("{")?;
+                self.write_control_word("lfolevel", None)?;
+                self.write_control_word("listoverridestartat", None)?;
+                self.write_control_word("levelstartat", Some(start_at))?;
+                self.write_str("}")?;
             }
             for level in &entry.levels {
                 self.write_str("{")?;
@@ -2986,12 +3093,18 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("shpz", Some(shape.geometry.z_order))?;
         self.write_shape_info(&shape.info)?;
         if shape.behind_doc
-            && !shape.info.iter().any(|info| matches!(info, crate::ShapeGroupInfo::BelowText(_)))
+            && !shape
+                .info
+                .iter()
+                .any(|info| matches!(info, crate::ShapeGroupInfo::BelowText(_)))
         {
             self.write_control_word("shpfblwtxt", Some(1))?;
         }
         if shape.locked
-            && !shape.info.iter().any(|info| matches!(info, crate::ShapeGroupInfo::LockAnchor))
+            && !shape
+                .info
+                .iter()
+                .any(|info| matches!(info, crate::ShapeGroupInfo::LockAnchor))
         {
             self.write_control_word("shplockanchor", None)?;
         }
@@ -3294,12 +3407,18 @@ impl<W: Write> RtfWriter<W> {
         self.write_control_word("shpz", Some(shape.geometry.z_order))?;
         self.write_shape_info(&shape.info)?;
         if shape.behind_doc
-            && !shape.info.iter().any(|info| matches!(info, crate::ShapeGroupInfo::BelowText(_)))
+            && !shape
+                .info
+                .iter()
+                .any(|info| matches!(info, crate::ShapeGroupInfo::BelowText(_)))
         {
             self.write_control_word("shpfblwtxt", Some(1))?;
         }
         if shape.locked
-            && !shape.info.iter().any(|info| matches!(info, crate::ShapeGroupInfo::LockAnchor))
+            && !shape
+                .info
+                .iter()
+                .any(|info| matches!(info, crate::ShapeGroupInfo::LockAnchor))
         {
             self.write_control_word("shplockanchor", None)?;
         }
@@ -3949,9 +4068,7 @@ impl<W: Write> RtfWriter<W> {
         }
         for child in &structure.children {
             match child {
-                crate::MathStructureChild::Element(element) => {
-                    self.write_math_element(element)?
-                },
+                crate::MathStructureChild::Element(element) => self.write_math_element(element)?,
                 crate::MathStructureChild::MatrixRow(row) => {
                     self.write_str("{")?;
                     self.write_control_word("mmr", None)?;
@@ -4496,20 +4613,24 @@ impl<W: Write> RtfWriter<W> {
         }
         let mut navigation_text_bytes = 0usize;
         let body_navigation: Vec<bool> = (0..navigation_entries.len())
-            .map(|index| body_story_events.iter().any(|event| {
+            .map(|index| {
+                body_story_events.iter().any(|event| {
                 matches!(event, crate::BodyStoryEvent::NavigationEntry(value) if *value == index)
-            }))
+            })
+            })
             .collect();
         let body_revisions: Vec<bool> = (0..revisions.len())
-            .map(|index| body_story_events.iter().any(|event| {
-                matches!(
-                    event,
-                    crate::BodyStoryEvent::RevisionStart(value)
-                        | crate::BodyStoryEvent::RevisionEnd(value)
-                        | crate::BodyStoryEvent::RevisionDeletion(value)
-                        if *value == index
-                )
-            }))
+            .map(|index| {
+                body_story_events.iter().any(|event| {
+                    matches!(
+                        event,
+                        crate::BodyStoryEvent::RevisionStart(value)
+                            | crate::BodyStoryEvent::RevisionEnd(value)
+                            | crate::BodyStoryEvent::RevisionDeletion(value)
+                            if *value == index
+                    )
+                })
+            })
             .collect();
         for (entry_index, entry) in navigation_entries.iter().enumerate() {
             entry
@@ -4593,7 +4714,10 @@ impl<W: Write> RtfWriter<W> {
             tag.validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
             let end = tag.position.checked_add(tag.content.len()).ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "RTF custom XML tag range overflow")
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF custom XML tag range overflow",
+                )
             })?;
             let content = body.get(tag.position..end).ok_or_else(|| {
                 io::Error::new(
@@ -4666,12 +4790,15 @@ impl<W: Write> RtfWriter<W> {
             range
                 .validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-            let end = range.position.checked_add(range.content.len()).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "RTF protection-range range overflow",
-                )
-            })?;
+            let end = range
+                .position
+                .checked_add(range.content.len())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF protection-range range overflow",
+                    )
+                })?;
             let content = body.get(range.position..end).ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -4695,12 +4822,15 @@ impl<W: Write> RtfWriter<W> {
             region
                 .validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
-            let end = region.position.checked_add(region.content.len()).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "RTF editable-region range overflow",
-                )
-            })?;
+            let end = region
+                .position
+                .checked_add(region.content.len())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF editable-region range overflow",
+                    )
+                })?;
             let content = body.get(region.position..end).ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -4775,7 +4905,9 @@ impl<W: Write> RtfWriter<W> {
         let mut revision_ranges: Vec<(usize, &Revision<'_>)> = revisions
             .iter()
             .enumerate()
-            .filter(|(index, revision)| body_revisions[*index] && revision.revision_type == RevisionType::Insertion)
+            .filter(|(index, revision)| {
+                body_revisions[*index] && revision.revision_type == RevisionType::Insertion
+            })
             .collect();
         revision_ranges.sort_by_key(|(_, revision)| (revision.position, revision.range_end));
         let mut previous_end = 0usize;
@@ -4811,7 +4943,9 @@ impl<W: Write> RtfWriter<W> {
         for revision in revisions
             .iter()
             .enumerate()
-            .filter(|(index, revision)| body_revisions[*index] && revision.revision_type == RevisionType::Deletion)
+            .filter(|(index, revision)| {
+                body_revisions[*index] && revision.revision_type == RevisionType::Deletion
+            })
             .map(|(_, revision)| revision)
         {
             revision
@@ -4915,9 +5049,7 @@ impl<W: Write> RtfWriter<W> {
                 crate::BodyStoryEvent::SectionBreak(section_break) => {
                     let section = match section_break.next_section {
                         None => None,
-                        Some(index)
-                            if index == next_section_index && index < sections.len() =>
-                        {
+                        Some(index) if index == next_section_index && index < sections.len() => {
                             next_section_index += 1;
                             Some(&sections[index])
                         },
@@ -5005,12 +5137,15 @@ impl<W: Write> RtfWriter<W> {
                     saw_protection_ends[index] = true;
                     let range = &protection_ranges[index];
                     (
-                        range.position.checked_add(range.content.len()).ok_or_else(|| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidInput,
-                                "RTF protection-range range overflow",
-                            )
-                        })?,
+                        range
+                            .position
+                            .checked_add(range.content.len())
+                            .ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF protection-range range overflow",
+                                )
+                            })?,
                         BodyEventKind::ProtectionRangeEnd(range),
                     )
                 },
@@ -5029,12 +5164,15 @@ impl<W: Write> RtfWriter<W> {
                     saw_editable_ends[index] = true;
                     let region = &editable_regions[index];
                     (
-                        region.position.checked_add(region.content.len()).ok_or_else(|| {
-                            io::Error::new(
-                                io::ErrorKind::InvalidInput,
-                                "RTF editable-region range overflow",
-                            )
-                        })?,
+                        region
+                            .position
+                            .checked_add(region.content.len())
+                            .ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF editable-region range overflow",
+                                )
+                            })?,
                         BodyEventKind::EditableRegionEnd(region),
                     )
                 },
@@ -5313,15 +5451,15 @@ impl<W: Write> RtfWriter<W> {
                 self.write_protection_range_marker("protend", range)
             },
             BodyEventKind::EditableRegionStart(region) => {
-                region
-                    .validate()
-                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+                region.validate().map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+                })?;
                 self.write_str("\\ebcstart ")
             },
             BodyEventKind::EditableRegionEnd(region) => {
-                region
-                    .validate()
-                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+                region.validate().map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidInput, error.to_string())
+                })?;
                 self.write_str("\\ebcend ")
             },
             BodyEventKind::AnnotationStart(annotation) => self.write_annotation_start(annotation),
@@ -6479,9 +6617,7 @@ impl<W: Write> RtfWriter<W> {
             UnderlineStyle::ThickDotted => self.write_control_word("ulthd", None)?,
             UnderlineStyle::ThickDashed => self.write_control_word("ulthdash", None)?,
             UnderlineStyle::ThickDashDot => self.write_control_word("ulthdashd", None)?,
-            UnderlineStyle::ThickDashDotDot => {
-                self.write_control_word("ulthdashdd", None)?
-            },
+            UnderlineStyle::ThickDashDotDot => self.write_control_word("ulthdashdd", None)?,
             UnderlineStyle::ThickLongDash => self.write_control_word("ulthldash", None)?,
             UnderlineStyle::LongDash => self.write_control_word("ulldash", None)?,
             UnderlineStyle::HeavyWave => self.write_control_word("ulhwave", None)?,
@@ -7219,7 +7355,13 @@ impl<W: Write> RtfWriter<W> {
             ));
         }
         for row in table.rows() {
-            self.write_table_row(row, table.direction(), fields, navigation_entries, revisions)?;
+            self.write_table_row(
+                row,
+                table.direction(),
+                fields,
+                navigation_entries,
+                revisions,
+            )?;
         }
         Ok(())
     }
@@ -7401,9 +7543,13 @@ impl<W: Write> RtfWriter<W> {
             };
             self.write_text(&cell.text()[offset..position])?;
             match *event {
-                crate::CellStoryEvent::NestedTable(index) => {
-                    self.write_nested_table(&cell.nested_tables()[index].table, depth + 1, fields, navigation_entries, revisions)?
-                },
+                crate::CellStoryEvent::NestedTable(index) => self.write_nested_table(
+                    &cell.nested_tables()[index].table,
+                    depth + 1,
+                    fields,
+                    navigation_entries,
+                    revisions,
+                )?,
                 crate::CellStoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
                     self.write_root_shape(&cell.shapes()[index])?
                 },
@@ -7417,32 +7563,62 @@ impl<W: Write> RtfWriter<W> {
                 crate::CellStoryEvent::PageBreak(_) => self.write_str("\\page ")?,
                 crate::CellStoryEvent::ColumnBreak(_) => self.write_str("\\column ")?,
                 crate::CellStoryEvent::NavigationEntry(reference) => {
-                    let entry = navigation_entries.get(reference.index).filter(|entry| {
-                        entry.position() == reference.position
-                    }).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell navigation reference is invalid"))?;
+                    let entry = navigation_entries
+                        .get(reference.index)
+                        .filter(|entry| entry.position() == reference.position)
+                        .ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF table-cell navigation reference is invalid",
+                            )
+                        })?;
                     self.write_navigation_entry(entry)?;
                 },
                 crate::CellStoryEvent::RevisionStart(reference) => {
-                    let revision = revisions.get(reference.index).filter(|revision| {
-                        revision.revision_type == RevisionType::Insertion
-                            && revision.position == reference.position
-                            && cell.text().get(revision.position..revision.range_end)
-                                == Some(revision.content.as_ref())
-                    }).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell insertion revision reference is invalid"))?;
+                    let revision = revisions
+                        .get(reference.index)
+                        .filter(|revision| {
+                            revision.revision_type == RevisionType::Insertion
+                                && revision.position == reference.position
+                                && cell.text().get(revision.position..revision.range_end)
+                                    == Some(revision.content.as_ref())
+                        })
+                        .ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF table-cell insertion revision reference is invalid",
+                            )
+                        })?;
                     self.write_revision_start(revision)?;
                 },
                 crate::CellStoryEvent::RevisionEnd(reference) => {
-                    revisions.get(reference.index).filter(|revision| {
-                        revision.revision_type == RevisionType::Insertion
-                            && revision.range_end == reference.position
-                    }).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell revision end reference is invalid"))?;
+                    revisions
+                        .get(reference.index)
+                        .filter(|revision| {
+                            revision.revision_type == RevisionType::Insertion
+                                && revision.range_end == reference.position
+                        })
+                        .ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF table-cell revision end reference is invalid",
+                            )
+                        })?;
                     self.write_str("}")?;
                 },
                 crate::CellStoryEvent::RevisionDeletion(reference) => {
-                    let revision = revisions.get(reference.index).filter(|revision| {
-                        revision.revision_type == RevisionType::Deletion
-                            && revision.position == reference.position
-                    }).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "RTF table-cell deletion revision reference is invalid"))?;
+                    let revision = revisions
+                        .get(reference.index)
+                        .filter(|revision| {
+                            revision.revision_type == RevisionType::Deletion
+                                && revision.position == reference.position
+                        })
+                        .ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF table-cell deletion revision reference is invalid",
+                            )
+                        })?;
                     self.write_revision(revision)?;
                 },
             }
@@ -8488,11 +8664,7 @@ impl<W: Write> RtfWriter<W> {
         if let Some(section_rsid) = section.properties.section_rsid {
             self.write_control_word("sectrsid", Some(section_rsid as i32))?;
         }
-        self.write_revision_metadata(
-            "srauth",
-            "srdate",
-            section.properties.revision,
-        )?;
+        self.write_revision_metadata("srauth", "srdate", section.properties.revision)?;
         if section.properties.title_page {
             self.write_control_word("titlepg", None)?;
         }
@@ -8573,10 +8745,7 @@ impl<W: Write> RtfWriter<W> {
             }
         }
         self.write_control_word("pgnstarts", Some(section.properties.page_number_start))?;
-        self.write_control_word(
-            section.properties.page_number_format.control_word(),
-            None,
-        )?;
+        self.write_control_word(section.properties.page_number_format.control_word(), None)?;
         if let Some(restart) = section.properties.page_number_restart {
             self.write_control_word(restart.control_word(), None)?;
         }
@@ -9145,16 +9314,11 @@ mod tests {
             crate::SectionBreakType::EvenPage
         );
         assert_eq!(reparsed.sections()[2].properties.page_width, 14000);
-        for (section, expected_header) in reparsed
-            .sections()
-            .iter()
-            .zip(["First", "Second", "Third"])
+        for (section, expected_header) in
+            reparsed.sections().iter().zip(["First", "Second", "Third"])
         {
             assert_eq!(
-                section
-                    .get_header(HeaderFooterType::Header)
-                    .unwrap()
-                    .text(),
+                section.get_header(HeaderFooterType::Header).unwrap().text(),
                 expected_header
             );
         }
@@ -9162,10 +9326,9 @@ mod tests {
 
     #[test]
     fn document_writer_round_trips_boundary_to_first_explicit_section() {
-        let document = RtfDocument::parse(
-            r#"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}"#,
-        )
-        .unwrap();
+        let document =
+            RtfDocument::parse(r#"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}"#)
+                .unwrap();
         assert_eq!(document.text(), "BeforeAfter");
         assert_eq!(document.sections().len(), 1);
         assert_eq!(
@@ -9219,18 +9382,16 @@ mod tests {
     #[test]
     fn document_writer_preserves_page_then_section_break_order() {
         let document =
-            RtfDocument::parse(r#"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}"#)
-                .unwrap();
+            RtfDocument::parse(r#"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}"#).unwrap();
         assert_eq!(document.text(), "OneTwo");
         assert_eq!(document.sections().len(), 2);
         assert_eq!(
             document.body_story_events(),
             [
                 crate::BodyStoryEvent::PageBreak(crate::PageBreak::new("One".len())),
-                crate::BodyStoryEvent::SectionBreak(crate::SectionBreak::new(
-                    "One".len(),
-                    Some(1),
-                )),
+                crate::BodyStoryEvent::SectionBreak(
+                    crate::SectionBreak::new("One".len(), Some(1),)
+                ),
             ]
         );
 

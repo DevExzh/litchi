@@ -8,6 +8,7 @@
 //! - Sound support
 //! - Build animations (chart, diagram, paragraph)
 
+mod editor;
 pub mod hash;
 mod linked_slide;
 pub mod motion_path;
@@ -17,7 +18,6 @@ pub mod sound;
 pub mod triggers;
 pub mod types;
 pub mod writer;
-mod editor;
 
 pub use editor::{
     PowerPointAnimationEditor, PowerPointAnimationEditorLimits, PowerPointAnimationScope,

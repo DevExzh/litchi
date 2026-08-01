@@ -48,8 +48,11 @@ fn data_tables_round_trip_through_writer_and_reader() {
 #[test]
 fn data_table_anchor_validation() {
     let range = XlsDataTableRange::new(2, 8, 3, 5).unwrap();
-    let table =
-        XlsDataTable::one_variable(range, false, XlsDataTableInputCell::Present { row: 0, col: 0 });
+    let table = XlsDataTable::one_variable(
+        range,
+        false,
+        XlsDataTableInputCell::Present { row: 0, col: 0 },
+    );
 
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Tables").unwrap();
@@ -74,9 +77,16 @@ fn kind_accessors_expose_input_cells() {
         XlsDataTableInputCell::Present { row: 1, col: 2 },
         XlsDataTableInputCell::Deleted,
     );
-    let XlsDataTableKind::TwoVariable { row_input, column_input } = table.kind() else {
+    let XlsDataTableKind::TwoVariable {
+        row_input,
+        column_input,
+    } = table.kind()
+    else {
         panic!()
     };
-    assert_eq!(*row_input, XlsDataTableInputCell::Present { row: 1, col: 2 });
+    assert_eq!(
+        *row_input,
+        XlsDataTableInputCell::Present { row: 1, col: 2 }
+    );
     assert_eq!(*column_input, XlsDataTableInputCell::Deleted);
 }

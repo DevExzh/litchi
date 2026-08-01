@@ -40,7 +40,8 @@ fn second_save_after_worksheet_removal_drops_the_stale_part() {
 }
 
 #[test]
-fn second_save_after_chartsheet_removal_drops_stale_parts() {    let directory = tempfile::tempdir().unwrap();
+fn second_save_after_chartsheet_removal_drops_stale_parts() {
+    let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("double-save-chartsheet.xlsx");
 
     let mut workbook = Workbook::create().unwrap();

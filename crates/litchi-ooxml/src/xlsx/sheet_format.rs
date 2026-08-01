@@ -254,10 +254,9 @@ fn capture_element_dy_descent(
     if depth == 1
         && is_spreadsheetml_name(namespace, element.name(), local.as_ref())
         && local.as_ref() == b"sheetFormatPr"
+        && let Some(value) = parse_dy_descent_attribute(element, decoder, resolver)?
     {
-        if let Some(value) = parse_dy_descent_attribute(element, decoder, resolver)? {
-            set_once(result, value, "x14ac:dyDescent")?;
-        }
+        set_once(result, value, "x14ac:dyDescent")?;
     }
     Ok(())
 }

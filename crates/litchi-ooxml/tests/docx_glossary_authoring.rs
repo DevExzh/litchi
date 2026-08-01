@@ -1,7 +1,7 @@
 use litchi_ooxml::docx::{
     DocPartCategory, DocPartGallery, DocPartName, DocPartProperties, DocPartType,
-    GlossaryAuxiliaryPart, GlossaryDocument, GlossaryEntry, GlossaryPackage,
-    GlossaryRelationship, InsertionBehavior, Package,
+    GlossaryAuxiliaryPart, GlossaryDocument, GlossaryEntry, GlossaryPackage, GlossaryRelationship,
+    InsertionBehavior, Package,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
@@ -93,7 +93,14 @@ fn ordinary_mutation_preserves_libreoffice_test_glossary() {
         "/../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx"
     ))
     .unwrap();
-    assert!(package.glossary_document().unwrap().unwrap().entries().is_empty());
+    assert!(
+        package
+            .glossary_document()
+            .unwrap()
+            .unwrap()
+            .entries()
+            .is_empty()
+    );
     package
         .document_mut()
         .unwrap()
@@ -101,7 +108,14 @@ fn ordinary_mutation_preserves_libreoffice_test_glossary() {
     package.save(&output).unwrap();
 
     let reopened = Package::open(&output).unwrap();
-    assert!(reopened.glossary_document().unwrap().unwrap().entries().is_empty());
+    assert!(
+        reopened
+            .glossary_document()
+            .unwrap()
+            .unwrap()
+            .entries()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -207,11 +221,13 @@ fn invalid_graph_updates_roll_back_without_losing_existing_glossary() {
         );
         invalid.relationships.push(relationship);
         assert!(package.set_glossary_package(invalid).is_err());
-        assert!(package
-            .glossary_document()
-            .unwrap()
-            .unwrap()
-            .find_entry("Keep")
-            .is_some());
+        assert!(
+            package
+                .glossary_document()
+                .unwrap()
+                .unwrap()
+                .find_entry("Keep")
+                .is_some()
+        );
     }
 }

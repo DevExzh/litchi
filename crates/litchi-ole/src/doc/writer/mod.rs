@@ -83,6 +83,7 @@ mod glossary;
 mod attached_glossary;
 
 // Re-export public types
+pub use crate::doc::encryption::DocEncryptionProfile;
 pub use crate::doc::parts::chp::{CharacterPosition, HresiOperand, HyphenationMode, TextEffect};
 pub use crate::doc::parts::pap::{
     AutoNumberAlignment, Border as ParagraphBorder, BorderStyle as ParagraphBorderStyle,
@@ -101,18 +102,17 @@ pub use crate::doc::parts::tap::{
 };
 pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
+pub use core::DocHeaderKind;
 pub use core::{
     CharacterFormatting, DocWriteError, DocWriter, HeaderFooterParagraph, LineSpacing,
     ParagraphFormatting,
 };
-pub use crate::doc::encryption::DocEncryptionProfile;
 pub use fib::FibBuilder;
 pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};
 pub use footnotes::{EndnotesWriter, FootnoteEntry, FootnotesWriter};
 pub use headers::{HeaderFooterEntry, HeaderFooterType, HeadersWriter};
 pub use hyperlinks::{HyperlinkEntry, HyperlinkType, HyperlinksWriter};
 pub use images::{DocPicture, FloatingPosition, PictureFormat};
-pub use core::DocHeaderKind;
 pub use numbering::{ListFormatOverride, ListLevel, ListStructure, NumberFormat, NumberingWriter};
 pub use piece_table::{Piece, PieceTableBuilder};
 pub use revisions::{DisplayFieldRevision, FormattingRevision, NumberingRevision, TextRevision};

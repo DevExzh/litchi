@@ -10,10 +10,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_zero_width_break_characters_and_round_trips() {
-    let document = RtfDocument::parse(
-        r"{\rtf1\ansi a\zwbo b\zwnbo c\zwj d\zwnj e}",
-    )
-    .unwrap();
+    let document = RtfDocument::parse(r"{\rtf1\ansi a\zwbo b\zwnbo c\zwj d\zwnj e}").unwrap();
     assert_eq!(document.text(), "a\u{200B}b\u{FEFF}c\u{200D}d\u{200C}e");
 
     let output = write(&document);
@@ -26,10 +23,8 @@ fn parses_zero_width_break_characters_and_round_trips() {
 
 #[test]
 fn parses_soft_break_markers_and_round_trips() {
-    let document = RtfDocument::parse(
-        r"{\rtf1 a\softline b\softpage c\softcol d\softlheight240 e}",
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r"{\rtf1 a\softline b\softpage c\softcol d\softlheight240 e}").unwrap();
     assert_eq!(document.text(), "abcde");
     let breaks: Vec<_> = document.soft_breaks().collect();
     assert_eq!(breaks.len(), 4);

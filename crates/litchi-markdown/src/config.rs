@@ -313,7 +313,7 @@ pub enum FormulaStyle {
 /// Determines how superscript and subscript text is rendered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptStyle {
-    /// Use HTML tags: <sup> and <sub>.
+    /// Use HTML tags: `<sup>` and `<sub>`.
     ///
     /// Examples:
     /// - Superscript: x<sup>2</sup>

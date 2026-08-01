@@ -121,27 +121,22 @@ pub use field::CompareField;
 pub use field::{
     ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AdvanceField,
     AdvanceFieldAdjustment, AdvanceFieldOperation, AutoNumberField, AutoNumberFieldKind,
-    AutoTextField, AutoTextFieldKind,
-    AutoTextListField, AutoTextListOption, BarcodeField, BibliographyField, BidiOutlineField,
-    CitationField, DatabaseField, DdeField, DdeFieldKind, DdeRepresentation,
-    DocumentContextField, DocumentContextFieldKind,
-    DocumentInformationField, DocumentInformationFieldKind, DocumentPropertyField,
-    DocumentVariableField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch,
-    EmbedField, EquationField, FormulaField, GoToButtonField, HyperlinkField, IfField,
-    IncludeFieldKind, IndexEntryField,
-    IndexField, IndexSortOrder, InfoField, LegacyFormField, LegacyFormFieldKind, LinkField,
-    LinkFormatting, LinkResultOption, ListNumberField, MacroButtonField,
-    MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
-    MailMergeCounterKind, MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
-    MailMergeRecipientFieldKind, MergeField, PrintField, PrivateField, PromptField,
-    PromptFieldKind,
-    QuoteField, ReferencedDocumentField, ReferenceField, ReferenceFieldKind, ReferenceFieldOption,
-    SequenceField,
-    SetField, ShapeField, StyleReferenceField, StyleReferenceFieldOption,
-    SymbolField,
+    AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption, BarcodeField,
+    BibliographyField, BidiOutlineField, CitationField, DatabaseField, DdeField, DdeFieldKind,
+    DdeRepresentation, DocumentContextField, DocumentContextFieldKind, DocumentInformationField,
+    DocumentInformationFieldKind, DocumentPropertyField, DocumentVariableField, EmbedField,
+    EquationField, ExternalIncludeField, ExternalIncludeOption, Field, FieldSwitch, FormulaField,
+    GoToButtonField, HyperlinkField, IfField, IncludeFieldKind, IndexEntryField, IndexField,
+    IndexSortOrder, InfoField, LegacyFormField, LegacyFormFieldKind, LinkField, LinkFormatting,
+    LinkResultOption, ListNumberField, MacroButtonField, MailMergeConditionalControlField,
+    MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
+    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
+    MergeField, PrintField, PrivateField, PromptField, PromptFieldKind, QuoteField, ReferenceField,
+    ReferenceFieldKind, ReferenceFieldOption, ReferencedDocumentField, SequenceField, SetField,
+    ShapeField, StyleReferenceField, StyleReferenceFieldOption, SymbolField,
     TableOfAuthoritiesEntryField, TableOfAuthoritiesField, TableOfContentsEntryField,
-    TableOfContentsField, TableOfContentsLevelRange,
-    TableOfContentsSwitch, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
+    TableOfContentsField, TableOfContentsLevelRange, TableOfContentsSwitch, UserIdentityField,
+    UserIdentityFieldKind, UserIdentityFormatting,
 };
 pub use font_table::{
     EmbeddedFont, EmbeddedFontLicensing, EmbeddedFontResource, EmbeddedFontStyle, Font,
@@ -153,8 +148,8 @@ pub use font_table::{
 pub use footnote::{Note, NoteType};
 pub use glossary::{
     DocPartCategory, DocPartGallery, DocPartName, DocPartProperties, DocPartType,
-    GlossaryAuxiliaryPart, GlossaryDocument, GlossaryEntry, GlossaryPackage,
-    GlossaryRelationship, InsertionBehavior,
+    GlossaryAuxiliaryPart, GlossaryDocument, GlossaryEntry, GlossaryPackage, GlossaryRelationship,
+    InsertionBehavior,
 };
 pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
@@ -201,9 +196,7 @@ pub use textbox::{
 };
 pub use theme::Theme;
 pub use variables::DocumentVariables;
-pub use vba_project::{
-    VbaDocumentEvent, VbaMacroDescriptor, VbaProject, VbaSupplementalData,
-};
+pub use vba_project::{VbaDocumentEvent, VbaMacroDescriptor, VbaProject, VbaSupplementalData};
 pub use web_settings::{
     Frame, FrameLayout, FrameScrollbarVisibility, Frameset, FramesetChild, FramesetColor,
     FramesetSplitBar, HtmlDiv, HtmlDivBorder, HtmlDivBorders, TargetScreenSize, ThemeColor,
@@ -213,23 +206,21 @@ pub use web_settings::{
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 // Re-export writer types
 pub use writer::{
-    BibliographyFieldSpec, BibliographyFilter, CellProperties, CitationFieldSpec, CitationSource,
-    ColorScheme, ContentControlType, DocumentProtection, ListType, MutableBookmark, MutableComment,
-    MutableContentControl, MutableDocument, MutableField, MutableHyperlink,
-    MutableInlineImage, MutableParagraph, MutableRevision, MutableRun, MutableSmartTag,
-    MutableSmartTagAttribute, MutableStyle, MutableTable, MutableTextBox, MutableTheme,
-    MutableOleObject, MAX_OLE_PAYLOAD_BYTES, MutableSmartArt, MAX_SMART_ARTS, PageNumberFormat,
-    MutableVmlShape, VmlShapeKind, VmlShapePosition,
-    PageOrientation, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
-    CellRevisionKind, TableCellMergeRevisionState, TableRevisionKind, RunContent,
-    DocumentGridType, NoteNumberRestart, SectionColumn, SectionColumns, SectionDocumentGrid,
-    SectionHeaderFooterPart, SectionHeaderFooterReference, SectionNoteProperties,
-    SectionPageNumbering, SectionProperties, SectionTextDirection, TableBorder, TableBorders,
-    LineNumberRestart, PageBorderDisplay, PageBorderOffsetFrom, PageBorderStyle,
-    PageBorderZOrder, SectionLineNumbering, SectionPageBorder, SectionPageBorders,
-    SectionPaperSource, SectionVerticalAlignment,
-    TableOfContents, Watermark, WatermarkLayout, ImageWatermark, ImageWatermarkAnchor,
-    MAX_WATERMARK_IMAGE_BYTES,
+    BibliographyFieldSpec, BibliographyFilter, CellProperties, CellRevisionKind, CitationFieldSpec,
+    CitationSource, ColorScheme, ContentControlType, DocumentGridType, DocumentProtection,
+    ImageWatermark, ImageWatermarkAnchor, LineNumberRestart, ListType, MAX_OLE_PAYLOAD_BYTES,
+    MAX_SMART_ARTS, MAX_WATERMARK_IMAGE_BYTES, MutableBookmark, MutableComment,
+    MutableContentControl, MutableDocument, MutableField, MutableHyperlink, MutableInlineImage,
+    MutableOleObject, MutableParagraph, MutableRevision, MutableRun, MutableSmartArt,
+    MutableSmartTag, MutableSmartTagAttribute, MutableStyle, MutableTable, MutableTextBox,
+    MutableTheme, MutableVmlShape, NoteNumberRestart, PageBorderDisplay, PageBorderOffsetFrom,
+    PageBorderStyle, PageBorderZOrder, PageNumberFormat, PageOrientation, RevisionContentControl,
+    RevisionKind, RevisionMetadata, RowRevisionKind, RunContent, SectionColumn, SectionColumns,
+    SectionDocumentGrid, SectionHeaderFooterPart, SectionHeaderFooterReference,
+    SectionLineNumbering, SectionNoteProperties, SectionPageBorder, SectionPageBorders,
+    SectionPageNumbering, SectionPaperSource, SectionProperties, SectionTextDirection,
+    SectionVerticalAlignment, TableBorder, TableBorders, TableCellMergeRevisionState,
+    TableOfContents, TableRevisionKind, VmlShapeKind, VmlShapePosition, Watermark, WatermarkLayout,
     generate_styles_xml,
 };
 // Note: writer::Note is not re-exported to avoid naming conflict with footnote::Note

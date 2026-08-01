@@ -646,10 +646,11 @@ fn parse_processed(xml: &[u8]) -> Result<VolatileDependencies> {
             Event::Eof => break,
             Event::Decl(_) | Event::Comment(_) => {},
         }
-        if let Some(Context::Root) = stack.last() {
-            if extension.is_none() && reader.buffer_position() > 0 {
-                // capture is initiated in `start`; this branch intentionally has no behavior.
-            }
+        if let Some(Context::Root) = stack.last()
+            && extension.is_none()
+            && reader.buffer_position() > 0
+        {
+            // capture is initiated in `start`; this branch intentionally has no behavior.
         }
     }
     if !root_closed || !stack.is_empty() {
@@ -945,10 +946,10 @@ fn validate_document(d: &VolatileDependencies) -> Result<()> {
     if mains > MAX_MAINS || topics > MAX_TOPICS || subs > MAX_SUBTOPICS || refs > MAX_REFERENCES {
         return Err(invalid("volatile-dependencies resource limit exceeded"));
     }
-    if let Some(ext) = &d.extension_list_xml {
-        if ext.len() > MAX_PART_BYTES {
-            return Err(invalid("extension list exceeds resource limit"));
-        }
+    if let Some(ext) = &d.extension_list_xml
+        && ext.len() > MAX_PART_BYTES
+    {
+        return Err(invalid("extension list exceeds resource limit"));
     }
     Ok(())
 }

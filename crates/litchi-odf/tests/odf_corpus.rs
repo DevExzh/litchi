@@ -34,8 +34,8 @@ fn corpus_text_documents_parse_and_extract() {
     ];
     for &(file, min_paragraphs, min_tables) in cases {
         let path = corpus().join(file);
-        let document = Document::open(&path)
-            .unwrap_or_else(|error| panic!("{file}: open failed: {error:?}"));
+        let document =
+            Document::open(&path).unwrap_or_else(|error| panic!("{file}: open failed: {error:?}"));
 
         let text = document
             .text()
@@ -65,7 +65,10 @@ fn corpus_text_documents_parse_and_extract() {
             ("sections", document.sections().map(|_| ())),
             ("forms", document.forms().map(|_| ())),
             ("tracked_changes", document.tracked_changes().map(|_| ())),
-            ("dynamic_text_fields", document.dynamic_text_fields().map(|_| ())),
+            (
+                "dynamic_text_fields",
+                document.dynamic_text_fields().map(|_| ()),
+            ),
             ("text_indexes", document.text_indexes().map(|_| ())),
             ("master_pages", document.master_pages().map(|_| ())),
             ("page_sequence", document.page_sequence().map(|_| ())),
@@ -118,9 +121,7 @@ fn corpus_spreadsheets_parse_and_extract() {
             .unwrap_or_else(|error| panic!("{file}: to_csv() failed: {error:?}"));
         assert!(csv.len() >= min_csv, "{file}: empty CSV export");
 
-        for (api, result) in [
-            ("metadata", spreadsheet.metadata().map(|_| ())),
-        ] {
+        for (api, result) in [("metadata", spreadsheet.metadata().map(|_| ()))] {
             if let Err(error) = result {
                 assert_typed(error, file, api);
             }
@@ -183,11 +184,7 @@ fn corpus_presentations_parse_and_extract() {
         Presentation::open(corpus().join("impress-embedded-spreadsheet.odp")).unwrap();
     let slides = presentation.slides().unwrap();
     assert!(
-        slides
-            .iter()
-            .flat_map(|slide| slide.shapes())
-            .count()
-            > 0,
+        slides.iter().flat_map(|slide| slide.shapes()).count() > 0,
         "embedded-object fixture must expose shapes"
     );
 }

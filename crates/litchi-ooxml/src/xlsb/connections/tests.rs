@@ -138,18 +138,14 @@ fn odbc_connection_records() -> Vec<(u16, Vec<u8>)> {
     vec![
         record(
             rt::BEGIN_EXT_CONNECTION,
-            &ExtConnectionBuilder::new(1, 42, "Warehouse")
-                .payload(),
+            &ExtConnectionBuilder::new(1, 42, "Warehouse").payload(),
         ),
         record(
             rt::BEGIN_EC_DB_PROPS,
             &db_props_payload(2, "Driver={SQL Server};Server=db", Some("SELECT * FROM T")),
         ),
         record(rt::END_EC_DB_PROPS, &[]),
-        record(
-            rt::BEGIN_EC_PARAMS,
-            &[],
-        ),
+        record(rt::BEGIN_EC_PARAMS, &[]),
         record(
             rt::BEGIN_EC_PARAM,
             &param_payload(1, Some(1), "threshold", &42.5f64.to_le_bytes()),
@@ -188,10 +184,7 @@ fn parses_odbc_connection_with_db_props_and_parameters() {
         connection.reconnection_type,
         Some(XlsbReconnectionType::Never)
     );
-    assert_eq!(
-        connection.password_state,
-        Some(XlsbPasswordState::NotSaved)
-    );
+    assert_eq!(connection.password_state, Some(XlsbPasswordState::NotSaved));
     assert_eq!(
         connection.credential_method,
         Some(XlsbCredentialMethod::Integrated)
@@ -241,11 +234,14 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
             rt::BEGIN_EXT_CONNECTION,
             &ExtConnectionBuilder::new(4, 9, "Web Query").payload(),
         ),
-        record(rt::BEGIN_EC_WEB_PROPS, &web_props_payload(2, Some("https://example.test/q"))),
+        record(
+            rt::BEGIN_EC_WEB_PROPS,
+            &web_props_payload(2, Some("https://example.test/q")),
+        ),
         record(rt::END_EC_WEB_PROPS, &[]),
         record(rt::BEGIN_EC_WP_TABLES, &[]),
-        record(20, &[]), // BrtPCDIMissing
-        record(24, &wide("results")), // BrtPCDIString
+        record(20, &[]),                 // BrtPCDIMissing
+        record(24, &wide("results")),    // BrtPCDIString
         record(26, &3u32.to_le_bytes()), // BrtPCDIIndex
         record(rt::END_EC_WP_TABLES, &[]),
         record(rt::END_EXT_CONNECTION, &[]),
@@ -287,7 +283,10 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
 #[test]
 fn skips_unknown_records_and_extension_collections() {
     let mut records = vec![
-        record(rt::BEGIN_EXT_CONNECTION, &ExtConnectionBuilder::new(6, 1, "T").payload()),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(6, 1, "T").payload(),
+        ),
         // Text-import wizard collection: skipped as a balanced collection.
         record(rt::BEGIN_EC_TXT_WIZ, &[0xAA, 0xBB]),
         record(rt::END_EC_TXT_WIZ, &[]),
@@ -339,7 +338,10 @@ fn rejects_malformed_parts() {
     // Unknown DBType.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
-        record(rt::BEGIN_EXT_CONNECTION, &ExtConnectionBuilder::new(99, 1, "x").payload()),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(99, 1, "x").payload(),
+        ),
         record(rt::END_EXT_CONNECTION, &[]),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
@@ -363,7 +365,10 @@ fn rejects_malformed_parts() {
     // Unterminated connection collection.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
-        record(rt::BEGIN_EXT_CONNECTION, &ExtConnectionBuilder::new(1, 1, "x").payload()),
+        record(
+            rt::BEGIN_EXT_CONNECTION,
+            &ExtConnectionBuilder::new(1, 1, "x").payload(),
+        ),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
     assert!(parse_connections_part(&build(&records)).is_err());

@@ -344,9 +344,7 @@ impl SectionPageBorder {
     /// Validate fields whose domains are wider in Rust than in `Brc80`.
     pub fn validate(self) -> Result<(), SectionPageBorderError> {
         if self.spacing_points > 31 {
-            return Err(SectionPageBorderError::InvalidSpacing(
-                self.spacing_points,
-            ));
+            return Err(SectionPageBorderError::InvalidSpacing(self.spacing_points));
         }
         Ok(())
     }
@@ -534,7 +532,10 @@ impl fmt::Display for SectionColumnError {
                 "section column {index} spacing {spacing_twips} exceeds 31680 twips"
             ),
             Self::MissingSpacing { index } => {
-                write!(formatter, "section column {index} is missing following spacing")
+                write!(
+                    formatter,
+                    "section column {index} is missing following spacing"
+                )
             },
             Self::FinalColumnHasSpacing => {
                 formatter.write_str("the final section column cannot have following spacing")

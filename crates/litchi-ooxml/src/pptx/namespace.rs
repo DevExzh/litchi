@@ -1,5 +1,5 @@
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -125,9 +125,7 @@ pub(crate) fn scan_presentationml_element_ranges(
                 .map_err(|error| OoxmlError::Xml(error.to_string()))?;
             if matches!(event, Event::Start(_) | Event::Empty(_)) {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
-                    OoxmlError::InvalidFormat(
-                        "PresentationML element counter overflow".to_string(),
-                    )
+                    OoxmlError::InvalidFormat("PresentationML element counter overflow".to_string())
                 })?;
                 if nodes > MAX_SCAN_NODES {
                     return Err(OoxmlError::InvalidFormat(format!(

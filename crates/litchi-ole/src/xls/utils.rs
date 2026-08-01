@@ -52,7 +52,8 @@ pub fn parse_short_string(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<Str
 }
 
 /// Parse a BIFF8 `XLUnicodeString` with a 16-bit character count.
-pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {    if data.len() < 3 {
+pub fn parse_string_record(data: &[u8], _encoding: &XlsEncoding) -> XlsResult<String> {
+    if data.len() < 3 {
         return Err(XlsError::InvalidLength {
             expected: 3,
             found: data.len(),

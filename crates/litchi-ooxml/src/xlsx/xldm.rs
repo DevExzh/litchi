@@ -253,7 +253,7 @@ pub fn inspect_xldm(bytes: &[u8]) -> Result<XldmStorage<'_>> {
     if bytes.len() > MAX_STORAGE_BYTES {
         return Err(limit("storage bytes"));
     }
-    if bytes.len() < XLDM_PAGE_SIZE * 3 || bytes.len() % XLDM_PAGE_SIZE != 0 {
+    if bytes.len() < XLDM_PAGE_SIZE * 3 || !bytes.len().is_multiple_of(XLDM_PAGE_SIZE) {
         return Err(invalid(
             "MS-XLDM storage must contain at least three complete 4096-byte pages",
         ));
@@ -772,60 +772,59 @@ fn classify_generated_name(name: &str, parent: Option<&str>) -> Result<XldmGener
     if name == "MdxScript.0.scr.xml" {
         return Ok(XldmGeneratedNameKind::MdxScriptMetadata);
     }
-    if let Some(prefix) = name.strip_suffix(".db.xml") {
-        if versioned_id(prefix) {
-            return Ok(XldmGeneratedNameKind::DatabaseDefinition);
-        }
+    if let Some(prefix) = name.strip_suffix(".db.xml")
+        && versioned_id(prefix)
+    {
+        return Ok(XldmGeneratedNameKind::DatabaseDefinition);
     }
-    if let Some(prefix) = name.strip_suffix(".dsv.xml") {
-        if versioned_id(prefix) {
-            return Ok(XldmGeneratedNameKind::DataSourceViewDefinition);
-        }
+    if let Some(prefix) = name.strip_suffix(".dsv.xml")
+        && versioned_id(prefix)
+    {
+        return Ok(XldmGeneratedNameKind::DataSourceViewDefinition);
     }
-    if let Some(prefix) = name.strip_suffix(".cub.xml") {
-        if versioned_id(prefix) {
-            return Ok(XldmGeneratedNameKind::CubeDefinition);
-        }
+    if let Some(prefix) = name.strip_suffix(".cub.xml")
+        && versioned_id(prefix)
+    {
+        return Ok(XldmGeneratedNameKind::CubeDefinition);
     }
-    if let Some(prefix) = name.strip_suffix(".ds.xml") {
-        if versioned_id(prefix) {
-            return Ok(XldmGeneratedNameKind::DataSourceOrDimensionDefinition);
-        }
+    if let Some(prefix) = name.strip_suffix(".ds.xml")
+        && versioned_id(prefix)
+    {
+        return Ok(XldmGeneratedNameKind::DataSourceOrDimensionDefinition);
     }
-    if let Some(prefix) = name.strip_suffix(".dim.xml") {
-        if versioned_id(prefix) {
-            return Ok(XldmGeneratedNameKind::DataSourceOrDimensionDefinition);
-        }
+    if let Some(prefix) = name.strip_suffix(".dim.xml")
+        && versioned_id(prefix)
+    {
+        return Ok(XldmGeneratedNameKind::DataSourceOrDimensionDefinition);
     }
     if let Some(prefix) = name
         .strip_prefix("info.")
         .and_then(|value| value.strip_suffix(".xml"))
+        && digits(prefix)
     {
-        if digits(prefix) {
-            return match parent {
-                Some(value) if folder(value, ".cub", true) => {
-                    Ok(XldmGeneratedNameKind::CubeInformation)
-                },
-                Some(value) if folder(value, ".prt", false) => {
-                    Ok(XldmGeneratedNameKind::PartitionInformation)
-                },
-                Some(value) if folder(value, ".dim", true) => {
-                    Ok(XldmGeneratedNameKind::TableInformation)
-                },
-                _ => Err(invalid(
-                    "info file is outside a cube, partition, or dimension folder",
-                )),
-            };
-        }
+        return match parent {
+            Some(value) if folder(value, ".cub", true) => {
+                Ok(XldmGeneratedNameKind::CubeInformation)
+            },
+            Some(value) if folder(value, ".prt", false) => {
+                Ok(XldmGeneratedNameKind::PartitionInformation)
+            },
+            Some(value) if folder(value, ".dim", true) => {
+                Ok(XldmGeneratedNameKind::TableInformation)
+            },
+            _ => Err(invalid(
+                "info file is outside a cube, partition, or dimension folder",
+            )),
+        };
     }
     for (suffix, kind) in [
         (".det.xml", XldmGeneratedNameKind::MeasureGroupMetadata),
         (".prt.xml", XldmGeneratedNameKind::PartitionMetadata),
     ] {
-        if let Some(prefix) = name.strip_suffix(suffix) {
-            if versioned_id(prefix) {
-                return Ok(kind);
-            }
+        if let Some(prefix) = name.strip_suffix(suffix)
+            && versioned_id(prefix)
+        {
+            return Ok(kind);
         }
     }
     if let Some(prefix) = name.strip_suffix(".tbl.xml") {
@@ -889,20 +888,21 @@ fn classify_idf(value: &str) -> Result<XldmGeneratedNameKind> {
     if !digits(version) {
         return Err(invalid("invalid idf version"));
     }
-    if let Some(rest) = rest.strip_prefix("R$") {
-        if rest.ends_with(".INDEX.0") && dollar_ids(rest.trim_end_matches(".INDEX.0"), 2) {
-            return Ok(XldmGeneratedNameKind::TableRelationshipIndex);
-        }
+    if let Some(rest) = rest.strip_prefix("R$")
+        && rest.ends_with(".INDEX.0")
+        && dollar_ids(rest.trim_end_matches(".INDEX.0"), 2)
+    {
+        return Ok(XldmGeneratedNameKind::TableRelationshipIndex);
     }
     if let Some(rest) = rest.strip_prefix("H$") {
         for (suffix, kind) in [
             (".POS_TO_ID.0", XldmGeneratedNameKind::ColumnPositionToId),
             (".ID_TO_POS.0", XldmGeneratedNameKind::ColumnIdToPosition),
         ] {
-            if let Some(ids) = rest.strip_suffix(suffix) {
-                if dollar_ids(ids, 2) {
-                    return Ok(kind);
-                }
+            if let Some(ids) = rest.strip_suffix(suffix)
+                && dollar_ids(ids, 2)
+            {
+                return Ok(kind);
             }
         }
     }
@@ -925,10 +925,10 @@ fn classify_idf(value: &str) -> Result<XldmGeneratedNameKind> {
                 XldmGeneratedNameKind::UserHierarchyMultilevelId,
             ),
         ] {
-            if let Some(ids) = rest.strip_suffix(suffix) {
-                if dollar_ids(ids, 2) {
-                    return Ok(kind);
-                }
+            if let Some(ids) = rest.strip_suffix(suffix)
+                && dollar_ids(ids, 2)
+            {
+                return Ok(kind);
             }
         }
     }
@@ -1472,7 +1472,7 @@ fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XldmXmlEncod
         return Err(invalid("unexpected XML byte-order mark"));
     }
     if require_utf16 || bytes.get(1) == Some(&0) {
-        if bytes.len() % 2 != 0 {
+        if !bytes.len().is_multiple_of(2) {
             return Err(invalid("odd-length UTF-16LE XML"));
         }
         let words: Vec<u16> = bytes

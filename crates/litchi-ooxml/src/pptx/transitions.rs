@@ -3,9 +3,9 @@
 //! This module provides types and functionality for working with slide transitions,
 //! including transition types, speeds, and directions.
 
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::is_presentationml_name;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;

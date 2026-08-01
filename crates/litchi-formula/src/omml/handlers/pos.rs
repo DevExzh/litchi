@@ -13,9 +13,10 @@ impl PosHandler {
     ) {
         if let Some(parent) = parent_context {
             // Set position from the m:val attribute or element content
-            let value = context.character_data.take().unwrap_or_else(|| {
-                context.text.as_str().trim().to_string()
-            });
+            let value = context
+                .character_data
+                .take()
+                .unwrap_or_else(|| context.text.as_str().trim().to_string());
             if !value.is_empty() {
                 parent.properties.accent_position = Some(value);
             }

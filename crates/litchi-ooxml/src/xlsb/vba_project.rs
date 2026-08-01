@@ -5,9 +5,7 @@
 //! bytes.
 
 use crate::error::{OoxmlError, Result};
-use crate::vba_package::{
-    ensure_exclusive_inbound_reference, validate_vba_project_payload,
-};
+use crate::vba_package::{ensure_exclusive_inbound_reference, validate_vba_project_payload};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
@@ -235,8 +233,8 @@ pub(crate) fn store_vba_project(
         let source_part = package.get_part(source)?;
         discover_vba_project(package, source_part)?
     };
-    let canonical = PackURI::new(PROJECT_PART)
-        .map_err(|error| OoxmlError::InvalidUri(error.to_string()))?;
+    let canonical =
+        PackURI::new(PROJECT_PART).map_err(|error| OoxmlError::InvalidUri(error.to_string()))?;
     if existing
         .as_ref()
         .is_none_or(|project| project.project_part_name != canonical)
@@ -608,7 +606,10 @@ mod tests {
                 b"opaque agile signature".to_vec(),
             )));
         }
-        assert_eq!(workbook.vba_project().unwrap().unwrap().signatures().len(), 2);
+        assert_eq!(
+            workbook.vba_project().unwrap().unwrap().signatures().len(),
+            2
+        );
 
         workbook.set_vba_project(&authored_project()).unwrap();
         assert!(
@@ -639,11 +640,7 @@ mod tests {
             "/xl/vbaProjectSignature.bin",
             "/xl/vbaProjectSignatureAgile.bin",
         ] {
-            assert!(
-                package
-                    .get_part(&PackURI::new(part_name).unwrap())
-                    .is_err()
-            );
+            assert!(package.get_part(&PackURI::new(part_name).unwrap()).is_err());
         }
     }
 

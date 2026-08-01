@@ -36,9 +36,7 @@ impl XlsBackup {
         let value = u16::from_le_bytes(data[0..2].try_into().expect("length checked"));
         // Boolean (MS-XLS 2.5.14): only 0x0000 and 0x0001 are legal.
         match value {
-            0x0000 => Ok(Self {
-                save_backup: false,
-            }),
+            0x0000 => Ok(Self { save_backup: false }),
             0x0001 => Ok(Self { save_backup: true }),
             other => Err(XlsError::InvalidRecord {
                 record_type: BACKUP_RECORD_TYPE,

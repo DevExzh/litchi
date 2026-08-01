@@ -86,12 +86,12 @@ impl XlsDdeOleValueMatrix {
             ));
         }
         for value in &self.values {
-            if let XlsExternalCachedValue::Text(text) = value {
-                if text.encode_utf16().count() > 255 {
-                    return Err(XlsError::InvalidData(
-                        "DDE/OLE matrix text exceeds 255 UTF-16 code units".to_string(),
-                    ));
-                }
+            if let XlsExternalCachedValue::Text(text) = value
+                && text.encode_utf16().count() > 255
+            {
+                return Err(XlsError::InvalidData(
+                    "DDE/OLE matrix text exceeds 255 UTF-16 code units".to_string(),
+                ));
             }
         }
         Ok(())

@@ -79,17 +79,18 @@ pub mod chart;
 pub mod smart_tags;
 
 // Re-export public types from core
-pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
 pub use crate::ppt::encryption::PptEncryptionProfile;
 pub use crate::ppt::view_info::{
     PowerPointGuide, PowerPointGuideOrientation, PowerPointRatio, PowerPointSlideViewInfo,
     PowerPointSlideViewPreferences, PowerPointViewKind, PowerPointViewOrigin,
     PowerPointZoomViewInfo,
 };
+pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignment};
 
 // Re-export commonly used types from submodules
 pub use crate::ppt::shapes::geometry::{GeometryRect, ShapePathType};
 pub use blip::{BlipStoreBuilder, BlipType, PictureData};
+pub use chart::{Chart, ChartKind, ChartSeries};
 pub use comments::{CommentDateTime, SlideComment};
 pub use custom_shows::CustomShow;
 pub use escher::{EscherBuilder, FreeformGeometry, create_dgg_container, create_shape_container};
@@ -100,10 +101,9 @@ pub use records::{RecordBuilder, RecordHeader};
 pub use shape_style::{FillStyle, LineStyleConfig, ShadowStyle, ShapeColor, ShapeStyle};
 pub use shapes::{Shape, ShapeCollection, ShapeKind};
 pub use slide_timing::SlideTiming;
-pub use sound_collection::build_sound_collection;
 pub use smart_tags::{PowerPointSmartTagDefinition, PowerPointSmartTagIndex};
+pub use sound_collection::build_sound_collection;
 pub use table::{DEFAULT_COLUMN_WIDTH_PT, DEFAULT_ROW_HEIGHT_PT, MAX_TABLE_DIMENSION, Table};
-pub use chart::{Chart, ChartKind, ChartSeries};
 pub use text_format::{
     FontEntity, FontStyle, Paragraph, TabAlign, TabStop, TextAlign, TextColor, TextDirection,
     TextFontAlign, TextRun,

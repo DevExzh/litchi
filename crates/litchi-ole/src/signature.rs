@@ -56,10 +56,20 @@ impl fmt::Display for BinaryOfficeSignatureError {
         match self {
             Self::Ole(error) => write!(formatter, "OLE error: {error}"),
             Self::Xml(error) => write!(formatter, "digital-signature error: {error}"),
-            Self::InvalidContainer(message) => write!(formatter, "invalid signature container: {message}"),
-            Self::ResourceLimit(message) => write!(formatter, "signature resource limit exceeded: {message}"),
-            Self::EncryptedDocument => write!(formatter, "encrypted binary Office documents cannot be signed or verified without their decrypted DRM storage"),
-            Self::LegacyCryptoApiUnsupported => write!(formatter, "legacy `_signatures` CryptoAPI MD5 signatures are recognized but unsupported"),
+            Self::InvalidContainer(message) => {
+                write!(formatter, "invalid signature container: {message}")
+            },
+            Self::ResourceLimit(message) => {
+                write!(formatter, "signature resource limit exceeded: {message}")
+            },
+            Self::EncryptedDocument => write!(
+                formatter,
+                "encrypted binary Office documents cannot be signed or verified without their decrypted DRM storage"
+            ),
+            Self::LegacyCryptoApiUnsupported => write!(
+                formatter,
+                "legacy `_signatures` CryptoAPI MD5 signatures are recognized but unsupported"
+            ),
         }
     }
 }
@@ -232,11 +242,9 @@ impl BinaryOfficeSignatureEditor {
     }
 
     pub fn add_signature(&mut self, signer: &PackageSigner) -> Result<&mut Self> {
-        if self
-            .streams
-            .iter()
-            .any(|(path, _)| path.len() == 1 && path[0].eq_ignore_ascii_case(LEGACY_SIGNATURE_STREAM))
-        {
+        if self.streams.iter().any(|(path, _)| {
+            path.len() == 1 && path[0].eq_ignore_ascii_case(LEGACY_SIGNATURE_STREAM)
+        }) {
             return Err(BinaryOfficeSignatureError::LegacyCryptoApiUnsupported);
         }
         let references = references_from_streams(&self.streams, self.format)?;
@@ -244,7 +252,9 @@ impl BinaryOfficeSignatureEditor {
         let existing: HashSet<u64> = self
             .streams
             .iter()
-            .filter(|(path, _)| path.len() == 2 && path[0].eq_ignore_ascii_case(XML_SIGNATURE_STORAGE))
+            .filter(|(path, _)| {
+                path.len() == 2 && path[0].eq_ignore_ascii_case(XML_SIGNATURE_STORAGE)
+            })
             .filter_map(|(path, _)| path[1].parse().ok())
             .collect();
         if existing.len() >= MAX_SIGNATURES {
@@ -263,10 +273,8 @@ impl BinaryOfficeSignatureEditor {
         {
             self.storages.push(vec![XML_SIGNATURE_STORAGE.into()]);
         }
-        self.streams.push((
-            vec![XML_SIGNATURE_STORAGE.into(), name.to_string()],
-            xml,
-        ));
+        self.streams
+            .push((vec![XML_SIGNATURE_STORAGE.into(), name.to_string()], xml));
         self.changed = true;
         Ok(self)
     }
@@ -279,11 +287,15 @@ impl BinaryOfficeSignatureEditor {
     pub fn clear(&mut self) -> &mut Self {
         let stream_count = self.streams.len();
         self.streams.retain(|(path, _)| {
-            !(path.first().is_some_and(|name| name.eq_ignore_ascii_case(XML_SIGNATURE_STORAGE))
+            !(path
+                .first()
+                .is_some_and(|name| name.eq_ignore_ascii_case(XML_SIGNATURE_STORAGE))
                 || path.len() == 1 && path[0].eq_ignore_ascii_case(LEGACY_SIGNATURE_STREAM))
         });
         self.storages.retain(|path| {
-            !path.first().is_some_and(|name| name.eq_ignore_ascii_case(XML_SIGNATURE_STORAGE))
+            !path
+                .first()
+                .is_some_and(|name| name.eq_ignore_ascii_case(XML_SIGNATURE_STORAGE))
         });
         self.changed |= self.streams.len() != stream_count;
         self
@@ -432,11 +444,10 @@ fn references_indicate_encryption(
     format: BinaryOfficeFormat,
 ) -> bool {
     references.iter().any(|reference| match format {
-        BinaryOfficeFormat::Doc if reference.uri.ends_with("/WordDocument") => {
-            reference.data.get(10..12).is_some_and(|bytes| {
-                u16::from_le_bytes([bytes[0], bytes[1]]) & 0x0100 != 0
-            })
-        },
+        BinaryOfficeFormat::Doc if reference.uri.ends_with("/WordDocument") => reference
+            .data
+            .get(10..12)
+            .is_some_and(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) & 0x0100 != 0),
         BinaryOfficeFormat::Xls if reference.uri.ends_with("/Workbook") => {
             contains_biff_record(&reference.data, 0x002f)
         },
@@ -449,7 +460,10 @@ fn contains_biff_record(data: &[u8], wanted: u16) -> bool {
     while let Some(header) = data.get(offset..offset + 4) {
         let record = u16::from_le_bytes([header[0], header[1]]);
         let length = u16::from_le_bytes([header[2], header[3]]) as usize;
-        let Some(next) = offset.checked_add(4).and_then(|value| value.checked_add(length)) else {
+        let Some(next) = offset
+            .checked_add(4)
+            .and_then(|value| value.checked_add(length))
+        else {
             return false;
         };
         if next > data.len() {

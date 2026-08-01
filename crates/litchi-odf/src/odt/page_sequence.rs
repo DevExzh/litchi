@@ -337,7 +337,9 @@ impl OdtPageSequence {
 
 fn validate_sequence(sequence: &OdtPageSequence) -> Result<()> {
     if sequence.master_page_names.is_empty() {
-        return Err(invalid("text:page-sequence requires at least one text:page"));
+        return Err(invalid(
+            "text:page-sequence requires at least one text:page",
+        ));
     }
     if sequence.master_page_names.len() > MAX_PAGES {
         return Err(invalid(format!(
@@ -349,7 +351,10 @@ fn validate_sequence(sequence: &OdtPageSequence) -> Result<()> {
         if name.is_empty() {
             return Err(invalid("text:master-page-name must not be empty"));
         }
-        if name.bytes().any(|byte| matches!(byte, b'\t' | b'\n' | b'\r')) {
+        if name
+            .bytes()
+            .any(|byte| matches!(byte, b'\t' | b'\n' | b'\r'))
+        {
             return Err(invalid(
                 "text:master-page-name must not contain attribute-normalized whitespace",
             ));
@@ -482,9 +487,8 @@ fn locate_site(xml: &str) -> Result<PageSequenceSite> {
             qualified_name,
         });
     }
-    let content_start = text_content_start.ok_or_else(|| {
-        invalid("content XML is missing the office:text element")
-    })?;
+    let content_start = text_content_start
+        .ok_or_else(|| invalid("content XML is missing the office:text element"))?;
     Ok(PageSequenceSite::FirstChild { content_start })
 }
 
@@ -519,9 +523,9 @@ pub(crate) fn set_page_sequence_xml(
             Some(fragment),
         ) => {
             let empty = &xml[start..end];
-            let marker = empty.rfind("/>").ok_or_else(|| {
-                invalid("malformed empty office:text element")
-            })?;
+            let marker = empty
+                .rfind("/>")
+                .ok_or_else(|| invalid("malformed empty office:text element"))?;
             let mut expanded = String::with_capacity(empty.len() + fragment.len() + 16);
             expanded.push_str(&empty[..marker]);
             expanded.push('>');
@@ -616,11 +620,8 @@ mod tests {
     fn authors_validates_and_serializes_sequences() {
         use super::set_page_sequence_xml;
 
-        let sequence = OdtPageSequence::new(vec![
-            "First".to_string(),
-            "Left & Right".to_string(),
-        ])
-        .unwrap();
+        let sequence =
+            OdtPageSequence::new(vec!["First".to_string(), "Left & Right".to_string()]).unwrap();
         let fragment = sequence.to_xml_fragment().unwrap();
         assert_eq!(
             fragment,
@@ -637,7 +638,10 @@ mod tests {
         let sequence_start = updated.find("<text:page-sequence").unwrap();
         let paragraph_start = updated.find("<t:p>").unwrap();
         assert!(sequence_start < paragraph_start);
-        assert_eq!(parse_page_sequence(&updated).unwrap(), Some(sequence.clone()));
+        assert_eq!(
+            parse_page_sequence(&updated).unwrap(),
+            Some(sequence.clone())
+        );
 
         // Replace an existing sequence, then remove it.
         let replacement = OdtPageSequence::new(vec!["Only".to_string()]).unwrap();

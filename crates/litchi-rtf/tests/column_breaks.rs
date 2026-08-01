@@ -31,26 +31,34 @@ fn table_and_nested_table_column_events_round_trip_in_place() {
     let source = r#"{\rtf1\trowd\cellx5000\intbl\itap1 Before\column After \intbl\itap2 Inner\column Tail\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}{\nonesttables\par}\intbl\itap1 End\cell\row}"#;
     let document = RtfDocument::parse(source).unwrap();
     let outer = &document.tables()[0].rows()[0].cells()[0];
-    assert!(outer.story_events().iter().any(
-        |event| matches!(event, CellStoryEvent::ColumnBreak(column) if column.position == 6),
-    ));
+    assert!(
+        outer.story_events().iter().any(
+            |event| matches!(event, CellStoryEvent::ColumnBreak(column) if column.position == 6),
+        )
+    );
     let inner = &outer.nested_tables()[0].table.rows()[0].cells()[0];
-    assert!(inner.story_events().iter().any(
-        |event| matches!(event, CellStoryEvent::ColumnBreak(column) if column.position == 5),
-    ));
+    assert!(
+        inner.story_events().iter().any(
+            |event| matches!(event, CellStoryEvent::ColumnBreak(column) if column.position == 5),
+        )
+    );
 
     let output = write(&document);
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     let outer = &reparsed.tables()[0].rows()[0].cells()[0];
     let inner = &outer.nested_tables()[0].table.rows()[0].cells()[0];
-    assert!(outer
-        .story_events()
-        .iter()
-        .any(|event| matches!(event, CellStoryEvent::ColumnBreak(_))));
-    assert!(inner
-        .story_events()
-        .iter()
-        .any(|event| matches!(event, CellStoryEvent::ColumnBreak(_))));
+    assert!(
+        outer
+            .story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::ColumnBreak(_)))
+    );
+    assert!(
+        inner
+            .story_events()
+            .iter()
+            .any(|event| matches!(event, CellStoryEvent::ColumnBreak(_)))
+    );
 }
 
 #[test]

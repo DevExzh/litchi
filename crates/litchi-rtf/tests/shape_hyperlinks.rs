@@ -32,7 +32,9 @@ fn parses_shape_hyperlink_property_and_round_trips() {
 
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
-    assert!(serialized.contains("{\\hl{\\hlloc http://example.test/x}{\\hlsrc src}{\\hlfr Click me}}"));
+    assert!(
+        serialized.contains("{\\hl{\\hlloc http://example.test/x}{\\hlsrc src}{\\hlfr Click me}}")
+    );
 
     let reparsed = RtfDocument::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());

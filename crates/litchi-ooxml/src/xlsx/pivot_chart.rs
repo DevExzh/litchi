@@ -15,15 +15,15 @@
 //! Everything here is read-only and inert: no pivot refresh, no cache
 //! rebuild, and no rendering.
 
-use litchi_ooxml_common::xml::{
-    decode_xml_reference, is_drawingml_chart_name, unqualified_attribute_value,
-};
 use crate::error::{OoxmlError, Result};
 use crate::pivot::PivotTable;
 use crate::xlsx::drawing::parse_drawing_xml;
 use crate::xlsx::parsers::workbook_parser;
 use crate::xlsx::pivot::read_pivot_tables;
 use crate::xlsx::worksheet::WorksheetInfo;
+use litchi_ooxml_common::xml::{
+    decode_xml_reference, is_drawingml_chart_name, unqualified_attribute_value,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
@@ -959,10 +959,10 @@ fn split_pivot_source_name(name: &str) -> (Option<String>, String) {
         return (None, name.to_string());
     };
     let mut sheet = &name[..bang];
-    if let Some(rest) = sheet.strip_prefix('[') {
-        if let Some(end) = rest.find(']') {
-            sheet = &rest[end + 1..];
-        }
+    if let Some(rest) = sheet.strip_prefix('[')
+        && let Some(end) = rest.find(']')
+    {
+        sheet = &rest[end + 1..];
     }
     (
         Some(unquote_sheet_name(sheet)),

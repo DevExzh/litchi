@@ -6,9 +6,9 @@
 //! citation tags, loads bibliography styles, runs XSLT, refreshes fields, or
 //! accesses external resources.
 
-use litchi_ooxml_common::xml::decode_xml_reference;
 use crate::custom_xml_data::CustomXmlDataItem;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::xml::decode_xml_reference;
 use litchi_opc::PackURI;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};

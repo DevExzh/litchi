@@ -1,0 +1,313 @@
+{
+  "schema": 1,
+  "packages": {
+    "litchi": [
+      "litchi-core",
+      "litchi-eval",
+      "litchi-fonts",
+      "litchi-formula",
+      "litchi-imgconv",
+      "litchi-iwa",
+      "litchi-markdown",
+      "litchi-odf",
+      "litchi-rtf"
+    ],
+    "litchi-cfb": [
+      "litchi-core"
+    ],
+    "litchi-core": [],
+    "litchi-drawingml": [
+      "litchi-core",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-sheet"
+    ],
+    "litchi-eval": [
+      "litchi-core"
+    ],
+    "litchi-fonts": [
+      "litchi-core"
+    ],
+    "litchi-formula": [],
+    "litchi-imgconv": [
+      "litchi-core",
+      "xml-minifier"
+    ],
+    "litchi-iwa": [
+      "litchi-core",
+      "soapberry-zip"
+    ],
+    "litchi-markdown": [
+      "litchi-core"
+    ],
+    "litchi-odf": [
+      "litchi-core",
+      "litchi-eval",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
+    "litchi-ole": [],
+    "litchi-ole-common": [
+      "litchi-cfb",
+      "litchi-core"
+    ],
+    "litchi-ooxml": [],
+    "litchi-ooxml-common": [
+      "litchi-core",
+      "litchi-opc"
+    ],
+    "litchi-opc": [
+      "litchi-core",
+      "soapberry-zip"
+    ],
+    "litchi-py": [
+      "litchi"
+    ],
+    "litchi-rtf": [
+      "litchi-core"
+    ],
+    "litchi-sheet": [
+      "litchi-core"
+    ],
+    "litchi-slide": [
+      "litchi-core"
+    ],
+    "litchi-word": [
+      "litchi-core"
+    ],
+    "litchi-xlsx": [
+      "litchi-core",
+      "litchi-drawingml",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-sheet"
+    ],
+    "soapberry-zip": [],
+    "xml-minifier": []
+  },
+  "migration_hosts": [
+    "litchi-ole",
+    "litchi-ooxml"
+  ],
+  "migration_debt": [
+    {
+      "order": 10,
+      "dependent": "litchi-core",
+      "dependency": "soapberry-zip",
+      "reason": "The pre-ADR core still owns ZIP-backed extraction code.",
+      "exit": "Move archive and package handling behind format/container crates, then remove this edge."
+    },
+    {
+      "order": 20,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-cfb",
+      "reason": "The legacy OLE monolith is an active migration host.",
+      "exit": "Move CFB-facing code into litchi-ole-common and the concrete binary format crates, then delete the host."
+    },
+    {
+      "order": 21,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-core",
+      "reason": "The legacy OLE monolith is an active migration host.",
+      "exit": "Move neutral contracts into the vocabulary crates and delete the host."
+    },
+    {
+      "order": 22,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-formula",
+      "reason": "The legacy OLE monolith still owns optional equation integration.",
+      "exit": "Move the integration to its concrete consumer after litchi-formula becomes litchi-math, then delete the host."
+    },
+    {
+      "order": 23,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-imgconv",
+      "reason": "The legacy OLE monolith still owns optional image-conversion integration.",
+      "exit": "Move the integration to its concrete binary format consumer, then delete the host."
+    },
+    {
+      "order": 24,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-ole-common",
+      "reason": "The monolith temporarily consumes the new common crate while records migrate downward.",
+      "exit": "Complete the DOC/PPT/XLS split and delete the litchi-ole migration host."
+    },
+    {
+      "order": 25,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-opc",
+      "reason": "The legacy OLE monolith still carries embedded OOXML package handling.",
+      "exit": "Move inert package embedding behind a focused shared capability without a format-family back edge."
+    },
+    {
+      "order": 30,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-cfb",
+      "reason": "The OOXML monolith still owns encrypted-container integration.",
+      "exit": "Move encryption/container integration to focused optional capability crates, then delete the host."
+    },
+    {
+      "order": 31,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-core",
+      "reason": "The OOXML monolith is an active migration host.",
+      "exit": "Move remaining neutral contracts and concrete implementations out, then delete the host."
+    },
+    {
+      "order": 32,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-drawingml",
+      "reason": "The OOXML monolith temporarily consumes the extracted DrawingML substrate.",
+      "exit": "Move all DrawingML consumers into concrete format crates and delete the host."
+    },
+    {
+      "order": 33,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-fonts",
+      "reason": "The OOXML monolith still owns optional font integration.",
+      "exit": "Move font integration to the concrete format or rendering capability that consumes it."
+    },
+    {
+      "order": 34,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-ole",
+      "reason": "Encryption support currently creates a cross-family monolith edge.",
+      "exit": "Replace the edge with focused crypto/container capabilities and delete both migration hosts."
+    },
+    {
+      "order": 35,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-ooxml-common",
+      "reason": "The OOXML monolith temporarily consumes its extracted common substrate.",
+      "exit": "Move remaining consumers into concrete OOXML crates and delete the host."
+    },
+    {
+      "order": 36,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-opc",
+      "reason": "The OOXML monolith is an active migration host over OPC.",
+      "exit": "Move remaining package consumers into concrete OOXML crates and delete the host."
+    },
+    {
+      "order": 37,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-xlsx",
+      "reason": "A reverse adapter keeps legacy callers working while XLSX migrates first.",
+      "exit": "Move callers to litchi-xlsx and delete the reverse adapter with the monolith."
+    },
+    {
+      "order": 38,
+      "dependent": "litchi-ooxml",
+      "dependency": "soapberry-zip",
+      "reason": "The OOXML monolith still performs package implementation work directly.",
+      "exit": "Route package access through litchi-opc and delete the host."
+    },
+    {
+      "order": 39,
+      "dependent": "litchi-ooxml",
+      "dependency": "xml-minifier",
+      "reason": "The OOXML monolith still performs XML implementation work directly.",
+      "exit": "Move the remaining XML consumers into common or concrete crates and delete the host."
+    },
+    {
+      "order": 40,
+      "dependent": "litchi",
+      "dependency": "litchi-ole",
+      "reason": "The facade still exposes the legacy OLE migration host.",
+      "exit": "Re-export the concrete DOC/PPT/XLS crates and remove the host dependency."
+    },
+    {
+      "order": 41,
+      "dependent": "litchi",
+      "dependency": "litchi-ooxml",
+      "reason": "The facade still exposes the OOXML migration host.",
+      "exit": "Re-export the concrete DOCX/PPTX/XLSB/XLSX crates and remove the host dependency."
+    },
+    {
+      "order": 42,
+      "dependent": "litchi",
+      "dependency": "soapberry-zip",
+      "reason": "The facade still owns format implementation dependencies.",
+      "exit": "Move archive use behind concrete crates so the facade only re-exports canonical APIs."
+    },
+    {
+      "order": 43,
+      "dependent": "litchi",
+      "dependency": "xml-minifier",
+      "reason": "The facade still owns format implementation dependencies.",
+      "exit": "Move XML implementation use behind concrete crates so the facade only re-exports canonical APIs."
+    }
+  ],
+  "runtime_neutral": [
+    "litchi-core",
+    "litchi-drawingml",
+    "litchi-ole-common",
+    "litchi-ooxml-common",
+    "litchi-sheet",
+    "litchi-slide",
+    "litchi-word"
+  ],
+  "runtime_packages": [
+    "rayon",
+    "reqwest",
+    "tokio"
+  ],
+  "core": {
+    "forbidden_dependencies": [
+      "encoding_rs",
+      "litchi-cfb",
+      "litchi-opc",
+      "quick-xml",
+      "rayon",
+      "reqwest",
+      "soapberry-zip",
+      "tokio"
+    ],
+    "dependency_debt": [
+      {
+        "order": 1,
+        "name": "encoding_rs",
+        "reason": "Pre-ADR legacy text decoding remains in core.",
+        "exit": "Move legacy encodings into the concrete RTF and binary Office crates."
+      },
+      {
+        "order": 2,
+        "name": "quick-xml",
+        "reason": "Pre-ADR format detection and helpers still parse XML in core.",
+        "exit": "Move XML parsing into format/common crates and leave only format-neutral contracts."
+      }
+    ],
+    "format_features": [
+      "doc",
+      "docx",
+      "odf",
+      "ole",
+      "ppt",
+      "pptx",
+      "rtf",
+      "xls",
+      "xlsb",
+      "xlsx"
+    ],
+    "feature_debt": [
+      {
+        "order": 3,
+        "name": "odf",
+        "reason": "Core still gates pre-ADR ODF detection code.",
+        "exit": "Move ODF detection into its format crate."
+      },
+      {
+        "order": 4,
+        "name": "ole",
+        "reason": "Core still gates pre-ADR binary Office encoding code.",
+        "exit": "Move binary Office encodings into common/concrete OLE crates."
+      },
+      {
+        "order": 5,
+        "name": "rtf",
+        "reason": "Core still gates pre-ADR RTF encoding code.",
+        "exit": "Move RTF encoding into litchi-rtf."
+      }
+    ]
+  }
+}

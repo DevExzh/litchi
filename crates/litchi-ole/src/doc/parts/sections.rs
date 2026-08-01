@@ -59,7 +59,7 @@ impl SectionsTable {
         word_document: &[u8],
         authors: &RevisionAuthorTable,
     ) -> Result<Self> {
-        if data.len() < 20 || (data.len() - 4) % 16 != 0 {
+        if data.len() < 20 || !(data.len() - 4).is_multiple_of(16) {
             return Err(DocError::Corrupted(
                 "PlcfSed does not contain complete CP and SED arrays".to_string(),
             ));

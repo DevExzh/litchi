@@ -251,7 +251,7 @@ pub fn decode_hex_data(hex_str: &str) -> Result<Vec<u8>> {
     let hex_clean: String = hex_str.chars().filter(|c| !c.is_whitespace()).collect();
 
     // Validate even length
-    if hex_clean.len() % 2 != 0 {
+    if !hex_clean.len().is_multiple_of(2) {
         return Err(Error::ParseError(
             "Hex data must have even number of characters".to_string(),
         ));

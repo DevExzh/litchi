@@ -1,7 +1,7 @@
 //! Round-trip tests for the BIFF8 SheetExt record (sheet tab color).
 
-use litchi_ole::xls::writer::XlsWriter;
 use litchi_ole::xls::XlsWorkbook;
+use litchi_ole::xls::writer::XlsWriter;
 use std::io::Cursor;
 
 fn written_workbook(configure: impl FnOnce(&mut XlsWriter)) -> Vec<u8> {

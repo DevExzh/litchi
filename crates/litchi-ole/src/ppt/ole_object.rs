@@ -618,13 +618,12 @@ impl PowerPointOleObjectCollection {
             objects.push(object);
         }
 
-        if let Some(media) = PowerPointExternalMediaCollection::parse(root)? {
-            if objects
+        if let Some(media) = PowerPointExternalMediaCollection::parse(root)?
+            && objects
                 .iter()
                 .any(|object| media.get(object.id()).is_some())
-            {
-                return corrupted("external-object list reuses an ID for OLE and media objects");
-            }
+        {
+            return corrupted("external-object list reuses an ID for OLE and media objects");
         }
         let hyperlinks = PowerPointHyperlinks::parse(root)?;
         if objects.iter().any(|object| {
@@ -722,12 +721,7 @@ impl PowerPointOleObjectCollection {
         self.validate()?;
         let seed = i32::try_from(self.id_seed)
             .map_err(|_| PptError::Corrupted("ExObjList identifier seed exceeds i32".into()))?;
-        let mut children = record_bytes(
-            0,
-            0,
-            PptRecordType::ExObjListAtom,
-            &seed.to_le_bytes(),
-        )?;
+        let mut children = record_bytes(0, 0, PptRecordType::ExObjListAtom, &seed.to_le_bytes())?;
         for object in &self.objects {
             children.extend_from_slice(&object.to_record_bytes()?);
         }
@@ -863,7 +857,7 @@ fn collect_external_object_lists<'a>(record: &'a PptRecord, lists: &mut Vec<&'a 
 fn parse_ole_string(record: &PptRecord, printable: bool) -> Result<String> {
     if record.version != 0
         || record.record_type != PptRecordType::CString
-        || record.data.len() % 2 != 0
+        || !record.data.len().is_multiple_of(2)
         || record.data.len() / 2 > MAX_OLE_NAME_UNITS
         || usize::try_from(record.data_length).ok() != Some(record.data.len())
     {

@@ -837,7 +837,7 @@ impl<'arena> TapParser<'arena> {
             ));
         }
         let start_of_tcs = 1 + ((itc_mac + 1) * 2);
-        if data.len() < start_of_tcs || (data.len() - start_of_tcs) % 20 != 0 {
+        if data.len() < start_of_tcs || !(data.len() - start_of_tcs).is_multiple_of(20) {
             return Err(DocError::Corrupted(
                 "sprmTDefTable contains incomplete boundaries or cell descriptors".to_string(),
             ));
@@ -1794,7 +1794,7 @@ impl<'arena> TapParser<'arena> {
 
     fn parse_cell_border_types(&self, tap: &mut TableProperties, sprm: &Sprm) -> Result<()> {
         let operand = sprm.operand_bytes();
-        if operand.len() % 4 != 0 || operand.len() / 4 > tap.cell_properties.len() {
+        if !operand.len().is_multiple_of(4) || operand.len() / 4 > tap.cell_properties.len() {
             return Err(DocError::Corrupted(
                 "DOC cell border-type array has an invalid size for the row".to_string(),
             ));
@@ -1864,7 +1864,7 @@ impl<'arena> TapParser<'arena> {
         _grpprl: &[u8],
     ) -> Result<()> {
         let bytes = sprm.operand_bytes();
-        if bytes.len() % 2 != 0 || bytes.len() / 2 > tap.cell_properties.len() {
+        if !bytes.len().is_multiple_of(2) || bytes.len() / 2 > tap.cell_properties.len() {
             return Err(DocError::Corrupted(
                 "DOC Shd80 array has an invalid size for the table row".to_string(),
             ));
@@ -1913,7 +1913,7 @@ impl<'arena> TapParser<'arena> {
         raw: bool,
     ) -> Result<()> {
         let operand = sprm.operand_bytes();
-        if operand.len() % 10 != 0 || operand.len() > 220 {
+        if !operand.len().is_multiple_of(10) || operand.len() > 220 {
             return Err(DocError::Corrupted(
                 "DOC table Shd array has an invalid byte count".to_string(),
             ));

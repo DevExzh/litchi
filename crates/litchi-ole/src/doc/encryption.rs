@@ -144,8 +144,7 @@ pub(crate) fn encrypt_document_streams_for_write(
             let mut verifier = Zeroizing::new([0u8; 16]);
             fill_random(salt.as_mut(), "CryptoAPI salt")?;
             fill_random(verifier.as_mut(), "CryptoAPI verifier")?;
-            let (header, context) =
-                build_cryptoapi_header(password, key_bits, &salt, &verifier)?;
+            let (header, context) = build_cryptoapi_header(password, key_bits, &salt, &verifier)?;
             if header.len() != header_len {
                 return Err("DOC CryptoAPI header length is inconsistent".to_string());
             }
@@ -155,8 +154,7 @@ pub(crate) fn encrypt_document_streams_for_write(
                 .map_err(|error| error.to_string())?;
             apply_cryptoapi_stream(&mut table_stream[header_len..], header_len, &context)
                 .map_err(|error| error.to_string())?;
-            apply_cryptoapi_stream(data_stream, 0, &context)
-                .map_err(|error| error.to_string())?;
+            apply_cryptoapi_stream(data_stream, 0, &context).map_err(|error| error.to_string())?;
         },
     }
     Ok(())

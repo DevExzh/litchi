@@ -1180,7 +1180,7 @@ pub fn set_paragraph_style_border_xml(
 
 fn base64_decode(value: &str) -> Result<Vec<u8>> {
     let clean: Vec<u8> = value.bytes().filter(|x| !x.is_ascii_whitespace()).collect();
-    if clean.len() % 4 != 0 {
+    if !clean.len().is_multiple_of(4) {
         return Err(bad("invalid office:binary-data base64"));
     }
     let val = |x| match x {

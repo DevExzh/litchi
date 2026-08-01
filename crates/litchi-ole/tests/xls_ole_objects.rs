@@ -1,6 +1,5 @@
 use litchi_ole::xls::{
-    XlsFtCmo, XlsFtPictFmla, XlsFtPioGrbit, XlsObjSubrecord, XlsOleObjectEditor,
-    XlsOleObjectRecord,
+    XlsFtCmo, XlsFtPictFmla, XlsFtPioGrbit, XlsObjSubrecord, XlsOleObjectEditor, XlsOleObjectRecord,
 };
 use litchi_ole::{LegacyOfficeObjectLimits, OleFile, OleWriter};
 use std::io::Cursor;
@@ -23,7 +22,10 @@ fn object(id: u16, storage: u32, unknown: u8) -> XlsOleObjectRecord {
             }),
             XlsObjSubrecord::ClipboardFormat(vec![2, 0]),
             XlsObjSubrecord::PictureFlags(XlsFtPioGrbit { raw: 0 }),
-            XlsObjSubrecord::Unknown { kind: 0x7777, data: vec![unknown] },
+            XlsObjSubrecord::Unknown {
+                kind: 0x7777,
+                data: vec![unknown],
+            },
             XlsObjSubrecord::PictureFormula(XlsFtPictFmla {
                 formula: vec![1, 2, 3],
                 storage_position: Some(storage),
@@ -67,7 +69,10 @@ fn workbook_stream(objects: &[XlsOleObjectRecord]) -> Vec<u8> {
 
 fn xls(objects: &[XlsOleObjectRecord], storages: &[u32]) -> Vec<u8> {
     let workbook = workbook_stream(objects);
-    let payloads = storages.iter().map(|id| (*id, nested_cfb(&id.to_le_bytes()))).collect::<Vec<_>>();
+    let payloads = storages
+        .iter()
+        .map(|id| (*id, nested_cfb(&id.to_le_bytes())))
+        .collect::<Vec<_>>();
     let mut writer = OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
     for (id, payload) in &payloads {
@@ -75,7 +80,9 @@ fn xls(objects: &[XlsOleObjectRecord], storages: &[u32]) -> Vec<u8> {
         writer.create_storage(&[&name]).unwrap();
         let mut nested = OleFile::open(Cursor::new(payload)).unwrap();
         let contents = nested.open_stream(&["CONTENTS"]).unwrap();
-        writer.create_stream(&[&name, "CONTENTS"], &contents).unwrap();
+        writer
+            .create_stream(&[&name, "CONTENTS"], &contents)
+            .unwrap();
     }
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
@@ -101,18 +108,38 @@ fn removes_shared_storage_only_after_last_reference() {
 fn add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data() {
     let bytes = xls(&[object(1, 1, 0xA1)], &[1]);
     let mut editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
-    editor.add(0, object(2, 2, 0xB2), nested_cfb(b"second")).unwrap();
+    editor
+        .add(0, object(2, 2, 0xB2), nested_cfb(b"second"))
+        .unwrap();
     editor.reorder(0, &[2, 1]).unwrap();
     let bytes = editor.finish().unwrap();
-    let editor = XlsOleObjectEditor::new(bytes.clone(), LegacyOfficeObjectLimits::default()).unwrap();
-    assert_eq!(editor.objects(0).unwrap().iter().map(XlsOleObjectRecord::object_id).collect::<Vec<_>>(), vec![2, 1]);
+    let editor =
+        XlsOleObjectEditor::new(bytes.clone(), LegacyOfficeObjectLimits::default()).unwrap();
+    assert_eq!(
+        editor
+            .objects(0)
+            .unwrap()
+            .iter()
+            .map(XlsOleObjectRecord::object_id)
+            .collect::<Vec<_>>(),
+        vec![2, 1]
+    );
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
     assert!(ole.exists(&["MBD00000002"]));
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
-    assert!(workbook.windows(b"unknown-sheet-record".len()).any(|value| value == b"unknown-sheet-record"));
-    assert!(editor.objects(0).unwrap()[0].subrecords.iter().any(|value| {
-        matches!(value, XlsObjSubrecord::Unknown { kind: 0x7777, data } if data == &[0xB2])
-    }));
+    assert!(
+        workbook
+            .windows(b"unknown-sheet-record".len())
+            .any(|value| value == b"unknown-sheet-record")
+    );
+    assert!(
+        editor.objects(0).unwrap()[0]
+            .subrecords
+            .iter()
+            .any(|value| {
+                matches!(value, XlsObjSubrecord::Unknown { kind: 0x7777, data } if data == &[0xB2])
+            })
+    );
 }
 
 #[test]
@@ -124,5 +151,13 @@ fn invalid_flags_and_reorder_are_atomic() {
     let bytes = xls(&[object(1, 1, 1), object(2, 2, 2)], &[1, 2]);
     let mut editor = XlsOleObjectEditor::new(bytes, LegacyOfficeObjectLimits::default()).unwrap();
     assert!(editor.reorder(0, &[1, 1]).is_err());
-    assert_eq!(editor.objects(0).unwrap().iter().map(XlsOleObjectRecord::object_id).collect::<Vec<_>>(), vec![1, 2]);
+    assert_eq!(
+        editor
+            .objects(0)
+            .unwrap()
+            .iter()
+            .map(XlsOleObjectRecord::object_id)
+            .collect::<Vec<_>>(),
+        vec![1, 2]
+    );
 }

@@ -995,7 +995,7 @@ fn base64_encode(data: &[u8]) -> String {
 }
 fn base64_decode(value: &str) -> Result<Vec<u8>> {
     let clean: Vec<u8> = value.bytes().filter(|x| !x.is_ascii_whitespace()).collect();
-    if clean.len() % 4 != 0 {
+    if !clean.len().is_multiple_of(4) {
         return Err(bad("invalid office:binary-data base64"));
     }
     let val = |x| match x {
@@ -1168,9 +1168,10 @@ pub fn set_table_row_style_properties_xml(
                 } else if depth_target.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"table-row-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some() {
-                        return Err(bad("duplicate style:table-row-properties"));
-                    }
+                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                {
+                    return Err(bad("duplicate style:table-row-properties"));
+                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;

@@ -972,8 +972,12 @@ pub fn write_sxfdb<W: Write>(writer: &mut W, cfg: &SxFdbConfig<'_>) -> XlsResult
     } else {
         0
     };
-    if cfg.group_child.is_some() { flags |= 0x0008; }
-    if cfg.is_grouped { flags |= 0x0010; }
+    if cfg.group_child.is_some() {
+        flags |= 0x0008;
+    }
+    if cfg.is_grouped {
+        flags |= 0x0010;
+    }
 
     write_record_header(writer, 0x00C7, data_len)?;
     writer.write_all(&flags.to_le_bytes())?; //  0: flags
@@ -1018,7 +1022,10 @@ pub fn write_sxstring<W: Write>(writer: &mut W, value: &str) -> XlsResult<()> {
     Ok(())
 }
 
-fn write_pivot_cache_item<W: Write>(writer: &mut W, item: &crate::xls::PivotCacheItem) -> XlsResult<()> {
+fn write_pivot_cache_item<W: Write>(
+    writer: &mut W,
+    item: &crate::xls::PivotCacheItem,
+) -> XlsResult<()> {
     match item {
         crate::xls::PivotCacheItem::String(value) => write_sxstring(writer, value),
         crate::xls::PivotCacheItem::Number(value) => write_sxnum(writer, *value),
@@ -1039,9 +1046,7 @@ fn write_pivot_cache_item<W: Write>(writer: &mut W, item: &crate::xls::PivotCach
             writer.write_all(&[value.day(), value.hour(), value.minute(), value.second()])?;
             Ok(())
         },
-        crate::xls::PivotCacheItem::Empty => {
-            write_record_header(writer, 0x00CF, 0)
-        },
+        crate::xls::PivotCacheItem::Empty => write_record_header(writer, 0x00CF, 0),
     }
 }
 
@@ -1230,17 +1235,49 @@ pub struct PivotCacheStreamInfo<'a> {
 ///
 /// Each byte is the item index for one string field. Numeric fields are
 /// excluded (they get separate SXNUM records).
-fn write_sxdbb<W: Write>(writer: &mut W, fields: &[PivotCacheFieldInfo<'_>], indices: &[u16]) -> XlsResult<()> {
-    let expected = fields.iter().filter(|field| field.is_source_field && !field.items.is_empty()).count();
-    if indices.len() != expected { return Err(crate::xls::XlsError::InvalidData("PivotCache row shared-index cardinality mismatch".to_string())); }
-    let size = fields.iter().filter(|field| field.is_source_field && !field.items.is_empty()).try_fold(0usize, |size, field| {
-        size.checked_add(if field.items.len() >= 0x100 { 2 } else { 1 })
-    }).ok_or_else(|| crate::xls::XlsError::InvalidData("SXINDEXLIST size overflow".to_string()))?;
-    write_record_header(writer, 0x00C8, u16::try_from(size).map_err(|_| crate::xls::XlsError::InvalidData("SXINDEXLIST exceeds BIFF record size".to_string()))?)?;
+fn write_sxdbb<W: Write>(
+    writer: &mut W,
+    fields: &[PivotCacheFieldInfo<'_>],
+    indices: &[u16],
+) -> XlsResult<()> {
+    let expected = fields
+        .iter()
+        .filter(|field| field.is_source_field && !field.items.is_empty())
+        .count();
+    if indices.len() != expected {
+        return Err(crate::xls::XlsError::InvalidData(
+            "PivotCache row shared-index cardinality mismatch".to_string(),
+        ));
+    }
+    let size = fields
+        .iter()
+        .filter(|field| field.is_source_field && !field.items.is_empty())
+        .try_fold(0usize, |size, field| {
+            size.checked_add(if field.items.len() >= 0x100 { 2 } else { 1 })
+        })
+        .ok_or_else(|| {
+            crate::xls::XlsError::InvalidData("SXINDEXLIST size overflow".to_string())
+        })?;
+    write_record_header(
+        writer,
+        0x00C8,
+        u16::try_from(size).map_err(|_| {
+            crate::xls::XlsError::InvalidData("SXINDEXLIST exceeds BIFF record size".to_string())
+        })?,
+    )?;
     let mut index_iter = indices.iter();
-    for field in fields.iter().filter(|field| field.is_source_field && !field.items.is_empty()) {
+    for field in fields
+        .iter()
+        .filter(|field| field.is_source_field && !field.items.is_empty())
+    {
         let index = *index_iter.next().unwrap();
-        if field.items.len() >= 0x100 { writer.write_all(&index.to_le_bytes())?; } else { writer.write_all(&[u8::try_from(index).map_err(|_| crate::xls::XlsError::InvalidData("SXINDEXLIST 8-bit index overflow".to_string()))?])?; }
+        if field.items.len() >= 0x100 {
+            writer.write_all(&index.to_le_bytes())?;
+        } else {
+            writer.write_all(&[u8::try_from(index).map_err(|_| {
+                crate::xls::XlsError::InvalidData("SXINDEXLIST 8-bit index overflow".to_string())
+            })?])?;
+        }
     }
     Ok(())
 }
@@ -1281,7 +1318,11 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
         &SxDbConfig {
             record_count: info.record_count,
             stream_id: info.stream_id,
-            standard_field_count: info.fields.iter().filter(|field| field.is_source_field).count() as u16,
+            standard_field_count: info
+                .fields
+                .iter()
+                .filter(|field| field.is_source_field)
+                .count() as u16,
             total_field_count: info.fields.len() as u16,
             flags: sxdb_flags,
         },
@@ -1293,7 +1334,9 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
     // Per-field: SXFDB + SXFDBTYPE + SXSTRING items
     // Order per LO XclExpPCField::Save(): SXFIELD, SXFDBTYPE, items
     for field in info.fields {
-        let group_items = field.grouping.map_or(&[][..], crate::xls::PivotCacheGrouping::group_items);
+        let group_items = field
+            .grouping
+            .map_or(&[][..], crate::xls::PivotCacheGrouping::group_items);
         let has_items = !field.items.is_empty() || !group_items.is_empty();
         let item_count = if !group_items.is_empty() {
             group_items.len() as u16
@@ -1314,7 +1357,10 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
                 has_items,
                 is_numeric: field.is_numeric,
                 data_flags: crate::xls::pivot_table::pivot_cache_data_flags(
-                    if matches!(field.grouping, Some(crate::xls::PivotCacheGrouping::Discrete(_))) {
+                    if matches!(
+                        field.grouping,
+                        Some(crate::xls::PivotCacheGrouping::Discrete(_))
+                    ) {
                         group_items
                     } else {
                         field.items
@@ -1324,7 +1370,12 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
                 group_child: field.group_child,
                 group_base,
                 group_item_count: group_items.len() as u16,
-                base_item_count: match field.grouping { Some(crate::xls::PivotCacheGrouping::Discrete(value)) => value.item_to_group.len() as u16, _ => 0 },
+                base_item_count: match field.grouping {
+                    Some(crate::xls::PivotCacheGrouping::Discrete(value)) => {
+                        value.item_to_group.len() as u16
+                    },
+                    _ => 0,
+                },
                 original_item_count: field.items.len() as u16,
                 is_grouped: field.grouping.is_some(),
             },
@@ -1340,19 +1391,41 @@ pub fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> XlsResult
             match grouping {
                 crate::xls::PivotCacheGrouping::Discrete(value) => {
                     write_record_header(&mut buf, 0x00D9, (value.item_to_group.len() * 2) as u16)?;
-                    for index in &value.item_to_group { buf.extend_from_slice(&index.to_le_bytes()); }
+                    for index in &value.item_to_group {
+                        buf.extend_from_slice(&index.to_le_bytes());
+                    }
                 },
                 crate::xls::PivotCacheGrouping::Numeric(value) => {
-                    let flags = 0x0020 | u16::from(value.auto_start) | (u16::from(value.auto_end) << 1);
-                    write_record_header(&mut buf, 0x00D8, 2)?; buf.extend_from_slice(&flags.to_le_bytes());
-                    write_sxnum(&mut buf, value.start)?; write_sxnum(&mut buf, value.end)?; write_sxnum(&mut buf, value.step)?;
+                    let flags =
+                        0x0020 | u16::from(value.auto_start) | (u16::from(value.auto_end) << 1);
+                    write_record_header(&mut buf, 0x00D8, 2)?;
+                    buf.extend_from_slice(&flags.to_le_bytes());
+                    write_sxnum(&mut buf, value.start)?;
+                    write_sxnum(&mut buf, value.end)?;
+                    write_sxnum(&mut buf, value.step)?;
                 },
                 crate::xls::PivotCacheGrouping::Date(value) => {
-                    let flags = ((value.unit as u16) << 2) | u16::from(value.auto_start) | (u16::from(value.auto_end) << 1);
-                    write_record_header(&mut buf, 0x00D8, 2)?; buf.extend_from_slice(&flags.to_le_bytes());
-                    write_pivot_cache_item(&mut buf, &crate::xls::PivotCacheItem::DateTime(value.start))?;
-                    write_pivot_cache_item(&mut buf, &crate::xls::PivotCacheItem::DateTime(value.end))?;
-                    write_sxinteger(&mut buf, i16::try_from(value.step).map_err(|_| crate::xls::XlsError::InvalidData("date grouping step exceeds i16".to_string()))?)?;
+                    let flags = ((value.unit as u16) << 2)
+                        | u16::from(value.auto_start)
+                        | (u16::from(value.auto_end) << 1);
+                    write_record_header(&mut buf, 0x00D8, 2)?;
+                    buf.extend_from_slice(&flags.to_le_bytes());
+                    write_pivot_cache_item(
+                        &mut buf,
+                        &crate::xls::PivotCacheItem::DateTime(value.start),
+                    )?;
+                    write_pivot_cache_item(
+                        &mut buf,
+                        &crate::xls::PivotCacheItem::DateTime(value.end),
+                    )?;
+                    write_sxinteger(
+                        &mut buf,
+                        i16::try_from(value.step).map_err(|_| {
+                            crate::xls::XlsError::InvalidData(
+                                "date grouping step exceeds i16".to_string(),
+                            )
+                        })?,
+                    )?;
                 },
             }
         }

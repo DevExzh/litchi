@@ -84,18 +84,21 @@ fn parses_empty_and_unicode_tag_content() {
 fn typed_constructors_validate() {
     assert!(CustomXmlTag::new(Cow::Borrowed(""), None, Vec::new(), 0, Cow::Borrowed("")).is_err());
     assert!(
-        CustomXmlTag::new(Cow::Borrowed("a"), Some(0), Vec::new(), 0, Cow::Borrowed("")).is_err()
+        CustomXmlTag::new(
+            Cow::Borrowed("a"),
+            Some(0),
+            Vec::new(),
+            0,
+            Cow::Borrowed("")
+        )
+        .is_err()
     );
-    assert!(
-        CustomXmlAttribute::new(Cow::Borrowed(" "), Cow::Borrowed("v")).is_err()
-    );
+    assert!(CustomXmlAttribute::new(Cow::Borrowed(" "), Cow::Borrowed("v")).is_err());
     let duplicate = vec![
         CustomXmlAttribute::new(Cow::Borrowed("n"), Cow::Borrowed("1")).unwrap(),
         CustomXmlAttribute::new(Cow::Borrowed("n"), Cow::Borrowed("2")).unwrap(),
     ];
-    assert!(
-        CustomXmlTag::new(Cow::Borrowed("a"), None, duplicate, 0, Cow::Borrowed("")).is_err()
-    );
+    assert!(CustomXmlTag::new(Cow::Borrowed("a"), None, duplicate, 0, Cow::Borrowed("")).is_err());
 }
 
 #[test]

@@ -30,7 +30,7 @@ pub(crate) async fn eval_ifs(
     current_sheet: &str,
     args: &[Expr],
 ) -> Result<CellValue> {
-    if args.len() < 2 || args.len() % 2 != 0 {
+    if args.len() < 2 || !args.len().is_multiple_of(2) {
         return Ok(CellValue::Error(
             "IFS expects an even number of arguments (condition/result pairs)".to_string(),
         ));
@@ -170,7 +170,7 @@ pub(crate) async fn eval_switch(
     }
 
     // Default value if exists (odd number of arguments total)
-    if args.len() % 2 == 0 {
+    if args.len().is_multiple_of(2) {
         evaluate_expression(ctx, current_sheet, &args[args.len() - 1]).await
     } else {
         Ok(CellValue::Error("#N/A".to_string()))

@@ -32,8 +32,8 @@ use crate::charts::types::{
     LayoutMode, LayoutTarget, LegendPosition, MarkerStyle, OfPieSplitType, OfPieType, RadarStyle,
     ScatterStyle, TickLabelPosition, TickMark,
 };
-use litchi_ooxml_common::xml::{decode_xml_reference, is_drawingml_chart_name, is_drawingml_name};
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::xml::{decode_xml_reference, is_drawingml_chart_name, is_drawingml_name};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};

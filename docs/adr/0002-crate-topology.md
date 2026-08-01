@@ -56,6 +56,11 @@ without creating aliases with redundant prefixes.
 
 - A checked-in dependency allowlist rejects concrete peer edges, including dev
   and optional dependencies.
+- The allowlist inventories every direct `crates/*/Cargo.toml` workspace member.
+  Every internal edge is either a canonical downward ceiling or an ordered,
+  stale-checked migration-debt entry with a reason and exit condition. Migration
+  hosts have no canonical edges: adding an unclassified edge fails, and removing
+  a debt edge also fails until its ledger entry is deleted.
 - `litchi-core` owns only format-neutral sources, blobs, budgets, execution,
   scalars, selectors, diagnostics, patch envelopes, and content events. It owns
   no ZIP, XML, CFB, format feature, Tokio, Reqwest, or Rayon dependency.

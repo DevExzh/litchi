@@ -841,13 +841,13 @@ fn apply_child(
             _ => {},
         }
     }
-    if let Some(value) = num.as_mut().filter(|value| depth == value.depth + 1) {
-        if element.local_name().as_ref() == b"abstractNumId" {
-            if value.abstract_num_id.is_some() {
-                return Err(invalid("duplicate abstractNumId"));
-            }
-            value.abstract_num_id = Some(required_u32(element, b"val", decoder, resolver)?);
+    if let Some(value) = num.as_mut().filter(|value| depth == value.depth + 1)
+        && element.local_name().as_ref() == b"abstractNumId"
+    {
+        if value.abstract_num_id.is_some() {
+            return Err(invalid("duplicate abstractNumId"));
         }
+        value.abstract_num_id = Some(required_u32(element, b"val", decoder, resolver)?);
     }
     Ok(())
 }

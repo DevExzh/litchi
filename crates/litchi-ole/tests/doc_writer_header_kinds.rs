@@ -6,7 +6,9 @@
 #![cfg(feature = "imgconv")]
 
 use litchi_ole::doc::shapes::extract_drawing_shapes;
-use litchi_ole::doc::writer::{DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition};
+use litchi_ole::doc::writer::{
+    DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition,
+};
 use litchi_ole::doc::{
     DocHeaderKind, HeaderFooterParagraph, HeaderFooterType, Package, ShapeHorizontalOrigin,
     ShapeTextWrap, ShapeVerticalOrigin,
@@ -57,8 +59,8 @@ fn make_png(width: u32, height: u32) -> Vec<u8> {
 }
 
 fn jpeg_fixture() -> Vec<u8> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/images/jpg/abstract4.jpg");
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/images/jpg/abstract4.jpg");
     std::fs::read(path).expect("read JPEG fixture")
 }
 
@@ -81,10 +83,7 @@ fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
             DocHeaderKind::FirstPage,
             DocDrawingShape::new(DocShapeKind::Ellipse, 3000, 1500).unwrap(),
             FloatingPosition::new(2000, 800)
-                .with_origins(
-                    ShapeHorizontalOrigin::Page,
-                    ShapeVerticalOrigin::Paragraph,
-                )
+                .with_origins(ShapeHorizontalOrigin::Page, ShapeVerticalOrigin::Paragraph)
                 .with_text_wrap(ShapeTextWrap::Square),
             "First\nBox",
         )
@@ -111,7 +110,10 @@ fn even_and_first_page_header_text_boxes_round_trip() {
     assert_eq!(boxes[0].header_kind, Some(HeaderFooterType::EvenPageHeader));
     assert_eq!(boxes[1].shape_id, 2050);
     assert_eq!(boxes[1].text, "First\rBox\r");
-    assert_eq!(boxes[1].header_kind, Some(HeaderFooterType::FirstPageHeader));
+    assert_eq!(
+        boxes[1].header_kind,
+        Some(HeaderFooterType::FirstPageHeader)
+    );
 
     // Header shape anchors: even story comes first (anchor at CP 0), the
     // first-page story follows the even story (3 CPs) and the odd story (6).

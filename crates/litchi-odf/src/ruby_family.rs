@@ -809,8 +809,7 @@ fn parse_ruby_entries(xml: &str) -> Result<Vec<RubyEntry>> {
                         ruby.text_depth = None;
                     }
                 }
-                if active.last().is_some_and(|ruby| ruby.depth == depth) {
-                    let ruby = active.pop().unwrap();
+                if let Some(ruby) = active.pop_if(|ruby| ruby.depth == depth) {
                     if frame.0 != Ns::Text
                         || frame.1 != b"ruby"
                         || ruby.base.is_none()
@@ -820,7 +819,9 @@ fn parse_ruby_entries(xml: &str) -> Result<Vec<RubyEntry>> {
                     {
                         return Err(bad("text:ruby requires ruby-base then ruby-text"));
                     }
-                    let (base_start, base_end) = ruby.base.unwrap();
+                    let (base_start, base_end) = ruby
+                        .base
+                        .ok_or_else(|| bad("text:ruby is missing ruby-base"))?;
                     let value = RubyAnnotation::new(
                         ruby.style_name,
                         RubyBase {

@@ -89,7 +89,10 @@ pub fn has_picture(
     if props.is_spec && !props.is_obj && !props.is_ole2 && !props.is_data {
         // Image should be in its own run, or in a run with the end-of-special
         // marker. 0x0001 anchors an inline picture, 0x0008 a floating one.
-        if matches!(text, "\u{0001}" | "\u{0001}\u{0015}" | "\u{0008}" | "\u{0008}\u{0015}") {
+        if matches!(
+            text,
+            "\u{0001}" | "\u{0001}\u{0015}" | "\u{0008}" | "\u{0008}\u{0015}"
+        ) {
             let pic_offset = props.pic_offset.unwrap_or(0);
             return does_block_contain_image(data_buff, pic_offset);
         }

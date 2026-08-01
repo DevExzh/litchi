@@ -73,7 +73,10 @@ mod tests {
     fn round_trip_empty_payloads() {
         assert_eq!(XlsBegin::parse(&[]).unwrap().to_payload(), Vec::<u8>::new());
         assert_eq!(XlsEnd::parse(&[]).unwrap().to_payload(), Vec::<u8>::new());
-        assert_eq!(XlsPlotArea::parse(&[]).unwrap().to_payload(), Vec::<u8>::new());
+        assert_eq!(
+            XlsPlotArea::parse(&[]).unwrap().to_payload(),
+            Vec::<u8>::new()
+        );
     }
 
     #[test]

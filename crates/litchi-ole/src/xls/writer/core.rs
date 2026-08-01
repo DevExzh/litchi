@@ -2080,7 +2080,7 @@ impl XlsWriter {
 
     /// Add a filter condition to a specific column within the AutoFilter range.
     ///
-    /// The AutoFilter range must first be set via [`set_auto_filter`]. The
+    /// The AutoFilter range must first be set via [`Self::set_auto_filter`]. The
     /// `column_index` is 0-based relative to the filter range start column.
     ///
     /// # Arguments
@@ -3216,12 +3216,12 @@ impl XlsWriter {
                     ..
                 }
             );
-            if let XlsConditionalFormat12Type::CellValue { formula2, .. } = &rule.format_type {
-                if between != formula2.is_some() {
-                    return Err(XlsError::InvalidData(
+            if let XlsConditionalFormat12Type::CellValue { formula2, .. } = &rule.format_type
+                && between != formula2.is_some()
+            {
+                return Err(XlsError::InvalidData(
                         "between/not-between CF12 rules require two formulas; other comparisons require one".to_string(),
                     ));
-                }
             }
             let visual = matches!(
                 rule.format_type,
@@ -3651,12 +3651,12 @@ impl XlsWriter {
         sheet: usize,
         tab_color: Option<u8>,
     ) -> XlsResult<()> {
-        if let Some(index) = tab_color {
-            if !(0x08..=0x3F).contains(&index) {
-                return Err(XlsError::InvalidData(format!(
-                    "sheet tab color index {index:#04X} is outside the Icv palette"
-                )));
-            }
+        if let Some(index) = tab_color
+            && !(0x08..=0x3F).contains(&index)
+        {
+            return Err(XlsError::InvalidData(format!(
+                "sheet tab color index {index:#04X} is outside the Icv palette"
+            )));
         }
         let worksheet = self
             .worksheets
@@ -3695,9 +3695,11 @@ impl XlsWriter {
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        if worksheet.data_tables.iter().any(|(row, col, _)| {
-            (*row, *col) == (anchor_row, anchor_col)
-        }) {
+        if worksheet
+            .data_tables
+            .iter()
+            .any(|(row, col, _)| (*row, *col) == (anchor_row, anchor_col))
+        {
             return Err(XlsError::InvalidData(
                 "duplicate data-table anchor cell".to_string(),
             ));

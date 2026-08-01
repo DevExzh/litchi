@@ -107,18 +107,26 @@ impl ShapeTwips {
     pub const ZERO: Self = Self(0);
 
     #[inline]
-    pub const fn new(value: i32) -> Self { Self(value) }
+    pub const fn new(value: i32) -> Self {
+        Self(value)
+    }
 
     #[inline]
-    pub const fn get(self) -> i32 { self.0 }
+    pub const fn get(self) -> i32 {
+        self.0
+    }
 }
 
 impl From<i32> for ShapeTwips {
-    fn from(value: i32) -> Self { Self(value) }
+    fn from(value: i32) -> Self {
+        Self(value)
+    }
 }
 
 impl From<ShapeTwips> for i32 {
-    fn from(value: ShapeTwips) -> Self { value.0 }
+    fn from(value: ShapeTwips) -> Self {
+        value.0
+    }
 }
 
 /// A clockwise shape rotation measured in whole degrees.
@@ -127,10 +135,14 @@ pub struct ShapeRotationDegrees(i32);
 
 impl ShapeRotationDegrees {
     #[inline]
-    pub const fn new(value: i32) -> Self { Self(value) }
+    pub const fn new(value: i32) -> Self {
+        Self(value)
+    }
 
     #[inline]
-    pub const fn get(self) -> i32 { self.0 }
+    pub const fn get(self) -> i32 {
+        self.0
+    }
 }
 
 /// A signed root-shape stacking order.
@@ -139,10 +151,14 @@ pub struct ShapeZOrder(i32);
 
 impl ShapeZOrder {
     #[inline]
-    pub const fn new(value: i32) -> Self { Self(value) }
+    pub const fn new(value: i32) -> Self {
+        Self(value)
+    }
 
     #[inline]
-    pub const fn get(self) -> i32 { self.0 }
+    pub const fn get(self) -> i32 {
+        self.0
+    }
 }
 
 /// Shape type
@@ -538,33 +554,61 @@ impl ShapeGeometry {
 
     /// Construct geometry using named RTF coordinate units.
     #[inline]
-    pub const fn from_twips(x: ShapeTwips, y: ShapeTwips, width: ShapeTwips, height: ShapeTwips) -> Self {
-        Self { x: x.0, y: y.0, width: width.0, height: height.0, rotation: 0, z_order: 0 }
+    pub const fn from_twips(
+        x: ShapeTwips,
+        y: ShapeTwips,
+        width: ShapeTwips,
+        height: ShapeTwips,
+    ) -> Self {
+        Self {
+            x: x.0,
+            y: y.0,
+            width: width.0,
+            height: height.0,
+            rotation: 0,
+            z_order: 0,
+        }
     }
 
     #[inline]
-    pub const fn x_twips(self) -> ShapeTwips { ShapeTwips(self.x) }
+    pub const fn x_twips(self) -> ShapeTwips {
+        ShapeTwips(self.x)
+    }
 
     #[inline]
-    pub const fn y_twips(self) -> ShapeTwips { ShapeTwips(self.y) }
+    pub const fn y_twips(self) -> ShapeTwips {
+        ShapeTwips(self.y)
+    }
 
     #[inline]
-    pub const fn width_twips(self) -> ShapeTwips { ShapeTwips(self.width) }
+    pub const fn width_twips(self) -> ShapeTwips {
+        ShapeTwips(self.width)
+    }
 
     #[inline]
-    pub const fn height_twips(self) -> ShapeTwips { ShapeTwips(self.height) }
+    pub const fn height_twips(self) -> ShapeTwips {
+        ShapeTwips(self.height)
+    }
 
     #[inline]
-    pub const fn rotation_degrees(self) -> ShapeRotationDegrees { ShapeRotationDegrees(self.rotation) }
+    pub const fn rotation_degrees(self) -> ShapeRotationDegrees {
+        ShapeRotationDegrees(self.rotation)
+    }
 
     #[inline]
-    pub const fn z_order_value(self) -> ShapeZOrder { ShapeZOrder(self.z_order) }
+    pub const fn z_order_value(self) -> ShapeZOrder {
+        ShapeZOrder(self.z_order)
+    }
 
     #[inline]
-    pub fn set_rotation_degrees(&mut self, value: ShapeRotationDegrees) { self.rotation = value.0; }
+    pub fn set_rotation_degrees(&mut self, value: ShapeRotationDegrees) {
+        self.rotation = value.0;
+    }
 
     #[inline]
-    pub fn set_z_order(&mut self, value: ShapeZOrder) { self.z_order = value.0; }
+    pub fn set_z_order(&mut self, value: ShapeZOrder) {
+        self.z_order = value.0;
+    }
 }
 
 /// Text wrapping mode for shapes
@@ -619,11 +663,27 @@ pub enum ShapeWrapStyle {
 
 impl ShapeWrapStyle {
     pub const fn from_rtf(value: i32) -> Self {
-        match value { 0 => Self::Around, 1 => Self::None, 2 => Self::Square, 3 => Self::Through, 4 => Self::Tight, 5 => Self::ThroughLargest, other => Self::Other(other) }
+        match value {
+            0 => Self::Around,
+            1 => Self::None,
+            2 => Self::Square,
+            3 => Self::Through,
+            4 => Self::Tight,
+            5 => Self::ThroughLargest,
+            other => Self::Other(other),
+        }
     }
 
     pub const fn to_rtf(self) -> i32 {
-        match self { Self::Around => 0, Self::None => 1, Self::Square => 2, Self::Through => 3, Self::Tight => 4, Self::ThroughLargest => 5, Self::Other(value) => value }
+        match self {
+            Self::Around => 0,
+            Self::None => 1,
+            Self::Square => 2,
+            Self::Through => 3,
+            Self::Tight => 4,
+            Self::ThroughLargest => 5,
+            Self::Other(value) => value,
+        }
     }
 }
 
@@ -639,11 +699,23 @@ pub enum ShapeWrapSide {
 
 impl ShapeWrapSide {
     pub const fn from_rtf(value: i32) -> Self {
-        match value { 0 => Self::Both, 1 => Self::Left, 2 => Self::Right, 3 => Self::Largest, other => Self::Other(other) }
+        match value {
+            0 => Self::Both,
+            1 => Self::Left,
+            2 => Self::Right,
+            3 => Self::Largest,
+            other => Self::Other(other),
+        }
     }
 
     pub const fn to_rtf(self) -> i32 {
-        match self { Self::Both => 0, Self::Left => 1, Self::Right => 2, Self::Largest => 3, Self::Other(value) => value }
+        match self {
+            Self::Both => 0,
+            Self::Left => 1,
+            Self::Right => 2,
+            Self::Largest => 3,
+            Self::Other(value) => value,
+        }
     }
 }
 
@@ -811,10 +883,12 @@ impl<'a> Shape<'a> {
     }
 
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
-        self.text_story_events.iter().filter_map(|event| match event {
-            crate::StoryEvent::PageBreak(page_break) => Some(page_break),
-            _ => None,
-        })
+        self.text_story_events
+            .iter()
+            .filter_map(|event| match event {
+                crate::StoryEvent::PageBreak(page_break) => Some(page_break),
+                _ => None,
+            })
     }
 
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
@@ -850,34 +924,67 @@ impl<'a> Shape<'a> {
 
     /// Return the last declared `shplid`, if present.
     pub fn shape_id(&self) -> Option<i32> {
-        self.info.iter().rev().find_map(|info| match info { ShapeGroupInfo::ShapeId(value) => Some(*value), _ => None })
+        self.info.iter().rev().find_map(|info| match info {
+            ShapeGroupInfo::ShapeId(value) => Some(*value),
+            _ => None,
+        })
     }
 
     /// Recursively find this shape or one owned by its text story by name.
     pub fn find_by_name(&self, name: &str) -> Option<&Shape<'a>> {
-        if self.name == name || self.property("wzName") == Some(name) { return Some(self); }
-        self.text_shapes.iter().find_map(|shape| shape.find_by_name(name))
-            .or_else(|| self.text_shape_groups.iter().find_map(|group| group.find_shape_by_name(name)))
+        if self.name == name || self.property("wzName") == Some(name) {
+            return Some(self);
+        }
+        self.text_shapes
+            .iter()
+            .find_map(|shape| shape.find_by_name(name))
+            .or_else(|| {
+                self.text_shape_groups
+                    .iter()
+                    .find_map(|group| group.find_shape_by_name(name))
+            })
     }
 
     /// Recursively find this shape or one owned by its text story by `shplid`.
     pub fn find_by_id(&self, id: i32) -> Option<&Shape<'a>> {
-        if self.shape_id() == Some(id) { return Some(self); }
-        self.text_shapes.iter().find_map(|shape| shape.find_by_id(id))
-            .or_else(|| self.text_shape_groups.iter().find_map(|group| group.find_shape_by_id(id)))
+        if self.shape_id() == Some(id) {
+            return Some(self);
+        }
+        self.text_shapes
+            .iter()
+            .find_map(|shape| shape.find_by_id(id))
+            .or_else(|| {
+                self.text_shape_groups
+                    .iter()
+                    .find_map(|group| group.find_shape_by_id(id))
+            })
     }
 
     /// Insert or replace the last property with the same name atomically.
-    pub fn set_property(&mut self, property: ShapeProperty<'a>) -> crate::RtfResult<Option<ShapeProperty<'a>>> {
+    pub fn set_property(
+        &mut self,
+        property: ShapeProperty<'a>,
+    ) -> crate::RtfResult<Option<ShapeProperty<'a>>> {
         property.validate()?;
         if property.name.len().saturating_add(property.value.len()) > 1_048_576 {
-            return Err(crate::RtfError::MalformedDocument("RTF shape property exceeds the safety limit".to_string()));
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF shape property exceeds the safety limit".to_string(),
+            ));
         }
-        if let Some(index) = self.properties.iter().rposition(|current| current.name == property.name) {
-            return Ok(Some(std::mem::replace(&mut self.properties[index], property)));
+        if let Some(index) = self
+            .properties
+            .iter()
+            .rposition(|current| current.name == property.name)
+        {
+            return Ok(Some(std::mem::replace(
+                &mut self.properties[index],
+                property,
+            )));
         }
         if self.properties.len() >= 65_536 {
-            return Err(crate::RtfError::MalformedDocument("RTF shape-property count exceeds the safety limit".to_string()));
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF shape-property count exceeds the safety limit".to_string(),
+            ));
         }
         self.properties.push(property);
         Ok(None)
@@ -885,7 +992,10 @@ impl<'a> Shape<'a> {
 
     /// Remove the last property with the requested name.
     pub fn remove_property(&mut self, name: &str) -> Option<ShapeProperty<'a>> {
-        let index = self.properties.iter().rposition(|property| property.name == name)?;
+        let index = self
+            .properties
+            .iter()
+            .rposition(|property| property.name == name)?;
         Some(self.properties.remove(index))
     }
 
@@ -1058,26 +1168,62 @@ pub enum ShapeGroupInfo {
 
 impl ShapeGroupInfo {
     pub const fn horizontal_anchor(value: ShapeHorizontalAnchor) -> Self {
-        match value { ShapeHorizontalAnchor::Page => Self::HorizontalPage, ShapeHorizontalAnchor::Margin => Self::HorizontalMargin, ShapeHorizontalAnchor::Column => Self::HorizontalColumn, ShapeHorizontalAnchor::ShapeProperty => Self::IgnoreHorizontal }
+        match value {
+            ShapeHorizontalAnchor::Page => Self::HorizontalPage,
+            ShapeHorizontalAnchor::Margin => Self::HorizontalMargin,
+            ShapeHorizontalAnchor::Column => Self::HorizontalColumn,
+            ShapeHorizontalAnchor::ShapeProperty => Self::IgnoreHorizontal,
+        }
     }
 
     pub const fn vertical_anchor(value: ShapeVerticalAnchor) -> Self {
-        match value { ShapeVerticalAnchor::Page => Self::VerticalPage, ShapeVerticalAnchor::Margin => Self::VerticalMargin, ShapeVerticalAnchor::Paragraph => Self::VerticalParagraph, ShapeVerticalAnchor::ShapeProperty => Self::IgnoreVertical }
+        match value {
+            ShapeVerticalAnchor::Page => Self::VerticalPage,
+            ShapeVerticalAnchor::Margin => Self::VerticalMargin,
+            ShapeVerticalAnchor::Paragraph => Self::VerticalParagraph,
+            ShapeVerticalAnchor::ShapeProperty => Self::IgnoreVertical,
+        }
     }
 
-    pub const fn wrap(value: ShapeWrapStyle) -> Self { Self::Wrap(value.to_rtf()) }
-    pub const fn wrap_side(value: ShapeWrapSide) -> Self { Self::WrapSide(value.to_rtf()) }
+    pub const fn wrap(value: ShapeWrapStyle) -> Self {
+        Self::Wrap(value.to_rtf())
+    }
+    pub const fn wrap_side(value: ShapeWrapSide) -> Self {
+        Self::WrapSide(value.to_rtf())
+    }
 
     pub const fn as_horizontal_anchor(self) -> Option<ShapeHorizontalAnchor> {
-        match self { Self::HorizontalPage => Some(ShapeHorizontalAnchor::Page), Self::HorizontalMargin => Some(ShapeHorizontalAnchor::Margin), Self::HorizontalColumn => Some(ShapeHorizontalAnchor::Column), Self::IgnoreHorizontal => Some(ShapeHorizontalAnchor::ShapeProperty), _ => None }
+        match self {
+            Self::HorizontalPage => Some(ShapeHorizontalAnchor::Page),
+            Self::HorizontalMargin => Some(ShapeHorizontalAnchor::Margin),
+            Self::HorizontalColumn => Some(ShapeHorizontalAnchor::Column),
+            Self::IgnoreHorizontal => Some(ShapeHorizontalAnchor::ShapeProperty),
+            _ => None,
+        }
     }
 
     pub const fn as_vertical_anchor(self) -> Option<ShapeVerticalAnchor> {
-        match self { Self::VerticalPage => Some(ShapeVerticalAnchor::Page), Self::VerticalMargin => Some(ShapeVerticalAnchor::Margin), Self::VerticalParagraph => Some(ShapeVerticalAnchor::Paragraph), Self::IgnoreVertical => Some(ShapeVerticalAnchor::ShapeProperty), _ => None }
+        match self {
+            Self::VerticalPage => Some(ShapeVerticalAnchor::Page),
+            Self::VerticalMargin => Some(ShapeVerticalAnchor::Margin),
+            Self::VerticalParagraph => Some(ShapeVerticalAnchor::Paragraph),
+            Self::IgnoreVertical => Some(ShapeVerticalAnchor::ShapeProperty),
+            _ => None,
+        }
     }
 
-    pub const fn as_wrap(self) -> Option<ShapeWrapStyle> { match self { Self::Wrap(value) => Some(ShapeWrapStyle::from_rtf(value)), _ => None } }
-    pub const fn as_wrap_side(self) -> Option<ShapeWrapSide> { match self { Self::WrapSide(value) => Some(ShapeWrapSide::from_rtf(value)), _ => None } }
+    pub const fn as_wrap(self) -> Option<ShapeWrapStyle> {
+        match self {
+            Self::Wrap(value) => Some(ShapeWrapStyle::from_rtf(value)),
+            _ => None,
+        }
+    }
+    pub const fn as_wrap_side(self) -> Option<ShapeWrapSide> {
+        match self {
+            Self::WrapSide(value) => Some(ShapeWrapSide::from_rtf(value)),
+            _ => None,
+        }
+    }
 }
 
 /// Group of shapes
@@ -1166,19 +1312,39 @@ impl<'a> ShapeGroup<'a> {
 
     /// Recursively find a shape by its `wzName` property or typed name.
     pub fn find_shape_by_name(&self, name: &str) -> Option<&Shape<'a>> {
-        self.shapes.iter().find_map(|shape| shape.find_by_name(name))
-            .or_else(|| self.groups.iter().find_map(|group| group.find_shape_by_name(name)))
+        self.shapes
+            .iter()
+            .find_map(|shape| shape.find_by_name(name))
+            .or_else(|| {
+                self.groups
+                    .iter()
+                    .find_map(|group| group.find_shape_by_name(name))
+            })
     }
 
     /// Recursively find a shape by `shplid`.
     pub fn find_shape_by_id(&self, id: i32) -> Option<&Shape<'a>> {
-        self.shapes.iter().find_map(|shape| shape.find_by_id(id))
-            .or_else(|| self.groups.iter().find_map(|group| group.find_shape_by_id(id)))
+        self.shapes
+            .iter()
+            .find_map(|shape| shape.find_by_id(id))
+            .or_else(|| {
+                self.groups
+                    .iter()
+                    .find_map(|group| group.find_shape_by_id(id))
+            })
     }
 
     /// Atomically replace a directly contained shape.
-    pub fn replace_shape(&mut self, index: usize, replacement: Shape<'a>) -> crate::RtfResult<Shape<'a>> {
-        if index >= self.shapes.len() { return Err(crate::RtfError::MalformedDocument(format!("RTF grouped shape index {index} is out of bounds"))); }
+    pub fn replace_shape(
+        &mut self,
+        index: usize,
+        replacement: Shape<'a>,
+    ) -> crate::RtfResult<Shape<'a>> {
+        if index >= self.shapes.len() {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF grouped shape index {index} is out of bounds"
+            )));
+        }
         let mut staged = self.clone();
         let old = std::mem::replace(&mut staged.shapes[index], replacement);
         staged.validate_at_depth(0, true)?;
@@ -1188,12 +1354,22 @@ impl<'a> ShapeGroup<'a> {
 
     /// Atomically remove a directly contained shape and repair child indices.
     pub fn remove_shape(&mut self, index: usize) -> crate::RtfResult<Shape<'a>> {
-        if index >= self.shapes.len() { return Err(crate::RtfError::MalformedDocument(format!("RTF grouped shape index {index} is out of bounds"))); }
+        if index >= self.shapes.len() {
+            return Err(crate::RtfError::MalformedDocument(format!(
+                "RTF grouped shape index {index} is out of bounds"
+            )));
+        }
         let mut staged = self.clone();
         let old = staged.shapes.remove(index);
-        staged.child_order.retain(|child| !matches!(child, ShapeGroupChild::Shape(value) if *value == index));
+        staged
+            .child_order
+            .retain(|child| !matches!(child, ShapeGroupChild::Shape(value) if *value == index));
         for child in &mut staged.child_order {
-            if let ShapeGroupChild::Shape(value) = child && *value > index { *value -= 1; }
+            if let ShapeGroupChild::Shape(value) = child
+                && *value > index
+            {
+                *value -= 1;
+            }
         }
         staged.validate_at_depth(0, true)?;
         *self = staged;
@@ -1203,9 +1379,13 @@ impl<'a> ShapeGroup<'a> {
     /// Atomically reorder direct children in bottom-to-top order.
     pub fn move_child(&mut self, from: usize, to: usize) -> crate::RtfResult<()> {
         if from >= self.child_order.len() || to >= self.child_order.len() {
-            return Err(crate::RtfError::MalformedDocument("RTF shape-group child reorder index is out of bounds".to_string()));
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF shape-group child reorder index is out of bounds".to_string(),
+            ));
         }
-        if from == to { return Ok(()); }
+        if from == to {
+            return Ok(());
+        }
         let mut staged = self.clone();
         let child = staged.child_order.remove(from);
         staged.child_order.insert(to, child);

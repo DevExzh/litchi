@@ -84,9 +84,7 @@ fn merge_block(declared_count: u32, ranges: &[MergedCell]) -> Vec<u8> {
         .write_record(BEGIN_MERGE_CELLS, &declared_count.to_le_bytes())
         .unwrap();
     for range in ranges {
-        writer
-            .write_record(MERGE_CELL, &range.serialize())
-            .unwrap();
+        writer.write_record(MERGE_CELL, &range.serialize()).unwrap();
     }
     writer.write_record(END_MERGE_CELLS, &[]).unwrap();
     output
@@ -159,7 +157,12 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
         reparsed.merged_cell_ranges_by_name("First").unwrap(),
         [MergedCell::new(0, 1, 0, 1), MergedCell::new(5, 6, 2, 3)]
     );
-    assert!(reparsed.merged_cell_ranges_by_name("Second").unwrap().is_empty());
+    assert!(
+        reparsed
+            .merged_cell_ranges_by_name("Second")
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -171,21 +174,30 @@ fn replaces_adds_removes_and_clears_present_block_by_index_and_name() {
         .add_merged_cell_range_by_name("Data", MergedCell::new(3, 4, 3, 4))
         .unwrap();
     assert_eq!(workbook.merged_cell_ranges(0).unwrap().len(), 2);
-    assert!(workbook
-        .remove_merged_cell_range(0, &MergedCell::new(0, 1, 0, 1))
-        .unwrap());
-    assert!(!workbook
-        .remove_merged_cell_range_by_name("Data", &MergedCell::new(9, 10, 9, 10))
-        .unwrap());
+    assert!(
+        workbook
+            .remove_merged_cell_range(0, &MergedCell::new(0, 1, 0, 1))
+            .unwrap()
+    );
+    assert!(
+        !workbook
+            .remove_merged_cell_range_by_name("Data", &MergedCell::new(9, 10, 9, 10))
+            .unwrap()
+    );
     assert_eq!(
         workbook.merged_cell_ranges_by_name("Data").unwrap(),
         [MergedCell::new(3, 4, 3, 4)]
     );
     workbook.clear_merged_cell_ranges_by_name("Data").unwrap();
     assert!(workbook.merged_cell_ranges(0).unwrap().is_empty());
-    assert!(records(&part_blob(&save(&workbook), "/xl/worksheets/sheet1.bin"))
-        .iter()
-        .all(|(kind, _, _, _)| !matches!(*kind, BEGIN_MERGE_CELLS | MERGE_CELL | END_MERGE_CELLS)));
+    assert!(
+        records(&part_blob(&save(&workbook), "/xl/worksheets/sheet1.bin"))
+            .iter()
+            .all(|(kind, _, _, _)| !matches!(
+                *kind,
+                BEGIN_MERGE_CELLS | MERGE_CELL | END_MERGE_CELLS
+            ))
+    );
 }
 
 #[test]
@@ -225,7 +237,11 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
             insert_before_end_sheet(sheet, &block)
         }),
         rewrite_first_sheet(&base, |sheet| {
-            let block = [merge_block(1, &[MergedCell::new(0, 1, 0, 1)]), merge_block(1, &[MergedCell::new(3, 4, 3, 4)])].concat();
+            let block = [
+                merge_block(1, &[MergedCell::new(0, 1, 0, 1)]),
+                merge_block(1, &[MergedCell::new(3, 4, 3, 4)]),
+            ]
+            .concat();
             insert_before_end_sheet(sheet, &block)
         }),
         rewrite_first_sheet(&base, |sheet| {
@@ -242,9 +258,11 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
         let original = part_blob(&source, "/xl/worksheets/sheet1.bin");
         let mut workbook = XlsbWorkbook::new(Cursor::new(source)).unwrap();
         assert!(workbook.merged_cell_ranges(0).is_err());
-        assert!(workbook
-            .set_merged_cell_ranges(0, &[MergedCell::new(8, 9, 8, 9)])
-            .is_err());
+        assert!(
+            workbook
+                .set_merged_cell_ranges(0, &[MergedCell::new(8, 9, 8, 9)])
+                .is_err()
+        );
         assert_eq!(
             part_blob(&save(&workbook), "/xl/worksheets/sheet1.bin"),
             original

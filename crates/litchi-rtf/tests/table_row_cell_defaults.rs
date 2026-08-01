@@ -1,6 +1,4 @@
-use litchi_rtf::{
-    BorderStyle, RtfDocument, RtfWriter, TableDistanceUnit, TablePreferredWidthUnit,
-};
+use litchi_rtf::{BorderStyle, RtfDocument, RtfWriter, TableDistanceUnit, TablePreferredWidthUnit};
 
 #[test]
 fn parses_row_cell_defaults_and_resets_per_row() {
@@ -17,7 +15,12 @@ fn parses_row_cell_defaults_and_resets_per_row() {
     assert_eq!(horizontal.style, BorderStyle::Dotted);
     assert_eq!(horizontal.width, 10);
     assert!(defaults.borders.vertical_inside.is_none());
-    assert!(defaults.borders.diagonal_upper_left_to_lower_right.is_none());
+    assert!(
+        defaults
+            .borders
+            .diagonal_upper_left_to_lower_right
+            .is_none()
+    );
     assert_eq!(defaults.padding.left.value, Some(100));
     assert_eq!(defaults.padding.left.unit, Some(TableDistanceUnit::Twips));
     assert_eq!(defaults.spacing.top.value, Some(20));

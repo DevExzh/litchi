@@ -3,82 +3,309 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_POLICY = Path(__file__).with_name("crate_boundaries.json")
 
-# These crates have exact internal dependency ceilings. External dependencies
-# are governed separately so the rules stay readable as the workspace grows.
-INTERNAL_ALLOWLIST: dict[str, set[str]] = {
-    "litchi-core": set(),
-    "litchi-word": {"litchi-core"},
-    "litchi-slide": {"litchi-core"},
-    "litchi-sheet": {"litchi-core"},
-    "litchi-ooxml-common": {"litchi-core", "litchi-opc"},
-    "litchi-drawingml": {
-        "litchi-core",
-        "litchi-opc",
-        "litchi-ooxml-common",
-        "litchi-sheet",
-    },
-    "litchi-xlsx": {
-        "litchi-core",
-        "litchi-ooxml-common",
-        "litchi-opc",
-        "litchi-sheet",
-    },
-    "litchi-ole-common": {"litchi-cfb", "litchi-core"},
-    "litchi-odraw": {"litchi-cfb", "litchi-core", "litchi-ole-common"},
-}
-
-OOXML_FORMATS = {"litchi-docx", "litchi-pptx", "litchi-xlsb", "litchi-xlsx"}
-OLE_FORMATS = {"litchi-doc", "litchi-ppt", "litchi-xls"}
-
-RUNTIME_PACKAGES = {"rayon", "reqwest", "tokio"}
-RUNTIME_NEUTRAL_CRATES = {
-    "litchi-core",
-    "litchi-word",
-    "litchi-slide",
-    "litchi-sheet",
-    "litchi-ooxml-common",
-    "litchi-drawingml",
-    "litchi-ole-common",
-    "litchi-odraw",
-}
-
-# Phase-one code moved into litchi-core before this ADR existed. Keep this debt
-# explicit so CI rejects additions while later extraction can remove entries.
-CORE_FORBIDDEN = {
-    "encoding_rs",
-    "litchi-cfb",
-    "litchi-opc",
-    "quick-xml",
-    "rayon",
-    "reqwest",
-    "soapberry-zip",
-    "tokio",
-}
-CORE_DEPENDENCY_DEBT = {"encoding_rs", "quick-xml", "soapberry-zip"}
-CORE_FEATURE_DEBT = {"odf", "ole", "rtf"}
-CORE_FORMAT_FEATURES = {
-    "doc",
-    "docx",
-    "odf",
-    "ole",
-    "ppt",
-    "pptx",
-    "rtf",
-    "xls",
-    "xlsb",
-    "xlsx",
+OOXML_FORMATS = frozenset(
+    {"litchi-docx", "litchi-pptx", "litchi-xlsb", "litchi-xlsx"}
+)
+OLE_FORMATS = frozenset({"litchi-doc", "litchi-ppt", "litchi-xls"})
+COMMON_FAMILY_GUARDS = {
+    "litchi-cfb": OLE_FORMATS,
+    "litchi-drawingml": OOXML_FORMATS,
+    "litchi-ooxml-common": OOXML_FORMATS,
+    "litchi-odraw": OLE_FORMATS,
+    "litchi-ole-common": OLE_FORMATS,
+    "litchi-opc": OOXML_FORMATS,
 }
 
 
-def metadata() -> dict[str, object]:
+@dataclass(frozen=True, order=True)
+class Edge:
+    """A dependency-direction edge, from dependent to dependency."""
+
+    dependent: str
+    dependency: str
+
+    def display(self) -> str:
+        return f"{self.dependent} -> {self.dependency}"
+
+
+@dataclass(frozen=True)
+class Debt:
+    order: int
+    edge: Edge
+    reason: str
+    exit: str
+
+
+@dataclass(frozen=True)
+class NamedDebt:
+    order: int
+    name: str
+    reason: str
+    exit: str
+
+
+@dataclass(frozen=True)
+class Policy:
+    packages: frozenset[str]
+    canonical_edges: frozenset[Edge]
+    migration_hosts: frozenset[str]
+    migration_debt: tuple[Debt, ...]
+    runtime_neutral: frozenset[str]
+    runtime_packages: frozenset[str]
+    core_forbidden_dependencies: frozenset[str]
+    core_dependency_debt: tuple[NamedDebt, ...]
+    core_format_features: frozenset[str]
+    core_feature_debt: tuple[NamedDebt, ...]
+
+    @property
+    def migration_edges(self) -> frozenset[Edge]:
+        return frozenset(item.edge for item in self.migration_debt)
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    packages: frozenset[str]
+    manifests: frozenset[Path]
+    edges: dict[Edge, tuple[str, ...]]
+    dependencies: dict[str, frozenset[str]]
+    features: dict[str, frozenset[str]]
+
+
+class PolicyError(ValueError):
+    pass
+
+
+def _require_string(record: dict[str, Any], key: str, context: str) -> str:
+    value = record.get(key)
+    if not isinstance(value, str) or not value:
+        raise PolicyError(f"{context}.{key} must be a non-empty string")
+    return value
+
+
+def _require_order(record: dict[str, Any], context: str) -> int:
+    value = record.get("order")
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise PolicyError(f"{context}.order must be a non-negative integer")
+    return value
+
+
+def _require_sorted_strings(value: Any, context: str) -> tuple[str, ...]:
+    invalid_item = isinstance(value, list) and any(
+        not isinstance(item, str) or not item for item in value
+    )
+    if not isinstance(value, list) or invalid_item:
+        raise PolicyError(f"{context} must be a list of non-empty strings")
+    if len(value) != len(set(value)):
+        raise PolicyError(f"{context} contains duplicates")
+    if value != sorted(value):
+        raise PolicyError(f"{context} must be sorted")
+    return tuple(value)
+
+
+def _parse_named_debt(value: Any, context: str) -> tuple[NamedDebt, ...]:
+    if not isinstance(value, list):
+        raise PolicyError(f"{context} must be a list")
+    result: list[NamedDebt] = []
+    for index, item in enumerate(value):
+        item_context = f"{context}[{index}]"
+        if not isinstance(item, dict):
+            raise PolicyError(f"{item_context} must be an object")
+        result.append(
+            NamedDebt(
+                order=_require_order(item, item_context),
+                name=_require_string(item, "name", item_context),
+                reason=_require_string(item, "reason", item_context),
+                exit=_require_string(item, "exit", item_context),
+            )
+        )
+    keys = [(item.order, item.name) for item in result]
+    if keys != sorted(keys):
+        raise PolicyError(f"{context} must be ordered by order, then name")
+    if len({item.name for item in result}) != len(result):
+        raise PolicyError(f"{context} contains duplicate names")
+    return tuple(result)
+
+
+def parse_policy(raw: Any) -> Policy:
+    """Parse and self-check the checked-in topology policy."""
+
+    if not isinstance(raw, dict):
+        raise PolicyError("policy root must be an object")
+    if raw.get("schema") != 1:
+        raise PolicyError("policy schema must be 1")
+
+    package_map = raw.get("packages")
+    if not isinstance(package_map, dict):
+        raise PolicyError("packages must be an object")
+    package_names = list(package_map)
+    if package_names != sorted(package_names):
+        raise PolicyError("packages must be sorted by package name")
+
+    canonical: set[Edge] = set()
+    for dependent, dependencies in package_map.items():
+        if not isinstance(dependent, str) or not dependent:
+            raise PolicyError("package names must be non-empty strings")
+        for dependency in _require_sorted_strings(dependencies, f"packages.{dependent}"):
+            canonical.add(Edge(dependent, dependency))
+
+    migration_hosts = frozenset(
+        _require_sorted_strings(raw.get("migration_hosts"), "migration_hosts")
+    )
+    migration_raw = raw.get("migration_debt")
+    if not isinstance(migration_raw, list):
+        raise PolicyError("migration_debt must be a list")
+    migration: list[Debt] = []
+    for index, item in enumerate(migration_raw):
+        context = f"migration_debt[{index}]"
+        if not isinstance(item, dict):
+            raise PolicyError(f"{context} must be an object")
+        migration.append(
+            Debt(
+                order=_require_order(item, context),
+                edge=Edge(
+                    _require_string(item, "dependent", context),
+                    _require_string(item, "dependency", context),
+                ),
+                reason=_require_string(item, "reason", context),
+                exit=_require_string(item, "exit", context),
+            )
+        )
+    migration_keys = [(item.order, item.edge) for item in migration]
+    if migration_keys != sorted(migration_keys):
+        raise PolicyError("migration_debt must be ordered by order, then edge")
+    if len({item.order for item in migration}) != len(migration):
+        raise PolicyError("migration_debt orders must be unique")
+    migration_edges = {item.edge for item in migration}
+    if len(migration_edges) != len(migration):
+        raise PolicyError("migration_debt contains duplicate edges")
+    overlap = canonical & migration_edges
+    if overlap:
+        joined = ", ".join(edge.display() for edge in sorted(overlap))
+        raise PolicyError(f"canonical and migration edges overlap: {joined}")
+    self_edges = sorted(
+        edge for edge in canonical | migration_edges if edge.dependent == edge.dependency
+    )
+    if self_edges:
+        raise PolicyError(
+            "policy contains self dependencies: "
+            + ", ".join(edge.display() for edge in self_edges)
+        )
+
+    packages = frozenset(package_names)
+    referenced = {
+        name
+        for edge in canonical | migration_edges
+        for name in (edge.dependent, edge.dependency)
+    }
+    unknown = referenced - packages
+    if unknown:
+        raise PolicyError("edges reference unknown packages: " + ", ".join(sorted(unknown)))
+    if not migration_hosts <= packages:
+        raise PolicyError(
+            "migration_hosts references unknown packages: "
+            + ", ".join(sorted(migration_hosts - packages))
+        )
+    host_canonical = sorted(edge for edge in canonical if edge.dependent in migration_hosts)
+    if host_canonical:
+        raise PolicyError(
+            "migration-host edges must be debt, not canonical: "
+            + ", ".join(edge.display() for edge in host_canonical)
+        )
+
+    runtime_neutral = frozenset(
+        _require_sorted_strings(raw.get("runtime_neutral"), "runtime_neutral")
+    )
+    if not runtime_neutral <= packages:
+        raise PolicyError(
+            "runtime_neutral references unknown packages: "
+            + ", ".join(sorted(runtime_neutral - packages))
+        )
+    runtime_packages = frozenset(
+        _require_sorted_strings(raw.get("runtime_packages"), "runtime_packages")
+    )
+
+    core = raw.get("core")
+    if not isinstance(core, dict):
+        raise PolicyError("core must be an object")
+    core_forbidden = frozenset(
+        _require_sorted_strings(
+            core.get("forbidden_dependencies"), "core.forbidden_dependencies"
+        )
+    )
+    core_dependency_debt = _parse_named_debt(
+        core.get("dependency_debt"), "core.dependency_debt"
+    )
+    core_features = frozenset(
+        _require_sorted_strings(core.get("format_features"), "core.format_features")
+    )
+    core_feature_debt = _parse_named_debt(core.get("feature_debt"), "core.feature_debt")
+
+    debt_orders = (
+        [item.order for item in migration]
+        + [item.order for item in core_dependency_debt]
+        + [item.order for item in core_feature_debt]
+    )
+    if len(debt_orders) != len(set(debt_orders)):
+        raise PolicyError("debt orders must be unique across the complete policy")
+
+    dependency_debt_names = {item.name for item in core_dependency_debt}
+    if not dependency_debt_names <= core_forbidden:
+        raise PolicyError("core dependency debt must also be forbidden")
+    internal_named_debt = dependency_debt_names & packages
+    if internal_named_debt:
+        raise PolicyError(
+            "internal core debt must use migration_debt edges: "
+            + ", ".join(sorted(internal_named_debt))
+        )
+    canonical_core_forbidden = sorted(
+        edge
+        for edge in canonical
+        if edge.dependent == "litchi-core" and edge.dependency in core_forbidden
+    )
+    if canonical_core_forbidden:
+        raise PolicyError(
+            "forbidden core edges must be migration debt, not canonical: "
+            + ", ".join(edge.display() for edge in canonical_core_forbidden)
+        )
+    feature_debt_names = {item.name for item in core_feature_debt}
+    if not feature_debt_names <= core_features:
+        raise PolicyError("core feature debt must also be a format feature")
+
+    return Policy(
+        packages=packages,
+        canonical_edges=frozenset(canonical),
+        migration_hosts=migration_hosts,
+        migration_debt=tuple(migration),
+        runtime_neutral=runtime_neutral,
+        runtime_packages=runtime_packages,
+        core_forbidden_dependencies=core_forbidden,
+        core_dependency_debt=core_dependency_debt,
+        core_format_features=core_features,
+        core_feature_debt=core_feature_debt,
+    )
+
+
+def load_policy(path: Path) -> Policy:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise PolicyError(f"cannot read {path}: {error}") from error
+    return parse_policy(raw)
+
+
+def cargo_metadata() -> dict[str, Any]:
     result = subprocess.run(
         ["cargo", "metadata", "--format-version", "1", "--no-deps"],
         cwd=ROOT,
@@ -92,107 +319,254 @@ def metadata() -> dict[str, object]:
     return json.loads(result.stdout)
 
 
-def main() -> int:
-    data = metadata()
+def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
     workspace_ids = set(data["workspace_members"])
-    packages = {
-        package["name"]: package
-        for package in data["packages"]
-        if package["id"] in workspace_ids
-    }
-    workspace_names = set(packages)
-    errors: list[str] = []
+    packages = [package for package in data["packages"] if package["id"] in workspace_ids]
+    names = frozenset(package["name"] for package in packages)
 
-    direct: dict[str, set[str]] = {}
-    for name, package in packages.items():
-        dependencies = {dependency["name"] for dependency in package["dependencies"]}
-        direct[name] = dependencies
+    evidence: dict[Edge, set[str]] = {}
+    dependencies: dict[str, frozenset[str]] = {}
+    features: dict[str, frozenset[str]] = {}
+    manifests: set[Path] = set()
+    for package in packages:
+        name = package["name"]
+        manifests.add(Path(package["manifest_path"]).resolve())
+        package_dependencies = frozenset(item["name"] for item in package["dependencies"])
+        dependencies[name] = package_dependencies
+        features[name] = frozenset(package["features"])
+        for dependency in package["dependencies"]:
+            if dependency["name"] not in names:
+                continue
+            edge = Edge(name, dependency["name"])
+            kind = dependency.get("kind") or "normal"
+            target = dependency.get("target") or "*"
+            optional = str(bool(dependency.get("optional"))).lower()
+            rename = dependency.get("rename") or "-"
+            evidence.setdefault(edge, set()).add(
+                f"kind={kind}, optional={optional}, target={target}, rename={rename}"
+            )
 
-        internal = dependencies & workspace_names
-        if name in INTERNAL_ALLOWLIST:
-            unexpected = internal - INTERNAL_ALLOWLIST[name]
-            if name == "litchi-core":
-                unexpected -= CORE_DEPENDENCY_DEBT
-            if unexpected:
-                errors.append(
-                    f"{name} has forbidden internal dependencies: "
-                    f"{', '.join(sorted(unexpected))}"
-                )
+    return Snapshot(
+        packages=names,
+        manifests=frozenset(manifests),
+        edges={edge: tuple(sorted(items)) for edge, items in evidence.items()},
+        dependencies=dependencies,
+        features=features,
+    )
 
-        if name in RUNTIME_NEUTRAL_CRATES:
-            runtimes = dependencies & RUNTIME_PACKAGES
-            if runtimes:
-                errors.append(
-                    f"{name} is runtime-neutral but depends on: "
-                    f"{', '.join(sorted(runtimes))}"
-                )
 
-    for family in (OOXML_FORMATS, OLE_FORMATS):
-        for name in family & workspace_names:
-            peers = direct[name] & (family - {name})
+def _first_cycle(packages: Iterable[str], edges: Iterable[Edge]) -> tuple[str, ...] | None:
+    graph = {name: [] for name in packages}
+    for edge in edges:
+        graph[edge.dependent].append(edge.dependency)
+    for dependencies in graph.values():
+        dependencies.sort()
+
+    state: dict[str, int] = {name: 0 for name in graph}
+    stack: list[str] = []
+    stack_positions: dict[str, int] = {}
+
+    def visit(name: str) -> tuple[str, ...] | None:
+        state[name] = 1
+        stack_positions[name] = len(stack)
+        stack.append(name)
+        for dependency in graph[name]:
+            if state[dependency] == 0:
+                cycle = visit(dependency)
+                if cycle is not None:
+                    return cycle
+            elif state[dependency] == 1:
+                start = stack_positions[dependency]
+                return tuple(stack[start:] + [dependency])
+        stack.pop()
+        stack_positions.pop(name)
+        state[name] = 2
+        return None
+
+    for name in sorted(graph):
+        if state[name] == 0:
+            cycle = visit(name)
+            if cycle is not None:
+                return cycle
+    return None
+
+
+def audit_snapshot(snapshot: Snapshot, policy: Policy) -> list[str]:
+    """Return deterministic violations for one resolved workspace snapshot."""
+
+    violations: list[str] = []
+    missing_policy = snapshot.packages - policy.packages
+    stale_policy = policy.packages - snapshot.packages
+    if missing_policy:
+        violations.append(
+            "workspace packages lack topology policy: " + ", ".join(sorted(missing_policy))
+        )
+    if stale_policy:
+        violations.append(
+            "topology policy names absent workspace packages: "
+            + ", ".join(sorted(stale_policy))
+        )
+
+    actual_edges = frozenset(snapshot.edges)
+    known_edges = policy.canonical_edges | policy.migration_edges
+    for edge in sorted(actual_edges - known_edges):
+        evidence = "; ".join(snapshot.edges[edge])
+        violations.append(f"unclassified internal edge {edge.display()} ({evidence})")
+    for edge in sorted(policy.migration_edges - actual_edges):
+        violations.append(
+            f"resolved migration debt still listed: {edge.display()}; remove its policy entry"
+        )
+
+    cycle = _first_cycle(snapshot.packages, actual_edges)
+    if cycle is not None:
+        violations.append("workspace dependency cycle: " + " -> ".join(cycle))
+
+    for family_name, family in (("OOXML", OOXML_FORMATS), ("OLE", OLE_FORMATS)):
+        for name in sorted(family & snapshot.packages):
+            peers = snapshot.dependencies.get(name, frozenset()) & (family - {name})
             if peers:
-                errors.append(
-                    f"{name} depends on concrete peer formats: "
-                    f"{', '.join(sorted(peers))}"
+                violations.append(
+                    f"{family_name} concrete peer edge from {name}: " + ", ".join(sorted(peers))
                 )
 
-    for common in ("litchi-ooxml-common", "litchi-drawingml"):
-        if common in direct:
-            concrete = direct[common] & OOXML_FORMATS
-            if concrete:
-                errors.append(
-                    f"{common} depends upward on concrete formats: "
-                    f"{', '.join(sorted(concrete))}"
-                )
-    for common in ("litchi-ole-common", "litchi-odraw"):
-        if common in direct:
-            concrete = direct[common] & OLE_FORMATS
-            if concrete:
-                errors.append(
-                    f"{common} depends upward on concrete formats: "
-                    f"{', '.join(sorted(concrete))}"
-                )
-
-    core_dependencies = direct.get("litchi-core", set())
-    current_dependency_debt = core_dependencies & CORE_FORBIDDEN
-    added_debt = current_dependency_debt - CORE_DEPENDENCY_DEBT
-    stale_dependency_debt = CORE_DEPENDENCY_DEBT - current_dependency_debt
-    if added_debt:
-        errors.append(
-            "litchi-core added forbidden format/container dependencies: "
-            + ", ".join(sorted(added_debt))
-        )
-    if stale_dependency_debt:
-        errors.append(
-            "remove resolved litchi-core dependency debt from the boundary checker: "
-            + ", ".join(sorted(stale_dependency_debt))
-        )
-
-    core = packages.get("litchi-core")
-    if core is not None:
-        current_feature_debt = set(core["features"]) & CORE_FORMAT_FEATURES
-        added_feature_debt = current_feature_debt - CORE_FEATURE_DEBT
-        stale_feature_debt = CORE_FEATURE_DEBT - current_feature_debt
-        if added_feature_debt:
-            errors.append(
-                "litchi-core added forbidden format features: "
-                + ", ".join(sorted(added_feature_debt))
-            )
-        if stale_feature_debt:
-            errors.append(
-                "remove resolved litchi-core feature debt from the boundary checker: "
-                + ", ".join(sorted(stale_feature_debt))
+    for common, family in sorted(COMMON_FAMILY_GUARDS.items()):
+        if common not in snapshot.packages:
+            continue
+        concrete = snapshot.dependencies.get(common, frozenset()) & family
+        if concrete:
+            violations.append(
+                f"foundation crate {common} depends upward on: "
+                + ", ".join(sorted(concrete))
             )
 
-    if errors:
-        for error in errors:
-            print(f"crate-boundary error: {error}", file=sys.stderr)
+    for name in sorted(policy.runtime_neutral & snapshot.packages):
+        runtimes = snapshot.dependencies.get(name, frozenset()) & policy.runtime_packages
+        if runtimes:
+            violations.append(
+                f"runtime-neutral crate {name} depends on: " + ", ".join(sorted(runtimes))
+            )
+
+    core_dependencies = snapshot.dependencies.get("litchi-core", frozenset())
+    active_forbidden = core_dependencies & policy.core_forbidden_dependencies
+    internal_core_debt = {
+        debt.edge.dependency
+        for debt in policy.migration_debt
+        if debt.edge.dependent == "litchi-core"
+    }
+    named_core_debt = {item.name for item in policy.core_dependency_debt}
+    approved_core_debt = internal_core_debt | named_core_debt
+    added_core_debt = active_forbidden - approved_core_debt
+    if added_core_debt:
+        violations.append(
+            "litchi-core added forbidden dependencies: " + ", ".join(sorted(added_core_debt))
+        )
+    stale_core_debt = named_core_debt - active_forbidden
+    if stale_core_debt:
+        violations.append(
+            "resolved litchi-core dependency debt still listed: "
+            + ", ".join(sorted(stale_core_debt))
+        )
+
+    core_features = snapshot.features.get("litchi-core", frozenset())
+    active_format_features = core_features & policy.core_format_features
+    feature_debt = {item.name for item in policy.core_feature_debt}
+    added_feature_debt = active_format_features - feature_debt
+    if added_feature_debt:
+        violations.append(
+            "litchi-core added forbidden format features: "
+            + ", ".join(sorted(added_feature_debt))
+        )
+    stale_feature_debt = feature_debt - active_format_features
+    if stale_feature_debt:
+        violations.append(
+            "resolved litchi-core feature debt still listed: "
+            + ", ".join(sorted(stale_feature_debt))
+        )
+
+    return sorted(set(violations))
+
+
+def audit_manifest_inventory(snapshot: Snapshot) -> list[str]:
+    manifests = frozenset(path.resolve() for path in (ROOT / "crates").glob("*/Cargo.toml"))
+    missing = manifests - snapshot.manifests
+    outside = snapshot.manifests - manifests
+    violations: list[str] = []
+    if missing:
+        violations.append(
+            "crate manifests are not audited workspace packages: "
+            + ", ".join(str(path.relative_to(ROOT)) for path in sorted(missing))
+        )
+    if outside:
+        violations.append(
+            "workspace package manifests fall outside crates/*/Cargo.toml: "
+            + ", ".join(str(path) for path in sorted(outside))
+        )
+    return violations
+
+
+def debt_report(policy: Policy, explain: bool) -> list[str]:
+    lines = ["ordered migration debt:"]
+    items: list[tuple[int, str, str, str]] = []
+    for item in policy.core_dependency_debt:
+        items.append(
+            (item.order, f"litchi-core dependency {item.name}", item.reason, item.exit)
+        )
+    for item in policy.core_feature_debt:
+        items.append(
+            (item.order, f"litchi-core feature {item.name}", item.reason, item.exit)
+        )
+    for item in policy.migration_debt:
+        items.append((item.order, item.edge.display(), item.reason, item.exit))
+    for order, label, reason, exit_condition in sorted(items):
+        lines.append(f"  [{order:03}] {label}")
+        if explain:
+            lines.extend((f"        reason: {reason}", f"        exit: {exit_condition}"))
+    return lines
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--policy",
+        type=Path,
+        default=DEFAULT_POLICY,
+        help="checked-in JSON topology policy",
+    )
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="print reasons and exit conditions for every migration debt item",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        policy = load_policy(args.policy)
+    except PolicyError as error:
+        print(f"crate-boundary policy error: {error}", file=sys.stderr)
+        return 2
+
+    snapshot = snapshot_from_metadata(cargo_metadata())
+    violations = audit_manifest_inventory(snapshot) + audit_snapshot(snapshot, policy)
+    if violations:
+        for violation in sorted(set(violations)):
+            print(f"crate-boundary error: {violation}", file=sys.stderr)
         return 1
 
-    print(
-        f"crate boundaries valid for {len(workspace_names)} workspace packages "
-        f"({len(CORE_DEPENDENCY_DEBT) + len(CORE_FEATURE_DEBT)} explicit debt items)"
+    declaration_count = sum(len(items) for items in snapshot.edges.values())
+    debt_count = (
+        len(policy.migration_debt)
+        + len(policy.core_dependency_debt)
+        + len(policy.core_feature_debt)
     )
+    print(
+        f"crate boundaries valid for {len(snapshot.packages)} workspace packages and "
+        f"{declaration_count} internal dependency declarations ({debt_count} explicit debt items)"
+    )
+    for line in debt_report(policy, args.explain):
+        print(line)
     return 0
 
 

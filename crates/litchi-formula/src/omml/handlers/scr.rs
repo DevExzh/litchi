@@ -13,9 +13,10 @@ impl ScrHandler {
     ) {
         if let Some(parent) = parent_context {
             // Set math variant from the m:val attribute or element content
-            let value = context.character_data.take().unwrap_or_else(|| {
-                context.text.as_str().trim().to_string()
-            });
+            let value = context
+                .character_data
+                .take()
+                .unwrap_or_else(|| context.text.as_str().trim().to_string());
             if !value.is_empty() {
                 parent.properties.math_variant = Some(value.clone());
                 parent.properties.run_math_style = Some(value);

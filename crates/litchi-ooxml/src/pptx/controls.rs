@@ -11,10 +11,10 @@
 //! instantiates a control, resolves a CLSID, decodes MS-OFORMS/CFB state,
 //! executes a macro, or follows an external relationship.
 
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
 use crate::xlsx::active_x::ActiveXDescriptor;
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI, Part};

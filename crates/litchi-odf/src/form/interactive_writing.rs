@@ -593,10 +593,10 @@ fn scan(xml: &str) -> Result<Scan> {
                         control: parsed,
                     });
                 } else if namespace.as_deref() == Some(FORM) && is_other_control(&local) {
-                    if let Some(form_index) = form_stack.last().copied() {
-                        if let Some(name) = optional(&attributes(&reader, element)?, FORM, "name") {
-                            register_name(&mut forms[form_index], &name)?;
-                        }
+                    if let Some(form_index) = form_stack.last().copied()
+                        && let Some(name) = optional(&attributes(&reader, element)?, FORM, "name")
+                    {
+                        register_name(&mut forms[form_index], &name)?;
                     }
                 } else if !form_stack.is_empty()
                     && ((namespace.as_deref() == Some(OFFICE)
@@ -648,10 +648,10 @@ fn scan(xml: &str) -> Result<Scan> {
                         control: parsed,
                     });
                 } else if namespace.as_deref() == Some(FORM) && is_other_control(&local) {
-                    if let Some(form_index) = form_stack.last().copied() {
-                        if let Some(name) = optional(&attributes(&reader, element)?, FORM, "name") {
-                            register_name(&mut forms[form_index], &name)?;
-                        }
+                    if let Some(form_index) = form_stack.last().copied()
+                        && let Some(name) = optional(&attributes(&reader, element)?, FORM, "name")
+                    {
+                        register_name(&mut forms[form_index], &name)?;
                     }
                 } else if !form_stack.is_empty()
                     && ((namespace.as_deref() == Some(OFFICE)
@@ -741,10 +741,10 @@ fn parse_control(
         value.default_button = optional_bool(&attrs, FORM, "default-button")?;
         value.toggle = optional_bool(&attrs, FORM, "toggle")?;
         value.focus_on_click = optional_bool(&attrs, FORM, "focus-on-click")?;
-        if let Some(kind) = optional(&attrs, XLINK, "type") {
-            if kind != "simple" {
-                return invalid("button xlink:type must be simple");
-            }
+        if let Some(kind) = optional(&attrs, XLINK, "type")
+            && kind != "simple"
+        {
+            return invalid("button xlink:type must be simple");
         }
         validate_button(&value)?;
         Ok(value.into())
@@ -845,10 +845,10 @@ fn validate_form(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<(
             let _ = parse_bool(&attr.value, &attr.local)?;
         }
     }
-    if let Some(kind) = optional(&attrs, XLINK, "type") {
-        if kind != "simple" {
-            return invalid("form xlink:type must be simple");
-        }
+    if let Some(kind) = optional(&attrs, XLINK, "type")
+        && kind != "simple"
+    {
+        return invalid("form xlink:type must be simple");
     }
     validate_resource(
         "form href",
@@ -1075,10 +1075,10 @@ fn validate_string(label: &str, value: &str) -> Result<()> {
     Ok(())
 }
 fn validate_token(label: &str, value: Option<&str>, allowed: &[&str]) -> Result<()> {
-    if let Some(value) = value {
-        if !allowed.contains(&value) {
-            return invalid(format!("invalid {label} '{value}'"));
-        }
+    if let Some(value) = value
+        && !allowed.contains(&value)
+    {
+        return invalid(format!("invalid {label} '{value}'"));
     }
     Ok(())
 }

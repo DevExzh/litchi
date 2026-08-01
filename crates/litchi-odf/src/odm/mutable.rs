@@ -3,11 +3,14 @@ use super::{
     builder::{validate_xml_part, write_master_package},
     document::validate_master_content_xml,
 };
-use crate::{
-    OdfDocumentSigner, OdfEncryptionProfile, OwnedPackage, Section, TextIndex, constants,
-};
+use crate::{OdfDocumentSigner, OdfEncryptionProfile, OwnedPackage, Section, TextIndex, constants};
 use litchi_core::{Error, Result, xml::escape_xml};
-use quick_xml::{XmlVersion, events::Event, name::{Namespace, ResolveResult}, reader::NsReader};
+use quick_xml::{
+    XmlVersion,
+    events::Event,
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
+};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
@@ -46,9 +49,8 @@ impl MutableMasterDocument {
     pub fn from_document(document: MasterDocument) -> Result<Self> {
         let mimetype = document.mimetype().to_string();
         let package = document.into_owned_package();
-        let content_xml = decode_part(&package, constants::ODF_CONTENT)?.ok_or_else(|| {
-            Error::InvalidFormat("master package has no content.xml".to_string())
-        })?;
+        let content_xml = decode_part(&package, constants::ODF_CONTENT)?
+            .ok_or_else(|| Error::InvalidFormat("master package has no content.xml".to_string()))?;
         let styles_xml = decode_part(&package, constants::ODF_STYLES)?;
         let meta_xml = decode_part(&package, constants::ODF_META)?;
         let settings_xml = decode_part(&package, constants::ODF_SETTINGS)?;
@@ -187,10 +189,7 @@ impl MutableMasterDocument {
 
     pub fn remove_index(&mut self, name: &str) -> Result<()> {
         let site = find_direct_named_site(&self.content_xml, name, true)?;
-        self.replace_candidate(apply_edits(
-            &self.content_xml,
-            vec![(site, String::new())],
-        )?)
+        self.replace_candidate(apply_edits(&self.content_xml, vec![(site, String::new())])?)
     }
 
     pub fn add_subdocument(&mut self, subdocument: &MasterSubdocument) -> Result<()> {
@@ -216,19 +215,16 @@ impl MutableMasterDocument {
         let site = find_section_site(&self.content_xml, section_name)?;
         let replacement = replacement.to_section();
         let canonical = replacement.to_xml_fragment()?;
-        let content_start = canonical.find("<text:p>").ok_or_else(|| {
-            Error::InvalidFormat("invalid canonical linked section".to_string())
-        })?;
+        let content_start = canonical
+            .find("<text:p>")
+            .ok_or_else(|| Error::InvalidFormat("invalid canonical linked section".to_string()))?;
         let prefix = &canonical[..content_start];
         let suffix = "</text:section>";
         let mut fragment = String::with_capacity(site.span.len() + prefix.len());
         fragment.push_str(prefix);
         fragment.push_str(&self.content_xml[site.body_start..site.close_start]);
         fragment.push_str(suffix);
-        self.replace_candidate(apply_edits(
-            &self.content_xml,
-            vec![(site.span, fragment)],
-        )?)
+        self.replace_candidate(apply_edits(&self.content_xml, vec![(site.span, fragment)])?)
     }
 
     pub fn remove_subdocument(&mut self, section_name: &str) -> Result<MasterSubdocument> {
@@ -284,9 +280,10 @@ impl MutableMasterDocument {
         }
         let mut by_name = HashMap::new();
         for site in &linked {
-            let name = site.section_name.as_deref().ok_or_else(|| {
-                Error::InvalidFormat("linked section has no name".to_string())
-            })?;
+            let name = site
+                .section_name
+                .as_deref()
+                .ok_or_else(|| Error::InvalidFormat("linked section has no name".to_string()))?;
             if by_name
                 .insert(name, self.content_xml[site.span.clone()].to_string())
                 .is_some()
@@ -426,14 +423,13 @@ fn scan_body(xml: &str) -> Result<BodyScan> {
                     });
                 } else if text_depth.is_some_and(|value| depth == value + 1)
                     && element_is(&reader, &element, TEXT_NS, b"section-source")
+                    && let Some(site) = &mut active
                 {
-                    if let Some(site) = &mut active {
-                        site.linked = true;
-                    }
+                    site.linked = true;
                 }
-                depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("master XML depth overflow".to_string())
-                })?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat("master XML depth overflow".to_string()))?;
             },
             Event::Empty(element) => {
                 if element_is(&reader, &element, OFFICE_NS, b"text") {
@@ -452,10 +448,9 @@ fn scan_body(xml: &str) -> Result<BodyScan> {
                     });
                 } else if text_depth.is_some_and(|value| depth == value + 1)
                     && element_is(&reader, &element, TEXT_NS, b"section-source")
+                    && let Some(site) = &mut active
                 {
-                    if let Some(site) = &mut active {
-                        site.linked = true;
-                    }
+                    site.linked = true;
                 }
             },
             Event::End(element) => {
@@ -467,11 +462,11 @@ fn scan_body(xml: &str) -> Result<BodyScan> {
                 {
                     close_offset = Some(before);
                     text_depth = None;
-                } else if text_depth == Some(depth) {
-                    if let Some(mut site) = active.take() {
-                        site.span.end = after;
-                        sites.push(site);
-                    }
+                } else if text_depth == Some(depth)
+                    && let Some(mut site) = active.take()
+                {
+                    site.span.end = after;
+                    sites.push(site);
                 }
             },
             Event::DocType(_) | Event::PI(_) => {
@@ -504,9 +499,9 @@ fn find_direct_named_site(xml: &str, name: &str, index: bool) -> Result<Range<us
                     .is_some_and(|local| local.ends_with("index") || local == "table-of-content")
                 && site.text_name.as_deref() == Some(name))
     });
-    let site = matches.next().ok_or_else(|| {
-        Error::InvalidFormat(format!("master body item '{name}' was not found"))
-    })?;
+    let site = matches
+        .next()
+        .ok_or_else(|| Error::InvalidFormat(format!("master body item '{name}' was not found")))?;
     if matches.next().is_some() {
         return Err(Error::InvalidFormat(format!(
             "master body item '{name}' is ambiguous"
@@ -540,9 +535,9 @@ fn find_section_site(xml: &str, name: &str) -> Result<SectionSite> {
     loop {
         let before = usize::try_from(reader.buffer_position())
             .map_err(|_| Error::InvalidFormat("master XML offset overflow".to_string()))?;
-        let event = reader.read_event_into(&mut buffer).map_err(|error| {
-            Error::InvalidFormat(format!("invalid master XML: {error}"))
-        })?;
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid master XML: {error}")))?;
         let after = usize::try_from(reader.buffer_position())
             .map_err(|_| Error::InvalidFormat("master XML offset overflow".to_string()))?;
         match event {
@@ -560,10 +555,10 @@ fn find_section_site(xml: &str, name: &str) -> Result<SectionSite> {
                     });
                 } else if element_is(&reader, &element, TEXT_NS, b"section-source")
                     && let Some(section) = stack.last_mut()
-                        && depth == section.content_depth
-                    {
-                        section.source_depth = Some(depth + 1);
-                    }
+                    && depth == section.content_depth
+                {
+                    section.source_depth = Some(depth + 1);
+                }
                 depth += 1;
             },
             Event::Empty(element) => {
@@ -574,9 +569,10 @@ fn find_section_site(xml: &str, name: &str) -> Result<SectionSite> {
                         section.source_end = Some(after);
                     }
                 } else if element_is(&reader, &element, TEXT_NS, b"section") {
-                    let section_name = text_attribute(&reader, &element, b"name")?.ok_or_else(|| {
-                        Error::InvalidFormat("master section has no name".to_string())
-                    })?;
+                    let section_name =
+                        text_attribute(&reader, &element, b"name")?.ok_or_else(|| {
+                            Error::InvalidFormat("master section has no name".to_string())
+                        })?;
                     if section_name == name {
                         if found.is_some() {
                             return Err(Error::InvalidFormat(format!(
@@ -682,9 +678,8 @@ fn text_attribute(
 ) -> Result<Option<String>> {
     let mut value = None;
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| {
-            Error::InvalidFormat(format!("invalid master attribute: {error}"))
-        })?;
+        let attribute = attribute
+            .map_err(|error| Error::InvalidFormat(format!("invalid master attribute: {error}")))?;
         let (resolved, found_local) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(resolved, ResolveResult::Bound(found) if found == Namespace(TEXT_NS))
             && found_local.as_ref() == local

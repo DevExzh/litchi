@@ -1,9 +1,9 @@
 use litchi_odf::elements::field::{
-    OdfCalculatedFieldValue, OdfCrossReferenceFormat, OdfDocumentStatisticKind,
-    OdfDropDownLabel, OdfDynamicTextField, OdfFieldValueType, OdfFormulaFieldDisplay,
-    OdfMeasureKind, OdfNoteReferenceClass, OdfNoteReferenceFormat, OdfPlaceholderType,
-    OdfSequenceNumberFormat, OdfSequenceReferenceFormat, OdfStatisticNumberFormat,
-    OdfUserFieldDisplay, OdfVariableSetDisplay,
+    OdfCalculatedFieldValue, OdfCrossReferenceFormat, OdfDocumentStatisticKind, OdfDropDownLabel,
+    OdfDynamicTextField, OdfFieldValueType, OdfFormulaFieldDisplay, OdfMeasureKind,
+    OdfNoteReferenceClass, OdfNoteReferenceFormat, OdfPlaceholderType, OdfSequenceNumberFormat,
+    OdfSequenceReferenceFormat, OdfStatisticNumberFormat, OdfUserFieldDisplay,
+    OdfVariableSetDisplay,
 };
 use litchi_odf::{Document, DocumentBuilder, MutableDocument};
 use std::io::{Cursor, Write};
@@ -612,9 +612,7 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
     };
     let mut mutable = MutableDocument::from_document(source).unwrap();
     assert_eq!(
-        mutable
-            .replace_dynamic_text_field(0, &replacement)
-            .unwrap(),
+        mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
     );
     let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();

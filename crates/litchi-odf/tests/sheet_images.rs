@@ -1,6 +1,6 @@
 use litchi_odf::{
-    CellValue, MutableSpreadsheet, OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource, OdfLength,
-    OpenDocumentPackage, OwnedPackage, Spreadsheet, SpreadsheetBuilder,
+    CellValue, MutableSpreadsheet, OdfImage, OdfImageFrame, OdfImagePart, OdfImageSource,
+    OdfLength, OpenDocumentPackage, OwnedPackage, Spreadsheet, SpreadsheetBuilder,
 };
 use std::io::{Cursor, Write};
 
@@ -203,7 +203,12 @@ fn insert_image_round_trips_discoverable_package_pictures() {
     assert_eq!(frame.height.as_deref(), Some("3cm"));
     assert_eq!(frame.end_cell_address.as_deref(), Some("Data.A1"));
     assert_eq!(
-        data_frames[1].frame.as_ref().unwrap().end_cell_address.as_deref(),
+        data_frames[1]
+            .frame
+            .as_ref()
+            .unwrap()
+            .end_cell_address
+            .as_deref(),
         Some("Data.D3")
     );
     let quoted = scanned
@@ -250,17 +255,38 @@ fn insert_image_continues_numbering_across_generations() {
     let mut mutable = MutableSpreadsheet::new();
     mutable.add_sheet("Data").unwrap();
     let first = mutable
-        .insert_image(0, 0, 0, PNG_PAYLOAD, &OdfLength::centimeters(1.0), &OdfLength::centimeters(1.0))
+        .insert_image(
+            0,
+            0,
+            0,
+            PNG_PAYLOAD,
+            &OdfLength::centimeters(1.0),
+            &OdfLength::centimeters(1.0),
+        )
         .unwrap();
     let second = mutable
-        .insert_image(0, 0, 1, GIF_PAYLOAD, &OdfLength::centimeters(1.0), &OdfLength::centimeters(1.0))
+        .insert_image(
+            0,
+            0,
+            1,
+            GIF_PAYLOAD,
+            &OdfLength::centimeters(1.0),
+            &OdfLength::centimeters(1.0),
+        )
         .unwrap();
     let first_generation = mutable.to_bytes().unwrap();
 
     let spreadsheet = Spreadsheet::from_bytes(first_generation).unwrap();
     let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
     let third = mutable
-        .insert_image(0, 1, 0, PNG_PAYLOAD, &OdfLength::centimeters(2.0), &OdfLength::centimeters(2.0))
+        .insert_image(
+            0,
+            1,
+            0,
+            PNG_PAYLOAD,
+            &OdfLength::centimeters(2.0),
+            &OdfLength::centimeters(2.0),
+        )
         .unwrap();
     // Existing parts block both their own stems and sibling extensions.
     assert_eq!(third, "Pictures/image3.png");
@@ -281,7 +307,14 @@ fn insert_image_preserves_existing_fixture_parts() {
     let spreadsheet = Spreadsheet::from_bytes(fixture.to_vec()).unwrap();
     let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
     let path = mutable
-        .insert_image(0, 0, 1, GIF_PAYLOAD, &OdfLength::centimeters(2.0), &OdfLength::centimeters(2.0))
+        .insert_image(
+            0,
+            0,
+            1,
+            GIF_PAYLOAD,
+            &OdfLength::centimeters(2.0),
+            &OdfLength::centimeters(2.0),
+        )
         .unwrap();
     assert_eq!(path, "Pictures/image1.gif");
 

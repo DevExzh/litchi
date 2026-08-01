@@ -1,5 +1,5 @@
-use litchi_ole::xls::{XlsWorkbook, XlsWriter};
 use litchi_ole::ovba::{VbaLimits, VbaModuleBuilder, VbaProjectBuilder};
+use litchi_ole::xls::{XlsWorkbook, XlsWriter};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -121,8 +121,10 @@ fn failed_project_build_does_not_replace_existing_configuration() {
     let mut writer = XlsWriter::new();
     writer.add_worksheet("Data").unwrap();
     writer.enable_empty_vba_project("ExistingBook").unwrap();
-    let project = VbaProjectBuilder::new("TooMany")
-        .with_module(VbaModuleBuilder::standard("Module1", "Sub A()\r\nEnd Sub\r\n"));
+    let project = VbaProjectBuilder::new("TooMany").with_module(VbaModuleBuilder::standard(
+        "Module1",
+        "Sub A()\r\nEnd Sub\r\n",
+    ));
     let limits = VbaLimits {
         max_modules: 0,
         ..VbaLimits::default()

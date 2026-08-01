@@ -388,10 +388,10 @@ impl TextStyleRecord {
             (None, true) => {},
             _ => return Err(bad("invalid text-property style identity")),
         }
-        if let Some(value) = &self.parent_style_name {
-            if self.is_default_style || !ncname(value, false) {
-                return Err(bad("invalid parent style name"));
-            }
+        if let Some(value) = &self.parent_style_name
+            && (self.is_default_style || !ncname(value, false))
+        {
+            return Err(bad("invalid parent style name"));
         }
         Ok(())
     }
@@ -695,10 +695,10 @@ pub fn parse_text_style_properties(xml: &str) -> Result<TextStylePropertiesSet> 
             },
             Ok(Event::End(_)) => {
                 let depth = stack.len();
-                if let Some(value) = active.as_mut() {
-                    if value.property_depth == Some(depth) {
-                        value.property_depth = None
-                    }
+                if let Some(value) = active.as_mut()
+                    && value.property_depth == Some(depth)
+                {
+                    value.property_depth = None
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
                     push(&mut out, active.take().unwrap().style, &mut total)?
@@ -842,9 +842,10 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
                     && current.1 == b"text-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some() {
-                        return Err(bad("duplicate style:text-properties"));
-                    }
+                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                {
+                    return Err(bad("duplicate style:text-properties"));
+                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;

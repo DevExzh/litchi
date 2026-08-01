@@ -847,15 +847,14 @@ impl XlsOleObjectEditor {
             .position(|value| value.object_id() == object_id)
             .ok_or_else(|| invalid(OBJ, "OLE object ID not found"))?;
         let removed = sheet.remove(index);
-        if let Some(storage) = removed.storage_name() {
-            if !candidate
+        if let Some(storage) = removed.storage_name()
+            && !candidate
                 .sheets
                 .iter()
                 .flatten()
                 .any(|value| value.storage_name().as_deref() == Some(&storage))
-            {
-                candidate.package.remove_referenced_storage(&storage)?;
-            }
+        {
+            candidate.package.remove_referenced_storage(&storage)?;
         }
         candidate.commit()?;
         *self = candidate;

@@ -177,7 +177,7 @@ fn parse_named_show(record: &PptRecord) -> Result<PowerPointNamedShow> {
 
 fn parse_name(record: &PptRecord) -> Result<String> {
     require_header(record, 0, 0, PptRecordType::CString, "NamedShowNameAtom")?;
-    if record.data.len() % 2 != 0 {
+    if !record.data.len().is_multiple_of(2) {
         return corrupted("NamedShowNameAtom has odd UTF-16 byte length");
     }
     if record.data.len() / 2 > MAX_NAME_UNITS {

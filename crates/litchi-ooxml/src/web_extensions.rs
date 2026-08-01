@@ -1434,15 +1434,15 @@ fn load_snapshot_resources(
 ) -> Result<Vec<WebExtensionSnapshotResource>> {
     let mut referenced = HashMap::new();
     if let Some(snapshot) = &extension.snapshot {
-        if let Some(id) = &snapshot.embedded_relationship_id {
-            if referenced.insert(id.as_str(), false).is_some() {
-                return invalid("snapshot embed and link IDs must differ".into());
-            }
+        if let Some(id) = &snapshot.embedded_relationship_id
+            && referenced.insert(id.as_str(), false).is_some()
+        {
+            return invalid("snapshot embed and link IDs must differ".into());
         }
-        if let Some(id) = &snapshot.linked_relationship_id {
-            if referenced.insert(id.as_str(), true).is_some() {
-                return invalid("snapshot embed and link IDs must differ".into());
-            }
+        if let Some(id) = &snapshot.linked_relationship_id
+            && referenced.insert(id.as_str(), true).is_some()
+        {
+            return invalid("snapshot embed and link IDs must differ".into());
         }
     }
     let mut resources = Vec::with_capacity(referenced.len());

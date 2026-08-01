@@ -14,8 +14,8 @@ base64        = { workspace = true }
 itoa          = { workspace = true }
 litchi-core   = { workspace = true }
 memchr        = { workspace = true }
-quick-xml     = { workspace = true }
 p256          = { workspace = true }
+quick-xml     = { workspace = true }
 rsa           = { workspace = true }
 sha1_legacy   = { workspace = true }
 sha2_legacy   = { workspace = true }

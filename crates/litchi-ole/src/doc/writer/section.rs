@@ -55,8 +55,8 @@ pub(crate) fn generate_sepx_with_properties(
     }
     if let Some(columns) = columns {
         columns.validate().map_err(|error| error.to_string())?;
-        let count_minus_one = u16::try_from(columns.count() - 1)
-            .expect("validated section column count fits u16");
+        let count_minus_one =
+            u16::try_from(columns.count() - 1).expect("validated section column count fits u16");
         push_word(
             &mut grpprl,
             crate::sprm_operations::SPRM_S_C_COLUMNS,
@@ -118,23 +118,13 @@ pub(crate) fn generate_sepx_with_properties(
         }
     }
     if right_to_left {
-        push_bool(
-            &mut grpprl,
-            crate::sprm_operations::SPRM_S_F_BIDI,
-            true,
-        );
+        push_bool(&mut grpprl, crate::sprm_operations::SPRM_S_F_BIDI, true);
     }
     if let Some(page_borders) = page_borders {
         page_borders.validate().map_err(|error| error.to_string())?;
         for (opcode, border) in [
-            (
-                crate::sprm_operations::SPRM_S_BRC_TOP80,
-                page_borders.top,
-            ),
-            (
-                crate::sprm_operations::SPRM_S_BRC_LEFT80,
-                page_borders.left,
-            ),
+            (crate::sprm_operations::SPRM_S_BRC_TOP80, page_borders.top),
+            (crate::sprm_operations::SPRM_S_BRC_LEFT80, page_borders.left),
             (
                 crate::sprm_operations::SPRM_S_BRC_BOTTOM80,
                 page_borders.bottom,
@@ -179,11 +169,7 @@ pub(crate) fn generate_sepx_with_properties(
             crate::doc::SectionTextFlow::HorizontalAsian => 4,
             crate::doc::SectionTextFlow::VerticalNonAsian => 5,
         };
-        push_word(
-            &mut grpprl,
-            crate::sprm_operations::SPRM_S_TEXT_FLOW,
-            value,
-        );
+        push_word(&mut grpprl, crate::sprm_operations::SPRM_S_TEXT_FLOW, value);
     }
     if let Some((author_index, timestamp)) = revision {
         // sprmSPropRMark + PropRMarkOperand(cb=7, active, ibstshort, DTTM)
@@ -216,11 +202,7 @@ fn push_indexed_twips(output: &mut Vec<u8>, opcode: u16, index: usize, value: u1
     output.extend_from_slice(&value.to_le_bytes());
 }
 
-fn push_page_border(
-    output: &mut Vec<u8>,
-    opcode: u16,
-    border: crate::doc::SectionPageBorder,
-) {
+fn push_page_border(output: &mut Vec<u8>, opcode: u16, border: crate::doc::SectionPageBorder) {
     let style = match border.style {
         crate::doc::SectionPageBorderStyle::Single => 0x01,
         crate::doc::SectionPageBorderStyle::Double => 0x03,

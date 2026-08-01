@@ -12,7 +12,7 @@
 //! anything authored here round-trips through the shape inventory with
 //! identical semantics.
 //!
-//! [`ShapeEmitter`] serializes authored objects as
+//! `ShapeEmitter` serializes authored objects as
 //! `xdr:twoCellAnchor`/`xdr:oneCellAnchor`/`xdr:absoluteAnchor` elements for
 //! the standard worksheet drawing parts used by both XLSX and XLSB,
 //! allocating drawing-wide unique object IDs and resolving connection-site
@@ -27,7 +27,7 @@ use litchi_core::xml::escape::escape_xml;
 use crate::xlsx::shape_geometry::write::write_custom_geometry;
 use crate::xlsx::shape_geometry::{XlsxCustomGeometry, validate_custom_geometry};
 use crate::xlsx::shapes::{
-    XlsxCellMarker, XlsxEmuExtent, XlsxEmuOffset, XlsxEditAs, XlsxGroupTransform, XlsxShapeAnchor,
+    XlsxCellMarker, XlsxEditAs, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform, XlsxShapeAnchor,
     XlsxShapeBodyProperties, XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun, XlsxTextAutofit,
     XlsxTextDirection, XlsxTextVerticalAnchor, XlsxTextWrap,
 };
@@ -442,8 +442,9 @@ fn validate_anchor(anchor: &XlsxShapeAnchor) -> Result<(), String> {
         }
     }
     match anchor {
-        XlsxShapeAnchor::OneCell { extent, .. }
-        | XlsxShapeAnchor::Absolute { extent, .. } => validate_extent(extent)?,
+        XlsxShapeAnchor::OneCell { extent, .. } | XlsxShapeAnchor::Absolute { extent, .. } => {
+            validate_extent(extent)?
+        },
         XlsxShapeAnchor::TwoCell { .. } => {},
     }
     Ok(())
@@ -530,9 +531,7 @@ impl ShapeEmitter {
             match child {
                 XlsxDrawingObjectSpec::Shape(shape) => self.reserve(&shape.name)?,
                 XlsxDrawingObjectSpec::Group(group) => self.reserve_group(group)?,
-                XlsxDrawingObjectSpec::Connection(connection) => {
-                    self.reserve(&connection.name)?
-                },
+                XlsxDrawingObjectSpec::Connection(connection) => self.reserve(&connection.name)?,
             }
         }
         Ok(())
@@ -697,8 +696,7 @@ impl ShapeEmitter {
             xml,
             "<xdr:cNvCxnSpPr><a:stCxn id=\"{start_id}\" idx=\"{}\"/>\
              <a:endCxn id=\"{end_id}\" idx=\"{}\"/></xdr:cNvCxnSpPr>",
-            connection.start.site,
-            connection.end.site
+            connection.start.site, connection.end.site
         );
         xml.push_str("</xdr:nvCxnSpPr><xdr:spPr>");
         xml.push_str(r#"<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>"#);
@@ -925,7 +923,11 @@ fn write_run_properties(xml: &mut String, run: &XlsxShapeRun) {
         xml.push_str(if italic { r#" i="1""# } else { r#" i="0""# });
     }
     if let Some(underline) = run.underline {
-        xml.push_str(if underline { r#" u="sng""# } else { r#" u="none""# });
+        xml.push_str(if underline {
+            r#" u="sng""#
+        } else {
+            r#" u="none""#
+        });
     }
     xml.push_str("/>");
 }
@@ -971,7 +973,12 @@ mod tests {
 
     #[test]
     fn two_cell_text_box_round_trips_through_reader() {
-        let mut spec = XlsxShapeSpec::text_box("Box 1", two_cell(), XlsxShapePreset::RoundRectangle, "Hello");
+        let mut spec = XlsxShapeSpec::text_box(
+            "Box 1",
+            two_cell(),
+            XlsxShapePreset::RoundRectangle,
+            "Hello",
+        );
         spec.description = Some("alt <text>".to_string());
         spec.hidden = true;
         spec.body_properties = XlsxShapeBodyProperties {
@@ -1014,7 +1021,9 @@ mod tests {
         ];
 
         let mut xml = String::new();
-        ShapeEmitter::new(7).write_anchored_shape(&mut xml, &spec).unwrap();
+        ShapeEmitter::new(7)
+            .write_anchored_shape(&mut xml, &spec)
+            .unwrap();
         let anchored = parse_single(&xml);
         assert_eq!(anchored.anchor, spec.anchor);
         let XlsxDrawingObject::Shape(shape) = &anchored.object else {
@@ -1053,9 +1062,12 @@ mod tests {
             },
         };
         for anchor in [one_cell, absolute] {
-            let spec = XlsxShapeSpec::shape("S", anchor, XlsxShapePreset::Other("custGeom".into()), "");
+            let spec =
+                XlsxShapeSpec::shape("S", anchor, XlsxShapePreset::Other("custGeom".into()), "");
             let mut xml = String::new();
-            ShapeEmitter::new(1).write_anchored_shape(&mut xml, &spec).unwrap();
+            ShapeEmitter::new(1)
+                .write_anchored_shape(&mut xml, &spec)
+                .unwrap();
             let anchored = parse_single(&xml);
             assert_eq!(anchored.anchor, anchor);
             let XlsxDrawingObject::Shape(shape) = &anchored.object else {
@@ -1073,7 +1085,9 @@ mod tests {
     fn default_body_properties_round_trip() {
         let spec = XlsxShapeSpec::text_box("Defaults", two_cell(), XlsxShapePreset::Rectangle, "x");
         let mut xml = String::new();
-        ShapeEmitter::new(2).write_anchored_shape(&mut xml, &spec).unwrap();
+        ShapeEmitter::new(2)
+            .write_anchored_shape(&mut xml, &spec)
+            .unwrap();
         let anchored = parse_single(&xml);
         let XlsxDrawingObject::Shape(shape) = &anchored.object else {
             panic!("expected a shape");
@@ -1088,7 +1102,9 @@ mod tests {
         };
         let spec = XlsxShapeSpec::text_box("E", default_edit, XlsxShapePreset::Rectangle, "x");
         let mut xml = String::new();
-        ShapeEmitter::new(3).write_anchored_shape(&mut xml, &spec).unwrap();
+        ShapeEmitter::new(3)
+            .write_anchored_shape(&mut xml, &spec)
+            .unwrap();
         assert!(!xml.contains("editAs"));
         assert_eq!(parse_single(&xml).anchor, default_edit);
     }
@@ -1169,7 +1185,8 @@ mod tests {
             let mut workbook = crate::xlsx::workbook::Workbook::create().unwrap();
             let ws = workbook.worksheet_mut(0).unwrap();
             sheet_name = ws.name().to_string();
-            ws.add_image(vec![9, 9, 9], "png", 1, 1, 2, 2, None).unwrap();
+            ws.add_image(vec![9, 9, 9], "png", 1, 1, 2, 2, None)
+                .unwrap();
             ws.add_text_box(
                 "Greeting",
                 XlsxShapeAnchor::TwoCell {
@@ -1274,9 +1291,7 @@ mod tests {
 #[cfg(test)]
 mod group_connection_tests {
     use super::*;
-    use crate::xlsx::shapes::{
-        XlsxCellMarker, XlsxDrawingObject, XlsxEmu, parse_drawing_shapes,
-    };
+    use crate::xlsx::shapes::{XlsxCellMarker, XlsxDrawingObject, XlsxEmu, parse_drawing_shapes};
     use crate::xlsx::writer::sheet::MutableWorksheet;
 
     fn marker(column: u32, row: u32) -> XlsxCellMarker {
@@ -1328,9 +1343,7 @@ mod group_connection_tests {
     fn collect_ids(object: &XlsxDrawingObject, ids: &mut Vec<u32>) {
         let (non_visual, children) = match object {
             XlsxDrawingObject::Shape(shape) => (&shape.non_visual, &[][..]),
-            XlsxDrawingObject::ConnectionShape(connection) => {
-                (&connection.non_visual, &[][..])
-            },
+            XlsxDrawingObject::ConnectionShape(connection) => (&connection.non_visual, &[][..]),
             XlsxDrawingObject::Group(group) => {
                 let children: &[XlsxDrawingObject] = &group.children;
                 (&group.non_visual, children)
@@ -1348,23 +1361,41 @@ mod group_connection_tests {
     #[test]
     fn group_with_nested_children_round_trips() {
         let nested = XlsxGroupSpec::new("Inner", anchor((0, 0), (1, 1))).with_child(
-            XlsxShapeSpec::text_box("Deep", anchor((0, 0), (1, 1)), XlsxShapePreset::Ellipse, "deep").into(),
+            XlsxShapeSpec::text_box(
+                "Deep",
+                anchor((0, 0), (1, 1)),
+                XlsxShapePreset::Ellipse,
+                "deep",
+            )
+            .into(),
         );
         let mut group = XlsxGroupSpec::new("Outer", anchor((1, 1), (8, 12)))
             .with_child(
-                XlsxShapeSpec::text_box("First", anchor((2, 2), (4, 4)), XlsxShapePreset::Rectangle, "one")
-                    .into(),
+                XlsxShapeSpec::text_box(
+                    "First",
+                    anchor((2, 2), (4, 4)),
+                    XlsxShapePreset::Rectangle,
+                    "one",
+                )
+                .into(),
             )
             .with_child(
-                XlsxShapeSpec::text_box("Second", anchor((5, 5), (7, 7)), XlsxShapePreset::RoundRectangle, "two")
-                    .into(),
+                XlsxShapeSpec::text_box(
+                    "Second",
+                    anchor((5, 5), (7, 7)),
+                    XlsxShapePreset::RoundRectangle,
+                    "two",
+                )
+                .into(),
             )
             .with_child(nested.into());
         group.transform = Some(transform());
         group.description = Some("grp".to_string());
 
         let mut xml = String::new();
-        ShapeEmitter::new(1).write_anchored_group(&mut xml, &group).unwrap();
+        ShapeEmitter::new(1)
+            .write_anchored_group(&mut xml, &group)
+            .unwrap();
         let objects = parse_drawing_shapes(&drawing_wrap(&xml)).unwrap().unwrap();
         assert_eq!(objects.len(), 1);
         let XlsxDrawingObject::Group(outer) = &objects[0].object else {
@@ -1397,8 +1428,12 @@ mod group_connection_tests {
 
     #[test]
     fn connector_resolves_named_shapes() {
-        let start_shape =
-            XlsxShapeSpec::text_box("Start", anchor((0, 0), (2, 2)), XlsxShapePreset::Rectangle, "a");
+        let start_shape = XlsxShapeSpec::text_box(
+            "Start",
+            anchor((0, 0), (2, 2)),
+            XlsxShapePreset::Rectangle,
+            "a",
+        );
         let end_shape =
             XlsxShapeSpec::text_box("End", anchor((4, 4), (6, 6)), XlsxShapePreset::Ellipse, "b");
         let connector = XlsxConnectionShapeSpec::new(
@@ -1417,9 +1452,13 @@ mod group_connection_tests {
 
         let mut xml = String::new();
         let mut emitter = ShapeEmitter::new(5);
-        emitter.write_anchored_shape(&mut xml, &start_shape).unwrap();
+        emitter
+            .write_anchored_shape(&mut xml, &start_shape)
+            .unwrap();
         emitter.write_anchored_shape(&mut xml, &end_shape).unwrap();
-        emitter.write_anchored_connection(&mut xml, &connector).unwrap();
+        emitter
+            .write_anchored_connection(&mut xml, &connector)
+            .unwrap();
 
         let objects = parse_drawing_shapes(&drawing_wrap(&xml)).unwrap().unwrap();
         assert_eq!(objects.len(), 3);
@@ -1479,13 +1518,8 @@ mod group_connection_tests {
                 .into(),
             )
             .with_child(
-                XlsxShapeSpec::shape(
-                    "Last",
-                    anchor((2, 2), (3, 3)),
-                    XlsxShapePreset::Ellipse,
-                    "",
-                )
-                .into(),
+                XlsxShapeSpec::shape("Last", anchor((2, 2), (3, 3)), XlsxShapePreset::Ellipse, "")
+                    .into(),
             );
         let mut emitter = ShapeEmitter::for_objects(1, &[], std::slice::from_ref(&group), &[])
             .expect("shape graph should preallocate");
@@ -1505,10 +1539,20 @@ mod group_connection_tests {
     #[test]
     fn connector_to_group_child_resolves() {
         let group = XlsxGroupSpec::new("Box", anchor((0, 0), (3, 3))).with_child(
-            XlsxShapeSpec::text_box("Child", anchor((0, 0), (1, 1)), XlsxShapePreset::Rectangle, "c")
-                .into(),
+            XlsxShapeSpec::text_box(
+                "Child",
+                anchor((0, 0), (1, 1)),
+                XlsxShapePreset::Rectangle,
+                "c",
+            )
+            .into(),
         );
-        let target = XlsxShapeSpec::text_box("Target", anchor((5, 5), (7, 7)), XlsxShapePreset::Ellipse, "t");
+        let target = XlsxShapeSpec::text_box(
+            "Target",
+            anchor((5, 5), (7, 7)),
+            XlsxShapePreset::Ellipse,
+            "t",
+        );
         let connector = XlsxConnectionShapeSpec::new(
             "L",
             anchor((3, 3), (5, 5)),
@@ -1526,7 +1570,9 @@ mod group_connection_tests {
         let mut emitter = ShapeEmitter::new(1);
         emitter.write_anchored_group(&mut xml, &group).unwrap();
         emitter.write_anchored_shape(&mut xml, &target).unwrap();
-        emitter.write_anchored_connection(&mut xml, &connector).unwrap();
+        emitter
+            .write_anchored_connection(&mut xml, &connector)
+            .unwrap();
         let objects = parse_drawing_shapes(&drawing_wrap(&xml)).unwrap().unwrap();
         let XlsxDrawingObject::ConnectionShape(link) = &objects[2].object else {
             panic!("expected a connection shape");
@@ -1559,7 +1605,12 @@ mod group_connection_tests {
         );
 
         // Duplicate shape names are ambiguous and rejected.
-        let shape = XlsxShapeSpec::text_box("Dup", anchor((0, 0), (1, 1)), XlsxShapePreset::Rectangle, "");
+        let shape = XlsxShapeSpec::text_box(
+            "Dup",
+            anchor((0, 0), (1, 1)),
+            XlsxShapePreset::Rectangle,
+            "",
+        );
         let mut xml = String::new();
         let mut emitter = ShapeEmitter::new(1);
         emitter.write_anchored_shape(&mut xml, &shape).unwrap();
@@ -1573,8 +1624,13 @@ mod group_connection_tests {
             .unwrap();
         ws.add_group(
             XlsxGroupSpec::new("G", anchor((3, 3), (6, 6))).with_child(
-                XlsxShapeSpec::text_box("GA", anchor((3, 3), (4, 4)), XlsxShapePreset::Ellipse, "g")
-                    .into(),
+                XlsxShapeSpec::text_box(
+                    "GA",
+                    anchor((3, 3), (4, 4)),
+                    XlsxShapePreset::Ellipse,
+                    "g",
+                )
+                .into(),
             ),
         )
         .unwrap();
@@ -1640,16 +1696,31 @@ mod group_connection_tests {
             let ws = workbook.worksheet_mut(0).unwrap();
             sheet_name = ws.name().to_string();
             ws.add_image(vec![7, 7], "png", 1, 1, 2, 2, None).unwrap();
-            ws.add_text_box("Solo", anchor((0, 0), (2, 2)), XlsxShapePreset::Rectangle, "solo")
-                .unwrap();
+            ws.add_text_box(
+                "Solo",
+                anchor((0, 0), (2, 2)),
+                XlsxShapePreset::Rectangle,
+                "solo",
+            )
+            .unwrap();
             let mut group = XlsxGroupSpec::new("Pair", anchor((3, 3), (9, 9)))
                 .with_child(
-                    XlsxShapeSpec::text_box("Left", anchor((3, 3), (5, 5)), XlsxShapePreset::Rectangle, "L")
-                        .into(),
+                    XlsxShapeSpec::text_box(
+                        "Left",
+                        anchor((3, 3), (5, 5)),
+                        XlsxShapePreset::Rectangle,
+                        "L",
+                    )
+                    .into(),
                 )
                 .with_child(
-                    XlsxShapeSpec::text_box("Right", anchor((6, 6), (8, 8)), XlsxShapePreset::Ellipse, "R")
-                        .into(),
+                    XlsxShapeSpec::text_box(
+                        "Right",
+                        anchor((6, 6), (8, 8)),
+                        XlsxShapePreset::Ellipse,
+                        "R",
+                    )
+                    .into(),
                 );
             group.transform = Some(transform());
             ws.add_group(group).unwrap();
@@ -1700,10 +1771,7 @@ mod group_connection_tests {
             panic!("expected a connection shape");
         };
         assert_eq!(bridge.preset, Some(XlsxShapePreset::StraightConnector1));
-        assert_eq!(
-            bridge.start.unwrap().shape_id,
-            left.non_visual.id.unwrap()
-        );
+        assert_eq!(bridge.start.unwrap().shape_id, left.non_visual.id.unwrap());
         assert_eq!(bridge.start.unwrap().site, 4);
         assert_eq!(bridge.end.unwrap().shape_id, right.non_visual.id.unwrap());
 

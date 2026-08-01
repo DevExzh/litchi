@@ -150,7 +150,8 @@ impl<'a> ChartSeries<'a> {
     }
 
     pub fn xml_id(self) -> Option<&'a str> {
-        self.element.attribute(Some("http://www.w3.org/XML/1998/namespace"), "id")
+        self.element
+            .attribute(Some("http://www.w3.org/XML/1998/namespace"), "id")
     }
 
     /// Return the chart class QName lexically; namespace resolution remains inert.

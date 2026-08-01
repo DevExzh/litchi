@@ -1,8 +1,8 @@
 //! Tests for the `SttbTtmbd` embedded TrueType font table (MS-DOC 2.9.296).
 
 use litchi_cfb::OleFile;
-use litchi_ole::doc::parts::fib::FileInformationBlock;
 use litchi_ole::doc::parts::embedded_fonts::DocumentEmbeddedFonts;
+use litchi_ole::doc::parts::fib::FileInformationBlock;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -16,7 +16,11 @@ fn parse_embedded_fonts(relative: &str) -> Option<DocumentEmbeddedFonts> {
     let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
-    let table_name = if fib.which_table_stream() { "1Table" } else { "0Table" };
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
     DocumentEmbeddedFonts::parse(&fib, &table_stream).unwrap()
 }
@@ -38,7 +42,10 @@ fn documents_without_the_table_report_none() {
 #[test]
 fn exposes_embedded_fonts_through_the_document_api() {
     let mut package = litchi_ole::doc::Package::from_reader(
-        File::open(fixture("test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc")).unwrap(),
+        File::open(fixture(
+            "test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc",
+        ))
+        .unwrap(),
     )
     .unwrap();
     let document = package.document().unwrap();

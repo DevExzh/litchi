@@ -13,15 +13,12 @@ use crate::docx::field::{
     BarcodeField, BibliographyField, BidiOutlineField, CitationField, DatabaseField, DdeField,
     DocumentContextField, DocumentInformationField, DocumentPropertyField, DocumentVariableField,
     EmbedField, EquationField, ExternalIncludeField, Field, FormulaField, GoToButtonField,
-    HyperlinkField, IfField,
-    IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField, ListNumberField,
-    MacroButtonField,
-    MailMergeConditionalControlField, MailMergeCounterField, MailMergeDataField,
-    MailMergeNextField,
-    MailMergeRecipientField, MergeField, PromptField, PrintField, PrivateField, QuoteField,
-    ReferencedDocumentField, ReferenceField, SequenceField, SetField, ShapeField,
-    StyleReferenceField, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
-    TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
+    HyperlinkField, IfField, IndexEntryField, IndexField, InfoField, LegacyFormField, LinkField,
+    ListNumberField, MacroButtonField, MailMergeConditionalControlField, MailMergeCounterField,
+    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MergeField, PrintField,
+    PrivateField, PromptField, QuoteField, ReferenceField, ReferencedDocumentField, SequenceField,
+    SetField, ShapeField, StyleReferenceField, SymbolField, TableOfAuthoritiesEntryField,
+    TableOfAuthoritiesField, TableOfContentsEntryField, TableOfContentsField, UserIdentityField,
 };
 use crate::docx::footnote::Note;
 use crate::docx::glossary::GlossaryDocument;
@@ -915,9 +912,7 @@ impl<'a> Document<'a> {
                     ));
                 }
                 let image_target = image_rel.target_partname().map_err(|error| {
-                    OoxmlError::InvalidFormat(format!(
-                        "invalid watermark image target: {error}"
-                    ))
+                    OoxmlError::InvalidFormat(format!("invalid watermark image target: {error}"))
                 })?;
                 let image_part = self.opc.get_part(&image_target)?;
                 parts.push(ImageWatermarkPart {

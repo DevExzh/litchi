@@ -570,15 +570,15 @@ fn scan_scope(xml: &str, scope: &OdfVariableScope) -> Result<ScopeScan> {
             },
             Event::End(_) => {
                 let event_end = reader.buffer_position() as usize;
-                if let Some((kind, start, group_depth)) = active_group {
-                    if group_depth == depth {
-                        groups.push(GroupSpan {
-                            kind,
-                            start,
-                            end: event_end,
-                        });
-                        active_group = None;
-                    }
+                if let Some((kind, start, group_depth)) = active_group
+                    && group_depth == depth
+                {
+                    groups.push(GroupSpan {
+                        kind,
+                        start,
+                        end: event_end,
+                    });
+                    active_group = None;
                 }
                 if parent_depth == Some(depth) {
                     parent_depth = None;
@@ -943,10 +943,11 @@ fn parse_part(
                     ));
                 }
             },
-            Event::CData(ref value) if (pending.is_some() || active.is_some())
-                && !value.is_empty() => {
-                    return Err(invalid("declaration elements cannot contain CDATA"));
-                },
+            Event::CData(ref value)
+                if (pending.is_some() || active.is_some()) && !value.is_empty() =>
+            {
+                return Err(invalid("declaration elements cannot contain CDATA"));
+            },
             Event::GeneralRef(_) if pending.is_some() || active.is_some() => {
                 return Err(invalid(
                     "declaration elements cannot contain entity references",

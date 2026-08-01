@@ -78,4 +78,3 @@ fn removing_comments_updates_the_comments_part() {
     assert!(authors.contains(&"Carol"));
     assert!(!authors.contains(&"Alice"));
 }
-

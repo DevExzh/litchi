@@ -94,7 +94,11 @@ impl DocDrawingShape {
     /// The shape starts as an outline (no fill, black line); use
     /// [`Self::with_fill`] / [`Self::with_line`] / [`Self::without_fill`] /
     /// [`Self::without_line`] to adjust.
-    pub fn new(kind: DocShapeKind, width_twips: u32, height_twips: u32) -> Result<Self, DocWriteError> {
+    pub fn new(
+        kind: DocShapeKind,
+        width_twips: u32,
+        height_twips: u32,
+    ) -> Result<Self, DocWriteError> {
         for dimension in [width_twips, height_twips] {
             if !(1..=MAX_SHAPE_DIMENSION_TWIPS).contains(&dimension) {
                 return Err(DocWriteError::InvalidData(format!(
@@ -166,7 +170,10 @@ pub(crate) fn write_shape_opt(out: &mut Vec<u8>, shape: &DocDrawingShape) {
     if let Some((red, green, blue)) = shape.fill_color {
         properties.push((OPT_FILL_COLOR, color_ref(red, green, blue)));
     } else {
-        properties.push((OPT_FILL_STYLE_BOOLEAN, FILL_FLAG_USE_FILLED & !FILL_FLAG_FILLED));
+        properties.push((
+            OPT_FILL_STYLE_BOOLEAN,
+            FILL_FLAG_USE_FILLED & !FILL_FLAG_FILLED,
+        ));
     }
     if let Some((red, green, blue)) = shape.line_color {
         properties.push((OPT_LINE_COLOR, color_ref(red, green, blue)));
@@ -214,11 +221,7 @@ pub(crate) fn write_client_textbox(out: &mut Vec<u8>, ftxbxs_index: u32) {
 /// * `shape_ids` - spid of each text box, in story order
 /// * `start_cps` - story-relative start CP of each text box's text
 /// * `ccp_txbx` - total textbox story length (including the story-final CR)
-pub(crate) fn build_plcf_txbx_txt(
-    shape_ids: &[u32],
-    start_cps: &[u32],
-    ccp_txbx: u32,
-) -> Vec<u8> {
+pub(crate) fn build_plcf_txbx_txt(shape_ids: &[u32], start_cps: &[u32], ccp_txbx: u32) -> Vec<u8> {
     debug_assert_eq!(shape_ids.len(), start_cps.len());
     let count = shape_ids.len();
     let mut out = Vec::with_capacity((count + 2) * 4 + (count + 1) * FTXBXS_LEN);
@@ -309,7 +312,10 @@ mod tests {
         assert_eq!(inst, 2);
         let (opid0, val0) = read_property(&out, 0);
         let (opid1, val1) = read_property(&out, 1);
-        assert_eq!((opid0, val0), (OPT_FILL_STYLE_BOOLEAN, FILL_FLAG_USE_FILLED));
+        assert_eq!(
+            (opid0, val0),
+            (OPT_FILL_STYLE_BOOLEAN, FILL_FLAG_USE_FILLED)
+        );
         assert_eq!((opid1, val1), (OPT_LINE_STYLE_BOOLEAN, LINE_FLAG_USE_LINE));
         assert_eq!(val0 & FILL_FLAG_FILLED, 0);
         assert_eq!(val1 & LINE_FLAG_LINE, 0);

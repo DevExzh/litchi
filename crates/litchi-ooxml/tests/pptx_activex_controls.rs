@@ -23,11 +23,11 @@ fn package_inventory_reports_activex_controls() {
     assert_eq!(first.relationship_id(), Some("rId2"));
 
     let descriptor = first.descriptor().unwrap();
+    assert_eq!(descriptor.part_name().as_str(), "/ppt/activeX/activeX1.xml");
     assert_eq!(
-        descriptor.part_name().as_str(),
-        "/ppt/activeX/activeX1.xml"
+        descriptor.class_id(),
+        "{8BD21D40-EC42-11CE-9E0D-00AA006002F3}"
     );
-    assert_eq!(descriptor.class_id(), "{8BD21D40-EC42-11CE-9E0D-00AA006002F3}");
     assert_eq!(descriptor.license(), None);
     assert_eq!(descriptor.persistence(), ControlPersistence::Storage);
 

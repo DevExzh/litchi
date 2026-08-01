@@ -10,13 +10,14 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_section_rendering_and_column_balance_and_round_trips() {
-    let document = RtfDocument::parse(
-        r"{\rtf1\ansi\sectd\vertsect\nocolbal\cols2\pgnstarts6 Body}",
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r"{\rtf1\ansi\sectd\vertsect\nocolbal\cols2\pgnstarts6 Body}").unwrap();
     assert_eq!(document.text(), "Body");
     let section = &document.sections()[0];
-    assert_eq!(section.properties.rendering, Some(SectionRendering::Vertical));
+    assert_eq!(
+        section.properties.rendering,
+        Some(SectionRendering::Vertical)
+    );
     assert!(!section.properties.balance_columns);
 
     let output = write(&document);
@@ -36,7 +37,10 @@ fn parses_section_rendering_and_column_balance_and_round_trips() {
 fn parses_horizontal_rendering_and_balanced_default() {
     let document = RtfDocument::parse(r"{\rtf1\ansi\sectd\horzsect Body}").unwrap();
     let section = &document.sections()[0];
-    assert_eq!(section.properties.rendering, Some(SectionRendering::Horizontal));
+    assert_eq!(
+        section.properties.rendering,
+        Some(SectionRendering::Horizontal)
+    );
     assert!(section.properties.balance_columns);
 
     let output = write(&document);
@@ -56,10 +60,9 @@ fn parses_horizontal_rendering_and_balanced_default() {
 
 #[test]
 fn parses_paragraph_suppression_flags_and_round_trips() {
-    let document = RtfDocument::parse(
-        r"{\rtf1\ansi\pard\noline\notabind Suppressed\par\pard Normal\par}",
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r"{\rtf1\ansi\pard\noline\notabind Suppressed\par\pard Normal\par}")
+            .unwrap();
     let suppressed = document
         .blocks()
         .iter()

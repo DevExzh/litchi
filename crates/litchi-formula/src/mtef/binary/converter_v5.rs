@@ -12,7 +12,7 @@
 //! base at all — in MTEF the base is the object that precedes the record.
 //!
 //! Reference: rtf2latex2e `Profile_TEMPLATES_5` and
-//! http://rtf2latex2e.sourceforge.net/MTEF5.html
+//! <http://rtf2latex2e.sourceforge.net/MTEF5.html>
 
 use super::objects::*;
 use crate::ast::{FractionType, LargeOperator, MathNode, Position, VerticalAlignment};

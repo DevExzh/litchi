@@ -333,10 +333,9 @@ pub(crate) fn parse_revisions(xml_bytes: &[u8]) -> Result<SmallVec<[Revision; 4]
                 let local_name = local_name_ref.as_ref();
 
                 match local_name {
-                    b"ins" | b"del" | b"moveFrom" | b"moveTo" | b"rPrChange"
-                    | b"pPrChange" | b"tblIns" | b"tblDel" | b"tblPrChange"
-                    | b"trPrChange" | b"cellIns" | b"cellDel" | b"cellMerge"
-                    | b"tcPrChange" => {
+                    b"ins" | b"del" | b"moveFrom" | b"moveTo" | b"rPrChange" | b"pPrChange"
+                    | b"tblIns" | b"tblDel" | b"tblPrChange" | b"trPrChange" | b"cellIns"
+                    | b"cellDel" | b"cellMerge" | b"tcPrChange" => {
                         // Finished parsing a revision
                         in_revision = false;
 

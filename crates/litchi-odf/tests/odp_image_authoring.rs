@@ -65,7 +65,10 @@ fn insert_image_round_trips_discoverable_package_pictures() {
     assert_eq!(first_frame.y.as_deref(), Some("3cm"));
     assert_eq!(first_frame.width.as_deref(), Some("10cm"));
     assert_eq!(first_frame.height.as_deref(), Some("5cm"));
-    assert_eq!(scanned[1].frame.as_ref().unwrap().page_name.as_deref(), Some("page2"));
+    assert_eq!(
+        scanned[1].frame.as_ref().unwrap().page_name.as_deref(),
+        Some("page2")
+    );
     assert!(
         matches!(&scanned[0].source, OdfImageSource::PackagePart { path, .. } if path == &first)
     );
@@ -84,7 +87,10 @@ fn insert_image_round_trips_discoverable_package_pictures() {
     assert_eq!(picture.image_href(), Some(first.as_str()));
     assert_eq!(picture.x.as_deref(), Some("2cm"));
     assert_eq!(picture.width.as_deref(), Some("10cm"));
-    assert_eq!(slides[1].shapes().unwrap()[0].image_href(), Some(second.as_str()));
+    assert_eq!(
+        slides[1].shapes().unwrap()[0].image_href(),
+        Some(second.as_str())
+    );
 }
 
 #[test]
@@ -190,8 +196,16 @@ fn insert_image_rejects_bad_input() {
             .is_err()
     );
     // Unsupported payload formats are rejected.
-    assert!(mutable.insert_image(0, b"BM bitmap", origin, origin, size, size).is_err());
-    assert!(mutable.insert_image(0, b"", origin, origin, size, size).is_err());
+    assert!(
+        mutable
+            .insert_image(0, b"BM bitmap", origin, origin, size, size)
+            .is_err()
+    );
+    assert!(
+        mutable
+            .insert_image(0, b"", origin, origin, size, size)
+            .is_err()
+    );
     // Oversized payloads stay within the shared 64 MiB bound.
     let oversized = vec![0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
         .into_iter()

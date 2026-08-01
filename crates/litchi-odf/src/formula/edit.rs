@@ -20,9 +20,8 @@ fn validate_name(name: &str, kind: &str) -> Result<()> {
         return Err(invalid(format!("MathML {kind} name is empty")));
     };
     if !(first.is_alphabetic() || first == '_')
-        || !characters.all(|character| {
-            character.is_alphanumeric() || matches!(character, '_' | '-' | '.')
-        })
+        || !characters
+            .all(|character| character.is_alphanumeric() || matches!(character, '_' | '-' | '.'))
     {
         return Err(invalid(format!("invalid MathML {kind} name '{name}'")));
     }
@@ -127,7 +126,9 @@ impl MathElement {
             })
             .nth(index);
         match position {
-            Some(position) => self.content_mut().insert(position, MathContent::Element(child)),
+            Some(position) => self
+                .content_mut()
+                .insert(position, MathContent::Element(child)),
             None if index == self.children().count() => {
                 self.content_mut().push(MathContent::Element(child));
             },
@@ -187,14 +188,25 @@ mod tests {
     #[test]
     fn builds_and_edits_a_tree() {
         let mut fraction = MathElement::new("mfrac").unwrap();
-        assert!(fraction.insert_child(1, MathElement::new("mn").unwrap()).is_err());
+        assert!(
+            fraction
+                .insert_child(1, MathElement::new("mn").unwrap())
+                .is_err()
+        );
         fraction.push_child(MathElement::new("mn").unwrap());
-        fraction.insert_child(0, MathElement::new("mi").unwrap()).unwrap();
+        fraction
+            .insert_child(0, MathElement::new("mi").unwrap())
+            .unwrap();
         assert_eq!(
-            fraction.children().map(MathElement::local_name).collect::<Vec<_>>(),
+            fraction
+                .children()
+                .map(MathElement::local_name)
+                .collect::<Vec<_>>(),
             ["mi", "mn"]
         );
-        let old = fraction.replace_child(1, MathElement::new("mrow").unwrap()).unwrap();
+        let old = fraction
+            .replace_child(1, MathElement::new("mrow").unwrap())
+            .unwrap();
         assert_eq!(old.local_name(), "mn");
         assert_eq!(fraction.remove_child(0).unwrap().local_name(), "mi");
         assert!(fraction.remove_child(3).is_none());

@@ -157,8 +157,18 @@ impl DocumentProtectedRanges {
                     STTBF_BKMK_PROT,
                     "SttbfBkmkProt",
                 )?)?,
-                parse_start_plcf(required_slice(fib, table_stream, PLCF_BKF_PROT, "PlcfBkfProt")?)?,
-                parse_end_plcf(required_slice(fib, table_stream, PLCF_BKL_PROT, "PlcfBklProt")?)?,
+                parse_start_plcf(required_slice(
+                    fib,
+                    table_stream,
+                    PLCF_BKF_PROT,
+                    "PlcfBkfProt",
+                )?)?,
+                parse_end_plcf(required_slice(
+                    fib,
+                    table_stream,
+                    PLCF_BKL_PROT,
+                    "PlcfBklProt",
+                )?)?,
             )
         } else {
             (Vec::new(), Vec::new(), Vec::new())
@@ -175,10 +185,7 @@ impl DocumentProtectedRanges {
         validate_positions(&starts, document_end, "PlcfBkfProt")?;
         validate_end_positions(&ends, document_end)?;
 
-        let users = user_data
-            .map(parse_users)
-            .transpose()?
-            .unwrap_or_default();
+        let users = user_data.map(parse_users).transpose()?.unwrap_or_default();
 
         let mut used_end_indexes = HashSet::with_capacity(starts.len());
         let mut ranges = Vec::with_capacity(starts.len());
@@ -196,12 +203,12 @@ impl DocumentProtectedRanges {
                     "range-level protection start CP exceeds its end CP",
                 ));
             }
-            if let UidSel::User(index) = editors {
-                if usize::from(*index) > users.len() {
-                    return Err(corrupted(
-                        "PRTI uidSel user index exceeds the SttbProtUser entry count",
-                    ));
-                }
+            if let UidSel::User(index) = editors
+                && usize::from(*index) > users.len()
+            {
+                return Err(corrupted(
+                    "PRTI uidSel user index exceeds the SttbProtUser entry count",
+                ));
             }
             ranges.push(ProtectedRange {
                 start: *start,
@@ -228,7 +235,9 @@ impl DocumentProtectedRanges {
 
     /// Resolve a 1-based `UidSel::User` index to its username entry.
     pub fn user(&self, index: u16) -> Option<&ProtectionUser> {
-        usize::from(index).checked_sub(1).and_then(|zero| self.users.get(zero))
+        usize::from(index)
+            .checked_sub(1)
+            .and_then(|zero| self.users.get(zero))
     }
 
     /// The username permitted to edit `range`, when its editor assignment is
@@ -261,7 +270,8 @@ fn parse_editor_assignments(data: &[u8]) -> Result<Vec<UidSel>> {
     if count > MAX_PROTECTED_RANGES {
         return Err(corrupted("SttbfBkmkProt contains too many entries"));
     }
-    let count = usize::try_from(count).map_err(|_| corrupted("SttbfBkmkProt count exceeds usize"))?;
+    let count =
+        usize::try_from(count).map_err(|_| corrupted("SttbfBkmkProt count exceeds usize"))?;
     let entry_size = 2usize + PRTI_SIZE;
     let expected = 8usize
         .checked_add(
@@ -334,7 +344,7 @@ fn parse_start_plcf(data: &[u8]) -> Result<Vec<(u32, StartData)>> {
 /// Parse `PlcfBkfProt`'s companion `Plcbkl`, which contains only CPs and no
 /// additional data (MS-DOC 2.8.1); element `ibkl` holds the end CP.
 fn parse_end_plcf(data: &[u8]) -> Result<Vec<u32>> {
-    if data.len() < 8 || data.len() % 4 != 0 {
+    if data.len() < 8 || !data.len().is_multiple_of(4) {
         return Err(corrupted("PlcfBklProt has an invalid byte length"));
     }
     let count = data.len() / 4 - 1;
@@ -361,7 +371,9 @@ fn parse_users(data: &[u8]) -> Result<Vec<ProtectionUser>> {
     for _ in 0..count {
         let length = read_u16(data, offset, "SttbProtUser cchData")?;
         if length > MAX_USER_NAME_CHARS {
-            return Err(corrupted("SttbProtUser usernames must not exceed 255 characters"));
+            return Err(corrupted(
+                "SttbProtUser usernames must not exceed 255 characters",
+            ));
         }
         offset += 2;
         let byte_length = usize::from(length) * 2;
@@ -396,7 +408,7 @@ fn parse_users(data: &[u8]) -> Result<Vec<ProtectionUser>> {
 }
 
 fn plcf_count(data: &[u8], property_size: usize, name: &str) -> Result<usize> {
-    if data.len() < 4 || (data.len() - 4) % (4 + property_size) != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(4 + property_size) {
         return Err(corrupted(format!("{name} has an invalid byte length")));
     }
     Ok((data.len() - 4) / (4 + property_size))
@@ -414,9 +426,7 @@ fn validate_positions<T>(values: &[(u32, T)], document_end: u32, name: &str) -> 
 }
 
 fn validate_end_positions(ends: &[u32], document_end: u32) -> Result<()> {
-    if ends.iter().any(|&cp| cp > document_end)
-        || ends.windows(2).any(|pair| pair[0] > pair[1])
-    {
+    if ends.iter().any(|&cp| cp > document_end) || ends.windows(2).any(|pair| pair[0] > pair[1]) {
         return Err(corrupted(
             "PlcfBklProt contains out-of-range or non-monotonic CPs",
         ));

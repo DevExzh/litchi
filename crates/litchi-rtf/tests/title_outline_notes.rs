@@ -20,8 +20,14 @@ fn title_page_and_endnote_here_round_trip() {
 
     let output = write(&document);
     let serialized = String::from_utf8(output).unwrap();
-    assert!(serialized.contains(r"\titlepg"), "missing titlepg in {serialized}");
-    assert!(serialized.contains(r"\endnhere"), "missing endnhere in {serialized}");
+    assert!(
+        serialized.contains(r"\titlepg"),
+        "missing titlepg in {serialized}"
+    );
+    assert!(
+        serialized.contains(r"\endnhere"),
+        "missing endnhere in {serialized}"
+    );
 
     let reparsed = RtfDocument::parse(&serialized).unwrap();
     let properties = &reparsed.sections()[0].properties;

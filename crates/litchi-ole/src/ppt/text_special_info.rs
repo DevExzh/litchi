@@ -200,9 +200,7 @@ impl PowerPointTextSIException {
             offset += 4;
             let remaining = (data.len() - offset) / SMART_TAG_INDEX_LEN;
             if count > remaining {
-                return Err(corrupted(
-                    "TextSIException smart-tag indices are truncated",
-                ));
+                return Err(corrupted("TextSIException smart-tag indices are truncated"));
             }
             let mut indices = Vec::with_capacity(count);
             for _ in 0..count {
@@ -348,7 +346,10 @@ impl PowerPointTextSpecialInfoRuns {
             let (special_info, consumed) =
                 PowerPointTextSIException::parse_prefix(&data[offset..])?;
             offset += consumed;
-            runs.push(PowerPointTextSIRun { count, special_info });
+            runs.push(PowerPointTextSIRun {
+                count,
+                special_info,
+            });
         }
         Ok(Self { runs })
     }
@@ -420,7 +421,7 @@ impl PowerPointMasterTextPropLevels {
 
     /// Parse the `rgMasterTextPropRun` payload of a `MasterTextPropAtom`.
     pub fn parse(data: &[u8]) -> Result<Self> {
-        if data.len() % MASTER_TEXT_PROP_RUN_LEN != 0 {
+        if !data.len().is_multiple_of(MASTER_TEXT_PROP_RUN_LEN) {
             return Err(corrupted(
                 "MasterTextPropAtom payload is not a whole number of runs",
             ));
@@ -431,11 +432,12 @@ impl PowerPointMasterTextPropLevels {
             let count = read_u32(data, offset);
             let indent_level = read_u16(data, offset + 4);
             if indent_level > MAX_INDENT_LEVEL {
-                return Err(corrupted(
-                    "MasterTextPropRun indent level exceeds 0x0004",
-                ));
+                return Err(corrupted("MasterTextPropRun indent level exceeds 0x0004"));
             }
-            runs.push(PowerPointMasterTextPropRun { count, indent_level });
+            runs.push(PowerPointMasterTextPropRun {
+                count,
+                indent_level,
+            });
             offset += MASTER_TEXT_PROP_RUN_LEN;
         }
         Ok(Self { runs })
@@ -508,8 +510,8 @@ mod tests {
     #[test]
     fn parses_special_info_runs_and_round_trips() {
         let payload = sample_special_info_payload();
-        let parsed = PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&payload))
-            .unwrap();
+        let parsed =
+            PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&payload)).unwrap();
         assert_eq!(parsed.runs().len(), 2);
         assert_eq!(parsed.total_count(), 8);
 
@@ -547,9 +549,7 @@ mod tests {
     #[test]
     fn rejects_malformed_special_info() {
         // Wrong record type.
-        assert!(
-            PowerPointTextSpecialInfoRuns::parse_record(&master_prop_atom(&[])).is_err()
-        );
+        assert!(PowerPointTextSpecialInfoRuns::parse_record(&master_prop_atom(&[])).is_err());
         // Truncated run count.
         assert!(PowerPointTextSpecialInfoRuns::parse_record(&special_info_atom(&[1, 0])).is_err());
         // Zero run count.
@@ -612,9 +612,7 @@ mod tests {
         // Wrong record type.
         assert!(PowerPointMasterTextPropLevels::parse_record(&special_info_atom(&[])).is_err());
         // Payload not a whole number of runs.
-        assert!(
-            PowerPointMasterTextPropLevels::parse_record(&master_prop_atom(&[0; 5])).is_err()
-        );
+        assert!(PowerPointMasterTextPropLevels::parse_record(&master_prop_atom(&[0; 5])).is_err());
         // Indent level above the maximum.
         let mut payload = Vec::new();
         payload.extend_from_slice(&1u32.to_le_bytes());

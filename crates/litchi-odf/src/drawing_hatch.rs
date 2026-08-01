@@ -179,10 +179,10 @@ impl OdfDrawingHatch {
         if let Some(value) = &self.rotation {
             validate_text(value.as_str(), "hatch rotation", false)?;
         }
-        if let Some(value) = self.distance {
-            if !value.value().is_finite() {
-                return invalid("hatch distance must be finite");
-            }
+        if let Some(value) = self.distance
+            && !value.value().is_finite()
+        {
+            return invalid("hatch distance must be finite");
         }
         Ok(())
     }

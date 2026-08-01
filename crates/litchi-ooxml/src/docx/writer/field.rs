@@ -633,8 +633,16 @@ impl MutableField {
                 xml.push_str(r#"<w:fldChar w:fldCharType="begin"/>"#);
 
                 // Field instruction
-                let instruction_name = if mode == RevisionTextMode::Deleted { "delInstrText" } else { "instrText" };
-                write!(&mut xml, "</w:r><w:r><w:{instruction_name}>{}</w:{instruction_name}>", escape_xml(instruction))?;
+                let instruction_name = if mode == RevisionTextMode::Deleted {
+                    "delInstrText"
+                } else {
+                    "instrText"
+                };
+                write!(
+                    &mut xml,
+                    "</w:r><w:r><w:{instruction_name}>{}</w:{instruction_name}>",
+                    escape_xml(instruction)
+                )?;
 
                 // Separate run
                 if *dirty {
@@ -647,8 +655,16 @@ impl MutableField {
 
                 // Field result
                 if let Some(res) = result {
-                    let text_name = if mode == RevisionTextMode::Deleted { "delText" } else { "t" };
-                    write!(&mut xml, "</w:r><w:r><w:{text_name}>{}</w:{text_name}>", escape_xml(res))?;
+                    let text_name = if mode == RevisionTextMode::Deleted {
+                        "delText"
+                    } else {
+                        "t"
+                    };
+                    write!(
+                        &mut xml,
+                        "</w:r><w:r><w:{text_name}>{}</w:{text_name}>",
+                        escape_xml(res)
+                    )?;
                 }
 
                 // Field end
@@ -658,8 +674,16 @@ impl MutableField {
                 xml.push_str(r#"<w:fldChar w:fldCharType="begin"/>"#);
             },
             Self::Instruction(text) => {
-                let name = if mode == RevisionTextMode::Deleted { "delInstrText" } else { "instrText" };
-                write!(&mut xml, r#"<w:{name} xml:space="preserve">{}</w:{name}>"#, escape_xml(text))?;
+                let name = if mode == RevisionTextMode::Deleted {
+                    "delInstrText"
+                } else {
+                    "instrText"
+                };
+                write!(
+                    &mut xml,
+                    r#"<w:{name} xml:space="preserve">{}</w:{name}>"#,
+                    escape_xml(text)
+                )?;
             },
             Self::Separate { dirty } => {
                 if *dirty {
@@ -867,9 +891,11 @@ mod tests {
             "BIBLIOGRAPHY \\l 1033 \\f \\m Doe2024 \\m \"Smith 2025\""
         );
         assert!(bibliography.add_source_tag("source\nname").is_err());
-        assert!(bibliography
-            .set_cached_result(Some("bad\0result".to_string()))
-            .is_err());
+        assert!(
+            bibliography
+                .set_cached_result(Some("bad\0result".to_string()))
+                .is_err()
+        );
 
         let mut too_many_switches = BibliographyFieldSpec::new();
         too_many_switches.set_locale(Some(1033));

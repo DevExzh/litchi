@@ -1,7 +1,5 @@
-use litchi_ooxml::docx::{
-    MutableDocument, Package, SectionProperties, WdSectionStart,
-};
 use litchi_ooxml::docx::writer::TableOfContents;
+use litchi_ooxml::docx::{MutableDocument, Package, SectionProperties, WdSectionStart};
 use litchi_opc::packuri::PackURI;
 use std::io::Cursor;
 
@@ -67,7 +65,10 @@ fn mutates_blocks_around_preserved_paragraphs_and_final_section() {
     // Append lands before the body-final sectPr.
     doc.insert_paragraph(2).unwrap().add_run().set_text("omega");
     // Insert between two preserved paragraphs.
-    doc.insert_paragraph(1).unwrap().add_run().set_text("middle");
+    doc.insert_paragraph(1)
+        .unwrap()
+        .add_run()
+        .set_text("middle");
     // Remove a preserved paragraph.
     doc.remove_paragraph(0).unwrap();
     assert_eq!(doc.paragraph_count(), 3);

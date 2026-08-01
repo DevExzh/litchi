@@ -62,7 +62,7 @@ impl ChpBinTable {
         // Each PnBteChpx contains:
         // - pn (PN): Page number (offset / 512) of CHPXFKP page
 
-        if plcf_bte_chpx_data.len() < 12 || (plcf_bte_chpx_data.len() - 4) % 8 != 0 {
+        if plcf_bte_chpx_data.len() < 12 || !(plcf_bte_chpx_data.len() - 4).is_multiple_of(8) {
             return None;
         }
 

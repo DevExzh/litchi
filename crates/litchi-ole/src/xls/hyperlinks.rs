@@ -334,7 +334,7 @@ fn parse_tooltip(data: &[u8]) -> XlsResult<(XlsHyperlinkRange, String)> {
         return invalid("HLinkTooltip internal record type must be 0x0800".to_string());
     }
     let range = cursor.range()?;
-    if cursor.remaining() % 2 != 0 {
+    if !cursor.remaining().is_multiple_of(2) {
         return invalid("HLinkTooltip string has an odd byte length".to_string());
     }
     let units = cursor.remaining() / 2;
@@ -384,7 +384,7 @@ fn parse_moniker(cursor: &mut Cursor<'_>, depth: usize) -> XlsResult<XlsHyperlin
 
 fn parse_url_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsUrlMoniker> {
     let length = cursor.u32()? as usize;
-    if length < 2 || length % 2 != 0 {
+    if length < 2 || !length.is_multiple_of(2) {
         return invalid(format!("invalid URLMoniker length: {length}"));
     }
     let data = cursor.take(length)?;
@@ -456,7 +456,7 @@ fn parse_file_moniker(cursor: &mut Cursor<'_>) -> XlsResult<XlsFileMoniker> {
             ));
         }
         let unicode_bytes = cursor.u32()? as usize;
-        if unicode_bytes % 2 != 0 || unicode_size != unicode_bytes + 6 {
+        if !unicode_bytes.is_multiple_of(2) || unicode_size != unicode_bytes + 6 {
             return invalid("FileMoniker Unicode size fields are inconsistent".to_string());
         }
         if cursor.u16()? != 3 {
@@ -493,7 +493,7 @@ fn parse_item_string(data: &[u8]) -> XlsResult<(String, Option<String>)> {
         .map(|&byte| char::from(byte))
         .collect();
     let unicode_data = &data[terminator + 1..];
-    if unicode_data.len() % 2 != 0 {
+    if !unicode_data.len().is_multiple_of(2) {
         return invalid("ItemMoniker Unicode string has an odd byte length".to_string());
     }
     let unicode = (!unicode_data.is_empty())
@@ -503,7 +503,7 @@ fn parse_item_string(data: &[u8]) -> XlsResult<(String, Option<String>)> {
 }
 
 fn decode_terminated_utf16(data: &[u8]) -> XlsResult<String> {
-    if data.len() < 2 || data.len() % 2 != 0 {
+    if data.len() < 2 || !data.len().is_multiple_of(2) {
         return invalid("invalid terminated UTF-16 byte length".to_string());
     }
     let units: Vec<u16> = data
@@ -517,7 +517,7 @@ fn decode_terminated_utf16(data: &[u8]) -> XlsResult<String> {
         .map_err(|_| XlsError::InvalidData("hyperlink string contains invalid UTF-16".to_string()))
 }
 fn decode_unterminated_utf16(data: &[u8]) -> XlsResult<String> {
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return invalid("invalid UTF-16 byte length".to_string());
     }
     let units: Vec<u16> = data

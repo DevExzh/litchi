@@ -33,13 +33,8 @@ fn format_a() -> ConditionalFormat {
 
 fn format_b() -> ConditionalFormat {
     ConditionalFormat::new(
-        vec![
-            "Grades.A2:Grades.A3".to_string(),
-            "Grades.B1".to_string(),
-        ],
-        vec![
-            ConditionalFormatCondition::new("cell-content()==\"\"", "Bad").into(),
-        ],
+        vec!["Grades.A2:Grades.A3".to_string(), "Grades.B1".to_string()],
+        vec![ConditionalFormatCondition::new("cell-content()==\"\"", "Bad").into()],
     )
     .unwrap()
 }
@@ -135,7 +130,9 @@ fn builder_authored_conditional_formats_round_trip_the_package() {
 
     let bytes = builder.build().unwrap();
     let xml = content_xml(&bytes);
-    assert!(xml.contains(r#"xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0""#));
+    assert!(xml.contains(
+        r#"xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0""#
+    ));
     assert!(xml.contains("<calcext:conditional-formats>"));
     assert!(xml.contains(r#"calcext:target-range-address="Grades.A2:Grades.A3 Grades.B1""#));
     assert!(xml.contains(r#"calcext:value="cell-content()&gt;5""#));
@@ -175,12 +172,8 @@ fn mutable_creates_replaces_and_removes_conditional_formats() {
     let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
 
     let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
-    mutable
-        .add_sheet_conditional_format(0, format_a())
-        .unwrap();
-    mutable
-        .add_sheet_conditional_format(0, format_c())
-        .unwrap();
+    mutable.add_sheet_conditional_format(0, format_a()).unwrap();
+    mutable.add_sheet_conditional_format(0, format_c()).unwrap();
     let mut reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     let formats = reopened.sheets().unwrap()[0].conditional_formats().to_vec();
     assert_eq!(formats, [format_a(), format_c()]);
@@ -190,7 +183,12 @@ fn mutable_creates_replaces_and_removes_conditional_formats() {
         mutable.remove_sheet_conditional_format(0, 0).unwrap(),
         Some(format_a())
     );
-    assert!(mutable.remove_sheet_conditional_format(0, 5).unwrap().is_none());
+    assert!(
+        mutable
+            .remove_sheet_conditional_format(0, 5)
+            .unwrap()
+            .is_none()
+    );
     mutable
         .set_sheet_conditional_formats(1, vec![format_b()])
         .unwrap_err();
@@ -202,7 +200,9 @@ fn mutable_creates_replaces_and_removes_conditional_formats() {
 
     // Editing a rule body in place survives the save round trip.
     let mut edited = format_c();
-    edited.rules.retain(|rule| !matches!(rule, ConditionalFormatRule::DataBar(_)));
+    edited
+        .rules
+        .retain(|rule| !matches!(rule, ConditionalFormatRule::DataBar(_)));
     let mut mutable = MutableSpreadsheet::from_spreadsheet(reopened).unwrap();
     mutable
         .set_sheet_conditional_formats(0, vec![edited.clone()])
@@ -214,7 +214,9 @@ fn mutable_creates_replaces_and_removes_conditional_formats() {
     );
 
     let mut mutable = MutableSpreadsheet::from_spreadsheet(reopened).unwrap();
-    mutable.set_sheet_conditional_formats(0, Vec::new()).unwrap();
+    mutable
+        .set_sheet_conditional_formats(0, Vec::new())
+        .unwrap();
     let mut reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
     assert!(
         reopened.sheets().unwrap()[0]
@@ -250,11 +252,13 @@ fn invalid_conditional_formats_are_rejected_atomically() {
         builder
             .add_sheet_conditional_format(ConditionalFormat {
                 target_range_addresses: vec![".A1".to_string()],
-                rules: vec![ConditionalDataBar::new(vec![ConditionalDataBarEntry::new(
-                    ConditionalFormatEntryType::AutomaticMinimum,
-                    "0",
-                )])
-                .into()],
+                rules: vec![
+                    ConditionalDataBar::new(vec![ConditionalDataBarEntry::new(
+                        ConditionalFormatEntryType::AutomaticMinimum,
+                        "0",
+                    )])
+                    .into()
+                ],
             })
             .is_err()
     );
@@ -263,18 +267,17 @@ fn invalid_conditional_formats_are_rejected_atomically() {
     let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
     assert!(
         mutable
-            .add_sheet_conditional_format(0, ConditionalFormat {
-                target_range_addresses: vec![".A1".to_string()],
-                rules: vec![ConditionalFormatCondition::new("", "S").into()],
-            })
+            .add_sheet_conditional_format(
+                0,
+                ConditionalFormat {
+                    target_range_addresses: vec![".A1".to_string()],
+                    rules: vec![ConditionalFormatCondition::new("", "S").into()],
+                }
+            )
             .is_err()
     );
     assert!(mutable.add_sheet_conditional_format(9, format_a()).is_err());
-    assert!(
-        mutable
-            .remove_sheet_conditional_format(9, 0)
-            .is_err()
-    );
+    assert!(mutable.remove_sheet_conditional_format(9, 0).is_err());
 }
 
 #[test]
@@ -330,7 +333,9 @@ fn parser_rejects_malformed_calcext_content() {
     // Empty rule bodies are invalid.
     assert!(rejects(&format(r#"<calcext:color-scale/>"#)));
     assert!(rejects(&format(r#"<calcext:data-bar/>"#)));
-    assert!(rejects(&format(r#"<calcext:icon-set calcext:icon-set-type="5Boxes"/>"#)));
+    assert!(rejects(&format(
+        r#"<calcext:icon-set calcext:icon-set-type="5Boxes"/>"#
+    )));
     // Data bars accept exactly two limit entries.
     assert!(rejects(&format(
         r#"<calcext:data-bar><calcext:formatting-entry calcext:value="0" calcext:type="auto-minimum"/></calcext:data-bar>"#,
@@ -352,7 +357,9 @@ fn parser_rejects_malformed_calcext_content() {
         r#"<calcext:data-bar calcext:axis-position=" sideways "><calcext:formatting-entry calcext:value="0" calcext:type="auto-minimum"/><calcext:formatting-entry calcext:value="1" calcext:type="auto-maximum"/></calcext:data-bar>"#,
     )));
     // calcext:date-is requires its style.
-    assert!(rejects(&format(r#"<calcext:date-is calcext:date="today"/>"#)));
+    assert!(rejects(&format(
+        r#"<calcext:date-is calcext:date="today"/>"#
+    )));
     // Non-numeric thresholds are rejected for non-formula entry types.
     assert!(rejects(&format(
         r#"<calcext:icon-set calcext:icon-set-type="5Boxes"><calcext:formatting-entry calcext:value="many" calcext:type="percent"/></calcext:icon-set>"#,

@@ -36,7 +36,7 @@ pub fn generate_single_entry_bin_table(start_fc: u32, end_fc: u32, page_number: 
 
 /// Generate a bin table from multi-page FKP results.
 ///
-/// Takes the FC ranges from [`FkpPages`] and associates each with a page number.
+/// Takes the FC ranges from [`super::fkp::FkpPages`] and associates each with a page number.
 ///
 /// # Arguments
 ///

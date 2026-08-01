@@ -1,7 +1,7 @@
 //! Round-trip tests for the BIFF8 XFExt record (formatting extensions).
 
 use litchi_ole::xls::writer::XlsWriter;
-use litchi_ole::xls::{XlsExtProp, XlsFullColorExt, XlsFullColorType, XlsXfExt, XlsWorkbook};
+use litchi_ole::xls::{XlsExtProp, XlsFullColorExt, XlsFullColorType, XlsWorkbook, XlsXfExt};
 use std::io::Cursor;
 
 fn extensions() -> Vec<XlsXfExt> {

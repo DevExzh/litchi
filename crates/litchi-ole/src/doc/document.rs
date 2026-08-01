@@ -11,8 +11,10 @@ use super::paragraph::{Paragraph, Run};
 use super::parts::associated_strings::DocumentAssociatedStrings;
 use super::parts::auto_summary::DocumentAutoSummary;
 use super::parts::bookmarks::BookmarksTable;
+use super::parts::captions::CaptionTables;
 use super::parts::chp_bin_table::ChpBinTable;
 use super::parts::comments::CommentsTable;
+use super::parts::embedded_fonts::DocumentEmbeddedFonts;
 use super::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 use super::parts::fields::{
     ActiveContentField, AdvanceField, AutoNumberField, AutoTextField, AutoTextListField,
@@ -28,38 +30,36 @@ use super::parts::fields::{
     TableOfContentsEntryField, TableOfContentsField, UserIdentityField, non_plcf_field_texts,
 };
 use super::parts::footnotes::{EndnotesTable, FootnotesTable};
-use super::parts::embedded_fonts::DocumentEmbeddedFonts;
 use super::parts::form_fields::FormFieldData;
+use super::parts::format_consistency::DocumentFormatConsistencyMarks;
 use super::parts::glossary::{AttachedGlossary, GlossaryMetadata};
+use super::parts::grammar_cookies::GrammarCookieTables;
 use super::parts::headers::HeadersTable;
 use super::parts::hyperlinks::HyperlinksTable;
 use super::parts::list_names::ListNamesTable;
 use super::parts::list_templates::ListTemplateTable;
 use super::parts::mail_merge::DocumentMailMerge;
 use super::parts::numbering::{ListTables, ParagraphListBinding};
+use super::parts::ole_controls::DocumentOleControls;
 use super::parts::pap_bin_table::PapBinTable;
 use super::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use super::parts::piece_table::PieceTable;
 use super::parts::proofing::ProofingTables;
-use super::parts::grammar_cookies::GrammarCookieTables;
-use super::parts::captions::CaptionTables;
+use super::parts::protection::DocumentProtectedRanges;
 use super::parts::repair_bookmarks::DocumentRepairBookmarks;
-use super::parts::table_char_cache::TableCharacterCache;
-use super::parts::text_services::TextServicesTables;
-use super::parts::textbox_breaks::TextBoxBreakTables;
 use super::parts::revisions::RevisionAuthorTable;
 use super::parts::rmd_threading::DocumentRmdThreading;
-use super::parts::saved_by::SavedByTable;
-use super::parts::format_consistency::DocumentFormatConsistencyMarks;
-use super::parts::ole_controls::DocumentOleControls;
-use super::parts::protection::DocumentProtectedRanges;
 use super::parts::rsids::DocumentRsids;
+use super::parts::saved_by::SavedByTable;
 use super::parts::sections::SectionsTable;
 use super::parts::smart_tags::DocumentSmartTags;
 use super::parts::structured_tags::DocumentStructuredTags;
 use super::parts::styles::StyleSheet;
 use super::parts::subdocuments::DocumentSubdocuments;
+use super::parts::table_char_cache::TableCharacterCache;
 use super::parts::text::TextExtractor;
+use super::parts::text_services::TextServicesTables;
+use super::parts::textbox_breaks::TextBoxBreakTables;
 use super::parts::xml_schemas::DocumentXmlSchemas;
 use super::table::Table;
 #[cfg(feature = "formula")]
@@ -813,9 +813,9 @@ impl Document {
     /// document's primary text from opening. Caption labels remain inert text
     /// and referenced OLE objects are never activated.
     pub fn caption_tables(&self) -> Result<&CaptionTables> {
-        self.caption_tables.as_ref().map_err(|error| {
-            DocError::Corrupted(format!("invalid caption metadata: {error}"))
-        })
+        self.caption_tables
+            .as_ref()
+            .map_err(|error| DocError::Corrupted(format!("invalid caption metadata: {error}")))
     }
 
     /// Strictly access the repair-bookmark tables recorded when Word repaired
@@ -828,7 +828,9 @@ impl Document {
         self.repair_bookmarks
             .as_ref()
             .map(Option::as_ref)
-            .map_err(|error| DocError::Corrupted(format!("invalid repair bookmark metadata: {error}")))
+            .map_err(|error| {
+                DocError::Corrupted(format!("invalid repair bookmark metadata: {error}"))
+            })
     }
 
     /// Strictly access glossary-only AutoText and formatted AutoCorrect metadata.

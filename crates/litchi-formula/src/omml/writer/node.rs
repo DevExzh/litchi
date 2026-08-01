@@ -8,9 +8,7 @@
 use super::OmmlWriter;
 use super::chars::*;
 use super::names::*;
-use crate::ast::{
-    BorderBoxStyle, EqArrayProperties, Fence, MathNode, MatrixProperties, StyleType,
-};
+use crate::ast::{BorderBoxStyle, EqArrayProperties, Fence, MathNode, MatrixProperties, StyleType};
 use crate::omml::error::OmmlError;
 use std::borrow::Cow;
 
@@ -146,7 +144,9 @@ impl OmmlWriter {
                     })
                 }
             },
-            MathNode::EqArray { rows, properties } => self.write_eq_array(rows, properties.as_ref()),
+            MathNode::EqArray { rows, properties } => {
+                self.write_eq_array(rows, properties.as_ref())
+            },
             MathNode::Accent {
                 base,
                 accent,
@@ -223,13 +223,7 @@ impl OmmlWriter {
                 overline: _,
                 strike_through: _,
                 double_strike_through: _,
-            } => self.write_run(
-                content,
-                *literal,
-                *style,
-                font.as_deref(),
-                color.as_deref(),
-            ),
+            } => self.write_run(content, *literal, *style, font.as_deref(), color.as_deref()),
             MathNode::Row(children) => self.write_all(children),
             MathNode::Phantom(content) => self.element(EL_PHANTOM, |w| w.base_element(content)),
             MathNode::Limit { content, .. } => self.write_all(content),
@@ -375,9 +369,7 @@ impl OmmlWriter {
     ) -> Result<(), OmmlError> {
         self.element(EL_MATRIX, |w| {
             if let Some(properties) = properties {
-                let base_jc = properties
-                    .base_alignment
-                    .and_then(base_alignment_value);
+                let base_jc = properties.base_alignment.and_then(base_alignment_value);
                 let row_spacing = properties.row_spacing;
                 if base_jc.is_some() || row_spacing.is_some() {
                     w.element(EL_MATRIX_PROPS, |w| {
@@ -564,4 +556,3 @@ fn leaf_text<'a>(node: &'a MathNode) -> Option<Cow<'a, str>> {
         _ => None,
     }
 }
-

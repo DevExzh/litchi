@@ -50,7 +50,7 @@ pub mod latex;
 /// storing mathematical equations.
 ///
 /// References:
-/// - http://rtf2latex2e.sourceforge.net/MTEF5.html
+/// - <http://rtf2latex2e.sourceforge.net/MTEF5.html>
 /// - rtf2latex2e source code
 mod mtef;
 /// OMML (Office Math Markup Language) Parser
@@ -66,7 +66,7 @@ mod mtef;
 /// - Memory-efficient arena-based allocation
 /// - Support for all OMML elements and properties
 ///
-/// Reference: https://devblogs.microsoft.com/math-in-office/officemath/
+/// Reference: <https://devblogs.microsoft.com/math-in-office/officemath/>
 mod omml;
 
 // Re-export public API
@@ -336,7 +336,10 @@ mod conversion_tests {
         let mtef = latex_to_mtef(r"a+b").expect("LaTeX converts to MTEF");
         let latex = mtef_to_latex(&mtef).expect("the writer's output parses back");
         for expected in ['a', '+', 'b'] {
-            assert!(latex.contains(expected), "round trip lost {expected}: {latex}");
+            assert!(
+                latex.contains(expected),
+                "round trip lost {expected}: {latex}"
+            );
         }
     }
 
@@ -346,7 +349,10 @@ mod conversion_tests {
         let omml = latex_to_omml(r"\frac{a}{b}").expect("converts to OMML");
         let latex = omml_to_latex(&omml).expect("converts back to LaTeX");
         assert!(latex.contains("\\frac"), "lost the fraction: {latex}");
-        assert!(latex.contains('a') && latex.contains('b'), "lost operands: {latex}");
+        assert!(
+            latex.contains('a') && latex.contains('b'),
+            "lost operands: {latex}"
+        );
     }
 
     /// Malformed LaTeX must be reported, never panic.

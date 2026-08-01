@@ -49,7 +49,7 @@ pub struct DocTextBox {
 pub fn parse_plcf_txbx_txt(data: &[u8]) -> Result<Vec<TextBoxEntry>> {
     // Standard PLC: n+1 CPs, n FTXBXS structures of FTXBXS_LEN bytes.
     let stride = 4 + FTXBXS_LEN;
-    if data.len() < 4 || (data.len() - 4) % stride != 0 {
+    if data.len() < 4 || !(data.len() - 4).is_multiple_of(stride) {
         return Err(DocError::InvalidFormat(
             "Invalid PlcftxbxTxt length".to_string(),
         ));

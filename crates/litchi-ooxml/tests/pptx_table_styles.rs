@@ -81,7 +81,10 @@ fn slide_tables_report_style_switches_and_references() {
     let styles = package.table_styles().unwrap().unwrap();
     for properties in &found {
         let style_id = properties.style_id.as_deref().unwrap();
-        assert!(styles.find(style_id).is_some(), "unresolved style {style_id}");
+        assert!(
+            styles.find(style_id).is_some(),
+            "unresolved style {style_id}"
+        );
     }
 }
 

@@ -68,19 +68,15 @@ impl DocumentOleControls {
             .map_err(|_| corrupted("RgxOcxInfo count exceeds usize"))?;
         if count == 0 {
             if data.len() != 4 {
-                return Err(corrupted(
-                    "RgxOcxInfo byte length does not match its count",
-                ));
+                return Err(corrupted("RgxOcxInfo byte length does not match its count"));
             }
             return Ok(Self {
                 controls: Vec::new(),
             });
         }
         let stride = (data.len() - 4) / count;
-        if (data.len() - 4) % count != 0 || stride < OCX_INFO_SIZE {
-            return Err(corrupted(
-                "RgxOcxInfo byte length does not match its count",
-            ));
+        if !(data.len() - 4).is_multiple_of(count) || stride < OCX_INFO_SIZE {
+            return Err(corrupted("RgxOcxInfo byte length does not match its count"));
         }
         let mut controls = Vec::with_capacity(count);
         let mut cookies = HashSet::with_capacity(count);
@@ -197,9 +193,12 @@ mod tests {
         data.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]);
         data.extend_from_slice(&[0; 12]);
         let parsed = DocumentOleControls::parse_bytes(&data).unwrap();
-        assert_eq!(parsed.controls(), [OleControlInfo {
-            cookie: 0xFFFF_FFFF
-        }]);
+        assert_eq!(
+            parsed.controls(),
+            [OleControlInfo {
+                cookie: 0xFFFF_FFFF
+            }]
+        );
     }
 
     #[test]

@@ -361,8 +361,6 @@ pub fn write_web_pub<W: Write>(writer: &mut W, value: &crate::xls::XlsWebPub) ->
     Ok(())
 }
 
-
-
 /// Write a STYLEEXT record (MS-XLS 2.4.270) with a cell-style extension.
 ///
 /// Record type: 0x0892

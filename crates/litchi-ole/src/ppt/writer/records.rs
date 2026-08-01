@@ -25,8 +25,8 @@ use super::tx_style::{
     build_tx_master_style_title, tx_style_instance,
 };
 
-use litchi_core::unit::emu_u32_to_ppt_master_u32;
 use crate::ppt::view_info::PowerPointSlideViewInfo;
+use litchi_core::unit::emu_u32_to_ppt_master_u32;
 
 /// Error type for PPT operations
 pub type PptError = std::io::Error;

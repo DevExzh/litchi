@@ -121,15 +121,16 @@ fn setters_reject_wrong_kinds_atomically_and_models_enforce_limits() {
     writer.add_slide().unwrap();
     writer.set_slide_view_info(slide_view()).unwrap();
     assert!(writer.set_slide_view_info(notes_view()).is_err());
-    assert_eq!(writer.slide_view_info().unwrap().kind(), PowerPointViewKind::Slide);
+    assert_eq!(
+        writer.slide_view_info().unwrap().kind(),
+        PowerPointViewKind::Slide
+    );
     assert!(writer.set_notes_view_info(slide_view()).is_err());
     assert!(writer.notes_view_info().is_none());
 
     assert!(PowerPointGuide::new(PowerPointGuideOrientation::Vertical, 32_256).is_err());
-    let too_many = vec![
-        PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 0).unwrap();
-        9
-    ];
+    let too_many =
+        vec![PowerPointGuide::new(PowerPointGuideOrientation::Horizontal, 0).unwrap(); 9];
     assert!(
         PowerPointSlideViewInfo::new(
             PowerPointViewKind::Slide,

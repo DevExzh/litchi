@@ -1252,7 +1252,7 @@ impl MarkdownWriter {
 
         while pos < bytes.len() {
             // Find the next character that needs escaping
-            let next_special = [b'&', b'<', b'>', b'\n']
+            let next_special = b"&<>\n"
                 .iter()
                 .filter_map(|&ch| memchr(ch, &bytes[pos..]).map(|p| pos + p))
                 .min();

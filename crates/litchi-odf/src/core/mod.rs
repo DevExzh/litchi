@@ -66,13 +66,13 @@ mod xml;
 
 // Re-export main types for convenience
 // Manifest is internal to the package system
+pub use encryption::{
+    OdfEncryptionCipher, OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey,
+};
 #[allow(unused_imports)]
 pub use manifest::{
     Manifest, ManifestChecksum, ManifestChecksumAlgorithm, ManifestEncryption,
     ManifestEncryptionAlgorithm, ManifestEntry, ManifestKeyDerivation, ManifestStartKeyGeneration,
-};
-pub use encryption::{
-    OdfEncryptionCipher, OdfEncryptionKdf, OdfEncryptionProfile, OdfEncryptionStartKey,
 };
 pub use metadata::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, OdfMetadata,

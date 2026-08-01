@@ -307,7 +307,7 @@ fn parse_cstring(
         PptRecordType::CString,
         context,
     )?;
-    if record.data.len() % 2 != 0 {
+    if !record.data.len().is_multiple_of(2) {
         return corrupted(format!("{context} has odd UTF-16 byte length"));
     }
     let units = record.data.len() / 2;

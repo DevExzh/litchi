@@ -1,7 +1,7 @@
 //! MS-PPT specification types and constants
 //!
 //! Reference: [MS-PPT] PowerPoint 97-2003 Binary File Format (.ppt)
-//! https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt
+//! <https://docs.microsoft.com/en-us/openspecs/office_file_formats/ms-ppt>
 
 // =============================================================================
 // Slide Layout Types (MS-PPT 2.13.25 SlideLayoutType)

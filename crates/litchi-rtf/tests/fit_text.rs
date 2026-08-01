@@ -10,10 +10,9 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_fittext_runs_with_continuation_and_round_trips() {
-    let document = RtfDocument::parse(
-        r"{\rtf1\ansi plain {\fittext1000 Fit this} {\fittext-1 text} done}",
-    )
-    .unwrap();
+    let document =
+        RtfDocument::parse(r"{\rtf1\ansi plain {\fittext1000 Fit this} {\fittext-1 text} done}")
+            .unwrap();
     assert_eq!(document.text(), "plain Fit this text done");
     let runs = document.runs();
     let fit_runs: Vec<_> = runs

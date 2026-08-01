@@ -43,8 +43,10 @@ fn even_and_first_pages_round_trip() {
 
 #[test]
 fn no_header_footer_record_by_default() {
-    let workbook =
-        XlsWorkbook::new(Cursor::new(written_workbook(XlsPageSetupOptions::default()))).unwrap();
+    let workbook = XlsWorkbook::new(Cursor::new(
+        written_workbook(XlsPageSetupOptions::default()),
+    ))
+    .unwrap();
     let page = workbook.xls_worksheet(0).unwrap().page_setup().unwrap();
     assert!(page.header_footer().is_none());
 }

@@ -169,7 +169,7 @@ impl XlsCubeFunction {
                 return Err(invalid(
                     record_type,
                     format!("unknown Tag_Fn_MDX value 0x{other:02X}"),
-                ))
+                ));
             },
         })
     }
@@ -212,7 +212,7 @@ impl XlsKpiProperty {
                 return Err(invalid(
                     MDX_KPI_RECORD_TYPE,
                     format!("unknown KPIProp value 0x{other:02X}"),
-                ))
+                ));
             },
         })
     }
@@ -257,7 +257,7 @@ impl XlsMdxSetSortOrder {
                 return Err(invalid(
                     MDX_SET_RECORD_TYPE,
                     format!("unknown SD_SetSortOrder value 0x{other:02X}"),
-                ))
+                ));
             },
         })
     }
@@ -734,7 +734,10 @@ impl XlsMdb {
     pub fn parse(data: &[u8]) -> XlsResult<Self> {
         let body = record_body(data, MDB_RECORD_TYPE)?;
         if body.len() % MDIR_LEN != 0 {
-            return Err(invalid(MDB_RECORD_TYPE, "MDB body is not a whole MDir array"));
+            return Err(invalid(
+                MDB_RECORD_TYPE,
+                "MDB body is not a whole MDir array",
+            ));
         }
         let entries = body
             .chunks_exact(MDIR_LEN)
@@ -786,10 +789,18 @@ impl XlsMdxMetadataRecord {
                 indexes
             },
             Self::Prop(prop) => {
-                vec![prop.connection_name_index, prop.member_index, prop.property_index]
+                vec![
+                    prop.connection_name_index,
+                    prop.member_index,
+                    prop.property_index,
+                ]
             },
             Self::Kpi(kpi) => {
-                vec![kpi.connection_name_index, kpi.kpi_name_index, kpi.member_kpi_index]
+                vec![
+                    kpi.connection_name_index,
+                    kpi.kpi_name_index,
+                    kpi.member_kpi_index,
+                ]
             },
         }
     }
@@ -926,8 +937,10 @@ impl XlsMdxMetadata {
         match record_type {
             MDT_INFO_RECORD_TYPE => self.add_info(XlsMdtInfo::parse(payload)?),
             MDX_STR_RECORD_TYPE => {
-                self.strings
-                    .push(parse_lp_wide_string(record_body(payload, record_type)?, record_type)?);
+                self.strings.push(parse_lp_wide_string(
+                    record_body(payload, record_type)?,
+                    record_type,
+                )?);
             },
             MDX_TUPLE_RECORD_TYPE => {
                 self.add_record(XlsMdxMetadataRecord::Tuple(XlsMdxTuple::parse(payload)?))?;
@@ -946,7 +959,7 @@ impl XlsMdxMetadata {
                 return Err(XlsError::UnexpectedRecordType {
                     expected: MDT_INFO_RECORD_TYPE,
                     found: other,
-                })
+                });
             },
         }
         Ok(())
@@ -1002,7 +1015,9 @@ mod tests {
 
     #[test]
     fn mdt_info_parses_flags_and_name() {
-        let mut body = (F_COPY | F_PASTE_VALUES | F_CELL_META).to_le_bytes().to_vec();
+        let mut body = (F_COPY | F_PASTE_VALUES | F_CELL_META)
+            .to_le_bytes()
+            .to_vec();
         body.extend_from_slice(&wide_string("MDXValueMetadata"));
         let info = XlsMdtInfo::parse(&payload(MDT_INFO_RECORD_TYPE, &body)).unwrap();
         assert_eq!(info.name, "MDXValueMetadata");
@@ -1153,8 +1168,14 @@ mod tests {
         assert_eq!(
             block.entries,
             vec![
-                XlsMdxMetadataDir { info_index: 1, metadata_index: 0 },
-                XlsMdxMetadataDir { info_index: 2, metadata_index: 3 },
+                XlsMdxMetadataDir {
+                    info_index: 1,
+                    metadata_index: 0
+                },
+                XlsMdxMetadataDir {
+                    info_index: 2,
+                    metadata_index: 3
+                },
             ]
         );
 
@@ -1172,7 +1193,9 @@ mod tests {
             name: "ValueMetadata".to_string(),
         });
         metadata.add_string("connection".to_string()).unwrap();
-        metadata.add_string("[Product].[All Products]".to_string()).unwrap();
+        metadata
+            .add_string("[Product].[All Products]".to_string())
+            .unwrap();
 
         // A tuple referencing a string that does not exist yet is rejected.
         let tuple = XlsMdxMetadataRecord::Tuple(XlsMdxTuple {
@@ -1182,21 +1205,32 @@ mod tests {
         });
         assert!(metadata.add_record(tuple.clone()).is_err());
 
-        metadata.add_string("[Measures].[Sales]".to_string()).unwrap();
+        metadata
+            .add_string("[Measures].[Sales]".to_string())
+            .unwrap();
         metadata.add_record(tuple).unwrap();
 
         // MDir indexes must reference collected types and records; MDTInfo
         // indexes are one-based.
         let bad_info = XlsMdb {
-            entries: vec![XlsMdxMetadataDir { info_index: 0, metadata_index: 0 }],
+            entries: vec![XlsMdxMetadataDir {
+                info_index: 0,
+                metadata_index: 0,
+            }],
         };
         assert!(metadata.add_block(bad_info).is_err());
         let bad_record = XlsMdb {
-            entries: vec![XlsMdxMetadataDir { info_index: 1, metadata_index: 1 }],
+            entries: vec![XlsMdxMetadataDir {
+                info_index: 1,
+                metadata_index: 1,
+            }],
         };
         assert!(metadata.add_block(bad_record).is_err());
         let good = XlsMdb {
-            entries: vec![XlsMdxMetadataDir { info_index: 1, metadata_index: 0 }],
+            entries: vec![XlsMdxMetadataDir {
+                info_index: 1,
+                metadata_index: 0,
+            }],
         };
         metadata.add_block(good).unwrap();
         assert!(!metadata.is_empty());
@@ -1241,8 +1275,14 @@ mod tests {
         metadata
             .add_block(XlsMdb {
                 entries: vec![
-                    XlsMdxMetadataDir { info_index: 1, metadata_index: 0 },
-                    XlsMdxMetadataDir { info_index: 1, metadata_index: 1 },
+                    XlsMdxMetadataDir {
+                        info_index: 1,
+                        metadata_index: 0,
+                    },
+                    XlsMdxMetadataDir {
+                        info_index: 1,
+                        metadata_index: 1,
+                    },
                 ],
             })
             .unwrap();
@@ -1250,7 +1290,10 @@ mod tests {
         let payloads = metadata.to_record_payloads().unwrap();
         assert_eq!(payloads.len(), 8);
         assert_eq!(
-            payloads.iter().map(|(record_type, _)| *record_type).collect::<Vec<_>>(),
+            payloads
+                .iter()
+                .map(|(record_type, _)| *record_type)
+                .collect::<Vec<_>>(),
             vec![
                 MDT_INFO_RECORD_TYPE,
                 MDX_STR_RECORD_TYPE,

@@ -169,7 +169,9 @@ mod tests {
     fn escapes_text_and_attribute_values() {
         let mut root = MathElement::new("math").unwrap();
         let mut identifier = MathElement::new("mi").unwrap();
-        identifier.set_attribute(None, "mathvariant", "bo<ld&\"x\"").unwrap();
+        identifier
+            .set_attribute(None, "mathvariant", "bo<ld&\"x\"")
+            .unwrap();
         identifier.push_text("a<b>&c");
         root.push_child(identifier);
         let serialized = root.to_xml();

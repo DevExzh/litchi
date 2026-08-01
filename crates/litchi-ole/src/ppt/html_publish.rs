@@ -403,7 +403,7 @@ fn parse_printable_unicode(
         || record.version != 0
         || record.instance != instance
         || record.data.len() > max_bytes
-        || record.data.len() % 2 != 0
+        || !record.data.len().is_multiple_of(2)
     {
         return Err(PptError::Corrupted(format!(
             "{record_name} has an invalid record header or size"

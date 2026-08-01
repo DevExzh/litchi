@@ -9,12 +9,12 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use litchi_ooxml_common::xml::{
-    decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,
-};
 use crate::error::{OoxmlError, Result};
 use crate::xlsx::chart::ChartAnchor;
 use crate::xlsx::namespace::relationship_attribute_value;
+use litchi_ooxml_common::xml::{
+    decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,
+};
 
 const SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -260,11 +260,11 @@ impl Parser {
                 }
             }
         }
-        if self.anchor.is_some() && is_spreadsheet_drawing_name(namespace, element.name(), b"cNvPr")
+        if self.anchor.is_some()
+            && is_spreadsheet_drawing_name(namespace, element.name(), b"cNvPr")
+            && let Some(description) = unqualified_attribute_value(element, b"descr", decoder)?
         {
-            if let Some(description) = unqualified_attribute_value(element, b"descr", decoder)? {
-                self.anchor_mut()?.description = Some(description);
-            }
+            self.anchor_mut()?.description = Some(description);
         }
         if self.anchor.is_some() && is_drawingml_name(namespace, element.name(), b"blip") {
             let relationship_id = relationship_attribute_value(

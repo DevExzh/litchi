@@ -414,7 +414,9 @@ impl XlsWorksheet {
 
     /// Finds a PivotTable by its SXVIEW table name.
     pub fn pivot_table(&self, name: &str) -> Option<&PivotTable> {
-        self.pivot_tables.iter().find(|table| table.view.name == name)
+        self.pivot_tables
+            .iter()
+            .find(|table| table.view.name == name)
     }
 
     /// Formula error-checking shared features declared for this worksheet.

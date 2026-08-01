@@ -73,7 +73,8 @@ fn strict_bool(value: u8, name: &str) -> Result<bool> {
 }
 
 fn check_unit_portion(ratio: PowerPointRatio, name: &str) -> Result<()> {
-    if ratio.denominator() <= 0 || ratio.numerator() < 0 || ratio.numerator() > ratio.denominator() {
+    if ratio.denominator() <= 0 || ratio.numerator() < 0 || ratio.numerator() > ratio.denominator()
+    {
         return Err(corrupted(format!(
             "NormalViewSetInfo9Atom {name} must be between 0 and 1"
         )));
@@ -137,7 +138,9 @@ impl PowerPointNormalViewSetInfo {
         check_unit_portion(top_portion, "topPortion")?;
         let flags = data[19];
         if flags & !KNOWN_FLAGS != 0 {
-            return Err(corrupted("NormalViewSetInfo9Atom reserved flag bits must be zero"));
+            return Err(corrupted(
+                "NormalViewSetInfo9Atom reserved flag bits must be zero",
+            ));
         }
         Ok(Self {
             left_portion,
@@ -221,9 +224,10 @@ impl PowerPointNormalViewSet {
                 "NormalViewSetInfo9 child is not a NormalViewSetInfo9Atom",
             ));
         }
-        let payload = PowerPointNormalViewSetInfo::parse(&atom.data)
-            .map_or_else(|_| PowerPointNormalViewSetPayload::Other(atom.data.clone()),
-                PowerPointNormalViewSetPayload::Layout);
+        let payload = PowerPointNormalViewSetInfo::parse(&atom.data).map_or_else(
+            |_| PowerPointNormalViewSetPayload::Other(atom.data.clone()),
+            PowerPointNormalViewSetPayload::Layout,
+        );
         Ok(Self { payload })
     }
 
@@ -337,7 +341,8 @@ mod tests {
 
     #[test]
     fn parses_pane_layout_and_round_trips() {
-        let container = PowerPointNormalViewSet::parse_record(&container_record(&pane_atom())).unwrap();
+        let container =
+            PowerPointNormalViewSet::parse_record(&container_record(&pane_atom())).unwrap();
         let layout = container.layout().unwrap();
         assert_eq!(layout.left_portion().numerator(), 1);
         assert_eq!(layout.left_portion().denominator(), 4);

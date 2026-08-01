@@ -14,9 +14,7 @@ fn seed_package(path: &std::path::Path, worksheet_xml: &str) {
     let base = directory.path().join("base.xlsx");
     Workbook::create().unwrap().save(&base).unwrap();
     let mut package = OpcPackage::open(&base).unwrap();
-    let part = package
-        .get_part_mut(&PackURI::new(SHEET).unwrap())
-        .unwrap();
+    let part = package.get_part_mut(&PackURI::new(SHEET).unwrap()).unwrap();
     part.set_blob(worksheet_xml.as_bytes().to_vec());
     part.rels_mut().add_relationship(
         rt::HYPERLINK.to_string(),
@@ -56,8 +54,7 @@ fn typed_metadata() -> WorksheetProtectionMetadata {
     metadata.set_sheet_protection(Some(protection)).unwrap();
     metadata
         .set_protected_range_collections(vec![
-            WorksheetProtectedRangeCollection::new(ProtectedRangeSource::Core, vec![core])
-                .unwrap(),
+            WorksheetProtectedRangeCollection::new(ProtectedRangeSource::Core, vec![core]).unwrap(),
             WorksheetProtectedRangeCollection::new(ProtectedRangeSource::Office2010, vec![x14])
                 .unwrap(),
         ])
@@ -94,7 +91,10 @@ fn mutates_existing_package_without_rebuilding_unrelated_xml_or_relationships() 
     assert!(output_xml.contains(r#"<z:payload token="byte-exact"/>"#));
     assert!(output_xml.contains(r#"<ext uri="{UNRELATED}"><z:payload token="keep"/></ext>"#));
     assert!(output_xml.contains("<x14:protectedRanges"));
-    assert_eq!(first_part.rels().get("rId9").unwrap().target_ref(), "https://example.test/preserved");
+    assert_eq!(
+        first_part.rels().get("rId9").unwrap().target_ref(),
+        "https://example.test/preserved"
+    );
     let parsed = parse_worksheet_protection(first_part.blob()).unwrap();
     assert!(parsed.sheet_protection().unwrap().sheet_locked());
     assert_eq!(parsed.protected_ranges().count(), 2);
@@ -122,7 +122,9 @@ fn emits_strict_core_protection_and_keeps_x14_extension() {
             .blob(),
     )
     .unwrap();
-    assert!(xml.contains(r#"<sheetProtection xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main""#));
+    assert!(
+        xml.contains(r#"<sheetProtection xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main""#)
+    );
     assert!(xml.contains("<x14:protectedRanges"));
 }
 
@@ -134,9 +136,11 @@ fn rejects_spoofed_namespaces_and_invalid_replacements_atomically() {
     let xml = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:f="urn:fake"><sheetData/><f:sheetProtection sheet="1"/></worksheet>"#;
     seed_package(&input, xml);
     let mut workbook = Workbook::open(&input).unwrap();
-    assert!(workbook
-        .replace_worksheet_protection(0, typed_metadata())
-        .is_err());
+    assert!(
+        workbook
+            .replace_worksheet_protection(0, typed_metadata())
+            .is_err()
+    );
     workbook.save(&output).unwrap();
     let package = OpcPackage::open(&output).unwrap();
     assert_eq!(
@@ -153,11 +157,13 @@ fn rejects_spoofed_namespaces_and_invalid_replacements_atomically() {
         ProtectionRangeSqref::parse("A1").unwrap(),
     )
     .unwrap();
-    assert!(WorksheetProtectedRangeCollection::new(
-        ProtectedRangeSource::Core,
-        vec![range.clone(), range],
-    )
-    .is_err());
+    assert!(
+        WorksheetProtectedRangeCollection::new(
+            ProtectedRangeSource::Core,
+            vec![range.clone(), range],
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -176,13 +182,15 @@ fn failed_package_save_restores_the_original_blob_and_can_be_retried() {
     assert!(workbook.save(directory.path()).is_err());
     workbook.save(&output).unwrap();
     let package = OpcPackage::open(&output).unwrap();
-    assert!(parse_worksheet_protection(
-        package
-            .get_part(&PackURI::new(SHEET).unwrap())
-            .unwrap()
-            .blob()
-    )
-    .unwrap()
-    .sheet_protection()
-    .is_some());
+    assert!(
+        parse_worksheet_protection(
+            package
+                .get_part(&PackURI::new(SHEET).unwrap())
+                .unwrap()
+                .blob()
+        )
+        .unwrap()
+        .sheet_protection()
+        .is_some()
+    );
 }

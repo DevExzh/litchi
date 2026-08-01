@@ -26,8 +26,14 @@ fn open(bytes: &[u8], password: Option<&str>) -> Result<litchi_ole::ppt::Present
 #[test]
 fn encrypted_modify_password_round_trips_and_open_password_behavior_is_unchanged() {
     let bytes = encrypted_presentation("修改🔐", "open secret");
-    assert!(matches!(open(&bytes, None), Err(PptError::PasswordRequired)));
-    assert!(matches!(open(&bytes, Some("wrong")), Err(PptError::InvalidPassword)));
+    assert!(matches!(
+        open(&bytes, None),
+        Err(PptError::PasswordRequired)
+    ));
+    assert!(matches!(
+        open(&bytes, Some("wrong")),
+        Err(PptError::InvalidPassword)
+    ));
     let presentation = open(&bytes, Some("open secret")).unwrap();
     let password = presentation.modify_password().unwrap().unwrap();
     assert_eq!(password.expose_secret(), "修改🔐");
@@ -42,20 +48,23 @@ fn setter_replacement_clear_and_failures_are_atomic() {
     writer.add_slide().unwrap();
     writer.set_modify_password("first").unwrap();
     writer.set_modify_password("replacement").unwrap();
-    assert_eq!(writer.modify_password().unwrap().expose_secret(), "replacement");
+    assert_eq!(
+        writer.modify_password().unwrap().expose_secret(),
+        "replacement"
+    );
     assert!(writer.set_modify_password("bad\nvalue").is_err());
     assert!(writer.set_modify_password("x".repeat(256)).is_err());
-    assert_eq!(writer.modify_password().unwrap().expose_secret(), "replacement");
+    assert_eq!(
+        writer.modify_password().unwrap().expose_secret(),
+        "replacement"
+    );
 
     let mut output = Cursor::new(Vec::new());
     assert!(writer.write_to(&mut output).is_err());
     assert!(output.get_ref().is_empty());
 
     writer
-        .set_password(
-            "open",
-            PptEncryptionProfile::CryptoApiRc4 { key_bits: 40 },
-        )
+        .set_password("open", PptEncryptionProfile::CryptoApiRc4 { key_bits: 40 })
         .unwrap();
     writer.clear_modify_password();
     assert!(writer.modify_password().is_none());

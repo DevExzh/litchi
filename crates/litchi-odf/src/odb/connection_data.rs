@@ -534,10 +534,10 @@ fn validate_connection_data(connection: &OdfDatabaseConnectionData) -> Result<()
             }
         },
     }
-    if let Some(login) = &connection.login {
-        if let Some(OdfDatabaseLoginIdentity::UserName(user)) = login.identity.as_ref() {
-            validate_value(user, "database user name", MAX_VALUE_SIZE)?;
-        }
+    if let Some(login) = &connection.login
+        && let Some(OdfDatabaseLoginIdentity::UserName(user)) = login.identity.as_ref()
+    {
+        validate_value(user, "database user name", MAX_VALUE_SIZE)?;
     }
     Ok(())
 }

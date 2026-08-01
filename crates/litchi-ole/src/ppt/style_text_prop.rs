@@ -126,13 +126,7 @@ impl PowerPointTextCFRun {
             return Err(corrupted("TextCFRun covers zero characters"));
         }
         let (character, character_len) = PowerPointTextCFException::parse_prefix(&data[4..])?;
-        Ok((
-            Self {
-                count,
-                character,
-            },
-            4 + character_len,
-        ))
+        Ok((Self { count, character }, 4 + character_len))
     }
 
     /// Serialize the run without any record header.

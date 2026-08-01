@@ -17,7 +17,9 @@
 //! or executed.
 
 use crate::error::{OoxmlError, Result};
-use crate::pptx::ole::{OleLoadLimits, PptxOleObjectMode, PptxOlePayloadKind, load_slide_ole_objects};
+use crate::pptx::ole::{
+    OleLoadLimits, PptxOleObjectMode, PptxOlePayloadKind, load_slide_ole_objects,
+};
 use litchi_core::xml::escape_xml;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -216,10 +218,7 @@ fn verify_authored_object(
         || object.mode() != PptxOleObjectMode::Embedded
         || object.relationship_id() != Some(relationship_id)
         || object.payload_kind() != Some(kind)
-        || object
-            .target()
-            .and_then(|target| target.part_name())
-            != Some(embedding_uri)
+        || object.target().and_then(|target| target.part_name()) != Some(embedding_uri)
     {
         return Err(invalid("authored OLE object did not round-trip"));
     }
@@ -306,7 +305,8 @@ fn scan_element_span(xml: &[u8], target: &str, depth: usize) -> Result<Option<El
                 if nodes > MAX_SCAN_NODES || stack.len() >= MAX_SCAN_DEPTH {
                     return Err(invalid("slide XML resource limit exceeded"));
                 }
-                let local = String::from_utf8_lossy(local_name(element.name().as_ref())).into_owned();
+                let local =
+                    String::from_utf8_lossy(local_name(element.name().as_ref())).into_owned();
                 stack.push((before, local));
             },
             Ok(Event::Empty(element)) => {
@@ -460,7 +460,9 @@ fn require_prog_id(prog_id: &str) -> Result<()> {
     let mut chars = prog_id.chars();
     let length = chars.clone().count();
     let valid = length <= MAX_PROG_ID_CHARS
-        && chars.next().is_some_and(|first| first.is_ascii_alphabetic())
+        && chars
+            .next()
+            .is_some_and(|first| first.is_ascii_alphabetic())
         && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '.');
     if valid {
         return Ok(());
@@ -498,9 +500,9 @@ fn require_payload(payload: &[u8]) -> Result<()> {
 }
 
 fn invalidate_signatures(package: &mut OpcPackage) -> Result<()> {
-    package
-        .clear_digital_signatures()
-        .map_err(|error| OoxmlError::Other(format!("cannot invalidate package signatures: {error}")))
+    package.clear_digital_signatures().map_err(|error| {
+        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
+    })
 }
 
 // ============================================================================
@@ -562,7 +564,9 @@ mod tests {
             let presentation = opc.get_part_mut(&presentation_name).unwrap();
             let xml = String::from_utf8(presentation.blob().to_vec()).unwrap();
             let entry = format!("<p:sldIdLst>{entries}</p:sldIdLst>");
-            let position = xml.find("<p:sldSz").expect("default presentation has a slide size");
+            let position = xml
+                .find("<p:sldSz")
+                .expect("default presentation has a slide size");
             let mut patched = xml;
             patched.insert_str(position, &entry);
             presentation.set_blob(patched.into_bytes());
@@ -601,7 +605,10 @@ mod tests {
         assert_eq!(object.shape_name(), Some("Quarterly & Numbers"));
         assert_eq!(object.program_id(), Some("Acme.Document.1"));
         assert_eq!(object.mode(), Mode::Embedded);
-        assert_eq!(object.relationship_id(), Some(authored.relationship_id.as_str()));
+        assert_eq!(
+            object.relationship_id(),
+            Some(authored.relationship_id.as_str())
+        );
         assert_eq!(object.payload_kind(), Some(Kind::OleObject));
         let PptxOleObjectTarget::Internal {
             part_name,
@@ -627,18 +634,42 @@ mod tests {
     fn multiple_embeddings_across_slides_get_distinct_parts() {
         let (mut package, slides) = package_with_slides(2, "");
         let first = package
-            .add_ole_object(&slides[0], Kind::OleObject, Some("Acme.Chart"), None, sample_frame(), b"one")
+            .add_ole_object(
+                &slides[0],
+                Kind::OleObject,
+                Some("Acme.Chart"),
+                None,
+                sample_frame(),
+                b"one",
+            )
             .unwrap();
         let second = package
-            .add_ole_object(&slides[0], Kind::Package, Some("Package"), None, sample_frame(), b"two")
+            .add_ole_object(
+                &slides[0],
+                Kind::Package,
+                Some("Package"),
+                None,
+                sample_frame(),
+                b"two",
+            )
             .unwrap();
         let third = package
-            .add_ole_object(&slides[1], Kind::OleObject, None, None, sample_frame(), b"three")
+            .add_ole_object(
+                &slides[1],
+                Kind::OleObject,
+                None,
+                None,
+                sample_frame(),
+                b"three",
+            )
             .unwrap();
         assert_eq!(first.part_name, "/ppt/embeddings/oleObject1.bin");
         assert_eq!(second.part_name, "/ppt/embeddings/oleObject2.bin");
         assert_eq!(third.part_name, "/ppt/embeddings/oleObject3.bin");
-        assert_ne!(first.shape_id, second.shape_id, "shape IDs must not collide on one slide");
+        assert_ne!(
+            first.shape_id, second.shape_id,
+            "shape IDs must not collide on one slide"
+        );
 
         let reopened = roundtrip(&package);
         let objects = reopened.ole_objects().unwrap();
@@ -647,7 +678,10 @@ mod tests {
             objects
                 .iter()
                 .find(|object| {
-                    object.target().and_then(|target| target.part_name()).map(PackURI::as_str)
+                    object
+                        .target()
+                        .and_then(|target| target.part_name())
+                        .map(PackURI::as_str)
                         == Some(name)
                 })
                 .unwrap()
@@ -670,9 +704,19 @@ mod tests {
         let picture = "<p:pic><p:nvPicPr><p:cNvPr id=\"2\" name=\"Logo\"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill/><p:spPr/></p:pic>";
         let (mut package, slides) = package_with_slides(1, picture);
         let authored = package
-            .add_ole_object(&slides[0], Kind::OleObject, Some("Acme.Doc"), None, sample_frame(), b"data")
+            .add_ole_object(
+                &slides[0],
+                Kind::OleObject,
+                Some("Acme.Doc"),
+                None,
+                sample_frame(),
+                b"data",
+            )
             .unwrap();
-        assert_eq!(authored.shape_id, 3, "shape ID must clear the existing picture");
+        assert_eq!(
+            authored.shape_id, 3,
+            "shape ID must clear the existing picture"
+        );
 
         let reopened = roundtrip(&package);
         let objects = reopened.ole_objects().unwrap();
@@ -699,7 +743,14 @@ mod tests {
         for bad in ["1Acme", "Acme!Doc", &"A".repeat(40), ""] {
             assert!(
                 package
-                    .add_ole_object(&slides[0], Kind::OleObject, Some(bad), None, sample_frame(), b"x")
+                    .add_ole_object(
+                        &slides[0],
+                        Kind::OleObject,
+                        Some(bad),
+                        None,
+                        sample_frame(),
+                        b"x"
+                    )
                     .is_err(),
                 "program ID '{bad}' must be rejected"
             );
@@ -709,7 +760,14 @@ mod tests {
         assert_eq!(long.chars().count(), 39);
         assert!(
             package
-                .add_ole_object(&slides[0], Kind::OleObject, Some(&long), None, sample_frame(), b"x")
+                .add_ole_object(
+                    &slides[0],
+                    Kind::OleObject,
+                    Some(&long),
+                    None,
+                    sample_frame(),
+                    b"x"
+                )
                 .is_ok()
         );
         // Empty and oversize payloads are rejected.
@@ -721,35 +779,77 @@ mod tests {
         let oversize = vec![0u8; MAX_OLE_PAYLOAD_BYTES + 1];
         assert!(
             package
-                .add_ole_object(&slides[0], Kind::OleObject, None, None, sample_frame(), &oversize)
+                .add_ole_object(
+                    &slides[0],
+                    Kind::OleObject,
+                    None,
+                    None,
+                    sample_frame(),
+                    &oversize
+                )
                 .is_err()
         );
         // Non-positive extents are rejected.
         assert!(
             package
-                .add_ole_object(&slides[0], Kind::OleObject, None, None, OleObjectFrame::new(0, 0, 0, 10), b"x")
+                .add_ole_object(
+                    &slides[0],
+                    Kind::OleObject,
+                    None,
+                    None,
+                    OleObjectFrame::new(0, 0, 0, 10),
+                    b"x"
+                )
                 .is_err()
         );
         // Empty and overlong names are rejected.
         assert!(
             package
-                .add_ole_object(&slides[0], Kind::OleObject, None, Some(""), sample_frame(), b"x")
+                .add_ole_object(
+                    &slides[0],
+                    Kind::OleObject,
+                    None,
+                    Some(""),
+                    sample_frame(),
+                    b"x"
+                )
                 .is_err()
         );
         assert!(
             package
-                .add_ole_object(&slides[0], Kind::OleObject, None, Some(&"n".repeat(257)), sample_frame(), b"x")
+                .add_ole_object(
+                    &slides[0],
+                    Kind::OleObject,
+                    None,
+                    Some(&"n".repeat(257)),
+                    sample_frame(),
+                    b"x"
+                )
                 .is_err()
         );
         // Missing slide part and non-slide part are rejected.
         assert!(
             package
-                .add_ole_object("/ppt/slides/slide99.xml", Kind::OleObject, None, None, sample_frame(), b"x")
+                .add_ole_object(
+                    "/ppt/slides/slide99.xml",
+                    Kind::OleObject,
+                    None,
+                    None,
+                    sample_frame(),
+                    b"x"
+                )
                 .is_err()
         );
         assert!(
             package
-                .add_ole_object("/ppt/presentation.xml", Kind::OleObject, None, None, sample_frame(), b"x")
+                .add_ole_object(
+                    "/ppt/presentation.xml",
+                    Kind::OleObject,
+                    None,
+                    None,
+                    sample_frame(),
+                    b"x"
+                )
                 .is_err()
         );
         // Rejections leave the package clean: one object from the valid call.
@@ -762,10 +862,24 @@ mod tests {
         let build = || {
             let (mut package, slides) = package_with_slides(1, "");
             package
-                .add_ole_object(&slides[0], Kind::OleObject, Some("Acme.Document.1"), Some("Same"), sample_frame(), b"payload")
+                .add_ole_object(
+                    &slides[0],
+                    Kind::OleObject,
+                    Some("Acme.Document.1"),
+                    Some("Same"),
+                    sample_frame(),
+                    b"payload",
+                )
                 .unwrap();
             package
-                .add_ole_object(&slides[0], Kind::Package, Some("Package"), None, sample_frame(), b"second")
+                .add_ole_object(
+                    &slides[0],
+                    Kind::Package,
+                    Some("Package"),
+                    None,
+                    sample_frame(),
+                    b"second",
+                )
                 .unwrap();
             package
         };

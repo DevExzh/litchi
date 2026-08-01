@@ -690,20 +690,21 @@ pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStyleProperti
                     .ok_or_else(|| invalid("unbalanced XML depth"))?;
             },
             Event::Text(text)
-                if (background_depth.is_some() || properties_depth == Some(depth)) => {
-                    let value = text
-                        .decode()
-                        .map_err(|e| invalid(format!("invalid XML text: {e}")))?;
-                    if !value.trim().is_empty() {
-                        return Err(invalid("unexpected section-properties text"));
-                    }
-                },
+                if (background_depth.is_some() || properties_depth == Some(depth)) =>
+            {
+                let value = text
+                    .decode()
+                    .map_err(|e| invalid(format!("invalid XML text: {e}")))?;
+                if !value.trim().is_empty() {
+                    return Err(invalid("unexpected section-properties text"));
+                }
+            },
             Event::CData(data)
                 if (background_depth.is_some() || properties_depth == Some(depth))
-                    && !data.is_empty()
-                => {
-                    return Err(invalid("section-properties contains CDATA"));
-                },
+                    && !data.is_empty() =>
+            {
+                return Err(invalid("section-properties contains CDATA"));
+            },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are forbidden"));
             },

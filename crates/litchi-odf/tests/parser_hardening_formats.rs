@@ -4,9 +4,7 @@
 //! hand-crafted malformed documents must always produce a typed `Result` —
 //! `Ok` or `Error::InvalidFormat` — and never a panic.
 
-use litchi_odf::{
-    FlatChartDocument, FlatDrawingDocument, FlatPresentation, MasterDocument,
-};
+use litchi_odf::{FlatChartDocument, FlatDrawingDocument, FlatPresentation, MasterDocument};
 
 /// Feature-rich flat ODP seed: declarations, a slide with a transition, an
 /// animation tree, grouped and custom shapes, a media plugin, and notes.
@@ -117,10 +115,7 @@ fn exercise_odm(bytes: Vec<u8>) -> Option<litchi_core::Error> {
     }
 }
 
-fn assert_typed_error(
-    error: Option<litchi_core::Error>,
-    case: &str,
-) {
+fn assert_typed_error(error: Option<litchi_core::Error>, case: &str) {
     let Some(error) = error else {
         panic!("case '{case}' unexpectedly parsed");
     };
@@ -174,7 +169,10 @@ fn odc_truncation_and_mutation_sweeps_never_panic() {
 
 #[test]
 fn odm_truncation_and_mutation_sweeps_never_panic() {
-    let bytes = package("application/vnd.oasis.opendocument.text-master", ODM_CONTENT);
+    let bytes = package(
+        "application/vnd.oasis.opendocument.text-master",
+        ODM_CONTENT,
+    );
     // Package sweeps corrupt the zip structure; content sweeps corrupt the
     // XML inside a valid package.
     for end in 0..bytes.len() {

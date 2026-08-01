@@ -216,9 +216,7 @@ impl Presentation {
     /// loaded, or resolved. Use
     /// [`crate::ppt::PowerPointProgTags::slide_extensions`] to decode the
     /// versioned binary-tag payloads into typed extension structs.
-    pub fn main_master_programmable_tags(
-        &self,
-    ) -> Result<Vec<crate::ppt::PowerPointProgTags>> {
+    pub fn main_master_programmable_tags(&self) -> Result<Vec<crate::ppt::PowerPointProgTags>> {
         self.main_master_programmable_tags_with_limits(
             crate::ppt::PowerPointProgTagLimits::default(),
         )
@@ -263,9 +261,7 @@ impl Presentation {
                     | PptRecordType::DateTimeMCAtom
                     | PptRecordType::RtfDateTimeMCAtom
             ) {
-                out.extend(crate::ppt::text_metachar::metachars_from_records(
-                    [record],
-                )?);
+                out.extend(crate::ppt::text_metachar::metachars_from_records([record])?);
             }
             Ok(())
         }
@@ -294,7 +290,9 @@ impl Presentation {
     /// The normal three-pane view's splitter state (`NormalViewSetInfo9`,
     /// MS-PPT 2.4.21.2), when the document declares one. Files with multiple
     /// top-level Document containers yield the first occurrence.
-    pub fn normal_view_set_info(&self) -> Result<Option<crate::ppt::view_set_info::PowerPointNormalViewSet>> {
+    pub fn normal_view_set_info(
+        &self,
+    ) -> Result<Option<crate::ppt::view_set_info::PowerPointNormalViewSet>> {
         for record in self.parser.find_records_ref() {
             if record.record_type == PptRecordType::NormalViewSetInfo9 {
                 return crate::ppt::view_set_info::PowerPointNormalViewSet::parse_record(record)
@@ -307,11 +305,15 @@ impl Presentation {
     /// The notes-text view's scaling state (`NotesTextViewInfo9`, MS-PPT
     /// 2.4.21.4), when the document declares one. Files with multiple
     /// top-level Document containers yield the first occurrence.
-    pub fn notes_text_view_info(&self) -> Result<Option<crate::ppt::view_set_info::PowerPointNotesTextViewInfo>> {
+    pub fn notes_text_view_info(
+        &self,
+    ) -> Result<Option<crate::ppt::view_set_info::PowerPointNotesTextViewInfo>> {
         for record in self.parser.find_records_ref() {
             if record.record_type == PptRecordType::NotesTextViewInfo9 {
-                return crate::ppt::view_set_info::PowerPointNotesTextViewInfo::parse_record(record)
-                    .map(Some);
+                return crate::ppt::view_set_info::PowerPointNotesTextViewInfo::parse_record(
+                    record,
+                )
+                .map(Some);
             }
         }
         Ok(None)

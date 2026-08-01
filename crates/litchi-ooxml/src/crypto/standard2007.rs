@@ -347,7 +347,7 @@ fn decrypt_package_stream(key: &[u8], encrypted: &[u8]) -> Result<Vec<u8>> {
     let stream_size = u64::from_le_bytes(size_bytes) as usize;
 
     let mut data = encrypted[8..].to_vec();
-    if data.len() % 16 != 0 {
+    if !data.len().is_multiple_of(16) {
         return Err(OoxmlError::InvalidFormat(
             "EncryptedPackage ciphertext length is not a multiple of 16 bytes".to_string(),
         ));

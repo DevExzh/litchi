@@ -217,7 +217,9 @@ fn validate_prog_id(prog_id: &str) -> Result<()> {
     let mut characters = prog_id.chars();
     let valid = !prog_id.is_empty()
         && prog_id.len() <= MAX_PROG_ID_LENGTH
-        && characters.next().is_some_and(|first| first.is_ascii_alphabetic())
+        && characters
+            .next()
+            .is_some_and(|first| first.is_ascii_alphabetic())
         && characters.all(|c| c.is_ascii_alphanumeric() || c == '.');
     if !valid {
         return Err(OoxmlError::InvalidFormat(format!(
@@ -298,7 +300,9 @@ mod tests {
         assert!(xml.contains(r#"<v:imagedata r:id="{{OLE_PREVIEW__x0000_i1026}}" o:title=""/>"#));
 
         let mut xml = String::new();
-        object.to_xml(&mut xml, Some("rId9"), Some("rId10")).unwrap();
+        object
+            .to_xml(&mut xml, Some("rId9"), Some("rId10"))
+            .unwrap();
         assert!(xml.contains(r#"<v:imagedata r:id="rId10" o:title=""/>"#));
     }
 
@@ -379,9 +383,7 @@ mod tests {
         let mut part_names: Vec<String> = entries
             .iter()
             .map(|entry| match entry.target() {
-                crate::EmbeddedTarget::Internal(payload) => {
-                    payload.part_name().as_str().to_owned()
-                },
+                crate::EmbeddedTarget::Internal(payload) => payload.part_name().as_str().to_owned(),
                 crate::EmbeddedTarget::External { .. } => panic!("expected internal payloads"),
             })
             .collect();

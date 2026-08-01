@@ -357,8 +357,7 @@ mod tests {
     #[test]
     fn serializes_preset_shape_and_formatted_runs() {
         let mut text_box =
-            MutableTextBox::with_shape("Round", ShapeType::RoundRectangle, 914400, 457200)
-                .unwrap();
+            MutableTextBox::with_shape("Round", ShapeType::RoundRectangle, 914400, 457200).unwrap();
         text_box.add_run("bold").bold = Some(true);
         text_box.add_run("italic-off").italic = Some(false);
         text_box.add_run("under").underline = Some(true);

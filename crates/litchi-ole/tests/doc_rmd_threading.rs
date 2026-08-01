@@ -16,7 +16,11 @@ fn parse_threading(relative: &str) -> Option<DocumentRmdThreading> {
     let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
-    let table_name = if fib.which_table_stream() { "1Table" } else { "0Table" };
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
     let table_stream = ole.open_stream(&[table_name]).unwrap();
     DocumentRmdThreading::parse(&fib, &table_stream).unwrap()
 }
@@ -40,10 +44,12 @@ fn reads_multi_author_threading_from_a_word_produced_document() {
     )
     .expect("Word 2000+ document carries RmdThreading");
     assert_eq!(threading.messages().len(), 2);
-    assert!(threading
-        .messages()
-        .iter()
-        .all(|message| message.message_id().is_empty() && message.display().is_none()));
+    assert!(
+        threading
+            .messages()
+            .iter()
+            .all(|message| message.message_id().is_empty() && message.display().is_none())
+    );
     assert_eq!(threading.personal_styles().len(), 2);
 }
 

@@ -19,7 +19,11 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
         assert!(presentation.insert_slide(7).is_err());
         assert_eq!(presentation.slide_count(), 6);
         assert_eq!(
-            presentation.slides().iter().map(|s| s.slide_id()).collect::<Vec<_>>(),
+            presentation
+                .slides()
+                .iter()
+                .map(|s| s.slide_id())
+                .collect::<Vec<_>>(),
             [260, 256, 259, 257, 258, 261]
         );
     }

@@ -2,7 +2,7 @@
 //!
 //! Re-exports the [`litchi-imgconv`](../../litchi_imgconv/index.html) crate
 //! (pure BLIP / EMF / WMF / PICT decoders and converters) plus an
-//! integration helper, [`extractor`], that bridges OLE Escher records to
+//! integration helper, [`crate::ole::extractor`], that bridges OLE Escher records to
 //! `litchi-imgconv` types. The integration helper stays in the umbrella
 //! because it depends on `crate::ole` and therefore cannot live in a leaf
 //! crate.

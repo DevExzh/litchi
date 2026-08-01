@@ -10,12 +10,11 @@ use litchi_ooxml::pptx::{
     find_modern_comment_reply, find_presentation_comment, find_presentation_comment_author,
     remove_modern_comment, remove_modern_comment_author, remove_modern_comment_reply,
     remove_presentation_comment, remove_presentation_comment_author,
-    reorder_modern_comment_authors, reorder_modern_comments,
-    reorder_presentation_comment_authors, reorder_presentation_comments,
-    replace_modern_comment, replace_modern_comment_author, replace_modern_comment_reply,
-    replace_presentation_comment, replace_presentation_comment_author,
-    store_presentation_comments, update_modern_comment, update_modern_comment_author,
-    update_modern_comment_reply, update_presentation_comment,
+    reorder_modern_comment_authors, reorder_modern_comments, reorder_presentation_comment_authors,
+    reorder_presentation_comments, replace_modern_comment, replace_modern_comment_author,
+    replace_modern_comment_reply, replace_presentation_comment,
+    replace_presentation_comment_author, store_presentation_comments, update_modern_comment,
+    update_modern_comment_author, update_modern_comment_reply, update_presentation_comment,
     update_presentation_comment_author,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -43,7 +42,8 @@ fn package() -> (OpcPackage, PackURI) {
     package.add_part(Box::new(BlobPart::new(
         slide_name.clone(),
         ct::PML_SLIDE.into(),
-        br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#.to_vec(),
+        br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
+            .to_vec(),
     )));
     package.relate_to("ppt/presentation.xml", rt::OFFICE_DOCUMENT);
     (package, slide_name)
@@ -183,7 +183,9 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
         PresentationCommentConformance::Transitional,
     )
     .unwrap();
-    let mut grace = find_presentation_comment_author(&package, 2).unwrap().unwrap();
+    let mut grace = find_presentation_comment_author(&package, 2)
+        .unwrap()
+        .unwrap();
     grace.name = "Grace Hopper".into();
     update_presentation_comment_author(
         &mut package,
@@ -206,12 +208,14 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
             .text,
         "updated"
     );
-    assert!(remove_presentation_comment_author(
-        &mut package,
-        2,
-        PresentationCommentConformance::Transitional
-    )
-    .is_err());
+    assert!(
+        remove_presentation_comment_author(
+            &mut package,
+            2,
+            PresentationCommentConformance::Transitional
+        )
+        .is_err()
+    );
 
     let comment_part = PackURI::new("/ppt/comments/comment1.xml").unwrap();
     let mut shared_owner = BlobPart::new(
@@ -221,28 +225,34 @@ fn legacy_author_and_slide_comment_crud_preserves_shared_target() {
     );
     shared_owner.relate_to("comments/comment1.xml", "urn:test:shared");
     package.add_part(Box::new(shared_owner));
-    assert!(remove_presentation_comment(
-        &mut package,
-        SLIDE,
-        2,
-        1,
-        PresentationCommentConformance::Transitional
-    )
-    .unwrap());
-    assert!(remove_presentation_comment_author(
-        &mut package,
-        2,
-        PresentationCommentConformance::Transitional
-    )
-    .unwrap());
-    assert!(remove_presentation_comment(
-        &mut package,
-        SLIDE,
-        1,
-        1,
-        PresentationCommentConformance::Transitional
-    )
-    .unwrap());
+    assert!(
+        remove_presentation_comment(
+            &mut package,
+            SLIDE,
+            2,
+            1,
+            PresentationCommentConformance::Transitional
+        )
+        .unwrap()
+    );
+    assert!(
+        remove_presentation_comment_author(
+            &mut package,
+            2,
+            PresentationCommentConformance::Transitional
+        )
+        .unwrap()
+    );
+    assert!(
+        remove_presentation_comment(
+            &mut package,
+            SLIDE,
+            1,
+            1,
+            PresentationCommentConformance::Transitional
+        )
+        .unwrap()
+    );
     assert!(package.get_part(&comment_part).is_ok());
 }
 
@@ -251,13 +261,19 @@ fn modern_author_comment_and_reply_crud_is_graph_checked() {
     let (mut package, slide) = package();
     add_modern_comment_author(&mut package, modern_author(AUTHOR_A, "Ada")).unwrap();
     add_modern_comment_author(&mut package, modern_author(AUTHOR_B, "Grace")).unwrap();
-    assert!(add_modern_comment(
-        &mut package,
-        &slide,
-        modern_comment(COMMENT_A, "{11111111-1111-4111-8111-111111111111}", "bad")
-    )
-    .is_err());
-    assert!(find_modern_comment(&package, &slide, COMMENT_A).unwrap().is_none());
+    assert!(
+        add_modern_comment(
+            &mut package,
+            &slide,
+            modern_comment(COMMENT_A, "{11111111-1111-4111-8111-111111111111}", "bad")
+        )
+        .is_err()
+    );
+    assert!(
+        find_modern_comment(&package, &slide, COMMENT_A)
+            .unwrap()
+            .is_none()
+    );
 
     add_modern_comment(
         &mut package,
@@ -271,12 +287,14 @@ fn modern_author_comment_and_reply_crud_is_graph_checked() {
         modern_comment(COMMENT_B, AUTHOR_B, "second"),
     )
     .unwrap();
-    assert!(add_modern_comment(
-        &mut package,
-        &slide,
-        modern_comment(COMMENT_A, AUTHOR_A, "duplicate")
-    )
-    .is_err());
+    assert!(
+        add_modern_comment(
+            &mut package,
+            &slide,
+            modern_comment(COMMENT_A, AUTHOR_A, "duplicate")
+        )
+        .is_err()
+    );
     add_modern_comment_reply(
         &mut package,
         &slide,
@@ -284,13 +302,15 @@ fn modern_author_comment_and_reply_crud_is_graph_checked() {
         modern_reply(REPLY_A, AUTHOR_B),
     )
     .unwrap();
-    assert!(add_modern_comment_reply(
-        &mut package,
-        &slide,
-        COMMENT_B,
-        modern_reply(REPLY_A, AUTHOR_A)
-    )
-    .is_err());
+    assert!(
+        add_modern_comment_reply(
+            &mut package,
+            &slide,
+            COMMENT_B,
+            modern_reply(REPLY_A, AUTHOR_A)
+        )
+        .is_err()
+    );
     update_modern_comment(&mut package, &slide, COMMENT_A, |comment| {
         comment.title = Some("updated".into());
         comment.assigned_to = Some(vec![AUTHOR_B.into()]);
@@ -301,25 +321,14 @@ fn modern_author_comment_and_reply_crud_is_graph_checked() {
     })
     .unwrap();
     let replacement_reply = modern_reply(REPLY_A, AUTHOR_B);
-    replace_modern_comment_reply(
-        &mut package,
-        &slide,
-        COMMENT_A,
-        REPLY_A,
-        replacement_reply,
-    )
-    .unwrap();
+    replace_modern_comment_reply(&mut package, &slide, COMMENT_A, REPLY_A, replacement_reply)
+        .unwrap();
     let mut replacement = find_modern_comment(&package, &slide, COMMENT_B)
         .unwrap()
         .unwrap();
     replacement.title = Some("replacement".into());
     replace_modern_comment(&mut package, &slide, COMMENT_B, replacement).unwrap();
-    reorder_modern_comments(
-        &mut package,
-        &slide,
-        &[COMMENT_B.into(), COMMENT_A.into()],
-    )
-    .unwrap();
+    reorder_modern_comments(&mut package, &slide, &[COMMENT_B.into(), COMMENT_A.into()]).unwrap();
     reorder_modern_comment_authors(&mut package, &[AUTHOR_B.into(), AUTHOR_A.into()]).unwrap();
     update_modern_comment_author(&mut package, AUTHOR_A, |author| {
         author.name = "Ada Lovelace".into();

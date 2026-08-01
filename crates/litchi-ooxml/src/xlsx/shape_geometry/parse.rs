@@ -13,14 +13,14 @@
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use crate::error::{OoxmlError, Result};
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 use super::{
     MAX_ADJUST_HANDLES, MAX_CONNECTION_SITES, MAX_GEOMETRY_GUIDES, MAX_GEOMETRY_PATHS,
     MAX_PATH_COMMANDS, XlsxAdjustHandle, XlsxAdjustValue, XlsxConnectionSite, XlsxCustomGeometry,
-    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle,
-    XlsxPathCommand, XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxXyAdjustHandle,
+    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
+    XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxXyAdjustHandle,
 };
 
 /// One element of the `a:custGeom` subtree, used as parser context so close
@@ -186,10 +186,7 @@ impl CustomGeometryBuilder {
                 self.push_command(XlsxPathCommand::Close)?;
                 El::Close
             },
-            (
-                El::MoveTo | El::LineTo | El::QuadraticBezierTo | El::CubicBezierTo,
-                b"pt",
-            ) => {
+            (El::MoveTo | El::LineTo | El::QuadraticBezierTo | El::CubicBezierTo, b"pt") => {
                 self.open_command_point(element, decoder)?;
                 El::Point
             },
@@ -304,7 +301,9 @@ impl CustomGeometryBuilder {
             return Err(limit("handle or connection site count"));
         }
         if self.pending_site.replace((site, false)).is_some() {
-            return Err(invalid("nested custom geometry handles or connection sites"));
+            return Err(invalid(
+                "nested custom geometry handles or connection sites",
+            ));
         }
         Ok(())
     }
@@ -337,10 +336,14 @@ impl CustomGeometryBuilder {
         }
         match site {
             PendingSite::Xy(handle) => {
-                self.geometry.adjust_handles.push(XlsxAdjustHandle::Xy(handle));
+                self.geometry
+                    .adjust_handles
+                    .push(XlsxAdjustHandle::Xy(handle));
             },
             PendingSite::Polar(handle) => {
-                self.geometry.adjust_handles.push(XlsxAdjustHandle::Polar(handle));
+                self.geometry
+                    .adjust_handles
+                    .push(XlsxAdjustHandle::Polar(handle));
             },
             PendingSite::Connection(connection) => {
                 self.geometry.connection_sites.push(connection);
@@ -385,10 +388,13 @@ impl CustomGeometryBuilder {
     }
 
     fn open_command(&mut self, kind: PendingCommandKind) -> Result<GeometryElement> {
-        if self.pending_command.replace(PendingCommand {
-            kind,
-            points: Vec::new(),
-        }).is_some()
+        if self
+            .pending_command
+            .replace(PendingCommand {
+                kind,
+                points: Vec::new(),
+            })
+            .is_some()
         {
             return Err(invalid("nested custom geometry path commands"));
         }

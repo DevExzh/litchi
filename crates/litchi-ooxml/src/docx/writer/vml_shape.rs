@@ -129,8 +129,12 @@ impl MutableVmlShape {
 
     /// Create a rectangle with default (one square inch) extents.
     pub fn rectangle() -> Self {
-        Self::new(VmlShapeKind::Rectangle, DEFAULT_WIDTH_EMU, DEFAULT_HEIGHT_EMU)
-            .expect("default extents are positive")
+        Self::new(
+            VmlShapeKind::Rectangle,
+            DEFAULT_WIDTH_EMU,
+            DEFAULT_HEIGHT_EMU,
+        )
+        .expect("default extents are positive")
     }
 
     /// Get the VML shape kind.
@@ -401,8 +405,8 @@ mod tests {
         {
             let document = package.document_mut().unwrap();
             document.add_paragraph_with_text("before the shape");
-            let mut shape = MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914400)
-                .unwrap();
+            let mut shape =
+                MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914400).unwrap();
             shape.set_fill_color("#E5F1F8").unwrap();
             shape.set_stroke_color("#007AB9").unwrap();
             shape.set_floating(914400, 457200);
@@ -450,7 +454,8 @@ mod tests {
             assert_eq!(second.id(), "_x0000_s1026");
 
             // An explicit shape ID colliding with an assigned one is rejected.
-            let mut duplicate = MutableVmlShape::new(VmlShapeKind::Rectangle, 914400, 914400).unwrap();
+            let mut duplicate =
+                MutableVmlShape::new(VmlShapeKind::Rectangle, 914400, 914400).unwrap();
             duplicate.set_shape_id("_x0000_s1025").unwrap();
             assert!(document.add_vml_shape(duplicate).is_err());
         }
@@ -461,12 +466,7 @@ mod tests {
         assert_eq!(inventory.len(), 2);
         let mut entries: Vec<(String, String)> = inventory
             .iter()
-            .map(|shape| {
-                (
-                    shape.name.as_deref().unwrap().to_owned(),
-                    shape.text(),
-                )
-            })
+            .map(|shape| (shape.name.as_deref().unwrap().to_owned(), shape.text()))
             .collect();
         entries.sort();
         assert_eq!(

@@ -65,9 +65,9 @@ pub(crate) fn prepare_writer_encryption(
     let PptEncryptionProfile::CryptoApiRc4 { key_bits } = profile;
     let mut salt = Zeroizing::new([0u8; 16]);
     let mut verifier = Zeroizing::new([0u8; 16]);
-    SysRng
-        .try_fill_bytes(salt.as_mut())
-        .map_err(|_| "operating-system randomness unavailable for PPT CryptoAPI salt".to_string())?;
+    SysRng.try_fill_bytes(salt.as_mut()).map_err(|_| {
+        "operating-system randomness unavailable for PPT CryptoAPI salt".to_string()
+    })?;
     SysRng.try_fill_bytes(verifier.as_mut()).map_err(|_| {
         "operating-system randomness unavailable for PPT CryptoAPI verifier".to_string()
     })?;
@@ -134,8 +134,8 @@ pub(crate) fn encrypt_powerpoint_document_for_write(
     if directory_end != user_edit_offset {
         return Err("PPT persist directory is not immediately before UserEditAtom".to_string());
     }
-    let mappings = parse_persist_directory(document, directory_offset)
-        .map_err(|error| error.to_string())?;
+    let mappings =
+        parse_persist_directory(document, directory_offset).map_err(|error| error.to_string())?;
     let session_offset = usize::try_from(
         *mappings
             .get(&session_id)

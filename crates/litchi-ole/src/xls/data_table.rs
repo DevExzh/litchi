@@ -49,7 +49,12 @@ impl XlsDataTableRange {
         if last_row < first_row || last_col < first_col {
             return Err(invalid("data-table range is reversed"));
         }
-        Ok(Self { first_row, last_row, first_col, last_col })
+        Ok(Self {
+            first_row,
+            last_row,
+            first_col,
+            last_col,
+        })
     }
 
     pub const fn first_row(&self) -> u16 {
@@ -167,7 +172,10 @@ impl XlsDataTable {
             range,
             always_calc: false,
             row_orientation: false,
-            kind: XlsDataTableKind::TwoVariable { row_input, column_input },
+            kind: XlsDataTableKind::TwoVariable {
+                row_input,
+                column_input,
+            },
         }
     }
 
@@ -206,11 +214,8 @@ impl XlsDataTable {
         let always_calc = flags & ALWAYS_CALC != 0;
         let row_orientation = flags & ROW_ORIENTATION != 0;
         let two_variable = flags & TWO_VARIABLE != 0;
-        let input1 = XlsDataTableInputCell::decode(
-            read_u16(8),
-            read_u16(10),
-            flags & DELETED1 != 0,
-        )?;
+        let input1 =
+            XlsDataTableInputCell::decode(read_u16(8), read_u16(10), flags & DELETED1 != 0)?;
         let kind = if two_variable {
             XlsDataTableKind::TwoVariable {
                 row_input: input1,
@@ -227,7 +232,12 @@ impl XlsDataTable {
                 ignored_deleted2: flags & DELETED2 != 0,
             }
         };
-        Ok(Self { range, always_calc, row_orientation, kind })
+        Ok(Self {
+            range,
+            always_calc,
+            row_orientation,
+            kind,
+        })
     }
 
     /// Serialize back to a complete `Table` record payload.
@@ -245,7 +255,10 @@ impl XlsDataTable {
                 ignored_coordinates,
                 ignored_deleted2,
             } => (*input, *ignored_coordinates, *ignored_deleted2),
-            XlsDataTableKind::TwoVariable { row_input, column_input } => {
+            XlsDataTableKind::TwoVariable {
+                row_input,
+                column_input,
+            } => {
                 let (row, col, deleted) = column_input.encode();
                 (*row_input, (row, col), deleted)
             },
@@ -340,8 +353,7 @@ mod tests {
 
     #[test]
     fn ptg_tbl_tokens_name_the_range_origin() {
-        let table =
-            XlsDataTable::one_variable(range(), false, XlsDataTableInputCell::Deleted);
+        let table = XlsDataTable::one_variable(range(), false, XlsDataTableInputCell::Deleted);
         assert_eq!(table.ptg_tbl_tokens(), [PTG_TBL, 2, 0, 3, 0]);
     }
 

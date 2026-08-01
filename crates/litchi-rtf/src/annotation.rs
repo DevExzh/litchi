@@ -207,9 +207,10 @@ impl<'a> Annotation<'a> {
         )?;
         self.shape_groups = groups;
         self.drawing_order = order;
-        self.story_events.push(crate::StoryEvent::Drawing(
-            crate::StoryDrawing::ShapeGroup(self.shape_groups.len() - 1),
-        ));
+        self.story_events
+            .push(crate::StoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(
+                self.shape_groups.len() - 1,
+            )));
         Ok(())
     }
 

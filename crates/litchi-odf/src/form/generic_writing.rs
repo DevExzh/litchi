@@ -194,16 +194,15 @@ impl OdfGenericForm {
                 control.xml_id()
             ));
         }
-        if let Some(target) = fixed_text_target(&control) {
-            if self
+        if let Some(target) = fixed_text_target(&control)
+            && self
                 .controls
                 .iter()
                 .any(|existing| fixed_text_target(existing) == Some(target))
-            {
-                return invalid(format!(
-                    "multiple fixed-text controls label target '{target}'"
-                ));
-            }
+        {
+            return invalid(format!(
+                "multiple fixed-text controls label target '{target}'"
+            ));
         }
         if self.controls.len() >= MAX_CONTROLS {
             return invalid("too many generic form controls");
@@ -655,24 +654,22 @@ fn scan(xml: &str) -> Result<Scan> {
                     return invalid("unexpected child element in generic form control");
                 }
             },
-            Event::Text(text)
-                if stack.iter().any(|open| open.control.is_some()) => {
-                    let decoded = text.decode().map_err(|error| {
-                        Error::InvalidFormat(format!("invalid generic control text: {error}"))
-                    })?;
-                    if !decoded.trim().is_empty() {
-                        return invalid("generic form controls cannot contain character data");
-                    }
-                },
-            Event::CData(text)
-                if stack.iter().any(|open| open.control.is_some()) => {
-                    let decoded = text.decode().map_err(|error| {
-                        Error::InvalidFormat(format!("invalid generic control CDATA: {error}"))
-                    })?;
-                    if !decoded.trim().is_empty() {
-                        return invalid("generic form controls cannot contain CDATA");
-                    }
-                },
+            Event::Text(text) if stack.iter().any(|open| open.control.is_some()) => {
+                let decoded = text.decode().map_err(|error| {
+                    Error::InvalidFormat(format!("invalid generic control text: {error}"))
+                })?;
+                if !decoded.trim().is_empty() {
+                    return invalid("generic form controls cannot contain character data");
+                }
+            },
+            Event::CData(text) if stack.iter().any(|open| open.control.is_some()) => {
+                let decoded = text.decode().map_err(|error| {
+                    Error::InvalidFormat(format!("invalid generic control CDATA: {error}"))
+                })?;
+                if !decoded.trim().is_empty() {
+                    return invalid("generic form controls cannot contain CDATA");
+                }
+            },
             Event::GeneralRef(_) if stack.iter().any(|open| open.control.is_some()) => {
                 return invalid("generic form controls cannot contain entity references");
             },
@@ -1017,12 +1014,12 @@ fn reject_duplicate(
                 replacement.xml_id()
             ));
         }
-        if let Some(target) = fixed_text_target(replacement) {
-            if fixed_text_target(&item.control) == Some(target) {
-                return invalid(format!(
-                    "multiple fixed-text controls label target '{target}'"
-                ));
-            }
+        if let Some(target) = fixed_text_target(replacement)
+            && fixed_text_target(&item.control) == Some(target)
+        {
+            return invalid(format!(
+                "multiple fixed-text controls label target '{target}'"
+            ));
         }
     }
     Ok(())

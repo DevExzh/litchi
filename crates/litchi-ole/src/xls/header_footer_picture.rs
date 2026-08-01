@@ -164,7 +164,10 @@ mod tests {
             let bytes = record(flags, b"drawing-bytes");
             let parsed = XlsHeaderFooterPicture::parse(&bytes).unwrap();
             assert_eq!(parsed.is_drawing(), flags & FLAG_IS_DRAWING != 0);
-            assert_eq!(parsed.is_drawing_group(), flags & FLAG_IS_DRAWING_GROUP != 0);
+            assert_eq!(
+                parsed.is_drawing_group(),
+                flags & FLAG_IS_DRAWING_GROUP != 0
+            );
             assert_eq!(parsed.is_continuation(), flags & FLAG_CONTINUE != 0);
             assert_eq!(parsed.drawing(), b"drawing-bytes");
             assert_eq!(parsed.to_payload(), bytes);

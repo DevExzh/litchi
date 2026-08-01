@@ -66,16 +66,18 @@ fn der(tag: u8, body: &[u8]) -> Vec<u8> {
     output
 }
 
-fn verify(bytes: &[u8], format: BinaryOfficeFormat) -> Result<Vec<litchi_ole::signature::BinaryOfficeSignatureVerification>, BinaryOfficeSignatureError> {
+fn verify(
+    bytes: &[u8],
+    format: BinaryOfficeFormat,
+) -> Result<Vec<litchi_ole::signature::BinaryOfficeSignatureVerification>, BinaryOfficeSignatureError>
+{
     let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
     verify_binary_office_signatures(&mut file, format, &SignatureVerificationPolicy::strict())
 }
 
 fn signature_xml(bytes: &[u8]) -> (String, Vec<u8>) {
     let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
-    let name = file
-        .list_directory_entries(&["_xmlsignatures"])
-        .unwrap()[0]
+    let name = file.list_directory_entries(&["_xmlsignatures"]).unwrap()[0]
         .name
         .clone();
     let xml = file.open_stream(&["_xmlsignatures", &name]).unwrap();
@@ -97,7 +99,10 @@ fn rsa_and_ecdsa_signatures_round_trip_with_chain_time_and_multiple_streams() {
         report.package_integrity == VerificationStatus::Valid
             && report.signature_value == VerificationStatus::Valid
     }));
-    let rsa = reports.iter().find(|report| report.certificates.len() == 2).unwrap();
+    let rsa = reports
+        .iter()
+        .find(|report| report.certificates.len() == 2)
+        .unwrap();
     assert_eq!(rsa.signing_time.as_deref(), Some("2026-07-19T12:34:56Z"));
 }
 
@@ -113,16 +118,22 @@ fn stale_payload_is_reported_without_conflating_certificate_trust() {
         (&["_xmlsignatures", name.as_str()], xml.as_slice()),
     ]);
 
-    let report = verify(&tampered, BinaryOfficeFormat::Doc).unwrap().remove(0);
+    let report = verify(&tampered, BinaryOfficeFormat::Doc)
+        .unwrap()
+        .remove(0);
     assert_eq!(report.package_integrity, VerificationStatus::Invalid);
     assert_eq!(report.signature_value, VerificationStatus::Valid);
-    assert_eq!(report.certificate_trust, litchi_ole::signature::CertificateTrust::NotEvaluated);
+    assert_eq!(
+        report.certificate_trust,
+        litchi_ole::signature::CertificateTrust::NotEvaluated
+    );
 }
 
 #[test]
 fn no_op_clear_and_resign_are_atomic_and_preserve_payload_streams() {
     let original = ole(&[(&["Payload"], b"preserve exactly")]);
-    let editor = BinaryOfficeSignatureEditor::new(original.clone(), BinaryOfficeFormat::Doc).unwrap();
+    let editor =
+        BinaryOfficeSignatureEditor::new(original.clone(), BinaryOfficeFormat::Doc).unwrap();
     assert_eq!(editor.finish().unwrap(), original);
 
     let mut editor = BinaryOfficeSignatureEditor::new(original, BinaryOfficeFormat::Doc).unwrap();
@@ -134,7 +145,11 @@ fn no_op_clear_and_resign_are_atomic_and_preserve_payload_streams() {
     let mut editor = BinaryOfficeSignatureEditor::new(signed, BinaryOfficeFormat::Doc).unwrap();
     editor.clear();
     let cleared = editor.finish().unwrap();
-    assert!(verify(&cleared, BinaryOfficeFormat::Doc).unwrap().is_empty());
+    assert!(
+        verify(&cleared, BinaryOfficeFormat::Doc)
+            .unwrap()
+            .is_empty()
+    );
     let mut file = OleFile::open(Cursor::new(cleared)).unwrap();
     assert_eq!(file.open_stream(&["Payload"]).unwrap(), b"preserve exactly");
 }
@@ -179,20 +194,50 @@ fn malformed_legacy_encrypted_and_resource_hostile_containers_are_rejected() {
 fn producer_fixtures_are_noop_exact_and_facades_discover_unsigned_state() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (relative, format) in [
-        ("test-data/ole/doc/documentProperties.doc", BinaryOfficeFormat::Doc),
-        ("test-data/poi/test-data/spreadsheet/Simple.xls", BinaryOfficeFormat::Xls),
-        ("test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls", BinaryOfficeFormat::Xls),
-        ("test-data/ole/ppt/text-margins.ppt", BinaryOfficeFormat::Ppt),
+        (
+            "test-data/ole/doc/documentProperties.doc",
+            BinaryOfficeFormat::Doc,
+        ),
+        (
+            "test-data/poi/test-data/spreadsheet/Simple.xls",
+            BinaryOfficeFormat::Xls,
+        ),
+        (
+            "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls",
+            BinaryOfficeFormat::Xls,
+        ),
+        (
+            "test-data/ole/ppt/text-margins.ppt",
+            BinaryOfficeFormat::Ppt,
+        ),
     ] {
         let bytes = std::fs::read(root.join(relative)).unwrap();
         let editor = BinaryOfficeSignatureEditor::new(bytes.clone(), format).unwrap();
         assert_eq!(editor.finish().unwrap(), bytes);
     }
 
-    let mut doc = litchi_ole::doc::Package::open(root.join("test-data/ole/doc/documentProperties.doc")).unwrap();
-    assert!(doc.verify_digital_signatures(&SignatureVerificationPolicy::strict()).unwrap().is_empty());
-    let mut xls = litchi_ole::xls::XlsWorkbook::new(File::open(root.join("test-data/poi/test-data/spreadsheet/Simple.xls")).unwrap()).unwrap();
-    assert!(xls.verify_digital_signatures(&SignatureVerificationPolicy::strict()).unwrap().is_empty());
-    let mut ppt = litchi_ole::ppt::Package::open(root.join("test-data/ole/ppt/text-margins.ppt")).unwrap();
-    assert!(ppt.verify_digital_signatures(&SignatureVerificationPolicy::strict()).unwrap().is_empty());
+    let mut doc =
+        litchi_ole::doc::Package::open(root.join("test-data/ole/doc/documentProperties.doc"))
+            .unwrap();
+    assert!(
+        doc.verify_digital_signatures(&SignatureVerificationPolicy::strict())
+            .unwrap()
+            .is_empty()
+    );
+    let mut xls = litchi_ole::xls::XlsWorkbook::new(
+        File::open(root.join("test-data/poi/test-data/spreadsheet/Simple.xls")).unwrap(),
+    )
+    .unwrap();
+    assert!(
+        xls.verify_digital_signatures(&SignatureVerificationPolicy::strict())
+            .unwrap()
+            .is_empty()
+    );
+    let mut ppt =
+        litchi_ole::ppt::Package::open(root.join("test-data/ole/ppt/text-margins.ppt")).unwrap();
+    assert!(
+        ppt.verify_digital_signatures(&SignatureVerificationPolicy::strict())
+            .unwrap()
+            .is_empty()
+    );
 }

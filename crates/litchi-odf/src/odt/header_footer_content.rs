@@ -1375,9 +1375,8 @@ mod tests {
 
     #[test]
     fn accepts_empty_and_skipped_column_regions() {
-        let xml = column_region_document(
-            r#"<s:region-left/><s:region-right><t:p/></s:region-right>"#,
-        );
+        let xml =
+            column_region_document(r#"<s:region-left/><s:region-right><t:p/></s:region-right>"#);
         let regions = parse_header_footer_blocks(&xml).unwrap();
         let blocks = &regions[&(String::from("A"), HeaderFooterKind::Header)];
         assert_eq!(blocks.len(), 1);

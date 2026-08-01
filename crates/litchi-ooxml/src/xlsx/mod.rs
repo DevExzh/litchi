@@ -60,6 +60,8 @@ pub mod printer_settings;
 pub mod query_table;
 pub mod revisions;
 pub mod scenarios;
+pub mod shape_geometry;
+pub mod shapes;
 mod shared_formula;
 pub mod shared_strings;
 pub mod sheet_calculation_properties;
@@ -67,11 +69,9 @@ pub mod sheet_format;
 pub mod sheet_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
-pub mod shape_geometry;
-pub mod shapes;
 pub mod slicer_cache;
-pub mod slicers;
 pub mod slicer_timeline_crud;
+pub mod slicers;
 pub mod sort;
 pub mod sparkline;
 pub mod styles;
@@ -79,9 +79,9 @@ pub mod table;
 pub mod template;
 pub mod theme;
 pub mod threaded_comments;
+pub mod vba_project;
 pub mod views;
 pub mod volatile_dependencies;
-pub mod vba_project;
 pub mod web_extension_bindings;
 pub mod workbook;
 pub mod workbook_metadata;
@@ -147,28 +147,27 @@ pub use data_consolidation::{
 };
 pub use data_validation::{
     DataValidationCollection, DataValidationConformance, DataValidationFormula,
-    DataValidationRange, DataValidationSource,
-    DataValidationSqref, ParsedDataValidation, ParsedDataValidationErrorStyle,
-    ParsedDataValidationImeMode, ParsedDataValidationOperator, ParsedDataValidationType,
-    ValidationListSource, parse_data_validation_collections,
-    replace_data_validation_collections,
-    validate_data_validation_collections, write_data_validation_collections,
+    DataValidationRange, DataValidationSource, DataValidationSqref, ParsedDataValidation,
+    ParsedDataValidationErrorStyle, ParsedDataValidationImeMode, ParsedDataValidationOperator,
+    ParsedDataValidationType, ValidationListSource, parse_data_validation_collections,
+    replace_data_validation_collections, validate_data_validation_collections,
+    write_data_validation_collections,
 };
 pub use external_links::{
     ExternalCell, ExternalCellType, ExternalDdeItem, ExternalDdeLink, ExternalDdeValue,
-    ExternalLinkConformance,
-    ExternalDdeValueType, ExternalDdeValues, ExternalDefinedName, ExternalLinkEntry,
-    ExternalLinkKind, ExternalOleItem, ExternalOleItemSource, ExternalOleLink, ExternalOleTarget,
-    ExternalRow, ExternalSheetData, ExternalWorkbookLink, ExternalWorkbookTarget,
+    ExternalDdeValueType, ExternalDdeValues, ExternalDefinedName, ExternalLinkConformance,
+    ExternalLinkEntry, ExternalLinkKind, ExternalOleItem, ExternalOleItemSource, ExternalOleLink,
+    ExternalOleTarget, ExternalRow, ExternalSheetData, ExternalWorkbookLink,
+    ExternalWorkbookTarget,
 };
 pub use query_table::{
-    add_worksheet_query_table, find_worksheet_query_table, load_worksheet_query_tables,
-    remove_worksheet_query_table, reorder_worksheet_query_tables, replace_worksheet_query_table,
-    update_worksheet_query_table,
     QueryTable, QueryTableConformance, QueryTableExtensionAttribute, QueryTableExtensionList,
     QueryTableField, QueryTableGrowShrinkType, QueryTableIconSet, QueryTableRefresh,
     QueryTableSortBy, QueryTableSortCondition, QueryTableSortMethod, QueryTableSortState,
-    WorksheetQueryTable, parse_query_table, write_query_table,
+    WorksheetQueryTable, add_worksheet_query_table, find_worksheet_query_table,
+    load_worksheet_query_tables, parse_query_table, remove_worksheet_query_table,
+    reorder_worksheet_query_tables, replace_worksheet_query_table, update_worksheet_query_table,
+    write_query_table,
 };
 pub use revisions::{
     RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
@@ -178,9 +177,9 @@ pub use revisions::{
     store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
 };
 pub use scenarios::{
-    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario,
-    WorksheetScenarioConformance, WorksheetScenarioInputCell, WorksheetScenarios,
-    parse_worksheet_scenarios, write_worksheet_scenarios,
+    ScenarioCellReference, ScenarioRangeReference, WorksheetScenario, WorksheetScenarioConformance,
+    WorksheetScenarioInputCell, WorksheetScenarios, parse_worksheet_scenarios,
+    write_worksheet_scenarios,
 };
 // Re-export shared formatting types
 pub use format::{
@@ -201,26 +200,6 @@ pub use named_sheet_view::{
     NamedSheetViewSortConditionKind, NamedSheetViewSortRule, NamedSheetViewSortRules,
     NamedSheetViews, load_worksheet_named_sheet_views, parse_named_sheet_views,
     remove_worksheet_named_sheet_views, store_worksheet_named_sheet_views, write_named_sheet_views,
-};
-pub use xml_maps::{
-    XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema,
-    load_from_package as load_xml_maps_from_package,
-    load_from_package_with_conformance as load_xml_maps_from_package_with_conformance,
-    remove_from_package as remove_xml_maps_from_package,
-    store_in_package as store_xml_maps_in_package,
-};
-pub use volatile_dependencies::{
-    VolatileDependencies, VolatileDependenciesConformance, VolatileDependencyType, VolatileMain,
-    VolatileReference, VolatileTopic, VolatileType, VolatileValue,
-    load_from_package as load_volatile_dependencies_from_package,
-    load_from_package_with_conformance as load_volatile_dependencies_from_package_with_conformance,
-    remove_from_package as remove_volatile_dependencies_from_package,
-    store_in_package as store_volatile_dependencies_in_package,
-};
-pub use web_extension_bindings::{
-    WEB_EXTENSIONS_EXTENSION_URI, WorksheetWebExtensionBinding,
-    parse_worksheet_web_extension_bindings, replace_worksheet_web_extension_bindings,
-    validate_worksheet_web_extension_apprefs, write_worksheet_web_extension_bindings,
 };
 pub use ole_objects::{
     OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker, OleObjectProperties,
@@ -246,6 +225,19 @@ pub use printer_settings::{
     parse_worksheet_printer_settings_reference, store_worksheet_printer_settings,
     write_worksheet_printer_settings_reference,
 };
+pub use shape_geometry::{
+    XlsxAdjustHandle, XlsxAdjustValue, XlsxConnectionSite, XlsxCustomGeometry, XlsxGeometryFormula,
+    XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint, XlsxGeometryRectangle, XlsxPathCommand,
+    XlsxPathFillMode, XlsxPolarAdjustHandle, XlsxXyAdjustHandle,
+};
+pub use shapes::{
+    XlsxAnchoredObject, XlsxCellMarker, XlsxClientData, XlsxConnectionShape, XlsxDrawingObject,
+    XlsxDrawingOleObject, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform,
+    XlsxShape, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeConnectionEnd, XlsxShapeGroup,
+    XlsxShapeNonVisual, XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun, XlsxShapeTextBody,
+    XlsxTextAutofit, XlsxTextDirection, XlsxTextInsets, XlsxTextVerticalAnchor, XlsxTextWrap,
+    XlsxWorksheetShapes, load_shapes, load_worksheet_shapes, parse_drawing_shapes,
+};
 pub use shared_strings::SharedStrings;
 pub use sheet_calculation_properties::{
     WorksheetSheetCalculationProperties, WorksheetSheetCalculationPropertiesConformance,
@@ -270,39 +262,24 @@ pub use sheet_view::{
     WorksheetViewCollection, WorksheetViewDefinition, WorksheetViewExtension, WorksheetViewPane,
     WorksheetViewSelection, WorksheetViewSqref, WorksheetViewType, parse_worksheet_views,
 };
-pub use shape_geometry::{
-    XlsxAdjustHandle, XlsxAdjustValue, XlsxConnectionSite, XlsxCustomGeometry,
-    XlsxGeometryFormula, XlsxGeometryGuide, XlsxGeometryPath, XlsxGeometryPoint,
-    XlsxGeometryRectangle, XlsxPathCommand, XlsxPathFillMode, XlsxPolarAdjustHandle,
-    XlsxXyAdjustHandle,
-};
-pub use shapes::{
-    XlsxAnchoredObject, XlsxCellMarker, XlsxClientData, XlsxConnectionShape, XlsxDrawingObject,
-    XlsxDrawingOleObject, XlsxEditAs, XlsxEmu, XlsxEmuExtent, XlsxEmuOffset, XlsxGroupTransform,
-    XlsxShape, XlsxShapeAnchor, XlsxShapeBodyProperties, XlsxShapeConnectionEnd,
-    XlsxShapeGroup, XlsxShapeNonVisual, XlsxShapeParagraph, XlsxShapePreset, XlsxShapeRun,
-    XlsxShapeTextBody, XlsxTextAutofit, XlsxTextDirection, XlsxTextInsets,
-    XlsxTextVerticalAnchor, XlsxTextWrap, XlsxWorksheetShapes, load_shapes,
-    load_worksheet_shapes, parse_drawing_shapes,
-};
 pub use slicer_cache::{
     SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, SlicerCacheData,
     SlicerCacheDataKind, SlicerCacheDefinition, SlicerCacheExtensionList, SlicerCachePivotTable,
     WorkbookSlicerCache, load_slicer_caches, parse_slicer_cache_definition, store_slicer_cache,
     write_slicer_cache_definition,
 };
+pub use slicer_timeline_crud::{
+    add_slicer, add_slicer_cache, add_timeline, add_timeline_cache, find_slicer, find_slicer_cache,
+    find_timeline, find_timeline_cache, remove_slicer, remove_slicer_cache, remove_timeline,
+    remove_timeline_cache, reorder_slicer_caches, reorder_slicers, reorder_timeline_caches,
+    reorder_timelines, replace_slicer, replace_slicer_cache, replace_timeline,
+    replace_timeline_cache, update_slicer, update_slicer_cache, update_timeline,
+    update_timeline_cache,
+};
 pub use slicers::{
     SLICERS_CONTENT_TYPE, SLICERS_RELATIONSHIP_TYPE, Slicer, SlicerExtensionList, Slicers,
     WorksheetSlicers, load_worksheet_slicers, parse_slicers, store_worksheet_slicers,
     write_slicers,
-};
-pub use slicer_timeline_crud::{
-    add_slicer, add_slicer_cache, add_timeline, add_timeline_cache, find_slicer,
-    find_slicer_cache, find_timeline, find_timeline_cache, remove_slicer,
-    remove_slicer_cache, remove_timeline, remove_timeline_cache, reorder_slicer_caches,
-    reorder_slicers, reorder_timeline_caches, reorder_timelines, replace_slicer,
-    replace_slicer_cache, replace_timeline, replace_timeline_cache, update_slicer,
-    update_slicer_cache, update_timeline, update_timeline_cache,
 };
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use sparkline::{
@@ -313,17 +290,37 @@ pub use styles::{Alignment, Border, BorderStyle, CellStyle, Fill, Font, NumberFo
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction, parse_table_xml,
 };
+pub use vba_project::VbaProject;
 pub use views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
+};
+pub use volatile_dependencies::{
+    VolatileDependencies, VolatileDependenciesConformance, VolatileDependencyType, VolatileMain,
+    VolatileReference, VolatileTopic, VolatileType, VolatileValue,
+    load_from_package as load_volatile_dependencies_from_package,
+    load_from_package_with_conformance as load_volatile_dependencies_from_package_with_conformance,
+    remove_from_package as remove_volatile_dependencies_from_package,
+    store_in_package as store_volatile_dependencies_in_package,
+};
+pub use web_extension_bindings::{
+    WEB_EXTENSIONS_EXTENSION_URI, WorksheetWebExtensionBinding,
+    parse_worksheet_web_extension_bindings, replace_worksheet_web_extension_bindings,
+    validate_worksheet_web_extension_apprefs, write_worksheet_web_extension_bindings,
 };
 pub use workbook::Workbook;
 pub use workbook_protection::{
     WorkbookProtectionMetadata, parse_workbook_protection, write_workbook_protection,
 };
-pub use vba_project::VbaProject;
 pub use worksheet::{
     ArrayFormula, AutoFilter, ColumnInfo, Comment, ConditionalFormatRule, DataValidationRule,
     Hyperlink, PageBreak, PageSetup, RowInfo, Worksheet, WorksheetInfo,
+};
+pub use xml_maps::{
+    XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema,
+    load_from_package as load_xml_maps_from_package,
+    load_from_package_with_conformance as load_xml_maps_from_package_with_conformance,
+    remove_from_package as remove_xml_maps_from_package,
+    store_in_package as store_xml_maps_in_package,
 };
 // Re-export pivot types
 pub use pivot::{

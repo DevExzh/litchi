@@ -4,12 +4,6 @@ pub mod consts;
 /// Shared MS-OFFCRYPTO structures for encryption and rights management.
 pub mod office_crypto;
 
-/// Legacy Office Custom XML Data Storage (`MsoDataStore`).
-pub mod custom_xml_data;
-
-/// Shared MS-OSHARED smart-tag property-bag structures.
-pub mod smart_tags;
-
 /// Shared bounded MS-OVBA project, module, and compression APIs.
 pub mod ovba {
     pub use litchi_cfb::ovba::*;

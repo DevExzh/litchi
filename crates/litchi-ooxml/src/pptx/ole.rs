@@ -4,9 +4,9 @@
 //! parses, opens, activates, renders, executes, or otherwise inspects embedded
 //! object or package payload bytes.
 
-use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::namespace::{is_presentationml_name, relationship_attribute_value};
+use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use litchi_ooxml_common::{MceCapabilities, MceLimits, process_markup_compatibility};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -567,10 +567,11 @@ fn inspect_end(
     depth: usize,
 ) -> Result<()> {
     if let Some(frame) = frames.last_mut() {
-        if let Some(object) = frame.open_object.as_mut() {
-            if object.pic_depth == Some(depth) && is_presentationml_name(namespace, name, b"pic") {
-                object.pic_depth = None;
-            }
+        if let Some(object) = frame.open_object.as_mut()
+            && object.pic_depth == Some(depth)
+            && is_presentationml_name(namespace, name, b"pic")
+        {
+            object.pic_depth = None;
         }
 
         let closes_object = frame

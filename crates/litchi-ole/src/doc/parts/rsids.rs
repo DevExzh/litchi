@@ -43,10 +43,7 @@ impl DocumentRsids {
 
     /// Parse the `PLRSID` from the table stream, or `None` when the document
     /// predates revision-save identifiers.
-    pub fn parse(
-        fib: &FileInformationBlock,
-        table_stream: &[u8],
-    ) -> Result<Option<DocumentRsids>> {
+    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<DocumentRsids>> {
         let Some((offset, length)) = fib.get_table_pointer(PLRSID) else {
             return Ok(None);
         };
@@ -56,9 +53,10 @@ impl DocumentRsids {
         let start = usize::try_from(offset)
             .map_err(|_| corrupted("PLRSID offset does not fit in memory"))?;
         let end = start
-            .checked_add(usize::try_from(length).map_err(|_| {
-                corrupted("PLRSID length does not fit in memory")
-            })?)
+            .checked_add(
+                usize::try_from(length)
+                    .map_err(|_| corrupted("PLRSID length does not fit in memory"))?,
+            )
             .ok_or_else(|| corrupted("PLRSID range overflows"))?;
         let data = table_stream
             .get(start..end)
@@ -86,9 +84,11 @@ impl DocumentRsids {
             return Err(corrupted("PLRSID reserved1 is not 229"));
         }
         let expected = HEADER_LEN
-            .checked_add(count.checked_mul(RSID_LEN).ok_or_else(|| {
-                corrupted("PLRSID identifier count overflows")
-            })?)
+            .checked_add(
+                count
+                    .checked_mul(RSID_LEN)
+                    .ok_or_else(|| corrupted("PLRSID identifier count overflows"))?,
+            )
             .ok_or_else(|| corrupted("PLRSID identifier count overflows"))?;
         if data.len() != expected {
             return Err(corrupted("PLRSID identifier count does not match its size"));

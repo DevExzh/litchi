@@ -577,10 +577,10 @@ impl GraphicStyleRecord {
             (None, true) => {},
             _ => return Err(bad("invalid graphic style identity")),
         }
-        if let Some(value) = &self.parent_style_name {
-            if self.is_default_style || !ncname(value, false) {
-                return Err(bad("invalid parent graphic style name"));
-            }
+        if let Some(value) = &self.parent_style_name
+            && (self.is_default_style || !ncname(value, false))
+        {
+            return Err(bad("invalid parent graphic style name"));
         }
         Ok(())
     }
@@ -1135,9 +1135,10 @@ pub fn set_graphic_style_properties_xml(
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == ElementNs::Style
                     && current.1 == b"graphic-properties"
-                    && active.as_mut().unwrap().properties.replace(span).is_some() {
-                        return Err(bad("duplicate style:graphic-properties"));
-                    }
+                    && active.as_mut().unwrap().properties.replace(span).is_some()
+                {
+                    return Err(bad("duplicate style:graphic-properties"));
+                }
             },
             Ok(Event::End(_)) => {
                 let end = reader.buffer_position() as usize;
