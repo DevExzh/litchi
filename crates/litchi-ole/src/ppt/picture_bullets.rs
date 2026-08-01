@@ -60,8 +60,8 @@ impl PictureBullet {
         &self,
         delay_stream: Option<&[u8]>,
     ) -> Result<litchi_imgconv::Blip<'static>> {
-        let (record, consumed) = crate::escher::EscherRecord::parse(&self.officeart_record, 0)
-            .map_err(|error| {
+        let (record, consumed) =
+            litchi_odraw::Record::parse(&self.officeart_record, 0).map_err(|error| {
                 PptError::Corrupted(format!("Invalid picture-bullet BLIP: {error}"))
             })?;
         if consumed != self.officeart_record.len() {
@@ -69,14 +69,11 @@ impl PictureBullet {
                 "Picture-bullet BLIP was only partially parsed".to_string(),
             ));
         }
-        crate::extractor::ImageExtractor::extract_from_escher_record_with_stream(
-            &record,
-            delay_stream,
-        )
-        .map(|image| image.blip)
-        .map_err(|error| {
-            PptError::Corrupted(format!("Could not decode picture-bullet BLIP: {error}"))
-        })
+        crate::extractor::ImageExtractor::extract_from_record_with_stream(&record, delay_stream)
+            .map(|image| image.blip)
+            .map_err(|error| {
+                PptError::Corrupted(format!("Could not decode picture-bullet BLIP: {error}"))
+            })
     }
 }
 

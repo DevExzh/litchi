@@ -176,9 +176,12 @@ impl EscherTextboxWrapper {
                 "Interactive ClientTextbox has an invalid TextHeaderAtom".to_string(),
             ));
         }
-        let _ = crate::ppt::PowerPointTextType::parse(u32::from_le_bytes(
-            header.data[..4].try_into().unwrap(),
-        ))?;
+        let text_type = header.data.as_slice().try_into().map_err(|_| {
+            PptError::Corrupted(
+                "Interactive ClientTextbox TextHeaderAtom is not four bytes".to_string(),
+            )
+        })?;
+        let _ = crate::ppt::PowerPointTextType::parse(u32::from_le_bytes(text_type))?;
         let text_units = text_units_from_records(records)?;
         PowerPointTextInteraction::parse_records(records, text_units, limits)
     }

@@ -28,21 +28,6 @@ pub mod prop_id {
     // Transform group
     pub const ROTATION: u16 = 0x0004;
 
-    // Protection group
-    pub const LOCK_ROTATION: u16 = 0x0077;
-    pub const LOCK_ASPECT_RATIO: u16 = 0x0078;
-    pub const LOCK_POSITION: u16 = 0x0079;
-    pub const LOCK_AGAINST_SELECT: u16 = 0x007A;
-    pub const LOCK_CROPPING: u16 = 0x007B;
-    pub const LOCK_VERTICES: u16 = 0x007C;
-    pub const LOCK_TEXT: u16 = 0x007D;
-    pub const LOCK_ADJUST_HANDLES: u16 = 0x007E;
-    pub const LOCK_AGGR: u16 = 0x007F;
-
-    // Text group
-    pub const TEXT_ID: u16 = 0x0080;
-    pub const TEXT_LEFT: u16 = 0x0081;
-
     // Geometry group
     pub const GEOM_LEFT: u16 = 0x0140;
     pub const GEOM_TOP: u16 = 0x0141;
@@ -52,21 +37,14 @@ pub mod prop_id {
     pub const VERTICES: u16 = 0x0145;
     pub const SEGMENT_INFO: u16 = 0x0146;
     pub const ADJUST_VALUE: u16 = 0x0147;
-    pub const ADJUST2_VALUE: u16 = 0x0148;
-    pub const ADJUST10_VALUE: u16 = 0x0150;
 
     // Fill style (MS-ODRAW section 2.3.7)
     pub const FILL_TYPE: u16 = 0x0180;
     pub const FILL_COLOR: u16 = 0x0181;
     pub const FILL_OPACITY: u16 = 0x0182;
     pub const FILL_BACK_COLOR: u16 = 0x0183;
-    pub const FILL_BACK_OPACITY: u16 = 0x0184;
     pub const FILL_BLIP: u16 = 0x4186;
-    pub const FILL_WIDTH: u16 = 0x0189; // fillWidth for pattern fills
-    pub const FILL_HEIGHT: u16 = 0x018A; // fillHeight for pattern fills
     pub const FILL_ANGLE: u16 = 0x018B; // fillAngle for gradients (degrees * 65536)
-    pub const FILL_FOCUS: u16 = 0x018C; // fillFocus for gradients (-100 to 100)
-    pub const FILL_SHADE_TYPE: u16 = 0x019C; // fillShadeType (0=linear, 1=gamma, etc.)
     pub const FILL_RECT_RIGHT: u16 = 0x0193; // fillRectRight per MS-ODRAW
     pub const FILL_RECT_BOTTOM: u16 = 0x0194; // fillRectBottom per MS-ODRAW
     pub const NO_FILL_HIT_TEST: u16 = 0x01BF;
@@ -74,7 +52,6 @@ pub mod prop_id {
     // Line style
     pub const LINE_COLOR: u16 = 0x01C0;
     pub const LINE_OPACITY: u16 = 0x01C1;
-    pub const LINE_BACK_COLOR: u16 = 0x01C2;
     pub const LINE_WIDTH: u16 = 0x01CB;
     pub const LINE_STYLE: u16 = 0x01CD;
     pub const LINE_DASH_STYLE: u16 = 0x01CE;
@@ -346,29 +323,6 @@ pub const BG_SHAPE_PROPERTIES: [EscherProperty; 8] = [
 ];
 
 // =============================================================================
-// Client Anchor - MS-ODRAW 2.2.46
-// =============================================================================
-
-/// Client anchor (8 bytes for PPT)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
-#[repr(C)]
-pub struct ClientAnchor {
-    pub left: u16,
-    pub top: u16,
-    pub right: u16,
-    pub bottom: u16,
-}
-
-impl ClientAnchor {
-    pub const ZERO: Self = Self {
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-    };
-}
-
-// =============================================================================
 // PPT Record Types
 // =============================================================================
 
@@ -376,29 +330,6 @@ impl ClientAnchor {
 pub mod ppt_record_type {
     /// OEPlaceholderAtom
     pub const OE_PLACEHOLDER_ATOM: u16 = 0x0BC3;
-}
-
-/// OEPlaceholderAtom data (8 bytes)
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
-#[repr(C)]
-pub struct OEPlaceholderAtom {
-    /// Placement ID
-    pub placement_id: u32,
-    /// Placeholder type
-    pub placeholder_type: u8,
-    /// Placeholder size
-    pub placeholder_size: u8,
-    /// Unused
-    pub unused: u16,
-}
-
-impl OEPlaceholderAtom {
-    pub const BACKGROUND: Self = Self {
-        placement_id: 0,
-        placeholder_type: 0,
-        placeholder_size: 0,
-        unused: 0,
-    };
 }
 
 /// Escher record builder
@@ -599,108 +530,6 @@ pub fn create_dgg_container_with_blips(
     let mut colors = EscherBuilder::new(header_version::SIMPLE, 4, record_type::SPLIT_MENU_COLORS);
     colors.add_data(SplitMenuColors::DEFAULT.as_bytes());
     container.add_data(&colors.build()?);
-
-    container.build()
-}
-
-/// Create a DgContainer (Drawing Container) for a slide
-pub fn create_dg_container(drawing_id: u32, shape_count: u32) -> Result<Vec<u8>, PptError> {
-    let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::DG_CONTAINER);
-
-    // Add DG record (instance = drawing_id)
-    let mut dg = EscherBuilder::new(header_version::DG, drawing_id as u16, record_type::DG);
-    let total_shapes = shape_count.saturating_add(2); // +group +background
-    let dg_data = EscherDgData::new(total_shapes, drawing_id);
-    dg.add_data(dg_data.as_bytes());
-    container.add_data(&dg.build()?);
-
-    // SpgrContainer
-    let mut spgr_container =
-        EscherBuilder::new(header_version::CONTAINER, 0, record_type::SPGR_CONTAINER);
-
-    // Group patriarch SpContainer
-    let mut group_sp_container =
-        EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
-
-    // Spgr (group bbox = all zeros)
-    let mut spgr = EscherBuilder::new(header_version::SPGR, 0, record_type::SPGR);
-    spgr.add_data(EscherSpgrData::ZERO.as_bytes());
-    group_sp_container.add_data(&spgr.build()?);
-
-    // Sp (group shape)
-    let group_spid = drawing_id << 10;
-    let mut sp = EscherBuilder::new(
-        header_version::SP,
-        shape_type::NOT_PRIMITIVE,
-        record_type::SP,
-    );
-    sp.add_data(EscherSpData::group_patriarch(group_spid).as_bytes());
-    group_sp_container.add_data(&sp.build()?);
-
-    spgr_container.add_data(&group_sp_container.build()?);
-
-    // Add SpgrContainer to DgContainer first
-    container.add_data(&spgr_container.build()?);
-
-    // Background shape container - added to DgContainer OUTSIDE SpgrContainer (per POI)
-    let mut bg_sp_container =
-        EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
-
-    // Background EscherSp
-    let bg_spid = group_spid + 1;
-    let mut bg_sp = EscherBuilder::new(header_version::SP, shape_type::RECTANGLE, record_type::SP);
-    bg_sp.add_data(EscherSpData::background(bg_spid).as_bytes());
-    bg_sp_container.add_data(&bg_sp.build()?);
-
-    // Background EscherOpt properties (per POI PPDrawing.create())
-    let mut opt = EscherBuilder::new(
-        header_version::OPT,
-        BG_SHAPE_PROPERTIES.len() as u16,
-        record_type::OPT,
-    );
-    for prop in &BG_SHAPE_PROPERTIES {
-        opt.add_data(prop.as_bytes());
-    }
-    bg_sp_container.add_data(&opt.build()?);
-
-    // NOTE: Per POI's PPDrawing.create(), background SpContainer has NO ClientAnchor or ClientData
-    // Only Sp + Opt records are present
-
-    // Add background SpContainer to DgContainer (NOT to SpgrContainer)
-    container.add_data(&bg_sp_container.build()?);
-
-    container.build()
-}
-
-/// Create a shape container (spContainer)
-pub fn create_shape_container(
-    shape_id: u32,
-    stype: u16,
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
-) -> Result<Vec<u8>, PptError> {
-    let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
-
-    // Add SP (Shape) record
-    let mut sp = EscherBuilder::new(header_version::SP, stype, record_type::SP);
-    let sp_data =
-        EscherSpData::with_flags(shape_id, ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT);
-    sp.add_data(sp_data.as_bytes());
-    container.add_data(&sp.build()?);
-
-    // Add client anchor (position and size)
-    let mut anchor = EscherBuilder::new(header_version::SIMPLE, 0, record_type::CLIENT_ANCHOR);
-    // Extended anchor format with position info
-    let anchor_data = ChildAnchor {
-        left: x,
-        top: y,
-        right: x + width,
-        bottom: y + height,
-    };
-    anchor.add_data(anchor_data.as_bytes());
-    container.add_data(&anchor.build()?);
 
     container.build()
 }
@@ -1776,11 +1605,13 @@ fn append_text_interactions(
 mod tests {
     use super::super::shapes::shape_type;
     use super::*;
-    use crate::escher::{EscherParser, EscherProperties, EscherRecordType};
+    use crate::escher::{parser::EscherParser, types::EscherRecordType};
     use crate::ppt::shapes::geometry::{
         extract_geometry_rect, extract_segment_info, extract_shape_path, extract_vertices,
     };
     use crate::ppt::writer::text_format::{Paragraph, TextRun};
+    use litchi_odraw::prop::Props;
+    use litchi_odraw::{Container, Record, RecordKind};
 
     #[test]
     fn test_escher_header() {
@@ -2016,21 +1847,6 @@ mod tests {
     }
 
     #[test]
-    fn test_create_shape_container() {
-        let container = create_shape_container(
-            0x0401,
-            shape_type::RECTANGLE,
-            100000,
-            100000,
-            500000,
-            300000,
-        );
-        assert!(container.is_ok());
-        let data = container.unwrap();
-        assert!(!data.is_empty());
-    }
-
-    #[test]
     fn test_build_shape_properties_rectangle() {
         let shape = UserShapeData {
             shape_type: shape_type::RECTANGLE,
@@ -2136,7 +1952,7 @@ mod tests {
             .iter()
             .filter_map(|property| {
                 let id = { property.prop_id };
-                (prop_id::ADJUST_VALUE..=prop_id::ADJUST10_VALUE)
+                (prop_id::ADJUST_VALUE..=0x0150)
                     .contains(&id)
                     .then_some((id, { property.value }))
             })
@@ -2616,12 +2432,14 @@ mod tests {
         };
 
         let bytes = create_user_shape_container(45, &shape).unwrap();
-        let root = EscherParser::new(&bytes)
-            .root_container()
-            .expect("shape container")
-            .unwrap();
-        let opt = root.find_child(EscherRecordType::Opt).expect("OPT record");
-        let properties = EscherProperties::from_opt_record(&opt);
+        let (root, consumed) = Record::parse(&bytes, 0).expect("shape container record");
+        assert_eq!(consumed, bytes.len());
+        let root = Container::try_new(root).expect("shape container");
+        let opt = root
+            .find(RecordKind::Opt)
+            .expect("valid shape container")
+            .expect("OPT record");
+        let properties = Props::parse(&opt).expect("valid OPT properties");
 
         assert_eq!(
             extract_geometry_rect(&properties),

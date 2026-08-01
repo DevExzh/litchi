@@ -99,6 +99,13 @@
 /// # }
 /// ```
 // Module declarations
+#[cfg(any(
+    feature = "ole",
+    feature = "ooxml",
+    feature = "odf",
+    feature = "rtf",
+    feature = "iwa"
+))]
 mod writer;
 
 // Document and presentation markdown implementations are only available when their respective features are enabled

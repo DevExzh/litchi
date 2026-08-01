@@ -5,12 +5,12 @@
 //! re-opens it with the crate's own reader and shape extraction APIs.
 #![cfg(feature = "imgconv")]
 
+use litchi_odraw::shape::Kind;
 use litchi_ole::doc::shapes::extract_drawing_shapes;
 use litchi_ole::doc::writer::{
     DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition,
 };
 use litchi_ole::doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
-use litchi_ole::escher::EscherShapeType;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
 
@@ -184,7 +184,7 @@ fn primitive_shapes_extract_with_type_geometry_and_colors() {
 
     let picture = shapes
         .iter()
-        .find(|shape| shape.shape_type == EscherShapeType::Picture)
+        .find(|shape| shape.shape_type == Kind::Picture)
         .expect("floating picture frame must be extracted");
     assert_eq!(picture.shape_id, 1026);
 
@@ -192,7 +192,7 @@ fn primitive_shapes_extract_with_type_geometry_and_colors() {
         .iter()
         .find(|shape| shape.shape_id == RECTANGLE_SPID)
         .expect("rectangle must be extracted");
-    assert_eq!(rectangle.shape_type, EscherShapeType::Rectangle);
+    assert_eq!(rectangle.shape_type, Kind::Rectangle);
     assert_eq!(rectangle.native_shape_type, Some(0x0001));
     assert_eq!(rectangle.fill_color, Some((0xFF, 0x00, 0x00)));
     assert_eq!(rectangle.line_color, Some((0x00, 0x00, 0xFF)));
@@ -201,7 +201,7 @@ fn primitive_shapes_extract_with_type_geometry_and_colors() {
         .iter()
         .find(|shape| shape.shape_id == ELLIPSE_SPID)
         .expect("ellipse must be extracted");
-    assert_eq!(ellipse.shape_type, EscherShapeType::Ellipse);
+    assert_eq!(ellipse.shape_type, Kind::Ellipse);
     assert_eq!(ellipse.native_shape_type, Some(0x0003));
     assert_eq!(ellipse.fill_color, None, "ellipse has no fill");
     assert_eq!(ellipse.line_color, Some((0x00, 0x80, 0x00)));
@@ -232,11 +232,7 @@ fn genuine_word_floating_pictures_extract_from_dgg_info() {
     let mut spids: Vec<u32> = shapes.iter().map(|shape| shape.shape_id).collect();
     spids.sort_unstable();
     assert_eq!(spids, vec![1028, 1029, 1030, 1031]);
-    assert!(
-        shapes
-            .iter()
-            .all(|shape| shape.shape_type == EscherShapeType::Picture)
-    );
+    assert!(shapes.iter().all(|shape| shape.shape_type == Kind::Picture));
 }
 
 #[test]
@@ -262,7 +258,7 @@ fn document_with_only_shapes_has_no_picture_data() {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     assert_eq!(shapes.len(), 1);
-    assert_eq!(shapes[0].shape_type, EscherShapeType::Rectangle);
+    assert_eq!(shapes[0].shape_type, Kind::Rectangle);
     // Default style: no fill, black line.
     assert_eq!(shapes[0].fill_color, None);
     assert_eq!(shapes[0].line_color, Some((0, 0, 0)));

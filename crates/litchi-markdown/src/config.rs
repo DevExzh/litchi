@@ -316,8 +316,8 @@ pub enum ScriptStyle {
     /// Use HTML tags: `<sup>` and `<sub>`.
     ///
     /// Examples:
-    /// - Superscript: x<sup>2</sup>
-    /// - Subscript: H<sub>2</sub>O
+    /// - Superscript: `x<sup>2</sup>`
+    /// - Subscript: `H<sub>2</sub>O`
     Html,
 
     /// Use Unicode superscript/subscript characters where possible.

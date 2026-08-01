@@ -6,6 +6,7 @@ use super::factory::SlideData;
 use super::notes::{NoteDescriptor, SpeakerNotes};
 use crate::consts::PptRecordType;
 use crate::ppt::animation::{ShapeAnimation, SlideAnimationExtension};
+use crate::ppt::odraw::{FrameKind, ShapeExt as _};
 use crate::ppt::slide_extension::PowerPoint12SlideExtension;
 use crate::ppt::slide_round_trip::PowerPoint12SlideRoundTripMetadata;
 use crate::ppt::slide_sync::PowerPointSlideSyncInfo;
@@ -129,20 +130,14 @@ impl<'doc> Slide<'doc> {
         else {
             return Ok(Vec::new());
         };
-        let escher_shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let escher_shapes = crate::ppt::odraw::parse(&ppdrawing.data)?;
         let mut result = Vec::new();
         let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
             let interactions = shape.interactions_with_limits(limits)?;
             if !interactions.is_empty() {
-                let shape_id = shape.shape_id().ok_or_else(|| {
-                    PptError::Corrupted(
-                        "Interactive OfficeArt shape has no shape identifier".to_string(),
-                    )
-                })?;
                 result.push(crate::ppt::PowerPointShapeInteractionEntry {
-                    shape_id,
+                    shape_id: shape.id(),
                     interactions,
                 });
             }
@@ -171,20 +166,14 @@ impl<'doc> Slide<'doc> {
         else {
             return Ok(Vec::new());
         };
-        let escher_shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let escher_shapes = crate::ppt::odraw::parse(&ppdrawing.data)?;
         let mut result = Vec::new();
         let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
             let interactions = shape.text_interactions_with_limits(limits)?;
             if !interactions.is_empty() {
-                let shape_id = shape.shape_id().ok_or_else(|| {
-                    PptError::Corrupted(
-                        "Text-interactive OfficeArt shape has no shape identifier".to_string(),
-                    )
-                })?;
                 result.push(crate::ppt::PowerPointShapeTextInteractionEntry {
-                    shape_id,
+                    shape_id: shape.id(),
                     interactions,
                 });
             }
@@ -224,15 +213,12 @@ impl<'doc> Slide<'doc> {
         else {
             return Ok(Vec::new());
         };
-        let escher_shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let escher_shapes = crate::ppt::odraw::parse(&ppdrawing.data)?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
-            if let Some(programmable_tags) =
-                shape.extract_shape_programmable_tags_with_limits(limits)?
-            {
+            if let Some(programmable_tags) = shape.programmable_tags_with_limits(limits)? {
                 result.push(crate::ppt::PowerPointShapeProgrammableTagsEntry {
-                    shape_id: shape.shape_id().unwrap_or(0),
+                    shape_id: shape.id(),
                     programmable_tags,
                 });
             }
@@ -275,13 +261,12 @@ impl<'doc> Slide<'doc> {
         else {
             return Ok(Vec::new());
         };
-        let escher_shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let escher_shapes = crate::ppt::odraw::parse(&ppdrawing.data)?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
-            if let Some(projection) = shape.shape_flags_with_limits(limits)? {
+            if let Some(projection) = shape.ppt_flags_with(limits)? {
                 result.push(crate::ppt::PowerPointShapeFlagEntry {
-                    shape_id: shape.shape_id().unwrap_or(0),
+                    shape_id: shape.id(),
                     projection,
                 });
             }
@@ -305,8 +290,7 @@ impl<'doc> Slide<'doc> {
         else {
             return Ok(Vec::new());
         };
-        let escher_shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let escher_shapes = crate::ppt::odraw::parse(&ppdrawing.data)?;
         let mut positions = std::collections::HashSet::new();
         let mut result = Vec::new();
         for shape in &escher_shapes {
@@ -320,7 +304,7 @@ impl<'doc> Slide<'doc> {
                     ));
                 }
                 result.push(crate::ppt::PowerPointPlaceholderEntry {
-                    shape_id: shape.shape_id().unwrap_or(0),
+                    shape_id: shape.id(),
                     placeholder,
                 });
             }
@@ -350,29 +334,19 @@ impl<'doc> Slide<'doc> {
         let Some(ppdrawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let shapes = crate::ppt::odraw::parse(&ppdrawing.data)?;
         let mut animations = Vec::new();
-        for shape in &shapes {
-            Self::collect_animations(shape, &mut animations)?;
+        let mut pending = shapes.iter().rev().collect::<Vec<_>>();
+        while let Some(shape) = pending.pop() {
+            if let Some(animation) = shape.animation()? {
+                animations.push(ShapeAnimation {
+                    shape_id: shape.id(),
+                    animation,
+                });
+            }
+            pending.extend(shape.children().iter().rev());
         }
         Ok(animations)
-    }
-
-    fn collect_animations(
-        shape: &super::super::escher::EscherShape<'_>,
-        animations: &mut Vec<ShapeAnimation>,
-    ) -> Result<()> {
-        if let Some(animation) = shape.animation_info()? {
-            animations.push(ShapeAnimation {
-                shape_id: shape.shape_id().unwrap_or(0),
-                animation,
-            });
-        }
-        for child in shape.children() {
-            Self::collect_animations(child, animations)?;
-        }
-        Ok(())
     }
 
     /// Return inert PowerPoint 2002 timing and build metadata from `___PPT10`.
@@ -478,13 +452,12 @@ impl<'doc> Slide<'doc> {
         };
 
         // Extract Escher shapes from PPDrawing data
-        let escher_shapes =
-            super::super::escher::EscherShapeFactory::extract_shapes_from_drawing(&ppdrawing.data)?;
+        let escher_shapes = crate::ppt::odraw::parse(&ppdrawing.data)?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());
         for escher_shape in &escher_shapes {
-            if let Some(shape) = Self::convert_escher_to_shape_enum(escher_shape)? {
+            if let Some(shape) = Self::convert_odraw_to_shape_enum(escher_shape)? {
                 shapes.push(shape);
             }
         }
@@ -498,18 +471,32 @@ impl<'doc> Slide<'doc> {
     ///
     /// - Direct property access (no allocations)
     /// - Pattern matching for type dispatch
-    pub(crate) fn convert_escher_to_shape_enum(
-        escher_shape: &super::super::escher::EscherShape<'_>,
+    pub(crate) fn convert_odraw_to_shape_enum(
+        odraw_shape: &litchi_odraw::shape::Shape<'_>,
     ) -> Result<Option<ShapeEnum<'static>>> {
-        use super::super::escher::EscherShapeType;
+        Self::convert_odraw_shape(odraw_shape, 0)
+    }
+
+    fn convert_odraw_shape(
+        escher_shape: &litchi_odraw::shape::Shape<'_>,
+        depth: usize,
+    ) -> Result<Option<ShapeEnum<'static>>> {
+        const MAX_SHAPE_DEPTH: usize = 256;
+        if depth >= MAX_SHAPE_DEPTH {
+            return Err(PptError::Corrupted(
+                "OfficeArt shape tree exceeds the PPT nesting limit".to_string(),
+            ));
+        }
+
         use super::super::shapes::*;
         use crate::ppt::slide_extension::PowerPointHeaderFooterPlaceholder;
+        use litchi_odraw::shape::Kind;
 
-        let shape_id = escher_shape.shape_id().unwrap_or(0);
-        let anchor = escher_shape.anchor();
+        let shape_id = escher_shape.id();
+        let anchor = crate::ppt::odraw::anchor(escher_shape)?;
         let powerpoint12_shape_metadata = escher_shape.powerpoint12_shape_metadata()?;
 
-        if let Some(placeholder_info) = escher_shape.placeholder() {
+        if let Some(placeholder_info) = escher_shape.placeholder()? {
             let mut properties = shape::ShapeProperties {
                 id: shape_id,
                 shape_type: shape::ShapeType::Placeholder,
@@ -517,18 +504,18 @@ impl<'doc> Slide<'doc> {
                 ..Default::default()
             };
             if let Some(a) = anchor {
-                properties.x = a.left;
-                properties.y = a.top;
+                properties.x = a.left();
+                properties.y = a.top();
                 properties.width = a.width();
                 properties.height = a.height();
             }
 
             return Ok(Some(ShapeEnum::Placeholder(Placeholder::from_parsed(
                 properties,
-                PlaceholderType::from_native_slide(placeholder_info.placeholder_type),
-                placeholder_info.size,
-                u16::try_from(placeholder_info.position).ok(),
-                escher_shape.text(),
+                PlaceholderType::from(placeholder_info.kind),
+                PlaceholderSize::from(placeholder_info.size),
+                placeholder_info.position,
+                escher_shape.text()?,
             ))));
         }
 
@@ -548,24 +535,22 @@ impl<'doc> Slide<'doc> {
                 ..Default::default()
             };
             if let Some(a) = anchor {
-                properties.x = a.left;
-                properties.y = a.top;
+                properties.x = a.left();
+                properties.y = a.top();
                 properties.width = a.width();
                 properties.height = a.height();
             }
             return Ok(Some(ShapeEnum::Placeholder(Placeholder::from_parsed(
                 properties,
                 placeholder_type,
-                1,
+                PlaceholderSize::Half,
                 None,
-                escher_shape.text(),
+                escher_shape.text()?,
             ))));
         }
 
-        match escher_shape.shape_type() {
-            EscherShapeType::Placeholder => Ok(None),
-
-            EscherShapeType::TextBox => {
+        match escher_shape.kind() {
+            Kind::TextBox => {
                 // Create TextBox with proper properties
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
@@ -576,47 +561,42 @@ impl<'doc> Slide<'doc> {
 
                 // Set coordinates if anchor exists
                 if let Some(a) = anchor {
-                    properties.x = a.left;
-                    properties.y = a.top;
+                    properties.x = a.left();
+                    properties.y = a.top();
                     properties.width = a.width();
                     properties.height = a.height();
                 }
 
-                // Extract text from shape
-                let text = escher_shape.text().unwrap_or_default();
-
-                let mut textbox = TextBox::new(properties, Vec::new());
-                if !text.is_empty() {
-                    textbox.set_text(text);
-                }
-
-                Ok(Some(ShapeEnum::TextBox(textbox)))
+                Ok(Some(ShapeEnum::TextBox(TextBox::from_odraw(
+                    properties,
+                    escher_shape,
+                )?)))
             },
 
-            EscherShapeType::Picture | EscherShapeType::Object | EscherShapeType::Media => {
+            Kind::Picture => {
                 // Create PictureShape
                 let mut picture = crate::ppt::shapes::PictureShape::new(shape_id);
 
-                picture.set_frame_kind(match escher_shape.shape_type() {
-                    EscherShapeType::Object => PictureFrameKind::OleObject,
-                    EscherShapeType::Media => PictureFrameKind::Media,
-                    _ => PictureFrameKind::Picture,
+                picture.set_frame_kind(match escher_shape.frame_kind()? {
+                    FrameKind::Object => PictureFrameKind::OleObject,
+                    FrameKind::Media => PictureFrameKind::Media,
+                    FrameKind::Picture => PictureFrameKind::Picture,
                 });
 
-                if let Some(external_object_id) = escher_shape.external_object_id() {
+                if let Some(external_object_id) = escher_shape.external_object_id()? {
                     picture.set_external_object_id(external_object_id);
                 }
 
                 if let Some(a) = anchor {
-                    picture.set_bounds(a.left, a.top, a.width(), a.height());
+                    picture.set_bounds(a.left(), a.top(), a.width(), a.height());
                 }
                 picture.properties_mut().powerpoint12_shape_metadata = powerpoint12_shape_metadata;
 
                 // Extract the one-based BLIP store index from the pib property.
-                use super::super::escher::EscherPropertyId;
+                use litchi_odraw::prop::Id;
                 if let Some(blip_id) = escher_shape
-                    .properties()
-                    .get_int(EscherPropertyId::BlipToDisplay)
+                    .props()
+                    .get_int(Id::BlipToDisplay)
                     .and_then(|value| u32::try_from(value).ok())
                     .filter(|value| *value != 0)
                 {
@@ -626,25 +606,34 @@ impl<'doc> Slide<'doc> {
                 Ok(Some(ShapeEnum::Picture(picture)))
             },
 
-            EscherShapeType::Line => {
+            Kind::Line | Kind::Connector => {
                 // Create LineShape
                 if let Some(a) = anchor {
-                    let mut line =
-                        shape_enum::LineShape::new(shape_id, a.left, a.top, a.right, a.bottom);
+                    let mut line = if escher_shape.kind() == Kind::Connector {
+                        shape_enum::LineShape::connector(
+                            shape_id,
+                            a.left(),
+                            a.top(),
+                            a.right(),
+                            a.bottom(),
+                        )
+                    } else {
+                        shape_enum::LineShape::new(
+                            shape_id,
+                            a.left(),
+                            a.top(),
+                            a.right(),
+                            a.bottom(),
+                        )
+                    };
 
                     // Extract line properties
-                    use super::super::escher::EscherPropertyId;
-                    if let Some(width) = escher_shape
-                        .properties()
-                        .get_int(EscherPropertyId::LineWidth)
-                    {
+                    use litchi_odraw::prop::Id;
+                    if let Some(width) = escher_shape.props().get_int(Id::LineWidth) {
                         line.set_width(width);
                     }
-                    if let Some(color) = escher_shape
-                        .properties()
-                        .get_color(EscherPropertyId::LineColor)
-                    {
-                        line.set_color(color);
+                    if let Some(color) = escher_shape.props().get_color(Id::LineColor) {
+                        line.set_color(color.raw());
                     }
                     line.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
@@ -654,19 +643,19 @@ impl<'doc> Slide<'doc> {
                 }
             },
 
-            EscherShapeType::Group => {
+            Kind::Group => {
                 // Create GroupShape and parse children recursively
                 let mut group = shape_enum::GroupShape::new(shape_id);
 
                 if let Some(a) = anchor {
-                    group.set_bounds(a.left, a.top, a.width(), a.height());
+                    group.set_bounds(a.left(), a.top(), a.width(), a.height());
                 }
                 group.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
                 // Recursively parse child shapes
                 // This follows Apache POI's approach: iterate child shapes and convert them
                 for child_escher in escher_shape.children() {
-                    if let Some(child_shape) = Self::convert_escher_to_shape_enum(child_escher)? {
+                    if let Some(child_shape) = Self::convert_odraw_shape(child_escher, depth + 1)? {
                         group.add_child(child_shape);
                     }
                 }
@@ -674,26 +663,27 @@ impl<'doc> Slide<'doc> {
                 Ok(Some(ShapeEnum::Group(group)))
             },
 
-            EscherShapeType::Table => {
+            Kind::Table => {
                 use std::collections::BTreeSet;
 
-                let cells: Vec<_> = escher_shape
-                    .children()
-                    .iter()
-                    .filter(|child| {
-                        matches!(
-                            child.shape_type(),
-                            EscherShapeType::Rectangle
-                                | EscherShapeType::TextBox
-                                | EscherShapeType::AutoShape
-                        )
-                    })
-                    .filter_map(|child| child.anchor().map(|anchor| (child, anchor)))
-                    .filter(|(_, anchor)| anchor.width() > 0 && anchor.height() > 0)
-                    .collect();
+                let mut cells = Vec::new();
+                for child in escher_shape.children().iter().filter(|child| {
+                    matches!(
+                        child.kind(),
+                        Kind::Rectangle | Kind::TextBox | Kind::AutoShape
+                    )
+                }) {
+                    if let Some(anchor) = crate::ppt::odraw::anchor(child)?
+                        && anchor.width() > 0
+                        && anchor.height() > 0
+                    {
+                        cells.push((child, anchor));
+                    }
+                }
 
-                let columns: BTreeSet<i32> = cells.iter().map(|(_, anchor)| anchor.left).collect();
-                let rows: BTreeSet<i32> = cells.iter().map(|(_, anchor)| anchor.top).collect();
+                let columns: BTreeSet<i32> =
+                    cells.iter().map(|(_, anchor)| anchor.left()).collect();
+                let rows: BTreeSet<i32> = cells.iter().map(|(_, anchor)| anchor.top()).collect();
                 let column_positions: Vec<_> = columns.into_iter().collect();
                 let row_positions: Vec<_> = rows.into_iter().collect();
 
@@ -703,27 +693,24 @@ impl<'doc> Slide<'doc> {
                     column_positions.len(),
                 );
                 if let Some(a) = anchor {
-                    table.set_bounds(a.left, a.top, a.width(), a.height());
+                    table.set_bounds(a.left(), a.top(), a.width(), a.height());
                 }
                 table.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
                 for (cell, cell_anchor) in cells {
-                    let Ok(row) = row_positions.binary_search(&cell_anchor.top) else {
+                    let Ok(row) = row_positions.binary_search(&cell_anchor.top()) else {
                         continue;
                     };
-                    let Ok(column) = column_positions.binary_search(&cell_anchor.left) else {
+                    let Ok(column) = column_positions.binary_search(&cell_anchor.left()) else {
                         continue;
                     };
-                    table.set_cell_text(row, column, cell.text().unwrap_or_default());
+                    table.set_cell_text(row, column, cell.text()?.unwrap_or_default());
                 }
 
                 Ok(Some(ShapeEnum::Table(table)))
             },
 
-            EscherShapeType::Rectangle
-            | EscherShapeType::Ellipse
-            | EscherShapeType::Polygon
-            | EscherShapeType::AutoShape => {
+            Kind::Rectangle | Kind::Ellipse | Kind::Callout | Kind::Polygon | Kind::AutoShape => {
                 // Create AutoShape
                 let mut properties = shape::ShapeProperties {
                     id: shape_id,
@@ -733,18 +720,18 @@ impl<'doc> Slide<'doc> {
                 };
 
                 if let Some(a) = anchor {
-                    properties.x = a.left;
-                    properties.y = a.top;
+                    properties.x = a.left();
+                    properties.y = a.top();
                     properties.width = a.width();
                     properties.height = a.height();
                 }
 
-                let mut autoshape = AutoShape::from_escher(
+                let mut autoshape = AutoShape::from_odraw(
                     properties,
-                    escher_shape.native_shape_type(),
-                    escher_shape.properties(),
+                    escher_shape.native_kind().raw(),
+                    escher_shape.props(),
                 );
-                if let Some(text) = escher_shape.text().filter(|text| !text.is_empty()) {
+                if let Some(text) = escher_shape.text()?.filter(|text| !text.is_empty()) {
                     autoshape.set_text(text);
                 }
                 Ok(Some(ShapeEnum::AutoShape(autoshape)))
@@ -761,11 +748,10 @@ impl<'doc> Slide<'doc> {
 
         // 1. Extract text from direct slide records (TextCharsAtom, etc.)
         // Note: record.extract_text() already recursively processes all children
-        if let Ok(record_text) = self.record.extract_text() {
-            let trimmed = record_text.trim();
-            if !trimmed.is_empty() {
-                text_parts.push(trimmed.to_string());
-            }
+        let record_text = self.record.extract_text()?;
+        let trimmed = record_text.trim();
+        if !trimmed.is_empty() {
+            text_parts.push(trimmed.to_string());
         }
 
         // 2. Extract text from Escher/PPDrawing (shapes, text boxes)
@@ -773,8 +759,8 @@ impl<'doc> Slide<'doc> {
         if let Some(ppdrawing) = self
             .record
             .find_child(crate::consts::PptRecordType::PPDrawing)
-            && let Ok(escher_text) = super::super::escher::extract_text_from_escher(&ppdrawing.data)
         {
+            let escher_text = crate::ppt::odraw::text_from_drawing(&ppdrawing.data)?;
             let trimmed = escher_text.trim();
             if !trimmed.is_empty() {
                 text_parts.push(trimmed.to_string());
@@ -920,18 +906,32 @@ mod tests {
     use crate::ppt::records::PptRecord;
     use crate::ppt::slide::SlideData;
 
+    const ROOT_SHAPE_FLAGS: u32 = 0x0A00;
+    const CHILD_SHAPE_FLAGS: u32 = 0x0A02;
+
+    fn drawing(children: &[u8]) -> Vec<u8> {
+        use crate::escher::writer::{record_type, write_atom, write_container};
+
+        let mut body = Vec::new();
+        write_atom(&mut body, 0, 0, record_type::DG, &[0; 8]).unwrap();
+        body.extend_from_slice(children);
+        let mut drawing = Vec::new();
+        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &body).unwrap();
+        drawing
+    }
+
     fn create_frame_escher_drawing(
         blip_id: u32,
         interactive_action: Option<u8>,
         external_object_id: Option<u32>,
     ) -> Vec<u8> {
         use crate::escher::writer::{
-            PropertyBuilder, ShapeBuilder, record_type, write_atom, write_client_anchor,
-            write_container,
+            PropertyBuilder, ShapeBuilder, record_type, write_atom, write_container,
         };
 
         let mut shape_children = Vec::new();
         ShapeBuilder::new(75, 42)
+            .with_flags(ROOT_SHAPE_FLAGS)
             .write(&mut shape_children)
             .unwrap();
         let mut properties = PropertyBuilder::new();
@@ -976,9 +976,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
-        drawing
+        drawing(&shape_container)
     }
 
     fn create_picture_escher_drawing(blip_id: u32) -> Vec<u8> {
@@ -987,12 +985,12 @@ mod tests {
 
     fn create_autoshape_escher_drawing() -> Vec<u8> {
         use crate::escher::writer::{
-            PropertyBuilder, ShapeBuilder, record_type, write_atom, write_client_anchor,
-            write_container,
+            PropertyBuilder, ShapeBuilder, record_type, write_atom, write_container,
         };
 
         let mut shape_children = Vec::new();
         ShapeBuilder::new(13, 44)
+            .with_flags(ROOT_SHAPE_FLAGS)
             .write(&mut shape_children)
             .unwrap();
         let mut properties = PropertyBuilder::new();
@@ -1007,9 +1005,8 @@ mod tests {
             .collect();
         let mut embedded_text = Vec::new();
         write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
-        write_atom(
+        write_container(
             &mut shape_children,
-            0,
             0,
             record_type::CLIENT_TEXTBOX,
             &embedded_text,
@@ -1025,18 +1022,17 @@ mod tests {
         )
         .unwrap();
 
-        let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
-        drawing
+        drawing(&shape_container)
     }
 
     fn create_freeform_escher_drawing() -> Vec<u8> {
-        use crate::escher::writer::{
-            PropertyBuilder, ShapeBuilder, record_type, write_client_anchor, write_container,
-        };
+        use crate::escher::writer::{PropertyBuilder, ShapeBuilder, record_type, write_container};
 
         let mut shape_children = Vec::new();
-        ShapeBuilder::new(0, 45).write(&mut shape_children).unwrap();
+        ShapeBuilder::new(0, 45)
+            .with_flags(ROOT_SHAPE_FLAGS)
+            .write(&mut shape_children)
+            .unwrap();
 
         let mut vertices = Vec::new();
         vertices.extend_from_slice(&2u16.to_le_bytes());
@@ -1070,15 +1066,11 @@ mod tests {
             &shape_children,
         )
         .unwrap();
-        let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
-        drawing
+        drawing(&shape_container)
     }
 
     fn create_animated_escher_drawing() -> Vec<u8> {
-        use crate::escher::writer::{
-            ShapeBuilder, record_type, write_atom, write_client_anchor, write_container,
-        };
+        use crate::escher::writer::{ShapeBuilder, record_type, write_container};
         use crate::ppt::animation::{
             AnimationInfo, LegacyAnimationAtom, LegacyAnimationBuild, LegacyAnimationEffect,
             write_animation_info,
@@ -1095,16 +1087,12 @@ mod tests {
         let (animation, _) = write_animation_info(&info).unwrap();
 
         let mut shape_children = Vec::new();
-        ShapeBuilder::new(1, 88).write(&mut shape_children).unwrap();
+        ShapeBuilder::new(1, 88)
+            .with_flags(ROOT_SHAPE_FLAGS)
+            .write(&mut shape_children)
+            .unwrap();
         write_client_anchor(&mut shape_children, 10, 20, 210, 120).unwrap();
-        write_atom(
-            &mut shape_children,
-            0,
-            0,
-            record_type::CLIENT_DATA,
-            &animation,
-        )
-        .unwrap();
+        write_container(&mut shape_children, 0, record_type::CLIENT_DATA, &animation).unwrap();
 
         let mut shape_container = Vec::new();
         write_container(
@@ -1114,18 +1102,15 @@ mod tests {
             &shape_children,
         )
         .unwrap();
-        let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
-        drawing
+        drawing(&shape_container)
     }
 
     fn create_placeholder_escher_drawing(round_trip_records: &[u8]) -> Vec<u8> {
-        use crate::escher::writer::{
-            ShapeBuilder, record_type, write_atom, write_client_anchor, write_container,
-        };
+        use crate::escher::writer::{ShapeBuilder, record_type, write_atom, write_container};
 
         let mut shape_children = Vec::new();
         ShapeBuilder::new(202, 43)
+            .with_flags(ROOT_SHAPE_FLAGS)
             .write(&mut shape_children)
             .unwrap();
         write_client_anchor(&mut shape_children, 15, 25, 315, 125).unwrap();
@@ -1136,9 +1121,8 @@ mod tests {
             .collect();
         let mut embedded_text = Vec::new();
         write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
-        write_atom(
+        write_container(
             &mut shape_children,
-            0,
             0,
             record_type::CLIENT_TEXTBOX,
             &embedded_text,
@@ -1170,21 +1154,18 @@ mod tests {
         )
         .unwrap();
 
-        let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
-        drawing
+        drawing(&shape_container)
     }
 
     fn create_round_trip_placeholder_escher_drawing(
         shape_type: u16,
         round_trip_records: &[u8],
     ) -> Vec<u8> {
-        use crate::escher::writer::{
-            ShapeBuilder, record_type, write_client_anchor, write_container,
-        };
+        use crate::escher::writer::{ShapeBuilder, record_type, write_container};
 
         let mut shape_children = Vec::new();
         ShapeBuilder::new(shape_type, 46)
+            .with_flags(ROOT_SHAPE_FLAGS)
             .write(&mut shape_children)
             .unwrap();
         write_client_anchor(&mut shape_children, 20, 30, 220, 130).unwrap();
@@ -1204,9 +1185,7 @@ mod tests {
             &shape_children,
         )
         .unwrap();
-        let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &shape_container).unwrap();
-        drawing
+        drawing(&shape_container)
     }
 
     fn create_table_escher_drawing() -> Vec<u8> {
@@ -1222,15 +1201,17 @@ mod tests {
 
         fn table_cell(shape_id: u32, text: &str, left: i32, top: i32) -> Vec<u8> {
             let mut children = Vec::new();
-            ShapeBuilder::new(1, shape_id).write(&mut children).unwrap();
+            ShapeBuilder::new(1, shape_id)
+                .with_flags(CHILD_SHAPE_FLAGS)
+                .write(&mut children)
+                .unwrap();
             write_child_anchor(&mut children, left, top, left + 100, top + 50).unwrap();
 
             let utf16: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
             let mut embedded_text = Vec::new();
             write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
-            write_atom(
+            write_container(
                 &mut children,
-                0,
                 0,
                 record_type::CLIENT_TEXTBOX,
                 &embedded_text,
@@ -1240,7 +1221,9 @@ mod tests {
         }
 
         let mut patriarch_children = Vec::new();
+        write_spgr(&mut patriarch_children, 0, 0, 0, 0).unwrap();
         ShapeBuilder::new(0, 1)
+            .with_flags(0x0005)
             .write(&mut patriarch_children)
             .unwrap();
         let patriarch = shape_container(&patriarch_children);
@@ -1248,13 +1231,14 @@ mod tests {
         let mut table_header_children = Vec::new();
         write_spgr(&mut table_header_children, 0, 0, 200, 100).unwrap();
         ShapeBuilder::new(0, 10)
+            .with_flags(0x0201)
             .write(&mut table_header_children)
             .unwrap();
         let mut table_properties = Vec::new();
         table_properties.extend_from_slice(&0x039Fu16.to_le_bytes());
         table_properties.extend_from_slice(&1i32.to_le_bytes());
         write_atom(&mut table_header_children, 3, 1, 0xF122, &table_properties).unwrap();
-        write_child_anchor(&mut table_header_children, 20, 30, 220, 130).unwrap();
+        write_client_anchor(&mut table_header_children, 20, 30, 220, 130).unwrap();
         let table_header = shape_container(&table_header_children);
 
         let mut table_children = table_header;
@@ -1286,9 +1270,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &root_group).unwrap();
-        drawing
+        drawing(&root_group)
     }
 
     // Helper function to create a test record
@@ -1317,6 +1299,20 @@ mod tests {
         data
     }
 
+    fn write_client_anchor(
+        data: &mut Vec<u8>,
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+    ) -> std::io::Result<()> {
+        crate::ppt::PowerPointClientAnchor::rect(left, top, right, bottom)
+            .map_err(|error| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string())
+            })?
+            .write_to(data)
+    }
+
     fn prog_tags_record(version: u8, blob_payload: &[u8]) -> PptRecord {
         let tag_name: Vec<u8> = format!("___PPT{version}")
             .encode_utf16()
@@ -1337,9 +1333,10 @@ mod tests {
 
     // Helper function to create a slide with PPDrawing
     fn create_slide_with_drawing() -> PptRecord {
+        let dg = record_bytes(0, 0, 0xf008, &[0; 8]);
         let ppdrawing = create_test_record(
             PptRecordType::PPDrawing,
-            vec![0u8; 16], // Empty escher data
+            record_bytes(0x0f, 0, 0xf002, &dg),
             Vec::new(),
         );
         create_test_record(PptRecordType::Slide, vec![0u8; 8], vec![ppdrawing])
@@ -1898,7 +1895,7 @@ mod tests {
         assert_eq!(placeholder.placeholder_size(), PlaceholderSize::Half);
         assert_eq!(placeholder.index(), None);
         assert_eq!(
-            shapes[0].powerpoint12_placeholder_metadata(),
+            shapes[0].powerpoint12_shape_metadata(),
             Some(&PowerPoint12PlaceholderMetadata {
                 header_footer: Some(PowerPointHeaderFooterPlaceholder::Header),
                 new_placeholder: Some(PowerPointNewPlaceholder::Picture),
@@ -1927,7 +1924,7 @@ mod tests {
         assert_eq!(placeholder.placeholder_type(), PlaceholderType::Title);
         assert_eq!(
             shapes[0]
-                .powerpoint12_placeholder_metadata()
+                .powerpoint12_shape_metadata()
                 .and_then(|metadata| metadata.header_footer),
             Some(PowerPointHeaderFooterPlaceholder::Footer)
         );
@@ -1951,7 +1948,7 @@ mod tests {
         assert!(shapes[0].as_autoshape().is_some());
         assert_eq!(
             shapes[0]
-                .powerpoint12_placeholder_metadata()
+                .powerpoint12_shape_metadata()
                 .and_then(|metadata| metadata.new_placeholder),
             Some(PowerPointNewPlaceholder::Picture)
         );
@@ -2009,12 +2006,10 @@ mod tests {
         ] {
             let atom = record_bytes(0, 0, 0x0420, &[id]);
             let drawing = create_round_trip_placeholder_escher_drawing(202, &atom);
-            let shapes =
-                crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing)
-                    .unwrap();
+            let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
             assert_eq!(
                 shapes[0]
-                    .powerpoint12_placeholder_metadata()
+                    .powerpoint12_shape_metadata()
                     .unwrap()
                     .and_then(|metadata| metadata.header_footer),
                 Some(expected)
@@ -2027,12 +2022,10 @@ mod tests {
         ] {
             let atom = record_bytes(0, 0, 0x0bdd, &[id]);
             let drawing = create_round_trip_placeholder_escher_drawing(1, &atom);
-            let shapes =
-                crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing)
-                    .unwrap();
+            let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
             assert_eq!(
                 shapes[0]
-                    .powerpoint12_placeholder_metadata()
+                    .powerpoint12_shape_metadata()
                     .unwrap()
                     .and_then(|metadata| metadata.new_placeholder),
                 Some(expected)
@@ -2107,9 +2100,7 @@ mod tests {
             duplicate_checksums,
         ] {
             let drawing = create_round_trip_placeholder_escher_drawing(1, &malformed);
-            let shapes =
-                crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing)
-                    .unwrap();
+            let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
             assert!(shapes[0].powerpoint12_shape_metadata().is_err());
         }
     }
@@ -2216,7 +2207,12 @@ mod tests {
         let text_data = vec![0x41, 0x00]; // 'A'
         let text_atom = create_test_record(PptRecordType::TextCharsAtom, text_data, Vec::new());
 
-        let ppdrawing = create_test_record(PptRecordType::PPDrawing, vec![0u8; 16], Vec::new());
+        let dg = record_bytes(0, 0, 0xf008, &[0; 8]);
+        let ppdrawing = create_test_record(
+            PptRecordType::PPDrawing,
+            record_bytes(0x0f, 0, 0xf002, &dg),
+            Vec::new(),
+        );
 
         let slide_record =
             create_test_record(PptRecordType::Slide, vec![], vec![text_atom, ppdrawing]);

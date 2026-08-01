@@ -25,8 +25,8 @@ pub enum ImageError {
     #[error("Decompression failed: {0}")]
     DecompressionFailed(String),
 
-    #[error("Failed to decode Escher record: {0}")]
-    DecodeEscherRecordFailed(std::io::Error),
+    #[error("Failed to decode OfficeArt record: {0}")]
+    DecodeOfficeArtRecord(litchi_odraw::Error),
 
     #[error("Failed to extract image from container: {0}")]
     ExtractImageFailed(litchi_core::Error),
@@ -229,7 +229,8 @@ impl Image {
         data_stream: &[u8],
         word_document: &[u8],
     ) -> Result<crate::extractor::ExtractedImage<'static>, ImageError> {
-        use crate::{escher::EscherRecord, extractor::ImageExtractor};
+        use crate::extractor::ImageExtractor;
+        use litchi_odraw::Record;
 
         let mut offset = self.pic_offset as usize;
 
@@ -249,20 +250,20 @@ impl Image {
         }
 
         // Parse the first Escher record (usually SpContainer or BStoreContainer)
-        let (_, record_size) = EscherRecord::parse(data_stream, offset)
-            .map_err(ImageError::DecodeEscherRecordFailed)?;
+        let (_, record_size) =
+            Record::parse(data_stream, offset).map_err(ImageError::DecodeOfficeArtRecord)?;
         offset += record_size;
 
         // Continue parsing remaining records looking for BSE or BLIP
         while (offset - self.pic_offset as usize) < pic_fields.lcb as usize {
-            let (next_record, next_record_size) = match EscherRecord::parse(data_stream, offset) {
+            let (next_record, next_record_size) = match Record::parse(data_stream, offset) {
                 Ok(r) => r,
                 Err(_) => break,
             };
 
             // Check if this is a BSE (0xF007) or BLIP record (0xF018-0xF117)
-            if next_record.record_type_raw != 0xF007
-                && (next_record.record_type_raw < 0xF018 || next_record.record_type_raw > 0xF117)
+            if next_record.raw_kind() != 0xF007
+                && (next_record.raw_kind() < 0xF018 || next_record.raw_kind() > 0xF117)
             {
                 break;
             }
@@ -270,10 +271,8 @@ impl Image {
 
             // Try to extract image from this record
             // Pass data_stream for delay-loaded BLIPs
-            match ImageExtractor::extract_from_escher_record_with_stream(
-                &next_record,
-                Some(word_document),
-            ) {
+            match ImageExtractor::extract_from_record_with_stream(&next_record, Some(word_document))
+            {
                 Ok(img) => return Ok(img),
                 Err(_) => {
                     // TODO: log this error?

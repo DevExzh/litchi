@@ -9,7 +9,7 @@
 //! - O(1) property lookups
 //! - Minimal allocations
 
-use super::super::escher::{EscherProperties, EscherPropertyId};
+use litchi_odraw::prop::{Array, Id, Props};
 
 /// Geometric rectangle defined by coordinates.
 ///
@@ -83,20 +83,20 @@ impl GeometryRect {
 /// # Example
 ///
 /// ```ignore
-/// use litchi_ole::ppt::escher::EscherProperties;
+/// use litchi_odraw::prop::Props;
 /// use litchi_ole::ppt::shapes::geometry::extract_geometry_rect;
 ///
-/// let props = EscherProperties::from_opt_record(&opt_record);
+/// let props = Props::parse(&opt_record)?;
 /// if let Some(geom) = extract_geometry_rect(&props) {
 ///     println!("Geometry: {}x{}", geom.width(), geom.height());
 /// }
 /// ```
 #[inline]
-pub fn extract_geometry_rect<'data>(props: &EscherProperties<'data>) -> Option<GeometryRect> {
-    let left = props.get_coord(EscherPropertyId::GeomLeft)?;
-    let top = props.get_coord(EscherPropertyId::GeomTop)?;
-    let right = props.get_coord(EscherPropertyId::GeomRight)?;
-    let bottom = props.get_coord(EscherPropertyId::GeomBottom)?;
+pub fn extract_geometry_rect<'data>(props: &Props<'data>) -> Option<GeometryRect> {
+    let left = props.get_coord(Id::GeomLeft)?;
+    let top = props.get_coord(Id::GeomTop)?;
+    let right = props.get_coord(Id::GeomRight)?;
+    let bottom = props.get_coord(Id::GeomBottom)?;
 
     Some(GeometryRect::new(left, top, right, bottom))
 }
@@ -152,10 +152,8 @@ impl From<i32> for ShapePathType {
 /// - Single property lookup
 /// - No allocations
 #[inline]
-pub fn extract_shape_path<'data>(props: &EscherProperties<'data>) -> Option<ShapePathType> {
-    props
-        .get_int(EscherPropertyId::ShapePath)
-        .map(ShapePathType::from)
+pub fn extract_shape_path<'data>(props: &Props<'data>) -> Option<ShapePathType> {
+    props.get_int(Id::ShapePath).map(ShapePathType::from)
 }
 
 /// Vertex data for complex shapes.
@@ -203,7 +201,7 @@ impl<'data> VertexData<'data> {
     /// Besides full 8-byte POINT records, OfficeArt permits `cbElem =
     /// 0xFFF0`, which stores each point as two signed 16-bit coordinates.
     #[inline]
-    pub fn from_array(array: &super::super::escher::EscherArrayProperty<'data>) -> Option<Self> {
+    pub fn from_array(array: &Array<'data>) -> Option<Self> {
         let element_size = array.element_size();
         if !matches!(element_size, 4 | 8) {
             return None;
@@ -309,9 +307,9 @@ impl<'data> VertexData<'data> {
 /// }
 /// ```
 #[inline]
-pub fn extract_vertices<'data>(props: &EscherProperties<'data>) -> Option<VertexData<'data>> {
+pub fn extract_vertices<'data>(props: &Props<'data>) -> Option<VertexData<'data>> {
     // Try to get vertices as array property
-    if let Some(array) = props.get_array(EscherPropertyId::Vertices) {
+    if let Some(array) = props.get_array(Id::Vertices) {
         // POINT elements can be full 8-byte coordinates or truncated
         // 4-byte pairs of signed 16-bit coordinates.
         if let Some(vertices) = VertexData::from_array(array) {
@@ -320,9 +318,7 @@ pub fn extract_vertices<'data>(props: &EscherProperties<'data>) -> Option<Vertex
     }
 
     // Also try as complex property (some files may store it this way)
-    props
-        .get_binary(EscherPropertyId::Vertices)
-        .and_then(VertexData::new)
+    props.get_binary(Id::Vertices).and_then(VertexData::new)
 }
 
 /// Extract segment info from Escher properties.
@@ -343,13 +339,13 @@ pub fn extract_vertices<'data>(props: &EscherProperties<'data>) -> Option<Vertex
 /// - Zero-copy via borrow
 /// - Single property lookup
 #[inline]
-pub fn extract_segment_info<'data>(props: &EscherProperties<'data>) -> Option<&'data [u8]> {
-    if let Some(array) = props.get_array(EscherPropertyId::SegmentInfo) {
+pub fn extract_segment_info<'data>(props: &Props<'data>) -> Option<&'data [u8]> {
+    if let Some(array) = props.get_array(Id::SegmentInfo) {
         let data = array.raw_data().get(6..)?;
         let required = usize::from(array.element_count()).checked_mul(array.element_size())?;
         return data.get(..required);
     }
-    props.get_binary(EscherPropertyId::SegmentInfo)
+    props.get_binary(Id::SegmentInfo)
 }
 
 #[cfg(test)]
@@ -420,7 +416,7 @@ mod tests {
             10, 0, 20, 0, // (10, 20)
             0xE2, 0xFF, 40, 0, // (-30, 40)
         ];
-        let array = super::super::super::escher::EscherArrayProperty::new(&data).unwrap();
+        let array = Array::new(&data).unwrap();
         let vertices = VertexData::from_array(&array).unwrap();
 
         assert_eq!(vertices.count(), 2);

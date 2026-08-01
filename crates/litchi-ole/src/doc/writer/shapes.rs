@@ -156,9 +156,9 @@ impl DocDrawingShape {
 }
 
 /// Encode an (R, G, B) color as an OfficeArtCOLORREF value
-/// ([MS-ODRAW] 2.2.2): blue, green, red bytes followed by zero flags.
+/// ([MS-ODRAW] 2.2.2): red, green, blue bytes followed by zero flags.
 fn color_ref(red: u8, green: u8, blue: u8) -> u32 {
-    u32::from(blue) | (u32::from(green) << 8) | (u32::from(red) << 16)
+    u32::from(red) | (u32::from(green) << 8) | (u32::from(blue) << 16)
 }
 
 /// Append the OfficeArtOPT record for a primitive shape: fill and line
@@ -280,10 +280,10 @@ mod tests {
 
     #[test]
     fn color_ref_uses_office_byte_order() {
-        // OfficeArtCOLORREF: blue in the low byte, red in byte 2.
-        assert_eq!(color_ref(0xFF, 0x00, 0x00), 0x00FF_0000);
-        assert_eq!(color_ref(0x00, 0x00, 0xFF), 0x0000_00FF);
-        assert_eq!(color_ref(0x12, 0x34, 0x56), 0x0012_3456);
+        // OfficeArtCOLORREF: red in the low byte, blue in byte 2.
+        assert_eq!(color_ref(0xFF, 0x00, 0x00), 0x0000_00FF);
+        assert_eq!(color_ref(0x00, 0x00, 0xFF), 0x00FF_0000);
+        assert_eq!(color_ref(0x12, 0x34, 0x56), 0x0056_3412);
     }
 
     #[test]
@@ -300,8 +300,8 @@ mod tests {
         assert_eq!(len as usize, out.len() - 8);
         let (opid0, val0) = read_property(&out, 0);
         let (opid1, val1) = read_property(&out, 1);
-        assert_eq!((opid0, val0), (OPT_FILL_COLOR, 0x00FF_0000));
-        assert_eq!((opid1, val1), (OPT_LINE_COLOR, 0x0000_00FF));
+        assert_eq!((opid0, val0), (OPT_FILL_COLOR, 0x0000_00FF));
+        assert_eq!((opid1, val1), (OPT_LINE_COLOR, 0x00FF_0000));
 
         // No fill, no line: the two boolean property sets with the "use" bits
         // set and the value bits clear.

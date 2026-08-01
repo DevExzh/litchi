@@ -571,11 +571,10 @@ mod tests {
             ex_obj_id: 42,
         };
         let bytes = build_chart_sp_container(&frame, 1027).unwrap();
-        let (container, _) = crate::ppt::shapes::escher::EscherRecord::parse(&bytes, 0).unwrap();
-        let reference = container
-            .extract_external_object_reference()
-            .unwrap()
-            .expect("chart frame references its object");
-        assert_eq!(reference.id, 42);
+        let (record, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        let shape = litchi_odraw::shape::Shape::try_from(record).unwrap();
+        use crate::ppt::odraw::ShapeExt as _;
+        assert_eq!(shape.external_object_id().unwrap(), Some(42));
     }
 }

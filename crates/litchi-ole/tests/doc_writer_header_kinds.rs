@@ -5,6 +5,7 @@
 //! picture pipeline (PICF block + PlcfSpaHdr + header-drawing picture frame).
 #![cfg(feature = "imgconv")]
 
+use litchi_odraw::shape::Kind;
 use litchi_ole::doc::shapes::extract_drawing_shapes;
 use litchi_ole::doc::writer::{
     DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition,
@@ -13,7 +14,6 @@ use litchi_ole::doc::{
     DocHeaderKind, HeaderFooterParagraph, HeaderFooterType, Package, ShapeHorizontalOrigin,
     ShapeTextWrap, ShapeVerticalOrigin,
 };
-use litchi_ole::escher::EscherShapeType;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
 
@@ -155,9 +155,9 @@ fn even_and_first_page_header_text_boxes_round_trip() {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let rectangle = shapes.iter().find(|s| s.shape_id == 2049).unwrap();
-    assert_eq!(rectangle.shape_type, EscherShapeType::TextBox);
+    assert_eq!(rectangle.shape_type, Kind::TextBox);
     let ellipse = shapes.iter().find(|s| s.shape_id == 2050).unwrap();
-    assert_eq!(ellipse.shape_type, EscherShapeType::TextBox);
+    assert_eq!(ellipse.shape_type, Kind::TextBox);
 
     // Main stories are untouched.
     assert!(document.text_boxes().is_empty());
@@ -256,11 +256,11 @@ fn header_picture_round_trips_with_byte_identical_payload() {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let header_pic = shapes.iter().find(|s| s.shape_id == 2049).unwrap();
-    assert_eq!(header_pic.shape_type, EscherShapeType::Picture);
+    assert_eq!(header_pic.shape_type, Kind::Picture);
     assert!(
         shapes
             .iter()
-            .any(|s| s.shape_type == EscherShapeType::Picture && s.shape_id == 1025)
+            .any(|s| s.shape_type == Kind::Picture && s.shape_id == 1025)
     );
 
     // The main story anchor/PLC tables are unaffected.

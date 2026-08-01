@@ -1201,6 +1201,9 @@ pub(crate) fn build_dgg_info(
     let has_main_drawing = !main_shapes.is_empty();
     let has_header_drawing = !header_shapes.is_empty();
     let drawing_count = u32::from(has_main_drawing) + u32::from(has_header_drawing);
+    // [MS-ODRAW] 2.2.47 defines cidcl as the number of OfficeArtIDCL
+    // records plus one. There can be at most the main and header drawings.
+    let cluster_count = drawing_count + 1;
     let highest_shape_id = if has_header_drawing {
         HEADER_FIRST_SHAPE_ID + header_shapes.len() as u32
     } else {
@@ -1209,7 +1212,7 @@ pub(crate) fn build_dgg_info(
     let dgg_payload_len = 16 + 8 * drawing_count;
     write_record_header(&mut out, VERSION_ATOM, 0, RECORD_DGG, dgg_payload_len);
     out.extend_from_slice(&spid_max(highest_shape_id).to_le_bytes()); // spidMax
-    out.extend_from_slice(&drawing_count.to_le_bytes()); // cidcl
+    out.extend_from_slice(&cluster_count.to_le_bytes()); // cidcl
     let saved_shapes = main_shapes.len() as u32
         + header_shapes.len() as u32
         + drawing_count * DG_GROUP_SHAPE_COUNT;
@@ -1625,7 +1628,7 @@ mod tests {
         assert_eq!(spid_max, 2 * SHAPE_IDS_PER_CLUSTER);
         assert_eq!(
             u32::from_le_bytes(dgg_payload[4..8].try_into().unwrap()),
-            1 // one drawing
+            2 // one OfficeArtIDCL plus one, per [MS-ODRAW] 2.2.47
         );
         // cspSaved = 2 shapes + group; cdgSaved = 1 drawing.
         assert_eq!(
@@ -1785,13 +1788,14 @@ mod tests {
         let records = collect_records(&dgg, 0, dgg.len());
 
         // Two drawings: main (dgglbl 0, Dg instance 1) and header (dgglbl 1,
-        // Dg instance 2). The Dgg cluster table has two entries.
+        // Dg instance 2). The Dgg cluster table has two entries, while cidcl
+        // is the entry count plus one.
         let dgg_record = records
             .iter()
             .find(|record| record.3 == RECORD_DGG)
             .unwrap();
         let dgg_payload = &dgg[dgg_record.0 + RECORD_HEADER_LEN..];
-        assert_eq!(u32::from_le_bytes(dgg_payload[4..8].try_into().unwrap()), 2);
+        assert_eq!(u32::from_le_bytes(dgg_payload[4..8].try_into().unwrap()), 3);
         assert_eq!(
             u32::from_le_bytes(dgg_payload[0..4].try_into().unwrap()),
             3 * SHAPE_IDS_PER_CLUSTER

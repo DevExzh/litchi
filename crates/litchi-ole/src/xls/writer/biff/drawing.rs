@@ -1,18 +1,21 @@
 use std::io::Write;
 
-use crate::escher::writer::{
-    PropertyBuilder, ShapeBuilder, ShapeFlags, record_type, write_atom, write_container,
-    write_record_header as write_escher_header,
-};
 use crate::xls::writer::{
     XlsShapeAnchor, XlsShapeFill, XlsShapeLine, XlsShapeText, XlsShapeTextRun, XlsShapeWrite,
 };
 use crate::xls::{XlsError, XlsResult};
+use litchi_odraw::{
+    prop::Id,
+    shape::{Flags, Native},
+    write::{
+        Atom as WriteAtom, Container as WriteContainer, PropertyBuilder, ShapeBuilder,
+        atom as write_escher_atom, atom_header as write_atom_header, container as write_container,
+        container_header as write_container_header,
+    },
+};
 
 use super::comment::{self, CommentConfig};
-use super::drawing_group::{
-    GroupFragmentObj, GroupShapeConfig, child_has_textbox, group_fragments,
-};
+use super::drawing_group::{GroupFragmentObj, GroupShapeConfig, group_fragments};
 use super::pivot;
 use super::write_record_header;
 
@@ -34,10 +37,12 @@ enum DrawingObject<'a> {
     Primitive {
         config: &'a PrimitiveShapeConfig<'a>,
         escher: Vec<u8>,
+        has_textbox: bool,
     },
     Group {
         obj: GroupFragmentObj<'a>,
         escher: Vec<u8>,
+        has_textbox: bool,
     },
     Comment {
         config: &'a CommentConfig<'a>,
@@ -53,6 +58,23 @@ impl DrawingObject<'_> {
             | Self::Group { escher, .. }
             | Self::Comment { escher, .. } => escher,
         }
+    }
+
+    fn has_textbox(&self) -> bool {
+        matches!(
+            self,
+            Self::Primitive {
+                has_textbox: true,
+                ..
+            } | Self::Group {
+                has_textbox: true,
+                ..
+            }
+        )
+    }
+
+    fn officeart_len(&self) -> usize {
+        self.escher().len() + usize::from(self.has_textbox()) * 8
     }
 }
 
@@ -88,23 +110,23 @@ fn group_prefix(drawing_id: u32, object_count: usize, shapes_size: usize) -> Xls
         .ok_or_else(|| XlsError::InvalidData("worksheet drawing size overflows".to_string()))?;
     let patriarch = drawing_id << 10;
     let mut out = Vec::with_capacity(80);
-    write_escher_header(&mut out, 0x0F, 0, record_type::DG_CONTAINER, dg_length)?;
-    write_escher_header(&mut out, 0, drawing_id as u16, record_type::DG, 8)?;
+    write_container_header(&mut out, 0, WriteContainer::Dg, dg_length)?;
+    write_atom_header(&mut out, drawing_id as u16, WriteAtom::Dg, 8)?;
     out.extend_from_slice(&shape_count.to_le_bytes());
     out.extend_from_slice(&(patriarch + object_count as u32).to_le_bytes());
-    write_escher_header(&mut out, 0x0F, 0, record_type::SPGR_CONTAINER, spgr_length)?;
+    write_container_header(&mut out, 0, WriteContainer::Spgr, spgr_length)?;
     let mut patriarch_children = Vec::with_capacity(40);
-    write_escher_header(&mut patriarch_children, 1, 0, record_type::SPGR, 16)?;
+    write_atom_header(&mut patriarch_children, 0, WriteAtom::Spgr, 16)?;
     patriarch_children.extend_from_slice(&[0; 16]);
-    ShapeBuilder::new(0, patriarch)
-        .with_flags((ShapeFlags::GROUP | ShapeFlags::PATRIARCH).bits())
+    ShapeBuilder::new(Native::FREEFORM, patriarch)
+        .with_flags(Flags::GROUP | Flags::PATRIARCH)
         .write(&mut patriarch_children)?;
-    write_container(&mut out, 0, record_type::SP_CONTAINER, &patriarch_children)?;
+    write_container(&mut out, 0, WriteContainer::Sp, &patriarch_children)?;
     Ok(out)
 }
 
 pub(super) fn write_xls_anchor<W: Write>(writer: &mut W, anchor: &XlsShapeAnchor) -> XlsResult<()> {
-    write_escher_header(writer, 0, 0, record_type::CLIENT_ANCHOR, 18)?;
+    write_atom_header(writer, 0, WriteAtom::ClientAnchor, 18)?;
     let flags = u16::from(anchor.move_with_cells) | (u16::from(anchor.size_with_cells) << 1);
     for value in [
         flags,
@@ -128,78 +150,90 @@ pub(super) fn style_properties(
     fill: XlsShapeFill,
     line: XlsShapeLine,
     visible: bool,
-) -> PropertyBuilder {
+) -> PropertyBuilder<'static> {
     let mut properties = PropertyBuilder::new();
-    properties.add_simple(0x007F, if locked { 0x0104_0104 } else { 0x0104_0000 });
+    properties.add_simple(
+        Id::LockAgainstGrouping,
+        if locked { 0x0104_0104 } else { 0x0104_0000 },
+    );
     match fill {
         XlsShapeFill::None => {
-            properties.add_simple(0x0181, 0);
-            properties.add_simple(0x01BF, 0x0010_0000);
+            properties.add_simple(Id::FillColor, 0);
+            properties.add_simple(Id::NoFillHitTest, 0x0010_0000);
         },
         XlsShapeFill::Solid(color) => {
-            properties.add_simple(0x0181, color.officeart_color() as i32);
-            properties.add_simple(0x01BF, 0x0015_0011);
+            properties.add_simple(Id::FillColor, color.officeart_color() as i32);
+            properties.add_simple(Id::NoFillHitTest, 0x0015_0011);
         },
     }
     match line {
         XlsShapeLine::None => {
-            properties.add_simple(0x01C0, 0);
-            properties.add_simple(0x01CB, 0);
-            properties.add_simple(0x01FF, 0x0008_0000);
+            properties.add_simple(Id::LineColor, 0);
+            properties.add_simple(Id::LineWidth, 0);
+            properties.add_simple(Id::NoLineDrawDash, 0x0008_0000);
         },
         XlsShapeLine::Solid { color, width_emu } => {
-            properties.add_simple(0x01C0, color.officeart_color() as i32);
-            properties.add_simple(0x01CB, width_emu as i32);
-            properties.add_simple(0x01FF, 0x0008_0008);
+            properties.add_simple(Id::LineColor, color.officeart_color() as i32);
+            properties.add_simple(Id::LineWidth, width_emu as i32);
+            properties.add_simple(Id::NoLineDrawDash, 0x0008_0008);
         },
     }
-    properties.add_simple(0x03BF, if visible { 0x0002_0000 } else { 0x0002_0002 });
+    properties.add_simple(
+        Id::from(0x03BF),
+        if visible { 0x0002_0000 } else { 0x0002_0002 },
+    );
     properties
 }
 
-fn primitive_shape(shape: &XlsShapeWrite, shape_id: u32) -> XlsResult<Vec<u8>> {
+pub(super) fn split_client_textbox(
+    mut escher: Vec<u8>,
+    has_textbox: bool,
+) -> XlsResult<(Vec<u8>, bool)> {
+    if has_textbox {
+        let split = escher.len().checked_sub(8).ok_or_else(|| {
+            XlsError::InvalidData("OfficeArt textbox shape is truncated".to_string())
+        })?;
+        escher.truncate(split);
+    }
+    Ok((escher, has_textbox))
+}
+
+fn primitive_shape(shape: &XlsShapeWrite, shape_id: u32) -> XlsResult<(Vec<u8>, bool)> {
     let mut children = Vec::with_capacity(112);
-    ShapeBuilder::new(shape.kind.officeart_type(), shape_id)
-        .with_flags((ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT).bits())
+    ShapeBuilder::new(Native::from_raw(shape.kind.officeart_type()), shape_id)
+        .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
         .write(&mut children)?;
     style_properties(shape.locked, shape.fill, shape.line, shape.visible).write(&mut children)?;
     write_xls_anchor(&mut children, &shape.anchor)?;
     let has_textbox =
         shape.kind == crate::xls::writer::XlsShapeKind::TextBox || shape.text.is_some();
-    write_atom(
-        &mut children,
-        0,
-        0,
-        if has_textbox {
-            record_type::CLIENT_TEXTBOX
-        } else {
-            record_type::CLIENT_DATA
-        },
-        &[],
-    )?;
+    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
+    if has_textbox {
+        write_escher_atom(&mut children, 0, WriteAtom::ClientTextbox, &[])?;
+    }
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, record_type::SP_CONTAINER, &children)?;
-    Ok(out)
+    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
+    split_client_textbox(out, has_textbox)
 }
 
 fn pivot_shape(shape_id: u32) -> XlsResult<Vec<u8>> {
     let mut children = Vec::with_capacity(82);
-    ShapeBuilder::new(201, shape_id)
-        .with_flags((ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT).bits())
+    ShapeBuilder::new(Native::from_raw(201), shape_id)
+        .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
         .write(&mut children)?;
     let mut properties = PropertyBuilder::new();
-    properties.add_simple(0x007F, 0x0104_0104);
-    properties.add_simple(0x00BF, 0x0008_0008);
-    properties.add_simple(0x01FF, 0x0008_0000);
-    properties.add_simple(0x03BF, 0x0002_0000);
+    properties.add_simple(Id::LockAgainstGrouping, 0x0104_0104);
+    properties.add_simple(Id::TextBooleanProperties, 0x0008_0008);
+    properties.add_simple(Id::NoLineDrawDash, 0x0008_0000);
+    properties.add_simple(Id::from(0x03BF), 0x0002_0000);
     properties.write(&mut children)?;
-    write_escher_header(&mut children, 0, 0, record_type::CLIENT_ANCHOR, 18)?;
+    write_atom_header(&mut children, 0, WriteAtom::ClientAnchor, 18)?;
     for field in [1u16, 1, 0, 0, 0, 2, 0, 1, 0] {
         children.extend_from_slice(&field.to_le_bytes());
     }
-    write_atom(&mut children, 0, 0, record_type::CLIENT_DATA, &[])?;
+    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, record_type::SP_CONTAINER, &children)?;
+    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
     Ok(out)
 }
 
@@ -332,6 +366,12 @@ fn write_shape_txo<W: Write>(writer: &mut W, text: Option<&XlsShapeText>) -> Xls
     Ok(())
 }
 
+fn write_client_textbox<W: Write>(writer: &mut W) -> XlsResult<()> {
+    let mut textbox = Vec::with_capacity(8);
+    write_escher_atom(&mut textbox, 0, WriteAtom::ClientTextbox, &[])?;
+    write_mso(writer, &textbox)
+}
+
 pub(crate) fn write_worksheet_drawing<W: Write>(
     writer: &mut W,
     drawing_id: u32,
@@ -359,9 +399,11 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
         offset += 1;
     }
     for config in primitives {
+        let (escher, has_textbox) = primitive_shape(config.shape, (drawing_id << 10) + offset)?;
         objects.push(DrawingObject::Primitive {
             config,
-            escher: primitive_shape(config.shape, (drawing_id << 10) + offset)?,
+            escher,
+            has_textbox,
         });
         offset += 1;
     }
@@ -371,6 +413,7 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
         objects.extend(fragments.into_iter().map(|fragment| DrawingObject::Group {
             obj: fragment.obj,
             escher: fragment.escher,
+            has_textbox: fragment.has_textbox,
         }));
     }
     for config in comments {
@@ -380,7 +423,7 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
         });
         offset += 1;
     }
-    let shapes_size = objects.iter().map(|object| object.escher().len()).sum();
+    let shapes_size = objects.iter().map(DrawingObject::officeart_len).sum();
     let prefix = group_prefix(drawing_id, object_count, shapes_size)?;
     for (index, object) in objects.iter().enumerate() {
         let mut drawing = if index == 0 {
@@ -394,7 +437,11 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
             DrawingObject::Pivot { object_id, .. } => {
                 pivot::write_pivot_page_obj(writer, *object_id)?;
             },
-            DrawingObject::Primitive { config, .. } => {
+            DrawingObject::Primitive {
+                config,
+                has_textbox,
+                ..
+            } => {
                 write_shape_obj(
                     writer,
                     config.shape.kind.object_type(),
@@ -402,13 +449,14 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
                     config.shape.locked,
                     config.shape.visible,
                 )?;
-                if config.shape.kind == crate::xls::writer::XlsShapeKind::TextBox
-                    || config.shape.text.is_some()
-                {
+                if *has_textbox {
+                    write_client_textbox(writer)?;
                     write_shape_txo(writer, config.shape.text.as_ref())?;
                 }
             },
-            DrawingObject::Group { obj, .. } => match obj {
+            DrawingObject::Group {
+                obj, has_textbox, ..
+            } => match obj {
                 GroupFragmentObj::Header {
                     object_id,
                     locked,
@@ -424,16 +472,15 @@ pub(crate) fn write_worksheet_drawing<W: Write>(
                         child.locked,
                         child.visible,
                     )?;
-                    if child_has_textbox(child) {
+                    if *has_textbox {
+                        write_client_textbox(writer)?;
                         write_shape_txo(writer, child.text.as_ref())?;
                     }
                 },
             },
             DrawingObject::Comment { config, .. } => {
                 comment::write_obj(writer, config)?;
-                let mut textbox = Vec::with_capacity(8);
-                write_atom(&mut textbox, 0, 0, record_type::CLIENT_TEXTBOX, &[])?;
-                write_mso(writer, &textbox)?;
+                write_client_textbox(writer)?;
                 comment::write_txo(writer, config)?;
             },
         }

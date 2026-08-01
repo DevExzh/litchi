@@ -3186,7 +3186,7 @@ impl BuiltinFunction {
             481 => count.is_multiple_of(2),
             // SUMIFS and AVERAGEIFS have one leading aggregate range followed
             // by range/criteria pairs.
-            482 | 484 => count % 2 == 1,
+            482 | 484 => !count.is_multiple_of(2),
             _ => true,
         }
     }

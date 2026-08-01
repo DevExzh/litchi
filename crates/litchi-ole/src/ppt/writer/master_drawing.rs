@@ -4,6 +4,7 @@
 //! including all placeholder shapes and their properties.
 
 use super::escher::{ShapeFlags, record_type as escher_rt};
+use crate::ppt::PowerPointPlaceholderKind as PlaceholderKind;
 
 // =============================================================================
 // PPT Record Types
@@ -23,19 +24,6 @@ pub mod ppt_record_type {
     pub const ROUND_TRIP_STYLE_TEXT_PROP: u16 = 0x0FA2;
     /// RoundTripHFPlaceholder
     pub const ROUND_TRIP_HF_PLACEHOLDER: u16 = 0x0FAA;
-}
-
-// =============================================================================
-// Placeholder Types (MS-PPT 2.9.39)
-// =============================================================================
-
-/// PPT placeholder types for OEPlaceholderAtom
-pub mod placeholder_type {
-    pub const TITLE: u8 = 0x00;
-    pub const BODY: u8 = 0x01;
-    pub const DATE: u8 = 0x07;
-    pub const SLIDE_NUMBER: u8 = 0x08;
-    pub const FOOTER: u8 = 0x09;
 }
 
 // Shape flags are imported from super::escher::ShapeFlags
@@ -175,8 +163,8 @@ impl MasterPPDrawingBuilder {
     /// Build ClientAnchor record
     fn build_client_anchor(&mut self, left: u16, top: u16, right: u16, bottom: u16) {
         self.write_escher_header(0x00, 0, escher_rt::CLIENT_ANCHOR, 8);
-        self.data.extend_from_slice(&left.to_le_bytes());
         self.data.extend_from_slice(&top.to_le_bytes());
+        self.data.extend_from_slice(&left.to_le_bytes());
         self.data.extend_from_slice(&right.to_le_bytes());
         self.data.extend_from_slice(&bottom.to_le_bytes());
     }
@@ -187,10 +175,10 @@ impl MasterPPDrawingBuilder {
     }
 
     /// Build OEPlaceholderAtom
-    fn build_oe_placeholder(&mut self, position: u32, placeholder_type: u8, size: u8) {
+    fn build_oe_placeholder(&mut self, position: u32, kind: PlaceholderKind, size: u8) {
         self.write_ppt_header(ppt_record_type::OE_PLACEHOLDER_ATOM, 8);
         self.data.extend_from_slice(&position.to_le_bytes());
-        self.data.push(placeholder_type);
+        self.data.push(kind as u8);
         self.data.push(size);
         self.data.extend_from_slice(&[0x00, 0x00]); // unused
     }
@@ -289,7 +277,7 @@ impl MasterPPDrawingBuilder {
         &mut self,
         spid: u32,
         anchor: (u16, u16, u16, u16),
-        ph_type: u8,
+        kind: PlaceholderKind,
         ph_position: u32,
         text: Option<&[u8]>,
         opt_props: &[(u16, u32)],
@@ -319,11 +307,11 @@ impl MasterPPDrawingBuilder {
         let client_content_start = self.data.len();
 
         // OEPlaceholderAtom
-        self.build_oe_placeholder(ph_position, ph_type, 0x01);
+        self.build_oe_placeholder(ph_position, kind, 0x01);
 
         // RoundTrip records if text provided
         if let Some(t) = text {
-            let level_count = if ph_type == placeholder_type::BODY {
+            let level_count = if kind == PlaceholderKind::MasterBody {
                 5
             } else {
                 1
@@ -383,7 +371,7 @@ impl MasterPPDrawingBuilder {
         self.build_placeholder_container(
             0x0402,
             anchor::TITLE,
-            placeholder_type::TITLE,
+            PlaceholderKind::MasterTitle,
             0,
             Some(placeholder_text::TITLE),
             &title_props,
@@ -405,7 +393,7 @@ impl MasterPPDrawingBuilder {
         self.build_placeholder_container(
             0x0403,
             anchor::BODY,
-            placeholder_type::BODY,
+            PlaceholderKind::MasterBody,
             1,
             Some(placeholder_text::BODY),
             &body_props,
@@ -426,7 +414,7 @@ impl MasterPPDrawingBuilder {
         self.build_placeholder_container(
             0x0404,
             anchor::DATE,
-            placeholder_type::DATE,
+            PlaceholderKind::MasterDate,
             2,
             None,
             &simple_props,
@@ -434,7 +422,7 @@ impl MasterPPDrawingBuilder {
         self.build_placeholder_container(
             0x0405,
             anchor::FOOTER,
-            placeholder_type::FOOTER,
+            PlaceholderKind::MasterFooter,
             3,
             None,
             &simple_props,
@@ -442,7 +430,7 @@ impl MasterPPDrawingBuilder {
         self.build_placeholder_container(
             0x0406,
             anchor::SLIDE_NUMBER,
-            placeholder_type::SLIDE_NUMBER,
+            PlaceholderKind::MasterSlideNumber,
             4,
             None,
             &simple_props,

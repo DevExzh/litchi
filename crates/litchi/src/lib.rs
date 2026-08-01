@@ -141,8 +141,8 @@
 //!
 //! ## High-Level API (Recommended)
 //!
-//! - [`Document`] - Unified Word document interface (.doc and .docx)
-//! - [`Presentation`] - Unified PowerPoint interface (.ppt and .pptx)
+//! - `Document` - Unified Word document interface (.doc and .docx)
+//! - `Presentation` - Unified PowerPoint interface (.ppt and .pptx)
 //!
 //! These automatically detect file formats and provide a consistent API.
 //!
@@ -156,8 +156,8 @@
 //!
 //! ## Low-Level Modules (Advanced Use)
 //!
-//! - [`ole`] - Direct access to OLE2 format parsers
-//! - [`ooxml`] - Direct access to OOXML format parsers
+//! - `ole` - Direct access to OLE2 format parsers
+//! - `ooxml` - Direct access to OOXML format parsers
 //!
 //! Most users should use the high-level API and only access low-level modules
 //! when format-specific features are needed.

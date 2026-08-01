@@ -49,7 +49,7 @@ where
             ShapeEnum::Picture(picture) => picture.properties.shape_type,
             ShapeEnum::Table(_) => ShapeType::Table,
             ShapeEnum::Group(_) => ShapeType::Group,
-            ShapeEnum::Line(_) => ShapeType::Line,
+            ShapeEnum::Line(line) => line.shape_type(),
         }
     }
 
@@ -80,13 +80,28 @@ where
                 Ok(text_parts.join(" "))
             },
             ShapeEnum::Group(group) => {
-                // Recursively extract text from all child shapes
                 let mut text_parts = Vec::new();
-                for child in group.children() {
-                    if let Ok(child_text) = child.text()
-                        && !child_text.is_empty()
-                    {
-                        text_parts.push(child_text);
+                let mut shapes: Vec<_> = group.children().iter().rev().collect();
+                let mut visited = 0u32;
+                while let Some(shape) = shapes.pop() {
+                    visited = visited.checked_add(1).ok_or_else(|| {
+                        crate::ppt::package::PptError::Corrupted(
+                            "PowerPoint shape count overflowed".to_string(),
+                        )
+                    })?;
+                    if visited > 1_000_000 {
+                        return Err(crate::ppt::package::PptError::Corrupted(
+                            "PowerPoint group contains more than 1000000 shapes".to_string(),
+                        ));
+                    }
+
+                    if let ShapeEnum::Group(child_group) = shape {
+                        shapes.extend(child_group.children().iter().rev());
+                    } else {
+                        let child_text = shape.text()?;
+                        if !child_text.is_empty() {
+                            text_parts.push(child_text);
+                        }
                     }
                 }
                 Ok(text_parts.join("\n"))
@@ -194,11 +209,6 @@ where
             ShapeEnum::Group(shape) => shape.powerpoint12_shape_metadata.as_ref(),
             ShapeEnum::Line(shape) => shape.powerpoint12_shape_metadata.as_ref(),
         }
-    }
-
-    /// Compatibility accessor for [`Self::powerpoint12_shape_metadata`].
-    pub fn powerpoint12_placeholder_metadata(&self) -> Option<&PowerPoint12ShapeMetadata> {
-        self.powerpoint12_shape_metadata()
     }
 }
 
@@ -399,6 +409,7 @@ impl<'a> GroupShape<'a> {
 /// Represents a line or connector between two points.
 #[derive(Debug, Clone)]
 pub struct LineShape {
+    kind: LineKind,
     /// Shape ID
     id: u32,
     /// Start X coordinate
@@ -416,10 +427,17 @@ pub struct LineShape {
     powerpoint12_shape_metadata: Option<PowerPoint12ShapeMetadata>,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum LineKind {
+    Line,
+    Connector,
+}
+
 impl LineShape {
     /// Create a new line shape.
     pub fn new(id: u32, x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
         Self {
+            kind: LineKind::Line,
             id,
             x1,
             y1,
@@ -428,6 +446,22 @@ impl LineShape {
             width: 1,
             color: None,
             powerpoint12_shape_metadata: None,
+        }
+    }
+
+    /// Create a connector between two points.
+    pub fn connector(id: u32, x1: i32, y1: i32, x2: i32, y2: i32) -> Self {
+        Self {
+            kind: LineKind::Connector,
+            ..Self::new(id, x1, y1, x2, y2)
+        }
+    }
+
+    /// Return whether this shape is a plain line or a connector.
+    pub fn shape_type(&self) -> ShapeType {
+        match self.kind {
+            LineKind::Line => ShapeType::Line,
+            LineKind::Connector => ShapeType::Connector,
         }
     }
 
@@ -458,5 +492,19 @@ impl LineShape {
         metadata: Option<PowerPoint12ShapeMetadata>,
     ) {
         self.powerpoint12_shape_metadata = metadata;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn line_family_preserves_connector_semantics() {
+        let line: ShapeEnum<'static> = ShapeEnum::Line(LineShape::new(1, 0, 0, 10, 10));
+        let connector: ShapeEnum<'static> = ShapeEnum::Line(LineShape::connector(2, 0, 0, 10, 10));
+
+        assert_eq!(line.shape_type(), ShapeType::Line);
+        assert_eq!(connector.shape_type(), ShapeType::Connector);
     }
 }

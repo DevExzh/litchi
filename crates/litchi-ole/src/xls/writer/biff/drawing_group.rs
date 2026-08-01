@@ -6,19 +6,25 @@
 //! Each OBJ-bearing SpContainer becomes its own MsoDrawing fragment so the BIFF
 //! stream can interleave the matching OBJ records.
 
-use crate::escher::writer::{
-    PropertyBuilder, ShapeBuilder, ShapeFlags, record_type, shape_type, write_atom,
-    write_child_anchor, write_container, write_record_header as write_escher_header, write_spgr,
-};
 use crate::xls::XlsResult;
 use crate::xls::writer::{XlsShapeGroupChild, XlsShapeGroupWrite, XlsShapeKind};
+use litchi_odraw::{
+    prop::Id,
+    shape::{Flags, Native},
+    write::{
+        Atom as WriteAtom, Container as WriteContainer, PropertyBuilder, ShapeBuilder,
+        atom as write_escher_atom, child_anchor as write_child_anchor,
+        container as write_container, container_header as write_container_header,
+        spgr as write_spgr,
+    },
+};
 
-use super::drawing::{style_properties, write_xls_anchor};
+use super::drawing::{split_client_textbox, style_properties, write_xls_anchor};
 
 /// OfficeArtFOPT "Protection Boolean Properties" property ID (MS-ODRAW 2.3.1.5).
-const PROTECTION_BOOLEAN_PROPERTIES: u16 = 0x007F;
+const PROTECTION_BOOLEAN_PROPERTIES: Id = Id::LockAgainstGrouping;
 /// OfficeArtFOPT "Group Shape Boolean Properties" property ID (MS-ODRAW 2.3.4.44).
-const GROUP_SHAPE_BOOLEAN_PROPERTIES: u16 = 0x03BF;
+const GROUP_SHAPE_BOOLEAN_PROPERTIES_RAW: u16 = 0x03BF;
 /// `fLockAgainstGrouping` asserted together with its use bit.
 const LOCK_AGAINST_GROUPING_ON: i32 = 0x0004_0004;
 /// `fLockAgainstGrouping` cleared while keeping its use bit.
@@ -38,6 +44,7 @@ pub(crate) struct GroupShapeConfig<'a> {
 /// One MsoDrawing fragment of a group plus the OBJ payload that must follow it.
 pub(crate) struct GroupFragment<'a> {
     pub escher: Vec<u8>,
+    pub has_textbox: bool,
     pub obj: GroupFragmentObj<'a>,
 }
 
@@ -77,27 +84,26 @@ pub(crate) fn group_fragments<'a>(
             first_shape_id + 1 + index as u32,
         )?);
     }
-    let total = header.len() + child_shapes.iter().map(Vec::len).sum::<usize>();
+    let total = header.len()
+        + child_shapes
+            .iter()
+            .map(|(escher, has_textbox)| escher.len() + usize::from(*has_textbox) * 8)
+            .sum::<usize>();
     let mut first = Vec::with_capacity(8 + header.len());
-    write_escher_header(
-        &mut first,
-        0x0F,
-        0,
-        record_type::SPGR_CONTAINER,
-        total as u32,
-    )?;
+    write_container_header(&mut first, 0, WriteContainer::Spgr, total as u32)?;
     first.extend_from_slice(&header);
 
     let mut fragments = Vec::with_capacity(1 + child_shapes.len());
     fragments.push(GroupFragment {
         escher: first,
+        has_textbox: false,
         obj: GroupFragmentObj::Header {
             object_id: config.object_id,
             locked: group.locked,
             visible: group.visible,
         },
     });
-    for ((child, escher), &object_id) in group
+    for ((child, (escher, has_textbox)), &object_id) in group
         .children
         .iter()
         .zip(child_shapes)
@@ -105,6 +111,7 @@ pub(crate) fn group_fragments<'a>(
     {
         fragments.push(GroupFragment {
             escher,
+            has_textbox,
             obj: GroupFragmentObj::Child { child, object_id },
         });
     }
@@ -121,8 +128,8 @@ fn group_header_shape(group: &XlsShapeGroupWrite, shape_id: u32) -> XlsResult<Ve
         group.coordinates.right,
         group.coordinates.bottom,
     )?;
-    ShapeBuilder::new(shape_type::NOT_PRIMITIVE, shape_id)
-        .with_flags((ShapeFlags::GROUP | ShapeFlags::HAVE_ANCHOR).bits())
+    ShapeBuilder::new(Native::FREEFORM, shape_id)
+        .with_flags(Flags::GROUP | Flags::HAVE_ANCHOR)
         .write(&mut children)?;
     let mut properties = PropertyBuilder::new();
     properties.add_simple(
@@ -134,7 +141,7 @@ fn group_header_shape(group: &XlsShapeGroupWrite, shape_id: u32) -> XlsResult<Ve
         },
     );
     properties.add_simple(
-        GROUP_SHAPE_BOOLEAN_PROPERTIES,
+        Id::from(GROUP_SHAPE_BOOLEAN_PROPERTIES_RAW),
         if group.visible {
             GROUP_SHAPE_VISIBLE
         } else {
@@ -143,17 +150,17 @@ fn group_header_shape(group: &XlsShapeGroupWrite, shape_id: u32) -> XlsResult<Ve
     );
     properties.write(&mut children)?;
     write_xls_anchor(&mut children, &group.anchor)?;
-    write_atom(&mut children, 0, 0, record_type::CLIENT_DATA, &[])?;
+    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, record_type::SP_CONTAINER, &children)?;
+    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
     Ok(out)
 }
 
 /// Build one child SpContainer anchored with an OfficeArtChildAnchor.
-fn grouped_child_shape(child: &XlsShapeGroupChild, shape_id: u32) -> XlsResult<Vec<u8>> {
+fn grouped_child_shape(child: &XlsShapeGroupChild, shape_id: u32) -> XlsResult<(Vec<u8>, bool)> {
     let mut children = Vec::with_capacity(112);
-    ShapeBuilder::new(child.kind.officeart_type(), shape_id)
-        .with_flags((ShapeFlags::CHILD | ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT).bits())
+    ShapeBuilder::new(Native::from_raw(child.kind.officeart_type()), shape_id)
+        .with_flags(Flags::CHILD | Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
         .write(&mut children)?;
     style_properties(child.locked, child.fill, child.line, child.visible).write(&mut children)?;
     write_child_anchor(
@@ -163,26 +170,21 @@ fn grouped_child_shape(child: &XlsShapeGroupChild, shape_id: u32) -> XlsResult<V
         child.anchor.right,
         child.anchor.bottom,
     )?;
-    write_atom(
-        &mut children,
-        0,
-        0,
-        if child_has_textbox(child) {
-            record_type::CLIENT_TEXTBOX
-        } else {
-            record_type::CLIENT_DATA
-        },
-        &[],
-    )?;
+    write_escher_atom(&mut children, 0, WriteAtom::ClientData, &[])?;
+    let has_textbox = child_has_textbox(child);
+    if has_textbox {
+        write_escher_atom(&mut children, 0, WriteAtom::ClientTextbox, &[])?;
+    }
     let mut out = Vec::with_capacity(children.len() + 8);
-    write_container(&mut out, 0, record_type::SP_CONTAINER, &children)?;
-    Ok(out)
+    write_container(&mut out, 0, WriteContainer::Sp, &children)?;
+    split_client_textbox(out, has_textbox)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::xls::writer::{XlsGroupRect, XlsShapeAnchor};
+    use litchi_odraw::RecordKind;
 
     fn anchor() -> XlsShapeAnchor {
         XlsShapeAnchor {
@@ -233,7 +235,7 @@ mod tests {
         let (version, instance, rec_type, length) = read_escher_header(&fragments[0].escher);
         assert_eq!(version, 0x0F);
         assert_eq!(instance, 0);
-        assert_eq!(rec_type, record_type::SPGR_CONTAINER);
+        assert_eq!(rec_type, RecordKind::SpgrContainer.raw());
         let payload = fragments
             .iter()
             .map(|fragment| fragment.escher.len())
@@ -256,10 +258,10 @@ mod tests {
 
         // SpgrContainer header, then SpContainer header, then the Spgr atom.
         let (_, _, sp_container, _) = read_escher_header(&header[8..16]);
-        assert_eq!(sp_container, record_type::SP_CONTAINER);
+        assert_eq!(sp_container, RecordKind::SpContainer.raw());
         let (version, _, spgr, spgr_len) = read_escher_header(&header[16..24]);
         assert_eq!(version, 1);
-        assert_eq!(spgr, record_type::SPGR);
+        assert_eq!(spgr, RecordKind::Spgr.raw());
         assert_eq!(spgr_len, 16);
         let rect = header[24..40]
             .chunks(4)
@@ -269,24 +271,24 @@ mod tests {
 
         // Sp atom: NotPrimitive shape type, group + anchor flags, first shape ID.
         let (_, sp_instance, sp, _) = read_escher_header(&header[40..48]);
-        assert_eq!(sp, record_type::SP);
-        assert_eq!(sp_instance, shape_type::NOT_PRIMITIVE);
+        assert_eq!(sp, RecordKind::Sp.raw());
+        assert_eq!(sp_instance, Native::FREEFORM.raw());
         assert_eq!(u32::from_le_bytes(header[48..52].try_into().unwrap()), 2049);
         assert_eq!(
             u32::from_le_bytes(header[52..56].try_into().unwrap()),
-            (ShapeFlags::GROUP | ShapeFlags::HAVE_ANCHOR).bits()
+            (Flags::GROUP | Flags::HAVE_ANCHOR).bits()
         );
 
         // The header anchors to cells (18-byte ClientAnchor), never a ChildAnchor.
         assert!(
             header
                 .windows(2)
-                .any(|pair| pair == record_type::CLIENT_ANCHOR.to_le_bytes())
+                .any(|pair| pair == RecordKind::ClientAnchor.raw().to_le_bytes())
         );
         assert!(
             header
                 .windows(2)
-                .all(|pair| pair != record_type::CHILD_ANCHOR.to_le_bytes())
+                .all(|pair| pair != RecordKind::ChildAnchor.raw().to_le_bytes())
         );
     }
 
@@ -303,17 +305,17 @@ mod tests {
         let child = &fragments[1].escher;
 
         let (_, sp_instance, sp, _) = read_escher_header(&child[8..16]);
-        assert_eq!(sp, record_type::SP);
+        assert_eq!(sp, RecordKind::Sp.raw());
         assert_eq!(sp_instance, XlsShapeKind::TextBox.officeart_type());
         assert_eq!(u32::from_le_bytes(child[16..20].try_into().unwrap()), 3074);
         assert_eq!(
             u32::from_le_bytes(child[20..24].try_into().unwrap()),
-            (ShapeFlags::CHILD | ShapeFlags::HAVE_ANCHOR | ShapeFlags::HAVE_SPT).bits()
+            (Flags::CHILD | Flags::HAVE_ANCHOR | Flags::HAVE_SPT).bits()
         );
 
         let anchor_offset = child
             .windows(2)
-            .position(|pair| pair == record_type::CHILD_ANCHOR.to_le_bytes())
+            .position(|pair| pair == RecordKind::ChildAnchor.raw().to_le_bytes())
             .unwrap()
             - 2;
         let rect = child[anchor_offset + 8..anchor_offset + 24]
@@ -321,11 +323,14 @@ mod tests {
             .map(|chunk| i32::from_le_bytes(chunk.try_into().unwrap()))
             .collect::<Vec<_>>();
         assert_eq!(rect, vec![-20, 0, 480, 480]);
+        // ClientTextbox is declared inside the SpContainer length but emitted
+        // as its own MsoDrawing fragment after OBJ, per [MS-XLS].
         assert!(
             child
                 .windows(2)
-                .any(|pair| pair == record_type::CLIENT_TEXTBOX.to_le_bytes())
+                .all(|pair| pair != RecordKind::ClientTextbox.raw().to_le_bytes())
         );
+        assert!(fragments[1].has_textbox);
         assert!(matches!(
             fragments[1].obj,
             GroupFragmentObj::Child { object_id: 2, .. }

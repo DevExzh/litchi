@@ -80,7 +80,7 @@ fn primitives_emit_exact_client_record_order_and_parse_after_write() {
     assert_eq!(
         relevant,
         vec![
-            0x00EB, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x01B6, 0x003C, 0x003C
+            0x00EB, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x00EC, 0x01B6, 0x003C, 0x003C
         ]
     );
     assert!(records.iter().all(|(_, data)| data.len() <= 8224));
@@ -90,15 +90,26 @@ fn primitives_emit_exact_client_record_order_and_parse_after_write() {
         .filter(|(kind, _)| *kind == 0x00EC)
         .map(|(_, data)| data)
         .collect::<Vec<_>>();
-    assert_eq!(drawings.len(), 2);
+    assert_eq!(drawings.len(), 3);
     assert!(drawings[0].windows(2).any(|pair| pair == [0x10, 0xF0]));
     assert!(drawings[0].windows(2).any(|pair| pair == [0x11, 0xF0]));
-    assert!(drawings[1].windows(2).any(|pair| pair == [0x0D, 0xF0]));
+    assert!(drawings[1].windows(2).any(|pair| pair == [0x11, 0xF0]));
+    assert_eq!(&drawings[2][2..4], &[0x0D, 0xF0]);
+
+    let officeart = drawings
+        .iter()
+        .flat_map(|data| data.iter().copied())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        u32::from_le_bytes(officeart[4..8].try_into().unwrap()) as usize,
+        officeart.len() - 8
+    );
 
     let parsed = extract_shapes_from_workbook(&stream).unwrap();
     assert_eq!(parsed.len(), 2);
     assert_eq!(parsed[0].shape_id, 1025);
     assert_eq!(parsed[1].shape_id, 1026);
+    assert_eq!(parsed[1].text.as_deref(), Some("Hello 世界"));
 }
 
 #[test]

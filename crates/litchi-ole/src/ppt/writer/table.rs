@@ -24,7 +24,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use litchi_core::unit::{EMUS_PER_INCH, PPT_MASTER_UNITS_PER_INCH, pt_to_emu_i32};
+use litchi_core::unit::{EMUS_PER_INCH, EMUS_PER_PT, PPT_MASTER_UNITS_PER_INCH, pt_to_emu_i32};
 use zerocopy::IntoBytes;
 
 use super::core::PptWriteError;
@@ -52,6 +52,8 @@ const CELL_TEXT_TYPE: u32 = 4;
 const RECORD_TYPE_TERTIARY_OPT: u16 = 0xF122;
 /// OfficeArt ChildAnchor record type (0xF00F) per [MS-ODRAW].
 const RECORD_TYPE_CHILD_ANCHOR: u16 = 0xF00F;
+/// PowerPoint OfficeArtClientAnchor record type (0xF010).
+const RECORD_TYPE_CLIENT_ANCHOR: u16 = 0xF010;
 /// OfficeArt property id marking a group shape as a table ([MS-ODRAW]).
 const PROP_GROUP_TABLE_PROPERTIES: u16 = 0x039F;
 /// OfficeArt complex property id with one i32 row height per row.
@@ -165,7 +167,8 @@ impl Table {
         if width_pt <= 0 {
             return Err(invalid("column width must be positive"));
         }
-        *slot = pt_to_emu_i32(width_pt);
+        *slot = i32::try_from(i64::from(width_pt) * EMUS_PER_PT)
+            .map_err(|_| invalid("column width exceeds the supported EMU range"))?;
         Ok(())
     }
 
@@ -187,18 +190,23 @@ impl Table {
         if height_pt <= 0 {
             return Err(invalid("row height must be positive"));
         }
-        *slot = pt_to_emu_i32(height_pt);
+        *slot = i32::try_from(i64::from(height_pt) * EMUS_PER_PT)
+            .map_err(|_| invalid("row height exceeds the supported EMU range"))?;
         Ok(())
     }
 
     /// Total table width in EMUs.
-    pub(crate) fn width_emu(&self) -> i32 {
-        self.column_widths.iter().sum()
+    pub(crate) fn width_emu(&self) -> Option<i32> {
+        self.column_widths
+            .iter()
+            .try_fold(0_i32, |total, width| total.checked_add(*width))
     }
 
     /// Total table height in EMUs.
-    pub(crate) fn height_emu(&self) -> i32 {
-        self.row_heights.iter().sum()
+    pub(crate) fn height_emu(&self) -> Option<i32> {
+        self.row_heights
+            .iter()
+            .try_fold(0_i32, |total, height| total.checked_add(*height))
     }
 
     /// Number of OfficeArt shapes this table occupies in its drawing:
@@ -230,7 +238,7 @@ pub(crate) struct PositionedTable {
 /// │   ├── Spgr          child-coordinate bounding box of the grid
 /// │   ├── Sp            NOT_PRIMITIVE, GROUP | HAVE_ANCHOR flags
 /// │   ├── TertiaryOpt   GroupTableProperties=1, GroupTableRowProperties=[heights]
-/// │   └── ChildAnchor   table position on the slide (master units)
+/// │   └── ClientAnchor  table position on the slide (master units)
 /// └── SpContainer × rows*columns (cells, row-major)
 ///     ├── Sp            RECTANGLE, CHILD | HAVE_ANCHOR | HAVE_SPT flags
 ///     ├── ChildAnchor   cell rectangle in group child coordinates
@@ -241,8 +249,20 @@ pub(crate) fn build_table_spgr_container(
     group_spid: u32,
 ) -> Result<Vec<u8>, PptError> {
     let table = &placed.table;
-    let width_master = emu_to_master_i32(table.width_emu());
-    let height_master = emu_to_master_i32(table.height_emu());
+    let width_emu = table.width_emu().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "total table width exceeds the supported EMU range",
+        )
+    })?;
+    let height_emu = table.height_emu().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "total table height exceeds the supported EMU range",
+        )
+    })?;
+    let width_master = emu_to_master_i32(width_emu);
+    let height_master = emu_to_master_i32(height_emu);
 
     let mut group = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SPGR_CONTAINER);
 
@@ -276,16 +296,48 @@ pub(crate) fn build_table_spgr_container(
 
     let left = emu_to_master_i32(placed.x);
     let top = emu_to_master_i32(placed.y);
-    let mut anchor = EscherBuilder::new(header_version::SIMPLE, 0, RECORD_TYPE_CHILD_ANCHOR);
-    anchor.add_data(
-        ChildAnchor {
-            left,
-            top,
-            right: left + width_master,
-            bottom: top + height_master,
-        }
-        .as_bytes(),
-    );
+    let right = left.checked_add(width_master).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "table right edge exceeds the supported master-unit range",
+        )
+    })?;
+    let bottom = top.checked_add(height_master).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "table bottom edge exceeds the supported master-unit range",
+        )
+    })?;
+    let top = i16::try_from(top).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "table top edge exceeds the PPT short-anchor range",
+        )
+    })?;
+    let left = i16::try_from(left).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "table left edge exceeds the PPT short-anchor range",
+        )
+    })?;
+    let right = i16::try_from(right).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "table right edge exceeds the PPT short-anchor range",
+        )
+    })?;
+    let bottom = i16::try_from(bottom).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "table bottom edge exceeds the PPT short-anchor range",
+        )
+    })?;
+    let mut anchor = EscherBuilder::new(header_version::SIMPLE, 0, RECORD_TYPE_CLIENT_ANCHOR);
+    // PPT's eight-byte SmallRectStruct stores top, left, right, bottom.
+    anchor.add_data(&top.to_le_bytes());
+    anchor.add_data(&left.to_le_bytes());
+    anchor.add_data(&right.to_le_bytes());
+    anchor.add_data(&bottom.to_le_bytes());
     header.add_data(&anchor.build()?);
 
     group.add_data(&header.build()?);

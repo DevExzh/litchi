@@ -108,9 +108,14 @@ fn emitted_group_is_detected_as_table_with_grid_and_text() {
     assert_eq!((first.left, first.top), (0, 0));
     assert_eq!((first.width(), first.height()), (800, 320));
 
-    // Group anchor: (50pt, 60pt) -> (400, 480) master units.
-    let group_anchor = shape.anchor().unwrap();
-    assert_eq!((group_anchor.left, group_anchor.top), (400, 480));
+    // Group anchor: (50pt, 60pt) -> (400, 480) master units. ClientAnchor is
+    // host-defined, so validate it through the typed PPT projection.
+    let (record, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
+    assert_eq!(consumed, bytes.len());
+    let typed = litchi_odraw::shape::Shape::try_from(record).unwrap();
+    assert_eq!(typed.client_anchor().unwrap().len(), 8);
+    let group_anchor = crate::ppt::odraw::anchor(&typed).unwrap().unwrap();
+    assert_eq!((group_anchor.left(), group_anchor.top()), (400, 480));
     assert_eq!((group_anchor.width(), group_anchor.height()), (2400, 640));
 }
 
@@ -189,9 +194,20 @@ fn header_records_appear_in_poi_order() {
             EscherRecordType::Spgr,
             EscherRecordType::Sp,
             EscherRecordType::TertiaryOpt,
-            EscherRecordType::ChildAnchor,
+            EscherRecordType::ClientAnchor,
         ]
     );
+}
+
+#[test]
+fn oversized_table_dimensions_return_an_error() {
+    let mut table = Table::new(1, 2).unwrap();
+    table.set_column_width(0, 160_000).unwrap();
+    table.set_column_width(1, 160_000).unwrap();
+
+    let error = build_table_spgr_container(&positioned(table, 0, 0), 3)
+        .expect_err("the aggregate width exceeds i32 EMUs");
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
 }
 
 #[test]

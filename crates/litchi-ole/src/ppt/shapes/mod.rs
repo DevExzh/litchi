@@ -12,7 +12,7 @@ pub mod autoshape;
 /// - `Placeholder`: Placeholder shapes for titles, content, etc.
 /// - `AutoShape`: Auto shapes (rectangles, ovals, etc.)
 /// - `PictureShape`: Picture shapes with embedded images
-/// - `EscherRecord`: Parser for Escher binary records
+/// - typed OfficeArt records supplied by `litchi-odraw`
 ///
 /// # PPT Shape Structure
 ///
@@ -42,7 +42,6 @@ pub mod autoshape;
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub mod escher;
 pub mod geometry;
 pub mod picture;
 pub mod placeholder;
@@ -59,7 +58,7 @@ pub use shape_enum::ShapeEnum;
 // Re-export concrete shape types
 pub use autoshape::{AutoShape, AutoShapeGeometry};
 #[cfg(feature = "imgconv")]
-pub use picture::extract_blip_id_from_escher;
+pub use picture::extract_blip_id;
 pub use picture::{PictureFrameKind, PictureShape};
 pub use placeholder::{Placeholder, PlaceholderSize, PlaceholderType};
 pub use textbox::TextBox;

@@ -6,13 +6,13 @@
 use super::shape::{Shape, ShapeProperties, ShapeType};
 #[cfg(feature = "imgconv")]
 use crate::extractor::ExtractedImage;
-#[cfg(feature = "imgconv")]
-use crate::ppt::escher::EscherContainer;
 use crate::ppt::package::PptError;
 #[cfg(feature = "imgconv")]
 use litchi_core::error::Result;
 #[cfg(feature = "imgconv")]
 use litchi_imgconv::Blip;
+#[cfg(feature = "imgconv")]
+use litchi_odraw::Container;
 
 /// Semantic kind of a PowerPoint picture frame.
 ///
@@ -268,28 +268,24 @@ impl Shape for PictureShape {
 ///
 /// Uses zero-copy parsing with `Cow` to avoid unnecessary allocations.
 #[cfg(feature = "imgconv")]
-pub fn extract_blip_id_from_escher(container: &EscherContainer) -> Option<u32> {
-    use crate::ppt::escher::EscherRecordType;
+pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option<u32>> {
+    use litchi_odraw::RecordKind;
+    use litchi_odraw::prop::{Id, Props};
 
     // Look for shape options (Opt record)
-    for child in container.children().flatten() {
-        if child.record_type == EscherRecordType::Opt {
-            // Parse properties from the Opt record with zero-copy optimization
-            let prop_count = child.instance;
-            if let Ok(properties) =
-                crate::ppt::shapes::escher::EscherProperty::parse_properties(child.data, prop_count)
-            {
-                // Look for BlipToDisplay property (0x0104)
-                for prop in properties {
-                    if prop.is_blip_id() && prop.property_number() == 0x0104 {
-                        return Some(prop.data);
-                    }
-                }
-            }
+    for child in container.children() {
+        let child = child?;
+        if child.kind() == RecordKind::Opt
+            && let Some(id) = Props::parse(&child)?
+                .get_int(Id::BlipToDisplay)
+                .and_then(|id| u32::try_from(id).ok())
+                .filter(|id| *id != 0)
+        {
+            return Ok(Some(id));
         }
     }
 
-    None
+    Ok(None)
 }
 
 #[cfg(test)]

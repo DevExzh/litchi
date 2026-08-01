@@ -28,6 +28,8 @@ pub enum PptError {
     Io(io::Error),
     /// OLE file error
     Ole(OleError),
+    /// Checked OfficeArt parsing or validation error.
+    OfficeArt(litchi_odraw::Error),
     /// Invalid PPT format
     InvalidFormat(String),
     /// Stream not found
@@ -56,11 +58,18 @@ impl From<OleError> for PptError {
     }
 }
 
+impl From<litchi_odraw::Error> for PptError {
+    fn from(err: litchi_odraw::Error) -> Self {
+        PptError::OfficeArt(err)
+    }
+}
+
 impl std::fmt::Display for PptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PptError::Io(e) => write!(f, "IO error: {}", e),
             PptError::Ole(e) => write!(f, "OLE error: {}", e),
+            PptError::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
             PptError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
             PptError::StreamNotFound(s) => write!(f, "Stream not found: {}", s),
             PptError::Corrupted(s) => write!(f, "Corrupted file: {}", s),
@@ -288,6 +297,9 @@ impl From<PptError> for litchi_core::Error {
         match err {
             PptError::Io(e) => litchi_core::Error::Io(e),
             PptError::Ole(ole_err) => litchi_core::Error::from(ole_err),
+            PptError::OfficeArt(error) => {
+                litchi_core::Error::CorruptedFile(format!("Invalid OfficeArt data: {error}"))
+            },
             PptError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             PptError::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             PptError::Corrupted(s) => litchi_core::Error::CorruptedFile(s),

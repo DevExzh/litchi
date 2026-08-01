@@ -6,14 +6,14 @@
 //! resolve correctly without disturbing the main stories.
 #![cfg(feature = "imgconv")]
 
+use litchi_odraw::{Record, shape::Kind};
 use litchi_ole::doc::parts::headers::HeaderFooterType;
-use litchi_ole::doc::shapes::extract_drawing_shapes;
+use litchi_ole::doc::shapes::{extract_drawing_shapes, extract_shape_text};
 use litchi_ole::doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition};
 use litchi_ole::doc::{
     DocHeaderKind, HeaderFooterParagraph, Package, ShapeHorizontalOrigin, ShapeTextWrap,
     ShapeVerticalOrigin,
 };
-use litchi_ole::escher::EscherShapeType;
 use std::io::Cursor;
 
 /// The first header-story shape id: header shapes use their own cluster
@@ -119,21 +119,27 @@ fn header_text_box_round_trips_through_doc_reader() {
         .iter()
         .find(|shape| shape.shape_id == HEADER_BOX_SPID)
         .expect("header text box in drawing layer");
-    assert_eq!(header_box.shape_type, EscherShapeType::TextBox);
+    assert_eq!(header_box.shape_type, Kind::TextBox);
+    assert_eq!(header_box.text.as_deref(), Some("Watermark\rDraft\r"));
     assert_eq!(header_box.fill_color, Some((0xEE, 0xEE, 0xFF)));
     assert_eq!(header_box.line_color, Some((0x40, 0x40, 0x40)));
     let main_box = shapes
         .iter()
         .find(|shape| shape.shape_id == MAIN_BOX_SPID)
         .expect("main text box in drawing layer");
-    assert_eq!(main_box.shape_type, EscherShapeType::TextBox);
+    assert_eq!(main_box.shape_type, Kind::TextBox);
+    assert_eq!(main_box.text.as_deref(), Some("Main box\r"));
+
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    assert_eq!(
+        extract_shape_text(&mut ole).unwrap(),
+        "Main box\r\nWatermark\rDraft\r"
+    );
 }
 
 #[test]
 fn header_text_box_writes_two_drawing_layers() {
     use litchi_ole::doc::parts::fib::FileInformationBlock;
-    use litchi_ole::escher::EscherRecord;
-
     const FIB_INDEX_DGG_INFO: usize = 50;
     const RECORD_DG_CONTAINER: u16 = 0xF002;
 
@@ -151,15 +157,15 @@ fn header_text_box_writes_two_drawing_layers() {
     let (dgg_offset, dgg_len) = fib.get_table_pointer(FIB_INDEX_DGG_INFO).unwrap();
     assert!(dgg_len > 0);
     let dgg = &table_stream[dgg_offset as usize..(dgg_offset + dgg_len) as usize];
-    let (_first, first_size) = EscherRecord::parse(dgg, 0).unwrap();
+    let (_first, first_size) = Record::parse(dgg, 0).unwrap();
     let mut dgglbls = Vec::new();
     let mut offset = first_size;
     while offset + 9 <= dgg.len() {
         dgglbls.push(dgg[offset]);
-        let Ok((record, size)) = EscherRecord::parse(dgg, offset + 1) else {
+        let Ok((record, size)) = Record::parse(dgg, offset + 1) else {
             break;
         };
-        if record.record_type_raw != RECORD_DG_CONTAINER {
+        if record.raw_kind() != RECORD_DG_CONTAINER {
             break;
         }
         offset += 1 + size;

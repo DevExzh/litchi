@@ -41,12 +41,10 @@ pub mod sprm;
 /// Complete SPRM operation definitions based on Apache POI.
 pub mod sprm_operations;
 
-/// Shared OfficeArt (Escher) functionality for Office binary formats
-///
-/// Escher is Microsoft's drawing layer format used across Office applications
-/// (DOC, XLS, PPT) for shapes, connectors, and graphical elements.
-/// This module provides shared zero-copy parsing and writing utilities.
-pub mod escher;
+// Migration-only OfficeArt writers that have not yet moved into `litchi-odraw`.
+// The old numeric Escher facade is intentionally not part of the public API.
+#[allow(dead_code)]
+mod escher;
 
 /// Safe typed discovery and inert CFB replacement for legacy embedded objects.
 pub mod embedded_object;
@@ -81,10 +79,6 @@ pub use embedded_object::{
 
 pub use xls::{XlsError, XlsWorkbook};
 
-/// Image extraction bridge between OLE Escher records and `litchi-imgconv`.
-///
-/// Lives here rather than in the umbrella because it depends on private
-/// `crate::escher` and `crate::ppt::escher` types that cannot cross crate
-/// boundaries.
+/// Image extraction bridge between typed OfficeArt records and `litchi-imgconv`.
 #[cfg(feature = "imgconv")]
 pub mod extractor;

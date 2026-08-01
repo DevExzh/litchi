@@ -46,6 +46,7 @@
       "soapberry-zip",
       "xml-minifier"
     ],
+    "litchi-odraw": [],
     "litchi-ole": [],
     "litchi-ole-common": [
       "litchi-cfb",
@@ -134,6 +135,13 @@
     },
     {
       "order": 25,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-odraw",
+      "reason": "The legacy migration host temporarily consumes the extracted OfficeArt substrate.",
+      "exit": "Move DOC, PPT, and XLS into concrete crates and delete the litchi-ole host."
+    },
+    {
+      "order": 26,
       "dependent": "litchi-ole",
       "dependency": "litchi-opc",
       "reason": "The legacy OLE monolith still carries embedded OOXML package handling.",
@@ -241,6 +249,7 @@
   "runtime_neutral": [
     "litchi-core",
     "litchi-drawingml",
+    "litchi-odraw",
     "litchi-ole-common",
     "litchi-ooxml-common",
     "litchi-sheet",

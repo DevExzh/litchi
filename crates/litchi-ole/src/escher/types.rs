@@ -29,7 +29,7 @@ pub enum EscherRecordType {
     /// File Drawing Group atom
     Dgg = 0xF006,
     /// Blip Store Entry
-    BSE = 0xF007,
+    Bse = 0xF007,
     /// Drawing atom
     Dg = 0xF008,
     /// Shape Group atom
@@ -75,7 +75,7 @@ pub enum EscherRecordType {
 
     // Color MRU
     /// Color MRU
-    ColorMRU = 0xF11A,
+    ColorMru = 0xF11A,
 
     // Connector rule
     /// Connector Rule
@@ -139,7 +139,7 @@ impl From<u16> for EscherRecordType {
             0xF004 => Self::SpContainer,
             0xF005 => Self::SolverContainer,
             0xF006 => Self::Dgg,
-            0xF007 => Self::BSE,
+            0xF007 => Self::Bse,
             0xF008 => Self::Dg,
             0xF009 => Self::Spgr,
             0xF00A => Self::Sp,
@@ -160,7 +160,7 @@ impl From<u16> for EscherRecordType {
             0xF01E => Self::BlipPng,
             0xF01F => Self::BlipDib,
             0xF029 => Self::BlipTiff,
-            0xF11A => Self::ColorMRU,
+            0xF11A => Self::ColorMru,
             0xF11E => Self::SplitMenuColors,
             0xF121 => Self::SecondaryOpt,
             0xF122 => Self::TertiaryOpt,

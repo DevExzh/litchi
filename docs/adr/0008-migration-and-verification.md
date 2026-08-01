@@ -1180,6 +1180,91 @@ architecture. The same workflow denies compiler, Clippy, and rustdoc warnings
 across every workspace target with the complete feature set so test-, example-,
 and documentation-only regressions cannot hide behind default library builds.
 
+The twenty-fourth implementation slice extracts the host-neutral binary
+OfficeArt substrate into `litchi-odraw`. The crate owns bounded record headers,
+record kinds, zero-copy record and container traversal, topology validation,
+ordered property tables, typed color and complex-array values, shape flags,
+and validated record writing. It has no internal workspace dependency and does
+not depend on DOC, PPT, XLS, CFB, an async runtime, or a concrete host model. Host
+records remain typed at their boundaries: Word anchors, PowerPoint client data,
+and Excel client anchors are interpreted by their respective crates rather
+than hidden behind an untyped common payload. Borrowed parsing keeps payloads
+in their source allocation, while writer builders accept borrowed or owned
+payloads through `Cow` and validate lengths and container invariants before
+emission.
+
+The DOC, PPT, and XLS readers and writers now consume `litchi-odraw` directly.
+The legacy public Escher model and duplicate PowerPoint parser were removed
+instead of retained as compatibility aliases. The migration host keeps only
+format-specific bridges and semantic models. OfficeArt properties preserve
+wire order, exact property identifiers, and flag bits for lossless inspection;
+duplicate semantic identifiers are rejected at the parse boundary instead of
+making ergonomic lookup ambiguous. Native record kinds and flags remain
+representable without weakening the typed known cases. This is the neutral
+ODraw extraction and first host migration slice, not completion of the planned
+`litchi-doc`, `litchi-ppt`, and `litchi-xls` crate split or the complete binary
+CRUD checklist.
+
+Computer Use exercised permanent generated smoke artifacts in the installed
+macOS desktop Microsoft Word, PowerPoint, and Excel applications. PowerPoint
+opened the generated PPT without repair, rendered the title, rectangle,
+ellipse, text boxes, and all four cells of a table at their requested bounds.
+Selecting a table cell exposed PowerPoint's native Table Design and Table
+Layout tabs. Excel opened the final XLS without repair, rendered a
+primitive rectangle, a Unicode text box, and a grouped ellipse/text-box pair;
+selecting the text box exposed native resize/edit affordances and Shape Format.
+Word opened the final DOC without repair, exposed `Rectangle 1` and `Text Box
+2` as native floating objects, rendered their corrected blue and pale-green
+fills, retained the text-box story, and displayed native resize handles when
+the rectangle was selected.
+
+These native checks found two specification defects that unit tests alone had
+missed. An XLS text shape originally placed `OfficeArtClientTextbox` in the
+same `MsoDrawing` fragment as `OfficeArtClientData`; `[MS-XLS]` requires the
+OBJ record between those fragments, followed by TXO and CONTINUE text records.
+The writer now splits the final client-textbox record at that BIFF boundary,
+and the reader rejoins it only when the preceding top-level OfficeArt record is
+structurally incomplete. The DOC writer also encoded `OfficeArtFDGG.cidcl` as
+the number of IDCL entries. `[MS-ODRAW]` section 2.2.47 requires that count plus
+one; Word rejected every floating drawing until the invariant was corrected.
+Regression tests pin both exact wire orders and the cluster count. These checks
+certify native open/render/select behavior for the generated artifacts on this
+machine. They do not yet certify Office resave/reverse-read for these binary
+artifacts, every Office build, the full binary CRUD matrix, or performance.
+
+The complete regression sweep exposed four further interoperability defects.
+The DOC writer had encoded direct OfficeArt RGB colors in blue-green-red byte
+order; typed `ColorRef` parsing made the low-byte red, then green, then blue
+wire contract explicit and the writer and integration expectations now agree.
+A genuine Microsoft Word fixture also contains a non-visible direct background
+sentinel with `fHaveAnchor` set but no `OfficeArtClientAnchor`. The parser keeps
+strict flag/topology agreement for user shapes, accepts only that narrow
+background omission, validates the rest of the sentinel, and excludes it from
+the user-facing shape list. Regression tests pin the asymmetric color bytes,
+the compatibility exception, and rejection of the same missing anchor on an
+ordinary shape.
+
+The PPT table writer had also placed an `OfficeArtChildAnchor` on a slide-level
+table group whose shape was not marked as a child. It now uses the
+PowerPoint-defined eight-byte `OfficeArtClientAnchor`; table/chart coexistence
+therefore survives typed shape parsing and chart-frame attribution. A native
+PowerPoint visual probe rejected the initial full-rectangle writer choice by
+rendering transposed and compressed coordinates, so the writer now pins the
+producer-compatible `SmallRectStruct` and rejects coordinates outside its
+range. Table dimension setters and aggregate dimensions likewise return typed
+errors when conversion or addition exceeds the representable EMU range instead
+of saturating or overflowing. The permanent native smoke artifact includes a
+table so this topology remains part of the desktop PowerPoint gate.
+
+The PPT master writer also had a private numeric placeholder mini-enum whose
+`TITLE = 0` encoded `PT_None`, while `BODY = 1` encoded `MasterTitle`. It now
+takes the shared typed `PowerPointPlaceholderKind` directly, so neither call
+site can silently manufacture those invalid semantic values. The
+header/footer integration regression pins the corrected master-title and
+master-body placeholder records. The regenerated final artifact was reopened
+in desktop PowerPoint after this correction and rendered without a repair
+dialog.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

@@ -886,14 +886,14 @@ fn rewrite_shape_container(record: &[u8], animation: Option<&[u8]>) -> Result<Ve
             if !anim_found && let Some(value) = animation {
                 payload.extend_from_slice(value);
             }
-            out.extend(escher_record(0, 0, ESCHER_CLIENT_DATA, &payload)?);
+            out.extend(escher_record(0x0f, 0, ESCHER_CLIENT_DATA, &payload)?);
         } else {
             out.extend_from_slice(child);
         }
         offset += child.len();
     }
     if !client_found && let Some(value) = animation {
-        out.extend(escher_record(0, 0, ESCHER_CLIENT_DATA, value)?);
+        out.extend(escher_record(0x0f, 0, ESCHER_CLIENT_DATA, value)?);
     }
     rebuild_record(record, &out)
 }
@@ -1070,7 +1070,7 @@ mod tests {
         let animation = write_animation_info(&AnimationInfo::new()).unwrap().0;
         let mut client_payload = interactive.clone();
         client_payload.extend(animation);
-        let client = escher_record(0, 0, ESCHER_CLIENT_DATA, &client_payload).unwrap();
+        let client = escher_record(0x0f, 0, ESCHER_CLIENT_DATA, &client_payload).unwrap();
         let mut shape_payload = escher_record(2, 0, ESCHER_SP, &[42, 0, 0, 0, 0, 0, 0, 0]).unwrap();
         shape_payload.extend(client);
         let shape = escher_record(0x0f, 0, ESCHER_SP_CONTAINER, &shape_payload).unwrap();

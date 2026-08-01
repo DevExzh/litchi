@@ -333,8 +333,8 @@ fn inline_and_floating_pictures_round_trip_through_doc_reader() {
 
 #[test]
 fn floating_picture_writes_valid_dgg_info() {
+    use litchi_odraw::Record;
     use litchi_ole::doc::parts::fib::FileInformationBlock;
-    use litchi_ole::escher::EscherRecord;
 
     const FIB_INDEX_DGG_INFO: usize = 50;
     const RECORD_DGG_CONTAINER: u16 = 0xF000;
@@ -359,25 +359,25 @@ fn floating_picture_writes_valid_dgg_info() {
     let dgg = &table_stream[dgg_offset as usize..(dgg_offset + dgg_len) as usize];
 
     // Top level: DggContainer, dgglbl byte, DgContainer.
-    let (dgg_container, dgg_container_size) = EscherRecord::parse(dgg, 0).unwrap();
-    assert_eq!(dgg_container.record_type_raw, RECORD_DGG_CONTAINER);
+    let (dgg_container, dgg_container_size) = Record::parse(dgg, 0).unwrap();
+    assert_eq!(dgg_container.raw_kind(), RECORD_DGG_CONTAINER);
     let dgglbl = dgg[dgg_container_size];
     assert_eq!(dgglbl, 0, "dgglbl 0 = Main Document drawing");
-    let (dg_container, _) = EscherRecord::parse(dgg, dgg_container_size + 1).unwrap();
-    assert_eq!(dg_container.record_type_raw, RECORD_DG_CONTAINER);
+    let (dg_container, _) = Record::parse(dgg, dgg_container_size + 1).unwrap();
+    assert_eq!(dg_container.raw_kind(), RECORD_DG_CONTAINER);
 
     // The BStoreContainer holds one BSE whose embedded BLIP is the JPEG.
     let mut offset = 0;
     let mut bse_count = 0;
-    while offset < dgg_container.data.len() {
-        let (record, size) = EscherRecord::parse(dgg_container.data, offset).unwrap();
-        if record.record_type_raw == RECORD_BSTORE_CONTAINER {
+    while offset < dgg_container.data().len() {
+        let (record, size) = Record::parse(dgg_container.data(), offset).unwrap();
+        if record.raw_kind() == RECORD_BSTORE_CONTAINER {
             let mut bse_offset = 0;
-            while bse_offset < record.data.len() {
-                let (bse, bse_size) = EscherRecord::parse(record.data, bse_offset).unwrap();
-                assert_eq!(bse.record_type_raw, RECORD_BSE);
+            while bse_offset < record.data().len() {
+                let (bse, bse_size) = Record::parse(record.data(), bse_offset).unwrap();
+                assert_eq!(bse.raw_kind(), RECORD_BSE);
                 assert!(
-                    bse.data
+                    bse.data()
                         .windows(jpeg_bytes.len())
                         .any(|window| window == jpeg_bytes.as_slice()),
                     "embedded BLIP must contain the original JPEG bytes"
@@ -400,23 +400,23 @@ fn floating_picture_writes_valid_dgg_info() {
     ) {
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            let Ok((record, size)) = EscherRecord::parse(data, offset) else {
+            let Ok((record, size)) = Record::parse(data, offset) else {
                 break;
             };
-            match record.record_type_raw {
+            match record.raw_kind() {
                 RECORD_SPGR_CONTAINER => *spgr_containers += 1,
                 RECORD_SP => {
-                    let spid = u32::from_le_bytes(record.data[0..4].try_into().unwrap());
+                    let spid = u32::from_le_bytes(record.data()[0..4].try_into().unwrap());
                     spids.push(spid);
                 },
                 RECORD_CLIENT_ANCHOR => {
-                    let index = u32::from_le_bytes(record.data[0..4].try_into().unwrap());
+                    let index = u32::from_le_bytes(record.data()[0..4].try_into().unwrap());
                     client_anchors.push(index);
                 },
                 _ => {},
             }
-            if record.version == 0xF {
-                walk_shapes(record.data, spids, client_anchors, spgr_containers);
+            if record.is_container() {
+                walk_shapes(record.data(), spids, client_anchors, spgr_containers);
             }
             offset += size;
         }
@@ -425,7 +425,7 @@ fn floating_picture_writes_valid_dgg_info() {
     let mut client_anchors = Vec::new();
     let mut spgr_containers = 0;
     walk_shapes(
-        dg_container.data,
+        dg_container.data(),
         &mut spids,
         &mut client_anchors,
         &mut spgr_containers,

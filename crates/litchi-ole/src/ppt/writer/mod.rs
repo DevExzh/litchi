@@ -18,8 +18,9 @@ mod core;
 /// PPT record generation system
 pub mod records;
 
-/// Escher (Office Drawing) records
-pub mod escher;
+// Migration-only OfficeArt encoding internals. The typed public substrate is
+// `litchi-odraw`; numeric record builders are not part of the writer facade.
+mod escher;
 
 /// PersistPtr offset mapping
 pub mod persist;
@@ -93,7 +94,7 @@ pub use blip::{BlipStoreBuilder, BlipType, PictureData};
 pub use chart::{Chart, ChartKind, ChartSeries};
 pub use comments::{CommentDateTime, SlideComment};
 pub use custom_shows::CustomShow;
-pub use escher::{EscherBuilder, FreeformGeometry, create_dgg_container, create_shape_container};
+pub use escher::FreeformGeometry;
 pub use hyperlink::{Hyperlink, HyperlinkCollection, HyperlinkTarget};
 pub use notes::{NotesCollection, NotesPage};
 pub use persist::{PersistPtrBuilder, UserEditAtom};

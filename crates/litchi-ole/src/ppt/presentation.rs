@@ -69,6 +69,28 @@ pub struct Presentation {
     blip_store: Option<BlipStore<'static>>,
 }
 
+fn drawing_textboxes(data: &[u8]) -> Result<Vec<litchi_odraw::Record<'_>>> {
+    fn collect<'data>(
+        shape: &litchi_odraw::shape::Shape<'data>,
+        records: &mut Vec<litchi_odraw::Record<'data>>,
+    ) -> Result<()> {
+        if let Some(textbox) = crate::ppt::odraw::textbox(shape)? {
+            records.push(textbox);
+        }
+        for child in shape.children() {
+            collect(child, records)?;
+        }
+        Ok(())
+    }
+
+    let shapes = crate::ppt::odraw::parse(data)?;
+    let mut records = Vec::new();
+    for shape in &shapes {
+        collect(shape, &mut records)?;
+    }
+    Ok(records)
+}
+
 impl Presentation {
     /// Create a new Presentation from an OLE file.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
@@ -250,8 +272,10 @@ impl Presentation {
 
         fn collect(record: &PptRecord, out: &mut Vec<PowerPointTextMetachar>) -> Result<()> {
             if record.record_type == PptRecordType::PPDrawing {
-                let (escher, _) = super::shapes::escher::EscherRecord::parse(&record.data, 0)?;
-                collect_escher(&escher, out)?;
+                for textbox in drawing_textboxes(&record.data)? {
+                    let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox.data().to_vec())?;
+                    out.extend_from_slice(wrapper.metachars());
+                }
             } else if matches!(
                 record.record_type,
                 PptRecordType::SlideNumberMCAtom
@@ -262,20 +286,6 @@ impl Presentation {
                     | PptRecordType::RtfDateTimeMCAtom
             ) {
                 out.extend(crate::ppt::text_metachar::metachars_from_records([record])?);
-            }
-            Ok(())
-        }
-
-        fn collect_escher(
-            record: &super::shapes::escher::EscherRecord<'_>,
-            out: &mut Vec<PowerPointTextMetachar>,
-        ) -> Result<()> {
-            if record.record_type == super::shapes::escher::EscherRecordType::ClientTextbox {
-                let wrapper = crate::ppt::EscherTextboxWrapper::new(record.data.to_vec())?;
-                out.extend_from_slice(wrapper.metachars());
-            }
-            for child in &record.children {
-                collect_escher(child, out)?;
             }
             Ok(())
         }
@@ -346,24 +356,12 @@ impl Presentation {
 
         fn collect(record: &PptRecord, out: &mut Vec<PowerPointOutlineTextRef>) -> Result<()> {
             if record.record_type == PptRecordType::PPDrawing {
-                let (escher, _) = super::shapes::escher::EscherRecord::parse(&record.data, 0)?;
-                collect_escher(&escher, out)?;
+                for textbox in drawing_textboxes(&record.data)? {
+                    let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox.data().to_vec())?;
+                    out.extend_from_slice(wrapper.outline_text_refs());
+                }
             } else if record.record_type == PptRecordType::OutlineTextRefAtom {
                 out.push(PowerPointOutlineTextRef::parse_record(record)?);
-            }
-            Ok(())
-        }
-
-        fn collect_escher(
-            record: &super::shapes::escher::EscherRecord<'_>,
-            out: &mut Vec<PowerPointOutlineTextRef>,
-        ) -> Result<()> {
-            if record.record_type == super::shapes::escher::EscherRecordType::ClientTextbox {
-                let wrapper = crate::ppt::EscherTextboxWrapper::new(record.data.to_vec())?;
-                out.extend_from_slice(wrapper.outline_text_refs());
-            }
-            for child in &record.children {
-                collect_escher(child, out)?;
             }
             Ok(())
         }
@@ -1046,19 +1044,18 @@ impl Presentation {
             let mut text = String::with_capacity(512);
 
             // Extract text from slide records without parsing shapes
-            if let Ok(record_text) = slide_data.record.extract_text() {
-                let trimmed = record_text.trim();
-                if !trimmed.is_empty() {
-                    text.push_str(trimmed);
-                }
+            let record_text = slide_data.record.extract_text()?;
+            let trimmed = record_text.trim();
+            if !trimmed.is_empty() {
+                text.push_str(trimmed);
             }
 
             // Extract text from Escher/PPDrawing using the optimized path
             if let Some(ppdrawing) = slide_data
                 .record
                 .find_child(crate::consts::PptRecordType::PPDrawing)
-                && let Ok(escher_text) = super::escher::extract_text_from_escher(&ppdrawing.data)
             {
+                let escher_text = super::odraw::text_from_drawing(&ppdrawing.data)?;
                 let trimmed = escher_text.trim();
                 if !trimmed.is_empty() {
                     if !text.is_empty() {
@@ -1366,11 +1363,10 @@ fn placeholder_display_from_record(
     let Some(drawing) = record.find_child(PptRecordType::PPDrawing) else {
         return Ok(None);
     };
-    let parsed =
-        crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
+    let parsed = super::odraw::parse(&drawing.data)?;
     let mut shapes = Vec::with_capacity(parsed.len());
     for shape in &parsed {
-        if let Some(shape) = Slide::<'static>::convert_escher_to_shape_enum(shape)? {
+        if let Some(shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
             shapes.push(shape);
         }
     }

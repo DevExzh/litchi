@@ -5,6 +5,7 @@
 //! Uses SIMD-accelerated signature matching for improved performance.
 
 use litchi_core::detection::FileFormat;
+#[cfg(feature = "ooxml")]
 use std::io::{Read, Seek};
 
 #[cfg(feature = "ooxml")]
@@ -50,13 +51,6 @@ pub fn detect_zip_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<F
 
     // Determine the specific OOXML format based on content
     detect_ooxml_format_from_package(&package)
-}
-
-/// Stub implementation when `ooxml` feature is disabled.
-/// Always returns None since OOXML parsing is not available.
-#[cfg(not(feature = "ooxml"))]
-pub fn detect_zip_format_from_reader<R: Read + Seek>(_reader: &mut R) -> Option<FileFormat> {
-    None
 }
 
 /// Detect specific OOXML format from OpcPackage.
@@ -121,12 +115,5 @@ pub fn detect_ooxml_format_from_package(package: &crate::ooxml::OpcPackage) -> O
         return Some(FileFormat::Xlsx);
     }
 
-    None
-}
-
-/// Stub implementation when `ooxml` feature is disabled.
-/// Always returns None since OOXML parsing is not available.
-#[cfg(not(feature = "ooxml"))]
-pub fn detect_ooxml_format_from_package(_package: &()) -> Option<FileFormat> {
     None
 }

@@ -73,8 +73,8 @@ pub mod records;
 pub mod shapes;
 pub mod text;
 
-// Drawing layer (Escher) support
-pub mod escher;
+// PowerPoint projections over the format-neutral OfficeArt substrate.
+pub mod odraw;
 
 // Legacy compatibility modules
 pub mod bookmark_summary;

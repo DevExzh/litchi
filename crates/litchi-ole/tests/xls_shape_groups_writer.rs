@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use litchi_ole::escher::EscherShapeType;
+use litchi_odraw::shape::Kind;
 use litchi_ole::xls::shapes::extract_shapes_from_workbook;
 use litchi_ole::xls::writer::{
     XlsGroupRect, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,
@@ -91,8 +91,8 @@ fn grouped_shapes_emit_exact_record_order_and_round_trip() {
     assert_eq!(
         relevant,
         vec![
-            0x00EB, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x01B6, 0x003C,
-            0x003C
+            0x00EB, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x00EC, 0x005D, 0x00EC, 0x01B6,
+            0x003C, 0x003C
         ]
     );
     assert!(records.iter().all(|(_, data)| data.len() <= 8224));
@@ -133,7 +133,7 @@ fn grouped_shapes_emit_exact_record_order_and_round_trip() {
         .filter(|(kind, _)| *kind == 0x00EC)
         .map(|(_, data)| data)
         .collect::<Vec<_>>();
-    assert_eq!(drawings.len(), 4);
+    assert_eq!(drawings.len(), 5);
     let escher = drawings
         .iter()
         .flat_map(|data| data.iter().copied())
@@ -152,7 +152,7 @@ fn grouped_shapes_emit_exact_record_order_and_round_trip() {
     );
     assert_eq!(
         u32::from_le_bytes(group_fragment[4..8].try_into().unwrap()) as usize,
-        (group_fragment.len() - 8) + drawings[2].len() + drawings[3].len()
+        (group_fragment.len() - 8) + drawings[2].len() + drawings[3].len() + drawings[4].len()
     );
 
     // The workbook drawing-group cluster accounts for group and child shape IDs.
@@ -178,18 +178,19 @@ fn grouped_shapes_emit_exact_record_order_and_round_trip() {
     let parsed = extract_shapes_from_workbook(&stream).unwrap();
     assert_eq!(parsed.len(), 2);
     assert_eq!(parsed[0].shape_id, 1025);
-    assert_eq!(parsed[0].shape_type, EscherShapeType::Rectangle);
+    assert_eq!(parsed[0].shape_type, Kind::Rectangle);
     assert!(!parsed[0].is_group);
 
     let group = &parsed[1];
     assert!(group.is_group);
-    assert_eq!(group.shape_type, EscherShapeType::Group);
+    assert_eq!(group.shape_type, Kind::Group);
     assert_eq!(group.shape_id, 1026);
     assert_eq!(group.children.len(), 2);
     assert_eq!(group.children[0].shape_id, 1027);
-    assert_eq!(group.children[0].shape_type, EscherShapeType::Rectangle);
+    assert_eq!(group.children[0].shape_type, Kind::Rectangle);
     assert_eq!(group.children[1].shape_id, 1028);
-    assert_eq!(group.children[1].shape_type, EscherShapeType::TextBox);
+    assert_eq!(group.children[1].shape_type, Kind::TextBox);
+    assert_eq!(group.children[1].text.as_deref(), Some("Grouped 世界"));
 }
 
 #[test]

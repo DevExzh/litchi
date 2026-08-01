@@ -3,8 +3,10 @@
 /// Text boxes are shapes that contain text content and are commonly used
 /// for titles, bullet points, and other text elements in PowerPoint slides.
 use super::shape::{Shape, ShapeContainer, ShapeProperties};
+use crate::ppt::odraw::ShapeExt as _;
 use crate::ppt::text_run::{ParagraphRun, ParagraphRunFormatting, TextRun, TextRunFormatting};
 use crate::ppt::{TextRuler, TextStyleExtension9, TextStyleExtension10, TextStyleExtension11};
+use litchi_odraw::shape::Shape as OdrawShape;
 
 /// Type alias for text formatting tuple to reduce complexity.
 type TextFormattingResult = (Option<u16>, Option<u32>, bool, bool, bool);
@@ -69,48 +71,42 @@ impl<'a> TextBox<'a> {
         }
     }
 
-    /// Create a text box from an Escher record with zero-copy parsing.
-    pub fn from_escher_record(
-        record: &'a super::escher::EscherRecord<'a>,
-    ) -> super::super::package::Result<Self> {
-        // Extract basic shape properties
-        let properties = record.extract_shape_properties()?;
-
-        let (text, runs, paragraph_runs, text_ruler, metachars, outline_text_refs) =
-            if let Some(textbox_record) =
-                Self::find_descendant(record, super::escher::EscherRecordType::ClientTextbox)
-            {
-                let wrapper = crate::ppt::EscherTextboxWrapper::new(textbox_record.data.to_vec())?;
-                (
-                    wrapper.text().to_string(),
-                    wrapper.runs().to_vec(),
-                    wrapper.paragraph_runs().to_vec(),
-                    wrapper.text_ruler().cloned(),
-                    wrapper.metachars().to_vec(),
-                    wrapper.outline_text_refs().to_vec(),
-                )
-            } else {
-                (
-                    String::new(),
-                    Vec::new(),
-                    Vec::new(),
-                    None,
-                    Vec::new(),
-                    Vec::new(),
-                )
-            };
+    /// Creates an owned text box from a typed, borrowed OfficeArt shape.
+    pub(crate) fn from_odraw(
+        properties: ShapeProperties,
+        shape: &OdrawShape<'_>,
+    ) -> super::super::package::Result<TextBox<'static>> {
+        let wrapper = crate::ppt::odraw::textbox(shape)?
+            .map(|record| crate::ppt::EscherTextboxWrapper::new(record.data().to_vec()))
+            .transpose()?;
+        let (text, runs, paragraph_runs, text_ruler, metachars, outline_text_refs) = match wrapper {
+            Some(wrapper) => (
+                wrapper.text().to_owned(),
+                wrapper.runs().to_vec(),
+                wrapper.paragraph_runs().to_vec(),
+                wrapper.text_ruler().cloned(),
+                wrapper.metachars().to_vec(),
+                wrapper.outline_text_refs().to_vec(),
+            ),
+            None => (
+                String::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+                Vec::new(),
+                Vec::new(),
+            ),
+        };
         let (font_size, font_color, bold, italic, underline) = Self::formatting_from_runs(&runs);
-        let text_style_extension9 = record.extract_text_style_extension9()?;
-        let text_style_extension10 = record.extract_text_style_extension10()?;
-        let text_style_extension11 = record.extract_text_style_extension11()?;
+        let tags = shape.programmable_tags()?;
+        let text_style_extension9 = tags.as_ref().and_then(|tags| tags.powerpoint9()).cloned();
+        let text_style_extension10 = tags.as_ref().and_then(|tags| tags.powerpoint10()).cloned();
+        let text_style_extension11 = tags.as_ref().and_then(|tags| tags.powerpoint11()).cloned();
 
-        // Extract additional properties from Escher records with zero-copy
-        let mut container = ShapeContainer::new_borrowed(properties, &record.data);
+        let mut container = ShapeContainer::new(properties, Vec::new());
+        Self::extract_odraw_text_properties(shape, &mut container)?;
 
-        // Look for text-related Escher properties in the record
-        Self::extract_escher_text_properties(record, &mut container)?;
-
-        Ok(Self {
+        Ok(TextBox {
             container,
             text,
             runs,
@@ -167,53 +163,6 @@ impl<'a> TextBox<'a> {
         }
     }
 
-    fn find_descendant<'record>(
-        record: &'record super::escher::EscherRecord<'a>,
-        record_type: super::escher::EscherRecordType,
-    ) -> Option<&'record super::escher::EscherRecord<'a>> {
-        if record.record_type == record_type {
-            return Some(record);
-        }
-        record
-            .children
-            .iter()
-            .find_map(|child| Self::find_descendant(child, record_type))
-    }
-
-    fn find_escher_property<'record>(
-        record: &'record super::escher::EscherRecord<'a>,
-        property_number: u32,
-    ) -> Option<&'record super::escher::EscherProperty<'a>> {
-        if matches!(
-            record.record_type,
-            super::escher::EscherRecordType::Opt
-                | super::escher::EscherRecordType::SecondaryOpt
-                | super::escher::EscherRecordType::TertiaryOpt
-        ) && let Some(property) = record.find_property(property_number)
-        {
-            return Some(property);
-        }
-        record
-            .children
-            .iter()
-            .find_map(|child| Self::find_escher_property(child, property_number))
-    }
-
-    fn packed_text_boolean(
-        record: &super::escher::EscherRecord<'a>,
-        individual_property: u32,
-    ) -> Option<bool> {
-        const TEXT_BOOLEAN_PROPERTIES: u32 = 0x00BF;
-        let property = Self::find_escher_property(record, TEXT_BOOLEAN_PROPERTIES)?;
-        let bit = TEXT_BOOLEAN_PROPERTIES.checked_sub(individual_property)?;
-        if bit >= 16 {
-            return None;
-        }
-        let value_mask = 1u32 << bit;
-        let use_mask = value_mask << 16;
-        (property.data & use_mask != 0).then_some(property.data & value_mask != 0)
-    }
-
     fn formatting_from_runs(runs: &[TextRun]) -> TextFormattingResult {
         let formatting = runs
             .first()
@@ -229,8 +178,7 @@ impl<'a> TextBox<'a> {
         )
     }
 
-    /// Extract additional text properties from Escher records.
-    /// This parses Escher-specific text formatting properties.
+    /// Extract additional text properties from typed OfficeArt options.
     ///
     /// Based on Apache POI's text property extraction logic, this function
     /// extracts text-related properties from the Escher Opt record within
@@ -244,52 +192,65 @@ impl<'a> TextBox<'a> {
     /// - Text margins (insets)
     /// - Text flow settings
     /// - Text anchor/alignment settings
-    fn extract_escher_text_properties(
-        record: &super::escher::EscherRecord<'a>,
-        container: &mut ShapeContainer<'a>,
+    fn extract_odraw_text_properties<'container>(
+        shape: &OdrawShape<'_>,
+        container: &mut ShapeContainer<'container>,
     ) -> super::super::package::Result<()> {
-        // Property IDs for text-related properties (from MS-ODRAW)
-        const TEXT_ID: u32 = 0x0080;
-        const TEXT_LEFT: u32 = 0x0081; // Text left margin
-        const TEXT_TOP: u32 = 0x0082; // Text top margin
-        const TEXT_RIGHT: u32 = 0x0083; // Text right margin
-        const TEXT_BOTTOM: u32 = 0x0084; // Text bottom margin
-        const WRAP_TEXT: u32 = 0x0085; // MSOWRAPMODE
-        const ANCHOR_TEXT: u32 = 0x0087; // Text anchor (vertical alignment)
-        const TEXT_FLOW: u32 = 0x0088; // Text flow direction
-        const FONT_ROTATION: u32 = 0x0089;
-        const NEXT_SHAPE_ID: u32 = 0x008A;
-        const TEXT_DIRECTION: u32 = 0x008B;
-        const SELECT_TEXT: u32 = 0x00BB;
-        const AUTO_TEXT_MARGIN: u32 = 0x00BC;
-        const FIT_SHAPE_TO_TEXT: u32 = 0x00BE;
+        use litchi_odraw::{
+            RecordKind,
+            prop::{Id, Props},
+        };
 
-        let property = |id| Self::find_escher_property(record, id);
-        container.text_id = property(TEXT_ID).map(|p| p.data as i32);
+        let secondary = shape
+            .meta()
+            .find(RecordKind::SecondaryOpt)?
+            .map(|record| Props::parse(&record))
+            .transpose()?;
+        let tertiary = shape
+            .meta()
+            .find(RecordKind::TertiaryOpt)?
+            .map(|record| Props::parse(&record))
+            .transpose()?;
+        let property = |id| {
+            shape
+                .props()
+                .get_int(id)
+                .or_else(|| secondary.as_ref().and_then(|props| props.get_int(id)))
+                .or_else(|| tertiary.as_ref().and_then(|props| props.get_int(id)))
+        };
+        let boolean = |id| {
+            shape
+                .props()
+                .get_bool(id)
+                .or_else(|| secondary.as_ref().and_then(|props| props.get_bool(id)))
+                .or_else(|| tertiary.as_ref().and_then(|props| props.get_bool(id)))
+        };
+
+        container.text_id = property(Id::TextId);
         let margin_value = |id, name| -> super::super::package::Result<Option<i32>> {
-            const MAX_TEXT_MARGIN: u32 = 0x0132_F540;
+            const MAX_TEXT_MARGIN: i32 = 0x0132_F540;
             property(id)
-                .map(|p| {
-                    if p.data > MAX_TEXT_MARGIN {
+                .map(|value| {
+                    if !(0..=MAX_TEXT_MARGIN).contains(&value) {
                         Err(super::super::package::PptError::Corrupted(format!(
                             "OfficeArt {name} margin exceeds the MS-ODRAW limit"
                         )))
                     } else {
-                        Ok(p.data as i32)
+                        Ok(value)
                     }
                 })
                 .transpose()
         };
-        container.text_left = margin_value(TEXT_LEFT, "left")?;
-        container.text_top = margin_value(TEXT_TOP, "top")?;
-        container.text_right = margin_value(TEXT_RIGHT, "right")?;
-        container.text_bottom = margin_value(TEXT_BOTTOM, "bottom")?;
-        container.id_of_next_shape = property(NEXT_SHAPE_ID).map(|p| p.data);
+        container.text_left = margin_value(Id::TextLeft, "left")?;
+        container.text_top = margin_value(Id::TextTop, "top")?;
+        container.text_right = margin_value(Id::TextRight, "right")?;
+        container.text_bottom = margin_value(Id::TextBottom, "bottom")?;
+        container.id_of_next_shape = property(Id::IdOfNextShape).map(|value| value as u32);
 
         let enum_value = |id, name| -> super::super::package::Result<Option<u16>> {
             property(id)
-                .map(|p| {
-                    u16::try_from(p.data).map_err(|_| {
+                .map(|value| {
+                    u16::try_from(value).map_err(|_| {
                         super::super::package::PptError::Corrupted(format!(
                             "OfficeArt {name} value does not fit in 16 bits"
                         ))
@@ -297,15 +258,15 @@ impl<'a> TextBox<'a> {
                 })
                 .transpose()
         };
-        container.wrap_text = enum_value(WRAP_TEXT, "WrapText")?;
-        container.anchor_text = enum_value(ANCHOR_TEXT, "anchorText")?;
-        container.text_flow = enum_value(TEXT_FLOW, "txflTextFlow")?;
-        container.font_rotation = enum_value(FONT_ROTATION, "cdirFont")?;
-        container.text_direction = enum_value(TEXT_DIRECTION, "txdir")?;
+        container.wrap_text = enum_value(Id::WrapText, "WrapText")?;
+        container.anchor_text = enum_value(Id::AnchorText, "anchorText")?;
+        container.text_flow = enum_value(Id::TextFlow, "txflTextFlow")?;
+        container.font_rotation = enum_value(Id::FontRotation, "cdirFont")?;
+        container.text_direction = enum_value(Id::TextDirection, "txdir")?;
 
-        container.select_text = Self::packed_text_boolean(record, SELECT_TEXT);
-        container.auto_text_margin = Self::packed_text_boolean(record, AUTO_TEXT_MARGIN);
-        container.size_shape_to_fit_text = Self::packed_text_boolean(record, FIT_SHAPE_TO_TEXT);
+        container.select_text = boolean(Id::SelectText);
+        container.auto_text_margin = boolean(Id::AutoTextMargin);
+        container.size_shape_to_fit_text = boolean(Id::FitShapeToText);
 
         Ok(())
     }
@@ -332,19 +293,16 @@ impl<'a> TextBox<'a> {
     /// # Example
     ///
     /// ```ignore
-    /// let props = EscherProperties::from_opt_record(&opt_record);
-    /// let (size, color, bold, italic, underline) =
-    ///     TextBox::extract_text_properties_from_escher(&props);
+    /// let props = litchi_odraw::prop::Props::parse(&opt_record)?;
+    /// let (size, color, bold, italic, underline) = TextBox::format_from_props(&props);
     /// ```
-    pub fn extract_text_properties_from_escher(
-        props: &super::super::escher::EscherProperties,
-    ) -> TextFormattingResult {
-        use super::super::escher::EscherPropertyId;
+    pub fn format_from_props(props: &litchi_odraw::prop::Props) -> TextFormattingResult {
+        use litchi_odraw::prop::Id;
 
         // Extract font size from text properties
         // In Escher, font size is typically in the GeoText properties
         let font_size = props
-            .get_int(EscherPropertyId::GeoTextDefaultPointSize)
+            .get_int(Id::GeoTextDefaultPointSize)
             .map(|size| size as u16);
 
         // Extract font color - not typically in Escher properties for text
@@ -353,9 +311,9 @@ impl<'a> TextBox<'a> {
 
         // Extract text styling flags from GeoText properties
         // These are boolean properties in Apache POI
-        let bold = props.is_true(EscherPropertyId::GeoTextBoldFont);
-        let italic = props.is_true(EscherPropertyId::GeoTextItalicFont);
-        let underline = props.is_true(EscherPropertyId::GeoTextUnderlineFont);
+        let bold = props.is_true(Id::GeoTextBoldFont);
+        let italic = props.is_true(Id::GeoTextItalicFont);
+        let underline = props.is_true(Id::GeoTextUnderlineFont);
 
         (font_size, font_color, bold, italic, underline)
     }
@@ -377,9 +335,7 @@ impl<'a> TextBox<'a> {
     ///
     /// - Single call to get_text_margins (already optimized)
     /// - No allocations
-    pub fn extract_text_margins_from_escher(
-        props: &super::super::escher::EscherProperties,
-    ) -> Option<(i32, i32, i32, i32)> {
+    pub fn margins_from_props(props: &litchi_odraw::prop::Props) -> Option<(i32, i32, i32, i32)> {
         props.get_text_margins()
     }
 
@@ -761,7 +717,7 @@ mod tests {
         let mut shape = Vec::new();
         let mut sp = Vec::new();
         sp.extend_from_slice(&1001u32.to_le_bytes());
-        sp.extend_from_slice(&0x0A00u32.to_le_bytes());
+        sp.extend_from_slice(&0x0800u32.to_le_bytes());
         push_record(&mut shape, 2, 24, 0xF00A, &sp);
         push_record(&mut shape, 3, properties.len() as u16, 0xF00B, &opt);
         push_record(
@@ -776,6 +732,19 @@ mod tests {
         let mut result = Vec::new();
         push_record(&mut result, 0xF, 0, 0xF004, &shape);
         result
+    }
+
+    fn parse_formatted_textbox(data: &[u8]) -> crate::ppt::package::Result<TextBox<'static>> {
+        let shapes = litchi_odraw::shape::parse(data)?;
+        let shape = shapes.first().ok_or_else(|| {
+            crate::ppt::package::PptError::Corrupted("test drawing contains no shape".to_owned())
+        })?;
+        let properties = ShapeProperties {
+            id: shape.id(),
+            shape_type: ShapeType::TextBox,
+            ..Default::default()
+        };
+        TextBox::from_odraw(properties, shape)
     }
 
     #[test]
@@ -834,10 +803,7 @@ mod tests {
     #[test]
     fn parses_embedded_style_runs_and_nested_text_options() {
         let data = formatted_textbox_record(0, 91_440);
-        let (record, consumed) = super::super::escher::EscherRecord::parse(&data, 0).unwrap();
-        assert_eq!(consumed, data.len());
-
-        let textbox = TextBox::from_escher_record(&record).unwrap();
+        let textbox = parse_formatted_textbox(&data).unwrap();
 
         assert_eq!(textbox.text(), "abcd");
         assert_eq!(textbox.runs().len(), 2);
@@ -913,18 +879,14 @@ mod tests {
     #[test]
     fn rejects_out_of_range_text_enum_values() {
         let data = formatted_textbox_record(u32::from(u16::MAX) + 1, 91_440);
-        let (record, _) = super::super::escher::EscherRecord::parse(&data, 0).unwrap();
-
-        let error = TextBox::from_escher_record(&record).unwrap_err();
+        let error = parse_formatted_textbox(&data).unwrap_err();
         assert!(error.to_string().contains("WrapText value"));
     }
 
     #[test]
     fn rejects_out_of_range_text_margins() {
         let data = formatted_textbox_record(0, 0x0132_F541);
-        let (record, _) = super::super::escher::EscherRecord::parse(&data, 0).unwrap();
-
-        let error = TextBox::from_escher_record(&record).unwrap_err();
+        let error = parse_formatted_textbox(&data).unwrap_err();
         assert!(error.to_string().contains("left margin"));
     }
 }

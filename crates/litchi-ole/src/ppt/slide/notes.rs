@@ -3,6 +3,7 @@
 use super::directory::SlideDirectory;
 use super::types::Slide;
 use crate::consts::PptRecordType;
+use crate::ppt::odraw::ShapeExt as _;
 use crate::ppt::package::{PptError, Result};
 use crate::ppt::persist::PersistMapping;
 use crate::ppt::records::PptRecord;
@@ -11,7 +12,6 @@ use once_cell::unsync::OnceCell;
 use std::collections::HashMap;
 
 const NOTES_LIST_INSTANCE: u16 = 2;
-const NOTES_BODY_PLACEHOLDER: u8 = 0x0c;
 const SLIDE_ATOM_SIZE: usize = 24;
 const NOTES_PERSIST_ATOM_SIZE: usize = 20;
 const NOTES_ATOM_SIZE: usize = 8;
@@ -270,11 +270,10 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let parsed =
-            crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
+        let parsed = crate::ppt::odraw::parse(&drawing.data)?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for shape in &parsed {
-            if let Some(shape) = Slide::<'static>::convert_escher_to_shape_enum(shape)? {
+            if let Some(shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
                 shapes.push(shape);
             }
         }
@@ -285,27 +284,41 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(PptRecordType::PPDrawing) else {
             return Ok(String::new());
         };
-        let shapes =
-            crate::ppt::escher::EscherShapeFactory::extract_shapes_from_drawing(&drawing.data)?;
+        let shapes = crate::ppt::odraw::parse(&drawing.data)?;
         let mut text = Vec::new();
         for shape in &shapes {
-            collect_notes_body_text(shape, &mut text);
+            collect_notes_body_text(shape, &mut text)?;
         }
         Ok(text.join("\n"))
     }
 }
 
-fn collect_notes_body_text(shape: &crate::ppt::escher::EscherShape<'_>, text: &mut Vec<String>) {
-    if shape
-        .placeholder()
-        .is_some_and(|placeholder| placeholder.placeholder_type == NOTES_BODY_PLACEHOLDER)
-        && let Some(value) = shape.text().filter(|value| !value.is_empty())
-    {
-        text.push(value);
+fn collect_notes_body_text(
+    shape: &litchi_odraw::shape::Shape<'_>,
+    text: &mut Vec<String>,
+) -> Result<()> {
+    const MAX_SHAPES: usize = 1_000_000;
+
+    let mut pending = vec![shape];
+    let mut visited = 0usize;
+    while let Some(shape) = pending.pop() {
+        visited = visited
+            .checked_add(1)
+            .ok_or_else(|| PptError::Corrupted("Notes shape count overflow".to_string()))?;
+        if visited > MAX_SHAPES {
+            return Err(PptError::Corrupted(
+                "Notes page exceeds the PPT shape limit".to_string(),
+            ));
+        }
+        if shape.placeholder()?.is_some_and(|placeholder| {
+            placeholder.kind == crate::ppt::PowerPointPlaceholderKind::NotesBody
+        }) && let Some(value) = shape.text()?.filter(|value| !value.is_empty())
+        {
+            text.push(value);
+        }
+        pending.extend(shape.children().iter().rev());
     }
-    for child in shape.children() {
-        collect_notes_body_text(child, text);
-    }
+    Ok(())
 }
 
 fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {

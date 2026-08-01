@@ -74,6 +74,7 @@ jobs:
           cargo test
           -p litchi-core
           -p litchi-drawingml
+          -p litchi-odraw
           -p litchi-ole-common
           -p litchi-ooxml-common
           -p litchi-sheet

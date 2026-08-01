@@ -6,12 +6,12 @@
 //! to the right shapes and text.
 #![cfg(feature = "imgconv")]
 
-use litchi_ole::doc::shapes::extract_drawing_shapes;
+use litchi_odraw::{Record, shape::Kind};
+use litchi_ole::doc::shapes::{extract_drawing_shapes, extract_shape_text};
 use litchi_ole::doc::writer::{
     DocDrawingShape, DocPicture, DocShapeKind, DocWriter, FloatingPosition,
 };
 use litchi_ole::doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
-use litchi_ole::escher::EscherShapeType;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
 
@@ -161,27 +161,33 @@ fn text_boxes_round_trip_text_and_shapes() {
         .iter()
         .find(|shape| shape.shape_id == FIRST_BOX_SPID)
         .expect("first text box in drawing layer");
-    assert_eq!(first.shape_type, EscherShapeType::TextBox);
+    assert_eq!(first.shape_type, Kind::TextBox);
+    assert_eq!(first.text.as_deref(), Some("First box\r"));
     assert_eq!(first.fill_color, Some((0xFF, 0xFF, 0xCC)));
     assert_eq!(first.line_color, Some((0x80, 0x00, 0x00)));
     let second = shapes
         .iter()
         .find(|shape| shape.shape_id == SECOND_BOX_SPID)
         .expect("second text box in drawing layer");
-    assert_eq!(second.shape_type, EscherShapeType::TextBox);
+    assert_eq!(second.shape_type, Kind::TextBox);
+    assert_eq!(second.text.as_deref(), Some("Hello\rWorld\r"));
     // The plain rectangle is still a rectangle.
     let rectangle = shapes
         .iter()
         .find(|shape| shape.shape_id == RECTANGLE_SPID)
         .unwrap();
-    assert_eq!(rectangle.shape_type, EscherShapeType::Rectangle);
+    assert_eq!(rectangle.shape_type, Kind::Rectangle);
+
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    assert_eq!(
+        extract_shape_text(&mut ole).unwrap(),
+        "First box\r\nHello\rWorld\r"
+    );
 }
 
 #[test]
 fn text_boxes_write_valid_client_textbox_links() {
     use litchi_ole::doc::parts::fib::FileInformationBlock;
-    use litchi_ole::escher::EscherRecord;
-
     const FIB_INDEX_DGG_INFO: usize = 50;
     const FIB_INDEX_PLCF_TXBX_TXT: usize = 56;
     const RECORD_CLIENT_TEXTBOX: u16 = 0xF00D;
@@ -213,22 +219,22 @@ fn text_boxes_write_valid_client_textbox_links() {
     fn collect_txids(data: &[u8], txids: &mut Vec<u32>) {
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            let Ok((record, size)) = EscherRecord::parse(data, offset) else {
+            let Ok((record, size)) = Record::parse(data, offset) else {
                 break;
             };
-            if record.record_type_raw == RECORD_CLIENT_TEXTBOX {
-                txids.push(u32::from_le_bytes(record.data[0..4].try_into().unwrap()));
+            if record.raw_kind() == RECORD_CLIENT_TEXTBOX {
+                txids.push(u32::from_le_bytes(record.data()[0..4].try_into().unwrap()));
             }
-            if record.version == 0xF {
-                collect_txids(record.data, txids);
+            if record.is_container() {
+                collect_txids(record.data(), txids);
             }
             offset += size;
         }
     }
     let mut txids = Vec::new();
     // Top level: DggContainer, then a dgglbl byte before the DgContainer.
-    let (first, first_size) = EscherRecord::parse(dgg, 0).unwrap();
-    collect_txids(first.data, &mut txids);
+    let (first, first_size) = Record::parse(dgg, 0).unwrap();
+    collect_txids(first.data(), &mut txids);
     collect_txids(&dgg[first_size + 1..], &mut txids);
     assert_eq!(txids, vec![0x0001_0000, 0x0002_0000]);
 }

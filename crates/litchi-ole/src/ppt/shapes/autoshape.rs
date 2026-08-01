@@ -138,7 +138,7 @@ pub struct AutoShapeGeometry {
 }
 
 impl AutoShapeGeometry {
-    fn from_properties(props: &super::super::escher::EscherProperties<'_>) -> Option<Self> {
+    fn from_properties(props: &litchi_odraw::prop::Props<'_>) -> Option<Self> {
         let coordinate_space = extract_geometry_rect(props);
         let path_type = extract_shape_path(props);
         let vertices: Vec<(i32, i32)> = extract_vertices(props)
@@ -198,35 +198,33 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Create an auto shape from already-parsed OfficeArt metadata.
-    pub(crate) fn from_escher(
+    pub(crate) fn from_odraw(
         properties: ShapeProperties,
-        native_shape_type: Option<u16>,
-        escher_properties: &super::super::escher::EscherProperties<'_>,
+        native_shape_type: u16,
+        odraw_properties: &litchi_odraw::prop::Props<'_>,
     ) -> Self {
         let mut shape = Self::new(properties, Vec::new());
-        if let Some(native_shape_type) = native_shape_type {
-            shape.auto_shape_type = AutoShapeType::from(native_shape_type);
-        }
-        shape.adjustments = Self::extract_adjustments_from_properties(escher_properties);
-        shape.geometry = AutoShapeGeometry::from_properties(escher_properties);
+        shape.auto_shape_type = AutoShapeType::from(native_shape_type);
+        shape.adjustments = Self::extract_adjustments_from_properties(odraw_properties);
+        shape.geometry = AutoShapeGeometry::from_properties(odraw_properties);
         shape
     }
 
     /// Create an auto shape from an existing container.
-    pub fn from_container(container: ShapeContainer<'a>) -> Self {
+    pub fn from_container(container: ShapeContainer<'a>) -> super::super::package::Result<Self> {
         // Extract auto shape type from raw data
-        let auto_shape_type = Self::extract_shape_type(&container.raw_data);
+        let auto_shape_type = Self::extract_shape_type(&container.raw_data)?;
 
         // Extract adjustment values if available
-        let adjustments = Self::extract_adjustments(&container.raw_data);
-        let geometry = Self::extract_geometry(&container.raw_data);
+        let adjustments = Self::extract_adjustments(&container.raw_data)?;
+        let geometry = Self::extract_geometry(&container.raw_data)?;
 
-        Self {
+        Ok(Self {
             container,
             auto_shape_type,
             adjustments,
             geometry,
-        }
+        })
     }
 
     /// Extract auto shape type from raw shape data.
@@ -238,10 +236,12 @@ impl<'a> AutoShape<'a> {
     ///
     /// - Bounded depth-first record scanning
     /// - Early termination on match
-    fn extract_shape_type(raw_data: &[u8]) -> AutoShapeType {
-        Self::find_escher_record(raw_data, super::super::escher::EscherRecordType::Sp)
-            .map(|sp| AutoShapeType::from(sp.instance))
-            .unwrap_or(AutoShapeType::Rectangle)
+    fn extract_shape_type(raw_data: &[u8]) -> super::super::package::Result<AutoShapeType> {
+        Ok(
+            Self::find_odraw_record(raw_data, litchi_odraw::RecordKind::Sp)?
+                .map(|sp| AutoShapeType::from(sp.instance()))
+                .unwrap_or(AutoShapeType::Rectangle),
+        )
     }
 
     /// Extract adjustment values from raw shape data.
@@ -258,26 +258,28 @@ impl<'a> AutoShape<'a> {
     /// - Returns empty vector for shapes without adjustments
     /// - Pre-allocated capacity for shapes with adjustments (max 10)
     /// - Bounded depth-first record scanning
-    fn extract_adjustments(raw_data: &[u8]) -> Vec<i32> {
-        let Some(opt) =
-            Self::find_escher_record(raw_data, super::super::escher::EscherRecordType::Opt)
-        else {
-            return Vec::new();
+    fn extract_adjustments(raw_data: &[u8]) -> super::super::package::Result<Vec<i32>> {
+        let Some(opt) = Self::find_odraw_record(raw_data, litchi_odraw::RecordKind::Opt)? else {
+            return Ok(Vec::new());
         };
-        let properties = super::super::escher::EscherProperties::from_opt_record(&opt);
-        Self::extract_adjustments_from_properties(&properties)
+        let properties = litchi_odraw::prop::Props::parse(&opt)?;
+        Ok(Self::extract_adjustments_from_properties(&properties))
     }
 
-    fn extract_geometry(raw_data: &[u8]) -> Option<AutoShapeGeometry> {
-        let opt = Self::find_escher_record(raw_data, super::super::escher::EscherRecordType::Opt)?;
-        let properties = super::super::escher::EscherProperties::from_opt_record(&opt);
-        AutoShapeGeometry::from_properties(&properties)
+    fn extract_geometry(
+        raw_data: &[u8],
+    ) -> super::super::package::Result<Option<AutoShapeGeometry>> {
+        let Some(opt) = Self::find_odraw_record(raw_data, litchi_odraw::RecordKind::Opt)? else {
+            return Ok(None);
+        };
+        let properties = litchi_odraw::prop::Props::parse(&opt)?;
+        Ok(AutoShapeGeometry::from_properties(&properties))
     }
 
-    fn find_escher_record<'data>(
+    fn find_odraw_record<'data>(
         data: &'data [u8],
-        record_type: super::super::escher::EscherRecordType,
-    ) -> Option<super::super::escher::EscherRecord<'data>> {
+        record_type: litchi_odraw::RecordKind,
+    ) -> super::super::package::Result<Option<litchi_odraw::Record<'data>>> {
         const MAX_SCANNED_RECORDS: usize = 4_096;
 
         let mut streams = vec![data];
@@ -286,32 +288,34 @@ impl<'a> AutoShape<'a> {
             let mut offset = 0;
             while stream.len().saturating_sub(offset) >= 8 {
                 if scanned == MAX_SCANNED_RECORDS {
-                    return None;
+                    return Err(super::super::package::PptError::Corrupted(
+                        "OfficeArt shape exceeds the PPT record limit".to_string(),
+                    ));
                 }
-                let Ok((record, consumed)) =
-                    super::super::escher::EscherRecord::parse(stream, offset)
-                else {
-                    break;
-                };
+                let (record, consumed) = litchi_odraw::Record::parse(stream, offset)?;
                 scanned += 1;
-                if record.record_type == record_type {
-                    return Some(record);
+                if record.kind() == record_type {
+                    return Ok(Some(record));
                 }
                 if record.is_container() {
-                    streams.push(record.data);
+                    streams.push(record.data());
                 }
                 if consumed == 0 {
                     break;
                 }
-                offset = offset.checked_add(consumed)?;
+                offset = offset.checked_add(consumed).ok_or_else(|| {
+                    super::super::package::PptError::Corrupted(
+                        "OfficeArt shape traversal offset overflow".to_string(),
+                    )
+                })?;
             }
         }
-        None
+        Ok(None)
     }
 
     /// Extract adjustment values from Escher properties.
     ///
-    /// This is the proper implementation using EscherProperties.
+    /// This is the proper implementation using checked OfficeArt properties.
     /// Adjustments are stored as simple integer properties.
     ///
     /// # Arguments
@@ -328,22 +332,20 @@ impl<'a> AutoShape<'a> {
     /// - O(1) property lookups via HashMap
     /// - Missing positions use the protocol-defined default of zero
     /// - Trailing absent positions are omitted
-    pub fn extract_adjustments_from_properties(
-        props: &super::super::escher::EscherProperties,
-    ) -> Vec<i32> {
-        use super::super::escher::EscherPropertyId;
+    pub fn extract_adjustments_from_properties(props: &litchi_odraw::prop::Props) -> Vec<i32> {
+        use litchi_odraw::prop::Id;
 
         let adjustment_ids = [
-            EscherPropertyId::AdjustValue,
-            EscherPropertyId::Adjust2Value,
-            EscherPropertyId::Adjust3Value,
-            EscherPropertyId::Adjust4Value,
-            EscherPropertyId::Adjust5Value,
-            EscherPropertyId::Adjust6Value,
-            EscherPropertyId::Adjust7Value,
-            EscherPropertyId::Adjust8Value,
-            EscherPropertyId::Adjust9Value,
-            EscherPropertyId::Adjust10Value,
+            Id::AdjustValue,
+            Id::Adjust2Value,
+            Id::Adjust3Value,
+            Id::Adjust4Value,
+            Id::Adjust5Value,
+            Id::Adjust6Value,
+            Id::Adjust7Value,
+            Id::Adjust8Value,
+            Id::Adjust9Value,
+            Id::Adjust10Value,
         ];
 
         let mut adjustments = vec![0; adjustment_ids.len()];
@@ -540,7 +542,7 @@ mod tests {
 
     #[test]
     fn test_autoshape_from_container_parses_officeart_metadata() {
-        let autoshape = AutoShape::from_container(autoshape_container());
+        let autoshape = AutoShape::from_container(autoshape_container()).unwrap();
 
         assert_eq!(autoshape.auto_shape_type(), AutoShapeType::Arrow);
         assert_eq!(autoshape.adjustments(), &[25, 0, 75]);

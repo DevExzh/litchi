@@ -38,6 +38,15 @@ They contain selectors, queries, events, detached builders, and semantic values,
 not container parsing or concrete document handles. Concrete imported objects
 remain canonical in their format crate.
 
+`litchi-odraw` owns only the OfficeArt record grammar, property tables, shape
+containers, bounded traversal, and deterministic record writing defined by
+`[MS-ODRAW]`. The `OfficeArtClientData` and `OfficeArtClientTextbox` payloads
+are explicitly host-application records in `[MS-ODRAW]` section 2.2.14, so DOC,
+PPT, and XLS decode those payloads in their concrete crates. Shared shapes
+expose the borrowed host payload records without interpreting them. Canonical
+types use their module context (`record::Record`, `prop::Props`,
+`shape::Shape`) instead of repeating an `Escher` or `OfficeArt` prefix.
+
 Additional focused crates are permitted where the responsibility is real:
 
 - `litchi-math` replaces the current equation-focused `litchi-formula` name.

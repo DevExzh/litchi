@@ -1,0 +1,14 @@
+[package]
+name = "litchi-odraw"
+description = "Format-neutral Microsoft OfficeArt drawing records for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bitflags = { workspace = true }
+zerocopy = { workspace = true }
+zerocopy-derive = { workspace = true }

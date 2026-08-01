@@ -509,8 +509,8 @@ impl NotesContainerBuilder {
         // ClientAnchor (position)
         let mut client_anchor = Vec::new();
         write_escher_header(&mut client_anchor, 0x00, 0, 0xF010, 8)?;
-        client_anchor.extend_from_slice(&anchor.0.to_le_bytes());
         client_anchor.extend_from_slice(&anchor.1.to_le_bytes());
+        client_anchor.extend_from_slice(&anchor.0.to_le_bytes());
         client_anchor.extend_from_slice(&anchor.2.to_le_bytes());
         client_anchor.extend_from_slice(&anchor.3.to_le_bytes());
         sp_children.push(client_anchor);
@@ -630,8 +630,8 @@ impl NotesContainerBuilder {
         // ClientAnchor (position)
         let mut client_anchor = Vec::new();
         write_escher_header(&mut client_anchor, 0x00, 0, 0xF010, 8)?;
-        client_anchor.extend_from_slice(&anchor.0.to_le_bytes());
         client_anchor.extend_from_slice(&anchor.1.to_le_bytes());
+        client_anchor.extend_from_slice(&anchor.0.to_le_bytes());
         client_anchor.extend_from_slice(&anchor.2.to_le_bytes());
         client_anchor.extend_from_slice(&anchor.3.to_le_bytes());
         sp_children.push(client_anchor);

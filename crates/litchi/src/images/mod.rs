@@ -45,9 +45,8 @@
 
 pub use litchi_imgconv::*;
 
-// Integration glue between `litchi_ole::escher` and `litchi_imgconv` lives
-// in the `litchi-ole` crate because it reaches into private Escher types.
-// Re-exported here so `litchi::images::ImageExtractor` resolves.
+// Integration glue between typed OfficeArt records and `litchi_imgconv` lives
+// in `litchi-ole`. Re-exported here so `litchi::images::ImageExtractor` resolves.
 #[cfg(all(feature = "ole", feature = "imgconv"))]
 pub use litchi_ole::extractor::{ExtractedImage, ImageExtractor};
 
