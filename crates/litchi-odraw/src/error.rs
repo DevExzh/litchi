@@ -11,6 +11,15 @@ pub enum Limit {
     Records,
 }
 
+/// A bounded resource used while parsing OfficeArt image records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageLimit {
+    /// Maximum size of one BLIP record body.
+    BlipBytes,
+    /// Maximum number of file blocks in one BLIP store.
+    StoreEntries,
+}
+
 /// A checked OfficeArt parsing or validation failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -52,6 +61,46 @@ pub enum Error {
     MalformedShape {
         /// Concise validation failure description.
         reason: &'static str,
+    },
+    /// An OfficeArt BLIP, FBSE, or BLIP-store invariant is invalid.
+    MalformedImage {
+        /// Concise validation failure description.
+        reason: &'static str,
+    },
+    /// A record is not an OfficeArt image record.
+    NotImageRecord {
+        /// Exact record type read from the wire.
+        raw_kind: u16,
+    },
+    /// A caller supplied an invalid one-based BLIP-store identifier.
+    InvalidBlipId {
+        /// Rejected numeric identifier.
+        value: u32,
+    },
+    /// An image record exceeded an explicit resource ceiling.
+    ImageLimitExceeded {
+        /// Resource whose ceiling was reached.
+        limit: ImageLimit,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A delay-loaded FBSE was resolved without its associated delay store.
+    MissingDelayStore,
+    /// An FBSE delay offset is outside the supplied delay store.
+    DelayOffsetOutOfBounds {
+        /// Requested byte offset.
+        offset: u32,
+        /// Delay-store byte length.
+        available: usize,
+    },
+    /// An image length field does not match the bytes it describes.
+    ImageSizeMismatch {
+        /// Field being validated.
+        field: &'static str,
+        /// Length declared on the wire.
+        declared: u64,
+        /// Actual byte length.
+        actual: usize,
     },
     /// A single-root parser was given additional top-level bytes.
     TrailingData {
@@ -102,6 +151,43 @@ impl core::fmt::Display for Error {
             Self::MalformedShape { reason } => {
                 write!(formatter, "malformed OfficeArt shape: {reason}")
             },
+            Self::MalformedImage { reason } => {
+                write!(formatter, "malformed OfficeArt image: {reason}")
+            },
+            Self::NotImageRecord { raw_kind } => {
+                write!(
+                    formatter,
+                    "OfficeArt record 0x{raw_kind:04X} is not an image record"
+                )
+            },
+            Self::InvalidBlipId { value } => {
+                write!(
+                    formatter,
+                    "OfficeArt BLIP identifier {value} is outside 1..=4095"
+                )
+            },
+            Self::ImageLimitExceeded { limit, maximum } => write!(
+                formatter,
+                "OfficeArt image {limit:?} limit of {maximum} exceeded"
+            ),
+            Self::MissingDelayStore => {
+                write!(
+                    formatter,
+                    "OfficeArt image requires an associated delay store"
+                )
+            },
+            Self::DelayOffsetOutOfBounds { offset, available } => write!(
+                formatter,
+                "OfficeArt delay offset {offset} is outside a {available}-byte delay store"
+            ),
+            Self::ImageSizeMismatch {
+                field,
+                declared,
+                actual,
+            } => write!(
+                formatter,
+                "OfficeArt image {field} declares {declared} bytes; actual size is {actual}"
+            ),
             Self::TrailingData { offset } => {
                 write!(
                     formatter,

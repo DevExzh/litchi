@@ -223,12 +223,11 @@ impl Image {
     /// - After header: actual picture content (may include BLIP container)
     ///
     /// Logics is copied from Apache Poi's `PICFAndOfficeArtData` method in `PICFAndOfficeArtData.java`
-    #[cfg(feature = "imgconv")]
-    pub fn data(
+    pub fn data<'data>(
         &self,
-        data_stream: &[u8],
-        word_document: &[u8],
-    ) -> Result<crate::extractor::ExtractedImage<'static>, ImageError> {
+        data_stream: &'data [u8],
+        word_document: &'data [u8],
+    ) -> Result<crate::extractor::ExtractedImage<'data>, ImageError> {
         use crate::extractor::ImageExtractor;
         use litchi_odraw::Record;
 
@@ -271,8 +270,7 @@ impl Image {
 
             // Try to extract image from this record
             // Pass data_stream for delay-loaded BLIPs
-            match ImageExtractor::extract_from_record_with_stream(&next_record, Some(word_document))
-            {
+            match ImageExtractor::from_record_with_delay(&next_record, Some(word_document)) {
                 Ok(img) => return Ok(img),
                 Err(_) => {
                     // TODO: log this error?

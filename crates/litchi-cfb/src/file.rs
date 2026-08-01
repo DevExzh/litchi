@@ -752,13 +752,19 @@ impl<R: Read + Seek> OleFile<R> {
                 }
                 owned.insert(sid as usize);
 
-                if lower.is_some_and(|bound| {
-                    Self::compare_validated(Self::validated_entry_unchecked(&entries, bound), entry)
+                let violates_lower = if let Some(bound) = lower {
+                    Self::compare_validated(Self::validated_entry(&entries, bound)?, entry)
                         != Ordering::Less
-                }) || upper.is_some_and(|bound| {
-                    Self::compare_validated(entry, Self::validated_entry_unchecked(&entries, bound))
+                } else {
+                    false
+                };
+                let violates_upper = if let Some(bound) = upper {
+                    Self::compare_validated(entry, Self::validated_entry(&entries, bound)?)
                         != Ordering::Less
-                }) {
+                } else {
+                    false
+                };
+                if violates_lower || violates_upper {
                     return Err(OleError::CorruptedFile(format!(
                         "CFB sibling tree violates name ordering at SID {sid}"
                     )));
@@ -904,15 +910,6 @@ impl<R: Read + Seek> OleFile<R> {
             .ok_or_else(|| {
                 OleError::CorruptedFile(format!("invalid or empty CFB directory SID {sid}"))
             })
-    }
-
-    fn validated_entry_unchecked(
-        entries: &[Option<ValidatedDirectoryEntry>],
-        sid: u32,
-    ) -> &ValidatedDirectoryEntry {
-        entries[sid as usize]
-            .as_ref()
-            .expect("ordering bounds always refer to visited directory entries")
     }
 
     fn compare_validated(

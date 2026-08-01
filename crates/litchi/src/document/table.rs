@@ -19,13 +19,13 @@ const UNMERGED_SPAN: usize = 1;
 #[derive(Debug, Clone)]
 pub enum Table {
     #[cfg(feature = "ole")]
-    Doc(ole::doc::Table),
+    Doc(Box<ole::doc::Table>),
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Table>),
     #[cfg(feature = "rtf")]
-    Rtf(litchi_rtf::Table<'static>),
+    Rtf(Box<litchi_rtf::Table<'static>>),
     #[cfg(feature = "odf")]
-    Odt(litchi_odf::Table),
+    Odt(Box<litchi_odf::Table>),
 }
 
 impl Table {
@@ -54,7 +54,10 @@ impl Table {
             #[cfg(feature = "ole")]
             Table::Doc(t) => {
                 let rows = t.rows().map_err(Error::from)?;
-                Ok(rows.into_iter().map(Row::Doc).collect())
+                Ok(rows
+                    .into_iter()
+                    .map(|row| Row::Doc(Box::new(row)))
+                    .collect())
             },
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
@@ -64,14 +67,21 @@ impl Table {
             #[cfg(feature = "rtf")]
             Table::Rtf(t) => {
                 let rows = t.rows();
-                Ok(rows.iter().cloned().map(Row::Rtf).collect())
+                Ok(rows
+                    .iter()
+                    .cloned()
+                    .map(|row| Row::Rtf(Box::new(row)))
+                    .collect())
             },
             #[cfg(feature = "odf")]
             Table::Odt(t) => {
                 let rows = t
                     .rows()
                     .map_err(|e| Error::ParseError(format!("Failed to get rows: {}", e)))?;
-                Ok(rows.into_iter().map(Row::Odt).collect())
+                Ok(rows
+                    .into_iter()
+                    .map(|row| Row::Odt(Box::new(row)))
+                    .collect())
             },
         }
     }
@@ -87,7 +97,7 @@ impl Table {
             #[cfg(feature = "ole")]
             Table::Doc(t) => {
                 let rows = t.rows().map_err(Error::from)?;
-                Ok(rows.get(index).cloned().map(Row::Doc))
+                Ok(rows.get(index).cloned().map(|row| Row::Doc(Box::new(row))))
             },
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
@@ -97,14 +107,14 @@ impl Table {
             #[cfg(feature = "rtf")]
             Table::Rtf(t) => {
                 let rows = t.rows();
-                Ok(rows.get(index).cloned().map(Row::Rtf))
+                Ok(rows.get(index).cloned().map(|row| Row::Rtf(Box::new(row))))
             },
             #[cfg(feature = "odf")]
             Table::Odt(t) => {
                 let rows = t
                     .rows()
                     .map_err(|e| Error::ParseError(format!("Failed to get rows: {}", e)))?;
-                Ok(rows.get(index).cloned().map(Row::Odt))
+                Ok(rows.get(index).cloned().map(|row| Row::Odt(Box::new(row))))
             },
         }
     }
@@ -114,13 +124,13 @@ impl Table {
 #[derive(Debug, Clone)]
 pub enum Row {
     #[cfg(feature = "ole")]
-    Doc(ole::doc::Row),
+    Doc(Box<ole::doc::Row>),
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Row>),
     #[cfg(feature = "rtf")]
-    Rtf(litchi_rtf::Row<'static>),
+    Rtf(Box<litchi_rtf::Row<'static>>),
     #[cfg(feature = "odf")]
-    Odt(litchi_odf::Row),
+    Odt(Box<litchi_odf::Row>),
 }
 
 impl Row {

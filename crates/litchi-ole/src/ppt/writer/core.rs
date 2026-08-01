@@ -38,7 +38,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-use super::blip::{BlipStoreBuilder, BlipType};
+use super::blip::{Id as PictureId, Kind as PictureKind, Pictures};
 use super::chart::{Chart, ChartPlan, PositionedChart};
 use super::comments::SlideComment;
 use super::custom_shows::CustomShow;
@@ -320,7 +320,7 @@ pub struct ShapeProperties {
     /// Flip vertical
     pub flip_v: bool,
     /// Picture BLIP index (for Picture type)
-    pub picture_index: Option<u32>,
+    pub picture_index: Option<PictureId>,
     /// Explicit geometry for a custom/freeform shape.
     pub freeform_geometry: Option<FreeformGeometry>,
     /// Hyperlink attached to shape
@@ -619,7 +619,7 @@ fn convert_shape_to_escher_with_sound_mapping(
                 opacity,
                 back_color,
                 angle,
-                fill.picture_index,
+                fill.picture_index.map(u32::from),
             )
         });
 
@@ -754,7 +754,7 @@ fn convert_shape_to_escher_with_sound_mapping(
         hyperlink_type: get_hyperlink_info(props.hyperlink_id, hyperlinks).2,
         interactions,
         text_interactions,
-        picture_index: props.picture_index,
+        picture_index: props.picture_index.map(u32::from),
         freeform_geometry: props.freeform_geometry.clone(),
         animation_info,
         shadow_color,
@@ -905,7 +905,7 @@ pub struct PptWriter {
     /// Slide height in EMUs (default: Letter size)
     slide_height: i32,
     /// Picture/BLIP storage
-    blip_store: BlipStoreBuilder,
+    blip_store: Pictures,
     /// Hyperlink collection
     hyperlinks: HyperlinkCollection,
     /// Font collection
@@ -978,7 +978,7 @@ impl PptWriter {
             properties: HashMap::new(),
             slide_width: width,
             slide_height: height,
-            blip_store: BlipStoreBuilder::new(),
+            blip_store: Pictures::new(),
             hyperlinks: HyperlinkCollection::new(),
             fonts: vec![FontEntity::arial()], // Default font
             sound_resources: BTreeMap::new(),
@@ -1955,7 +1955,7 @@ impl PptWriter {
             )));
         }
         // Add picture to BLIP store
-        let blip_index = self.add_picture_data(image_data);
+        let blip_id = self.add_picture_data(image_data)?;
 
         let slide_data = self
             .slides
@@ -1969,8 +1969,8 @@ impl PptWriter {
                 y: pt_to_emu_i32(y),
                 width: pt_to_emu_i32(width),
                 height: pt_to_emu_i32(height),
-                picture_index: Some(blip_index),
-                fill: Some(FillStyle::picture(blip_index)),
+                picture_index: Some(blip_id),
+                fill: Some(FillStyle::picture(blip_id)),
                 ..Default::default()
             },
             animation_info: None,
@@ -1982,7 +1982,7 @@ impl PptWriter {
 
     /// Add a picture with explicit type
     #[allow(clippy::too_many_arguments)]
-    pub fn add_picture_with_type(
+    pub fn add_picture_as(
         &mut self,
         slide: usize,
         x: i32,
@@ -1990,7 +1990,7 @@ impl PptWriter {
         width: i32,
         height: i32,
         image_data: Vec<u8>,
-        blip_type: BlipType,
+        kind: PictureKind,
     ) -> Result<(), PptWriteError> {
         if slide >= self.slides.len() {
             return Err(PptWriteError::InvalidData(format!(
@@ -1998,7 +1998,7 @@ impl PptWriter {
                 slide
             )));
         }
-        let blip_index = self.add_picture_data_with_type(image_data, blip_type);
+        let blip_id = self.add_picture_data_as(image_data, kind)?;
 
         let slide_data = self
             .slides
@@ -2012,8 +2012,8 @@ impl PptWriter {
                 y: pt_to_emu_i32(y),
                 width: pt_to_emu_i32(width),
                 height: pt_to_emu_i32(height),
-                picture_index: Some(blip_index),
-                fill: Some(FillStyle::picture(blip_index)),
+                picture_index: Some(blip_id),
+                fill: Some(FillStyle::picture(blip_id)),
                 ..Default::default()
             },
             animation_info: None,
@@ -2027,13 +2027,19 @@ impl PptWriter {
     ///
     /// Use the returned index with [`FillStyle::picture`] to create a picture
     /// or texture fill without adding a picture-frame shape.
-    pub fn add_picture_data(&mut self, image_data: Vec<u8>) -> u32 {
-        self.blip_store.add_picture(image_data)
+    pub fn add_picture_data(&mut self, image_data: Vec<u8>) -> Result<PictureId, PptWriteError> {
+        self.blip_store.add(image_data).map_err(PptWriteError::Io)
     }
 
-    /// Register explicitly typed picture data and return its 1-based BLIP index.
-    pub fn add_picture_data_with_type(&mut self, image_data: Vec<u8>, blip_type: BlipType) -> u32 {
-        self.blip_store.add_picture_with_type(image_data, blip_type)
+    /// Register explicitly typed picture data and return its checked ID.
+    pub fn add_picture_data_as(
+        &mut self,
+        image_data: Vec<u8>,
+        kind: PictureKind,
+    ) -> Result<PictureId, PptWriteError> {
+        self.blip_store
+            .add_as(image_data, kind)
+            .map_err(PptWriteError::Io)
     }
 
     /// Add a hyperlink and return its ID
@@ -2428,7 +2434,7 @@ impl PptWriter {
 
     /// Get number of pictures in the presentation
     pub fn picture_count(&self) -> usize {
-        self.blip_store.count()
+        self.blip_store.len()
     }
 
     /// Get number of hyperlinks in the presentation
@@ -2720,7 +2726,7 @@ impl PptWriter {
             .collect();
         // Build DggContainer with BStore if pictures are present
         let dgg = if !self.blip_store.is_empty() {
-            let bstore = self.blip_store.build().map_err(PptWriteError::Io)?;
+            let bstore = self.blip_store.store().map_err(PptWriteError::Io)?;
             super::escher::create_dgg_container_with_blips(
                 master_shapes,
                 &slide_shape_counts,
@@ -2992,11 +2998,7 @@ impl PptWriter {
         let mut pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
-            Some(
-                self.blip_store
-                    .build_pictures_stream()
-                    .map_err(PptWriteError::Io)?,
-            )
+            Some(self.blip_store.delay().map_err(PptWriteError::Io)?)
         };
         let encryption = self.prepare_encryption()?;
         let encryption_session_id = if let Some(encryption) = &encryption {
@@ -3122,7 +3124,7 @@ impl PptWriter {
             self.slides.iter().map(|s| s.escher_shape_count()).collect();
         // Build DggContainer with BStore if pictures are present
         let dgg = if !self.blip_store.is_empty() {
-            let bstore = self.blip_store.build().map_err(PptWriteError::Io)?;
+            let bstore = self.blip_store.store().map_err(PptWriteError::Io)?;
             super::escher::create_dgg_container_with_blips(
                 master_shapes,
                 &slide_shape_counts,
@@ -3330,11 +3332,7 @@ impl PptWriter {
         let mut pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
-            Some(
-                self.blip_store
-                    .build_pictures_stream()
-                    .map_err(PptWriteError::Io)?,
-            )
+            Some(self.blip_store.delay().map_err(PptWriteError::Io)?)
         };
         let encryption = self.prepare_encryption()?;
         let encryption_session_id = if let Some(encryption) = &encryption {
@@ -4261,8 +4259,12 @@ mod tests {
     fn test_picture_fill_registers_and_serializes_blip_reference() {
         let mut writer = PptWriter::new();
         let slide = writer.add_slide().unwrap();
-        let blip_index =
-            writer.add_picture_data_with_type(vec![0x89, b'P', b'N', b'G'], BlipType::Png);
+        let blip_index = writer
+            .add_picture_data_as(
+                vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a],
+                PictureKind::Png,
+            )
+            .unwrap();
         let style = ShapeStyle::new().with_fill(FillStyle::picture(blip_index));
         writer
             .add_styled_shape(slide, ShapeType::Rectangle, 10, 10, 100, 100, style)

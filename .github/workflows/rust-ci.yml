@@ -76,9 +76,11 @@ jobs:
           -p litchi-crypto
           -p litchi-drawingml
           -p litchi-odraw
+          -p litchi-ograph
           -p litchi-ole-common
           -p litchi-ooxml-common
           -p litchi-sheet
+          -p litchi-sign
           -p litchi-slide
           -p litchi-vba
           -p litchi-word

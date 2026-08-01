@@ -487,7 +487,7 @@ pub fn add_presentation_comment_author(
             slides: Vec::new(),
         };
         store_presentation_comments(package, &graph, conformance)?;
-        let _ = package.clear_digital_signatures();
+        package.unsign();
         return Ok(());
     };
     if graph.authors.iter().any(|item| item.id == author.id) {
@@ -669,7 +669,7 @@ pub fn add_presentation_comment(
             );
     }
     commit_legacy_authors(package, &graph, conformance)?;
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 
@@ -753,7 +753,7 @@ pub fn remove_presentation_comment(
         if !part_is_referenced(package, &part_uri) {
             package.remove_part(&part_uri);
         }
-        let _ = package.clear_digital_signatures();
+        package.unsign();
     } else {
         commit_legacy_slide_comments(package, slide, comments, conformance)?;
     }
@@ -806,7 +806,7 @@ fn commit_legacy_authors(
     parse_comment_authors(&xml)?;
     let uri = PackURI::new(&graph.author_part_name).map_err(OoxmlError::InvalidUri)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 
@@ -820,7 +820,7 @@ fn commit_legacy_slide_comments(
     parse_slide_comments(&xml)?;
     let uri = PackURI::new(&slide.part_name).map_err(OoxmlError::InvalidUri)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 

@@ -169,7 +169,7 @@ fn test_write_update_delete() {
 
 #[test]
 fn test_write_sector_size_4096() {
-    let mut writer = OleWriter::with_sector_size(4096);
+    let mut writer = OleWriter::with_sector_size(4096).unwrap();
     writer.create_stream(&["Test"], b"Hello, 4096!").unwrap();
 
     let mut buffer = Cursor::new(Vec::new());
@@ -262,9 +262,8 @@ fn test_write_mixed_sizes() {
 }
 
 #[test]
-#[should_panic(expected = "Sector size must be 512 or 4096")]
 fn test_invalid_sector_size() {
-    let _ = OleWriter::with_sector_size(1024);
+    assert!(OleWriter::with_sector_size(1024).is_err());
 }
 
 #[test]

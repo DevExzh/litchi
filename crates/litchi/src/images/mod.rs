@@ -1,152 +1,83 @@
-//! Image processing and conversion module.
+//! Office image grammar, codecs, and legacy-container discovery.
 //!
-//! Re-exports the [`litchi-imgconv`](../../litchi_imgconv/index.html) crate
-//! (pure BLIP / EMF / WMF / PICT decoders and converters) plus an
-//! integration helper, [`crate::ole::extractor`], that bridges OLE Escher records to
-//! `litchi-imgconv` types. The integration helper stays in the umbrella
-//! because it depends on `crate::ole` and therefore cannot live in a leaf
-//! crate.
+//! The layers remain explicit:
 //!
-//! # Quick Start: Extract Images from Office Files
+//! - [`art`] owns borrowed OfficeArt BLIP and BStore grammar;
+//! - [`codec`] owns bounded decoding, rendering, and conversion;
+//! - [`ImageExtractor`] maps DOC and PPT storage topology onto those views.
 //!
 //! ```no_run
-//! use litchi::images::{extract_images_from_doc, extract_images_from_ppt};
+//! use litchi::images::{Options, doc, ppt};
 //!
 //! # fn main() -> Result<(), litchi::Error> {
-//! // Extract from Word document
-//! let images = extract_images_from_doc("document.doc")?;
-//! for (i, img) in images.iter().enumerate() {
-//!     let png = img.to_png(Some(800), None)?;
-//!     std::fs::write(format!("image_{}.png", i), png)?;
+//! for image in doc("document.doc")? {
+//!     std::fs::write(image.suggested_filename(), image.extract(Options::default())?)?;
 //! }
-//!
-//! // Extract from PowerPoint presentation
-//! let images = extract_images_from_ppt("presentation.ppt")?;
-//! for img in images {
-//!     let filename = img.suggested_filename();
-//!     let png = img.to_png(None, None)?;
-//!     std::fs::write(filename, png)?;
+//! for image in ppt("presentation.ppt")? {
+//!     std::fs::write(image.suggested_filename(), image.extract(Options::default())?)?;
 //! }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok(())
 //! # }
 //! ```
-//!
-//! # Example: Converting a BLIP record
-//!
-//! ```no_run
-//! use litchi::images::blip::Blip;
-//! use litchi::images::convert_blip_to_png;
-//!
-//! let blip_data = vec![/* BLIP record bytes */];
-//! let blip = Blip::parse(&blip_data)?;
-//! let png_bytes = convert_blip_to_png(&blip, Some(800), None)?;
-//! # Ok::<(), litchi::Error>(())
-//! ```
 
-pub use litchi_imgconv::*;
+/// Borrowed OfficeArt image records, checked identifiers, stores, and writers.
+pub mod art {
+    pub use litchi_odraw::image::*;
+}
 
-// Integration glue between typed OfficeArt records and `litchi_imgconv` lives
-// in `litchi-ole`. Re-exported here so `litchi::images::ImageExtractor` resolves.
-#[cfg(all(feature = "ole", feature = "imgconv"))]
+/// Bounded native-image decoding, rendering, and format conversion.
+pub mod codec {
+    pub use litchi_imgconv::*;
+}
+
+pub use codec::{Limits, Options, convert, decode_data, to_jpeg, to_png, to_svg, to_webp};
+
+#[cfg(feature = "ole")]
 pub use litchi_ole::extractor::{ExtractedImage, ImageExtractor};
 
-#[cfg(all(feature = "ole", feature = "imgconv"))]
+#[cfg(feature = "ole")]
 use litchi_core::error::Result;
 
-/// Extract all images from a PPT presentation file
+/// Extracts images from a legacy PowerPoint presentation.
 ///
-/// # Arguments
-/// * `path` - Path to the .ppt file
-///
-/// # Returns
-/// Vector of extracted images with metadata
-///
-/// # Example
-/// ```no_run
-/// use litchi::images::extract_images_from_ppt;
-///
-/// let images = extract_images_from_ppt("presentation.ppt")?;
-/// for (i, img) in images.iter().enumerate() {
-///     let png_data = img.to_png(None, None)?;
-///     std::fs::write(format!("image_{}.png", i), png_data)?;
-/// }
-/// # Ok::<(), litchi::Error>(())
-/// ```
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<Vec<ExtractedImage<'static>>> {
-    use crate::ole::OleFile;
+/// Returned records own their OfficeArt framing because the compound file is
+/// closed before this function returns. Native image data is not decoded.
+#[cfg(feature = "ole")]
+pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<ExtractedImage<'static>>> {
+    use litchi_ole::OleFile;
     use std::fs::File;
 
     let file = File::open(path).map_err(litchi_core::error::Error::Io)?;
-    let mut ole = OleFile::open(file).map_err(|e| {
-        litchi_core::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
+    let mut ole = OleFile::open(file).map_err(|error| {
+        litchi_core::error::Error::ParseError(format!("failed to open OLE file: {error}"))
     })?;
-
-    ImageExtractor::extract_from_ppt(&mut ole)
+    ImageExtractor::from_ppt(&mut ole)
 }
 
-/// Extract all images from a DOC document file
+/// Extracts images from a legacy Word document.
 ///
-/// # Arguments
-/// * `path` - Path to the .doc file
-///
-/// # Returns
-/// Vector of extracted images with metadata
-///
-/// # Example
-/// ```no_run
-/// use litchi::images::extract_images_from_doc;
-///
-/// let images = extract_images_from_doc("document.doc")?;
-/// for img in images {
-///     let filename = img.suggested_filename();
-///     let data = img.decompressed_data()?;
-///     std::fs::write(filename, &*data)?;
-/// }
-/// # Ok::<(), litchi::Error>(())
-/// ```
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn extract_images_from_doc<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<Vec<ExtractedImage<'static>>> {
-    use crate::ole::OleFile;
+/// Returned records own their OfficeArt framing because the compound file is
+/// closed before this function returns. Native image data is not decoded.
+#[cfg(feature = "ole")]
+pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<ExtractedImage<'static>>> {
+    use litchi_ole::OleFile;
     use std::fs::File;
 
     let file = File::open(path).map_err(litchi_core::error::Error::Io)?;
-    let mut ole = OleFile::open(file).map_err(|e| {
-        litchi_core::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
+    let mut ole = OleFile::open(file).map_err(|error| {
+        litchi_core::error::Error::ParseError(format!("failed to open OLE file: {error}"))
     })?;
-
-    ImageExtractor::extract_from_doc(&mut ole)
+    ImageExtractor::from_doc(&mut ole)
 }
 
-/// Extract images from raw Escher drawing data
-///
-/// This is a lower-level function useful when you already have Escher data
-/// extracted from a document.
-///
-/// # Arguments
-/// * `escher_data` - Raw Escher drawing layer data
-///
-/// # Returns
-/// Vector of extracted images
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn extract_images_from_escher(escher_data: &[u8]) -> Result<Vec<ExtractedImage<'static>>> {
-    ImageExtractor::extract_blips(escher_data)
+/// Discovers borrowed images in an OfficeArt record sequence.
+#[cfg(feature = "ole")]
+pub fn escher(data: &[u8]) -> Result<Vec<ExtractedImage<'_>>> {
+    ImageExtractor::blips(data)
 }
 
-/// Parse a BLIP store (BSE index) from Escher data
-///
-/// The BLIP store provides metadata about all images in a document.
-///
-/// # Arguments
-/// * `escher_data` - Raw Escher drawing layer data
-///
-/// # Returns
-/// BlipStore with all BSE entries
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn parse_blip_store(escher_data: &[u8]) -> Result<BlipStore<'_>> {
-    ImageExtractor::extract_blip_store(escher_data)
+/// Finds the unique borrowed BStore in an OfficeArt drawing sequence.
+#[cfg(feature = "ole")]
+pub fn store(data: &[u8]) -> Result<Option<art::Store<'_>>> {
+    ImageExtractor::store(data)
 }

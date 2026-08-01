@@ -1348,7 +1348,7 @@ pub fn add_modern_comment(
             relationship_id,
             false,
         );
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(staged)
 }
 
@@ -1458,7 +1458,7 @@ pub fn remove_modern_comment(
     if !modern_comment_part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -1630,7 +1630,7 @@ fn validate_and_commit_modern_comment_part(
     ModernCommentList::parse(&xml)?;
     let part_name = PackURI::new(&staged.part_name).map_err(invalid)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 

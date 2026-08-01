@@ -1,6 +1,5 @@
 use super::super::OleFile;
 use super::document_properties::PowerPoint12DocumentProperties;
-#[cfg(feature = "imgconv")]
 use super::encryption::decrypt_pictures;
 use super::encryption::decrypt_powerpoint_document;
 use super::external_media::PowerPointExternalMediaCollection;
@@ -23,10 +22,8 @@ use super::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
 use super::sound_collection::PowerPointSoundCollection;
 use super::view_info::PowerPointSlideViewInformation;
 use crate::consts::PptRecordType;
-#[cfg(feature = "imgconv")]
 use crate::extractor::{ExtractedImage, ImageExtractor};
-#[cfg(feature = "imgconv")]
-use litchi_imgconv::BlipStore;
+use litchi_odraw::image::{Id as ImageId, Store as ImageStore};
 use std::io::{Cursor, Read, Seek};
 
 /// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
@@ -62,11 +59,7 @@ pub struct Presentation {
     pub(crate) persist_mapping: PersistMapping,
     slide_directory: SlideDirectory,
     /// Pictures stream data (for image extraction)
-    #[cfg(feature = "imgconv")]
     pictures_data: Option<Vec<u8>>,
-    /// BLIP store (image metadata index)
-    #[cfg(feature = "imgconv")]
-    blip_store: Option<BlipStore<'static>>,
 }
 
 fn drawing_textboxes(data: &[u8]) -> Result<Vec<litchi_odraw::Record<'_>>> {
@@ -139,18 +132,13 @@ impl Presentation {
             SlideDirectory::build(&powerpoint_document, current_user_data, &persist_mapping)?;
 
         // Try to read Pictures stream for image extraction
-        #[cfg(feature = "imgconv")]
-        let (pictures_data, blip_store) = if let Ok(mut pictures) = ole.open_stream(&["Pictures"]) {
+        let pictures_data = if let Ok(mut pictures) = ole.open_stream(&["Pictures"]) {
             if let Some(encrypted) = &encrypted {
                 decrypt_pictures(&mut pictures, &encrypted.crypto)?;
             }
-            // Extract BLIP store from pictures data
-            let store = ImageExtractor::extract_blip_store(&pictures)
-                .ok()
-                .map(|store| store.into_owned()); // Convert to 'static lifetime
-            (Some(pictures), store)
+            Some(pictures)
         } else {
-            (None, None)
+            None
         };
 
         Ok(Self {
@@ -158,10 +146,7 @@ impl Presentation {
             parser,
             persist_mapping,
             slide_directory,
-            #[cfg(feature = "imgconv")]
             pictures_data,
-            #[cfg(feature = "imgconv")]
-            blip_store,
         })
     }
 
@@ -1102,7 +1087,9 @@ impl Presentation {
 
     /// Extract all images from the presentation
     ///
-    /// This extracts all embedded images from the Pictures stream.
+    /// Images are returned in semantic BStore order. FBSE metadata comes from
+    /// the document's `PPDrawingGroup`; delayed payloads are resolved against
+    /// the headerless `Pictures` stream.
     ///
     /// # Returns
     /// Vector of all extracted images with metadata
@@ -1114,20 +1101,23 @@ impl Presentation {
     /// let mut pkg = Package::open("presentation.ppt")?;
     /// let pres = pkg.presentation()?;
     ///
-    /// for image in pres.extract_all_images()? {
-    ///     let png_data = image.to_png(None, None)?;
-    ///     std::fs::write(image.suggested_filename(), png_data)?;
+    /// for image in pres.images()? {
+    ///     std::fs::write(image.suggested_filename(), image.data()?)?;
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "imgconv")]
-    pub fn extract_all_images(&self) -> Result<Vec<ExtractedImage<'static>>> {
-        if let Some(ref pictures_data) = self.pictures_data {
-            ImageExtractor::extract_from_pictures_stream(pictures_data)
-                .map_err(|e| PptError::Corrupted(format!("Failed to extract images: {}", e)))
-        } else {
-            Ok(Vec::new())
+    pub fn images(&self) -> Result<Vec<ExtractedImage<'_>>> {
+        if let Some(store) = self.image_store()? {
+            return ImageExtractor::from_store(&store, self.pictures_data.as_deref())
+                .map_err(|error| PptError::Corrupted(error.to_string()));
         }
+        self.pictures_data.as_deref().map_or_else(
+            || Ok(Vec::new()),
+            |pictures| {
+                ImageExtractor::pictures(pictures)
+                    .map_err(|error| PptError::Corrupted(error.to_string()))
+            },
+        )
     }
 
     /// Extract an image by BLIP ID
@@ -1136,34 +1126,49 @@ impl Presentation {
     /// BLIP ID references to actual image data.
     ///
     /// # Arguments
-    /// * `blip_id` - The BLIP ID from the shape's Escher properties
+    /// * `id` - Checked BLIP ID from the shape's Escher properties
     ///
     /// # Returns
     /// The extracted image, or None if not found
-    #[cfg(feature = "imgconv")]
-    pub(crate) fn extract_image_by_blip_id(
-        &self,
-        blip_id: u32,
-    ) -> Result<Option<ExtractedImage<'static>>> {
-        // Extract all images and find the one matching the BLIP ID
-        let images = self.extract_all_images()?;
-
-        // BLIP ID is 1-based index
-        let index = (blip_id.saturating_sub(1)) as usize;
-
-        Ok(images.into_iter().nth(index))
+    pub fn image(&self, id: ImageId) -> Result<Option<ExtractedImage<'_>>> {
+        let Some(store) = self.image_store()? else {
+            return Ok(None);
+        };
+        ImageExtractor::resolve(&store, id, self.pictures_data.as_deref())
+            .map_err(|error| PptError::Corrupted(error.to_string()))
     }
 
-    /// Get the BLIP store (image metadata index)
+    /// Resolves a raw one-based host index after checking its OfficeArt range.
+    pub fn image_at(&self, index: u32) -> Result<Option<ExtractedImage<'_>>> {
+        self.image(ImageId::new(index)?)
+    }
+
+    /// Parses the borrowed BLIP store from the document's drawing group.
     ///
-    /// This provides access to image metadata without extracting the full image data.
-    #[cfg(feature = "imgconv")]
-    pub fn blip_store(&self) -> Option<&BlipStore<'static>> {
-        self.blip_store.as_ref()
+    /// No parsed store is retained inside `Presentation`; this avoids
+    /// self-referential storage while keeping the view zero-copy.
+    pub fn image_store(&self) -> Result<Option<ImageStore<'_>>> {
+        let mut store = None;
+        for record in self
+            .parser
+            .find_records_ref()
+            .into_iter()
+            .filter(|record| record.record_type == PptRecordType::PPDrawingGroup)
+        {
+            let candidate = ImageExtractor::store(&record.data)
+                .map_err(|error| PptError::Corrupted(error.to_string()))?;
+            if let Some(candidate) = candidate
+                && store.replace(candidate).is_some()
+            {
+                return Err(PptError::Corrupted(
+                    "Presentation contains multiple OfficeArt BStore containers".to_string(),
+                ));
+            }
+        }
+        Ok(store)
     }
 
     /// Check if the presentation has a Pictures stream
-    #[cfg(feature = "imgconv")]
     pub fn has_pictures(&self) -> bool {
         self.pictures_data.is_some()
     }
@@ -1504,10 +1509,7 @@ mod tests {
             parser,
             persist_mapping,
             slide_directory: SlideDirectory::new_for_test(0),
-            #[cfg(feature = "imgconv")]
             pictures_data: None,
-            #[cfg(feature = "imgconv")]
-            blip_store: None,
         }
     }
 

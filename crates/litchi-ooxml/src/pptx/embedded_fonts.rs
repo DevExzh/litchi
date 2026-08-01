@@ -778,9 +778,7 @@ pub fn store_embedded_fonts(
         }
     }
 
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
-    })?;
+    package.unsign();
     let existing_font_relationships = package
         .get_part(&presentation_name)?
         .rels()

@@ -1,5 +1,5 @@
 use litchi_cfb::OleFile;
-use litchi_ole::ppt::writer::{BlipType, PptEncryptionProfile, PptWriter};
+use litchi_ole::ppt::writer::{PictureKind, PptEncryptionProfile, PptWriter};
 use litchi_ole::ppt::{Package, PptError, PptOpenOptions};
 use std::collections::BTreeMap;
 use std::io::Cursor;
@@ -12,10 +12,12 @@ fn write(profile: PptEncryptionProfile, password: &str, picture: bool) -> Vec<u8
         .unwrap();
     writer.set_slide_notes(slide, "Speaker notes").unwrap();
     if picture {
-        writer.add_picture_data_with_type(
-            vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4],
-            BlipType::Png,
-        );
+        writer
+            .add_picture_data_as(
+                vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4],
+                PictureKind::Png,
+            )
+            .unwrap();
     }
     writer.set_password(password, profile).unwrap();
     let mut output = Cursor::new(Vec::new());
@@ -68,10 +70,9 @@ fn assert_round_trip(profile: PptEncryptionProfile, password: &str, picture: boo
         })
         .unwrap();
     assert!(presentation.text().unwrap().contains("Encrypted 文本"));
-    #[cfg(feature = "imgconv")]
     if picture {
         assert!(presentation.has_pictures());
-        assert_eq!(presentation.extract_all_images().unwrap().len(), 1);
+        assert_eq!(presentation.images().unwrap().len(), 1);
     }
     bytes
 }

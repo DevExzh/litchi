@@ -249,7 +249,7 @@ pub fn store_in_package(
             );
     }
 
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 
@@ -273,7 +273,7 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     if !package_part_is_referenced(package, &existing.part_name) {
         package.remove_part(&existing.part_name);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 

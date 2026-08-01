@@ -709,7 +709,7 @@ impl Package {
         xml: &[u8],
     ) -> Result<RibbonCustomization> {
         let customization = store_ribbon_customization(&mut self.opc, version, xml)?;
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         Ok(customization)
     }
 
@@ -746,33 +746,58 @@ impl Package {
         &self.opc
     }
 
-    /// Verify package signatures without making a PKI trust determination.
-    pub fn verify_digital_signatures(
+    /// Return whether this document contains package signatures.
+    #[must_use]
+    #[inline]
+    pub fn is_signed(&self) -> bool {
+        self.opc.is_signed()
+    }
+
+    /// Verify package signatures with the safe strict policy.
+    pub fn signatures(&self) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
+        self.opc.signatures()
+    }
+
+    /// Verify package signatures with an explicit trust-neutral policy.
+    pub fn signatures_with(
         &self,
-        policy: &litchi_opc::SignatureVerificationPolicy,
-    ) -> litchi_opc::signature::Result<Vec<litchi_opc::DigitalSignatureVerification>> {
-        self.opc.verify_digital_signatures(policy)
+        policy: &litchi_sign::Policy,
+    ) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
+        self.opc.signatures_with(policy)
     }
 
-    /// Sign the current, fully materialized package while preserving valid signatures.
-    pub fn add_digital_signature(
+    /// Add a signature while preserving every existing valid signature.
+    pub fn sign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
+        self.opc.sign(signer)
+    }
+
+    /// Add a signature with explicit authoring resource bounds.
+    pub fn sign_with(
         &mut self,
-        signer: &litchi_opc::PackageSigner,
-    ) -> litchi_opc::signature::Result<PackURI> {
-        self.opc.add_digital_signature(signer)
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> litchi_opc::sign::Result<PackURI> {
+        self.opc.sign_with(signer, limits)
     }
 
-    /// Replace all package signatures with one new signature.
-    pub fn resign_digital_signature(
+    /// Atomically replace all signatures with one signature.
+    pub fn resign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
+        self.opc.resign(signer)
+    }
+
+    /// Atomically replace signatures with explicit authoring resource bounds.
+    pub fn resign_with(
         &mut self,
-        signer: &litchi_opc::PackageSigner,
-    ) -> litchi_opc::signature::Result<PackURI> {
-        self.opc.resign_digital_signature(signer)
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> litchi_opc::sign::Result<PackURI> {
+        self.opc.resign_with(signer, limits)
     }
 
-    /// Remove all package digital signatures.
-    pub fn clear_digital_signatures(&mut self) -> litchi_opc::signature::Result<()> {
-        self.opc.clear_digital_signatures()
+    /// Remove all package signatures.
+    pub fn unsign(&mut self) -> &mut Self {
+        self.opc.unsign();
+        self
     }
 
     /// Discover inert embedded-object and embedded-package relationships.
@@ -821,7 +846,7 @@ impl Package {
     /// This provides access to lower-level package operations for modification.
     #[inline]
     pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         &mut self.opc
     }
 
@@ -1232,7 +1257,7 @@ impl Package {
                 conformance: store.conformance,
             },
         )?;
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         discover_custom_xml_data(&self.opc)?
             .into_iter()
             .find(|item| item.data_part_name == data_part_name)
@@ -1248,7 +1273,7 @@ impl Package {
             .find_custom_xml_data_store(item_id)?
             .ok_or_else(|| OoxmlError::PartNotFound(format!("Custom XML itemID '{item_id}'")))?;
         self.opc.get_part_mut(&item.data_part_name)?.set_blob(xml);
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         Ok(())
     }
 
@@ -1304,7 +1329,7 @@ impl Package {
         self.opc
             .get_part_mut(&properties_part_name)?
             .set_blob(properties_xml);
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         Ok(())
     }
 
@@ -1348,7 +1373,7 @@ impl Package {
                 self.opc.remove_part(&properties_part_name);
             }
         }
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         Ok(true)
     }
 
@@ -1529,7 +1554,7 @@ impl Package {
                 false,
             );
         }
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         Ok(())
     }
 
@@ -1769,7 +1794,7 @@ impl Package {
                 self.opc.remove_part(&old_target);
             }
         }
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         Ok(())
     }
 
@@ -1846,7 +1871,7 @@ impl Package {
                 self.opc.remove_part(&old_target);
             }
         }
-        let _ = self.opc.clear_digital_signatures();
+        self.opc.unsign();
         Ok(true)
     }
 

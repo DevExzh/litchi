@@ -3,8 +3,6 @@
 //! Writes a .doc containing text, an inline picture, a floating picture, and
 //! floating primitive shapes (rectangle, ellipse, rounded rectangle), then
 //! re-opens it with the crate's own reader and shape extraction APIs.
-#![cfg(feature = "imgconv")]
-
 use litchi_odraw::shape::Kind;
 use litchi_ole::doc::shapes::extract_drawing_shapes;
 use litchi_ole::doc::writer::{
@@ -134,7 +132,7 @@ fn primitive_shapes_round_trip_through_doc_reader() {
     assert_eq!(picture_runs.len(), 2);
     let floating_image = picture_runs[1].image().unwrap();
     assert_eq!(
-        document.image_data(floating_image).unwrap().raw_data(),
+        document.image_data(floating_image).unwrap().data().unwrap(),
         jpeg_fixture().as_slice()
     );
 

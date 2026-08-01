@@ -3,8 +3,6 @@
 //! Covers the full header kind set (odd/even/first-page), the automatic
 //! section flags (DOP fFacingPages, SEP sprmSFTitlePage), and the header
 //! picture pipeline (PICF block + PlcfSpaHdr + header-drawing picture frame).
-#![cfg(feature = "imgconv")]
-
 use litchi_odraw::shape::Kind;
 use litchi_ole::doc::shapes::extract_drawing_shapes;
 use litchi_ole::doc::writer::{
@@ -235,13 +233,13 @@ fn header_picture_round_trips_with_byte_identical_payload() {
         .collect();
     let header_png = extracted
         .iter()
-        .find(|image| image.blip_type() == Some(litchi_imgconv::BlipType::Png))
+        .find(|image| image.kind() == litchi_odraw::image::Kind::Png)
         .expect("header PNG picture must be extractable");
-    assert_eq!(header_png.raw_data(), png_bytes.as_slice());
+    assert_eq!(header_png.data().unwrap(), png_bytes.as_slice());
     assert!(
         extracted
             .iter()
-            .any(|image| image.blip_type() == Some(litchi_imgconv::BlipType::Jpeg))
+            .any(|image| image.kind() == litchi_odraw::image::Kind::Jpeg)
     );
 
     // Header shape position for the picture (spid 2049 = first header item).

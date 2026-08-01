@@ -22,10 +22,17 @@ litchi-opc -> litchi-ooxml-common -> litchi-drawingml
                                       ├── litchi-xlsx
                                       └── litchi-xlsb
 
-litchi-cfb -> litchi-ole-common -> litchi-odraw
-                                   ├── litchi-doc
-                                   ├── litchi-ppt
-                                   └── litchi-xls
+litchi-cfb -> litchi-ole-common
+litchi-ole-common -> litchi-doc
+litchi-ole-common -> litchi-ppt
+litchi-ole-common -> litchi-xls
+litchi-odraw -> litchi-doc
+litchi-odraw -> litchi-ppt
+litchi-odraw -> litchi-xls
+
+litchi-cfb -> litchi-sign -> litchi-opc
+litchi-cfb -> litchi-ograph
+litchi-odraw -> litchi-imgconv
 ```
 
 The diagram shows the main direction, not every foundation edge. In particular,
@@ -68,6 +75,37 @@ Additional focused crates are permitted where the responsibility is real:
   and PPT owns presentation frames and embedded-object integration; PPT never
   depends on the concrete XLS crate.
 - Runtime adapters such as `litchi-tokio` are separate optional crates.
+
+`litchi-sign` owns the bounded, trust-neutral signature engine rather than a
+format facade. Its root vocabulary is compact (`Signer`, `Policy`, `Coverage`,
+`Report`, `Status`, and `Trust`), `xml` owns XMLDSig canonicalization and
+verification, and `cfb` owns the compound-file storage adapter. `litchi-opc`
+depends downward on that engine and owns only OPC graph selection, relationship
+and content-type maintenance, and package-level transaction staging. This
+direction prevents a signing/OPC cycle and lets DOC, PPT, and XLS use the same
+neutral engine without depending on OOXML. Strict policy accepts only complete
+package coverage; compatibility policy may report a typed partial coverage for
+real producer signatures that intentionally select a subset. Neither policy
+turns partial coverage into an unqualified success.
+
+`litchi-odraw::image` owns the OfficeArt BLIP, FBSE/BStore, delayed-storage,
+digest, and bounded writer grammar. Image decoding and conversion remain in
+`litchi-imgconv`, which consumes the grammar instead of redefining it. Host
+crates retain their native topology: in particular, PPT resolves a picture ID
+through the drawing-group FBSE table to a delayed Pictures-stream BLIP instead
+of treating that headerless stream as a second BStore.
+
+The optional umbrella image facade depends on both layers directly. It exposes
+the grammar as `images::art` and codecs as `images::codec`, so the codec crate
+does not become a compatibility tunnel for types it does not own. File helpers
+use short contextual names (`images::doc`, `images::ppt`, `images::escher`, and
+`images::store`) and return borrowed views whenever the input lifetime permits.
+
+`litchi-ograph` owns only neutral chart records, borrowed and owned package
+views, deterministic record encoding, and the standalone compound-package
+codec. XLS owns workbook tabs, BIFF objects, and chart-substream mutation; PPT
+owns frames and embedded-object integration. The neutral crate does not depend
+on either host, expose a runtime lock wrapper, or imply rendering or activation.
 
 `litchi-crypto` owns bounded `[MS-OFFCRYPTO]` structures and transformations,
 including compound-file DataSpaces metadata and password-derived cipher

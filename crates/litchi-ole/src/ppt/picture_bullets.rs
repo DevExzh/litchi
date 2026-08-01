@@ -34,6 +34,17 @@ impl TryFrom<u8> for PictureBulletType {
     }
 }
 
+impl PictureBulletType {
+    const fn kind(self) -> litchi_odraw::image::Kind {
+        match self {
+            Self::Emf => litchi_odraw::image::Kind::Emf,
+            Self::Wmf => litchi_odraw::image::Kind::Wmf,
+            Self::Jpeg => litchi_odraw::image::Kind::Jpeg,
+            Self::Png => litchi_odraw::image::Kind::Png,
+        }
+    }
+}
+
 /// One picture bullet from a `BlipEntityAtom`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PictureBullet {
@@ -48,18 +59,18 @@ pub struct PictureBullet {
 }
 
 impl PictureBullet {
-    /// Decode the embedded OfficeArt image using the image-conversion feature.
-    #[cfg(feature = "imgconv")]
-    pub fn blip(&self) -> Result<litchi_imgconv::Blip<'static>> {
-        self.blip_with_delay_stream(None)
+    /// Parses the embedded OfficeArt image without copying its file data.
+    pub fn blip(&self) -> Result<litchi_odraw::image::Blip<'_>> {
+        self.blip_with_delay(None)
     }
 
-    /// Decode the image, optionally resolving a delay-loaded FBSE from its stream.
-    #[cfg(feature = "imgconv")]
-    pub fn blip_with_delay_stream(
-        &self,
-        delay_stream: Option<&[u8]>,
-    ) -> Result<litchi_imgconv::Blip<'static>> {
+    /// Parses the image, optionally resolving a delay-loaded FBSE.
+    pub fn blip_with_delay<'data>(
+        &'data self,
+        delay: Option<&'data [u8]>,
+    ) -> Result<litchi_odraw::image::Blip<'data>> {
+        use litchi_odraw::image::{Blip, Context, Delay, Entry};
+
         let (record, consumed) =
             litchi_odraw::Record::parse(&self.officeart_record, 0).map_err(|error| {
                 PptError::Corrupted(format!("Invalid picture-bullet BLIP: {error}"))
@@ -69,11 +80,23 @@ impl PictureBullet {
                 "Picture-bullet BLIP was only partially parsed".to_string(),
             ));
         }
-        crate::extractor::ImageExtractor::extract_from_record_with_stream(&record, delay_stream)
-            .map(|image| image.blip)
-            .map_err(|error| {
-                PptError::Corrupted(format!("Could not decode picture-bullet BLIP: {error}"))
-            })
+        let blip = if record.kind() == litchi_odraw::RecordKind::Bse {
+            let entry = Entry::parse(record)?;
+            let context = delay.map_or_else(Context::new, |data| {
+                Context::new().with_delay(Delay::new(data))
+            });
+            entry.resolve(context)?.ok_or_else(|| {
+                PptError::Corrupted("Picture-bullet FBSE is an empty slot".to_string())
+            })?
+        } else {
+            Blip::from_record(record)?
+        };
+        if !picture_type_matches(self.picture_type, blip.kind()) {
+            return Err(PptError::Corrupted(
+                "Picture-bullet preferred and stored BLIP types disagree".to_string(),
+            ));
+        }
+        Ok(blip)
     }
 }
 
@@ -151,33 +174,21 @@ fn parse_picture_bullet(record: &PptRecord) -> Result<PictureBullet> {
     let picture_type = PictureBulletType::try_from(record.data[0])?;
     let unused = record.data[1];
     let officeart_record = &record.data[2..];
-    let instance_version = u16::from_le_bytes([officeart_record[0], officeart_record[1]]);
-    let version = instance_version & 0x000f;
-    let instance = instance_version >> 4;
-    let record_type = u16::from_le_bytes([officeart_record[2], officeart_record[3]]);
-    let length = u32::from_le_bytes([
-        officeart_record[4],
-        officeart_record[5],
-        officeart_record[6],
-        officeart_record[7],
-    ]);
-    let length = usize::try_from(length)
-        .map_err(|_| PptError::Corrupted("Picture-bullet BLIP size overflow".to_string()))?;
-    if 8usize.checked_add(length) != Some(officeart_record.len()) {
+    let (image_record, consumed) = litchi_odraw::Record::parse(officeart_record, 0)?;
+    if consumed != officeart_record.len() {
         return Err(PptError::Corrupted(
             "Picture-bullet OfficeArt record has an invalid size".to_string(),
         ));
     }
-    if record_type == 0xf007 {
-        validate_fbse(officeart_record, version, instance, picture_type)?;
+    let kind = if image_record.kind() == litchi_odraw::RecordKind::Bse {
+        litchi_odraw::image::Entry::parse(image_record)?.kind()?
     } else {
-        validate_direct_blip(
-            officeart_record,
-            version,
-            instance,
-            record_type,
-            picture_type,
-        )?;
+        litchi_odraw::image::Blip::from_record(image_record)?.kind()
+    };
+    if !picture_type_matches(picture_type, kind) {
+        return Err(PptError::Corrupted(
+            "Picture-bullet preferred and stored BLIP types disagree".to_string(),
+        ));
     }
 
     Ok(PictureBullet {
@@ -188,154 +199,13 @@ fn parse_picture_bullet(record: &PptRecord) -> Result<PictureBullet> {
     })
 }
 
-fn validate_fbse(
-    record: &[u8],
-    version: u16,
-    instance: u16,
+fn picture_type_matches(
     picture_type: PictureBulletType,
-) -> Result<()> {
-    let payload = &record[8..];
-    if version != 2 || payload.len() < 36 {
-        return Err(PptError::Corrupted(
-            "Picture-bullet FBSE has an invalid version or size".to_string(),
-        ));
-    }
-    let win_type = payload[0];
-    let mac_type = payload[1];
-    if instance != u16::from(win_type) && instance != u16::from(mac_type) {
-        return Err(PptError::Corrupted(
-            "Picture-bullet FBSE instance does not match its BLIP types".to_string(),
-        ));
-    }
-    if !picture_type_matches(picture_type, win_type) {
-        return Err(PptError::Corrupted(
-            "Picture-bullet preferred and stored BLIP types disagree".to_string(),
-        ));
-    }
-
-    let name_length = usize::from(payload[33]);
-    if name_length & 1 != 0 {
-        return Err(PptError::Corrupted(
-            "Picture-bullet FBSE name has an odd byte length".to_string(),
-        ));
-    }
-    let embedded_offset = 36usize
-        .checked_add(name_length)
-        .ok_or_else(|| PptError::Corrupted("Picture-bullet FBSE name size overflow".to_string()))?;
-    if embedded_offset > payload.len() {
-        return Err(PptError::Corrupted(
-            "Picture-bullet FBSE name extends beyond the record".to_string(),
-        ));
-    }
-    if name_length > 0 {
-        let name = &payload[36..embedded_offset];
-        let valid_utf16 = name.ends_with(&[0, 0])
-            && char::decode_utf16(
-                name[..name.len() - 2]
-                    .chunks_exact(2)
-                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
-            )
-            .all(|character| character.is_ok());
-        if !valid_utf16 {
-            return Err(PptError::Corrupted(
-                "Picture-bullet FBSE name is not valid null-terminated UTF-16".to_string(),
-            ));
-        }
-    }
-    if embedded_offset == payload.len() {
-        let delay_offset = u32::from_le_bytes([payload[28], payload[29], payload[30], payload[31]]);
-        if delay_offset == u32::MAX {
-            return Err(PptError::Corrupted(
-                "Picture-bullet FBSE does not identify any BLIP data".to_string(),
-            ));
-        }
-        return Ok(());
-    }
-
-    let embedded_size = usize::try_from(u32::from_le_bytes([
-        payload[20],
-        payload[21],
-        payload[22],
-        payload[23],
-    ]))
-    .map_err(|_| PptError::Corrupted("Picture-bullet FBSE size overflow".to_string()))?;
-    if embedded_offset.checked_add(embedded_size) != Some(payload.len()) {
-        return Err(PptError::Corrupted(
-            "Picture-bullet FBSE embedded BLIP has an invalid size".to_string(),
-        ));
-    }
-    let embedded = &payload[embedded_offset..];
-    if embedded.len() < 8 {
-        return Err(PptError::Corrupted(
-            "Picture-bullet FBSE embedded BLIP is truncated".to_string(),
-        ));
-    }
-    let options = u16::from_le_bytes([embedded[0], embedded[1]]);
-    let embedded_type = u16::from_le_bytes([embedded[2], embedded[3]]);
-    validate_direct_blip(
-        embedded,
-        options & 0x000f,
-        options >> 4,
-        embedded_type,
-        picture_type,
-    )
-}
-
-fn validate_direct_blip(
-    record: &[u8],
-    version: u16,
-    instance: u16,
-    record_type: u16,
-    picture_type: PictureBulletType,
-) -> Result<()> {
-    if version != 0 || record.len() < 8 {
-        return Err(PptError::Corrupted(
-            "Picture-bullet OfficeArt BLIP has an invalid version or size".to_string(),
-        ));
-    }
-    let length = usize::try_from(u32::from_le_bytes([
-        record[4], record[5], record[6], record[7],
-    ]))
-    .map_err(|_| PptError::Corrupted("Picture-bullet BLIP size overflow".to_string()))?;
-    if 8usize.checked_add(length) != Some(record.len()) {
-        return Err(PptError::Corrupted(
-            "Picture-bullet OfficeArt BLIP has an invalid size".to_string(),
-        ));
-    }
-
-    let (stored_type, one_uid_instance, two_uid_instance, one_uid_size, two_uid_size) =
-        match record_type {
-            0xf01a => (0x02, 0x3d4, 0x3d5, 50, 66),
-            0xf01b => (0x03, 0x216, 0x217, 50, 66),
-            0xf01d | 0xf02a if matches!(instance, 0x46a | 0x46b) => (0x05, 0x46a, 0x46b, 17, 33),
-            0xf01d | 0xf02a => (0x05, 0x6e2, 0x6e3, 17, 33),
-            0xf01e => (0x06, 0x6e0, 0x6e1, 17, 33),
-            _ => {
-                return Err(PptError::Corrupted(
-                    "Picture bullet contains an unsupported OfficeArt BLIP type".to_string(),
-                ));
-            },
-        };
-    let minimum_size = if instance == one_uid_instance {
-        one_uid_size
-    } else if instance == two_uid_instance {
-        two_uid_size
-    } else {
-        return Err(PptError::Corrupted(
-            "Picture-bullet OfficeArt BLIP has an invalid record instance".to_string(),
-        ));
-    };
-    if length < minimum_size || stored_type != picture_type as u8 {
-        return Err(PptError::Corrupted(
-            "Picture-bullet preferred and stored BLIP types disagree".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn picture_type_matches(picture_type: PictureBulletType, stored_type: u8) -> bool {
-    stored_type == picture_type as u8
-        || (picture_type == PictureBulletType::Jpeg && stored_type == 0x12)
+    stored_type: litchi_odraw::image::Kind,
+) -> bool {
+    stored_type == picture_type.kind()
+        || (picture_type == PictureBulletType::Jpeg
+            && stored_type == litchi_odraw::image::Kind::CmykJpeg)
 }
 
 #[cfg(test)]
@@ -441,14 +311,13 @@ mod tests {
         assert_eq!(bullets.get(7).unwrap().picture_type, PictureBulletType::Png);
     }
 
-    #[cfg(feature = "imgconv")]
     #[test]
     fn decodes_direct_and_fbse_picture_bullets() {
         let direct = PictureBulletCollection::parse(&collection(png_bullet(1))).unwrap();
-        assert_eq!(direct.get(1).unwrap().blip().unwrap().picture_data(), []);
+        assert_eq!(direct.get(1).unwrap().blip().unwrap().data(), []);
 
         let embedded = PictureBulletCollection::parse(&collection(fbse_png_bullet(2))).unwrap();
-        assert_eq!(embedded.get(2).unwrap().blip().unwrap().picture_data(), []);
+        assert_eq!(embedded.get(2).unwrap().blip().unwrap().data(), []);
     }
 
     #[test]

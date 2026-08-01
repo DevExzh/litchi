@@ -12,7 +12,7 @@ use crate::part::{Part, PartFactory};
 use crate::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
 use crate::pkgreader::PackageReader;
 use crate::rel::Relationships;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -343,42 +343,60 @@ impl OpcPackage {
         &mut self.rels
     }
 
-    /// Whether the package declares an OPC digital-signature origin.
+    /// Whether a package-level signature-origin relationship is present.
     ///
-    /// This is a cheap capability check, not cryptographic verification.
-    pub fn has_digital_signatures(&self) -> bool {
-        self.rels.iter().any(|relationship| {
-            relationship.reltype() == relationship_type::DIGITAL_SIGNATURE_ORIGIN
-        })
+    /// This is a cheap capability check. Use [`Self::signatures`] when graph
+    /// validation and cryptographic verification are required.
+    pub fn is_signed(&self) -> bool {
+        crate::sign::is_signed(self)
     }
 
-    /// Discover and verify OPC digital signatures without evaluating certificate trust.
-    pub fn verify_digital_signatures(
+    /// Verifies every OPC signature with the safe strict policy.
+    pub fn signatures(&self) -> crate::sign::Result<Vec<crate::sign::Report>> {
+        crate::sign::signatures(self, &litchi_sign::Policy::strict())
+    }
+
+    /// Verifies every OPC signature with an explicit trust-neutral policy.
+    pub fn signatures_with(
         &self,
-        policy: &crate::signature::SignatureVerificationPolicy,
-    ) -> crate::signature::Result<Vec<crate::signature::DigitalSignatureVerification>> {
-        crate::signature::verify_package(self, policy)
+        policy: &litchi_sign::Policy,
+    ) -> crate::sign::Result<Vec<crate::sign::Report>> {
+        crate::sign::signatures(self, policy)
     }
 
-    /// Add a package digital signature without removing existing valid signatures.
-    pub fn add_digital_signature(
+    /// Adds a signature while retaining every existing valid signature.
+    pub fn sign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
+        crate::sign::sign(self, signer, &litchi_sign::Limits::standard())
+    }
+
+    /// Adds a signature with explicit authoring resource bounds.
+    pub fn sign_with(
         &mut self,
-        signer: &crate::signature::PackageSigner,
-    ) -> crate::signature::Result<PackURI> {
-        crate::signature::add_package_signature(self, signer)
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> crate::sign::Result<PackURI> {
+        crate::sign::sign(self, signer, limits)
     }
 
-    /// Replace every package digital signature with one new signature.
-    pub fn resign_digital_signature(
+    /// Atomically replaces the validated signature graph with one signature.
+    pub fn resign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
+        crate::sign::resign(self, signer, &litchi_sign::Limits::standard())
+    }
+
+    /// Atomically replaces signatures with explicit authoring resource bounds.
+    pub fn resign_with(
         &mut self,
-        signer: &crate::signature::PackageSigner,
-    ) -> crate::signature::Result<PackURI> {
-        crate::signature::resign_package(self, signer)
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> crate::sign::Result<PackURI> {
+        crate::sign::resign(self, signer, limits)
     }
 
-    /// Remove the complete package digital-signature graph.
-    pub fn clear_digital_signatures(&mut self) -> crate::signature::Result<()> {
-        crate::signature::clear_package_signatures(self)
+    /// Removes all signature relationships and infrastructure parts.
+    ///
+    /// Deletion is infallible and idempotent, including for a malformed graph.
+    pub fn unsign(&mut self) {
+        self.strip_signature_graph();
     }
 
     /// Relate the package to a part.
@@ -514,6 +532,40 @@ impl OpcPackage {
     /// ```
     pub fn to_stream<W: Write>(&self, writer: W) -> Result<()> {
         crate::pkgwriter::PackageWriter::write_to_stream(writer, self)
+    }
+
+    pub(crate) fn strip_signature_graph(&mut self) {
+        let infrastructure: HashSet<PackURI> = self
+            .parts
+            .values()
+            .filter(|part| crate::sign::is_infrastructure(&***part))
+            .map(|part| part.partname().clone())
+            .collect();
+
+        self.rels.retain(|relationship| {
+            !crate::sign::is_signature_relationship(relationship.reltype())
+                && !targets_any(relationship, &infrastructure)
+        });
+        for part in self.parts.values_mut() {
+            part.rels_mut().retain(|relationship| {
+                !crate::sign::is_signature_relationship(relationship.reltype())
+                    && !targets_any(relationship, &infrastructure)
+            });
+        }
+        self.parts
+            .retain(|_, part| !crate::sign::is_infrastructure(&**part));
+    }
+}
+
+fn targets_any(relationship: &crate::Relationship, infrastructure: &HashSet<PackURI>) -> bool {
+    if relationship.is_external() {
+        return false;
+    }
+    match relationship.target_partname() {
+        Ok(target) => infrastructure
+            .iter()
+            .any(|part| part.as_str().eq_ignore_ascii_case(target.as_str())),
+        Err(_) => crate::sign::is_signature_path(relationship.target_path()),
     }
 }
 

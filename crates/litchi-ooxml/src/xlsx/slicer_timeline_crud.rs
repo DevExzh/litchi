@@ -66,7 +66,7 @@ pub fn add_slicer(
         package
             .get_part_mut(&PackURI::new(&staged.part_name).map_err(OoxmlError::InvalidUri)?)?
             .set_blob(xml);
-        let _ = package.clear_digital_signatures();
+        package.unsign();
         return Ok(staged);
     }
     let part_name = next_part_name(package, "/xl/slicers/slicer%d.xml")?;
@@ -77,7 +77,7 @@ pub fn add_slicer(
         slicers: Slicers::new(vec![slicer]),
     };
     store_worksheet_slicers(package, worksheet_name, &value)?;
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(value)
 }
 
@@ -120,7 +120,7 @@ where
     let xml = write_slicers(&parts[index].slicers)?;
     let part_name = PackURI::new(&parts[index].part_name).map_err(OoxmlError::InvalidUri)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -174,7 +174,7 @@ pub fn remove_slicer(
             package.remove_part(&uri);
         }
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -212,7 +212,7 @@ pub fn reorder_slicers(
     for (uri, xml) in plans {
         package.get_part_mut(&uri)?.set_blob(xml);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(ordered)
 }
 
@@ -234,7 +234,7 @@ pub fn add_slicer_cache(
     };
     validate_slicer_cache_pivot_links(package, std::slice::from_ref(&value))?;
     store_slicer_cache(package, &value)?;
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(value)
 }
 
@@ -257,7 +257,7 @@ where
     let xml = write_slicer_cache_definition(&caches[index].definition)?;
     let uri = PackURI::new(&caches[index].part_name).map_err(OoxmlError::InvalidUri)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -312,7 +312,7 @@ pub fn remove_slicer_cache(package: &mut OpcPackage, name: &str) -> Result<bool>
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -341,7 +341,7 @@ pub fn reorder_slicer_caches(
         &ids,
     )?;
     package.get_part_mut(&workbook_name)?.set_blob(updated);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(caches)
 }
 
@@ -369,7 +369,7 @@ pub fn add_timeline_cache(
     validate_timeline_cache_set(package, std::slice::from_ref(&value))?;
     if caches.is_empty() {
         store_timeline_caches(package, &workbook, std::slice::from_ref(&value))?;
-        let _ = package.clear_digital_signatures();
+        package.unsign();
         return Ok(value);
     }
     caches.push(value.clone());
@@ -403,7 +403,7 @@ pub fn add_timeline_cache(
             false,
         );
     package.get_part_mut(&workbook)?.set_blob(updated);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(value)
 }
 
@@ -427,7 +427,7 @@ where
     let xml = write_timeline_cache_definition(&caches[index].definition)?;
     let uri = PackURI::new(&caches[index].part_name).map_err(OoxmlError::InvalidUri)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -485,7 +485,7 @@ pub fn remove_timeline_cache(package: &mut OpcPackage, name: &str) -> Result<boo
     if !part_is_referenced(package, &uri) {
         package.remove_part(&uri);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -514,7 +514,7 @@ pub fn reorder_timeline_caches(
         &ids,
     )?;
     package.get_part_mut(&workbook)?.set_blob(updated);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(caches)
 }
 
@@ -564,7 +564,7 @@ pub fn add_timeline(
         let xml = write_timelines(&sheets[index].timelines)?;
         let uri = PackURI::new(&sheets[index].part_name).map_err(OoxmlError::InvalidUri)?;
         package.get_part_mut(&uri)?.set_blob(xml);
-        let _ = package.clear_digital_signatures();
+        package.unsign();
         return Ok(sheets[index].clone());
     }
     let value = WorksheetTimelines {
@@ -576,7 +576,7 @@ pub fn add_timeline(
         },
     };
     store_worksheet_timelines(package, &workbook, &value)?;
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(value)
 }
 
@@ -617,7 +617,7 @@ where
     let xml = write_timelines(&sheets[sheet_index].timelines)?;
     let uri = PackURI::new(&sheets[sheet_index].part_name).map_err(OoxmlError::InvalidUri)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -680,7 +680,7 @@ pub fn remove_timeline(package: &mut OpcPackage, worksheet: &PackURI, name: &str
             package.remove_part(&uri);
         }
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -712,7 +712,7 @@ pub fn reorder_timelines(
     let xml = write_timelines(&sheets[sheet_index].timelines)?;
     let uri = PackURI::new(&sheets[sheet_index].part_name).map_err(OoxmlError::InvalidUri)?;
     package.get_part_mut(&uri)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(ordered)
 }
 

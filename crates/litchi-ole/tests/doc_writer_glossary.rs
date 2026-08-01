@@ -490,7 +490,8 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
         document
             .image_data(&attached.images()[0])
             .unwrap()
-            .raw_data(),
+            .data()
+            .unwrap(),
         child_image.as_slice()
     );
     assert!(

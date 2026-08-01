@@ -43,9 +43,7 @@ pub mod docx;
 pub mod embedded_object;
 pub mod error;
 pub mod metadata;
-// OPC implementation lives in the litchi-opc crate. Re-export the public
-// surface so existing `litchi_ooxml::opc::*` paths (and the umbrella
-// `litchi::ooxml::opc::*` shim that re-exports this crate) keep resolving.
+// OPC implementation lives in the focused litchi-opc crate.
 pub mod opc {
     pub use litchi_opc::*;
 }
@@ -63,12 +61,8 @@ pub mod crypto;
 #[cfg(feature = "fonts")]
 pub mod fonts;
 
-// Re-export commonly used types from OPC layer
-pub use opc::{
-    CanonicalizationMethod, CertificateTrust, DigitalSignatureError, DigitalSignatureVerification,
-    EmbeddedCertificate, OpcPackage, PackURI, PackageSigner, ReferenceVerification, Sha1Policy,
-    SignatureAlgorithm, SignatureVerificationPolicy, VerificationStatus,
-};
+pub use litchi_sign::{Coverage, Limits, Policy, Signer, Status, Trust};
+pub use opc::{OpcPackage, PackURI};
 
 // Re-export common utilities
 pub use litchi_ooxml_common::{

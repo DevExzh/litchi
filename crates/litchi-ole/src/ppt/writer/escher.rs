@@ -452,7 +452,7 @@ pub fn create_dgg_container(
 /// Create a DggContainer with BStore for pictures
 ///
 /// Same as `create_dgg_container` but includes a BStoreContainer for pictures.
-/// The bstore_blob should be the raw bytes from `BlipStoreBuilder::build()`.
+/// `bstore_blob` is the raw output of `Pictures::store`.
 pub fn create_dgg_container_with_blips(
     master_shapes: u32,
     slide_shape_counts: &[u32],

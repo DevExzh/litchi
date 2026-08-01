@@ -941,7 +941,7 @@ pub fn store_worksheet_named_sheet_views(
             .add_relationship(RELATIONSHIP.into(), target, relationship_id, false);
     }
 
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 
@@ -965,7 +965,7 @@ pub fn remove_worksheet_named_sheet_views(
     if !package_part_is_referenced(package, &relationship.part_name) {
         package.remove_part(&relationship.part_name);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 

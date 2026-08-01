@@ -1,722 +1,449 @@
-// Image extraction from Office documents
-//
-// This module provides high-level functionality to extract all images
-// from Microsoft Office documents (PPT, DOC) using the Escher drawing layer.
+//! Host-neutral image discovery for legacy Office containers.
+//!
+//! OfficeArt grammar is provided by `litchi-odraw`. This module only maps the
+//! DOC/PPT host topology onto borrowed BLIP views. Rasterization and
+//! decompression remain behind the optional `imgconv` feature.
 
-use litchi_core::error::Result;
-use litchi_imgconv::{Blip, BlipStore, BlipStoreEntry};
-use litchi_odraw::{Container, Parser, Record, RecordKind};
+use litchi_core::error::{Error, Result};
+use litchi_odraw::image::{Blip, Block, Context, Delay, Entry, Id, Kind, Store};
+use litchi_odraw::{Children, Container, Parser, Record, RecordKind};
+
+#[cfg(feature = "imgconv")]
 use std::borrow::Cow;
 
-fn odraw_error(error: litchi_odraw::Error) -> litchi_core::error::Error {
-    litchi_core::error::Error::ParseError(error.to_string())
+const MAX_IMAGES: usize = 0x0FFF;
+
+fn parse_error(error: impl std::fmt::Display) -> Error {
+    Error::ParseError(error.to_string())
 }
 
-/// Extracted image with metadata
+/// Backing storage for an extracted image.
+///
+/// Borrowed views are zero-copy. Owned records are parsed on demand, avoiding
+/// a self-referential allocation.
+#[derive(Debug, Clone)]
+enum Source<'data> {
+    View(Blip<'data>),
+    Bytes(Vec<u8>),
+}
+
+/// One validated OfficeArt image with host metadata.
 #[derive(Debug, Clone)]
 pub struct ExtractedImage<'data> {
-    /// The parsed BLIP data
-    pub blip: Blip<'data>,
-    /// Optional name/filename hint
+    source: Source<'data>,
+    kind: Kind,
+    /// Optional name or filename hint.
     pub name: Option<String>,
-    /// Index in the document's image collection
+    /// Zero-based position in the host image collection.
     pub index: usize,
 }
 
 impl<'data> ExtractedImage<'data> {
-    /// Create a new extracted image
+    /// Wraps a validated borrowed BLIP without copying its file data.
     pub fn new(blip: Blip<'data>, name: Option<String>, index: usize) -> Self {
-        Self { blip, name, index }
-    }
-
-    /// Get the BLIP type
-    pub fn blip_type(&self) -> Option<litchi_imgconv::BlipType> {
-        self.blip.blip_type()
-    }
-
-    /// Get file extension for this image
-    pub fn extension(&self) -> &'static str {
-        self.blip_type().map(|t| t.extension()).unwrap_or("bin")
-    }
-
-    /// Get the recommended output extension for this image
-    ///
-    /// - EMF, WMF: Converted to SVG
-    /// - PICT: Converted to PNG (SVG not yet implemented)
-    /// - Bitmaps (PNG, JPEG, etc.): Keep their original extension
-    pub fn output_extension(&self) -> &'static str {
-        use litchi_imgconv::BlipType;
-
-        if let Some(blip_type) = self.blip_type() {
-            match blip_type {
-                BlipType::Emf | BlipType::Wmf => "svg",
-                BlipType::Pict => "png", // PICT to SVG not yet implemented
-                _ => blip_type.extension(),
-            }
-        } else {
-            "bin"
+        let kind = blip.kind();
+        Self {
+            source: Source::View(blip),
+            kind,
+            name,
+            index,
         }
     }
 
-    /// Get suggested filename for output
-    ///
-    /// Uses the output extension (SVG for metafiles, original extension for bitmaps)
+    /// Parses a fresh borrowed BLIP view.
+    pub fn blip(&self) -> Result<Blip<'_>> {
+        match &self.source {
+            Source::View(blip) => Ok(blip.clone()),
+            Source::Bytes(bytes) => Blip::parse(bytes).map_err(parse_error),
+        }
+    }
+
+    /// Returns the native OfficeArt image kind.
+    pub const fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    /// Returns the conventional native extension.
+    pub const fn extension(&self) -> &'static str {
+        self.kind.extension()
+    }
+
+    /// Returns the recommended extraction extension.
+    pub const fn output_extension(&self) -> &'static str {
+        match self.kind {
+            Kind::Emf | Kind::Wmf => "svg",
+            Kind::Pict => "png",
+            _ => self.kind.extension(),
+        }
+    }
+
+    /// Returns a suggested output filename.
     pub fn suggested_filename(&self) -> String {
-        if let Some(name) = &self.name {
-            // Check if name already has extension
-            if name.contains('.') {
-                // Replace extension with output extension
-                let stem = name.split('.').next().unwrap_or(name);
-                format!("{}.{}", stem, self.output_extension())
-            } else {
-                format!("{}.{}", name, self.output_extension())
-            }
-        } else {
-            format!("image_{:03}.{}", self.index, self.output_extension())
+        match &self.name {
+            Some(name) => {
+                let stem = name
+                    .rsplit_once('.')
+                    .map_or(name.as_str(), |(stem, _)| stem);
+                format!("{stem}.{}", self.output_extension())
+            },
+            None => format!("image_{:03}.{}", self.index, self.output_extension()),
         }
     }
 
-    /// Get raw picture data
-    pub fn raw_data(&self) -> &[u8] {
-        self.blip.picture_data()
+    /// Borrows the stored image file data without decoding it.
+    pub fn data(&self) -> Result<&[u8]> {
+        match &self.source {
+            Source::View(blip) => Ok(blip.data()),
+            Source::Bytes(bytes) => Blip::parse(bytes)
+                .map(|blip| blip.data())
+                .map_err(parse_error),
+        }
     }
 
-    /// Get decompressed picture data
-    pub fn decompressed_data(&self) -> Result<Cow<'data, [u8]>> {
-        self.blip.get_decompressed_data()
-    }
-
-    /// Convert to PNG format
-    pub fn to_png(&self, width: Option<u32>, height: Option<u32>) -> Result<Vec<u8>> {
-        litchi_imgconv::convert_blip_to_png(&self.blip, width, height)
-    }
-
-    /// Convert to JPEG format
-    pub fn to_jpeg(&self, width: Option<u32>, height: Option<u32>) -> Result<Vec<u8>> {
-        litchi_imgconv::convert_blip_to_jpeg(&self.blip, width, height)
-    }
-
-    /// Convert metafile to SVG format
-    ///
-    /// For EMF and WMF formats, converts to SVG.
-    /// PICT format is not yet supported for SVG conversion and will return an error.
-    /// Returns an error if the image is not a metafile.
-    pub fn to_svg(&self) -> Result<String> {
-        use litchi_imgconv::BlipType;
-
-        // For WMF, we need to add the placeable header using BLIP metadata
-        // For EMF and others, just use decompressed data
-        let data = self.blip.get_picture_data_for_conversion()?;
-
-        match self.blip_type() {
-            Some(BlipType::Emf) => litchi_imgconv::emf::convert_emf_to_svg(&data),
-            Some(BlipType::Wmf) => litchi_imgconv::wmf::convert_wmf_to_svg(&data),
-            Some(BlipType::Pict) => {
-                // PICT to SVG conversion is not yet implemented
-                // Fall back to error for now
-                Err(litchi_core::error::Error::ParseError(
-                    "PICT to SVG conversion is not yet implemented".into(),
-                ))
+    /// Moves or copies this image into an independently owned record.
+    pub fn into_owned(self) -> Result<ExtractedImage<'static>> {
+        let bytes = match self.source {
+            Source::Bytes(bytes) => bytes,
+            Source::View(blip) => {
+                let mut bytes = Vec::new();
+                litchi_odraw::image::write::copy(&mut bytes, &blip)?;
+                bytes
             },
-            _ => Err(litchi_core::error::Error::ParseError(
-                "Image is not a metafile format (EMF/WMF/PICT)".into(),
+        };
+        Ok(ExtractedImage {
+            source: Source::Bytes(bytes),
+            kind: self.kind,
+            name: self.name,
+            index: self.index,
+        })
+    }
+
+    /// Returns bounded, decompressed native file data.
+    #[cfg(feature = "imgconv")]
+    pub fn decode(&self, limits: litchi_imgconv::Limits) -> Result<Cow<'_, [u8]>> {
+        let blip = self.blip()?;
+        litchi_imgconv::decode_data(&blip, &limits)
+    }
+
+    /// Converts this image to PNG under explicit sizing and resource limits.
+    #[cfg(feature = "imgconv")]
+    pub fn to_png(&self, options: litchi_imgconv::Options) -> Result<Vec<u8>> {
+        litchi_imgconv::to_png(&self.blip()?, options)
+    }
+
+    /// Converts this image to JPEG under explicit sizing and resource limits.
+    #[cfg(feature = "imgconv")]
+    pub fn to_jpeg(&self, options: litchi_imgconv::Options) -> Result<Vec<u8>> {
+        litchi_imgconv::to_jpeg(&self.blip()?, options)
+    }
+
+    /// Converts an EMF or WMF image to SVG under explicit limits.
+    #[cfg(feature = "imgconv")]
+    pub fn to_svg(&self, options: litchi_imgconv::Options) -> Result<String> {
+        litchi_imgconv::to_svg(&self.blip()?, options)
+    }
+
+    /// Extracts the recommended representation under explicit limits.
+    #[cfg(feature = "imgconv")]
+    pub fn extract(&self, options: litchi_imgconv::Options) -> Result<Vec<u8>> {
+        match self.kind {
+            Kind::Emf | Kind::Wmf => self.to_svg(options).map(String::into_bytes),
+            Kind::Pict => self.to_png(options),
+            Kind::Jpeg | Kind::CmykJpeg | Kind::Png | Kind::Dib | Kind::Tiff => {
+                self.decode(options.limits).map(|data| data.into_owned())
+            },
+            Kind::Error | Kind::Unknown | Kind::Other(_) => Err(Error::Unsupported(
+                "unknown OfficeArt images cannot be decoded".to_string(),
             )),
         }
     }
-
-    /// Extract the image in its recommended format
-    ///
-    /// - For metafiles (EMF, WMF): Converts to SVG
-    /// - For PICT: Converts to PNG (SVG not yet implemented)
-    /// - For bitmaps (PNG, JPEG, DIB, TIFF): Returns raw decompressed data
-    ///
-    /// This is the recommended method for extracting images as it preserves
-    /// vector graphics as vectors and bitmaps as bitmaps.
-    pub fn extract(&self) -> Result<Vec<u8>> {
-        use litchi_imgconv::BlipType;
-
-        if let Some(blip_type) = self.blip_type() {
-            match blip_type {
-                BlipType::Emf | BlipType::Wmf => {
-                    // Convert EMF/WMF to SVG
-                    self.to_svg().map(|s| s.into_bytes())
-                },
-                BlipType::Pict => {
-                    // PICT to SVG not yet implemented, convert to PNG instead
-                    self.to_png(Some(800), None)
-                },
-                _ => {
-                    // Extract bitmaps as-is
-                    self.decompressed_data().map(|cow| cow.into_owned())
-                },
-            }
-        } else {
-            // Unknown format, just return decompressed data
-            self.decompressed_data().map(|cow| cow.into_owned())
-        }
-    }
 }
 
-/// Image extractor for Office documents
-///
-/// This provides functionality to extract all images from Office documents
-/// by parsing the Escher drawing layer and BLIP records.
+/// Borrowed image discovery for OfficeArt-bearing OLE streams.
 pub struct ImageExtractor;
 
 impl ImageExtractor {
-    /// Extract BLIP store (BSE index) from Escher drawing data
-    ///
-    /// # Arguments
-    /// * `data` - Escher drawing data (typically from Drawing Group Container)
-    ///
-    /// # Returns
-    /// BlipStore containing all BSE entries
-    pub fn extract_blip_store<'data>(data: &'data [u8]) -> Result<BlipStore<'data>> {
-        let mut store = BlipStore::new();
-
-        // Parse Escher records
-        let parser = Parser::new(data);
-        for record in parser.records() {
-            let record = record.map_err(odraw_error)?;
-
-            // Look for BStoreContainer (0xF001)
+    /// Finds the unique BStore below an OfficeArt drawing root.
+    pub fn store(data: &[u8]) -> Result<Option<Store<'_>>> {
+        let mut found = None;
+        for record in Parser::new(data).records() {
+            let record = record.map_err(parse_error)?;
             if record.kind() == RecordKind::BStoreContainer {
-                // Parse container to get BSE records
-                let container = Container::try_new(record).map_err(odraw_error)?;
-
-                // The instance field in BStoreContainer header indicates the number of BLIPs
-                let blip_count = usize::from(container.record().instance());
-                store = BlipStore::with_capacity(blip_count);
-
-                // Each child record should be a BSE (0xF007)
-                for child in container.children() {
-                    let child = child.map_err(odraw_error)?;
-                    if child.kind() == RecordKind::Bse {
-                        match BlipStoreEntry::parse(child.data()) {
-                            Ok(bse) => store.add_entry(bse),
-                            Err(e) => {
-                                // Log error but continue processing
-                                eprintln!("Warning: Failed to parse BSE entry: {}", e);
-                            },
-                        }
-                    }
+                set_store(&mut found, record)?;
+                continue;
+            }
+            if record.is_container() {
+                let container = Container::try_new(record).map_err(parse_error)?;
+                for store in container
+                    .find_recursive(RecordKind::BStoreContainer)
+                    .map_err(parse_error)?
+                {
+                    set_store(&mut found, store)?;
                 }
-
-                break; // Found the store, no need to continue
             }
         }
-
-        Ok(store)
+        found
+            .map(Store::from_record)
+            .transpose()
+            .map_err(parse_error)
     }
 
-    /// Extract BLIP from BSE record, handling both embedded and delay-loaded cases.
-    ///
-    /// # Arguments
-    /// * `bse` - Parsed BSE record
-    /// * `record_data` - Raw BSE record data (without Escher header)
-    /// * `delay_stream` - Optional data stream for delay-loaded BLIPs
-    ///
-    /// # Returns
-    /// Owned BLIP data
-    fn blip_from_bse(
-        bse: &BlipStoreEntry<'_>,
-        bse_record: &Record<'_>,
-        delay_stream: Option<&[u8]>,
-    ) -> Result<Blip<'static>> {
-        let embedded_offset = 36usize
-            .checked_add(usize::from(bse.name_len))
-            .ok_or_else(|| {
-                litchi_core::error::Error::ParseError("BSE name size overflow".into())
-            })?;
-        if embedded_offset > bse_record.data().len() {
-            return Err(litchi_core::error::Error::ParseError(
-                "BSE name extends beyond record data".into(),
-            ));
-        }
-        let blip_data = if bse_record.data().len() == embedded_offset {
-            if !bse.is_delay_loaded() {
-                return Err(litchi_core::error::Error::ParseError(
-                    "BSE has neither an embedded nor delay-loaded BLIP".into(),
-                ));
-            }
-            let stream = delay_stream.ok_or_else(|| {
-                litchi_core::error::Error::ParseError(
-                    "BSE record is delay-loaded but no data stream was provided".into(),
-                )
-            })?;
-            let offset = bse.offset as usize;
-            if offset >= stream.len() {
-                return Err(litchi_core::error::Error::ParseError(
-                    "BSE delay stream offset is out of bounds".into(),
-                ));
-            }
-            &stream[offset..]
-        } else {
-            &bse_record.data()[embedded_offset..]
+    /// Resolves one checked semantic BStore ID against an optional delay store.
+    pub fn resolve<'data>(
+        store: &Store<'data>,
+        id: Id,
+        delay: Option<&'data [u8]>,
+    ) -> Result<Option<ExtractedImage<'data>>> {
+        let Some(block) = store.get(id).map_err(parse_error)? else {
+            return Ok(None);
         };
-
-        if blip_data.len() < 8 {
-            return Err(litchi_core::error::Error::ParseError(
-                "Insufficient data for BLIP".into(),
-            ));
-        }
-        let payload_length =
-            u32::from_le_bytes([blip_data[4], blip_data[5], blip_data[6], blip_data[7]]);
-        let record_length = usize::try_from(payload_length)
-            .ok()
-            .and_then(|length| 8usize.checked_add(length))
-            .ok_or_else(|| {
-                litchi_core::error::Error::ParseError("BLIP record size overflow".into())
-            })?;
-        if record_length > blip_data.len() || record_length as u64 != u64::from(bse.size) {
-            return Err(litchi_core::error::Error::ParseError(
-                "BSE size does not match its BLIP record".into(),
-            ));
-        }
-
-        Blip::parse(&blip_data[..record_length]).map(|b| b.into_owned())
-    }
-
-    /// Extracts an image from one typed OfficeArt record.
-    ///
-    /// This method handles both BSE (0xF007) and BLIP type records directly.
-    /// For BSE records, it extracts the embedded BLIP data.
-    /// For BLIP records (0xF01A-0xF029), it parses the image directly.
-    ///
-    /// # Arguments
-    /// * `record` - An OfficeArt record that is either BSE or a BLIP type
-    ///
-    /// # Returns
-    /// ExtractedImage if the record contains valid image data
-    pub fn extract_from_record(record: &Record<'_>) -> Result<ExtractedImage<'static>> {
-        Self::extract_from_record_with_stream(record, None)
-    }
-
-    /// Extracts an image from one OfficeArt record with an optional data stream.
-    ///
-    /// This method handles both BSE (0xF007) and BLIP type records directly.
-    /// For BSE records with delay-loaded BLIPs, the `delay_stream`
-    /// parameter must be provided to locate the BLIP data.
-    ///
-    /// # Arguments
-    /// * `record` - An OfficeArt record that is either BSE or a BLIP type
-    /// * `delay_stream` - Optional main stream for delay-loaded BLIPs
-    ///
-    /// # Returns
-    /// ExtractedImage if the record contains valid image data
-    pub fn extract_from_record_with_stream(
-        record: &Record<'_>,
-        delay_stream: Option<&[u8]>,
-    ) -> Result<ExtractedImage<'static>> {
-        match record.kind() {
-            // BLIP type records - parse directly
-            RecordKind::BlipEmf
-            | RecordKind::BlipWmf
-            | RecordKind::BlipPict
-            | RecordKind::BlipJpeg
-            | RecordKind::BlipPng
-            | RecordKind::BlipDib
-            | RecordKind::BlipTiff => {
-                // Reconstruct full BLIP record from the Escher record so
-                // `Blip::parse` can decode it without depending on Escher
-                // types from this crate.
-                let mut full_data = Vec::with_capacity(8 + record.data().len());
-                let ver_inst = (record.instance() << 4) | u16::from(record.version());
-                full_data.extend_from_slice(&ver_inst.to_le_bytes());
-                full_data.extend_from_slice(&record.raw_kind().to_le_bytes());
-                full_data.extend_from_slice(&record.len().to_le_bytes());
-                full_data.extend_from_slice(record.data());
-                let blip = Blip::parse(&full_data).map(|b| b.into_owned())?;
-                Ok(ExtractedImage::new(blip, None, 0))
-            },
-
-            // BSE record - extract embedded or delay-loaded BLIP
-            RecordKind::Bse => {
-                let bse = BlipStoreEntry::parse(record.data())?;
-                let name = bse.name.as_ref().map(|n| n.to_string());
-                let blip = Self::blip_from_bse(&bse, record, delay_stream)?;
-                Ok(ExtractedImage::new(blip, name, 0))
-            },
-            _ => Err(litchi_core::error::Error::ParseError(format!(
-                "Record type 0x{:04X} is not a supported image record",
-                record.raw_kind()
-            ))),
+        let index = usize::from(id.get() - 1);
+        match block {
+            Block::Blip(blip) => Ok(Some(ExtractedImage::new(blip, None, index))),
+            Block::Entry(entry) => image_from_entry(entry, delay, index),
         }
     }
 
-    /// Extract all BLIPs from Escher drawing data
-    ///
-    /// This extracts actual BLIP records (image data) from the drawing layer.
-    ///
-    /// # Arguments
-    /// * `data` - Escher drawing data
-    ///
-    /// # Returns
-    /// Vector of extracted images with metadata
-    ///
-    /// Note: Returns owned BLIPs (static lifetime) since we reconstruct data from records
-    pub fn extract_blips(data: &[u8]) -> Result<Vec<ExtractedImage<'static>>> {
-        let mut images = Vec::new();
-        let mut index = 0;
-
-        // First, try to extract the BLIP store for metadata
-        let store = Self::extract_blip_store(data).ok();
-
-        // Parse all Escher records looking for BLIPs
-        let parser = Parser::new(data);
-        for record in parser.records() {
-            let record = record.map_err(odraw_error)?;
-
-            // Check if this is a BLIP record
-            let is_blip = matches!(
-                record.kind(),
-                RecordKind::BlipEmf
-                    | RecordKind::BlipWmf
-                    | RecordKind::BlipPict
-                    | RecordKind::BlipJpeg
-                    | RecordKind::BlipPng
-                    | RecordKind::BlipDib
-                    | RecordKind::BlipTiff
-            );
-
-            if is_blip {
-                // Need to reconstruct full BLIP record with header
-                let mut full_data = Vec::with_capacity(8 + record.data().len());
-
-                // Reconstruct header
-                let ver_inst = (record.instance() << 4) | u16::from(record.version());
-                full_data.extend_from_slice(&ver_inst.to_le_bytes());
-                full_data.extend_from_slice(&record.raw_kind().to_le_bytes());
-                full_data.extend_from_slice(&record.len().to_le_bytes());
-                full_data.extend_from_slice(record.data());
-
-                // Parse the BLIP and immediately convert to owned
-                match Blip::parse(&full_data) {
-                    Ok(blip) => {
-                        // Convert to owned to avoid lifetime issues
-                        let owned_blip = blip.into_owned();
-
-                        // Try to get name from store if available
-                        let name = if let Some(ref blip_store) = store {
-                            blip_store
-                                .get_entry(index)
-                                .and_then(|bse| bse.name.as_ref().map(|n| n.to_string()))
-                        } else {
-                            None
-                        };
-
-                        images.push(ExtractedImage::new(owned_blip, name, index));
-                        index += 1;
-                    },
-                    Err(e) => {
-                        eprintln!("Warning: Failed to parse BLIP at index {}: {}", index, e);
-                    },
-                }
+    /// Resolves every semantic BStore slot in one-based ID order.
+    pub fn from_store<'data>(
+        store: &Store<'data>,
+        delay: Option<&'data [u8]>,
+    ) -> Result<Vec<ExtractedImage<'data>>> {
+        let mut images = Vec::with_capacity(usize::from(store.len()));
+        for raw in 1..=u32::from(store.len()) {
+            let id = Id::new(raw).map_err(parse_error)?;
+            if let Some(image) = Self::resolve(store, id, delay)? {
+                images.push(image);
             }
         }
-
         Ok(images)
     }
 
-    /// Search for BLIP records in raw data (for DOC files)
-    ///
-    /// In DOC files, the Data stream may contain BLIP records at various offsets,
-    /// not necessarily starting at the beginning. This function searches for
-    /// BLIP record signatures throughout the data.
-    ///
-    /// # Arguments
-    /// * `data` - Raw data to search (typically from the Data stream)
-    ///
-    /// # Returns
-    /// Vector of extracted images
-    fn search_blips_in_data(data: &[u8]) -> Result<Vec<ExtractedImage<'static>>> {
+    /// Extracts an image from a direct BLIP or FBSE record.
+    pub fn from_record<'data>(record: &Record<'data>) -> Result<ExtractedImage<'data>> {
+        Self::from_record_with_delay(record, None)
+    }
+
+    /// Extracts an image from a direct BLIP or FBSE with a host delay store.
+    pub fn from_record_with_delay<'data>(
+        record: &Record<'data>,
+        delay: Option<&'data [u8]>,
+    ) -> Result<ExtractedImage<'data>> {
+        if record.kind().is_blip() {
+            let blip = Blip::from_record(record.clone()).map_err(parse_error)?;
+            return Ok(ExtractedImage::new(blip, None, 0));
+        }
+        if record.kind() == RecordKind::Bse {
+            let entry = Entry::parse(record.clone()).map_err(parse_error)?;
+            return image_from_entry(entry, delay, 0)?.ok_or_else(|| {
+                Error::ParseError("OfficeArt FBSE is an empty image slot".to_string())
+            });
+        }
+        Err(Error::ParseError(format!(
+            "OfficeArt record 0x{:04X} is not an image file block",
+            record.raw_kind()
+        )))
+    }
+
+    /// Recursively discovers BLIPs and FBSEs in an OfficeArt record sequence.
+    pub fn blips(data: &[u8]) -> Result<Vec<ExtractedImage<'_>>> {
         let mut images = Vec::new();
-        let mut index = 0;
+        collect_sequence(data, None, &mut images)?;
+        for (index, image) in images.iter_mut().enumerate() {
+            image.index = index;
+        }
+        Ok(images)
+    }
 
-        // BLIP record type IDs to search for
-        const BLIP_SIGNATURES: &[(u16, &str)] = &[
-            (0xF01A, "emf"),
-            (0xF01B, "wmf"),
-            (0xF01C, "pict"),
-            (0xF01D, "jpeg"),
-            (0xF02A, "jpeg"),
-            (0xF01E, "png"),
-            (0xF01F, "dib"),
-            (0xF029, "tiff"),
-        ];
+    /// Discovers images below one already checked OfficeArt container.
+    pub fn from_container<'data>(
+        container: &Container<'data>,
+        delay: Option<&'data [u8]>,
+    ) -> Result<Vec<ExtractedImage<'data>>> {
+        let mut images = Vec::new();
+        collect_sequence(container.record().data(), delay, &mut images)?;
+        for (index, image) in images.iter_mut().enumerate() {
+            image.index = index;
+        }
+        Ok(images)
+    }
 
-        // Search through the data for BLIP signatures
-        let mut offset = 0;
-        while offset + 8 <= data.len() {
-            // Read potential record header
-            if offset + 4 <= data.len() {
-                let record_type = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
-
-                // Check if this looks like a BLIP record
-                let is_blip = BLIP_SIGNATURES.iter().any(|(sig, _)| *sig == record_type);
-
-                if is_blip && offset + 8 <= data.len() {
-                    // Read the length
-                    let length = u32::from_le_bytes([
-                        data[offset + 4],
-                        data[offset + 5],
-                        data[offset + 6],
-                        data[offset + 7],
-                    ]) as usize;
-
-                    // Validate length is reasonable
-                    if length > 0 && length < 100_000_000 && offset + 8 + length <= data.len() {
-                        // Extract the full BLIP record
-                        let blip_data = &data[offset..offset + 8 + length];
-
-                        // Try to parse it
-                        match Blip::parse(blip_data) {
-                            Ok(blip) => {
-                                images.push(ExtractedImage::new(blip.into_owned(), None, index));
-                                index += 1;
-                                // Skip past this record
-                                offset += 8 + length;
-                                continue;
-                            },
-                            Err(_) => {
-                                // Not a valid BLIP, continue searching
-                            },
-                        }
+    /// Parses the headerless PPT `Pictures` BStoreDelay sequence.
+    pub fn pictures(data: &[u8]) -> Result<Vec<ExtractedImage<'_>>> {
+        let delay = Delay::new(data);
+        let mut images = Vec::new();
+        for block in delay.iter() {
+            let index = images.len();
+            match block.map_err(parse_error)? {
+                Block::Blip(blip) => images.push(ExtractedImage::new(blip, None, index)),
+                Block::Entry(entry) => {
+                    if let Some(image) = image_from_entry(entry, Some(data), index)? {
+                        images.push(image);
                     }
-                }
+                },
             }
+        }
+        Ok(images)
+    }
 
+    /// Searches a DOC data stream for validated BLIP record signatures.
+    fn search(data: &[u8]) -> Result<Vec<ExtractedImage<'_>>> {
+        let mut images = Vec::new();
+        let mut offset = 0usize;
+        while data.len().saturating_sub(offset) >= 8 {
+            match Record::parse(data, offset) {
+                Ok((record, consumed)) if record.kind().is_blip() => {
+                    if let Ok(blip) = Blip::from_record(record) {
+                        check_image_count(images.len(), 1)?;
+                        images.push(ExtractedImage::new(blip, None, images.len()));
+                        if let Some(next) = offset.checked_add(consumed) {
+                            offset = next;
+                            continue;
+                        }
+                        break;
+                    }
+                },
+                _ => {},
+            }
             offset += 1;
         }
-
         Ok(images)
-    }
-
-    /// Extract images from a specific Escher container
-    ///
-    /// This is useful when you want to extract images from a specific
-    /// part of a document (e.g., a specific slide in PPT).
-    pub fn extract_from_container(container: &Container) -> Result<Vec<ExtractedImage<'static>>> {
-        Self::extract_from_container_with_stream(container, None)
-    }
-
-    /// Extract images from a specific Escher container with optional data stream.
-    ///
-    /// # Arguments
-    /// * `container` - The Escher container to extract from
-    /// * `delay_stream` - Optional data stream for delay-loaded BLIPs
-    pub fn extract_from_container_with_stream(
-        container: &Container,
-        delay_stream: Option<&[u8]>,
-    ) -> Result<Vec<ExtractedImage<'static>>> {
-        let mut images = Vec::new();
-        let mut index = 0;
-
-        // Recursively search for BLIP records
-        Self::extract_from_container_recursive_with_stream(
-            container,
-            &mut images,
-            &mut index,
-            delay_stream,
-        )?;
-
-        Ok(images)
-    }
-
-    /// Recursively extract BLIPs from a container with optional data stream.
-    fn extract_from_container_recursive_with_stream(
-        container: &Container,
-        images: &mut Vec<ExtractedImage<'static>>,
-        index: &mut usize,
-        delay_stream: Option<&[u8]>,
-    ) -> Result<()> {
-        // Check if this container has BLIP records
-        for child_result in container.children() {
-            let child = child_result.map_err(odraw_error)?;
-
-            if child.kind().is_blip() {
-                // Reconstruct full BLIP record
-                let mut full_data = Vec::with_capacity(8 + child.data().len());
-                let ver_inst = (child.instance() << 4) | u16::from(child.version());
-                full_data.extend_from_slice(&ver_inst.to_le_bytes());
-                full_data.extend_from_slice(&child.raw_kind().to_le_bytes());
-                full_data.extend_from_slice(&child.len().to_le_bytes());
-                full_data.extend_from_slice(child.data());
-
-                if let Ok(blip) = Blip::parse(&full_data) {
-                    // Convert to owned to avoid lifetime issues
-                    let owned_blip = blip.into_owned();
-                    images.push(ExtractedImage::new(owned_blip, None, *index));
-                    *index += 1;
-                }
-            } else if child.is_container() {
-                // Recurse into child containers
-                let child_container = Container::try_new(child).map_err(odraw_error)?;
-                Self::extract_from_container_recursive_with_stream(
-                    &child_container,
-                    images,
-                    index,
-                    delay_stream,
-                )?;
-            } else if child.kind() == RecordKind::Bse {
-                // BSE records can contain embedded or delay-loaded BLIP data
-                match BlipStoreEntry::parse(child.data()) {
-                    Ok(bse) => {
-                        let name = bse.name.as_ref().map(|n| n.to_string());
-                        match Self::blip_from_bse(&bse, &child, delay_stream) {
-                            Ok(blip) => {
-                                images.push(ExtractedImage::new(blip, name, *index));
-                                *index += 1;
-                            },
-                            Err(_) => {
-                                continue;
-                            },
-                        }
-                    },
-                    Err(_) => {
-                        continue;
-                    },
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Extract images from Pictures stream (PPT specific)
-    ///
-    /// In PPT files, images are often stored in a separate "Pictures" stream.
-    /// This method extracts all BLIPs from that stream.
-    ///
-    /// # Arguments
-    /// * `pictures_data` - Raw data from the Pictures stream
-    ///
-    /// # Returns
-    /// Vector of extracted images
-    pub fn extract_from_pictures_stream(
-        pictures_data: &[u8],
-    ) -> Result<Vec<ExtractedImage<'static>>> {
-        Self::extract_blips(pictures_data)
     }
 }
 
-/// High-level image extraction from PPT presentations
+fn set_store<'data>(slot: &mut Option<Record<'data>>, record: Record<'data>) -> Result<()> {
+    if slot.replace(record).is_some() {
+        return Err(Error::ParseError(
+            "OfficeArt drawing contains multiple BStore containers".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn entry_name(entry: &Entry<'_>) -> Result<Option<String>> {
+    entry
+        .name()
+        .map(|name| name.to_string().map_err(parse_error))
+        .transpose()
+}
+
+fn image_from_entry<'data>(
+    entry: Entry<'data>,
+    delay: Option<&'data [u8]>,
+    index: usize,
+) -> Result<Option<ExtractedImage<'data>>> {
+    let name = entry_name(&entry)?;
+    let context = delay.map_or_else(Context::new, |data| {
+        Context::new().with_delay(Delay::new(data))
+    });
+    entry
+        .resolve(context)
+        .map_err(parse_error)
+        .map(|blip| blip.map(|blip| ExtractedImage::new(blip, name, index)))
+}
+
+fn check_image_count(current: usize, additional: usize) -> Result<()> {
+    if current
+        .checked_add(additional)
+        .is_none_or(|count| count > MAX_IMAGES)
+    {
+        return Err(Error::ParseError(
+            "OfficeArt image collection exceeds 4095 file blocks".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn collect_sequence<'data>(
+    data: &'data [u8],
+    delay: Option<&'data [u8]>,
+    images: &mut Vec<ExtractedImage<'data>>,
+) -> Result<()> {
+    const MAX_DEPTH: usize = 64;
+    const MAX_RECORDS: u32 = 1_000_000;
+
+    let mut stack = vec![Children::new(data)];
+    let mut visited = 0u32;
+    while let Some(records) = stack.last_mut() {
+        let Some(record) = records.next() else {
+            stack.pop();
+            continue;
+        };
+        let record = record.map_err(parse_error)?;
+        visited = visited
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("OfficeArt record count overflow".to_string()))?;
+        if visited > MAX_RECORDS {
+            return Err(Error::ParseError(
+                "OfficeArt image traversal exceeds one million records".to_string(),
+            ));
+        }
+        if record.kind().is_blip() {
+            let blip = Blip::from_record(record).map_err(parse_error)?;
+            check_image_count(images.len(), 1)?;
+            images.push(ExtractedImage::new(blip, None, images.len()));
+        } else if record.kind() == RecordKind::Bse {
+            let entry = Entry::parse(record).map_err(parse_error)?;
+            if let Some(image) = image_from_entry(entry, delay, images.len())? {
+                check_image_count(images.len(), 1)?;
+                images.push(image);
+            }
+        } else if record.kind() == RecordKind::BStoreContainer {
+            let store = Store::from_record(record).map_err(parse_error)?;
+            check_image_count(images.len(), usize::from(store.len()))?;
+            images.extend(ImageExtractor::from_store(&store, delay)?);
+        } else if record.is_container() {
+            if stack.len() >= MAX_DEPTH {
+                return Err(Error::ParseError(
+                    "OfficeArt image traversal exceeds 64 containers".to_string(),
+                ));
+            }
+            stack.push(Children::new(record.data()));
+        }
+    }
+    Ok(())
+}
+
+/// High-level extraction from an OLE-backed PPT file.
 pub mod ppt {
     use super::*;
     use crate::OleFile;
     use std::io::{Read, Seek};
 
     impl ImageExtractor {
-        /// Extract all images from a PPT presentation
-        ///
-        /// # Arguments
-        /// * `ole` - Opened OLE file for the PPT presentation
-        ///
-        /// # Returns
-        /// Vector of all extracted images
-        pub fn extract_from_ppt<R: Read + Seek>(
+        /// Extracts physical records from the PPT `Pictures` stream.
+        pub fn from_ppt<R: Read + Seek>(
             ole: &mut OleFile<R>,
         ) -> Result<Vec<ExtractedImage<'static>>> {
-            let mut all_images = Vec::new();
-
-            // Try to read Pictures stream
-            if ole.exists(&["Pictures"]) {
-                match ole.open_stream(&["Pictures"]) {
-                    Ok(data) => {
-                        let images = Self::extract_from_pictures_stream(&data)?;
-                        // Convert to owned data since we're returning from function
-                        all_images.extend(images.into_iter().map(|img| ExtractedImage {
-                            blip: img.blip.into_owned(),
-                            name: img.name,
-                            index: img.index,
-                        }));
-                    },
-                    Err(e) => {
-                        eprintln!("Warning: Failed to read Pictures stream: {}", e);
-                    },
-                }
+            if !ole.exists(&["Pictures"]) {
+                return Ok(Vec::new());
             }
-
-            // Also check PowerPoint Document stream for embedded drawings
-            if ole.exists(&["PowerPoint Document"]) {
-                match ole.open_stream(&["PowerPoint Document"]) {
-                    Ok(data) => {
-                        let images = Self::extract_blips(&data)?;
-                        let offset = all_images.len();
-                        all_images.extend(images.into_iter().map(|mut img| {
-                            img.index += offset;
-                            ExtractedImage {
-                                blip: img.blip.into_owned(),
-                                name: img.name,
-                                index: img.index,
-                            }
-                        }));
-                    },
-                    Err(e) => {
-                        eprintln!("Warning: Failed to read PowerPoint Document stream: {}", e);
-                    },
-                }
-            }
-
-            Ok(all_images)
+            let data = ole.open_stream(&["Pictures"]).map_err(parse_error)?;
+            Self::pictures(&data)
+                .and_then(|images| images.into_iter().map(ExtractedImage::into_owned).collect())
         }
     }
 }
 
-/// High-level image extraction from DOC documents
+/// High-level extraction from an OLE-backed DOC file.
 pub mod doc {
     use super::*;
     use crate::OleFile;
     use std::io::{Read, Seek};
 
     impl ImageExtractor {
-        /// Extract all images from a DOC document
-        ///
-        /// In DOC files, images are typically stored in the Data stream as raw BLIP records.
-        /// The table stream contains metadata about where these images are referenced in the text,
-        /// but the actual image data is in the Data stream or embedded in the ObjectPool.
-        ///
-        /// # Arguments
-        /// * `ole` - Opened OLE file for the DOC document
-        ///
-        /// # Returns
-        /// Vector of all extracted images
-        pub fn extract_from_doc<R: Read + Seek>(
+        /// Searches the DOC `Data` stream for validated native BLIPs.
+        pub fn from_doc<R: Read + Seek>(
             ole: &mut OleFile<R>,
         ) -> Result<Vec<ExtractedImage<'static>>> {
-            let mut all_images = Vec::new();
-
-            // Try to read Data stream (contains embedded objects and images)
-            // In DOC files, this is where the actual picture data is stored
-            if ole.exists(&["Data"]) {
-                match ole.open_stream(&["Data"]) {
-                    Ok(data) => {
-                        // The Data stream may contain multiple BLIP records at various offsets
-                        // Use the search function to find them all
-                        match Self::search_blips_in_data(&data) {
-                            Ok(images) => {
-                                all_images.extend(images);
-                            },
-                            Err(e) => {
-                                eprintln!(
-                                    "Warning: Failed to search for BLIPs in Data stream: {}",
-                                    e
-                                );
-                            },
-                        }
-                    },
-                    Err(e) => {
-                        eprintln!("Warning: Failed to read Data stream: {}", e);
-                    },
-                }
+            if !ole.exists(&["Data"]) {
+                return Ok(Vec::new());
             }
-
-            // Note: We don't try to parse the entire table stream as Escher data
-            // because it contains various other structures and the drawing data
-            // is at specific offsets that would need to be parsed from the FIB.
-            // For most practical purposes, the Data stream contains the images we need.
-
-            Ok(all_images)
+            let data = ole.open_stream(&["Data"]).map_err(parse_error)?;
+            Self::search(&data)?
+                .into_iter()
+                .map(ExtractedImage::into_owned)
+                .collect()
         }
     }
 }
@@ -725,37 +452,10 @@ pub mod doc {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_extracted_image_filename() {
-        let blip_data = vec![
-            0xA0, 0x46, // version=0, instance=0x46A
-            0x1D, 0xF0, // JPEG BLIP
-            0x19, 0x00, 0x00, 0x00, // length = 25
-            // UID (16 bytes)
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
-            0x0F, 0x10, 0xFF, // marker
-            // Minimal JPEG data
-            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46,
-        ];
-
-        let blip = Blip::parse(&blip_data).unwrap();
-        let img = ExtractedImage::new(blip, None, 0);
-
-        assert_eq!(img.extension(), "jpg");
-        assert_eq!(img.suggested_filename(), "image_000.jpg");
-
-        let img_with_name = ExtractedImage::new(
-            Blip::parse(&blip_data).unwrap(),
-            Some("photo".to_string()),
-            5,
-        );
-        assert_eq!(img_with_name.suggested_filename(), "photo.jpg");
-    }
-
-    fn png_blip() -> Vec<u8> {
+    fn png_blip(data: &[u8]) -> Vec<u8> {
         let mut payload = vec![0; 16];
         payload.push(0xff);
-        payload.extend_from_slice(&[1, 2, 3]);
+        payload.extend_from_slice(data);
         let mut record = Vec::new();
         record.extend_from_slice(&(0x6e0u16 << 4).to_le_bytes());
         record.extend_from_slice(&0xf01eu16.to_le_bytes());
@@ -764,20 +464,17 @@ mod tests {
         record
     }
 
-    fn fbse(blip: Option<&[u8]>, offset: u32, name: &[u8]) -> Vec<u8> {
-        let mut payload = vec![0x06, 0x06];
+    fn delayed_fbse(blip: &[u8], offset: u32, name: &[u8]) -> Vec<u8> {
+        let mut payload = vec![Kind::Png.raw(), Kind::Png.raw()];
         payload.extend_from_slice(&[0; 16]);
         payload.extend_from_slice(&0xffu16.to_le_bytes());
-        payload.extend_from_slice(&(blip.map_or(28, <[u8]>::len) as u32).to_le_bytes());
+        payload.extend_from_slice(&(blip.len() as u32).to_le_bytes());
         payload.extend_from_slice(&1u32.to_le_bytes());
         payload.extend_from_slice(&offset.to_le_bytes());
         payload.push(0);
         payload.push(name.len() as u8);
         payload.extend_from_slice(&[0, 0]);
         payload.extend_from_slice(name);
-        if let Some(blip) = blip {
-            payload.extend_from_slice(blip);
-        }
         let mut record = Vec::new();
         record.extend_from_slice(&0x62u16.to_le_bytes());
         record.extend_from_slice(&0xf007u16.to_le_bytes());
@@ -787,17 +484,51 @@ mod tests {
     }
 
     #[test]
-    fn extracts_named_embedded_and_offset_zero_bse_blips() {
-        let blip = png_blip();
-        let embedded = fbse(Some(&blip), u32::MAX, &[b'A', 0, 0, 0]);
-        let (record, _) = Record::parse(&embedded, 0).unwrap();
-        let image = ImageExtractor::extract_from_record(&record).unwrap();
-        assert_eq!(image.name.as_deref(), Some("A"));
-        assert_eq!(image.blip.picture_data(), [1, 2, 3]);
+    fn extracted_image_reparses_owned_bytes_without_self_reference() {
+        let bytes = png_blip(b"png");
+        let blip = Blip::parse(&bytes).expect("valid PNG");
+        let image = ExtractedImage::new(blip, Some("photo.old".to_string()), 4)
+            .into_owned()
+            .expect("copy image");
+        assert_eq!(image.kind(), Kind::Png);
+        assert_eq!(image.data().expect("image data"), b"png");
+        assert_eq!(image.suggested_filename(), "photo.png");
+    }
 
-        let delayed = fbse(None, 0, &[]);
-        let (record, _) = Record::parse(&delayed, 0).unwrap();
-        let image = ImageExtractor::extract_from_record_with_stream(&record, Some(&blip)).unwrap();
-        assert_eq!(image.blip.picture_data(), [1, 2, 3]);
+    #[test]
+    fn resolves_offset_zero_from_bstore_metadata() {
+        let blip = png_blip(b"png");
+        let fbse = delayed_fbse(&blip, 0, &[]);
+        let mut store = vec![0x1f, 0, 0x01, 0xf0];
+        store.extend_from_slice(&(fbse.len() as u32).to_le_bytes());
+        store.extend_from_slice(&fbse);
+        let store = ImageExtractor::store(&store)
+            .expect("valid store")
+            .expect("store exists");
+        let image = ImageExtractor::resolve(&store, Id::new(1).expect("valid ID"), Some(&blip))
+            .expect("resolve")
+            .expect("image");
+        assert_eq!(image.data().expect("image data"), b"png");
+    }
+
+    #[test]
+    fn pictures_is_a_headerless_delay_sequence() {
+        let first = png_blip(b"one");
+        let second = png_blip(b"two");
+        let mut pictures = first;
+        pictures.extend_from_slice(&second);
+        let images = ImageExtractor::pictures(&pictures).expect("valid Pictures stream");
+        assert_eq!(images.len(), 2);
+        assert_eq!(images[0].data().expect("first image"), b"one");
+        assert_eq!(images[1].data().expect("second image"), b"two");
+    }
+
+    #[test]
+    fn recursive_discovery_caps_the_semantic_image_collection() {
+        let data = png_blip(b"x").repeat(MAX_IMAGES + 1);
+        assert!(matches!(
+            ImageExtractor::blips(&data),
+            Err(Error::ParseError(message)) if message.contains("4095")
+        ));
     }
 }

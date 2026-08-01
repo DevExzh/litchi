@@ -5248,7 +5248,7 @@ fn removal_reference_part(part: &dyn Part) -> bool {
 }
 
 fn ensure_unsigned(workbook: &Workbook) -> Result<()> {
-    if workbook.inner.package.has_digital_signatures() {
+    if workbook.inner.package.is_signed() {
         Err(Error::Signed)
     } else {
         Ok(())

@@ -108,37 +108,68 @@ impl XlsbWorkbook {
 
     /// Get mutable OPC access, dropping signatures that would become stale.
     pub fn opc_package_mut(&mut self) -> &mut OpcPackage {
-        let _ = self.package.clear_digital_signatures();
+        self.package.unsign();
         &mut self.package
     }
 
-    /// Verify package signatures without making a PKI trust determination.
-    pub fn verify_digital_signatures(
+    /// Return whether this workbook contains package signatures.
+    #[must_use]
+    #[inline]
+    pub fn is_signed(&self) -> bool {
+        self.package.is_signed()
+    }
+
+    /// Verify package signatures with the safe strict policy.
+    pub fn signatures(&self) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
+        self.package.signatures()
+    }
+
+    /// Verify package signatures with an explicit trust-neutral policy.
+    pub fn signatures_with(
         &self,
-        policy: &litchi_opc::SignatureVerificationPolicy,
-    ) -> litchi_opc::signature::Result<Vec<litchi_opc::DigitalSignatureVerification>> {
-        self.package.verify_digital_signatures(policy)
+        policy: &litchi_sign::Policy,
+    ) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
+        self.package.signatures_with(policy)
     }
 
-    /// Sign the current, fully materialized package while preserving valid signatures.
-    pub fn add_digital_signature(
+    /// Add a signature while preserving every existing valid signature.
+    pub fn sign(
         &mut self,
-        signer: &litchi_opc::PackageSigner,
-    ) -> litchi_opc::signature::Result<litchi_opc::PackURI> {
-        self.package.add_digital_signature(signer)
+        signer: &litchi_sign::Signer,
+    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
+        self.package.sign(signer)
     }
 
-    /// Replace all package signatures with one new signature.
-    pub fn resign_digital_signature(
+    /// Add a signature with explicit authoring resource bounds.
+    pub fn sign_with(
         &mut self,
-        signer: &litchi_opc::PackageSigner,
-    ) -> litchi_opc::signature::Result<litchi_opc::PackURI> {
-        self.package.resign_digital_signature(signer)
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
+        self.package.sign_with(signer, limits)
     }
 
-    /// Remove all package digital signatures.
-    pub fn clear_digital_signatures(&mut self) -> litchi_opc::signature::Result<()> {
-        self.package.clear_digital_signatures()
+    /// Atomically replace all signatures with one signature.
+    pub fn resign(
+        &mut self,
+        signer: &litchi_sign::Signer,
+    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
+        self.package.resign(signer)
+    }
+
+    /// Atomically replace signatures with explicit authoring resource bounds.
+    pub fn resign_with(
+        &mut self,
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> litchi_opc::sign::Result<litchi_opc::PackURI> {
+        self.package.resign_with(signer, limits)
+    }
+
+    /// Remove all package signatures.
+    pub fn unsign(&mut self) -> &mut Self {
+        self.package.unsign();
+        self
     }
 
     /// Discover the attached MS-XLSB VBA project and declared signatures.

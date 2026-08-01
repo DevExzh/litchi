@@ -184,7 +184,7 @@ impl RecordKind {
                 | Self::BlipPng
                 | Self::BlipDib
                 | Self::BlipTiff
-        )
+        ) || matches!(self, Self::Unknown(raw) if raw >= 0xF018 && raw <= 0xF117)
     }
 }
 

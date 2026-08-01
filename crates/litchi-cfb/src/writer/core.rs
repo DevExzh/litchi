@@ -145,7 +145,7 @@ impl OleWriter {
     /// let writer = OleWriter::new();
     /// ```
     pub fn new() -> Self {
-        Self::with_sector_size(512)
+        Self::with_valid_sector_size(512)
     }
 
     /// Create a new OLE writer with specified sector size
@@ -154,16 +154,18 @@ impl OleWriter {
     ///
     /// * `sector_size` - Sector size in bytes (512 or 4096)
     ///
-    /// # Panics
-    ///
-    /// Panics if sector_size is not 512 or 4096
-    pub fn with_sector_size(sector_size: usize) -> Self {
-        assert!(
-            sector_size == 512 || sector_size == 4096,
-            "Sector size must be 512 or 4096"
-        );
+    /// Returns a typed error when `sector_size` is not 512 or 4096 bytes.
+    pub fn with_sector_size(sector_size: usize) -> Result<Self, OleError> {
+        if !matches!(sector_size, 512 | 4096) {
+            return Err(OleError::InvalidData(format!(
+                "sector size must be 512 or 4096 bytes, got {sector_size}"
+            )));
+        }
+        Ok(Self::with_valid_sector_size(sector_size))
+    }
 
-        let mut writer = OleWriter {
+    fn with_valid_sector_size(sector_size: usize) -> Self {
+        let mut writer = Self {
             sector_size,
             mini_sector_size: 64,
             mini_stream_cutoff: 4096,

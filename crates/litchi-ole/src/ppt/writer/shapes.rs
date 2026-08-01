@@ -7,6 +7,7 @@
 
 use super::shape_style::{ArrowStyle, FillStyle, LineStyleConfig, ShapeColor, ShapeStyle};
 use super::text_format::Paragraph;
+use litchi_odraw::image::Id as PictureId;
 
 // =============================================================================
 // Shape Type Constants (MS-ODRAW 2.4.6 MSOSPT)
@@ -439,7 +440,7 @@ pub struct Shape {
     /// Adjust values (shape-specific parameters)
     pub adjust_values: Vec<i32>,
     /// Associated picture BLIP index (for picture frames)
-    pub picture_index: Option<u32>,
+    pub picture_index: Option<PictureId>,
 }
 
 impl Shape {
@@ -510,10 +511,10 @@ impl Shape {
     }
 
     /// Create picture frame
-    pub fn picture(x: i32, y: i32, width: i32, height: i32, blip_index: u32) -> Self {
+    pub fn picture(x: i32, y: i32, width: i32, height: i32, id: PictureId) -> Self {
         let mut shape = Self::new(ShapeKind::PictureFrame, x, y, width, height);
-        shape.picture_index = Some(blip_index);
-        shape.style.fill = FillStyle::picture(blip_index);
+        shape.picture_index = Some(id);
+        shape.style.fill = FillStyle::picture(id);
         shape
     }
 
@@ -610,7 +611,7 @@ impl Shape {
 
         // Add picture BLIP reference if present
         if let Some(blip_idx) = self.picture_index {
-            props.push((0x4104, blip_idx)); // pib
+            props.push((0x4104, u32::from(blip_idx))); // pib
         }
 
         props
@@ -943,11 +944,17 @@ mod tests {
 
     #[test]
     fn test_picture_creation() {
-        let picture = Shape::picture(100, 100, 400, 300, 1);
+        let picture = Shape::picture(100, 100, 400, 300, PictureId::new(1).unwrap());
         assert_eq!(picture.kind, ShapeKind::PictureFrame);
-        assert_eq!(picture.picture_index, Some(1));
-        assert_eq!(picture.style.fill.picture_index, Some(1));
-        assert_eq!(picture.style.fill.picture_index, Some(1));
+        assert_eq!(picture.picture_index.map(PictureId::get), Some(1));
+        assert_eq!(
+            picture.style.fill.picture_index.map(PictureId::get),
+            Some(1)
+        );
+        assert_eq!(
+            picture.style.fill.picture_index.map(PictureId::get),
+            Some(1)
+        );
     }
 
     #[test]

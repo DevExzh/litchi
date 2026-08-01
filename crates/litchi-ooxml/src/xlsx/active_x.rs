@@ -582,11 +582,7 @@ pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) 
         .filter_map(|item| item.preview.as_ref().map(|p| p.relationship_id.clone()))
         .collect();
     let remaining_ids = relationship_ids_in_xml(&updated)?;
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!(
-            "failed to clear signatures before removing ActiveX controls: {error}"
-        ))
-    })?;
+    package.unsign();
     {
         let worksheet = package.get_part_mut(worksheet_uri)?;
         for id in &control_ids {
@@ -779,11 +775,7 @@ fn install_graph(
     worksheet_uri: &PackURI,
     prepared: PreparedGraph,
 ) -> Result<()> {
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!(
-            "failed to clear signatures before storing ActiveX controls: {error}"
-        ))
-    })?;
+    package.unsign();
     for (uri, content_type, bytes) in prepared.resources {
         package.try_add_part(Box::new(BlobPart::new(uri, content_type, bytes)))?;
     }

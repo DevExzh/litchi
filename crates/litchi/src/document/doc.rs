@@ -416,7 +416,10 @@ impl Document {
             #[cfg(feature = "ole")]
             DocumentImpl::Doc(doc, _) => {
                 let tables = doc.tables().map_err(Error::from)?;
-                Ok(tables.into_iter().map(Table::Doc).collect())
+                Ok(tables
+                    .into_iter()
+                    .map(|table| Table::Doc(Box::new(table)))
+                    .collect())
             },
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(package, _) => {
@@ -443,7 +446,7 @@ impl Document {
                 Ok(doc
                     .tables()
                     .iter()
-                    .map(|t| Table::Rtf(t.clone().into_owned()))
+                    .map(|table| Table::Rtf(Box::new(table.clone().into_owned())))
                     .collect())
             },
             #[cfg(feature = "odf")]
@@ -451,7 +454,10 @@ impl Document {
                 let tables = doc
                     .tables()
                     .map_err(|e| Error::ParseError(format!("Failed to get tables: {}", e)))?;
-                Ok(tables.into_iter().map(Table::Odt).collect())
+                Ok(tables
+                    .into_iter()
+                    .map(|table| Table::Odt(Box::new(table)))
+                    .collect())
             },
         }
     }
@@ -503,7 +509,7 @@ impl Document {
                             DocumentElement::Paragraph(Box::new(super::Paragraph::Doc(*p)))
                         },
                         DocElement::Table(t) => {
-                            DocumentElement::Table(Box::new(super::Table::Doc(*t)))
+                            DocumentElement::Table(Box::new(super::Table::Doc(t)))
                         },
                     })
                     .collect())
@@ -576,9 +582,9 @@ impl Document {
                         },
                         litchi_rtf::DocumentElement::Table(table) => {
                             // Detach without flattening; see `tables()` above.
-                            elements.push(DocumentElement::Table(Box::new(Table::Rtf(
+                            elements.push(DocumentElement::Table(Box::new(Table::Rtf(Box::new(
                                 table.into_owned(),
-                            ))));
+                            )))));
                         },
                     }
                 }
@@ -623,7 +629,9 @@ impl Document {
                             }
                         },
                         DocumentOrderElement::Table(table) => {
-                            elements.push(DocumentElement::Table(Box::new(Table::Odt(table))));
+                            elements.push(DocumentElement::Table(Box::new(Table::Odt(Box::new(
+                                table,
+                            )))));
                         },
                         DocumentOrderElement::List(_list) => {
                             // Lists are typically expanded to paragraphs in text extraction

@@ -149,7 +149,8 @@ impl DocEmbeddedObjectEditor {
         options: DocMtefEquationWriteOptions,
     ) -> Result<DocEmbeddedObjectReference> {
         let mut picture_data = Vec::new();
-        write_picture_block(&options.preview, options.storage_id, &mut picture_data);
+        write_picture_block(&options.preview, options.storage_id, &mut picture_data)
+            .map_err(|error| DocError::Corrupted(error.to_string()))?;
         let compound_file = equation_compound_file(options.equation)?;
         self.add(DocEmbeddedObjectWriteOptions {
             storage_id: options.storage_id,

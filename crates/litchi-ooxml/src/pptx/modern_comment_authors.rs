@@ -923,7 +923,7 @@ pub fn add_modern_comment_author(
             relationship_id,
             false,
         );
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(part)
 }
 
@@ -1002,7 +1002,7 @@ pub fn remove_modern_comment_author(package: &mut OpcPackage, author_id: &str) -
     if !modern_author_part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -1054,7 +1054,7 @@ fn commit_modern_comment_authors(
     ModernCommentAuthorList::parse(&xml)?;
     let part_name = PackURI::new(&part.part_name).map_err(invalid)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 

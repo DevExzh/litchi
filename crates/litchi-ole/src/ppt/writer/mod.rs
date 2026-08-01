@@ -90,7 +90,7 @@ pub use core::{PptWriteError, PptWriter, ShapeProperties, ShapeType, TextAlignme
 
 // Re-export commonly used types from submodules
 pub use crate::ppt::shapes::geometry::{GeometryRect, ShapePathType};
-pub use blip::{BlipStoreBuilder, BlipType, PictureData};
+pub use blip::{Id as PictureId, Kind as PictureKind, PictureData, Pictures};
 pub use chart::{Chart, ChartKind, ChartSeries};
 pub use comments::{CommentDateTime, SlideComment};
 pub use custom_shows::CustomShow;

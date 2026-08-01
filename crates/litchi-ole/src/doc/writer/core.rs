@@ -3540,7 +3540,7 @@ impl DocWriter {
                         &entry.picture,
                         entry.shape_id,
                         &mut data_stream,
-                    );
+                    )?;
                     if entry.floating.is_some() {
                         floating_anchors.push((
                             current_cp + para_chars,
@@ -3691,7 +3691,7 @@ impl DocWriter {
             let pic_offset = u32::try_from(data_stream.len()).map_err(|_| {
                 DocWriteError::InvalidData("DOC Data stream exceeds 32-bit FC space".to_string())
             })?;
-            super::images::write_picture_block(&entry.picture, entry.shape_id, &mut data_stream);
+            super::images::write_picture_block(&entry.picture, entry.shape_id, &mut data_stream)?;
             header_pic_offsets.push(pic_offset);
         }
 
@@ -4295,7 +4295,7 @@ impl DocWriter {
                 &floating_shapes,
                 &header_floating_shapes,
                 total_shapes,
-            );
+            )?;
             fib.set_dgg_info(table_offset, dgg_info.len() as u32);
             table_stream.extend_from_slice(&dgg_info);
         }

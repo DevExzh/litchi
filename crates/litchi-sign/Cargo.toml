@@ -1,0 +1,24 @@
+[package]
+name        = "litchi-sign"
+description = "Runtime-neutral, trust-neutral digital-signature primitives and Office container adapters."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+base64      = { workspace = true }
+chrono      = { workspace = true }
+litchi-cfb  = { workspace = true }
+p256        = { workspace = true }
+quick-xml   = { workspace = true }
+rsa         = { workspace = true }
+sha1_legacy = { workspace = true }
+sha2_legacy = { workspace = true }
+signature   = { workspace = true }
+subtle      = { workspace = true }
+thiserror   = { workspace = true }
+x509-cert   = { workspace = true }
+zeroize     = { workspace = true }

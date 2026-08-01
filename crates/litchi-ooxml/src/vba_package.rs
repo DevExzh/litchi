@@ -208,11 +208,7 @@ fn store_vba_project_graph_in_place(
     let source = package.get_part_mut(source_part)?;
     source.relate_to(host.project_target(), rt::VBA_PROJECT);
     source.set_content_type(macro_content_type.to_string())?;
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::InvalidFormat(format!(
-            "failed to clear signatures after storing a VBA project: {error}"
-        ))
-    })?;
+    package.unsign();
     Ok(())
 }
 
@@ -264,11 +260,7 @@ fn remove_vba_project_graph_in_place(
     if let Some((supplemental, _)) = graph.supplemental {
         package.remove_part(&supplemental);
     }
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::InvalidFormat(format!(
-            "failed to clear signatures after removing a VBA project: {error}"
-        ))
-    })?;
+    package.unsign();
     Ok(())
 }
 

@@ -51,8 +51,8 @@ conversion, fonts, and image conversion are optional.
 | OOXML encryption | ✅ | ✅ | ✅ | Standard 2007 and Agile encryption; requires `ooxml_encryption` |
 | Legacy Office encryption | ✅ | ✅ | ✅ | Format-specific DOC, XLS, and PPT password profiles |
 | ODF encryption | ✅ | ✅ | ✅ | Package authoring/opening with supported AES/Blowfish, PBKDF2, and Argon2 profiles |
-| OOXML digital signatures | ✅ | ✅ | ✅ | Verify, add, re-sign, and clear RSA-SHA256/ECDSA package signatures |
-| Legacy Office digital signatures | ✅ | ✅ | ✅ | Verify, add, re-sign, and clear signatures in CFB packages |
+| OOXML digital signatures | ✅ | ✅ | ✅ | Neutral `litchi-sign` XMLDSig engine plus an atomic `litchi-opc` graph adapter; strict verification is the safe default, while explicit compatibility verification reports producer subset signatures as partial coverage; verify, add, re-sign, and clear RSA-SHA256/ECDSA signatures |
+| Legacy Office digital signatures | ✅ | ✅ | ✅ | Neutral `litchi-sign::cfb` verification and move-first transactional editing for DOC/PPT/XLS; clean finish returns the original allocation, changed writes preserve exposed CFB topology/CLSIDs, and strict verification is the safe default |
 | ODF digital signatures | ✅ | ✅ | ✅ | Sign and verify package documents with RSA or ECDSA |
 | Core/extended/custom properties | ✅ | ✅ | ✅ | OOXML properties and OLE property-set editing; ODF metadata has its own model |
 | Spreadsheet formula evaluation | 🟡 | ✅ | N/A | Shared async evaluator for workbook-trait adapters; broad function set but not complete Excel semantics |
@@ -323,8 +323,8 @@ conversion, fonts, and image conversion are optional.
 | Data validation | ✅ | ✅ | ✅ | Validation collections, prompts, and ranges |
 | Hyperlinks | ✅ | ✅ | ✅ | URL, file, and internal monikers |
 | Comments/notes | ✅ | ✅ | ✅ | NOTE/OBJ/TXO text and object records |
-| Images and primitive drawing shapes | 🟡 | ✅ | ✅ | OfficeArt extraction plus bounded primitive shape CRUD; `add_shape_group`/`remove_shape_group` author `SpgrContainer` groups with an explicit child coordinate space, per-child child anchors, collision-free OBJ identifiers, and the spec-required ftGmo group record, and groups reparse through the existing group-aware reader |
-| Charts and chart sheets | 🟡 | ✅ | ✅ | Typed embedded/chart-sheet substreams and transactional CRUD plus the `CrtMlFrt`/`CrtMlFrtContinue` multilevel-properties future-record pair (FRT header validation, continuation reassembly, verbatim `XmlTkChain` bytes, and 8224-byte re-chunking); no renderer |
+| Images and primitive drawing shapes | 🟡 | ✅ | ✅ | Canonical borrowed BLIP/FBSE/BStore/BStoreDelay grammar and streaming writers live in `litchi-odraw::image`, while `litchi-imgconv` owns codecs only; OfficeArt extraction plus bounded primitive shape CRUD, including typed group construction/removal, remains host-specific |
+| Charts and chart sheets | 🟡 | ✅ | ✅ | `litchi-ograph` provides the bounded host-neutral BIFF/compound-package foundation and short contextual record types such as `chart3d::BarShape`; XLS/PPT bridge migration remains open, while existing typed embedded/chart-sheet substreams, transactional CRUD, and multilevel-property round trips remain available; no renderer |
 | Pivot tables and caches | ✅ | ✅ | ✅ | Cache values, grouping, fields, filters, and view/editor support |
 | Structured tables/ListObjects | ✅ | ✅ | ✅ | ListObject, AutoFilter12, web/XML, and external-source metadata |
 | Auto-filter and sort | ✅ | ✅ | ✅ | Filter conditions, filter modes, and sort records |
@@ -737,8 +737,9 @@ models allow it. The matrix does not claim complete ODF-version conformance vali
 The implementation and its tests are the source of truth for this matrix. Principal locations are:
 
 - OOXML shared/package features: `crates/litchi-opc/src/` and `crates/litchi-ooxml/src/`
+- Shared trust-neutral Office signatures: `crates/litchi-sign/src/`
 - DOCX, XLSX, XLSB, PPTX: `crates/litchi-ooxml/src/docx/`, `xlsx/`, `xlsb/`, and `pptx/`
-- OLE/CFB infrastructure: `crates/litchi-cfb/src/` and `crates/litchi-ole/src/`
+- OLE/CFB, OfficeArt, and OGraph infrastructure: `crates/litchi-cfb/src/`, `crates/litchi-ole-common/src/`, `crates/litchi-odraw/src/`, `crates/litchi-ograph/src/`, and `crates/litchi-ole/src/`
 - Shared inert VBA codec and project model: `crates/litchi-vba/src/`
 - DOC, XLS, PPT: `crates/litchi-ole/src/doc/`, `xls/`, and `ppt/`
 - OpenDocument: `crates/litchi-odf/src/`

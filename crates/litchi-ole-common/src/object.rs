@@ -623,7 +623,7 @@ impl Editor {
     }
 
     fn render(&self) -> Result<Vec<u8>, OleError> {
-        let mut writer = OleWriter::with_sector_size(self.sector_size);
+        let mut writer = OleWriter::with_sector_size(self.sector_size)?;
         if let Some(clsid) = self.root_clsid {
             writer.set_root_clsid(clsid);
         }

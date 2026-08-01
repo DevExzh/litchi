@@ -106,8 +106,8 @@ impl DirectoryEntryBuilder {
     /// Create a new root entry
     pub fn root(start_sector: u32, size: u64) -> Self {
         let name = "Root Entry".to_string();
-        let (name_utf16, comparison_name) =
-            directory_name_data(&name).expect("the fixed root entry name is valid");
+        let name_utf16 = "Root Entry".encode_utf16().collect();
+        let comparison_name = "ROOT ENTRY".encode_utf16().collect();
         Self {
             name,
             entry_type: STGTY_ROOT,
@@ -197,8 +197,9 @@ impl DirectoryEntryBuilder {
         }
 
         // Name length in bytes (including null terminator)
-        let name_len_bytes = u16::try_from((self.name_utf16.len() + 1) * 2)
-            .expect("validated CFB directory name length fits in u16");
+        let name_len_bytes = u16::try_from((self.name_utf16.len() + 1) * 2).map_err(|_| {
+            OleError::InvalidData("CFB directory name length exceeds u16".to_string())
+        })?;
         data[64..66].copy_from_slice(&name_len_bytes.to_le_bytes());
 
         // Entry type
@@ -335,7 +336,11 @@ impl DirectoryBuilder {
             0
         };
 
-        let name = full_path.last().unwrap().clone();
+        let Some(name) = full_path.last().cloned() else {
+            return Err(OleError::InvalidData(
+                "CFB stream path must not be empty".to_string(),
+            ));
+        };
         let entry = DirectoryEntryBuilder::stream(name, start_sector, size)?;
         self.ensure_unique_child(parent_sid, &entry)?;
         let sid = u32::try_from(self.entries.len()).map_err(|_| {

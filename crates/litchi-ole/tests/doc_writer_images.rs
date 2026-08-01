@@ -3,11 +3,9 @@
 //! Writes a new .doc with PNG and JPEG pictures via `DocWriter::insert_picture`
 //! and re-opens it with the crate's own DOC reader, asserting image count,
 //! format, dimensions, and byte-identity of the embedded payloads.
-#![cfg(feature = "imgconv")]
-
-use litchi_imgconv::BlipType;
+use litchi_odraw::image::Kind as BlipKind;
 use litchi_ole::doc::image::PictureFields;
-use litchi_ole::doc::writer::{DocPicture, DocWriter, FloatingPosition, PictureFormat};
+use litchi_ole::doc::writer::{DocPicture, DocWriter, FloatingPosition, PictureKind};
 use litchi_ole::doc::{Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use std::io::{Cursor, Write};
 use std::path::PathBuf;
@@ -99,13 +97,13 @@ fn picture_runs(document: &litchi_ole::doc::Document) -> Vec<Run> {
 #[test]
 fn doc_picture_new_sniffs_format_and_dimensions() {
     let png = DocPicture::new(make_png(32, 16)).unwrap();
-    assert_eq!(png.format(), PictureFormat::Png);
+    assert_eq!(png.kind(), PictureKind::Png);
     // 96 DPI: 32 px * 1440 twips/inch / 96 dpi = 480 twips.
     assert_eq!(png.width_twips(), 480);
     assert_eq!(png.height_twips(), 240);
 
     let jpeg = DocPicture::new(jpeg_fixture()).unwrap();
-    assert_eq!(jpeg.format(), PictureFormat::Jpeg);
+    assert_eq!(jpeg.kind(), PictureKind::Jpeg);
     assert!(jpeg.width_twips() > 0);
     assert!(jpeg.height_twips() > 0);
 }
@@ -142,8 +140,8 @@ fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
     assert_eq!(runs.len(), 2, "expected exactly two picture runs");
 
     let expected = [
-        (BlipType::Png, png_bytes.as_slice()),
-        (BlipType::Jpeg, jpeg_bytes.as_slice()),
+        (BlipKind::Png, png_bytes.as_slice()),
+        (BlipKind::Jpeg, jpeg_bytes.as_slice()),
     ];
     let data_stream = document.data_stream().expect("Data stream must exist");
     for (run, ((blip_type, payload), (width_twips, height_twips))) in
@@ -151,9 +149,9 @@ fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
     {
         let image = run.image().unwrap();
         let extracted = document.image_data(image).unwrap();
-        assert_eq!(extracted.blip_type(), Some(*blip_type));
+        assert_eq!(extracted.kind(), *blip_type);
         assert_eq!(
-            extracted.raw_data(),
+            extracted.data().unwrap(),
             *payload,
             "embedded payload must be byte-identical"
         );
@@ -168,29 +166,24 @@ fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
 #[test]
 fn native_officeart_picture_family_round_trips_without_reencoding() {
     let fixtures = [
-        ("dib-2x3.hex", PictureFormat::Dib, BlipType::Dib, (30, 45)),
-        (
-            "tiff-2x3.hex",
-            PictureFormat::Tiff,
-            BlipType::Tiff,
-            (30, 45),
-        ),
+        ("dib-2x3.hex", PictureKind::Dib, BlipKind::Dib, (30, 45)),
+        ("tiff-2x3.hex", PictureKind::Tiff, BlipKind::Tiff, (30, 45)),
         (
             "emf-1x0.5in.hex",
-            PictureFormat::Emf,
-            BlipType::Emf,
+            PictureKind::Emf,
+            BlipKind::Emf,
             (1440, 720),
         ),
         (
             "wmf-placeable-1x0.5in.hex",
-            PictureFormat::Wmf,
-            BlipType::Wmf,
+            PictureKind::Wmf,
+            BlipKind::Wmf,
             (1440, 720),
         ),
         (
             "pict-96x48.hex",
-            PictureFormat::Pict,
-            BlipType::Pict,
+            PictureKind::Pict,
+            BlipKind::Pict,
             (1440, 720),
         ),
     ];
@@ -200,7 +193,7 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
         let bytes = hex_fixture(name);
         let picture = DocPicture::new(bytes.clone())
             .unwrap_or_else(|error| panic!("{name} failed validation: {error}"));
-        assert_eq!(picture.format(), format);
+        assert_eq!(picture.kind(), format);
         assert_eq!((picture.width_twips(), picture.height_twips()), dimensions);
         expected.push((blip_type, bytes));
         writer.insert_picture(picture).unwrap();
@@ -214,8 +207,8 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
     assert_eq!(runs.len(), expected.len());
     for (run, (blip_type, bytes)) in runs.iter().zip(&expected) {
         let extracted = document.image_data(run.image().unwrap()).unwrap();
-        assert_eq!(extracted.blip_type(), Some(*blip_type));
-        assert_eq!(extracted.raw_data(), bytes);
+        assert_eq!(extracted.kind(), *blip_type);
+        assert_eq!(extracted.data().unwrap(), bytes);
     }
 }
 
@@ -230,16 +223,11 @@ fn bmp_is_normalized_to_dib_and_explicit_formats_are_validated() {
     bmp.extend_from_slice(&dib);
 
     let picture = DocPicture::new(bmp).unwrap();
-    assert_eq!(picture.format(), PictureFormat::Dib);
+    assert_eq!(picture.kind(), PictureKind::Dib);
     assert_eq!(picture.data(), dib);
     assert!(
-        DocPicture::from_parts_with_format(
-            hex_fixture("tiff-2x3.hex"),
-            PictureFormat::Png,
-            100,
-            100,
-        )
-        .is_err()
+        DocPicture::from_parts_as(hex_fixture("tiff-2x3.hex"), PictureKind::Png, 100, 100,)
+            .is_err()
     );
     assert!(DocPicture::from_parts(b"BM\0\0".to_vec(), 100, 100).is_err());
     assert!(DocPicture::from_parts(vec![0xD7, 0xCD, 0xC6, 0x9A], 100, 100).is_err());
@@ -310,8 +298,8 @@ fn inline_and_floating_pictures_round_trip_through_doc_reader() {
     // The floating picture's bytes and format survive the round trip.
     let floating_image = runs[1].image().unwrap();
     let extracted = document.image_data(floating_image).unwrap();
-    assert_eq!(extracted.blip_type(), Some(BlipType::Jpeg));
-    assert_eq!(extracted.raw_data(), jpeg_bytes.as_slice());
+    assert_eq!(extracted.kind(), BlipKind::Jpeg);
+    assert_eq!(extracted.data().unwrap(), jpeg_bytes.as_slice());
 
     // The SPA carries the anchor CP, position rectangle, origins, and wrap.
     let positions = document.shape_positions();

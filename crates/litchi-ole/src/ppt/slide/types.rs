@@ -594,13 +594,13 @@ impl<'doc> Slide<'doc> {
 
                 // Extract the one-based BLIP store index from the pib property.
                 use litchi_odraw::prop::Id;
-                if let Some(blip_id) = escher_shape
-                    .props()
-                    .get_int(Id::BlipToDisplay)
-                    .and_then(|value| u32::try_from(value).ok())
-                    .filter(|value| *value != 0)
-                {
-                    picture.set_blip_id(blip_id);
+                if let Some(blip_id) = escher_shape.props().get_int(Id::BlipToDisplay) {
+                    let blip_id = u32::try_from(blip_id).map_err(|_| {
+                        litchi_odraw::Error::MalformedProperties {
+                            reason: "BlipToDisplay must be a positive one-based image identifier",
+                        }
+                    })?;
+                    picture.set_blip_index(blip_id)?;
                 }
 
                 Ok(Some(ShapeEnum::Picture(picture)))
@@ -1711,7 +1711,7 @@ mod tests {
         assert_eq!(shapes.len(), 1);
         let picture = shapes[0].as_picture().expect("picture frame");
         assert_eq!(picture.properties.id, 42);
-        assert_eq!(picture.blip_id(), Some(7));
+        assert_eq!(picture.blip_id().map(litchi_odraw::image::Id::get), Some(7));
         assert_eq!(picture.properties.x, 10);
         assert_eq!(picture.properties.y, 20);
         assert_eq!(picture.properties.width, 200);
@@ -1794,7 +1794,7 @@ mod tests {
         let object = shapes[0].as_object_frame().expect("OLE frame");
         assert_eq!(object.frame_kind(), PictureFrameKind::OleObject);
         assert_eq!(object.external_object_id(), Some(77));
-        assert_eq!(object.blip_id(), Some(8));
+        assert_eq!(object.blip_id().map(litchi_odraw::image::Id::get), Some(8));
         assert_eq!(object.properties.x, 10);
         assert_eq!(object.properties.width, 200);
     }
@@ -1817,7 +1817,7 @@ mod tests {
         let media = shapes[0].as_media_frame().expect("media frame");
         assert_eq!(media.frame_kind(), PictureFrameKind::Media);
         assert_eq!(media.external_object_id(), Some(88));
-        assert_eq!(media.blip_id(), Some(9));
+        assert_eq!(media.blip_id().map(litchi_odraw::image::Id::get), Some(9));
         assert_eq!(media.properties.y, 20);
         assert_eq!(media.properties.height, 100);
     }

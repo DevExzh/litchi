@@ -1,0 +1,14 @@
+[package]
+name = "litchi-ograph"
+description = "Strict, host-neutral Microsoft Office Graph (MS-OGRAPH) package and record primitives."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-cfb = { workspace = true }
+litchi-core = { workspace = true }
+thiserror = { workspace = true }

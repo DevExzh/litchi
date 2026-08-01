@@ -6,7 +6,7 @@
 use crate::error::{OpcError, Result};
 use crate::packuri::PackURI;
 use litchi_core::xml::escape_xml;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 /// Whether a relationship target is inside or outside the OPC package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -266,13 +266,7 @@ impl Relationships {
         // Preserve compatibility for existing writer call sites without ever
         // replacing an established relationship. New code that needs duplicate
         // diagnostics should use `try_add_relationship`.
-        if self.rels.contains_key(&r_id) {
-            return self
-                .rels
-                .get(&r_id)
-                .expect("relationship existence was checked");
-        }
-        let rel = Relationship::new_with_source(
+        let relationship = Relationship::new_with_source(
             r_id.clone(),
             reltype,
             target_ref,
@@ -284,9 +278,10 @@ impl Relationships {
                 TargetMode::Internal
             },
         );
-        self.rels.insert(r_id.clone(), rel);
-        // Safe to unwrap since we just inserted it
-        self.rels.get(r_id.as_str()).unwrap()
+        match self.rels.entry(r_id) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(relationship),
+        }
     }
 
     /// Add a relationship without replacing an existing ID.
@@ -297,21 +292,22 @@ impl Relationships {
         r_id: String,
         target_mode: TargetMode,
     ) -> Result<&Relationship> {
-        if self.rels.contains_key(&r_id) {
-            return Err(OpcError::DuplicateRelationshipId(r_id));
+        let base_uri = self.base_uri.clone();
+        let source_uri = self.source_uri.clone();
+        match self.rels.entry(r_id) {
+            Entry::Occupied(entry) => Err(OpcError::DuplicateRelationshipId(entry.key().clone())),
+            Entry::Vacant(entry) => {
+                let id = entry.key().clone();
+                Ok(entry.insert(Relationship::new_with_source(
+                    id,
+                    reltype,
+                    target_ref,
+                    base_uri,
+                    source_uri,
+                    target_mode,
+                )))
+            },
         }
-        let relationship = Relationship::new_with_source(
-            r_id.clone(),
-            reltype,
-            target_ref,
-            self.base_uri.clone(),
-            self.source_uri.clone(),
-            target_mode,
-        );
-        self.rels.insert(r_id.clone(), relationship);
-        self.rels.get(&r_id).ok_or_else(|| {
-            OpcError::InvalidRelationship("relationship insertion failed".to_string())
-        })
     }
 
     /// Get a relationship by its ID.
@@ -333,17 +329,16 @@ impl Relationships {
     /// # Returns
     /// Reference to the relationship (existing or newly created)
     pub fn get_or_add(&mut self, reltype: &str, target_ref: &str) -> &Relationship {
-        // Check if matching relationship already exists
-        for rel in self.rels.values() {
-            if rel.reltype() == reltype && rel.target_ref() == target_ref && !rel.is_external() {
-                // Return the rId to look it up again (to avoid borrow checker issues)
-                let r_id = rel.r_id().to_string();
-                return self.rels.get(&r_id).unwrap();
-            }
-        }
-
-        // Create new relationship with next available rId
-        let r_id = self.next_r_id();
+        let r_id = self
+            .rels
+            .values()
+            .find(|relationship| {
+                relationship.reltype() == reltype
+                    && relationship.target_ref() == target_ref
+                    && !relationship.is_external()
+            })
+            .map(|relationship| relationship.r_id().to_string())
+            .unwrap_or_else(|| self.next_r_id());
         self.add_relationship(reltype.to_string(), target_ref.to_string(), r_id, false)
     }
 
@@ -449,6 +444,10 @@ impl Relationships {
     /// Remove a relationship by its ID.
     pub fn remove(&mut self, r_id: &str) -> Option<Relationship> {
         self.rels.remove(r_id)
+    }
+
+    pub(crate) fn retain(&mut self, mut keep: impl FnMut(&Relationship) -> bool) {
+        self.rels.retain(|_, relationship| keep(relationship));
     }
 
     /// Serialize relationships to XML format.

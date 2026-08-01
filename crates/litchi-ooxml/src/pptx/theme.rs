@@ -444,7 +444,7 @@ pub fn add_theme(
         xml.into_bytes(),
     )));
 
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     validate_theme_graph(package)?;
     Ok(AuthoredTheme {
         part_name: uri.to_string(),
@@ -502,7 +502,7 @@ pub fn attach_theme_to_master(
     }
     let relationship_id = master_part.relate_to(&target, rt::THEME);
 
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     validate_theme_graph(package)?;
     Ok(relationship_id)
 }
@@ -529,7 +529,7 @@ pub fn store_theme_color_scheme(
     verify_patched_color_scheme(&patched, color_scheme)?;
     package.get_part_mut(&uri)?.set_blob(patched);
 
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     validate_theme_graph(package)?;
     Ok(())
 }
@@ -555,7 +555,7 @@ pub fn store_theme_font_scheme(
     verify_patched_font_scheme(&patched, font_scheme)?;
     package.get_part_mut(&uri)?.set_blob(patched);
 
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     validate_theme_graph(package)?;
     Ok(())
 }
@@ -868,7 +868,7 @@ pub fn store_theme_override(
         if parse_theme_override(&stored)? != *value {
             return Err(invalid("theme override failed read-back validation"));
         }
-        invalidate_signatures(package)?;
+        invalidate_signatures(package);
         return Ok(uri.to_string());
     }
 
@@ -888,7 +888,7 @@ pub fn store_theme_override(
     if parse_theme_override(&stored)? != *value {
         return Err(invalid("theme override failed read-back validation"));
     }
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     Ok(uri.to_string())
 }
 
@@ -955,7 +955,7 @@ pub fn remove_theme_override(package: &mut OpcPackage, parent_part_name: &str) -
     if orphaned {
         package.remove_part(&uri);
     }
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     Ok(true)
 }
 
@@ -1417,10 +1417,8 @@ fn require_font_face(label: &str, face: &ThemeFontFace) -> Result<()> {
     Ok(())
 }
 
-fn invalidate_signatures(package: &mut OpcPackage) -> Result<()> {
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
-    })
+fn invalidate_signatures(package: &mut OpcPackage) {
+    package.unsign();
 }
 
 // ============================================================================

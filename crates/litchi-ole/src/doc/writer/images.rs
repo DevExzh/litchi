@@ -13,6 +13,8 @@ use crate::doc::parts::images::PictureType;
 use crate::doc::parts::spa::{
     SPA_LEN, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide, Spa,
 };
+use litchi_odraw::image::write::{BlipBuilder, digest};
+use litchi_odraw::image::{Kind as BlipKind, Point, Rect};
 
 /// Size of the PICF picture descriptor header ([MS-DOC] 2.9.161).
 const PICF_HEADER_LEN: usize = 0x44;
@@ -37,19 +39,11 @@ const RECORD_SP: u16 = 0xF00A;
 const RECORD_OPT: u16 = 0xF00B;
 const RECORD_CLIENT_ANCHOR: u16 = 0xF010;
 const RECORD_CLIENT_DATA: u16 = 0xF011;
-const RECORD_BLIP_EMF: u16 = 0xF01A;
-const RECORD_BLIP_WMF: u16 = 0xF01B;
-const RECORD_BLIP_PICT: u16 = 0xF01C;
-const RECORD_BLIP_JPEG: u16 = 0xF01D;
-const RECORD_BLIP_PNG: u16 = 0xF01E;
-const RECORD_BLIP_DIB: u16 = 0xF01F;
-const RECORD_BLIP_TIFF: u16 = 0xF029;
 
 // Escher record versions.
 const VERSION_CONTAINER: u16 = 0xF;
 const VERSION_DG: u16 = 0x0;
 const VERSION_SPGR: u16 = 0x1;
-const VERSION_BSE: u16 = 0x2;
 const VERSION_SP: u16 = 0x2;
 const VERSION_OPT: u16 = 0x3;
 const VERSION_ATOM: u16 = 0x0;
@@ -85,16 +79,6 @@ const SHAPE_CONTAINER_LEN: u32 = (RECORD_HEADER_LEN as u32 + SP_PAYLOAD_LEN)
 const RECORD_HEADER_LEN: usize = 8;
 /// Fixed OfficeArtFBSE payload length when no name is stored.
 const BSE_HEADER_LEN: usize = 36;
-/// Length of a BLIP record UID in bytes.
-const BLIP_UID_LEN: usize = 16;
-/// BLIP payload marker byte for embedded (non-external) picture data.
-const BLIP_EMBEDDED_MARKER: u8 = 0xFF;
-/// Size of an OfficeArtMetafileHeader ([MS-ODRAW] 2.2.31).
-const METAFILE_HEADER_LEN: usize = 34;
-/// OfficeArtMetafileHeader value indicating uncompressed BLIP data.
-const METAFILE_NO_COMPRESSION: u8 = 0xFE;
-/// Required OfficeArtMetafileHeader filter value.
-const METAFILE_FILTER_NONE: u8 = 0xFE;
 /// OfficeArtFBSE `foDelay` value when the BLIP is embedded in the BSE record
 /// (no delay-stream position).
 const BSE_NO_DELAY_STREAM: u32 = u32::MAX;
@@ -114,111 +98,6 @@ const ASSUMED_DPI: u32 = 96;
 /// Largest dimension expressible in the signed 16-bit PICF goal fields.
 const MAX_PICF_DIMENSION_TWIPS: u32 = i16::MAX as u32;
 
-/// MSOBLIPTYPE value for JPEG blips.
-const MSO_BLIP_TYPE_JPEG: u8 = 0x05;
-/// MSOBLIPTYPE value for PNG blips.
-const MSO_BLIP_TYPE_PNG: u8 = 0x06;
-/// MSOBLIPTYPE value for EMF blips.
-const MSO_BLIP_TYPE_EMF: u8 = 0x02;
-/// MSOBLIPTYPE value for WMF blips.
-const MSO_BLIP_TYPE_WMF: u8 = 0x03;
-/// MSOBLIPTYPE value for PICT blips.
-const MSO_BLIP_TYPE_PICT: u8 = 0x04;
-/// MSOBLIPTYPE value for DIB blips.
-const MSO_BLIP_TYPE_DIB: u8 = 0x07;
-/// MSOBLIPTYPE value for TIFF blips.
-const MSO_BLIP_TYPE_TIFF: u8 = 0x11;
-/// OfficeArtBlip record instance for single-UID JPEG blips.
-const BLIP_INSTANCE_JPEG: u16 = 0x46A;
-/// OfficeArtBlip record instance for single-UID PNG blips.
-const BLIP_INSTANCE_PNG: u16 = 0x6E0;
-/// OfficeArtBlip record instances for single-UID metafile and bitmap blips.
-const BLIP_INSTANCE_EMF: u16 = 0x3D4;
-const BLIP_INSTANCE_WMF: u16 = 0x216;
-const BLIP_INSTANCE_PICT: u16 = 0x542;
-const BLIP_INSTANCE_DIB: u16 = 0x7A8;
-const BLIP_INSTANCE_TIFF: u16 = 0x6E4;
-
-/// Native OfficeArt BLIP formats supported by the DOC picture writer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PictureFormat {
-    /// Enhanced Windows metafile (OfficeArtBlipEMF).
-    Emf,
-    /// Windows metafile (OfficeArtBlipWMF).
-    Wmf,
-    /// Macintosh PICT metafile (OfficeArtBlipPICT).
-    Pict,
-    /// JPEG image (OfficeArtBlipJPEG).
-    Jpeg,
-    /// PNG image (OfficeArtBlipPNG).
-    Png,
-    /// Device-independent bitmap (OfficeArtBlipDIB).
-    Dib,
-    /// TIFF image (OfficeArtBlipTIFF).
-    Tiff,
-}
-
-impl PictureFormat {
-    /// Detect the picture format from raw bytes via the crate's format detection.
-    fn sniff(data: &[u8]) -> Option<Self> {
-        match PictureType::from_data(data) {
-            PictureType::Emf => Some(Self::Emf),
-            PictureType::Wmf => Some(Self::Wmf),
-            PictureType::Jpeg => Some(Self::Jpeg),
-            PictureType::Png => Some(Self::Png),
-            PictureType::Bmp | PictureType::Dib => Some(Self::Dib),
-            PictureType::Tiff => Some(Self::Tiff),
-            PictureType::Unknown if dib_dimensions(data).is_some() => Some(Self::Dib),
-            PictureType::Unknown if pict_dimensions(data).is_some() => Some(Self::Pict),
-            _ => None,
-        }
-    }
-
-    /// OfficeArtBlip record type for this format.
-    fn blip_record_type(self) -> u16 {
-        match self {
-            Self::Emf => RECORD_BLIP_EMF,
-            Self::Wmf => RECORD_BLIP_WMF,
-            Self::Pict => RECORD_BLIP_PICT,
-            Self::Jpeg => RECORD_BLIP_JPEG,
-            Self::Png => RECORD_BLIP_PNG,
-            Self::Dib => RECORD_BLIP_DIB,
-            Self::Tiff => RECORD_BLIP_TIFF,
-        }
-    }
-
-    /// OfficeArtBlip record instance for the single-UID record variant.
-    fn blip_instance(self) -> u16 {
-        match self {
-            Self::Emf => BLIP_INSTANCE_EMF,
-            Self::Wmf => BLIP_INSTANCE_WMF,
-            Self::Pict => BLIP_INSTANCE_PICT,
-            Self::Jpeg => BLIP_INSTANCE_JPEG,
-            Self::Png => BLIP_INSTANCE_PNG,
-            Self::Dib => BLIP_INSTANCE_DIB,
-            Self::Tiff => BLIP_INSTANCE_TIFF,
-        }
-    }
-
-    /// MSOBLIPTYPE value used in the BSE header.
-    fn mso_blip_type(self) -> u8 {
-        match self {
-            Self::Emf => MSO_BLIP_TYPE_EMF,
-            Self::Wmf => MSO_BLIP_TYPE_WMF,
-            Self::Pict => MSO_BLIP_TYPE_PICT,
-            Self::Jpeg => MSO_BLIP_TYPE_JPEG,
-            Self::Png => MSO_BLIP_TYPE_PNG,
-            Self::Dib => MSO_BLIP_TYPE_DIB,
-            Self::Tiff => MSO_BLIP_TYPE_TIFF,
-        }
-    }
-
-    /// Whether this format uses OfficeArtMetafileHeader rather than a tag byte.
-    const fn is_metafile(self) -> bool {
-        matches!(self, Self::Emf | Self::Wmf | Self::Pict)
-    }
-}
-
 /// An inline picture to be embedded in a DOC document.
 ///
 /// Encoded bytes are stored as-is except that a 14-byte BMP file header is
@@ -227,8 +106,8 @@ impl PictureFormat {
 pub struct DocPicture {
     /// Raw BLIP file data.
     data: Vec<u8>,
-    /// Detected image format.
-    format: PictureFormat,
+    /// Detected native OfficeArt kind.
+    kind: BlipKind,
     /// Display width in twips.
     width_twips: u32,
     /// Display height in twips.
@@ -243,13 +122,13 @@ impl DocPicture {
     /// an error for unsupported formats or when the dimensions cannot be
     /// determined; use [`Self::from_parts`] to supply dimensions explicitly.
     pub fn new(data: Vec<u8>) -> Result<Self, DocWriteError> {
-        let format = sniff_format(&data)?;
-        let dimensions = intrinsic_dimensions_twips(format, &data).ok_or_else(|| {
+        let kind = sniff_kind(&data)?;
+        let dimensions = intrinsic_dimensions_twips(kind, &data).ok_or_else(|| {
             DocWriteError::InvalidData(
                 "DOC picture dimensions are unreadable; use DocPicture::from_parts".to_string(),
             )
         })?;
-        Self::from_parts_with_format(data, format, dimensions.0, dimensions.1)
+        Self::from_parts_as(data, kind, dimensions.0, dimensions.1)
     }
 
     /// Create a picture from raw image bytes and explicit display dimensions
@@ -259,26 +138,26 @@ impl DocPicture {
         width_twips: u32,
         height_twips: u32,
     ) -> Result<Self, DocWriteError> {
-        let format = sniff_format(&data)?;
-        Self::from_parts_with_format(data, format, width_twips, height_twips)
+        let kind = sniff_kind(&data)?;
+        Self::from_parts_as(data, kind, width_twips, height_twips)
     }
 
     /// Create a picture with an explicit native OfficeArt format and display
     /// dimensions. This is useful for headerless DIB and PICT data whose
     /// format cannot always be inferred unambiguously.
-    pub fn from_parts_with_format(
+    pub fn from_parts_as(
         mut data: Vec<u8>,
-        format: PictureFormat,
+        kind: BlipKind,
         width_twips: u32,
         height_twips: u32,
     ) -> Result<Self, DocWriteError> {
-        validate_explicit_format(format, &data)?;
-        if format == PictureFormat::Dib && data.starts_with(b"BM") {
+        validate_kind(kind, &data)?;
+        if kind == BlipKind::Dib && data.starts_with(b"BM") {
             data.drain(..14);
         }
         let picture = Self {
             data,
-            format,
+            kind,
             width_twips: 0,
             height_twips: 0,
         };
@@ -311,9 +190,9 @@ impl DocPicture {
         &self.data
     }
 
-    /// Detected image format.
-    pub fn format(&self) -> PictureFormat {
-        self.format
+    /// Detected native OfficeArt kind.
+    pub const fn kind(&self) -> BlipKind {
+        self.kind
     }
 
     /// Display width in twips.
@@ -328,8 +207,19 @@ impl DocPicture {
 }
 
 /// Sniff the picture format, rejecting unsupported or unrecognised data.
-fn sniff_format(data: &[u8]) -> Result<PictureFormat, DocWriteError> {
-    PictureFormat::sniff(data).ok_or_else(|| {
+fn sniff_kind(data: &[u8]) -> Result<BlipKind, DocWriteError> {
+    let kind = match PictureType::from_data(data) {
+        PictureType::Emf => Some(BlipKind::Emf),
+        PictureType::Wmf => Some(BlipKind::Wmf),
+        PictureType::Jpeg => Some(BlipKind::Jpeg),
+        PictureType::Png => Some(BlipKind::Png),
+        PictureType::Bmp | PictureType::Dib => Some(BlipKind::Dib),
+        PictureType::Tiff => Some(BlipKind::Tiff),
+        PictureType::Unknown if dib_dimensions(data).is_some() => Some(BlipKind::Dib),
+        PictureType::Unknown if pict_dimensions(data).is_some() => Some(BlipKind::Pict),
+        _ => None,
+    };
+    kind.ok_or_else(|| {
         DocWriteError::InvalidData(
             "DOC picture data is not a supported native OfficeArt format".to_string(),
         )
@@ -337,19 +227,20 @@ fn sniff_format(data: &[u8]) -> Result<PictureFormat, DocWriteError> {
 }
 
 /// Validate that explicit format metadata agrees with the encoded bytes.
-fn validate_explicit_format(format: PictureFormat, data: &[u8]) -> Result<(), DocWriteError> {
-    let valid = match format {
-        PictureFormat::Emf => PictureType::from_data(data) == PictureType::Emf,
-        PictureFormat::Wmf => valid_wmf_data(data),
-        PictureFormat::Pict => pict_dimensions(data).is_some(),
-        PictureFormat::Jpeg => PictureType::from_data(data) == PictureType::Jpeg,
-        PictureFormat::Png => PictureType::from_data(data) == PictureType::Png,
-        PictureFormat::Dib => dib_dimensions(data).is_some(),
-        PictureFormat::Tiff => PictureType::from_data(data) == PictureType::Tiff,
+fn validate_kind(kind: BlipKind, data: &[u8]) -> Result<(), DocWriteError> {
+    let valid = match kind {
+        BlipKind::Emf => PictureType::from_data(data) == PictureType::Emf,
+        BlipKind::Wmf => valid_wmf_data(data),
+        BlipKind::Pict => pict_dimensions(data).is_some(),
+        BlipKind::Jpeg | BlipKind::CmykJpeg => PictureType::from_data(data) == PictureType::Jpeg,
+        BlipKind::Png => PictureType::from_data(data) == PictureType::Png,
+        BlipKind::Dib => dib_dimensions(data).is_some(),
+        BlipKind::Tiff => PictureType::from_data(data) == PictureType::Tiff,
+        BlipKind::Error | BlipKind::Unknown | BlipKind::Other(_) => false,
     };
     if !valid {
         return Err(DocWriteError::InvalidData(format!(
-            "DOC picture bytes do not match explicit {format:?} format"
+            "DOC picture bytes do not match explicit {kind:?} kind"
         )));
     }
     if data.len() > i32::MAX as usize - 1024 {
@@ -371,15 +262,16 @@ fn pixels_to_twips(pixels: u32) -> u32 {
 }
 
 /// Extract the pixel dimensions of an image without decoding it.
-fn intrinsic_dimensions_twips(format: PictureFormat, data: &[u8]) -> Option<(u32, u32)> {
-    match format {
-        PictureFormat::Png => pixels_as_twips(png_pixel_dimensions(data)?),
-        PictureFormat::Jpeg => pixels_as_twips(jpeg_pixel_dimensions(data)?),
-        PictureFormat::Dib => pixels_as_twips(dib_dimensions(data)?),
-        PictureFormat::Tiff => pixels_as_twips(tiff_dimensions(data)?),
-        PictureFormat::Emf => emf_dimensions_twips(data),
-        PictureFormat::Wmf => wmf_dimensions_twips(data),
-        PictureFormat::Pict => pixels_as_twips(pict_dimensions(data)?),
+fn intrinsic_dimensions_twips(kind: BlipKind, data: &[u8]) -> Option<(u32, u32)> {
+    match kind {
+        BlipKind::Png => pixels_as_twips(png_pixel_dimensions(data)?),
+        BlipKind::Jpeg | BlipKind::CmykJpeg => pixels_as_twips(jpeg_pixel_dimensions(data)?),
+        BlipKind::Dib => pixels_as_twips(dib_dimensions(data)?),
+        BlipKind::Tiff => pixels_as_twips(tiff_dimensions(data)?),
+        BlipKind::Emf => emf_dimensions_twips(data),
+        BlipKind::Wmf => wmf_dimensions_twips(data),
+        BlipKind::Pict => pixels_as_twips(pict_dimensions(data)?),
+        BlipKind::Error | BlipKind::Unknown | BlipKind::Other(_) => None,
     }
 }
 
@@ -610,134 +502,92 @@ fn pict_frame(data: &[u8]) -> Option<(usize, i32, i32, i32, i32)> {
     None
 }
 
-/// Derive the 16-byte UID shared by a BSE and its embedded BLIP record.
-///
-/// [MS-ODRAW] specifies the MD4 digest of the uncompressed BLIP file data.
-fn picture_uid(picture: &DocPicture) -> [u8; BLIP_UID_LEN] {
-    md4_digest(&picture.data)
-}
-
-/// Compute RFC 1320 MD4 without allocating in proportion to the input size.
-fn md4_digest(data: &[u8]) -> [u8; 16] {
-    let mut state = [0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476];
-    let mut chunks = data.chunks_exact(64);
-    for chunk in &mut chunks {
-        md4_compress(&mut state, chunk.try_into().unwrap());
-    }
-
-    let remainder = chunks.remainder();
-    let padded_len = if remainder.len() < 56 { 64 } else { 128 };
-    let mut tail = [0u8; 128];
-    tail[..remainder.len()].copy_from_slice(remainder);
-    tail[remainder.len()] = 0x80;
-    tail[padded_len - 8..padded_len].copy_from_slice(&(data.len() as u64 * 8).to_le_bytes());
-    for chunk in tail[..padded_len].chunks_exact(64) {
-        md4_compress(&mut state, chunk.try_into().unwrap());
-    }
-
-    let mut digest = [0; 16];
-    for (bytes, word) in digest.chunks_exact_mut(4).zip(state) {
-        bytes.copy_from_slice(&word.to_le_bytes());
-    }
-    digest
-}
-
-fn md4_compress(state: &mut [u32; 4], block: &[u8; 64]) {
-    let mut words = [0u32; 16];
-    for (word, bytes) in words.iter_mut().zip(block.chunks_exact(4)) {
-        *word = u32::from_le_bytes(bytes.try_into().unwrap());
-    }
-    let [mut a, mut b, mut c, mut d] = *state;
-    const ROUND_1: [usize; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-    const ROUND_2: [usize; 16] = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
-    const ROUND_3: [usize; 16] = [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15];
-    for (round, indices, shifts, constant) in [
-        (0, &ROUND_1[..], [3, 7, 11, 19], 0),
-        (1, &ROUND_2[..], [3, 5, 9, 13], 0x5a82_7999),
-        (2, &ROUND_3[..], [3, 9, 11, 15], 0x6ed9_eba1),
-    ] {
-        for (step, &index) in indices.iter().enumerate() {
-            let function = |x: u32, y: u32, z: u32| match round {
-                0 => (x & y) | (!x & z),
-                1 => (x & y) | (x & z) | (y & z),
-                _ => x ^ y ^ z,
-            };
-            let rotate = shifts[step % 4];
-            let update = |value: u32, x: u32, y: u32, z: u32| {
-                value
-                    .wrapping_add(function(x, y, z))
-                    .wrapping_add(words[index])
-                    .wrapping_add(constant)
-                    .rotate_left(rotate)
-            };
-            match step % 4 {
-                0 => a = update(a, b, c, d),
-                1 => d = update(d, a, b, c),
-                2 => c = update(c, d, a, b),
-                _ => b = update(b, c, d, a),
-            }
-        }
-    }
-    state[0] = state[0].wrapping_add(a);
-    state[1] = state[1].wrapping_add(b);
-    state[2] = state[2].wrapping_add(c);
-    state[3] = state[3].wrapping_add(d);
-}
-
-/// BLIP payload length, excluding the 8-byte OfficeArt record header.
-fn blip_payload_len(picture: &DocPicture) -> u32 {
-    let metadata_len = if picture.format.is_metafile() {
-        METAFILE_HEADER_LEN
-    } else {
-        1
-    };
-    (BLIP_UID_LEN + metadata_len + picture.data.len()) as u32
-}
-
 /// Clipping bounds stored in an OfficeArtMetafileHeader.
-fn metafile_bounds(picture: &DocPicture) -> (i32, i32, i32, i32) {
+fn metafile_bounds(picture: &DocPicture) -> Result<Rect, DocWriteError> {
     let data = &picture.data;
-    match picture.format {
-        PictureFormat::Emf if data.len() >= 24 => (
-            i32::from_le_bytes(data[8..12].try_into().unwrap()),
-            i32::from_le_bytes(data[12..16].try_into().unwrap()),
-            i32::from_le_bytes(data[16..20].try_into().unwrap()),
-            i32::from_le_bytes(data[20..24].try_into().unwrap()),
-        ),
-        PictureFormat::Wmf if data.starts_with(&[0xD7, 0xCD, 0xC6, 0x9A]) => (
-            i32::from(i16::from_le_bytes(data[6..8].try_into().unwrap())),
-            i32::from(i16::from_le_bytes(data[8..10].try_into().unwrap())),
-            i32::from(i16::from_le_bytes(data[10..12].try_into().unwrap())),
-            i32::from(i16::from_le_bytes(data[12..14].try_into().unwrap())),
-        ),
-        PictureFormat::Pict => {
-            let (_, top, left, bottom, right) =
-                pict_frame(data).expect("validated PICT picture has a frame");
-            (left, top, right, bottom)
+    let bounds = match picture.kind {
+        BlipKind::Emf if data.len() >= 24 => Rect {
+            left: read_i32(data, 8)?,
+            top: read_i32(data, 12)?,
+            right: read_i32(data, 16)?,
+            bottom: read_i32(data, 20)?,
         },
-        _ => (
-            0,
-            0,
-            picture.width_twips as i32,
-            picture.height_twips as i32,
-        ),
-    }
+        BlipKind::Wmf if data.starts_with(&[0xD7, 0xCD, 0xC6, 0x9A]) => Rect {
+            left: i32::from(read_i16(data, 6)?),
+            top: i32::from(read_i16(data, 8)?),
+            right: i32::from(read_i16(data, 10)?),
+            bottom: i32::from(read_i16(data, 12)?),
+        },
+        BlipKind::Pict => {
+            let (_, top, left, bottom, right) = pict_frame(data).ok_or_else(|| {
+                DocWriteError::InvalidData("validated PICT picture has no frame".to_string())
+            })?;
+            Rect {
+                left,
+                top,
+                right,
+                bottom,
+            }
+        },
+        _ => Rect {
+            left: 0,
+            top: 0,
+            right: i32::try_from(picture.width_twips)
+                .map_err(|_| DocWriteError::InvalidData("picture width exceeds i32".to_string()))?,
+            bottom: i32::try_from(picture.height_twips).map_err(|_| {
+                DocWriteError::InvalidData("picture height exceeds i32".to_string())
+            })?,
+        },
+    };
+    Ok(bounds)
 }
 
-/// Append the 34-byte OfficeArtMetafileHeader for an uncompressed metafile.
-fn write_metafile_header(out: &mut Vec<u8>, picture: &DocPicture) {
-    let data_len = picture.data.len() as u32;
-    out.extend_from_slice(&data_len.to_le_bytes()); // cbSize
-    let (left, top, right, bottom) = metafile_bounds(picture);
-    for coordinate in [left, top, right, bottom] {
-        out.extend_from_slice(&coordinate.to_le_bytes()); // rcBounds
+fn read_i32(data: &[u8], offset: usize) -> Result<i32, DocWriteError> {
+    let end = offset.checked_add(4).ok_or_else(|| {
+        DocWriteError::InvalidData("metafile bounds offset overflows".to_string())
+    })?;
+    let bytes = data
+        .get(offset..end)
+        .ok_or_else(|| DocWriteError::InvalidData("metafile bounds are truncated".to_string()))?;
+    Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn read_i16(data: &[u8], offset: usize) -> Result<i16, DocWriteError> {
+    let end = offset.checked_add(2).ok_or_else(|| {
+        DocWriteError::InvalidData("metafile bounds offset overflows".to_string())
+    })?;
+    let bytes = data
+        .get(offset..end)
+        .ok_or_else(|| DocWriteError::InvalidData("metafile bounds are truncated".to_string()))?;
+    Ok(i16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn picture_blip(picture: &DocPicture) -> Result<BlipBuilder<'_>, DocWriteError> {
+    if picture.kind.is_meta() {
+        let width = i32::try_from(picture.width_twips)
+            .ok()
+            .and_then(|value| value.checked_mul(635))
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("metafile width extent exceeds i32".to_string())
+            })?;
+        let height = i32::try_from(picture.height_twips)
+            .ok()
+            .and_then(|value| value.checked_mul(635))
+            .ok_or_else(|| {
+                DocWriteError::InvalidData("metafile height extent exceeds i32".to_string())
+            })?;
+        Ok(BlipBuilder::meta(
+            picture.kind,
+            picture.data(),
+            metafile_bounds(picture)?,
+            Point {
+                x: width,
+                y: height,
+            },
+        )?)
+    } else {
+        Ok(BlipBuilder::bitmap(picture.kind, picture.data())?.tag(0xFF))
     }
-    // 1 twip = 635 EMUs.
-    out.extend_from_slice(&(picture.width_twips as i32 * 635).to_le_bytes()); // ptSize.x
-    out.extend_from_slice(&(picture.height_twips as i32 * 635).to_le_bytes()); // ptSize.y
-    out.extend_from_slice(&data_len.to_le_bytes()); // cbSave
-    out.push(METAFILE_NO_COMPRESSION);
-    out.push(METAFILE_FILTER_NONE);
 }
 
 /// Append an Escher record header ([MS-ODRAW] 2.2.1).
@@ -841,21 +691,27 @@ fn write_shape_container(out: &mut Vec<u8>, shape_id: u32) {
 /// Append an OfficeArtFBSE record with the embedded OfficeArtBlip record for
 /// a picture. Used both for the Data-stream picture blocks and for the
 /// BStoreContainer inside the drawing group of floating pictures.
-fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &DocPicture) {
-    let blip_payload_len = blip_payload_len(picture);
-    let blip_record_len = RECORD_HEADER_LEN as u32 + blip_payload_len;
-    let bse_payload_len = BSE_HEADER_LEN as u32 + blip_record_len;
+fn write_bse_with_embedded_blip(
+    out: &mut Vec<u8>,
+    picture: &DocPicture,
+) -> Result<(), DocWriteError> {
+    let blip = picture_blip(picture)?;
+    let blip_record_len = blip.wire_len()?;
+    let bse_payload_len = u32::try_from(BSE_HEADER_LEN)
+        .ok()
+        .and_then(|header| header.checked_add(blip_record_len))
+        .ok_or_else(|| DocWriteError::InvalidData("DOC FBSE length exceeds u32".to_string()))?;
 
     write_record_header(
         out,
-        VERSION_BSE,
-        u16::from(picture.format.mso_blip_type()),
+        2,
+        u16::from(picture.kind.raw()),
         RECORD_BSE,
         bse_payload_len,
     );
-    out.push(picture.format.mso_blip_type()); // btWin32
-    out.push(picture.format.mso_blip_type()); // btMacOS
-    out.extend_from_slice(&picture_uid(picture)); // rgbUid
+    out.push(picture.kind.raw()); // btWin32
+    out.push(picture.kind.raw()); // btMacOS
+    out.extend_from_slice(digest(picture.data()).as_bytes()); // rgbUid
     out.extend_from_slice(&0u16.to_le_bytes()); // tag
     out.extend_from_slice(&blip_record_len.to_le_bytes()); // size
     out.extend_from_slice(&1u32.to_le_bytes()); // cRef
@@ -865,39 +721,44 @@ fn write_bse_with_embedded_blip(out: &mut Vec<u8>, picture: &DocPicture) {
     out.push(0); // unused2
     out.push(0); // unused3
 
-    // OfficeArtBlip: a single-UID bitmap or metafile record.
-    write_record_header(
-        out,
-        VERSION_ATOM,
-        picture.format.blip_instance(),
-        picture.format.blip_record_type(),
-        blip_payload_len,
-    );
-    out.extend_from_slice(&picture_uid(picture));
-    if picture.format.is_metafile() {
-        write_metafile_header(out, picture);
-    } else {
-        out.push(BLIP_EMBEDDED_MARKER);
-    }
-    out.extend_from_slice(&picture.data);
+    blip.write(out)?;
+    Ok(())
 }
 
 /// Append an OfficeArtWordDrawing block (PICF + shape container + BSE with an
 /// embedded BLIP) to the Data stream.
-pub(crate) fn write_picture_block(picture: &DocPicture, shape_id: u32, out: &mut Vec<u8>) {
-    let blip_payload_len = blip_payload_len(picture);
-    let blip_record_len = RECORD_HEADER_LEN as u32 + blip_payload_len;
-    let bse_payload_len = BSE_HEADER_LEN as u32 + blip_record_len;
+pub(crate) fn write_picture_block(
+    picture: &DocPicture,
+    shape_id: u32,
+    out: &mut Vec<u8>,
+) -> Result<(), DocWriteError> {
+    let blip_record_len = picture_blip(picture)?.wire_len()?;
+    let bse_payload_len = u32::try_from(BSE_HEADER_LEN)
+        .ok()
+        .and_then(|header| header.checked_add(blip_record_len))
+        .ok_or_else(|| DocWriteError::InvalidData("DOC FBSE length exceeds u32".to_string()))?;
 
     let block_start = out.len();
     // lcb covers the PICF header plus everything that follows it.
-    let lcb =
-        PICF_HEADER_LEN as u32 + SHAPE_CONTAINER_LEN + RECORD_HEADER_LEN as u32 + bse_payload_len;
+    let lcb = u32::try_from(PICF_HEADER_LEN)
+        .ok()
+        .and_then(|value| value.checked_add(SHAPE_CONTAINER_LEN))
+        .and_then(|value| value.checked_add(RECORD_HEADER_LEN as u32))
+        .and_then(|value| value.checked_add(bse_payload_len))
+        .ok_or_else(|| DocWriteError::InvalidData("DOC picture block exceeds u32".to_string()))?;
     write_picf(out, picture, lcb);
     write_shape_container(out, shape_id);
-    write_bse_with_embedded_blip(out, picture);
+    write_bse_with_embedded_blip(out, picture)?;
 
-    debug_assert_eq!(out.len() - block_start, lcb as usize);
+    let actual = out.len().checked_sub(block_start).ok_or_else(|| {
+        DocWriteError::InvalidData("DOC picture block length underflow".to_string())
+    })?;
+    if actual != usize::try_from(lcb).unwrap_or(usize::MAX) {
+        return Err(DocWriteError::InvalidData(
+            "DOC picture block length mismatch".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 // ============================================================================
@@ -1190,7 +1051,7 @@ pub(crate) fn build_dgg_info(
     main_shapes: &[FloatingShapeInfo<'_>],
     header_shapes: &[FloatingShapeInfo<'_>],
     allocated_main_shapes: u32,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, DocWriteError> {
     let mut out = Vec::new();
 
     // ── OfficeArtDggContainer ──
@@ -1241,16 +1102,24 @@ pub(crate) fn build_dgg_info(
             .iter()
             .filter(|shape| matches!(shape.content, FloatingShapeContent::Picture(_)))
             .count();
+    let picture_count = u16::try_from(picture_count).map_err(|_| {
+        DocWriteError::InvalidData("DOC BStore picture count exceeds u16".to_string())
+    })?;
+    if picture_count > 0x0fff {
+        return Err(DocWriteError::InvalidData(
+            "DOC BStore contains more than 4095 pictures".to_string(),
+        ));
+    }
     write_record_header(
         &mut out,
         VERSION_CONTAINER,
-        picture_count as u16,
+        picture_count,
         RECORD_BSTORE_CONTAINER,
         0,
     );
     for shape in main_shapes.iter().chain(header_shapes.iter()) {
         if let FloatingShapeContent::Picture(picture) = shape.content {
-            write_bse_with_embedded_blip(&mut out, picture);
+            write_bse_with_embedded_blip(&mut out, picture)?;
         }
     }
     patch_record_len(&mut out, bstore_start);
@@ -1279,7 +1148,7 @@ pub(crate) fn build_dgg_info(
         );
     }
 
-    out
+    Ok(out)
 }
 
 /// Back-patch the payload length of a container record header written with a
@@ -1319,13 +1188,10 @@ mod tests {
     }
 
     #[test]
-    fn sniff_format_detects_png_and_jpeg() {
-        assert_eq!(PictureFormat::sniff(&png_bytes()), Some(PictureFormat::Png));
-        assert_eq!(
-            PictureFormat::sniff(&jpeg_bytes()),
-            Some(PictureFormat::Jpeg)
-        );
-        assert_eq!(PictureFormat::sniff(b"not an image"), None);
+    fn sniff_kind_detects_png_and_jpeg() {
+        assert_eq!(sniff_kind(&png_bytes()).unwrap(), BlipKind::Png);
+        assert_eq!(sniff_kind(&jpeg_bytes()).unwrap(), BlipKind::Jpeg);
+        assert!(sniff_kind(b"not an image").is_err());
     }
 
     #[test]
@@ -1343,7 +1209,7 @@ mod tests {
     #[test]
     fn doc_picture_new_derives_dimensions_at_96_dpi() {
         let picture = DocPicture::new(png_bytes()).unwrap();
-        assert_eq!(picture.format(), PictureFormat::Png);
+        assert_eq!(picture.kind(), BlipKind::Png);
         assert_eq!(picture.width_twips(), 32 * TWIPS_PER_INCH / ASSUMED_DPI);
         assert_eq!(picture.height_twips(), 16 * TWIPS_PER_INCH / ASSUMED_DPI);
     }
@@ -1367,7 +1233,7 @@ mod tests {
     fn picture_block_layout_matches_ms_doc() {
         let picture = DocPicture::new(png_bytes()).unwrap();
         let mut block = Vec::new();
-        write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block);
+        write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block).unwrap();
 
         // PICF header.
         let lcb = i32::from_le_bytes(block[0..4].try_into().unwrap()) as usize;
@@ -1395,11 +1261,11 @@ mod tests {
 
         // BSE record with the embedded BLIP.
         let (ver, inst, record_type, len) = parse_record_header(&block, bse_offset);
-        assert_eq!((ver, record_type), (VERSION_BSE, RECORD_BSE));
-        assert_eq!(inst, u16::from(MSO_BLIP_TYPE_PNG));
+        assert_eq!((ver, record_type), (2, RECORD_BSE));
+        assert_eq!(inst, u16::from(BlipKind::Png.raw()));
         let bse = &block[bse_offset + RECORD_HEADER_LEN..];
-        assert_eq!(bse[0], MSO_BLIP_TYPE_PNG); // btWin32
-        assert_eq!(bse[1], MSO_BLIP_TYPE_PNG); // btMacOS
+        assert_eq!(bse[0], BlipKind::Png.raw()); // btWin32
+        assert_eq!(bse[1], BlipKind::Png.raw()); // btMacOS
         let blip_size = u32::from_le_bytes(bse[20..24].try_into().unwrap()) as usize;
         let c_ref = u32::from_le_bytes(bse[24..28].try_into().unwrap());
         let fo_delay = u32::from_le_bytes(bse[28..32].try_into().unwrap());
@@ -1409,32 +1275,34 @@ mod tests {
 
         // Embedded BLIP record.
         let blip = &bse[BSE_HEADER_LEN..BSE_HEADER_LEN + blip_size];
-        let (ver, inst, record_type, len) = parse_record_header(blip, 0);
-        assert_eq!((ver, record_type), (VERSION_ATOM, RECORD_BLIP_PNG));
-        assert_eq!(inst, BLIP_INSTANCE_PNG);
-        assert_eq!(len as usize + RECORD_HEADER_LEN, blip_size);
+        let parsed = litchi_odraw::image::Blip::parse(blip).unwrap();
+        assert_eq!(parsed.kind(), BlipKind::Png);
+        assert_eq!(parsed.record().instance(), 0x6e0);
         // The BLIP UID matches the BSE rgbUid, and the payload is byte-identical.
-        assert_eq!(&blip[8..8 + BLIP_UID_LEN], &bse[2..2 + BLIP_UID_LEN]);
-        assert_eq!(blip[8 + BLIP_UID_LEN], BLIP_EMBEDDED_MARKER);
-        assert_eq!(&blip[9 + BLIP_UID_LEN..], picture.data());
+        assert_eq!(parsed.uids().unwrap().effective(), digest(picture.data()));
+        assert_eq!(parsed.data(), picture.data());
     }
 
     #[test]
     fn picture_uid_is_the_md4_digest_of_blip_data() {
         let picture = DocPicture::new(png_bytes()).unwrap();
-        assert_eq!(picture_uid(&picture), md4_digest(picture.data()));
+        assert_eq!(
+            digest(picture.data()),
+            picture_blip(&picture).unwrap().uid()
+        );
         // RFC 1320 test vector.
         assert_eq!(
-            md4_digest(b"abc"),
+            digest(b"abc").bytes(),
             [
                 0xa4, 0x48, 0x01, 0x7a, 0xaf, 0x21, 0xd8, 0x52, 0x5f, 0xc1, 0x0a, 0xe8, 0x7a, 0xa6,
                 0x72, 0x9d,
             ]
         );
         assert_eq!(
-            md4_digest(
+            digest(
                 b"12345678901234567890123456789012345678901234567890123456789012345678901234567890"
-            ),
+            )
+            .bytes(),
             [
                 0xe3, 0x3b, 0x4d, 0xdc, 0x9c, 0x38, 0xf2, 0x19, 0x9c, 0x3e, 0x7b, 0x16, 0x4f, 0xcc,
                 0x05, 0x36,
@@ -1442,27 +1310,26 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "imgconv")]
     #[test]
     fn picture_block_bse_parses_with_crate_reader() {
-        use litchi_imgconv::{Blip, BlipStoreEntry, BlipType};
+        use litchi_odraw::Record;
+        use litchi_odraw::image::{Blip, Context, Entry, Storage};
 
         let picture = DocPicture::new(jpeg_bytes()).unwrap();
         let mut block = Vec::new();
-        write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block);
+        write_picture_block(&picture, FIRST_PICTURE_SHAPE_ID, &mut block).unwrap();
 
         let (_ver, _inst, _record_type, sp_len) = parse_record_header(&block, PICF_HEADER_LEN);
         let bse_offset = PICF_HEADER_LEN + RECORD_HEADER_LEN + sp_len as usize;
-        let bse_payload = &block[bse_offset + RECORD_HEADER_LEN..];
-
-        let bse = BlipStoreEntry::parse(bse_payload).unwrap();
-        assert_eq!(bse.blip_type, BlipType::Jpeg);
-        assert!(!bse.is_delay_loaded());
-
-        let blip =
-            Blip::parse(&bse_payload[BSE_HEADER_LEN..BSE_HEADER_LEN + bse.size as usize]).unwrap();
-        assert_eq!(blip.blip_type(), Some(BlipType::Jpeg));
-        assert_eq!(blip.picture_data(), picture.data());
+        let (record, _) = Record::parse(&block, bse_offset).unwrap();
+        let bse = Entry::parse(record).unwrap();
+        assert_eq!(bse.kind().unwrap(), BlipKind::Jpeg);
+        assert!(matches!(
+            bse.storage().unwrap(),
+            Storage::Embedded(Blip::Jpeg(_))
+        ));
+        let blip = bse.resolve(Context::new()).unwrap().unwrap();
+        assert_eq!(blip.data(), picture.data());
     }
 
     // ── Floating pictures ──
@@ -1606,7 +1473,7 @@ mod tests {
         let positions = sample_positions();
         let shapes = floating_shapes(&png, &jpeg, &positions);
 
-        let dgg = build_dgg_info(&shapes, &[], 3);
+        let dgg = build_dgg_info(&shapes, &[], 3).unwrap();
         let records = collect_records(&dgg, 0, dgg.len());
 
         // Top level: DggContainer, then dgglbl + DgContainer.
@@ -1713,17 +1580,17 @@ mod tests {
         assert_eq!(spids.len(), 3);
     }
 
-    #[cfg(feature = "imgconv")]
     #[test]
     fn dgg_info_bse_blips_parse_with_crate_reader() {
-        use litchi_imgconv::{Blip, BlipStoreEntry, BlipType};
+        use litchi_odraw::Record;
+        use litchi_odraw::image::{Context, Entry};
 
         let png = DocPicture::new(png_bytes()).unwrap();
         let jpeg = DocPicture::new(jpeg_bytes()).unwrap();
         let positions = sample_positions();
         let shapes = floating_shapes(&png, &jpeg, &positions);
 
-        let dgg = build_dgg_info(&shapes, &[], 2);
+        let dgg = build_dgg_info(&shapes, &[], 2).unwrap();
         let records = collect_records(&dgg, 0, dgg.len());
         let bses: Vec<_> = records
             .iter()
@@ -1731,17 +1598,13 @@ mod tests {
             .collect();
         assert_eq!(bses.len(), 2);
 
-        let expected = [(BlipType::Png, png.data()), (BlipType::Jpeg, jpeg.data())];
-        for (bse_record, (blip_type, payload)) in bses.iter().zip(expected.iter()) {
-            let bse_payload = &dgg[bse_record.0 + RECORD_HEADER_LEN
-                ..bse_record.0 + RECORD_HEADER_LEN + bse_record.4 as usize];
-            let bse = BlipStoreEntry::parse(bse_payload).unwrap();
-            assert_eq!(bse.blip_type, *blip_type);
-            assert!(!bse.is_delay_loaded());
-            let blip =
-                Blip::parse(&bse_payload[BSE_HEADER_LEN..BSE_HEADER_LEN + bse.size as usize])
-                    .unwrap();
-            assert_eq!(blip.picture_data(), *payload);
+        let expected = [(BlipKind::Png, png.data()), (BlipKind::Jpeg, jpeg.data())];
+        for (bse_record, (kind, payload)) in bses.iter().zip(expected.iter()) {
+            let (record, _) = Record::parse(&dgg, bse_record.0).unwrap();
+            let bse = Entry::parse(record).unwrap();
+            assert_eq!(bse.kind().unwrap(), *kind);
+            let blip = bse.resolve(Context::new()).unwrap().unwrap();
+            assert_eq!(blip.data(), *payload);
         }
     }
 
@@ -1784,7 +1647,7 @@ mod tests {
             text: Some("hdr"),
         }];
 
-        let dgg = build_dgg_info(&main_shapes, &header_shapes, 2);
+        let dgg = build_dgg_info(&main_shapes, &header_shapes, 2).unwrap();
         let records = collect_records(&dgg, 0, dgg.len());
 
         // Two drawings: main (dgglbl 0, Dg instance 1) and header (dgglbl 1,

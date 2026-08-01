@@ -1905,7 +1905,7 @@ pub fn add_worksheet_query_table(
             relationship_id.clone(),
             false,
         );
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(WorksheetQueryTable::new(
         relationship_id,
         part_name.to_string(),
@@ -1931,7 +1931,7 @@ pub fn replace_worksheet_query_table(
         QUERY_TABLE_CONTENT_TYPE.into(),
         xml,
     )));
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 
@@ -1968,7 +1968,7 @@ pub fn remove_worksheet_query_table(
     if !package_part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -2032,7 +2032,7 @@ pub fn reorder_worksheet_query_tables(
             item.query_table,
         ));
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(result)
 }
 

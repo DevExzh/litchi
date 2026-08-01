@@ -50,9 +50,6 @@ pub mod doc;
 /// in the legacy binary format (.ppt files), which are OLE2-based files.
 pub mod ppt;
 
-/// Trust-neutral verification and authoring of legacy binary Office signatures.
-pub mod signature;
-
 /// Legacy Excel spreadsheet (.xls) reader
 ///
 /// This module provides functionality to parse Microsoft Excel spreadsheets
@@ -61,6 +58,5 @@ pub mod xls;
 
 pub use xls::{XlsError, XlsWorkbook};
 
-/// Image extraction bridge between typed OfficeArt records and `litchi-imgconv`.
-#[cfg(feature = "imgconv")]
+/// Image extraction bridge between typed OfficeArt records and optional codecs.
 pub mod extractor;

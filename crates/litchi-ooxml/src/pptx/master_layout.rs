@@ -356,7 +356,7 @@ pub fn add_slide_master(package: &mut OpcPackage) -> Result<AuthoredSlideMaster>
     master_part.relate_to(&theme_target, rt::THEME);
     package.add_part(Box::new(master_part));
 
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     validate_master_layout_graph(package)?;
     Ok(AuthoredSlideMaster {
         master_id,
@@ -437,7 +437,7 @@ pub fn add_slide_layout(
     );
     package.add_part(Box::new(layout_part));
 
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     validate_master_layout_graph(package)?;
     Ok(AuthoredSlideLayout {
         layout_id,
@@ -517,7 +517,7 @@ pub fn store_placeholder_shape(
             "read-side placeholder inventory lost the authored shape",
         ));
     }
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     Ok(())
 }
 
@@ -603,7 +603,7 @@ pub fn remove_slide_layout(package: &mut OpcPackage, layout_part_name: &str) -> 
     }
     package.remove_part(&layout_uri);
 
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     validate_master_layout_graph(package)?;
     Ok(())
 }
@@ -1557,10 +1557,8 @@ fn require_placeholders(placeholders: &[PlaceholderSpec]) -> Result<()> {
     Ok(())
 }
 
-fn invalidate_signatures(package: &mut OpcPackage) -> Result<()> {
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
-    })
+fn invalidate_signatures(package: &mut OpcPackage) {
+    package.unsign();
 }
 
 // ============================================================================

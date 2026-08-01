@@ -831,7 +831,7 @@ pub fn store_web_extension_task_panes(
     if let Some(existing) = existing {
         remove_unreferenced_parts(package, &existing.owned_parts, &reserved);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 
@@ -844,7 +844,7 @@ pub fn remove_web_extension_task_panes(package: &mut OpcPackage) -> Result<bool>
     };
     package.rels_mut().remove(&existing.root_relationship_id);
     remove_unreferenced_parts(package, &existing.owned_parts, &HashSet::new());
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 

@@ -845,9 +845,7 @@ pub fn store_font_table(
                 .map_err(OoxmlError::InvalidUri)
         })
         .collect::<Result<Vec<_>>>()?;
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
-    })?;
+    package.unsign();
 
     for (uri, content_type, data) in resource_parts {
         if let Ok(part) = package.get_part_mut(&uri) {

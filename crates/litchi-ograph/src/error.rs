@@ -1,0 +1,136 @@
+use thiserror::Error;
+
+/// Result type used by this crate.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// Checked OGraph parsing and encoding failures.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// The underlying compound-file container is malformed.
+    #[error("invalid compound file: {0}")]
+    Cfb(#[from] litchi_cfb::OleError),
+
+    /// A configured bound is internally inconsistent or unsupported.
+    #[error("invalid {resource} limit {value}: {reason}")]
+    InvalidLimit {
+        /// Name of the bounded resource.
+        resource: &'static str,
+        /// Rejected bound.
+        value: u64,
+        /// Static explanation of the constraint.
+        reason: &'static str,
+    },
+
+    /// Input or output crossed a configured resource bound.
+    #[error("{resource} limit exceeded: observed {observed}, maximum {maximum}")]
+    LimitExceeded {
+        /// Name of the bounded resource.
+        resource: &'static str,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+
+    /// A BIFF record header was cut short.
+    #[error("truncated BIFF header at offset {offset}: only {available} byte(s) remain")]
+    TruncatedHeader {
+        /// Header offset in the stream.
+        offset: usize,
+        /// Remaining byte count.
+        available: usize,
+    },
+
+    /// A BIFF payload was shorter than its declared length.
+    #[error(
+        "truncated BIFF record {kind:#06X} at offset {offset}: declared {declared} byte(s), only {available} available"
+    )]
+    TruncatedPayload {
+        /// Header offset in the stream.
+        offset: usize,
+        /// BIFF record identifier.
+        kind: u16,
+        /// Length declared by the header.
+        declared: usize,
+        /// Bytes available after the header.
+        available: usize,
+    },
+
+    /// A typed decoder received a different record identifier.
+    #[error("expected BIFF record {expected:#06X}, found {actual:#06X}")]
+    WrongRecord {
+        /// Expected BIFF identifier.
+        expected: u16,
+        /// Actual BIFF identifier.
+        actual: u16,
+    },
+
+    /// A typed BIFF record has an invalid fixed payload size.
+    #[error("BIFF record {kind:#06X} has invalid length: expected {expected}, found {actual}")]
+    InvalidRecordLength {
+        /// BIFF record identifier.
+        kind: u16,
+        /// Required length.
+        expected: usize,
+        /// Actual length.
+        actual: usize,
+    },
+
+    /// A scalar value is outside the range defined by the specification.
+    #[error("BIFF record {kind:#06X} has invalid {field} value {value:#X}")]
+    InvalidRecordValue {
+        /// BIFF record identifier.
+        kind: u16,
+        /// Field name.
+        field: &'static str,
+        /// Rejected raw value.
+        value: u64,
+    },
+
+    /// A required root stream is absent.
+    #[error("missing required root stream {name:?}")]
+    MissingStream {
+        /// Required stream name.
+        name: &'static str,
+    },
+
+    /// A root stream occurs more than once.
+    #[error("duplicate root stream {name:?}")]
+    DuplicateStream {
+        /// Duplicated stream name.
+        name: String,
+    },
+
+    /// Standalone OGraph packages reject unknown streams and all storages.
+    #[error("unexpected root entry {name:?} with type {entry_type}")]
+    UnexpectedEntry {
+        /// Directory entry name.
+        name: String,
+        /// Raw CFB directory entry type.
+        entry_type: u8,
+    },
+
+    /// The Workbook stream does not have the standalone OGraph substream shape.
+    #[error("invalid standalone OGraph Workbook at offset {offset}: {reason}")]
+    InvalidWorkbook {
+        /// Record offset nearest the failure.
+        offset: usize,
+        /// Static structural explanation.
+        reason: &'static str,
+    },
+
+    /// Checked length arithmetic could not be represented.
+    #[error("size overflow while processing {resource}")]
+    SizeOverflow {
+        /// Resource being sized.
+        resource: &'static str,
+    },
+
+    /// A fallible allocation could not reserve the requested capacity.
+    #[error("could not allocate storage for {resource}")]
+    Allocation {
+        /// Resource being allocated.
+        resource: &'static str,
+    },
+}

@@ -2447,7 +2447,6 @@ impl Document {
     ///     }
     /// }
     /// ```
-    #[cfg(feature = "imgconv")]
     pub fn image_data(
         &self,
         image: &super::image::Image,

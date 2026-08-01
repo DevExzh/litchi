@@ -289,6 +289,16 @@ pub mod ooxml {
     pub use litchi_ooxml::*;
 }
 
+/// Trust-neutral Office signature authoring and verification.
+///
+/// The concise facade re-exports the canonical types without aliases. Format
+/// packages provide the container-specific `signatures`, `sign`, `resign`, and
+/// `unsign` operations.
+#[cfg(feature = "sign")]
+pub mod sign {
+    pub use litchi_sign::*;
+}
+
 /// Formula module
 ///
 /// This module provides functionality to parse and convert mathematical formulas between different formats.

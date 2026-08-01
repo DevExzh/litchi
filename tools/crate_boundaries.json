@@ -10,7 +10,9 @@
       "litchi-iwa",
       "litchi-markdown",
       "litchi-odf",
-      "litchi-rtf"
+      "litchi-odraw",
+      "litchi-rtf",
+      "litchi-sign"
     ],
     "litchi-cfb": [
       "litchi-core"
@@ -35,6 +37,7 @@
     "litchi-formula": [],
     "litchi-imgconv": [
       "litchi-core",
+      "litchi-odraw",
       "xml-minifier"
     ],
     "litchi-iwa": [
@@ -51,6 +54,10 @@
       "xml-minifier"
     ],
     "litchi-odraw": [],
+    "litchi-ograph": [
+      "litchi-cfb",
+      "litchi-core"
+    ],
     "litchi-ole": [],
     "litchi-ole-common": [
       "litchi-cfb",
@@ -63,6 +70,7 @@
     ],
     "litchi-opc": [
       "litchi-core",
+      "litchi-sign",
       "soapberry-zip"
     ],
     "litchi-py": [
@@ -73,6 +81,9 @@
     ],
     "litchi-sheet": [
       "litchi-core"
+    ],
+    "litchi-sign": [
+      "litchi-cfb"
     ],
     "litchi-slide": [
       "litchi-core"
@@ -171,104 +182,118 @@
     },
     {
       "order": 29,
+      "dependent": "litchi-ole",
+      "dependency": "litchi-sign",
+      "reason": "The legacy OLE migration host temporarily consumes the extracted trust-neutral signing capability.",
+      "exit": "Move DOC, PPT, and XLS into concrete crates that depend directly on litchi-sign, then delete the host."
+    },
+    {
+      "order": 30,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-vba",
       "reason": "The OOXML migration host temporarily consumes the extracted inert VBA capability.",
       "exit": "Move DOCX, PPTX, XLSB, and XLSX into concrete crates that depend directly on litchi-vba, then delete the host."
     },
     {
-      "order": 30,
+      "order": 31,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-cfb",
       "reason": "The OOXML monolith still owns encrypted-container integration.",
       "exit": "Move encryption/container integration to focused optional capability crates, then delete the host."
     },
     {
-      "order": 31,
+      "order": 32,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-core",
       "reason": "The OOXML monolith is an active migration host.",
       "exit": "Move remaining neutral contracts and concrete implementations out, then delete the host."
     },
     {
-      "order": 32,
+      "order": 33,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-drawingml",
       "reason": "The OOXML monolith temporarily consumes the extracted DrawingML substrate.",
       "exit": "Move all DrawingML consumers into concrete format crates and delete the host."
     },
     {
-      "order": 33,
+      "order": 34,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-fonts",
       "reason": "The OOXML monolith still owns optional font integration.",
       "exit": "Move font integration to the concrete format or rendering capability that consumes it."
     },
     {
-      "order": 34,
+      "order": 35,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-crypto",
       "reason": "The OOXML migration host temporarily owns encrypted-package integration over the extracted shared cryptography capability.",
       "exit": "Move encrypted-package integration to concrete OOXML crates or a focused adapter, then delete the host."
     },
     {
-      "order": 35,
+      "order": 36,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-ooxml-common",
       "reason": "The OOXML monolith temporarily consumes its extracted common substrate.",
       "exit": "Move remaining consumers into concrete OOXML crates and delete the host."
     },
     {
-      "order": 36,
+      "order": 37,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-opc",
       "reason": "The OOXML monolith is an active migration host over OPC.",
       "exit": "Move remaining package consumers into concrete OOXML crates and delete the host."
     },
     {
-      "order": 37,
+      "order": 38,
+      "dependent": "litchi-ooxml",
+      "dependency": "litchi-sign",
+      "reason": "The OOXML migration host temporarily consumes the extracted trust-neutral signing capability.",
+      "exit": "Move DOCX, PPTX, XLSB, and XLSX into concrete crates that depend directly on litchi-sign, then delete the host."
+    },
+    {
+      "order": 39,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-xlsx",
       "reason": "A reverse adapter keeps legacy callers working while XLSX migrates first.",
       "exit": "Move callers to litchi-xlsx and delete the reverse adapter with the monolith."
     },
     {
-      "order": 38,
+      "order": 40,
       "dependent": "litchi-ooxml",
       "dependency": "soapberry-zip",
       "reason": "The OOXML monolith still performs package implementation work directly.",
       "exit": "Route package access through litchi-opc and delete the host."
     },
     {
-      "order": 39,
+      "order": 41,
       "dependent": "litchi-ooxml",
       "dependency": "xml-minifier",
       "reason": "The OOXML monolith still performs XML implementation work directly.",
       "exit": "Move the remaining XML consumers into common or concrete crates and delete the host."
     },
     {
-      "order": 40,
+      "order": 42,
       "dependent": "litchi",
       "dependency": "litchi-ole",
       "reason": "The facade still exposes the legacy OLE migration host.",
       "exit": "Re-export the concrete DOC/PPT/XLS crates and remove the host dependency."
     },
     {
-      "order": 41,
+      "order": 43,
       "dependent": "litchi",
       "dependency": "litchi-ooxml",
       "reason": "The facade still exposes the OOXML migration host.",
       "exit": "Re-export the concrete DOCX/PPTX/XLSB/XLSX crates and remove the host dependency."
     },
     {
-      "order": 42,
+      "order": 44,
       "dependent": "litchi",
       "dependency": "soapberry-zip",
       "reason": "The facade still owns format implementation dependencies.",
       "exit": "Move archive use behind concrete crates so the facade only re-exports canonical APIs."
     },
     {
-      "order": 43,
+      "order": 45,
       "dependent": "litchi",
       "dependency": "xml-minifier",
       "reason": "The facade still owns format implementation dependencies.",
@@ -280,9 +305,11 @@
     "litchi-crypto",
     "litchi-drawingml",
     "litchi-odraw",
+    "litchi-ograph",
     "litchi-ole-common",
     "litchi-ooxml-common",
     "litchi-sheet",
+    "litchi-sign",
     "litchi-slide",
     "litchi-vba",
     "litchi-word"

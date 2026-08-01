@@ -70,9 +70,7 @@ pub fn store_presentation_structure(
     {
         return Err(invalid("staged presentation structure did not round-trip"));
     }
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
-    })?;
+    package.unsign();
     package.get_part_mut(&presentation_name)?.set_blob(staged);
     Ok(())
 }

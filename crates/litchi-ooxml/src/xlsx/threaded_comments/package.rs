@@ -147,7 +147,7 @@ pub fn add_threaded_comment_person(
             relationship_id,
             false,
         );
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(part)
 }
 
@@ -238,7 +238,7 @@ pub fn remove_threaded_comment_person(
     if !part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -350,7 +350,7 @@ pub fn add_threaded_comment(
             relationship_id,
             false,
         );
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(part)
 }
 
@@ -485,7 +485,7 @@ pub fn remove_threaded_comment(
     if !part_is_referenced(package, &part_name) {
         package.remove_part(&part_name);
     }
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(true)
 }
 
@@ -613,7 +613,7 @@ fn commit_person_part(package: &mut OpcPackage, part: &WorkbookPersonPart) -> Sh
     let xml = write_persons(&part.persons)?.into_bytes();
     let part_name = PackURI::new(&part.part_name)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 
@@ -624,7 +624,7 @@ fn commit_comment_part(
     let xml = write_threaded_comments(&part.comments)?.into_bytes();
     let part_name = PackURI::new(&part.part_name)?;
     package.get_part_mut(&part_name)?.set_blob(xml);
-    let _ = package.clear_digital_signatures();
+    package.unsign();
     Ok(())
 }
 

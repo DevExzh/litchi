@@ -1420,6 +1420,97 @@ its DOC/PPT/XLS VBA integrations, and the 2,068-test OOXML library suite plus
 PPTX integration coverage. The dependency checker accepts 27 workspace crates
 and 65 internal dependency declarations, including the new downward VBA edges.
 
+The twenty-eighth implementation slice completes the acyclic shared-signature
+cut. `litchi-sign` owns bounded, trust-neutral XMLDSig authoring and verification
+plus the CFB storage adapter; `litchi-opc` depends on that engine and owns only
+package-part selection, RelationshipTransform resolution, certificate-part
+relationships, and staged graph mutation. The former duplicate OPC and OLE
+signature engines and their long compatibility facades are deleted. DOC, PPT,
+XLS, DOCX, PPTX, XLSB, and XLSX use the canonical `Signer`, `Policy`, `Limits`,
+`Coverage`, `Report`, `Status`, and `Trust` vocabulary directly or through a
+short host method. The safe ordinary `signatures`, `sign`, and additive-editor
+paths use strict policy; permissive SHA-1 and partial-package handling requires
+an explicit compatibility policy and returns `Coverage::Partial` rather than an
+unqualified complete result.
+
+The XML engine requires one uniquely bound package object whose sole direct
+Manifest owns the external package references. Producer-specific Office
+metadata and XAdES signed-properties references are accepted only as known,
+uniquely resolved SignedInfo objects whose canonicalized digests also verify;
+unknown, duplicate, ambiguous, or unverified fragment references fail. OPC
+resolution borrows ordinary part bodies, transforms only relationship parts,
+and merges related certificate DER as borrowed evidence. Signature addition and
+replacement author and validate a structurally shared staged package before
+commit. CFB editing consumes the source allocation, materializes streams lazily,
+authors before clearing on replacement, and returns the exact input allocation
+when clean. A changed CFB preserves sector size, root and exposed storage
+CLSIDs, stream bytes, and hierarchy; state bits and directory timestamps remain
+an explicit `litchi-cfb` metadata limitation rather than a false preservation
+claim.
+
+The twenty-ninth implementation slice moves OfficeArt image grammar and writing
+from optional image conversion into `litchi-odraw::image`. Borrowed `Blip`,
+`Bitmap`, `Meta`, `Entry`, `Store`, `Block`, and delayed-storage views retain
+unknown records, JPEG record flavor, platform fields, direct BLIPs, dual UIDs,
+and offset-zero semantics under explicit bounds. Consuming or borrowing writer
+builders emit the required MD4 UID, cache it instead of hashing a large image
+twice, use the `0xFE` uncompressed metafile marker, and stream payload bytes to
+the caller's sink. `litchi-imgconv` now owns only bounded decode, decompression,
+render, and codec conversion over those canonical views; its duplicate BLIP and
+FBSE models are deleted.
+
+The PowerPoint host follows the actual binary topology: the Pictures stream is
+a headerless BStoreDelay sequence, while the FBSE table comes from the drawing
+group. Picture lookup resolves `pib` to an FBSE and then `foDelay` to a BLIP,
+including direct embedded BLIPs and the valid zero offset, without constructing
+a self-referential package model. DOC and XLS retain their host-specific anchor,
+object, and stream rules while consuming the same borrowed image grammar. This
+is a parser/writer ownership correction, not a claim that every image codec or
+every binary picture CRUD path is complete.
+
+The thirtieth implementation slice establishes `litchi-ograph` as the neutral
+chart foundation required to remove PPT/XLS peer-format coupling. Its raw layer
+iterates borrowed BIFF frames under record and output budgets, its contextual
+record modules expose short names such as `chart3d::BarShape`, `frame::Frame`,
+`line::Line`, `pie::Format`, and `series::Parent`, and its owned package boundary
+consumes validated standalone compound bytes without cloning them. Reserved
+bits, unknown records, record order, and opaque streams remain lossless. XLS
+workbook/tab/OBJ mutation and PPT frame/embedded-object integration deliberately
+remain in their hosts; migrating those bridges and completing the full OGraph
+grammar are later slices, so this foundation alone makes no chart authoring,
+rendering, activation, or native-Office compatibility claim.
+
+These three slices preserve the previously verified native Office artifacts and
+do not add a desktop-application certification claim. Their verification is
+therefore focused on the changed dependency boundaries, hostile parser cases,
+real producer signature fixtures, exact round trips, transactional failures,
+warnings, and documentation. Per the explicit review decision, the earlier
+fully green workspace baseline is relied upon and the full workspace gate is
+not repeated for this cut; any later change to emitted document relationships
+or visible image/chart bytes still requires the applicable Microsoft Office
+open, edit/resave, and reverse-read evidence.
+
+Focused evidence for this cut is green. Warning-denied test and Clippy gates
+cover 71 `litchi-cfb`, 17 `litchi-sign`, 50 `litchi-odraw`, 48
+`litchi-imgconv`, and 18 `litchi-ograph` tests. `litchi-opc` passes 66 unit, 11
+integration, and 5 documentation tests, including seven real Microsoft/POI
+signed-package fixtures. The all-feature OLE gate passes 2,501 library tests
+with zero failures and three pre-existing ignored cases plus every integration
+and example target; the narrowed image and final hostile-extractor suites pass
+28 and 17 tests respectively. OOXML's focused gates pass two real signed
+DOCX/XLSX/PPTX fixture tests, 36 VBA unit tests, and two PPTX VBA integration
+tests, with all-target check and Clippy warnings denied.
+
+The umbrella's default, full-feature, and `ole,imgconv` library boundaries pass
+warning-denied check and Clippy; its image facade documentation compiles and the
+newly boxed format-neutral table/row facade passes fourteen full-feature focused
+tests. The dependency checker accepts 29 workspace packages, 74 direct internal
+edges, and 32 explicit
+migration-debt entries; all seven checker regression tests pass. Formatting,
+rustdoc on the extracted foundations, legacy-name searches, primary-path panic
+searches, and diff validation are clean. These are focused crate and boundary
+gates, not a repeated full-workspace run or a new native-Office certification.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

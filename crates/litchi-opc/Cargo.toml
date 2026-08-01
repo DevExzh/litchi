@@ -10,19 +10,15 @@ rust-version.workspace = true
 
 [dependencies]
 atoi_simd     = { workspace = true }
-base64        = { workspace = true }
 itoa          = { workspace = true }
 litchi-core   = { workspace = true }
+litchi-sign   = { workspace = true }
 memchr        = { workspace = true }
-p256          = { workspace = true }
 quick-xml     = { workspace = true }
-rsa           = { workspace = true }
-sha1_legacy   = { workspace = true }
-sha2_legacy   = { workspace = true }
-signature     = { workspace = true }
 smallvec      = { workspace = true }
 soapberry-zip = { workspace = true }
-subtle        = { workspace = true }
 tempfile      = { workspace = true }
 thiserror     = { workspace = true }
-zeroize       = { workspace = true }
+
+[dev-dependencies]
+p256 = { workspace = true }

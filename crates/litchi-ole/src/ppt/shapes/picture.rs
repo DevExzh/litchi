@@ -4,15 +4,11 @@
 // embedded images directly from shapes, similar to python-pptx.
 
 use super::shape::{Shape, ShapeProperties, ShapeType};
-#[cfg(feature = "imgconv")]
 use crate::extractor::ExtractedImage;
 use crate::ppt::package::PptError;
-#[cfg(feature = "imgconv")]
 use litchi_core::error::Result;
-#[cfg(feature = "imgconv")]
-use litchi_imgconv::Blip;
-#[cfg(feature = "imgconv")]
 use litchi_odraw::Container;
+use litchi_odraw::image::Id as ImageId;
 
 /// Semantic kind of a PowerPoint picture frame.
 ///
@@ -47,7 +43,7 @@ pub enum PictureFrameKind {
 ///         if let Some(picture) = shape.as_picture() {
 ///             // Extract the image
 ///             if let Ok(Some(image)) = picture.extract_image(&pres) {
-///                 let png_data = image.to_png(None, None)?;
+///                 let png_data = image.to_png(Default::default())?;
 ///                 std::fs::write(image.suggested_filename(), png_data)?;
 ///             }
 ///         }
@@ -60,7 +56,7 @@ pub struct PictureShape {
     /// Shape properties
     pub properties: ShapeProperties,
     /// BLIP ID reference (index into BLIP store)
-    pub blip_id: Option<u32>,
+    pub blip_id: Option<ImageId>,
     /// Picture name/filename
     pub name: Option<String>,
     /// Semantic kind of this picture frame.
@@ -68,7 +64,6 @@ pub struct PictureShape {
     /// Reference to an external OLE or media object.
     external_object_id: Option<u32>,
     /// Escher container data (for extracting BLIP)
-    #[cfg(feature = "imgconv")]
     escher_data: Option<Vec<u8>>,
 }
 
@@ -87,7 +82,6 @@ impl PictureShape {
             name: None,
             frame_kind: PictureFrameKind::Picture,
             external_object_id: None,
-            #[cfg(feature = "imgconv")]
             escher_data: None,
         }
     }
@@ -105,14 +99,19 @@ impl PictureShape {
             name: None,
             frame_kind,
             external_object_id: None,
-            #[cfg(feature = "imgconv")]
             escher_data: None,
         }
     }
 
     /// Set BLIP ID reference
-    pub fn set_blip_id(&mut self, blip_id: u32) {
-        self.blip_id = Some(blip_id);
+    pub fn set_blip_id(&mut self, id: ImageId) {
+        self.blip_id = Some(id);
+    }
+
+    /// Set a BLIP ID from a raw host property after validating its range.
+    pub fn set_blip_index(&mut self, index: u32) -> litchi_odraw::Result<()> {
+        self.set_blip_id(ImageId::new(index)?);
+        Ok(())
     }
 
     /// Set picture name
@@ -144,13 +143,12 @@ impl PictureShape {
     }
 
     /// Set Escher container data for BLIP extraction
-    #[cfg(feature = "imgconv")]
     pub fn set_escher_data(&mut self, data: Vec<u8>) {
         self.escher_data = Some(data);
     }
 
     /// Get BLIP ID
-    pub const fn blip_id(&self) -> Option<u32> {
+    pub const fn blip_id(&self) -> Option<ImageId> {
         self.blip_id
     }
 
@@ -180,22 +178,21 @@ impl PictureShape {
     ///
     /// # Returns
     /// The extracted image, or None if no image data is found
-    #[cfg(feature = "imgconv")]
-    pub fn extract_image(
-        &self,
-        presentation: &crate::ppt::Presentation,
-    ) -> Result<Option<ExtractedImage<'static>>> {
+    pub fn extract_image<'data>(
+        &'data self,
+        presentation: &'data crate::ppt::Presentation,
+    ) -> Result<Option<ExtractedImage<'data>>> {
         // Try to extract from embedded Escher data first
-        if let Some(ref escher_data) = self.escher_data
-            && let Ok(images) = crate::extractor::ImageExtractor::extract_blips(escher_data)
-            && let Some(image) = images.into_iter().next()
-        {
-            return Ok(Some(image));
+        if let Some(ref escher_data) = self.escher_data {
+            let images = crate::extractor::ImageExtractor::blips(escher_data)?;
+            if let Some(image) = images.into_iter().next() {
+                return Ok(Some(image));
+            }
         }
 
         // Try to extract from Pictures stream using BLIP ID
         if let Some(blip_id) = self.blip_id {
-            return presentation.extract_image_by_blip_id(blip_id).map_err(|e| {
+            return presentation.image(blip_id).map_err(|e| {
                 litchi_core::error::Error::ParseError(format!(
                     "Failed to extract image by BLIP ID: {}",
                     e
@@ -203,21 +200,6 @@ impl PictureShape {
             });
         }
 
-        Ok(None)
-    }
-
-    /// Extract the BLIP directly from embedded Escher data
-    ///
-    /// This is a lower-level method that extracts the BLIP without
-    /// requiring access to the full presentation.
-    #[cfg(feature = "imgconv")]
-    pub fn extract_blip_from_escher(&self) -> Result<Option<Blip<'static>>> {
-        if let Some(ref escher_data) = self.escher_data {
-            let images = crate::extractor::ImageExtractor::extract_blips(escher_data)?;
-            if let Some(image) = images.into_iter().next() {
-                return Ok(Some(image.blip));
-            }
-        }
         Ok(None)
     }
 
@@ -266,9 +248,8 @@ impl Shape for PictureShape {
 /// Searches for the BlipToDisplay property (0x0104) which contains
 /// the reference to the BLIP in the BStoreContainer.
 ///
-/// Uses zero-copy parsing with `Cow` to avoid unnecessary allocations.
-#[cfg(feature = "imgconv")]
-pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option<u32>> {
+/// Uses zero-copy OfficeArt property parsing.
+pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option<ImageId>> {
     use litchi_odraw::RecordKind;
     use litchi_odraw::prop::{Id, Props};
 
@@ -276,12 +257,12 @@ pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option
     for child in container.children() {
         let child = child?;
         if child.kind() == RecordKind::Opt
-            && let Some(id) = Props::parse(&child)?
-                .get_int(Id::BlipToDisplay)
-                .and_then(|id| u32::try_from(id).ok())
-                .filter(|id| *id != 0)
+            && let Some(raw) = Props::parse(&child)?.get_int(Id::BlipToDisplay)
         {
-            return Ok(Some(id));
+            let raw = u32::try_from(raw).map_err(|_| litchi_odraw::Error::MalformedProperties {
+                reason: "BlipToDisplay must be a positive one-based image identifier",
+            })?;
+            return ImageId::new(raw).map(Some);
         }
     }
 
@@ -304,8 +285,9 @@ mod tests {
     #[test]
     fn test_picture_shape_set_blip_id() {
         let mut picture = PictureShape::new(1);
-        picture.set_blip_id(42);
-        assert_eq!(picture.blip_id(), Some(42));
+        picture.set_blip_index(42).unwrap();
+        assert_eq!(picture.blip_id().map(ImageId::get), Some(42));
+        assert!(picture.set_blip_index(0).is_err());
     }
 
     #[test]

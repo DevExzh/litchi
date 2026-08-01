@@ -1383,17 +1383,18 @@ impl<R: Read + Seek> XlsWorkbook<R> {
         }
     }
 
-    /// Verify workbook XML signatures without evaluating certificate trust or
-    /// executing any macro content.
-    pub fn verify_digital_signatures(
+    /// Verify workbook XML signatures with the safe strict policy, without
+    /// evaluating certificate trust or executing any macro content.
+    pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
+        self.signatures_with(&litchi_sign::Policy::strict())
+    }
+
+    /// Verify workbook XML signatures with an explicit trust-neutral policy.
+    pub fn signatures_with(
         &mut self,
-        policy: &crate::signature::SignatureVerificationPolicy,
-    ) -> crate::signature::Result<Vec<crate::signature::BinaryOfficeSignatureVerification>> {
-        crate::signature::verify_binary_office_signatures(
-            &mut self.ole_file,
-            crate::signature::BinaryOfficeFormat::Xls,
-            policy,
-        )
+        policy: &litchi_sign::Policy,
+    ) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
+        litchi_sign::cfb::verify(&mut self.ole_file, litchi_sign::cfb::Format::Xls, policy)
     }
 
     pub fn document_summary_information(

@@ -281,7 +281,6 @@ fn checked_picture_segment(
 pub(super) struct EncryptedPresentation {
     pub live_offsets: Vec<usize>,
     pub mappings: Vec<(u32, u32)>,
-    #[cfg(feature = "imgconv")]
     pub crypto: Context,
 }
 
@@ -443,12 +442,10 @@ pub(super) fn decrypt_powerpoint_document(
     Ok(Some(EncryptedPresentation {
         live_offsets: ranges.into_iter().map(|range| range.0).collect(),
         mappings: mappings.into_iter().collect(),
-        #[cfg(feature = "imgconv")]
         crypto,
     }))
 }
 
-#[cfg(feature = "imgconv")]
 pub(super) fn decrypt_pictures(data: &mut Vec<u8>, crypto: &Context) -> Result<()> {
     let mut clear = data.clone();
     let mut record_offset = 0usize;
@@ -577,7 +574,6 @@ fn map_crypto_error(error: Error) -> PptError {
     }
 }
 
-#[cfg(feature = "imgconv")]
 fn decrypt_picture_segment(
     data: &mut [u8],
     offset: usize,
@@ -614,7 +610,6 @@ fn checked_slice<'a>(data: &'a [u8], offset: usize, len: usize, field: &str) -> 
         .ok_or_else(|| PptError::MalformedEncryptionHeader(format!("{field} is truncated")))
 }
 
-#[cfg(feature = "imgconv")]
 fn checked_slice_mut<'a>(
     data: &'a mut [u8],
     offset: usize,
@@ -695,7 +690,6 @@ mod tests {
         assert!(presentation.text().unwrap().contains("Dominic Salemno"));
     }
 
-    #[cfg(feature = "imgconv")]
     #[test]
     fn decrypts_poi_encrypted_pictures_stream() {
         use crate::{OleFile, extractor::ImageExtractor};
@@ -711,11 +705,11 @@ mod tests {
             .unwrap();
         let mut encrypted_pictures = encrypted_ole.open_stream(&["Pictures"]).unwrap();
         decrypt_pictures(&mut encrypted_pictures, &state.crypto).unwrap();
-        let images = ImageExtractor::extract_blips(&encrypted_pictures).unwrap();
+        let images = ImageExtractor::pictures(&encrypted_pictures).unwrap();
         let hashes: Vec<String> = images
             .iter()
             .map(|image| {
-                Sha1::digest(image.raw_data())
+                Sha1::digest(image.data().unwrap())
                     .iter()
                     .map(|byte| format!("{byte:02x}"))
                     .collect()

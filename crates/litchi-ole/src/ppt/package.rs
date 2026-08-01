@@ -254,17 +254,18 @@ impl<R: Read + Seek> Package<R> {
         }
     }
 
-    /// Verify presentation XML signatures without evaluating certificate
-    /// trust or opening any VBA project stream.
-    pub fn verify_digital_signatures(
+    /// Verify presentation XML signatures with the safe strict policy, without
+    /// evaluating certificate trust or opening any VBA project stream.
+    pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
+        self.signatures_with(&litchi_sign::Policy::strict())
+    }
+
+    /// Verify presentation XML signatures with an explicit trust-neutral policy.
+    pub fn signatures_with(
         &mut self,
-        policy: &crate::signature::SignatureVerificationPolicy,
-    ) -> crate::signature::Result<Vec<crate::signature::BinaryOfficeSignatureVerification>> {
-        crate::signature::verify_binary_office_signatures(
-            &mut self.ole,
-            crate::signature::BinaryOfficeFormat::Ppt,
-            policy,
-        )
+        policy: &litchi_sign::Policy,
+    ) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
+        litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Ppt, policy)
     }
 
     pub fn document_summary_information(

@@ -174,7 +174,7 @@ pub fn add_ole_object(
         kind,
         &embedding_uri,
     )?;
-    invalidate_signatures(package)?;
+    invalidate_signatures(package);
     Ok(AuthoredOleObject {
         part_name: embedding_uri.to_string(),
         relationship_id,
@@ -499,10 +499,8 @@ fn require_payload(payload: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn invalidate_signatures(package: &mut OpcPackage) -> Result<()> {
-    package.clear_digital_signatures().map_err(|error| {
-        OoxmlError::Other(format!("cannot invalidate package signatures: {error}"))
-    })
+fn invalidate_signatures(package: &mut OpcPackage) {
+    package.unsign();
 }
 
 // ============================================================================

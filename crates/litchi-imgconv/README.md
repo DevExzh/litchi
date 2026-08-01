@@ -1,43 +1,24 @@
 # litchi-imgconv
 
-Pure decoders and converters for the image formats embedded inside Microsoft Office documents.
+Bounded decoders and renderers for image formats embedded in Microsoft Office documents.
 
-## Overview
-
-`litchi-imgconv` parses BLIP (Binary Large Image or Picture) records and
-the metafile formats they wrap — Enhanced Metafile (EMF), Windows Metafile
-(WMF), and Macintosh PICT — and converts them to modern raster formats
-(PNG, JPEG, WebP) or SVG. It is a leaf crate in the
-[Litchi](https://github.com/DevExzh/litchi) workspace, depending only on
-`litchi-core` plus the `image`, `flate2`, `bytes`, `xml-minifier`, and
-`zerocopy` crates. The OLE/Escher integration glue lives in the umbrella
-`litchi` crate.
-
-## Usage
-
-```toml
-[dependencies]
-litchi-imgconv = "0.0.1"
-```
+OfficeArt BLIP and BStore grammar lives in `litchi-odraw`. This crate consumes
+its borrowed `image::Blip` views and performs RFC1950 decompression, DIB/WMF
+adaptation, EMF/WMF/PICT rendering, resizing, and raster encoding under explicit
+resource ceilings.
 
 ```rust
-use litchi_imgconv::{Blip, convert_blip_to_png};
+use litchi_imgconv::{Options, to_png};
+use litchi_odraw::image::Blip;
 
 fn render(blip_bytes: &[u8]) -> litchi_core::error::Result<Vec<u8>> {
-    let blip = Blip::parse(blip_bytes)?;
-    convert_blip_to_png(&blip, Some(800), None)
+    let blip = Blip::parse(blip_bytes)
+        .map_err(|error| litchi_core::error::Error::ParseError(error.to_string()))?;
+    to_png(&blip, Options::default().width(800))
 }
 ```
 
-## Features
+The default limits are safe for ordinary Office documents and can be replaced
+through `Options::limits` when a trusted workload needs larger images.
 
-- BLIP record parsing (`Blip`, `BitmapBlip`, `MetafileBlip`, `BlipType`)
-- BLIP store table parsing (`BlipStore`, `BlipStoreEntry`)
-- EMF, WMF, and PICT metafile decoding to PNG/JPEG/WebP
-- Optional SVG output for vector metafiles
-- Optional resizing with high-quality Lanczos3 filtering
-
-## License
-
-Licensed under the Apache License, Version 2.0. Part of the
-[Litchi](https://github.com/DevExzh/litchi) workspace.
+Licensed under the Apache License, Version 2.0.

@@ -8,6 +8,7 @@
 // Shape styling structures don't need zerocopy for now
 
 use litchi_core::unit::{EMUS_PER_PT, pt_f32_to_emu_u32};
+use litchi_odraw::image::Id as PictureId;
 
 // =============================================================================
 // Escher Property IDs for Shape Styling (MS-ODRAW 2.3)
@@ -371,7 +372,7 @@ pub struct FillStyle {
     /// Gradient angle in degrees (for gradient fills)
     pub gradient_angle: Option<i16>,
     /// Picture BLIP index (for picture fills)
-    pub picture_index: Option<u32>,
+    pub picture_index: Option<PictureId>,
 }
 
 impl FillStyle {
@@ -425,7 +426,7 @@ impl FillStyle {
     }
 
     /// Picture fill
-    pub fn picture(blip_index: u32) -> Self {
+    pub fn picture(id: PictureId) -> Self {
         Self {
             fill_type: FillType::Picture,
             color: ShapeColor::TRANSPARENT,
@@ -433,7 +434,7 @@ impl FillStyle {
             opacity: 100,
             enabled: true,
             gradient_angle: None,
-            picture_index: Some(blip_index),
+            picture_index: Some(id),
         }
     }
 
@@ -481,7 +482,7 @@ impl FillStyle {
 
         // Picture BLIP reference
         if let Some(blip_idx) = self.picture_index {
-            props.push((fill_prop::FILL_BLIP, blip_idx));
+            props.push((fill_prop::FILL_BLIP, u32::from(blip_idx)));
         }
 
         // Explicitly enable filling, keep fillShape clear, and disable fill hit-testing.
