@@ -1,6 +1,78 @@
 //! Axis scales, ticks, and lines.
 
-use super::format;
+use super::{format, layout};
+
+/// Primary or secondary axis-parent identifier.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct ParentId(u8);
+
+impl ParentId {
+    /// Primary axis group.
+    pub const PRIMARY: Self = Self(0);
+    /// Secondary axis group.
+    pub const SECONDARY: Self = Self(1);
+
+    /// Creates a checked axis-parent identifier.
+    pub const fn new(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::PRIMARY),
+            1 => Some(Self::SECONDARY),
+            _ => None,
+        }
+    }
+
+    /// Raw primary-or-secondary index.
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+
+    pub(super) const fn index(self) -> usize {
+        self.0 as usize
+    }
+}
+
+/// One primary or secondary axis-parent collection and its mandatory plot
+/// position. Axis and chart-group records remain ordered in the containing
+/// chart model while collection ownership is validated by the codec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Parent {
+    id: ParentId,
+    pos: layout::Pos,
+}
+
+impl Parent {
+    /// Creates a primary axis-parent collection.
+    pub const fn primary(pos: layout::Pos) -> Self {
+        Self {
+            id: ParentId::PRIMARY,
+            pos,
+        }
+    }
+
+    /// Creates a secondary axis-parent collection.
+    pub const fn secondary(pos: layout::Pos) -> Self {
+        Self {
+            id: ParentId::SECONDARY,
+            pos,
+        }
+    }
+
+    /// Stable primary-or-secondary identifier.
+    pub const fn id(self) -> ParentId {
+        self.id
+    }
+
+    /// Whether this is the secondary axis group.
+    pub const fn is_secondary(self) -> bool {
+        matches!(self.id, ParentId::SECONDARY)
+    }
+
+    /// Mandatory axis-group plot position.
+    pub const fn pos(self) -> layout::Pos {
+        self.pos
+    }
+}
 
 /// Axis role in the chart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,6 +144,8 @@ pub struct Line {
 /// One chart axis.
 #[derive(Debug, PartialEq)]
 pub struct Axis {
+    /// Axis-parent collection that owns this axis.
+    pub parent: ParentId,
     /// Axis role.
     pub kind: Kind,
     /// Optional numeric scale.
@@ -85,7 +159,13 @@ pub struct Axis {
 impl Axis {
     /// Creates an axis with no explicit scale, ticks, or lines.
     pub const fn new(kind: Kind) -> Self {
+        Self::in_parent(kind, ParentId::PRIMARY)
+    }
+
+    /// Creates an axis owned by a selected primary or secondary group.
+    pub const fn in_parent(kind: Kind, parent: ParentId) -> Self {
         Self {
+            parent,
             kind,
             scale: None,
             tick: None,

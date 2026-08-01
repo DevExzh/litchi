@@ -379,6 +379,17 @@ impl Editor {
             .map(|stream| stream.data.as_ref())
     }
 
+    /// Returns shared ownership of an existing stream without copying it.
+    ///
+    /// Format-specific editors that keep a parsed view beside this package can
+    /// use the same immutable allocation for both layers.
+    pub fn stream_shared(&self, path: &[String]) -> Option<Arc<[u8]>> {
+        self.streams
+            .iter()
+            .find(|stream| stream.path == path)
+            .map(|stream| Arc::clone(&stream.data))
+    }
+
     pub fn update<F>(&mut self, id: &str, edit: F) -> Result<(), OleError>
     where
         F: FnOnce(&mut Vec<u8>) -> Result<(), OleError>,
@@ -473,6 +484,15 @@ impl Editor {
     /// Format-specific editors use this only after validating and rebuilding
     /// references and offsets in the stream.
     pub fn put_stream(&mut self, path: &[String], data: Vec<u8>) -> Result<(), OleError> {
+        self.put_stream_shared(path, data.into())
+    }
+
+    /// Replaces an existing stream from an immutable shared allocation.
+    ///
+    /// The update remains atomic: the package is rendered and reparsed before
+    /// the candidate replaces this editor. Sharing only avoids a second copy
+    /// when the format-specific editor also retains the rewritten bytes.
+    pub fn put_stream_shared(&mut self, path: &[String], data: Arc<[u8]>) -> Result<(), OleError> {
         if data.len() as u64 > self.limits.max_stream_size {
             return Err(OleError::InvalidFormat(
                 "replacement stream exceeds size limit".into(),
@@ -484,7 +504,7 @@ impl Editor {
             .iter_mut()
             .find(|stream| stream.path == path)
             .ok_or(OleError::StreamNotFound)?;
-        stream.data = data.into();
+        stream.data = data;
         let rendered = candidate.render()?;
         let mut check = OleFile::open(Cursor::new(rendered))?;
         candidate.objects = discover(&mut check, candidate.format, candidate.limits)?;

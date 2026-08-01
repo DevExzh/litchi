@@ -1,6 +1,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole_common::object::{Editor, Format, Kind, Limits, discover};
 use std::io::Cursor;
+use std::sync::Arc;
 
 fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
     let mut writer = OleWriter::new();
@@ -191,4 +192,20 @@ fn no_op_editor_round_trip_preserves_stream_payloads() {
             .unwrap(),
         native("do-not-run", b"opaque native bytes")
     );
+}
+
+#[test]
+fn shared_stream_replacement_reuses_the_validated_allocation() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(original, Format::Doc, Limits::default()).unwrap();
+    let path = vec!["WordDocument".to_string()];
+    let replacement: Arc<[u8]> = Arc::from(&b"shared-word-stream"[..]);
+
+    editor
+        .put_stream_shared(&path, Arc::clone(&replacement))
+        .unwrap();
+
+    let installed = editor.stream_shared(&path).unwrap();
+    assert!(Arc::ptr_eq(&replacement, &installed));
+    assert_eq!(editor.stream(&path), Some(&b"shared-word-stream"[..]));
 }

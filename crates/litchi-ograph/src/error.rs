@@ -161,6 +161,16 @@ pub enum Error {
         reason: &'static str,
     },
 
+    /// A mutation is well-formed at the API boundary but its complete host
+    /// ownership graph is not yet modeled safely.
+    #[error("unsupported chart mutation {operation}: {reason}")]
+    UnsupportedMutation {
+        /// Concise operation name.
+        operation: &'static str,
+        /// Static explanation of the missing proof boundary.
+        reason: &'static str,
+    },
+
     /// Checked length arithmetic could not be represented.
     #[error("size overflow while processing {resource}")]
     SizeOverflow {

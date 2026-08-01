@@ -49,6 +49,17 @@ fn assert_unsupported<T>(result: Result<T, XlsError>) {
     }
 }
 
+fn assert_unsupported_mutation<T>(result: Result<T, XlsError>) {
+    match result {
+        Err(XlsError::Graph(litchi_ograph::Error::UnsupportedMutation { operation, reason })) => {
+            assert!(!operation.is_empty());
+            assert!(!reason.is_empty());
+        },
+        Err(error) => panic!("expected typed unsupported-mutation error, found {error}"),
+        Ok(_) => panic!("unsafe embedded chart mutation unexpectedly succeeded"),
+    }
+}
+
 #[test]
 fn public_fresh_and_replacement_authoring_is_typed_and_atomic() {
     let original = workbook();
@@ -101,6 +112,62 @@ fn clean_inventory_replay_and_existing_sheet_reorder_remain_available() {
     let finished = editor.finish().unwrap();
     let reopened = Editor::open(finished, Limits::default()).unwrap();
     assert_eq!(reopened.charts().len(), 0);
+}
+
+#[test]
+fn real_embedded_chart_mutations_are_typed_atomic_refusals() {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/xls/WithThreeCharts.xls");
+    let original = std::fs::read(path).unwrap();
+    let inventory = Editor::open(original.clone(), Limits::default())
+        .expect("bundled POI three-chart fixture must remain readable")
+        .charts()
+        .map(|entry| entry.location.clone())
+        .collect::<Vec<_>>();
+    let (sheet_index, object_ids) = inventory
+        .iter()
+        .find_map(|location| {
+            let Location::Embedded {
+                sheet_index,
+                object_id: _,
+            } = location
+            else {
+                return None;
+            };
+            let ids = inventory
+                .iter()
+                .filter_map(|candidate| match candidate {
+                    Location::Embedded {
+                        sheet_index: candidate_sheet,
+                        object_id,
+                    } if candidate_sheet == sheet_index => Some(*object_id),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            (ids.len() >= 2).then_some((*sheet_index, ids))
+        })
+        .expect("fixture must contain two embedded charts on one worksheet");
+
+    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    let first_object_id = object_ids
+        .first()
+        .copied()
+        .expect("fixture chart inventory is non-empty");
+    assert_unsupported_mutation(editor.remove_at(&Location::Embedded {
+        sheet_index,
+        object_id: first_object_id,
+    }));
+    assert_eq!(editor.finish().unwrap(), original);
+
+    let mut reversed = object_ids.clone();
+    reversed.reverse();
+    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    assert_unsupported_mutation(editor.reorder_at(sheet_index, &reversed));
+    assert_eq!(editor.finish().unwrap(), original);
+
+    let mut editor = Editor::open(original.clone(), Limits::default()).unwrap();
+    editor.reorder_at(sheet_index, &object_ids).unwrap();
+    assert_eq!(editor.finish().unwrap(), original);
 }
 
 #[test]

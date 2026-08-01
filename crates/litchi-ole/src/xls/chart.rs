@@ -8,7 +8,10 @@
 //! Fresh and replacement authoring is refused until the complete
 //! Office-compatible BIFF chart grammar is implemented.
 
-use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use litchi_ole_common::object::{
     Editor as ObjectEditor, Format as ObjectFormat, Limits as ObjectLimits,
@@ -800,12 +803,16 @@ pub struct Entry {
 #[derive(Clone)]
 struct StoredChart {
     entry: Entry,
+    #[cfg(test)]
     start: usize,
+    #[cfg(test)]
     end: usize,
+    #[cfg(test)]
     object: Option<(usize, usize)>,
 }
 
 const UNSUPPORTED_AUTHORING_REASON: &str = "fresh and replacement XLS chart authoring requires the complete Office-compatible BIFF chart grammar";
+const UNSUPPORTED_EMBEDDED_MUTATION_REASON: &str = "embedded XLS chart mutation requires complete MsoDrawing/Continue, Obj/Continue, chart-substream, and OfficeArt drawing-group ownership";
 
 fn unsupported_authoring<T>() -> XlsResult<T> {
     Err(litchi_ograph::Error::UnsupportedAuthoring {
@@ -814,11 +821,19 @@ fn unsupported_authoring<T>() -> XlsResult<T> {
     .into())
 }
 
+fn unsupported_embedded_mutation<T>() -> XlsResult<T> {
+    Err(litchi_ograph::Error::UnsupportedMutation {
+        operation: "embedded XLS chart drawing",
+        reason: UNSUPPORTED_EMBEDDED_MUTATION_REASON,
+    }
+    .into())
+}
+
 /// Transactional editor for existing BIFF8 chart substreams.
 pub struct Editor {
     package: ObjectEditor,
     workbook_path: Vec<String>,
-    workbook: Vec<u8>,
+    workbook: Arc<[u8]>,
     limits: Limits,
     charts: Vec<StoredChart>,
 }
@@ -833,9 +848,8 @@ impl Editor {
             .find(|path| package.stream(path).is_some())
             .ok_or_else(|| XlsError::InvalidData("Workbook stream not found".into()))?;
         let workbook = package
-            .stream(&workbook_path)
-            .ok_or_else(|| XlsError::InvalidData("selected Workbook stream disappeared".into()))?
-            .to_vec();
+            .stream_shared(&workbook_path)
+            .ok_or_else(|| XlsError::InvalidData("selected Workbook stream disappeared".into()))?;
         if workbook.len() > limits.max_workbook_bytes {
             return invalid(CHART, "Workbook stream exceeds chart editor limit");
         }
@@ -941,7 +955,7 @@ impl Editor {
                 chart,
             },
         );
-        self.commit(&original, desired)
+        self.commit_fixture(&original, desired)
     }
 
     /// Refuses fresh chart-sheet authoring until its complete BIFF grammar is available.
@@ -975,17 +989,21 @@ impl Editor {
         if sheet.kind != 2 {
             return invalid(BOUNDSHEET, "selected tab is not a chart sheet");
         }
-        let chart = self
-            .at(&Location::ChartSheet { sheet_index })
-            .cloned()
+        let chart_index = self
+            .charts
+            .iter()
+            .position(|value| value.entry.location == Location::ChartSheet { sheet_index })
             .ok_or_else(|| invalid_error(CHART, "chart sheet has no chart"))?;
         let order = (0..sheets.len())
             .filter(|value| *value != sheet_index)
             .map(Some)
             .collect::<Vec<_>>();
         let workbook = rewrite_sheet_directory(&self.workbook, &order, None)?;
-        self.install_workbook(workbook)?;
-        Ok(chart)
+        let mut previous = self.install_workbook(workbook)?;
+        if chart_index >= previous.len() {
+            return invalid(CHART, "removed chart-sheet inventory changed unexpectedly");
+        }
+        Ok(previous.swap_remove(chart_index).entry.chart)
     }
 
     /// Reorders workbook tabs by Unicode case-insensitive tab names.
@@ -1033,7 +1051,7 @@ impl Editor {
             &order.iter().copied().map(Some).collect::<Vec<_>>(),
             None,
         )?;
-        self.install_workbook(workbook)
+        self.install_workbook(workbook).map(drop)
     }
 
     /// Refuses replacement authoring until its complete BIFF grammar is available.
@@ -1052,7 +1070,11 @@ impl Editor {
         unsupported_authoring()
     }
 
-    /// Removes a semantically selected chart transactionally.
+    /// Removes a chart sheet transactionally and refuses embedded-chart removal.
+    ///
+    /// Embedded charts participate in the worksheet OfficeArt drawing graph;
+    /// until that complete ownership is modeled, the editor returns
+    /// [`litchi_ograph::Error::UnsupportedMutation`] without mutation.
     pub fn remove(&mut self, selector: Selector<'_>) -> XlsResult<Chart> {
         let location = self
             .resolve(selector)?
@@ -1060,23 +1082,28 @@ impl Editor {
         self.remove_at(&location)
     }
 
-    /// Removes a chart using a checked low-level host location.
+    /// Removes a chart sheet using a checked low-level host location.
+    ///
+    /// An existing embedded location is validated and then refused atomically
+    /// until its complete OfficeArt drawing ownership can be rewritten.
     pub fn remove_at(&mut self, location: &Location) -> XlsResult<Chart> {
         if let Location::ChartSheet { sheet_index } = location {
             return self.remove_sheet_at(*sheet_index);
         }
-        let original = self.charts.clone();
-        let mut desired = original.iter().map(|v| v.entry.clone()).collect::<Vec<_>>();
-        let index = desired
+        if self
+            .charts
             .iter()
-            .position(|value| &value.location == location)
-            .ok_or_else(|| invalid_error(CHART, "chart location was not found"))?;
-        let removed = desired.remove(index).chart;
-        self.commit(&original, desired)?;
-        Ok(removed)
+            .all(|value| &value.entry.location != location)
+        {
+            return Err(invalid_error(CHART, "chart location was not found"));
+        }
+        unsupported_embedded_mutation()
     }
 
-    /// Reorders embedded charts on a named worksheet by previous chart indexes.
+    /// Validates embedded-chart order on a named worksheet.
+    ///
+    /// The current identity order is a no-op. A structural reorder is refused
+    /// atomically until complete OfficeArt drawing ownership is modeled.
     pub fn reorder(&mut self, sheet: &str, order: &[usize]) -> XlsResult<()> {
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
@@ -1115,14 +1142,24 @@ impl Editor {
         self.reorder_at(sheet.index, &object_ids)
     }
 
-    /// Reorders embedded charts using checked worksheet and Obj identifiers.
+    /// Validates embedded-chart order using checked worksheet and Obj identifiers.
+    ///
+    /// The current identity order is a no-op. A structural reorder is refused
+    /// atomically until complete OfficeArt drawing ownership is modeled.
     pub fn reorder_at(&mut self, sheet_index: usize, object_ids: &[u16]) -> XlsResult<()> {
-        let original = self.charts.clone();
-        let mut desired = original.iter().map(|v| v.entry.clone()).collect::<Vec<_>>();
-        let slots = desired
+        let (_, sheets) = bindings(&self.workbook)?;
+        let sheet = sheets
+            .iter()
+            .find(|value| value.index == sheet_index)
+            .ok_or_else(|| invalid_error(BOUNDSHEET, "worksheet index was not found"))?;
+        if sheet.kind != 0 {
+            return invalid(BOUNDSHEET, "embedded charts require a worksheet tab");
+        }
+        let slots = self
+            .charts
             .iter()
             .enumerate()
-            .filter_map(|(i, value)| match value.location {
+            .filter_map(|(i, value)| match value.entry.location {
                 Location::Embedded {
                     sheet_index: sheet, ..
                 } if sheet == sheet_index => Some(i),
@@ -1135,27 +1172,42 @@ impl Editor {
                 "reorder must include every embedded chart on the worksheet",
             );
         }
-        let mut values = slots
-            .iter()
-            .map(|index| {
-                desired
-                    .get(*index)
-                    .cloned()
-                    .ok_or_else(|| invalid_error(CHART, "chart reorder slot is invalid"))
-            })
-            .collect::<XlsResult<Vec<_>>>()?;
-        let mut ordered = Vec::new();
+        let mut available = slots.clone();
+        let mut current = Vec::new();
+        current
+            .try_reserve_exact(slots.len())
+            .map_err(|_| XlsError::InvalidData("could not allocate chart reorder".into()))?;
+        for index in &slots {
+            let object_id = self
+                .charts
+                .get(*index)
+                .and_then(|value| match value.entry.location {
+                    Location::Embedded { object_id, .. } => Some(object_id),
+                    Location::ChartSheet { .. } => None,
+                })
+                .ok_or_else(|| invalid_error(CHART, "chart reorder slot is invalid"))?;
+            current.push(object_id);
+        }
         for id in object_ids {
-            let index = values.iter().position(|value| matches!(value.location, Location::Embedded { object_id, .. } if object_id == *id))
-            .ok_or_else(|| invalid_error(CHART, "reorder contains an unknown or repeated object ID"))?;
-            ordered.push(values.remove(index));
+            let position = available
+                .iter()
+                .position(|index| {
+                    self.charts.get(*index).is_some_and(|value| {
+                        matches!(
+                            value.entry.location,
+                            Location::Embedded { object_id, .. } if object_id == *id
+                        )
+                    })
+                })
+                .ok_or_else(|| {
+                    invalid_error(CHART, "reorder contains an unknown or repeated object ID")
+                })?;
+            available.remove(position);
         }
-        for (slot, value) in slots.into_iter().zip(ordered) {
-            *desired
-                .get_mut(slot)
-                .ok_or_else(|| invalid_error(CHART, "chart reorder slot is invalid"))? = value;
+        if current == object_ids {
+            return Ok(());
         }
-        self.commit(&original, desired)
+        unsupported_embedded_mutation()
     }
 
     /// Consumes the editor and returns the rewritten compound-file allocation.
@@ -1163,7 +1215,8 @@ impl Editor {
         self.package.finish().map_err(Into::into)
     }
 
-    fn commit(&mut self, original: &[StoredChart], desired: Vec<Entry>) -> XlsResult<()> {
+    #[cfg(test)]
+    fn commit_fixture(&mut self, original: &[StoredChart], desired: Vec<Entry>) -> XlsResult<()> {
         if desired.len() > self.limits.max_charts {
             return invalid(CHART, "chart count exceeds limit");
         }
@@ -1176,25 +1229,24 @@ impl Editor {
                 "rewritten chart substreams failed typed round-trip validation",
             );
         }
-        let mut package = self.package.clone();
-        package.put_stream(&self.workbook_path, workbook.clone())?;
-        self.package = package;
+        let workbook: Arc<[u8]> = workbook.into();
+        self.package
+            .put_stream_shared(&self.workbook_path, Arc::clone(&workbook))?;
         self.workbook = workbook;
         self.charts = reparsed;
         Ok(())
     }
 
-    fn install_workbook(&mut self, workbook: Vec<u8>) -> XlsResult<()> {
+    fn install_workbook(&mut self, workbook: Vec<u8>) -> XlsResult<Vec<StoredChart>> {
         if workbook.len() > self.limits.max_workbook_bytes {
             return invalid(CHART, "rewritten Workbook exceeds limit");
         }
         let charts = parse_workbook_charts(&workbook, self.limits)?;
-        let mut package = self.package.clone();
-        package.put_stream(&self.workbook_path, workbook.clone())?;
-        self.package = package;
+        let workbook: Arc<[u8]> = workbook.into();
+        self.package
+            .put_stream_shared(&self.workbook_path, Arc::clone(&workbook))?;
         self.workbook = workbook;
-        self.charts = charts;
-        Ok(())
+        Ok(std::mem::replace(&mut self.charts, charts))
     }
 
     fn resolve(&self, selector: Selector<'_>) -> XlsResult<Option<Location>> {
@@ -1649,8 +1701,11 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> XlsResult<Vec<StoredCh
                     },
                     chart,
                 },
+                #[cfg(test)]
                 start: sheet.start,
+                #[cfg(test)]
                 end: sheet.end,
+                #[cfg(test)]
                 object: None,
             });
             continue;
@@ -1691,6 +1746,8 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> XlsResult<Vec<StoredCh
             let end = start
                 .checked_add(chart_ref.as_bytes().len())
                 .ok_or_else(|| XlsError::InvalidData("chart end offset overflow".into()))?;
+            #[cfg(not(test))]
+            let _ = end;
             let object = chart_objects
                 .iter()
                 .rev()
@@ -1709,8 +1766,11 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> XlsResult<Vec<StoredCh
                     },
                     chart,
                 },
+                #[cfg(test)]
                 start,
+                #[cfg(test)]
                 end,
+                #[cfg(test)]
                 object: Some((object.1, object.2)),
             });
         }
@@ -1873,16 +1933,20 @@ fn parse_chart(input: &[u8], limits: Limits) -> XlsResult<Chart> {
                 series_depth = Some(depth + 1);
             },
             0x1051 => {
-                let link = parse_link(data, limits)?;
-                let series = current_series.ok_or_else(|| {
-                    invalid_error(0x1051, "BRAI appears outside a Series collection")
-                })?;
-                chart
-                    .series
-                    .get_mut(series)
-                    .ok_or_else(|| invalid_error(0x1051, "Series index is invalid"))?
-                    .links
-                    .push(link);
+                if let Some(series) = current_series {
+                    let link = parse_link(data, limits)?;
+                    chart
+                        .series
+                        .get_mut(series)
+                        .ok_or_else(|| invalid_error(0x1051, "Series index is invalid"))?
+                        .links
+                        .push(link);
+                } else {
+                    chart.unknown_records.push(Raw {
+                        record_type: value.kind,
+                        data: data.to_vec(),
+                    });
+                }
             },
             SER_TO_CRT => {
                 exact(data, 2, SER_TO_CRT)?;
@@ -2404,6 +2468,7 @@ fn parse_group(kind: u16, data: &[u8]) -> XlsResult<GroupKind> {
     })
 }
 
+#[cfg(test)]
 fn serialize_chart(chart: &Chart, limits: Limits) -> XlsResult<Vec<u8>> {
     chart.validate(limits)?;
     if !chart.unknown_records.is_empty() {
@@ -2604,6 +2669,7 @@ fn serialize_chart(chart: &Chart, limits: Limits) -> XlsResult<Vec<u8>> {
     Ok(out.finish())
 }
 
+#[cfg(test)]
 fn write_group(out: &mut GraphEncoder, group: &Group) -> XlsResult<()> {
     match &group.kind {
         GroupKind::Line { flags } => push_record(out, LINE, &flags.to_le_bytes())?,
@@ -2659,6 +2725,7 @@ fn write_group(out: &mut GraphEncoder, group: &Group) -> XlsResult<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn rewrite_workbook_charts(
     input: &[u8],
     original: &[StoredChart],
@@ -2896,6 +2963,7 @@ fn parse_object(data: &[u8]) -> XlsResult<Option<(u16, u16)>> {
     }
     Ok(None)
 }
+#[cfg(test)]
 fn chart_object_record(id: u16) -> XlsResult<Vec<u8>> {
     let mut body = Vec::new();
     body.extend(0x15u16.to_le_bytes());
@@ -2913,9 +2981,11 @@ fn is_chart_bof(data: &[u8]) -> bool {
         && u16::from_le_bytes([data[0], data[1]]) == 0x0600
         && u16::from_le_bytes([data[2], data[3]]) == 0x0020
 }
+#[cfg(test)]
 fn chart_bof() -> Vec<u8> {
     bof_body(0x0020)
 }
+#[cfg(test)]
 fn bof_body(kind: u16) -> Vec<u8> {
     let mut d = Vec::new();
     d.extend(0x0600u16.to_le_bytes());
@@ -2936,6 +3006,7 @@ fn parse_line_format(data: &[u8]) -> XlsResult<LineFormat> {
         color_index: u16_at(data, 10)?,
     })
 }
+#[cfg(test)]
 fn write_line(v: &LineFormat) -> Vec<u8> {
     let mut d = v.color.to_vec();
     d.extend(v.pattern.to_le_bytes());
@@ -2953,6 +3024,7 @@ fn shared_line(value: &LineFormat) -> format::Line {
         color_index: value.color_index,
     }
 }
+#[cfg(test)]
 fn shared_line_bytes(value: &format::Line) -> Vec<u8> {
     write_line(&LineFormat {
         color: value.color,
@@ -2973,6 +3045,7 @@ fn parse_area_format(data: &[u8]) -> XlsResult<AreaFormat> {
         background_index: u16_at(data, 14)?,
     })
 }
+#[cfg(test)]
 fn write_area(v: &AreaFormat) -> Vec<u8> {
     let mut d = v.foreground.to_vec();
     d.extend(v.background);
@@ -2992,6 +3065,7 @@ fn shared_area(value: &AreaFormat) -> format::Area {
         background_index: value.background_index,
     }
 }
+#[cfg(test)]
 fn shared_area_bytes(value: &format::Area) -> Vec<u8> {
     write_area(&AreaFormat {
         foreground: value.foreground,
@@ -3011,6 +3085,7 @@ fn parse_short_text(data: &[u8]) -> XlsResult<String> {
     }
     parse_biff8_string(&data[2..])
 }
+#[cfg(test)]
 fn short_text(value: &str) -> XlsResult<Vec<u8>> {
     let mut d = 0u16.to_le_bytes().to_vec();
     d.extend(biff8_string(value)?);
@@ -3040,6 +3115,7 @@ fn parse_biff8_string(data: &[u8]) -> XlsResult<String> {
         Ok(data[2..].iter().map(|v| char::from(*v)).collect())
     }
 }
+#[cfg(test)]
 fn biff8_string(value: &str) -> XlsResult<Vec<u8>> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     if units.len() > 255 {
@@ -3065,6 +3141,7 @@ fn chart_scan_limits(limits: Limits) -> GraphLimits {
         ..GraphLimits::default()
     }
 }
+#[cfg(test)]
 fn chart_encoder(limits: Limits) -> XlsResult<GraphEncoder> {
     GraphEncoder::with_limits(GraphLimits {
         max_records: limits.max_records_per_chart,
@@ -3090,6 +3167,7 @@ fn record(kind: u16, data: &[u8]) -> XlsResult<Vec<u8>> {
     push_record(&mut out, kind, data)?;
     Ok(out.finish())
 }
+#[cfg(test)]
 fn known_record(kind: u16) -> bool {
     matches!(
         kind,
@@ -3157,7 +3235,7 @@ fn validate_sheet_properties(flags: u32) -> XlsResult<()> {
     let blank = (flags >> 16) & 0xff;
     let always_auto = flags & (1 << 4) != 0;
     let manual_plot = flags & (1 << 3) != 0;
-    if flags & 0xff00_ffe4 != 0 || blank > 2 || (always_auto && !manual_plot) {
+    if flags & 0xff00_ffe0 != 0 || blank > 2 || (always_auto && !manual_plot) {
         return invalid(
             SHT_PROPS,
             "ShtProps reserved bits, blank mode, or plot-area flags are invalid",
@@ -3306,23 +3384,32 @@ mod tests {
     }
 
     #[test]
-    fn existing_test_fixture_reorders_exactly_and_removes_safely() {
+    fn embedded_identity_reorder_is_exact_and_removal_is_atomic_refusal() {
         let original = build_workbook_fixture(Chart::default(), Limits::default()).unwrap();
 
         let mut reordered = Editor::open(original.clone(), Limits::default()).unwrap();
         reordered.reorder("Sheet1", &[0]).unwrap();
         assert_eq!(reordered.finish().unwrap(), original);
 
-        let mut removed = Editor::open(original, Limits::default()).unwrap();
-        removed
-            .remove(Selector::Embedded {
-                sheet: "Sheet1",
-                index: 0,
-            })
-            .unwrap();
-        let bytes = removed.finish().unwrap();
-        let reopened = Editor::open(bytes, Limits::default()).unwrap();
-        assert_eq!(reopened.charts().len(), 0);
+        let mut removed = Editor::open(original.clone(), Limits::default()).unwrap();
+        assert!(matches!(
+            removed
+                .remove(Selector::Embedded {
+                    sheet: "Sheet1",
+                    index: 0,
+                })
+                .expect_err("embedded removal must be refused"),
+            XlsError::Graph(litchi_ograph::Error::UnsupportedMutation { .. })
+        ));
+        assert_eq!(removed.finish().unwrap(), original);
+    }
+
+    #[test]
+    fn editor_and_package_share_the_workbook_stream_allocation() {
+        let bytes = build_workbook_fixture(Chart::default(), Limits::default()).unwrap();
+        let editor = Editor::open(bytes, Limits::default()).unwrap();
+        let captured = editor.package.stream_shared(&editor.workbook_path).unwrap();
+        assert!(Arc::ptr_eq(&captured, &editor.workbook));
     }
 
     #[test]
@@ -3469,7 +3556,9 @@ mod tests {
         chart.sheet_properties = 3 << 16;
         assert!(chart.validate(limits).is_err());
         chart.sheet_properties = 1 << 2;
-        assert!(chart.validate(limits).is_err());
+        chart
+            .validate(limits)
+            .expect("fNotSizeWith is a defined ShtProps bit");
         chart.sheet_properties = 1 << 4;
         assert!(chart.validate(limits).is_err());
         chart.sheet_properties = (1 << 4) | (1 << 3);

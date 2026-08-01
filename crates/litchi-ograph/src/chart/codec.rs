@@ -1,11 +1,14 @@
 use std::char;
 
 use super::axis::{self, Axis};
+use super::cache;
 use super::format::{self, Format};
 use super::group;
+use super::layout;
 use super::model::{
-    Cache, Cell, CellRef, Chart, Context, Count, DataKind, Family, Group, GroupId, Label, Legend,
-    Link, Origin, Props, Raw, Rect, Role, RowCol, Series, Source, Value,
+    Binding, Cache, CellRef, Chart, Context, Count, DataKind, Family, Group, GroupId, Label,
+    Legend, Link, Order, Origin, Owner, Props, Raw, Rect, Role, RowCol, Series, Source, Value,
+    XlValue, cache_dimensions, dimensions_cover,
 };
 use super::{
     BOF, BOF_BYTES, EOF, EXCEL_DOC_TYPE, EXCEL_VERSION, GRAPH_DOC_TYPE, GRAPH_VERSION, Kind, Ref,
@@ -15,10 +18,13 @@ use crate::raw::{Encoder, Kind as RecordKind, RecordRef};
 use crate::{Error, Limits, Result};
 
 const CONTINUE: RecordKind = RecordKind::new(0x003C);
+const SCL: RecordKind = RecordKind::new(0x00A0);
+const DIMENSIONS: RecordKind = RecordKind::new(0x0200);
 const GRAPH_BLANK: RecordKind = RecordKind::new(0x0001);
 const GRAPH_NUMBER: RecordKind = RecordKind::new(0x0003);
 const EXCEL_BLANK: RecordKind = RecordKind::new(0x0201);
 const EXCEL_NUMBER: RecordKind = RecordKind::new(0x0203);
+const EXCEL_BOOL_ERR: RecordKind = RecordKind::new(0x0205);
 const CELL_LABEL: RecordKind = RecordKind::new(0x0204);
 const DATA_LAB_EXT: RecordKind = RecordKind::new(0x086A);
 const DATA_LAB_EXT_CONTENTS: RecordKind = RecordKind::new(0x086B);
@@ -44,6 +50,7 @@ const TICK: RecordKind = RecordKind::new(0x101E);
 const VALUE_RANGE: RecordKind = RecordKind::new(0x101F);
 const CAT_SER_RANGE: RecordKind = RecordKind::new(0x1020);
 const AXIS_LINE: RecordKind = RecordKind::new(0x1021);
+const CRT_LINK: RecordKind = RecordKind::new(0x1022);
 const DEFAULT_TEXT: RecordKind = RecordKind::new(0x1024);
 const TEXT: RecordKind = RecordKind::new(0x1025);
 const FONT_X: RecordKind = RecordKind::new(0x1026);
@@ -60,7 +67,11 @@ const AXIS_PARENT: RecordKind = RecordKind::new(0x1041);
 const SHT_PROPS: RecordKind = RecordKind::new(0x1044);
 const SER_TO_CRT: RecordKind = RecordKind::new(0x1045);
 const AXES_USED: RecordKind = RecordKind::new(0x1046);
+const SER_PARENT: RecordKind = RecordKind::new(0x104A);
+const SER_AUX_TREND: RecordKind = RecordKind::new(0x104B);
+const POS: RecordKind = RecordKind::new(0x104F);
 const BRAI: RecordKind = RecordKind::new(0x1051);
+const SER_AUX_ERR_BAR: RecordKind = RecordKind::new(0x105B);
 const PLOT_GROWTH: RecordKind = RecordKind::new(0x1064);
 const SI_INDEX: RecordKind = RecordKind::new(0x1065);
 
@@ -96,12 +107,16 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
             flags: 2,
             plot_area: false,
         },
+        zoom: layout::Zoom::default(),
+        growth: layout::Growth::default(),
         title: None,
         series: Vec::new(),
         groups: Vec::new(),
         axes: Vec::new(),
+        parents: Vec::new(),
         legend: None,
         caches: Vec::new(),
+        dimensions: cache::Dims::empty(context.kind()),
         formats: Vec::new(),
         labels: Vec::new(),
         unknown: Vec::new(),
@@ -113,11 +128,31 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     let mut depth = 0usize;
     let mut current_series = None;
     let mut series_depth = None;
+    let mut ai_next = 0usize;
+    let mut last_ai = None;
+    let mut series_owner_seen = false;
+    let mut series_parent = None;
     let mut current_axis = None;
     let mut axis_depth = None;
     let mut group_depth = None;
+    let mut group_family_seen = false;
+    let mut group_link_seen = false;
+    let mut parent_depth = None;
+    let mut current_parent: Option<usize> = None;
+    let mut parent_needs_pos = false;
+    let mut parent_groups = 0usize;
+    let mut parent_group_started = false;
     let mut pending_begin = false;
-    let mut cache_index = 0u16;
+    let strict_excel = context.kind() == Kind::Excel;
+    let mut cache_section = None;
+    let mut next_cache_section = 0usize;
+    let mut zoom_seen = false;
+    let mut growth_seen = false;
+    let mut dimensions_seen = false;
+    let mut axes_used = None;
+    let mut chart_seen = false;
+    let mut props_seen = false;
+    let mut chart_closed = false;
     let mut pending_axis_line = None;
     let mut pending_drop: Option<PendingDrop> = None;
     let mut unknown_bytes = 0usize;
@@ -155,6 +190,48 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 return invalid(record, "DropBar LineFormat is not followed by AreaFormat");
             }
         }
+        if last_ai.is_some() && record.kind() != SERIES_TEXT {
+            last_ai = None;
+        }
+        if series_parent.is_some() && !matches!(record.kind(), SER_AUX_TREND | SER_AUX_ERR_BAR) {
+            return invalid(
+                record,
+                "SerParent is not followed immediately by SerAuxTrend or SerAuxErrBar",
+            );
+        }
+        if series_depth == Some(depth) && ai_next < Role::ALL.len() {
+            let optional_text = record.kind() == SERIES_TEXT && last_ai.is_some();
+            if record.kind() != BRAI && !optional_text {
+                return invalid(
+                    record,
+                    "Series must begin with exactly four ordered AI bindings",
+                );
+            }
+        }
+        if strict_excel && parent_needs_pos && record.kind() != POS {
+            return invalid(
+                record,
+                "AxisParent Begin is not followed immediately by Pos",
+            );
+        }
+        if strict_excel && group_depth == Some(depth) {
+            let family = matches!(
+                record.kind(),
+                BAR | LINE | PIE | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE
+            );
+            if !group_family_seen && !family {
+                return invalid(
+                    record,
+                    "ChartFormat Begin is not followed by a chart family",
+                );
+            }
+            if group_family_seen && !group_link_seen && record.kind() != CRT_LINK {
+                return invalid(
+                    record,
+                    "chart family is not followed immediately by CrtLink",
+                );
+            }
+        }
         if record.kind() == EOF {
             break;
         }
@@ -168,12 +245,18 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         match record.kind() {
             BEGIN => {
                 exact(record, 0)?;
+                if strict_excel && depth == 0 && !pending_begin {
+                    return invalid(record, "Begin record has no chart-level collection owner");
+                }
                 pending_begin = false;
                 depth = depth.checked_add(1).ok_or(Error::SizeOverflow {
                     resource: "chart nesting",
                 })?;
                 if depth > limits.max_nesting {
                     return limit("chart nesting", depth, limits.max_nesting);
+                }
+                if parent_depth == Some(depth) {
+                    parent_needs_pos = true;
                 }
             },
             END => {
@@ -215,19 +298,73 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     )?;
                 }
                 if series_depth == Some(depth) {
+                    if ai_next != Role::ALL.len() || !series_owner_seen || series_parent.is_some() {
+                        return invalid(
+                            record,
+                            "Series requires exactly four AI bindings and one SerToCrt",
+                        );
+                    }
                     current_series = None;
                     series_depth = None;
+                    ai_next = 0;
+                    last_ai = None;
+                    series_owner_seen = false;
+                    series_parent = None;
                 }
                 if axis_depth == Some(depth) {
                     current_axis = None;
                     axis_depth = None;
                 }
                 if group_depth == Some(depth) {
+                    if !group_family_seen || (strict_excel && !group_link_seen) {
+                        return invalid(
+                            record,
+                            "ChartFormat collection is missing its family or required Excel CrtLink",
+                        );
+                    }
                     group_depth = None;
+                    group_family_seen = false;
+                    group_link_seen = false;
+                    parent_groups = parent_groups.checked_add(1).ok_or(Error::SizeOverflow {
+                        resource: "axis-parent chart groups",
+                    })?;
+                }
+                if parent_depth == Some(depth) {
+                    if strict_excel && (parent_needs_pos || !(1..=4).contains(&parent_groups)) {
+                        return invalid(
+                            record,
+                            "AxisParent requires Pos and one through four ChartFormat collections",
+                        );
+                    }
+                    parent_depth = None;
+                    current_parent = None;
+                    parent_groups = 0;
+                    parent_group_started = false;
+                }
+                if depth == 1 {
+                    let parent_count =
+                        u16::try_from(chart.parents.len()).map_err(|_| Error::SizeOverflow {
+                            resource: "axis-parent count",
+                        })?;
+                    if strict_excel
+                        && (!zoom_seen
+                            || !growth_seen
+                            || !props_seen
+                            || axes_used != Some(parent_count))
+                    {
+                        return invalid(
+                            record,
+                            "CHARTFOMATS is missing or misorders a mandatory collection",
+                        );
+                    }
+                    chart_closed = true;
                 }
                 depth -= 1;
             },
             CHART_REC => {
+                if chart_seen || depth != 0 {
+                    return invalid(record, "Chart must occur once at chart-substream level");
+                }
                 exact(record, 16)?;
                 chart.rect = Rect {
                     x: i32_at(data, 0, record)?,
@@ -235,19 +372,60 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     width: i32_at(data, 8, record)?,
                     height: i32_at(data, 12, record)?,
                 };
+                chart_seen = true;
                 pending_begin = true;
             },
+            SCL => {
+                if zoom_seen || (strict_excel && (depth != 1 || growth_seen || !chart_seen)) {
+                    return invalid(
+                        record,
+                        "Scl must occur once before PlotGrowth in CHARTFOMATS",
+                    );
+                }
+                exact(record, 4)?;
+                chart.zoom = layout::Zoom::new(u16_at(data, 0, record)?, u16_at(data, 2, record)?)
+                    .ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "Scl fraction is outside 1/10 through 4",
+                    })?;
+                zoom_seen = true;
+            },
+            PLOT_GROWTH => {
+                if growth_seen || (strict_excel && (depth != 1 || !zoom_seen)) {
+                    return invalid(
+                        record,
+                        "PlotGrowth must occur once after Scl in CHARTFOMATS",
+                    );
+                }
+                exact(record, 8)?;
+                chart.growth = layout::Growth {
+                    x: layout::Fixed::from_raw(i32_at(data, 0, record)?),
+                    y: layout::Fixed::from_raw(i32_at(data, 4, record)?),
+                };
+                growth_seen = true;
+            },
             SHT_PROPS => {
+                if props_seen
+                    || (strict_excel && (depth != 1 || !growth_seen || axes_used.is_some()))
+                {
+                    return invalid(record, "ShtProps is duplicated or misplaced in CHARTFOMATS");
+                }
                 exact(record, 4)?;
                 let flags = u32_at(data, 0, record)?;
                 if !valid_props(flags) {
                     return invalid(record, "ShtProps reserved bits or blank mode are invalid");
                 }
                 chart.props.flags = flags;
+                props_seen = true;
             },
             SERIES => {
-                if current_series.is_some() {
-                    return invalid(record, "Series collections overlap");
+                if current_series.is_some()
+                    || (strict_excel && (depth != 1 || !growth_seen || props_seen))
+                {
+                    return invalid(
+                        record,
+                        "Series must own a non-overlapping CHARTFOMATS collection",
+                    );
                 }
                 exact(record, 12)?;
                 check_add(chart.series.len(), limits.max_series, "series count")?;
@@ -259,18 +437,18 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if u16_at(data, 2, record)? != 1 || u16_at(data, 8, record)? != 1 {
                     return invalid(record, "series numeric data type fields are invalid");
                 }
-                let series = Series {
-                    category_kind,
-                    category_count: count_at(data, 4, record)?,
-                    value_count: count_at(data, 6, record)?,
-                    bubble_count: count_at(data, 10, record)?,
-                    group: GroupId::ZERO,
-                    name: None,
-                    links: Vec::new(),
-                };
+                let mut series = Series::new(context);
+                series.category_kind = category_kind;
+                series.category_count = count_at(data, 4, record)?;
+                series.value_count = count_at(data, 6, record)?;
+                series.bubble_count = count_at(data, 10, record)?;
                 push(&mut chart.series, series, "chart series")?;
                 current_series = chart.series.len().checked_sub(1);
                 series_depth = depth.checked_add(1);
+                ai_next = 0;
+                last_ai = None;
+                series_owner_seen = false;
+                series_parent = None;
                 pending_begin = true;
             },
             BRAI => {
@@ -278,6 +456,16 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     return invalid(record, "BRAI appears outside a Series collection");
                 }
                 let link = parse_link(record, context, limits)?;
+                let expected = Role::ALL.get(ai_next).copied().ok_or(Error::InvalidChart {
+                    offset: record.offset(),
+                    reason: "Series collection contains more than four AI bindings",
+                })?;
+                if link.role() != expected {
+                    return invalid(
+                        record,
+                        "Series AI bindings are missing or out of role order",
+                    );
+                }
                 let index = current_series.ok_or(Error::InvalidChart {
                     offset: record.offset(),
                     reason: "BRAI appears outside a Series collection",
@@ -286,12 +474,19 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     offset: record.offset(),
                     reason: "BRAI refers to a missing Series",
                 })?;
-                push(&mut series.links, link, "series links")?;
+                series.ai.replace(Binding::new(link, None));
+                ai_next = ai_next.checked_add(1).ok_or(Error::SizeOverflow {
+                    resource: "series AI count",
+                })?;
+                last_ai = Some(expected);
             },
             SER_TO_CRT => {
                 exact(record, 2)?;
                 if series_depth != Some(depth) {
                     return invalid(record, "SerToCrt appears outside a Series collection");
+                }
+                if series_owner_seen || series_parent.is_some() {
+                    return invalid(record, "Series contains more than one owner branch");
                 }
                 let index = current_series.ok_or(Error::InvalidChart {
                     offset: record.offset(),
@@ -313,23 +508,94 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         offset: record.offset(),
                         reason: "SerToCrt refers to a missing Series",
                     })?
-                    .group = group;
+                    .owner = Owner::Group(group);
+                series_owner_seen = true;
+            },
+            SER_PARENT => {
+                if series_depth != Some(depth) || series_owner_seen || series_parent.is_some() {
+                    return invalid(
+                        record,
+                        "SerParent is duplicated or outside a Series owner branch",
+                    );
+                }
+                series_parent =
+                    Some(crate::record::series::Parent::parse(record).map_err(|_| {
+                        Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "SerParent series index is outside 1 through 254",
+                        }
+                    })?);
+            },
+            SER_AUX_TREND | SER_AUX_ERR_BAR => {
+                if series_depth != Some(depth) || series_owner_seen {
+                    return invalid(
+                        record,
+                        "auxiliary-series record is duplicated or outside Series",
+                    );
+                }
+                let parent = series_parent.take().ok_or(Error::InvalidChart {
+                    offset: record.offset(),
+                    reason: "auxiliary-series record must immediately follow SerParent",
+                })?;
+                let owner = if record.kind() == SER_AUX_TREND {
+                    exact(record, 28)?;
+                    Owner::Trend {
+                        parent,
+                        data: data.try_into().map_err(|_| Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "SerAuxTrend payload is not 28 bytes",
+                        })?,
+                    }
+                } else {
+                    exact(record, 14)?;
+                    Owner::ErrorBar {
+                        parent,
+                        data: data.try_into().map_err(|_| Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "SerAuxErrBar payload is not 14 bytes",
+                        })?,
+                    }
+                };
+                let series = current_series
+                    .and_then(|index| chart.series.get_mut(index))
+                    .ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "auxiliary owner refers to a missing Series",
+                    })?;
+                series.owner = owner;
+                series_owner_seen = true;
             },
             SERIES_TEXT => {
-                let text = parse_short_text(record)?;
-                if let Some(series) = current_series
-                    .filter(|_| series_depth == Some(depth))
-                    .and_then(|index| chart.series.get_mut(index))
-                    && series.name.is_none()
-                {
-                    series.name = Some(text);
-                } else if chart.title.is_none() {
-                    chart.title = Some(text);
+                if series_depth == Some(depth) {
+                    let role = last_ai.take().ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "SeriesText in Series must immediately follow one BRAI",
+                    })?;
+                    let text = parse_short_text(record)?;
+                    let series = current_series
+                        .and_then(|index| chart.series.get_mut(index))
+                        .ok_or(Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "SeriesText refers to a missing Series",
+                        })?;
+                    series
+                        .ai
+                        .get_mut(role)
+                        .set_text(text)
+                        .map_err(|_| Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "one AI has more than one SeriesText",
+                        })?;
+                } else {
+                    add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
                 }
             },
             CHART_FORMAT => {
-                if group_depth.is_some() {
-                    return invalid(record, "ChartFormat collections overlap");
+                if group_depth.is_some() || parent_depth != Some(depth) {
+                    return invalid(
+                        record,
+                        "ChartFormat must belong to one AxisParent collection",
+                    );
                 }
                 exact(record, 20)?;
                 let reserved = data.get(..16).ok_or(Error::InvalidChart {
@@ -346,27 +612,42 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     offset: record.offset(),
                     reason: "chart-group order exceeds nine",
                 })?;
-                let order = GroupId::new(raw).ok_or(Error::InvalidChart {
+                let order = Order::new(raw).ok_or(Error::InvalidChart {
                     offset: record.offset(),
                     reason: "chart-group order exceeds nine",
                 })?;
+                let parent = current_parent
+                    .and_then(|index| chart.parents.get(index))
+                    .map(|parent| parent.id())
+                    .ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "ChartFormat has no AxisParent owner",
+                    })?;
                 push(
                     &mut chart.groups,
                     Group {
+                        parent,
                         order,
                         vary_colors: vary & 1 != 0,
                         family: Family::Line { flags: 0 },
+                        link: crate::record::line::Link::new([0; 10]),
                         lines: Vec::new(),
                         drop_bars: Vec::new(),
                     },
                     "chart groups",
                 )?;
                 group_depth = depth.checked_add(1);
+                group_family_seen = false;
+                group_link_seen = false;
+                parent_group_started = true;
                 pending_begin = true;
             },
             BAR | LINE | PIE | AREA | SCATTER | RADAR | RADAR_AREA | SURFACE => {
                 if group_depth != Some(depth) {
                     return invalid(record, "chart-family record appears outside ChartFormat");
+                }
+                if group_family_seen {
+                    return invalid(record, "ChartFormat contains more than one chart family");
                 }
                 let family = parse_family(record)?;
                 chart
@@ -377,6 +658,30 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         reason: "chart-family record has no ChartFormat owner",
                     })?
                     .family = family;
+                group_family_seen = true;
+            },
+            CRT_LINK => {
+                if group_depth != Some(depth) || !group_family_seen || group_link_seen {
+                    return invalid(
+                        record,
+                        "CrtLink is missing, duplicated, or outside ChartFormat",
+                    );
+                }
+                let link = crate::record::line::Link::from_payload(data).map_err(|_| {
+                    Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "CrtLink payload is not ten bytes",
+                    }
+                })?;
+                chart
+                    .groups
+                    .last_mut()
+                    .ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "CrtLink has no ChartFormat owner",
+                    })?
+                    .link = link;
+                group_link_seen = true;
             },
             CRT_LINE => {
                 if group_depth != Some(depth) {
@@ -443,8 +748,11 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 pending_begin = true;
             },
             AXIS => {
-                if current_axis.is_some() {
-                    return invalid(record, "Axis collections overlap");
+                if current_axis.is_some() || parent_depth != Some(depth) || parent_group_started {
+                    return invalid(
+                        record,
+                        "Axis must own a non-overlapping AxisParent collection",
+                    );
                 }
                 exact(record, 18)?;
                 let reserved = data.get(2..).ok_or(Error::InvalidChart {
@@ -461,23 +769,118 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     _ => return invalid(record, "invalid axis kind"),
                 };
                 check_add(chart.axes.len(), limits.max_axes, "axis count")?;
-                push(&mut chart.axes, Axis::new(kind), "chart axes")?;
+                let parent = current_parent
+                    .and_then(|index| chart.parents.get(index))
+                    .map(|parent| parent.id())
+                    .ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "Axis has no AxisParent owner",
+                    })?;
+                push(&mut chart.axes, Axis::in_parent(kind, parent), "chart axes")?;
                 current_axis = chart.axes.len().checked_sub(1);
                 axis_depth = depth.checked_add(1);
                 pending_begin = true;
             },
             AXES_USED => {
+                if axes_used.is_some() || (strict_excel && (depth != 1 || !props_seen)) {
+                    return invalid(record, "AxesUsed must occur once in CHARTFOMATS");
+                }
                 exact(record, 2)?;
-                if !matches!(u16_at(data, 0, record)?, 1 | 2) {
+                let count = u16_at(data, 0, record)?;
+                if !matches!(count, 1 | 2) {
                     return invalid(record, "AxesUsed must specify one or two axis groups");
                 }
+                axes_used = Some(count);
             },
             AXIS_PARENT => {
+                let expected = match axes_used {
+                    Some(value) => usize::from(value),
+                    None if strict_excel => {
+                        return invalid(record, "AxisParent appears before AxesUsed");
+                    },
+                    None => 2,
+                };
+                if parent_depth.is_some()
+                    || chart.parents.len() >= expected
+                    || (strict_excel && depth != 1)
+                {
+                    return invalid(
+                        record,
+                        "AxisParent is nested, misplaced, or exceeds two groups",
+                    );
+                }
                 exact(record, 18)?;
+                let secondary = match u16_at(data, 0, record)? {
+                    0 if chart.parents.is_empty() => false,
+                    1 if chart.parents.len() == 1 => true,
+                    _ => {
+                        return invalid(
+                            record,
+                            "AxisParent groups must be ordered primary then optional secondary",
+                        );
+                    },
+                };
                 if u16_at(data, 0, record)? > 1 {
                     return invalid(record, "AxisParent index must be primary or secondary");
                 }
+                check_add(chart.parents.len(), 2, "axis-parent count")?;
+                push(
+                    &mut chart.parents,
+                    if secondary {
+                        axis::Parent::secondary(layout::Pos::default())
+                    } else {
+                        axis::Parent::primary(layout::Pos::default())
+                    },
+                    "axis parents",
+                )?;
+                current_parent = chart.parents.len().checked_sub(1);
+                parent_depth = depth.checked_add(1);
+                parent_groups = 0;
+                parent_group_started = false;
                 pending_begin = true;
+            },
+            POS if parent_depth == Some(depth) => {
+                if !parent_needs_pos {
+                    return invalid(record, "AxisParent contains more than one Pos");
+                }
+                exact(record, 20)?;
+                let top_left = layout::Mode::from_raw(u16_at(data, 0, record)?).ok_or(
+                    Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "Pos upper-left mode is invalid",
+                    },
+                )?;
+                let bottom_right = layout::Mode::from_raw(u16_at(data, 2, record)?).ok_or(
+                    Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "Pos lower-right mode is invalid",
+                    },
+                )?;
+                let pos = layout::Pos::parsed(
+                    top_left,
+                    bottom_right,
+                    i16_at(data, 4, record)?,
+                    i16_at(data, 8, record)?,
+                    i16_at(data, 12, record)?,
+                    i16_at(data, 16, record)?,
+                );
+                if !pos.is_plot() {
+                    return invalid(record, "AxisParent Pos must use Parent/Parent modes");
+                }
+                let index = current_parent.ok_or(Error::InvalidChart {
+                    offset: record.offset(),
+                    reason: "Pos has no AxisParent owner",
+                })?;
+                let parent = chart.parents.get_mut(index).ok_or(Error::InvalidChart {
+                    offset: record.offset(),
+                    reason: "Pos AxisParent owner is missing",
+                })?;
+                *parent = if parent.is_secondary() {
+                    axis::Parent::secondary(pos)
+                } else {
+                    axis::Parent::primary(pos)
+                };
+                parent_needs_pos = false;
             },
             VALUE_RANGE => {
                 exact(record, 42)?;
@@ -651,43 +1054,136 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     "chart labels",
                 )?;
             },
+            DIMENSIONS => {
+                if dimensions_seen || (strict_excel && (depth != 0 || !chart_closed)) {
+                    return invalid(record, "Dimensions must occur once before SERIESDATA cells");
+                }
+                exact(record, 14)?;
+                chart.dimensions = match context.kind() {
+                    Kind::Excel => {
+                        if u16_at(data, 12, record)? != 0 {
+                            return invalid(record, "Excel Dimensions reserved field is nonzero");
+                        }
+                        let dims = cache::ExcelDims::new(
+                            u32_at(data, 0, record)?,
+                            u32_at(data, 4, record)?,
+                            u16_at(data, 8, record)?,
+                            u16_at(data, 10, record)?,
+                        )
+                        .ok_or(Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "Excel Dimensions range is reversed or outside the BIFF8 grid",
+                        })?;
+                        cache::Dims::Excel(dims)
+                    },
+                    Kind::Graph => {
+                        if u32_at(data, 0, record)? != 0
+                            || u16_at(data, 8, record)? != 0
+                            || u16_at(data, 12, record)? != 0
+                        {
+                            return invalid(record, "Graph Dimensions reserved fields are nonzero");
+                        }
+                        let longest =
+                            RowCol::new(u16::try_from(u32_at(data, 4, record)?).map_err(|_| {
+                                Error::InvalidChart {
+                                    offset: record.offset(),
+                                    reason: "Graph Dimensions longest row exceeds u16",
+                                }
+                            })?)
+                            .ok_or(Error::InvalidChart {
+                                offset: record.offset(),
+                                reason: "Graph Dimensions longest row exceeds 3,999",
+                            })?;
+                        let rows = u8::try_from(u16_at(data, 10, record)?).map_err(|_| {
+                            Error::InvalidChart {
+                                offset: record.offset(),
+                                reason: "Graph Dimensions row count exceeds 255",
+                            }
+                        })?;
+                        cache::Dims::Graph(cache::GraphDims::new(longest, rows).ok_or(
+                            Error::InvalidChart {
+                                offset: record.offset(),
+                                reason: "Graph Dimensions empty fields disagree",
+                            },
+                        )?)
+                    },
+                };
+                dimensions_seen = true;
+            },
             SI_INDEX if context.kind() == Kind::Excel => {
+                if depth != 0 || !dimensions_seen {
+                    return invalid(record, "SIIndex must follow Dimensions at substream level");
+                }
                 exact(record, 2)?;
-                cache_index = u16_at(data, 0, record)?;
+                let index = cache::Index::from_raw(u16_at(data, 0, record)?).ok_or(
+                    Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "SIIndex must identify values, categories, or bubbles",
+                    },
+                )?;
+                if cache::Index::ALL.get(next_cache_section).copied() != Some(index) {
+                    return invalid(
+                        record,
+                        "SIIndex sections are missing, duplicated, or out of order",
+                    );
+                }
+                next_cache_section =
+                    next_cache_section
+                        .checked_add(1)
+                        .ok_or(Error::SizeOverflow {
+                            resource: "SIIndex section count",
+                        })?;
+                cache_section = Some(index);
+            },
+            SI_INDEX => {
+                return invalid(
+                    record,
+                    "SIIndex is not part of the standalone Graph grammar",
+                );
             },
             kind if kind == number_kind(context.kind()) => {
-                let (value_offset, format) = match context.kind() {
+                if depth != 0 || !dimensions_seen {
+                    return invalid(record, "cached Number must follow Dimensions in SERIESDATA");
+                }
+                let value = match context.kind() {
                     Kind::Graph => {
                         exact(record, 15)?;
                         if byte_at(data, 4, record)? != 0 {
                             return invalid(record, "Graph Number reserved byte is nonzero");
                         }
-                        (7, u16_at(data, 5, record)?)
+                        graph_cache(
+                            data,
+                            cache::Ifmt::new(u16_at(data, 5, record)?),
+                            Value::Number(f64_at(data, 7, record)?),
+                            record,
+                        )
                     },
                     Kind::Excel => {
                         exact(record, 14)?;
-                        (6, u16_at(data, 4, record)?)
+                        excel_cache(
+                            data,
+                            cache_section.ok_or(Error::InvalidChart {
+                                offset: record.offset(),
+                                reason: "Excel cache cell appears before its SIIndex",
+                            })?,
+                            cache::Xf::new(u16_at(data, 4, record)?),
+                            XlValue::Number(f64_at(data, 6, record)?),
+                            record,
+                        )
                     },
-                };
+                }?;
                 check_add(
                     chart.caches.len(),
                     limits.max_cached_values,
                     "cached value count",
                 )?;
-                let cell = cache_cell(data, context, record)?;
-                push(
-                    &mut chart.caches,
-                    Cache {
-                        index: cache_index,
-                        cell,
-                        format,
-                        value: Value::Number(f64_at(data, value_offset, record)?),
-                    },
-                    "chart cache",
-                )?;
+                push(&mut chart.caches, value, "chart cache")?;
             },
             CELL_LABEL => {
-                let (string_offset, format) = match context.kind() {
+                if depth != 0 || !dimensions_seen {
+                    return invalid(record, "cached Label must follow Dimensions in SERIESDATA");
+                }
+                let value = match context.kind() {
                     Kind::Graph => {
                         if data.len() < 9 || byte_at(data, 4, record)? != 0 {
                             return invalid(
@@ -695,70 +1191,124 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                                 "Graph Label is truncated or reserved byte is nonzero",
                             );
                         }
-                        (7, u16_at(data, 5, record)?)
+                        let string = data.get(7..).ok_or(Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "cached Label string is truncated",
+                        })?;
+                        graph_cache(
+                            data,
+                            cache::Ifmt::new(u16_at(data, 5, record)?),
+                            Value::Text(parse_string(string, record)?),
+                            record,
+                        )
                     },
                     Kind::Excel => {
-                        if data.len() < 8 {
-                            return invalid(record, "Excel Label is shorter than eight bytes");
+                        if data.len() < 9 {
+                            return invalid(record, "Excel Label is shorter than nine bytes");
                         }
-                        (6, u16_at(data, 4, record)?)
+                        let string = data.get(6..).ok_or(Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "cached Label string is truncated",
+                        })?;
+                        excel_cache(
+                            data,
+                            cache_section.ok_or(Error::InvalidChart {
+                                offset: record.offset(),
+                                reason: "Excel cache cell appears before its SIIndex",
+                            })?,
+                            cache::Xf::new(u16_at(data, 4, record)?),
+                            XlValue::Text(parse_xl_unicode_string(string, record)?),
+                            record,
+                        )
                     },
-                };
+                }?;
                 check_add(
                     chart.caches.len(),
                     limits.max_cached_values,
                     "cached value count",
                 )?;
-                let cell = cache_cell(data, context, record)?;
-                let string = data.get(string_offset..).ok_or(Error::InvalidChart {
-                    offset: record.offset(),
-                    reason: "cached Label string is truncated",
-                })?;
-                push(
-                    &mut chart.caches,
-                    Cache {
-                        index: cache_index,
-                        cell,
-                        format,
-                        value: Value::Text(parse_string(string, record)?),
-                    },
-                    "chart cache",
-                )?;
+                push(&mut chart.caches, value, "chart cache")?;
             },
             kind if kind == blank_kind(context.kind()) => {
-                let format = match context.kind() {
+                if depth != 0 || !dimensions_seen {
+                    return invalid(record, "cached Blank must follow Dimensions in SERIESDATA");
+                }
+                let value = match context.kind() {
                     Kind::Graph => {
                         exact(record, 7)?;
                         if byte_at(data, 4, record)? != 0 {
                             return invalid(record, "Graph Blank reserved byte is nonzero");
                         }
-                        u16_at(data, 5, record)?
+                        graph_cache(
+                            data,
+                            cache::Ifmt::new(u16_at(data, 5, record)?),
+                            Value::Blank,
+                            record,
+                        )
                     },
                     Kind::Excel => {
                         exact(record, 6)?;
-                        u16_at(data, 4, record)?
+                        excel_cache(
+                            data,
+                            cache_section.ok_or(Error::InvalidChart {
+                                offset: record.offset(),
+                                reason: "Excel cache cell appears before its SIIndex",
+                            })?,
+                            cache::Xf::new(u16_at(data, 4, record)?),
+                            XlValue::Blank,
+                            record,
+                        )
                     },
+                }?;
+                check_add(
+                    chart.caches.len(),
+                    limits.max_cached_values,
+                    "cached value count",
+                )?;
+                push(&mut chart.caches, value, "chart cache")?;
+            },
+            EXCEL_BOOL_ERR if context.kind() == Kind::Excel => {
+                if depth != 0 || !dimensions_seen {
+                    return invalid(
+                        record,
+                        "cached BoolErr must follow Dimensions in SERIESDATA",
+                    );
+                }
+                exact(record, 8)?;
+                let value = match byte_at(data, 7, record)? {
+                    0 => match byte_at(data, 6, record)? {
+                        0 => XlValue::Bool(false),
+                        1 => XlValue::Bool(true),
+                        _ => return invalid(record, "BoolErr Boolean value is not zero or one"),
+                    },
+                    1 => XlValue::Error(cache::Fault::from_raw(byte_at(data, 6, record)?).ok_or(
+                        Error::InvalidChart {
+                            offset: record.offset(),
+                            reason: "BoolErr contains an unknown BIFF error code",
+                        },
+                    )?),
+                    _ => return invalid(record, "BoolErr discriminator is not zero or one"),
                 };
                 check_add(
                     chart.caches.len(),
                     limits.max_cached_values,
                     "cached value count",
                 )?;
-                let cell = cache_cell(data, context, record)?;
-                push(
-                    &mut chart.caches,
-                    Cache {
-                        index: cache_index,
-                        cell,
-                        format,
-                        value: Value::Blank,
-                    },
-                    "chart cache",
+                let value = excel_cache(
+                    data,
+                    cache_section.ok_or(Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "Excel cache cell appears before its SIIndex",
+                    })?,
+                    cache::Xf::new(u16_at(data, 4, record)?),
+                    value,
+                    record,
                 )?;
+                push(&mut chart.caches, value, "chart cache")?;
             },
             BOF => return invalid(record, "nested BOF in chart substream"),
             CONTINUE | SERIES_LIST | CAT_SER_RANGE | DEFAULT_TEXT | FONT_X | OBJECT_LINK
-            | FRAME | PLOT_GROWTH => {
+            | FRAME | POS => {
                 add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
             },
             _ => add_raw(&mut chart, record, &mut unknown_bytes, limits)?,
@@ -775,13 +1325,42 @@ pub(super) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         || current_series.is_some()
         || current_axis.is_some()
         || group_depth.is_some()
+        || parent_depth.is_some()
+        || parent_needs_pos
     {
         return Err(Error::InvalidChart {
             offset: input.as_bytes().len(),
             reason: "chart collection owner is missing its complete Begin/End collection",
         });
     }
-    validate(&chart, limits)?;
+    if strict_excel
+        && (!chart_seen || !chart_closed || !zoom_seen || !growth_seen || !dimensions_seen)
+    {
+        return Err(Error::InvalidChart {
+            offset: input.as_bytes().len(),
+            reason: "chart is missing Chart, Scl, PlotGrowth, or Dimensions",
+        });
+    }
+    if (strict_excel || axes_used.is_some())
+        && axes_used
+            != Some(
+                u16::try_from(chart.parents.len()).map_err(|_| Error::SizeOverflow {
+                    resource: "axis-parent count",
+                })?,
+            )
+    {
+        return Err(Error::InvalidChart {
+            offset: input.as_bytes().len(),
+            reason: "AxesUsed does not match the AxisParent collection count",
+        });
+    }
+    if context.kind() == Kind::Excel && next_cache_section != cache::Index::ALL.len() {
+        return Err(Error::InvalidChart {
+            offset: input.as_bytes().len(),
+            reason: "Excel SERIESDATA does not contain exactly three SIIndex sections",
+        });
+    }
+    validate(&chart, limits, strict_excel)?;
     Ok(chart)
 }
 
@@ -1037,7 +1616,7 @@ fn add_raw(
     )
 }
 
-fn validate(chart: &Chart, limits: Limits) -> Result<()> {
+fn validate(chart: &Chart, limits: Limits, require_topology: bool) -> Result<()> {
     if chart.series.len() > limits.max_series {
         return limit("series count", chart.series.len(), limits.max_series);
     }
@@ -1060,9 +1639,42 @@ fn validate(chart: &Chart, limits: Limits) -> Result<()> {
             "ShtProps reserved bits, blank mode, or plot-area flags are invalid",
         );
     }
+    if (require_topology && !(1..=2).contains(&chart.parents.len()))
+        || (!require_topology && chart.parents.len() > 2)
+    {
+        return invalid_model(
+            "axis parents",
+            "the chart has an invalid number of AxisParent collections",
+        );
+    }
+    for (index, parent) in chart.parents.iter().copied().enumerate() {
+        if parent.id().index() != index || !parent.pos().is_plot() {
+            return invalid_model(
+                "axis parents",
+                "axis parents must be primary then optional secondary with plot positions",
+            );
+        }
+    }
+    if !chart.dimensions.matches(chart.context.kind()) {
+        return invalid_model("Dimensions", "dimensions do not match the chart producer");
+    }
+    let derived = cache_dimensions(&chart.caches, chart.context.kind())?;
+    if !dimensions_cover(chart.dimensions, derived) {
+        return invalid_model(
+            "Dimensions",
+            "declared dimensions do not cover the cached chart cells",
+        );
+    }
 
     let mut orders = [false; 10];
     for group in &chart.groups {
+        if chart
+            .parents
+            .get(group.parent.index())
+            .is_none_or(|parent| parent.id() != group.parent)
+        {
+            return invalid_model("group", "chart group refers to a missing axis parent");
+        }
         let order = usize::from(group.order.get());
         let Some(seen) = orders.get_mut(order) else {
             return invalid_model("group", "chart-group order exceeds nine");
@@ -1113,17 +1725,55 @@ fn validate(chart: &Chart, limits: Limits) -> Result<()> {
     }
 
     for series in &chart.series {
-        if usize::from(series.group.get()) >= chart.groups.len() {
-            return invalid_model("series", "series refers to a missing chart group");
+        match &series.owner {
+            Owner::Group(group) if usize::from(group.get()) >= chart.groups.len() => {
+                return invalid_model("series", "series refers to a missing chart group");
+            },
+            Owner::Trend { parent, .. } | Owner::ErrorBar { parent, .. } => {
+                let zero_based =
+                    parent
+                        .series()
+                        .get()
+                        .checked_sub(1)
+                        .ok_or(Error::InvalidModel {
+                            field: "series",
+                            reason: "auxiliary parent is not a one-based series index",
+                        })?;
+                let zero_based = usize::try_from(zero_based).map_err(|_| Error::InvalidModel {
+                    field: "series",
+                    reason: "auxiliary parent index exceeds this platform",
+                })?;
+                if chart
+                    .series
+                    .get(zero_based)
+                    .is_none_or(|parent| !matches!(parent.owner, Owner::Group(_)))
+                {
+                    return invalid_model(
+                        "series",
+                        "auxiliary series must refer to an existing regular series",
+                    );
+                }
+            },
+            _ => {},
         }
-        check_string(series.name.as_deref(), "series name")?;
-        for link in &series.links {
-            validate_link(link, chart.context, limits)?;
+        for (binding, role) in series.ai.ordered().into_iter().zip(Role::ALL) {
+            if binding.link().role() != role {
+                return invalid_model("AI", "series AI roles are not in canonical order");
+            }
+            validate_link(binding.link(), chart.context, limits)?;
+            check_string(binding.text(), "AI text")?;
         }
     }
     check_string(chart.title.as_deref(), "title")?;
 
     for axis in &chart.axes {
+        if chart
+            .parents
+            .get(axis.parent.index())
+            .is_none_or(|parent| parent.id() != axis.parent)
+        {
+            return invalid_model("axis", "axis refers to a missing axis parent");
+        }
         if let Some(scale) = axis.scale {
             let values = [
                 scale.min,
@@ -1151,17 +1801,28 @@ fn validate(chart: &Chart, limits: Limits) -> Result<()> {
     }
 
     for value in &chart.caches {
-        if !cache_matches(value.cell, chart.context.kind()) {
-            return invalid_model("cache", "cell coordinate does not match producer context");
+        if value.kind() != chart.context.kind() {
+            return invalid_model("cache", "cached cell does not match producer context");
         }
-        if chart.context.kind() == Kind::Graph && value.index != 0 {
-            return invalid_model("cache", "Graph cache entries do not use SIIndex");
-        }
-        match &value.value {
-            Value::Number(number) if !number.is_finite() => {
+        match value {
+            Cache::Excel {
+                value: XlValue::Number(number),
+                ..
+            }
+            | Cache::Graph {
+                value: Value::Number(number),
+                ..
+            } if !number.is_finite() => {
                 return invalid_model("cache", "cached number is not finite");
             },
-            Value::Text(text) => check_string(Some(text), "cached text")?,
+            Cache::Excel {
+                value: XlValue::Text(text),
+                ..
+            } => check_xl_string(text, limits)?,
+            Cache::Graph {
+                value: Value::Text(text),
+                ..
+            } => check_string(Some(text), "cached text")?,
             _ => {},
         }
     }
@@ -1244,10 +1905,15 @@ fn validate_link(link: &Link, context: Context, limits: Limits) -> Result<()> {
 pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
     if !chart.authoring_proven {
         return Err(Error::UnsupportedAuthoring {
-            reason: "complete CHARTSHEET, CHARTFOMATS, and SERIESDATA scaffolding is not modeled",
+            reason: "the host prelude, attached-label/frame grammar, and complete axis ownership are not yet proven",
         });
     }
-    validate(chart, limits)?;
+    if chart.parents.len() != 1 || !(1..=4).contains(&chart.groups.len()) {
+        return Err(Error::UnsupportedAuthoring {
+            reason: "secondary-axis chart-group ownership is not yet modeled",
+        });
+    }
+    validate(chart, limits, true)?;
     let mut out = Encoder::with_limits(limits)?;
     out.push(BOF, &bof(chart.context.kind()))?;
 
@@ -1274,7 +1940,14 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         .copy_from_slice(&chart.rect.height.to_le_bytes());
     out.push(CHART_REC, &rect)?;
     out.push(BEGIN, &[])?;
-    out.push(SHT_PROPS, &chart.props.flags.to_le_bytes())?;
+    let mut zoom = [0u8; 4];
+    put_u16(&mut zoom, 0, chart.zoom.numerator())?;
+    put_u16(&mut zoom, 2, chart.zoom.denominator())?;
+    out.push(SCL, &zoom)?;
+    let mut growth = [0u8; 8];
+    put_i32(&mut growth, 0, chart.growth.x.raw())?;
+    put_i32(&mut growth, 4, chart.growth.y.raw())?;
+    out.push(PLOT_GROWTH, &growth)?;
 
     for series in &chart.series {
         let mut data = [0u8; 12];
@@ -1293,21 +1966,47 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         put_u16(&mut data, 10, series.bubble_count.get())?;
         out.push(SERIES, &data)?;
         out.push(BEGIN, &[])?;
-        for link in &series.links {
-            let data = encode_link(link, chart.context, limits)?;
+        for binding in series.ai.ordered() {
+            let data = encode_link(binding.link(), chart.context, limits)?;
             out.push(BRAI, &data)?;
+            if let Some(text) = binding.text() {
+                out.push(SERIES_TEXT, &short_text(text)?)?;
+            }
         }
-        if let Some(name) = &series.name {
-            out.push(SERIES_TEXT, &short_text(name)?)?;
+        match &series.owner {
+            Owner::Group(group) => {
+                out.push(SER_TO_CRT, &u16::from(group.get()).to_le_bytes())?;
+            },
+            Owner::Trend { parent, data } => {
+                parent.write(&mut out)?;
+                out.push(SER_AUX_TREND, data)?;
+            },
+            Owner::ErrorBar { parent, data } => {
+                parent.write(&mut out)?;
+                out.push(SER_AUX_ERR_BAR, data)?;
+            },
         }
-        out.push(SER_TO_CRT, &u16::from(series.group.get()).to_le_bytes())?;
         out.push(END, &[])?;
     }
 
-    let axis_groups = if chart.groups.len() > 1 { 2u16 } else { 1u16 };
-    out.push(AXES_USED, &axis_groups.to_le_bytes())?;
-    out.push(AXIS_PARENT, &[0; 18])?;
+    out.push(SHT_PROPS, &chart.props.flags.to_le_bytes())?;
+    out.push(
+        AXES_USED,
+        &u16::try_from(chart.parents.len())
+            .map_err(|_| Error::SizeOverflow {
+                resource: "axis-parent count",
+            })?
+            .to_le_bytes(),
+    )?;
+    let parent = chart.parents.first().copied().ok_or(Error::InvalidModel {
+        field: "axis parents",
+        reason: "a chart requires a primary AxisParent",
+    })?;
+    let mut parent_body = [0u8; 18];
+    put_u16(&mut parent_body, 0, u16::from(parent.is_secondary()))?;
+    out.push(AXIS_PARENT, &parent_body)?;
     out.push(BEGIN, &[])?;
+    encode_pos(&mut out, parent.pos())?;
     for axis in &chart.axes {
         encode_axis(&mut out, axis)?;
     }
@@ -1338,101 +2037,172 @@ pub(super) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         out.push(label.kind, &label.data)?;
     }
 
-    let mut active_cache = None;
-    for cache in &chart.caches {
-        if chart.context.kind() == Kind::Excel && active_cache != Some(cache.index) {
-            out.push(SI_INDEX, &cache.index.to_le_bytes())?;
-            active_cache = Some(cache.index);
-        }
-        match &cache.value {
-            Value::Number(number) => match cache.cell {
-                Cell::Excel { row, col } if chart.context.kind() == Kind::Excel => {
-                    let mut data = [0u8; 14];
-                    put_u16(&mut data, 0, row)?;
-                    put_u16(&mut data, 2, u16::from(col))?;
-                    put_u16(&mut data, 4, cache.format)?;
-                    put_f64(&mut data, 6, *number)?;
-                    out.push(EXCEL_NUMBER, &data)?;
-                },
-                Cell::Graph { row, col } if chart.context.kind() == Kind::Graph => {
-                    let mut data = [0u8; 15];
-                    put_u16(&mut data, 0, row.get())?;
-                    put_u16(&mut data, 2, col.get())?;
-                    put_byte(&mut data, 4, 0)?;
-                    put_u16(&mut data, 5, cache.format)?;
-                    put_f64(&mut data, 7, *number)?;
-                    out.push(GRAPH_NUMBER, &data)?;
-                },
-                _ => {
-                    return invalid_model(
-                        "cache",
-                        "cell coordinate does not match producer context",
-                    );
-                },
-            },
-            Value::Text(text) => {
-                let string = biff_string(text)?;
-                let prefix = match chart.context.kind() {
-                    Kind::Graph => 7usize,
-                    Kind::Excel => 6usize,
-                };
-                let capacity = prefix
-                    .checked_add(string.len())
-                    .ok_or(Error::SizeOverflow {
-                        resource: "cached chart string",
-                    })?;
-                let mut data = vec_with_capacity(capacity, "cached chart string")?;
-                match cache.cell {
-                    Cell::Excel { row, col } if chart.context.kind() == Kind::Excel => {
-                        data.extend_from_slice(&row.to_le_bytes());
-                        data.extend_from_slice(&u16::from(col).to_le_bytes());
-                        data.extend_from_slice(&cache.format.to_le_bytes());
-                    },
-                    Cell::Graph { row, col } if chart.context.kind() == Kind::Graph => {
-                        data.extend_from_slice(&row.get().to_le_bytes());
-                        data.extend_from_slice(&col.get().to_le_bytes());
-                        data.push(0);
-                        data.extend_from_slice(&cache.format.to_le_bytes());
-                    },
-                    _ => {
-                        return invalid_model(
-                            "cache",
-                            "cell coordinate does not match producer context",
-                        );
-                    },
+    out.push(END, &[])?;
+    out.push(END, &[])?;
+    encode_dimensions(&mut out, chart.dimensions)?;
+    match chart.context.kind() {
+        Kind::Excel => {
+            for index in cache::Index::ALL {
+                out.push(SI_INDEX, &(index as u16).to_le_bytes())?;
+                for value in chart.caches.iter().filter(
+                    |value| matches!(value, Cache::Excel { section, .. } if *section == index),
+                ) {
+                    encode_cache(&mut out, value)?;
                 }
-                data.extend_from_slice(&string);
-                out.push(CELL_LABEL, &data)?;
-            },
-            Value::Blank => match cache.cell {
-                Cell::Excel { row, col } if chart.context.kind() == Kind::Excel => {
-                    let mut data = [0u8; 6];
-                    put_u16(&mut data, 0, row)?;
-                    put_u16(&mut data, 2, u16::from(col))?;
-                    put_u16(&mut data, 4, cache.format)?;
-                    out.push(EXCEL_BLANK, &data)?;
-                },
-                Cell::Graph { row, col } if chart.context.kind() == Kind::Graph => {
-                    let mut data = [0u8; 7];
-                    put_u16(&mut data, 0, row.get())?;
-                    put_u16(&mut data, 2, col.get())?;
-                    put_byte(&mut data, 4, 0)?;
-                    put_u16(&mut data, 5, cache.format)?;
-                    out.push(GRAPH_BLANK, &data)?;
-                },
-                _ => {
-                    return invalid_model(
-                        "cache",
-                        "cell coordinate does not match producer context",
-                    );
-                },
-            },
-        }
+            }
+        },
+        Kind::Graph => {
+            for value in &chart.caches {
+                encode_cache(&mut out, value)?;
+            }
+        },
     }
-    out.push(END, &[])?;
-    out.push(END, &[])?;
     out.push(EOF, &[])?;
     Ok(out.finish())
+}
+
+fn encode_pos(out: &mut Encoder, pos: layout::Pos) -> Result<()> {
+    let mut data = [0u8; 20];
+    put_u16(&mut data, 0, pos.top_left() as u16)?;
+    put_u16(&mut data, 2, pos.bottom_right() as u16)?;
+    put_i16(&mut data, 4, pos.x())?;
+    put_i16(&mut data, 8, pos.y())?;
+    put_i16(&mut data, 12, pos.width())?;
+    put_i16(&mut data, 16, pos.height())?;
+    out.push(POS, &data)
+}
+
+fn encode_dimensions(out: &mut Encoder, dimensions: cache::Dims) -> Result<()> {
+    let mut data = [0u8; 14];
+    match dimensions {
+        cache::Dims::Excel(value) => {
+            put_u32(&mut data, 0, value.first_row())?;
+            put_u32(&mut data, 4, value.row_after())?;
+            put_u16(&mut data, 8, value.first_col())?;
+            put_u16(&mut data, 10, value.col_after())?;
+        },
+        cache::Dims::Graph(value) => {
+            put_u32(&mut data, 4, u32::from(value.longest_row().get()))?;
+            put_u16(&mut data, 10, u16::from(value.rows()))?;
+        },
+    }
+    out.push(DIMENSIONS, &data)
+}
+
+fn encode_cache(out: &mut Encoder, cache: &Cache) -> Result<()> {
+    match cache {
+        Cache::Excel {
+            row,
+            col,
+            xf,
+            value,
+            ..
+        } => encode_excel_cache(out, *row, *col, *xf, value),
+        Cache::Graph {
+            row,
+            col,
+            ifmt,
+            value,
+        } => encode_graph_cache(out, *row, *col, *ifmt, value),
+    }
+}
+
+fn encode_excel_cache(
+    out: &mut Encoder,
+    row: u16,
+    col: u8,
+    xf: cache::Xf,
+    value: &XlValue,
+) -> Result<()> {
+    match value {
+        XlValue::Number(number) => {
+            let mut data = [0u8; 14];
+            put_u16(&mut data, 0, row)?;
+            put_u16(&mut data, 2, u16::from(col))?;
+            put_u16(&mut data, 4, xf.get())?;
+            put_f64(&mut data, 6, *number)?;
+            out.push(EXCEL_NUMBER, &data)
+        },
+        XlValue::Text(text) => {
+            let string = xl_unicode_string(text)?;
+            let capacity = 6usize
+                .checked_add(string.len())
+                .ok_or(Error::SizeOverflow {
+                    resource: "cached chart string",
+                })?;
+            let mut data = vec_with_capacity(capacity, "cached chart string")?;
+            data.extend_from_slice(&row.to_le_bytes());
+            data.extend_from_slice(&u16::from(col).to_le_bytes());
+            data.extend_from_slice(&xf.get().to_le_bytes());
+            data.extend_from_slice(&string);
+            out.push(CELL_LABEL, &data)
+        },
+        XlValue::Bool(value) => {
+            let mut data = [0u8; 8];
+            put_u16(&mut data, 0, row)?;
+            put_u16(&mut data, 2, u16::from(col))?;
+            put_u16(&mut data, 4, xf.get())?;
+            put_byte(&mut data, 6, u8::from(*value))?;
+            out.push(EXCEL_BOOL_ERR, &data)
+        },
+        XlValue::Error(value) => {
+            let mut data = [0u8; 8];
+            put_u16(&mut data, 0, row)?;
+            put_u16(&mut data, 2, u16::from(col))?;
+            put_u16(&mut data, 4, xf.get())?;
+            put_byte(&mut data, 6, *value as u8)?;
+            put_byte(&mut data, 7, 1)?;
+            out.push(EXCEL_BOOL_ERR, &data)
+        },
+        XlValue::Blank => {
+            let mut data = [0u8; 6];
+            put_u16(&mut data, 0, row)?;
+            put_u16(&mut data, 2, u16::from(col))?;
+            put_u16(&mut data, 4, xf.get())?;
+            out.push(EXCEL_BLANK, &data)
+        },
+    }
+}
+
+fn encode_graph_cache(
+    out: &mut Encoder,
+    row: RowCol,
+    col: RowCol,
+    ifmt: cache::Ifmt,
+    value: &Value,
+) -> Result<()> {
+    match value {
+        Value::Number(number) => {
+            let mut data = [0u8; 15];
+            put_u16(&mut data, 0, row.get())?;
+            put_u16(&mut data, 2, col.get())?;
+            put_u16(&mut data, 5, ifmt.get())?;
+            put_f64(&mut data, 7, *number)?;
+            out.push(GRAPH_NUMBER, &data)
+        },
+        Value::Text(text) => {
+            let string = biff_string(text)?;
+            let capacity = 7usize
+                .checked_add(string.len())
+                .ok_or(Error::SizeOverflow {
+                    resource: "cached chart string",
+                })?;
+            let mut data = vec_with_capacity(capacity, "cached chart string")?;
+            data.extend_from_slice(&row.get().to_le_bytes());
+            data.extend_from_slice(&col.get().to_le_bytes());
+            data.push(0);
+            data.extend_from_slice(&ifmt.get().to_le_bytes());
+            data.extend_from_slice(&string);
+            out.push(CELL_LABEL, &data)
+        },
+        Value::Blank => {
+            let mut data = [0u8; 7];
+            put_u16(&mut data, 0, row.get())?;
+            put_u16(&mut data, 2, col.get())?;
+            put_u16(&mut data, 5, ifmt.get())?;
+            out.push(GRAPH_BLANK, &data)
+        },
+    }
 }
 
 fn bof(kind: Kind) -> [u8; BOF_BYTES] {
@@ -1443,7 +2213,7 @@ fn bof(kind: Kind) -> [u8; BOF_BYTES] {
             data[2..4].copy_from_slice(&EXCEL_DOC_TYPE.to_le_bytes());
             data[4..6].copy_from_slice(&0x0DBB_u16.to_le_bytes());
             data[6..8].copy_from_slice(&0x07CC_u16.to_le_bytes());
-            data[8..12].copy_from_slice(&0u32.to_le_bytes());
+            data[8..12].copy_from_slice(&0x0000_0009_u32.to_le_bytes());
             data[12..16].copy_from_slice(&6u32.to_le_bytes());
         },
         Kind::Graph => {
@@ -1595,6 +2365,7 @@ fn encode_group(out: &mut Encoder, group: &Group) -> Result<()> {
         },
         Family::Surface { flags } => out.push(SURFACE, &flags.to_le_bytes())?,
     }
+    out.push(CRT_LINK, &group.link.payload())?;
     for line in &group.lines {
         let marker = crate::record::line::Line::new(line.kind);
         out.push(CRT_LINE, &marker.payload())?;
@@ -1686,6 +2457,25 @@ fn parse_string(data: &[u8], record: RecordRef<'_>) -> Result<String> {
     }
     let count = usize::from(byte_at(data, 0, record)?);
     let flags = byte_at(data, 1, record)?;
+    parse_string_content(data, 2, count, flags, record)
+}
+
+fn parse_xl_unicode_string(data: &[u8], record: RecordRef<'_>) -> Result<String> {
+    if data.len() < 3 {
+        return invalid(record, "Excel chart string is shorter than three bytes");
+    }
+    let count = usize::from(u16_at(data, 0, record)?);
+    let flags = byte_at(data, 2, record)?;
+    parse_string_content(data, 3, count, flags, record)
+}
+
+fn parse_string_content(
+    data: &[u8],
+    header: usize,
+    count: usize,
+    flags: u8,
+    record: RecordRef<'_>,
+) -> Result<String> {
     if flags & !1 != 0 {
         return invalid(record, "chart string uses unsupported option flags");
     }
@@ -1694,7 +2484,7 @@ fn parse_string(data: &[u8], record: RecordRef<'_>) -> Result<String> {
     let content = count.checked_mul(width).ok_or(Error::SizeOverflow {
         resource: "chart string",
     })?;
-    let expected = 2usize.checked_add(content).ok_or(Error::SizeOverflow {
+    let expected = header.checked_add(content).ok_or(Error::SizeOverflow {
         resource: "chart string",
     })?;
     if data.len() != expected {
@@ -1703,7 +2493,7 @@ fn parse_string(data: &[u8], record: RecordRef<'_>) -> Result<String> {
             "chart string length does not match its character count",
         );
     }
-    let bytes = data.get(2..).ok_or(Error::InvalidChart {
+    let bytes = data.get(header..).ok_or(Error::InvalidChart {
         offset: record.offset(),
         reason: "chart string content is truncated",
     })?;
@@ -1719,9 +2509,10 @@ fn parse_string(data: &[u8], record: RecordRef<'_>) -> Result<String> {
             resource: "chart string",
         })?;
     if wide {
-        let units = bytes
-            .chunks_exact(2)
-            .map(|value| u16::from_le_bytes([value[0], value[1]]));
+        let units = bytes.chunks_exact(2).map(|value| match value {
+            [low, high] => u16::from_le_bytes([*low, *high]),
+            _ => 0,
+        });
         for value in char::decode_utf16(units) {
             output.push(value.map_err(|_| Error::InvalidChart {
                 offset: record.offset(),
@@ -1769,6 +2560,41 @@ fn biff_string(value: &str) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+fn xl_unicode_string(value: &str) -> Result<Vec<u8>> {
+    let count = value.encode_utf16().count();
+    let count = u16::try_from(count).map_err(|_| Error::InvalidModel {
+        field: "cached text",
+        reason: "Excel chart string exceeds 65,535 UTF-16 code units",
+    })?;
+    let wide = value.encode_utf16().any(|unit| unit > u16::from(u8::MAX));
+    let width = if wide { 2usize } else { 1usize };
+    let capacity = 3usize
+        .checked_add(
+            usize::from(count)
+                .checked_mul(width)
+                .ok_or(Error::SizeOverflow {
+                    resource: "Excel chart string",
+                })?,
+        )
+        .ok_or(Error::SizeOverflow {
+            resource: "Excel chart string",
+        })?;
+    let mut data = vec_with_capacity(capacity, "Excel chart string")?;
+    data.extend_from_slice(&count.to_le_bytes());
+    data.push(u8::from(wide));
+    for unit in value.encode_utf16() {
+        if wide {
+            data.extend_from_slice(&unit.to_le_bytes());
+        } else {
+            data.push(u8::try_from(unit).map_err(|_| Error::InvalidModel {
+                field: "cached text",
+                reason: "narrow Excel chart string contains a wide code unit",
+            })?);
+        }
+    }
+    Ok(data)
+}
+
 fn parse_role(value: u8, record: RecordRef<'_>) -> Result<Role> {
     match value {
         0 => Ok(Role::Name),
@@ -1802,35 +2628,45 @@ fn number_kind(kind: Kind) -> RecordKind {
     }
 }
 
-fn cache_cell(data: &[u8], context: Context, record: RecordRef<'_>) -> Result<Cell> {
+fn excel_cache(
+    data: &[u8],
+    section: cache::Index,
+    xf: cache::Xf,
+    value: XlValue,
+    record: RecordRef<'_>,
+) -> Result<Cache> {
     let row = u16_at(data, 0, record)?;
     let col = u16_at(data, 2, record)?;
-    match context.kind() {
-        Kind::Graph => Ok(Cell::Graph {
-            row: RowCol::new(row).ok_or(Error::InvalidChart {
-                offset: record.offset(),
-                reason: "Graph cache row exceeds 3,999",
-            })?,
-            col: RowCol::new(col).ok_or(Error::InvalidChart {
-                offset: record.offset(),
-                reason: "Graph cache column exceeds 3,999",
-            })?,
-        }),
-        Kind::Excel => Ok(Cell::Excel {
-            row,
-            col: u8::try_from(col).map_err(|_| Error::InvalidChart {
-                offset: record.offset(),
-                reason: "Excel cache column exceeds the BIFF8 grid",
-            })?,
-        }),
-    }
+    Ok(Cache::excel(
+        section,
+        row,
+        u8::try_from(col).map_err(|_| Error::InvalidChart {
+            offset: record.offset(),
+            reason: "Excel cache column exceeds the BIFF8 grid",
+        })?,
+        xf,
+        value,
+    ))
 }
 
-fn cache_matches(cell: Cell, kind: Kind) -> bool {
-    matches!(
-        (cell, kind),
-        (Cell::Graph { .. }, Kind::Graph) | (Cell::Excel { .. }, Kind::Excel)
-    )
+fn graph_cache(
+    data: &[u8],
+    ifmt: cache::Ifmt,
+    value: Value,
+    record: RecordRef<'_>,
+) -> Result<Cache> {
+    Ok(Cache::graph(
+        RowCol::new(u16_at(data, 0, record)?).ok_or(Error::InvalidChart {
+            offset: record.offset(),
+            reason: "Graph cache row exceeds 3,999",
+        })?,
+        RowCol::new(u16_at(data, 2, record)?).ok_or(Error::InvalidChart {
+            offset: record.offset(),
+            reason: "Graph cache column exceeds 3,999",
+        })?,
+        ifmt,
+        value,
+    ))
 }
 
 fn check_string(value: Option<&str>, field: &'static str) -> Result<()> {
@@ -1843,8 +2679,34 @@ fn check_string(value: Option<&str>, field: &'static str) -> Result<()> {
     Ok(())
 }
 
+fn check_xl_string(value: &str, limits: Limits) -> Result<()> {
+    let count = value.encode_utf16().count();
+    if count > usize::from(u16::MAX) {
+        return invalid_model(
+            "cached text",
+            "Excel chart string exceeds 65,535 UTF-16 code units",
+        );
+    }
+    let width = if value.encode_utf16().any(|unit| unit > u16::from(u8::MAX)) {
+        2usize
+    } else {
+        1usize
+    };
+    let payload = 9usize
+        .checked_add(count.checked_mul(width).ok_or(Error::SizeOverflow {
+            resource: "cached chart string",
+        })?)
+        .ok_or(Error::SizeOverflow {
+            resource: "cached chart string",
+        })?;
+    if payload > limits.max_record_bytes {
+        return limit("record bytes", payload, limits.max_record_bytes);
+    }
+    Ok(())
+}
+
 fn valid_props(flags: u32) -> bool {
-    let reserved_clear = flags & 0x0000_FFE4 == 0 && flags & 0xFF00_0000 == 0;
+    let reserved_clear = flags & 0x0000_FFE0 == 0 && flags & 0xFF00_0000 == 0;
     let blank = (flags >> 16) & 0xFF;
     let auto_plot = flags & (1 << 4) != 0;
     let manual_plot = flags & (1 << 3) != 0;
@@ -2045,6 +2907,10 @@ fn put_byte(output: &mut [u8], offset: usize, value: u8) -> Result<()> {
 
 fn put_u16(output: &mut [u8], offset: usize, value: u16) -> Result<()> {
     put_slice(output, offset, &value.to_le_bytes(), "encoded u16")
+}
+
+fn put_u32(output: &mut [u8], offset: usize, value: u32) -> Result<()> {
+    put_slice(output, offset, &value.to_le_bytes(), "encoded u32")
 }
 
 fn put_i16(output: &mut [u8], offset: usize, value: i16) -> Result<()> {

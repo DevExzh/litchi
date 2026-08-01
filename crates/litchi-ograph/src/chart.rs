@@ -12,14 +12,17 @@ use crate::raw::{Kind as RecordKind, RecordRef, Records as RawRecords};
 use crate::{Error, Limits, Result};
 
 pub mod axis;
+pub mod cache;
 mod codec;
 pub mod format;
 pub mod group;
+pub mod layout;
 mod model;
 
 pub use model::{
-    Cache, Cell, CellRef, Chart, Context, Count, DataKind, Family, Group, GroupId, Label, Legend,
-    Link, Props, Raw, Rect, Role, RowCol, Series, Source, Value,
+    Ai, Binding, Cache, CellRef, Chart, Context, Count, DataKind, Edit, Family, Group, GroupId,
+    Label, Legend, Link, Order, Owner, Props, Raw, Rect, Role, RowCol, Series, Source, Value,
+    ValueRef, XlValue,
 };
 
 const BOF: RecordKind = RecordKind::new(0x0809);
