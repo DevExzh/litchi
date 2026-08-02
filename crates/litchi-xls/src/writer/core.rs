@@ -71,8 +71,8 @@ pub use self::shape::{
 };
 pub use self::shape_group::{XlsGroupRect, XlsShapeGroupChild, XlsShapeGroupWrite};
 use self::worksheet::{
-    AutoFilterColumnDef, AutoFilterRange, MergedRange, PivotCellXfRole, SortConfig, WritableCell,
-    WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
+    AutoFilterColumnDef, AutoFilterRange, CellPos, MergedRange, PivotCellXfRole, SortConfig,
+    WritableCell, WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
     WritableWorksheet, XlsHyperlink, XlsSheetProtection,
 };
 
@@ -1425,10 +1425,10 @@ impl XlsWriter {
         value: &str,
         format_id: u16,
     ) -> XlsResult<()> {
+        let pos = CellPos::try_new(row, col)?;
         self.write_cell(
             sheet,
-            row,
-            col,
+            pos,
             XlsCellValue::String(value.to_string()),
             format_id,
         )
@@ -1454,7 +1454,8 @@ impl XlsWriter {
         value: f64,
         format_id: u16,
     ) -> XlsResult<()> {
-        self.write_cell(sheet, row, col, XlsCellValue::Number(value), format_id)
+        let pos = CellPos::try_new(row, col)?;
+        self.write_cell(sheet, pos, XlsCellValue::Number(value), format_id)
     }
 
     /// Write a boolean value to a cell
@@ -1483,7 +1484,8 @@ impl XlsWriter {
         value: bool,
         format_id: u16,
     ) -> XlsResult<()> {
-        self.write_cell(sheet, row, col, XlsCellValue::Boolean(value), format_id)
+        let pos = CellPos::try_new(row, col)?;
+        self.write_cell(sheet, pos, XlsCellValue::Boolean(value), format_id)
     }
 
     /// Write a formula to a cell
@@ -1516,10 +1518,10 @@ impl XlsWriter {
         formula: &str,
         format_id: u16,
     ) -> XlsResult<()> {
+        let pos = CellPos::try_new(row, col)?;
         self.write_cell(
             sheet,
-            row,
-            col,
+            pos,
             XlsCellValue::Formula(formula.to_string()),
             format_id,
         )
@@ -1565,10 +1567,10 @@ impl XlsWriter {
     /// Adds a legacy BIFF8 worksheet table and writes its header captions.
     pub fn add_list_object(&mut self, sheet: usize, table: XlsListObject) -> XlsResult<()> {
         table.validate()?;
-        validate_list_object_style(
-            table.style().unwrap().name(),
-            self.custom_table_styles.as_ref(),
-        )?;
+        let style = table.style().ok_or_else(|| {
+            XlsError::InvalidData("validated table is missing its style".to_string())
+        })?;
+        validate_list_object_style(style.name(), self.custom_table_styles.as_ref())?;
         if self
             .worksheets
             .iter()
@@ -1617,6 +1619,7 @@ impl XlsWriter {
                 "table range overlaps the worksheet AutoFilter".to_string(),
             ));
         }
+        let mut header_cells = Vec::new();
         for (offset, column) in table
             .columns()
             .iter()
@@ -1633,27 +1636,22 @@ impl XlsWriter {
                 return Err(XlsError::InvalidData(
                     "table header collides with a different cell value".to_string(),
                 ));
+            } else if !worksheet.cells.contains_key(&key) {
+                header_cells.push(WritableCell::new(
+                    CellPos::try_new(key.0, key.1)?,
+                    XlsCellValue::String(column.name().to_string()),
+                    0,
+                    None,
+                ));
             }
         }
-        let worksheet = self.worksheets.get_mut(sheet).unwrap();
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {sheet}")))?;
         worksheet.include_list_object_range(table.range());
-        for (offset, column) in table
-            .columns()
-            .iter()
-            .enumerate()
-            .filter(|_| table.has_header_row())
-        {
-            let row = u32::from(table.range().first_row());
-            let col = table.range().first_column() + offset as u16;
-            if !worksheet.cells.contains_key(&(row, col)) {
-                worksheet.add_cell(WritableCell {
-                    row,
-                    col,
-                    value: XlsCellValue::String(column.name().to_string()),
-                    format_idx: 0,
-                    pivot_xf_role: None,
-                });
-            }
+        for cell in header_cells {
+            worksheet.add_cell(cell);
         }
         worksheet.list_objects.push(table);
         Ok(())
@@ -2180,12 +2178,11 @@ impl XlsWriter {
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
-        self.fmt.enable_pivot_xfs();
-
         // Generate pivot output cells BEFORE consuming config.fields / config.data_items.
         // Excel validates that DIMENSIONS and cell content are consistent with the
         // pivot table definition; missing cells cause a "corrupt file" repair dialog.
-        Self::generate_pivot_output_cells(worksheet, &config);
+        Self::generate_pivot_output_cells(worksheet, &config)?;
+        self.fmt.enable_pivot_xfs();
 
         let fields: Vec<WritablePivotField> = config
             .fields
@@ -2290,7 +2287,10 @@ impl XlsWriter {
     /// (first_data_row+i, 0)  : row item name       (fdr+i, fdc+j)         : aggregated value
     /// (last_row, 0)          : "Grand Total"        (lr, fdc+j)            : column totals
     /// ```
-    fn generate_pivot_output_cells(ws: &mut WritableWorksheet, cfg: &XlsPivotTableConfig) {
+    fn generate_pivot_output_cells(
+        ws: &mut WritableWorksheet,
+        cfg: &XlsPivotTableConfig,
+    ) -> XlsResult<()> {
         // Identify fields per axis.
         let row_field = cfg.fields.iter().find(|f| f.axis == 0x0001);
         let col_field = cfg.fields.iter().find(|f| f.axis == 0x0002);
@@ -2317,83 +2317,89 @@ impl XlsWriter {
         let lc = cfg.last_col;
         let fc = cfg.first_col;
 
-        let add = |ws: &mut WritableWorksheet,
-                   r: u16,
-                   c: u16,
-                   v: XlsCellValue,
-                   pivot_xf_role: Option<PivotCellXfRole>| {
-            ws.add_cell(WritableCell {
-                row: r as u32,
-                col: c,
-                value: v,
-                format_idx: 0,
+        let offset = |base: u16, amount: usize| -> XlsResult<u16> {
+            let amount = u16::try_from(amount).map_err(|_| {
+                XlsError::InvalidCellReference(
+                    "PivotTable output exceeds the BIFF8 grid".to_string(),
+                )
+            })?;
+            base.checked_add(amount).ok_or_else(|| {
+                XlsError::InvalidCellReference(
+                    "PivotTable output exceeds the BIFF8 grid".to_string(),
+                )
+            })
+        };
+        let mut staged = Vec::new();
+        let mut add = |row: u16,
+                       col: u16,
+                       value: XlsCellValue,
+                       pivot_xf_role: Option<PivotCellXfRole>|
+         -> XlsResult<()> {
+            staged.push(WritableCell::new(
+                CellPos::try_new(u32::from(row), col)?,
+                value,
+                0,
                 pivot_xf_role,
-            });
+            ));
+            Ok(())
         };
 
         // --- Page field area (above SXVIEW range) ---
         if let Some(pf) = page_field {
             let page_row = fr.saturating_sub(2);
             add(
-                ws,
                 page_row,
                 0,
                 XlsCellValue::String(pf.cache_name.clone()),
                 Some(PivotCellXfRole::HeaderAccent),
-            );
+            )?;
             add(
-                ws,
                 page_row,
                 1,
                 XlsCellValue::String("(All)".to_string()),
                 Some(PivotCellXfRole::HeaderPlain),
-            );
+            )?;
         }
 
         // --- Row at first_row: data item name + "Column Labels" ---
         if let Some(di) = data_item {
             add(
-                ws,
                 fr,
                 fc,
                 XlsCellValue::String(di.name.clone()),
                 Some(PivotCellXfRole::HeaderAccent),
-            );
+            )?;
         }
         if col_field.is_some() {
             add(
-                ws,
                 fr,
                 fdc,
                 XlsCellValue::String("Column Labels".to_string()),
                 Some(PivotCellXfRole::HeaderAccent),
-            );
+            )?;
         }
 
         // --- Row at first_header_row: "Row Labels" + column item names + "Grand Total" ---
         add(
-            ws,
             fhr,
             fc,
             XlsCellValue::String("Row Labels".to_string()),
             Some(PivotCellXfRole::HeaderAccent),
-        );
+        )?;
         for (j, ci) in col_items.iter().enumerate() {
             add(
-                ws,
                 fhr,
-                fdc + j as u16,
+                offset(fdc, j)?,
                 XlsCellValue::String(ci.clone()),
                 Some(PivotCellXfRole::HeaderPlain),
-            );
+            )?;
         }
         add(
-            ws,
             fhr,
             lc,
             XlsCellValue::String("Grand Total".to_string()),
             Some(PivotCellXfRole::HeaderPlain),
-        );
+        )?;
 
         // --- Compute aggregated values from source_data ---
         let row_fi = row_field.and_then(|f| field_idx_of(&f.cache_name));
@@ -2440,56 +2446,54 @@ impl XlsWriter {
 
         // --- Data rows ---
         for (i, (ri_name, row_total)) in row_items.iter().zip(row_totals.iter()).enumerate() {
-            let r = fdr + i as u16;
+            let r = offset(fdr, i)?;
             add(
-                ws,
                 r,
                 fc,
                 XlsCellValue::String(ri_name.clone()),
                 Some(PivotCellXfRole::RowLabel),
-            );
+            )?;
             for (j, cell_val) in grid[i].iter().enumerate() {
                 add(
-                    ws,
                     r,
-                    fdc + j as u16,
+                    offset(fdc, j)?,
                     XlsCellValue::Number(*cell_val),
                     Some(PivotCellXfRole::Value),
-                );
+                )?;
             }
             add(
-                ws,
                 r,
                 lc,
                 XlsCellValue::Number(*row_total),
                 Some(PivotCellXfRole::Value),
-            );
+            )?;
         }
 
         // --- Grand total row ---
         add(
-            ws,
             lr,
             fc,
             XlsCellValue::String("Grand Total".to_string()),
             Some(PivotCellXfRole::RowLabel),
-        );
+        )?;
         for (j, col_total) in col_totals.iter().enumerate() {
             add(
-                ws,
                 lr,
-                fdc + j as u16,
+                offset(fdc, j)?,
                 XlsCellValue::Number(*col_total),
                 Some(PivotCellXfRole::Value),
-            );
+            )?;
         }
         add(
-            ws,
             lr,
             lc,
             XlsCellValue::Number(grand_total),
             Some(PivotCellXfRole::Value),
-        );
+        )?;
+        for cell in staged {
+            ws.add_cell(cell);
+        }
+        Ok(())
     }
 
     /// Sort a field's cache items alphabetically and return the sorted labels
@@ -3236,8 +3240,7 @@ impl XlsWriter {
     fn write_cell(
         &mut self,
         sheet: usize,
-        row: u32,
-        col: u16,
+        pos: CellPos,
         value: XlsCellValue,
         format_id: u16,
     ) -> XlsResult<()> {
@@ -3250,13 +3253,7 @@ impl XlsWriter {
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
-        worksheet.add_cell(WritableCell {
-            row,
-            col,
-            value,
-            format_idx: format_id,
-            pivot_xf_role: None,
-        });
+        worksheet.add_cell(WritableCell::new(pos, value, format_id, None));
 
         Ok(())
     }
@@ -3657,15 +3654,11 @@ impl XlsWriter {
         anchor_col: u16,
         table: crate::XlsDataTable,
     ) -> XlsResult<()> {
-        if anchor_row > u32::from(u16::MAX) || anchor_col > 255 {
-            return Err(XlsError::InvalidData(
-                "data-table anchor cell exceeds the BIFF8 grid".to_string(),
-            ));
-        }
+        let anchor_pos = CellPos::try_new(anchor_row, anchor_col)?;
         let range = table.range();
         let inside = (u32::from(range.first_row())..=u32::from(range.last_row()))
             .contains(&anchor_row)
-            && (range.first_col()..=range.last_col()).contains(&(anchor_col as u8));
+            && (range.first_col()..=range.last_col()).contains(&anchor_pos.col());
         if inside {
             return Err(XlsError::InvalidData(
                 "data-table anchor formula cell must lie outside the table range".to_string(),
@@ -3691,13 +3684,7 @@ impl XlsWriter {
                 ));
             }
         } else {
-            worksheet.add_cell(WritableCell {
-                row: anchor_row,
-                col: anchor_col,
-                value: XlsCellValue::Blank,
-                format_idx: 0,
-                pivot_xf_role: None,
-            });
+            worksheet.add_cell(WritableCell::new(anchor_pos, XlsCellValue::Blank, 0, None));
         }
         worksheet.data_tables.push((anchor_row, anchor_col, table));
         Ok(())
@@ -4242,8 +4229,8 @@ mod tests {
         assert_eq!(writer.worksheets[0].cells.len(), 1);
 
         let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
-        assert_eq!(cell.row, 0);
-        assert_eq!(cell.col, 0);
+        assert_eq!(cell.row(), 0);
+        assert_eq!(cell.col(), 0);
         assert!(matches!(&cell.value, XlsCellValue::String(s) if s == "Hello"));
     }
 
@@ -4256,6 +4243,85 @@ mod tests {
 
         let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
         assert!(matches!(&cell.value, XlsCellValue::Number(n) if *n == 42.5));
+    }
+
+    #[test]
+    fn cell_grid_bounds_are_atomic_and_never_unwind() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+        let max = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.write_number(sheet, u32::from(u16::MAX), u16::from(u8::MAX), 42.5)
+        }));
+        assert!(matches!(max, Ok(Ok(()))));
+        let state = |writer: &XlsWriter| {
+            let worksheet = &writer.worksheets[sheet];
+            (
+                worksheet.cells.len(),
+                worksheet.first_row,
+                worksheet.last_row,
+                worksheet.first_col,
+                worksheet.last_col,
+            )
+        };
+        let max_state = (1, 65_535, 65_536, 255, 256);
+        assert_eq!(state(&writer), max_state);
+
+        let oversized_row = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.write_string(sheet, 65_536, 0, "outside")
+        }));
+        assert!(matches!(
+            oversized_row,
+            Ok(Err(XlsError::InvalidCellReference(_)))
+        ));
+        assert_eq!(state(&writer), max_state);
+
+        let adversarial_row = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.write_number(sheet, u32::MAX, 0, 1.0)
+        }));
+        assert!(matches!(
+            adversarial_row,
+            Ok(Err(XlsError::InvalidCellReference(_)))
+        ));
+        assert_eq!(state(&writer), max_state);
+
+        let oversized_col = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.write_formula(sheet, 0, 256, "1")
+        }));
+        assert!(matches!(
+            oversized_col,
+            Ok(Err(XlsError::InvalidCellReference(_)))
+        ));
+        assert_eq!(state(&writer), max_state);
+
+        let table = crate::XlsDataTable::one_variable(
+            crate::XlsDataTableRange::new(2, 8, 3, 5).unwrap(),
+            false,
+            crate::XlsDataTableInputCell::Deleted,
+        );
+        let adversarial_col = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_data_table(sheet, 0, u16::MAX, table)
+        }));
+        assert!(matches!(
+            adversarial_col,
+            Ok(Err(XlsError::InvalidCellReference(_)))
+        ));
+        assert_eq!(state(&writer), max_state);
+        assert!(writer.worksheets[sheet].data_tables.is_empty());
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.set_position(0);
+        let workbook = crate::XlsWorkbook::new(output).unwrap();
+        let cell = workbook
+            .xls_worksheet(0)
+            .unwrap()
+            .get_cell(u32::from(u16::MAX), u32::from(u8::MAX))
+            .unwrap();
+        assert!(matches!(
+            cell.value(),
+            litchi_core::sheet::CellValue::Float(value) if *value == 42.5
+        ));
     }
 
     #[test]
@@ -4436,17 +4502,24 @@ mod tests {
 
     #[test]
     fn test_writablecell_creation() {
-        let cell = WritableCell {
-            row: 5,
-            col: 3,
-            value: XlsCellValue::String("Test".to_string()),
-            format_idx: 15,
-            pivot_xf_role: None,
-        };
+        let cell = WritableCell::new(
+            CellPos::try_new(5, 3).unwrap(),
+            XlsCellValue::String("Test".to_string()),
+            15,
+            None,
+        );
 
-        assert_eq!(cell.row, 5);
-        assert_eq!(cell.col, 3);
+        assert_eq!(cell.row(), 5);
+        assert_eq!(cell.col(), 3);
         assert_eq!(cell.format_idx, 15);
+        assert!(matches!(
+            CellPos::try_new(65_536, 0),
+            Err(XlsError::InvalidCellReference(_))
+        ));
+        assert!(matches!(
+            CellPos::try_new(0, 256),
+            Err(XlsError::InvalidCellReference(_))
+        ));
     }
 
     #[test]
@@ -4461,13 +4534,12 @@ mod tests {
     #[test]
     fn test_writableworksheet_add_cell() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        let cell = WritableCell {
-            row: 0,
-            col: 0,
-            value: XlsCellValue::Number(100.0),
-            format_idx: 0,
-            pivot_xf_role: None,
-        };
+        let cell = WritableCell::new(
+            CellPos::try_new(0, 0).unwrap(),
+            XlsCellValue::Number(100.0),
+            0,
+            None,
+        );
         ws.add_cell(cell);
         assert_eq!(ws.cells.len(), 1);
     }

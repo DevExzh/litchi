@@ -10,6 +10,7 @@ use super::{
     XlsPageSetupOptions,
 };
 use crate::writer::biff::AutoFilterConditionWrite;
+use crate::{XlsError, XlsResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PivotCellXfRole {
@@ -19,16 +20,64 @@ pub(super) enum PivotCellXfRole {
     Value,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) struct CellPos {
+    row: u16,
+    col: u8,
+}
+
+impl CellPos {
+    pub(super) fn try_new(row: u32, col: u16) -> XlsResult<Self> {
+        let invalid = || {
+            XlsError::InvalidCellReference(format!(
+                "row {row}, column {col} is outside the BIFF8 grid"
+            ))
+        };
+        let row = u16::try_from(row).map_err(|_| invalid())?;
+        let col = u8::try_from(col).map_err(|_| invalid())?;
+        Ok(Self { row, col })
+    }
+
+    pub(super) const fn row(self) -> u16 {
+        self.row
+    }
+
+    pub(super) const fn col(self) -> u8 {
+        self.col
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) struct WritableCell {
-    /// Row index (0-based)
-    pub row: u32,
-    /// Column index (0-based)
-    pub col: u16,
+    pos: CellPos,
     /// Cell value
     pub value: XlsCellValue,
     pub format_idx: u16,
     pub pivot_xf_role: Option<PivotCellXfRole>,
+}
+
+impl WritableCell {
+    pub(super) const fn new(
+        pos: CellPos,
+        value: XlsCellValue,
+        format_idx: u16,
+        pivot_xf_role: Option<PivotCellXfRole>,
+    ) -> Self {
+        Self {
+            pos,
+            value,
+            format_idx,
+            pivot_xf_role,
+        }
+    }
+
+    pub(super) const fn row(&self) -> u16 {
+        self.pos.row()
+    }
+
+    pub(super) const fn col(&self) -> u8 {
+        self.pos.col()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -208,20 +257,23 @@ impl WritableWorksheet {
     }
 
     pub(super) fn add_cell(&mut self, cell: WritableCell) {
+        let row = u32::from(cell.row());
+        let col = u16::from(cell.col());
+
         // Update dimensions
         if self.cells.is_empty() {
-            self.first_row = cell.row;
-            self.last_row = cell.row + 1;
-            self.first_col = cell.col;
-            self.last_col = cell.col + 1;
+            self.first_row = row;
+            self.last_row = row + 1;
+            self.first_col = col;
+            self.last_col = col + 1;
         } else {
-            self.first_row = self.first_row.min(cell.row);
-            self.last_row = self.last_row.max(cell.row + 1);
-            self.first_col = self.first_col.min(cell.col);
-            self.last_col = self.last_col.max(cell.col + 1);
+            self.first_row = self.first_row.min(row);
+            self.last_row = self.last_row.max(row + 1);
+            self.first_col = self.first_col.min(col);
+            self.last_col = self.last_col.max(col + 1);
         }
 
-        self.cells.insert((cell.row, cell.col), cell);
+        self.cells.insert((row, col), cell);
     }
 
     pub(super) fn include_list_object_range(&mut self, range: crate::XlsListObjectRange) {
