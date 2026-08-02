@@ -7,7 +7,7 @@
 //! cargo run -p litchi-rtf --example parse_rtf -- test-data/rtf/hyperlink.rtf
 //! ```
 
-use litchi_rtf::RtfDocument;
+use litchi_rtf::Document;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,21 +20,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Parsing RTF file: {}", path.display());
     println!("{}", "=".repeat(60));
 
-    let doc = RtfDocument::open(&path)?;
+    let doc = Document::open(&path)?;
 
     // Document statistics
     let text = doc.text();
     println!("Text length        : {} characters", text.len());
     println!("Paragraph count    : {}", doc.paragraph_count());
-    println!("Font table entries : {}", doc.font_table().fonts().len());
-    println!("Color table entries: {}", doc.color_table().colors().len());
+    println!("Font table entries : {}", doc.fonts().len());
+    println!("Color table entries: {}", doc.colors().len());
     println!("Style blocks       : {}", doc.blocks().len());
     println!("Tables             : {}", doc.tables().len());
     println!("Pictures           : {}", doc.pictures().len());
     println!("Fields             : {}", doc.fields().len());
     println!("Sections           : {}", doc.sections().len());
-    println!("Footnotes          : {}", doc.footnotes().len());
-    println!("Endnotes           : {}", doc.endnotes().len());
+    println!("Footnotes          : {}", doc.footnotes().count());
+    println!("Endnotes           : {}", doc.endnotes().count());
     println!("Revisions          : {}", doc.revisions().len());
 
     // Document info / metadata

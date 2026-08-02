@@ -15,11 +15,12 @@
 )]
 #![allow(missing_docs)]
 
-//! RTF (Rich Text Format) parser module.
+//! Typed Rich Text Format documents.
 //!
-//! This module provides high-performance parsing of RTF documents with support
-//! for the RTF 1.9.1 specification. It uses arena allocation (bumpalo) for efficient
-//! memory management during parsing and zero-copy patterns where possible.
+//! [`Document`] is the ordinary immutable, lifetime-free snapshot. Parsing and
+//! opening live in [`read`], streaming serialization lives in [`mod@write`], and
+//! Outlook's compressed-RTF transport lives in [`transport`]. The retained
+//! mutable parser model is an advanced interface under [`raw`].
 //!
 //! # Architecture
 //!
@@ -31,13 +32,13 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_rtf::RtfDocument;
+//! use litchi_rtf::{Document, Result};
 //!
-//! # fn main() -> Result<(), litchi_rtf::RtfError> {
-//! let rtf_text = r#"{\rtf1\ansi{\fonttbl\f0\fswiss Helvetica;}\f0\pard Hello World!\par}"#;
-//! let doc = RtfDocument::parse(rtf_text)?;
-//! let text = doc.text();
-//! # Ok::<(), litchi_rtf::RtfError>(())
+//! # fn main() -> Result<()> {
+//! let rtf_text = r#"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}"#;
+//! let doc = Document::parse(rtf_text)?;
+//! assert_eq!(doc.text(), "Hello World!\n");
+//! # Ok(())
 //! # }
 //! ```
 
@@ -79,7 +80,8 @@ mod editable_region;
 mod equation;
 mod error;
 mod external_reference;
-mod field;
+mod facade;
+pub mod field;
 mod file_table;
 mod form_field;
 mod generated_list_marker;
@@ -95,9 +97,9 @@ mod legacy_paragraph_numbering;
 mod legacy_text_box;
 mod lexer;
 mod limits;
-mod list;
+pub mod list;
 mod mail_merge;
-mod math;
+pub mod math;
 mod math_properties;
 mod navigation_entry;
 mod note_options;
@@ -106,17 +108,17 @@ mod object;
 mod page_border;
 mod paragraph_group;
 mod parser;
-mod picture;
+pub mod picture;
 mod picture_compatibility;
 mod protection_range;
 mod protection_user;
 mod review_display;
 mod revision_save;
-mod section;
-mod shape;
+pub mod section;
+pub mod shape;
 mod style_list_filter;
 mod stylesheet;
-mod table;
+pub mod table;
 mod theme;
 mod types;
 mod user_property;
@@ -126,240 +128,367 @@ mod writer;
 mod xml_namespace;
 mod xsl_transform;
 
-// Re-exports
-pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
-pub use bookmark::{Bookmark, BookmarkTable};
-pub use border::{
-    Border, BorderStyle, Borders, CharacterBorder, CharacterBorderStyle, CharacterShading,
-    MAX_PARAGRAPH_TAB_STOPS, Shading, ShadingPattern, TabAlignment, TabLeader, TabStop, TabStops,
-};
-pub use character_positioning::{
-    CharacterBaseline, CharacterExpansion, CharacterPositioning,
-    MAX_CHARACTER_BASELINE_HALF_POINTS, MAX_CHARACTER_EXPANSION, MAX_CHARACTER_KERNING_HALF_POINTS,
-    MAX_CHARACTER_SCALE_PERCENT,
-};
-pub use compressed::{
-    DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
-    decompress_with_limits, is_compressed_rtf,
-};
-pub use custom_xml::{CustomXmlAttribute, CustomXmlTag};
-pub use data_store::DocumentDataStore;
-pub use document::RtfDocument;
-pub use document_asian_grid_compatibility::DocumentAsianGridCompatibility;
-pub use document_booklet_printing::DocumentBookletPrinting;
-pub use document_compatibility_policy::{DocumentCompatibilityPolicy, DocumentFeatureThrottle};
-pub use document_default_formatting::{
-    DefaultCharacterProperties, DefaultFormattingDestination, DefaultParagraphProperties,
-    DocumentDefaultFonts, DocumentDefaultFormatting,
-};
-pub use document_drawing_grid::{DocumentDrawingGrid, DrawingGridLineInterval, DrawingGridSpacing};
-pub use document_east_asian_compatibility::DocumentEastAsianCompatibility;
-pub use document_embedding_policies::DocumentEmbeddingPolicies;
-pub use document_file_settings::DocumentFileSettings;
-pub use document_legacy_layout_compatibility::DocumentLegacyLayoutCompatibility;
-pub use document_line_spacing_compatibility::DocumentLineSpacingCompatibility;
-pub use document_origin::{
-    DocumentAutoFormatType, DocumentOrigin, DocumentOriginMetadata, HtmlEmailVersion,
-};
-pub use document_output_settings::DocumentOutputSettings;
-pub use document_print_layout_settings::{DocumentPrintLayoutSettings, MAX_DOCUMENT_GUTTER_TWIPS};
-pub use document_privacy_policies::DocumentPrivacyPolicies;
-pub use document_processing_settings::{
-    AbstractNumberingCleanupStatus, DocumentEventMask, DocumentProcessingSettings,
-};
-pub use document_rendering_settings::{
-    DocumentJustificationMode, DocumentRenderingOrientation, DocumentRenderingSettings,
-};
-pub use document_revision_policies::DocumentRevisionPolicies;
-pub use document_save_preferences::{
-    DocumentReadOnlyRecommendation, DocumentSavePreferences, DocumentThumbnailPreference,
-};
-pub use document_style_policies::DocumentStylePolicies;
-pub use document_style_restrictions::DocumentStyleRestrictions;
-pub use document_table_layout_compatibility::DocumentTableLayoutCompatibility;
-pub use document_theme_languages::DocumentThemeLanguages;
-pub use document_variable::DocumentVariable;
-pub use document_view::{
-    DocumentView, DocumentViewKind, DocumentZoomKind, MAX_DOCUMENT_VIEW_SCALE_PERCENT,
-};
-pub use document_word_2003_compatibility::DocumentWord2003Compatibility;
-pub use document_xml_policies::DocumentXmlPolicies;
-pub use editable_region::EditableRegion;
-pub use equation::{
-    EquationAlignment, EquationArray, EquationBox, EquationBracket, EquationDisplace,
-    EquationGroup, EquationIntegral, EquationIntegralSymbol, EquationModel, EquationOverstrike,
-    EquationScript, EquationSegment, EquationSpacing, EquationSwitch,
-};
-pub use error::{RtfError, RtfResult};
-pub use external_reference::{
-    DocumentExternalReferences, MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,
-    MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
-};
-pub use field::CompareField;
-pub use field::{
-    ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AutoNumberField,
-    AutoNumberFieldKind, AutoTextField, AutoTextFieldKind, AutoTextListField, AutoTextListOption,
-    BarcodeDisplayField, BarcodeDisplayFieldKind, BarcodeField, BibliographyField,
-    BibliographyOption, BidiOutlineField, BodyStoryEvent, CitationField, CitationOption,
-    ColumnBreak, DatabaseField, DdeField, DdeFieldKind, DdeRepresentation, DocumentContextField,
-    DocumentContextFieldKind, DocumentInformationField, DocumentInformationFieldKind,
-    DocumentPropertyField, DocumentVariableField, EmbedField, EquationField, ExternalIncludeField,
-    ExternalIncludeOption, Field, FieldCodeError, FieldCodeToken, FieldOwner, FieldStatus,
-    FieldSwitch, FieldType, FormulaField, GoToButtonField, HyperlinkCode, HyperlinkField, IfField,
-    IncludeFieldKind, IndexEntryField, IndexEntryOption, IndexField, IndexOption, InfoField,
-    LegacyFormField, LegacyFormFieldKind, LinkField, LinkFormatting, LinkResultOption,
-    ListNumberField, MacroButtonField, MailMergeConditionalControlField,
-    MailMergeConditionalControlKind, MailMergeCounterField, MailMergeCounterKind,
-    MailMergeDataField, MailMergeNextField, MailMergeRecipientField, MailMergeRecipientFieldKind,
-    MergeField, PageBreak, ParsedFieldCode, PrintField, PrivateField, PromptField, PromptFieldKind,
-    QuoteField, ReferenceCode, ReferenceField, ReferenceFieldKind, ReferencedDocumentField,
-    SectionBreak, SequenceField, SetField, ShapeField, SoftBreak, SoftBreakKind, StoryEvent,
-    StoryField, StyleReferenceField, StyleReferenceFieldOption, SymbolField,
-    TableOfAuthoritiesEntryField, TableOfAuthoritiesEntryOption, TableOfAuthoritiesField,
-    TableOfAuthoritiesOption, TableOfContentsEntryField, TableOfContentsEntryOption,
-    TableOfContentsField, TableOfContentsOption, UserIdentityField, UserIdentityFieldKind,
-    UserIdentityFormatting, parse_field_code,
-};
-pub use field::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
-pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
-pub use form_field::{FormField, FormFieldType, FormTextType};
-pub use generated_list_marker::{GeneratedListMarker, GeneratedListMarkerKind};
-pub use generator::DocumentGenerator;
-pub use hyphenation::{
-    DocumentHyphenation, MAX_HYPHENATION_CONSECUTIVE_LINES, MAX_HYPHENATION_HOT_ZONE_TWIPS,
-};
-pub use info::{DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp};
-pub use kinsoku::DocumentKinsoku;
-pub use language::{DocumentLanguageDefaults, LanguageId};
-pub use latent_style::{LatentStyleException, LatentStyles};
-pub use legacy_drawing::{
-    LegacyCallout, LegacyCalloutAttachment, LegacyCalloutType, LegacyDrawing, LegacyDrawingArrow,
-    LegacyDrawingArrowFill, LegacyDrawingArrowSize, LegacyDrawingColor, LegacyDrawingFill,
-    LegacyDrawingFillPattern, LegacyDrawingGeometry, LegacyDrawingLine, LegacyDrawingLineStyle,
-    LegacyDrawingPoint, LegacyDrawingPrimitive, LegacyDrawingProperties, LegacyDrawingShadow,
-    MAX_LEGACY_DRAWING_DEPTH, MAX_LEGACY_DRAWING_POINTS, MAX_LEGACY_DRAWING_PRIMITIVES,
-    MAX_LEGACY_DRAWING_TOTAL_POINTS, MAX_LEGACY_DRAWINGS,
-};
-pub use legacy_numbering::{
-    LegacyNumberingAlignment, LegacyNumberingFormat, LegacySectionNumbering,
-    LegacySectionNumberingLevel,
-};
-pub use legacy_paragraph_numbering::{
-    LegacyParagraphNumbering, LegacyParagraphNumberingAlignment, LegacyParagraphNumberingBidi,
-    LegacyParagraphNumberingFormat, LegacyParagraphNumberingLevel,
-    LegacyParagraphNumberingRevision, LegacyParagraphNumberingUnderline,
-    MAX_LEGACY_PARAGRAPH_NUMBERING_RECORDS, MAX_LEGACY_PARAGRAPH_NUMBERING_TEXT_BYTES,
-};
-pub use legacy_text_box::{
-    LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
-};
-pub use lexer::CharacterSet;
-pub use limits::ParseLimits;
-pub use list::{
-    List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideLevel,
-    ListOverrideTable, ListTable,
-};
-pub use mail_merge::{
-    MAX_MAIL_MERGE_FIELD_MAPPINGS, MAX_MAIL_MERGE_NESTING_DEPTH, MAX_MAIL_MERGE_RECIPIENT_DATA,
-    MAX_MAIL_MERGE_STRING_BYTES, MAX_MAIL_MERGE_TOTAL_BYTES, MailMerge, MailMergeColumnIndex,
-    MailMergeDataSourceObject, MailMergeDataSourceType, MailMergeFieldMapping,
-};
-pub use math::{
-    MathElement, MathElementRole, MathMatrixColumn, MathMatrixRow, MathObject, MathProperties,
-    MathPropertiesKind, MathProperty, MathPropertyName, MathRun, MathStructure, MathStructureChild,
-    MathStructureKind, MathZone, MathZoneKind,
-};
-pub use math_properties::{
-    DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,
-    MathJustification, MathLimitPlacement,
-};
-pub use navigation_entry::{IndexEntry, IndexPageReference, NavigationEntry, TableOfContentsEntry};
-pub use note_options::{
-    EndnoteRestart, FootnoteRestart, NoteNumberingStyle, NoteOptions, NotePlacement,
-    PresentNoteKinds,
-};
-pub use note_separator::{
-    NoteSeparator, NoteSeparatorElement, NoteSeparatorKind, NoteSeparatorTable,
-};
-pub use object::{
-    EmbeddedObject, MAX_EMBEDDED_OBJECTS, MAX_OBJECT_DATA_BYTES, MAX_OBJECT_METADATA_BYTES,
-    ObjectKind, ObjectResultKind, OleObjectHeader,
-};
-pub use page_border::{
-    PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderSide,
-    PageBorderStyle, PageBorders,
-};
-pub use paragraph_group::{ParagraphGroupProperty, ParagraphGroupPropertyTable};
-pub use picture::{
-    ImageType, MAX_PICTURE_SHAPE_PROPERTIES, MAX_PICTURE_SHAPE_PROPERTY_BYTES, Picture,
-    PictureBitmapMetadata, PictureCrop, PictureIdentity, PictureShapeProperties, detect_image_type,
-};
-pub use picture_compatibility::{
-    MAX_PICTURE_COMPATIBILITY_RECORDS, PictureCompatibilityKind, PictureCompatibilityRecord,
-};
-pub use protection_range::ProtectionRange;
-pub use protection_user::{
-    MAX_PROTECTION_USER_BYTES, MAX_PROTECTION_USER_TOTAL_BYTES, MAX_PROTECTION_USERS,
-    ProtectionUser, ProtectionUserTable,
-};
-pub use review_display::DocumentReviewDisplay;
-pub use revision_save::RevisionSaveMetadata;
-pub use section::{
-    HeaderFooter, HeaderFooterParagraph, HeaderFooterType, MAX_PAGE_NUMBER_HEADING_LEVEL,
-    MAX_SECTION_COLUMN_TWIPS, MAX_SECTION_COLUMNS, MAX_SECTION_LINE_DISTANCE,
-    MAX_SECTION_LINE_GRID_TWIPS, MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START, Note,
-    PageNumberFormat, PageNumberHeadingSeparator, PageNumberRestart, PageOrientation, Section,
-    SectionBreakType, SectionColumn, SectionColumns, SectionDocumentGrid, SectionDocumentGridType,
-    SectionLineNumberRestart, SectionLineNumbering, SectionPageNumberHeading, SectionProperties,
-    SectionRendering, VerticalAlignment,
-};
-pub use section::{SectionFootnotePlacement, SectionNoteOptions};
-pub use shape::{
-    Fill, FillType, GradientDirection, MAX_SHAPE_PROPERTY_BINARY_BYTES, OfficeArtColor,
-    OfficeArtOpacity, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
-    ShapeHorizontalAnchor, ShapeHyperlink, ShapeLine, ShapeProperty, ShapeResult,
-    ShapeRotationDegrees, ShapeThemeColor, ShapeThemeValue, ShapeTwips, ShapeType,
-    ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing, WrapMode,
-};
-pub use style_list_filter::{DocumentStyleListFilter, DocumentStyleSortMethod};
-pub use stylesheet::{Style, StyleSheet, StyleType, TableStyleConditionalFormatting};
-pub use table::{
-    Cell, CellNestedTable, CellRevision, CellRevisionKind, CellStoryEvent, CellStoryReference,
-    FloatingTablePosition, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW,
-    MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_GEOMETRY_TWIPS, MAX_TABLE_NESTING_DEPTH,
-    MAX_TABLE_ROW_INDEX, MAX_TABLE_WIDTH_PERCENT, Row, Table, TableAutoformatFlag,
-    TableAutoformatFlags, TableCellBorderSide, TableCellBorders, TableCellCoordinate,
-    TableCellLayout, TableCellMergeAxis, TableCellMergeRole, TableCellMergeState, TableCellPath,
-    TableCellTextFlow, TableCellVerticalAlignment, TableDistanceKind, TableDistanceScope,
-    TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances, TableHorizontalPosition,
-    TableHorizontalReference, TableIndent, TableIndentUnit, TablePreferredWidth,
-    TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex, TableRowBanding,
-    TableRowBorderSide, TableRowBorders, TableRowCellDefaults, TableRowGeometry, TableRowHeight,
-    TableRowLayout, TableShading, TableSideDistance, TableStyleBorderSide,
-    TableStyleDefaultBorders, TableVerticalPosition, TableVerticalReference, TableWrapDistances,
-};
-pub use theme::DocumentTheme;
-pub use types::{
-    Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
-    AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
-    DocumentElement, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font, FontCharset,
-    FontFamily, FontPage, FontPitch, FontRef, FontTable, FontTheme, Formatting, Indentation,
-    MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphContent, ParagraphDropCap,
-    ParagraphDropCapKind, ParagraphFontAlignment, ParagraphLineBreaking,
-    ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata, Run,
-    Spacing, StyleBlock, TextDirection, UnderlineStyle,
-};
-pub use user_property::{UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue};
-pub use window_caption::{DocumentWindowCaption, MAX_WINDOW_CAPTION_BYTES};
-pub use write_reservation::{
-    DocumentWriteReservations, LegacyWriteReservation, MAX_WRITE_RESERVATION_BYTES,
-    WriteReservationHash,
-};
-pub use writer::{
-    Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS,
-    RtfWriter, WriterOptions,
-};
-pub use xml_namespace::XmlNamespace;
-pub use xsl_transform::{
-    DocumentXslTransform, DocumentXslTransformUsage, MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES,
-};
+/// Concise document-opening facade.
+pub mod read {
+    pub use crate::facade::Document;
+    pub use crate::limits::ParseLimits as Limits;
+}
+
+/// Concise streaming writer facade.
+pub mod write {
+    pub use crate::writer::{
+        Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy as TabWidth,
+        MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfWriter as Writer, WriterOptions as Options,
+    };
+}
+
+/// Bounded Outlook/MAPI compressed-RTF transport codec.
+pub mod transport {
+    pub use crate::compressed::{
+        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits as Limits, compress, decompress,
+        decompress_with_limits, is_compressed_rtf,
+    };
+}
+
+/// Advanced retained RTF model.
+///
+/// This interface exposes format-specific structure. Ordinary read-only code
+/// should prefer [`crate::Document`].
+pub mod raw {
+    pub use crate::document::RtfDocument as Document;
+    pub use crate::legacy::*;
+}
+
+/// Body text, local formatting, and paragraph values.
+pub mod text {
+    pub use crate::border::{
+        Border, BorderStyle, Borders, CharacterBorder, CharacterBorderStyle, CharacterShading,
+        Shading, ShadingPattern, TabAlignment, TabLeader, TabStop, TabStops,
+    };
+    pub use crate::character_positioning::{
+        CharacterBaseline as Baseline, CharacterExpansion as Expansion,
+        CharacterPositioning as Positioning,
+    };
+    pub use crate::types::{
+        Alignment, AnimatedTextEffect, AssociatedCharacterFormatting, CharacterGrid, CharacterType,
+        EmphasisMark, FitText, Formatting, Indentation, Paragraph, ParagraphContent,
+        ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment, ParagraphLineBreaking,
+        ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata,
+        Run, Spacing, StyleBlock as Block, TextDirection, UnderlineStyle,
+    };
+}
+
+/// Font resources and checked references.
+pub mod font {
+    pub use crate::types::{
+        EmbeddedFont as Embedded, EmbeddedFontFormat as EmbeddedFormat, Font,
+        FontCharset as Charset, FontFamily as Family, FontPage as Page, FontPitch as Pitch,
+        FontTheme as Theme,
+    };
+}
+
+/// Color resources and checked references.
+pub mod color {
+    pub use crate::types::Color;
+}
+
+/// Named document styles and stylesheet policy values.
+pub mod style {
+    pub use crate::latent_style::{LatentStyleException as LatentException, LatentStyles};
+    pub use crate::style_list_filter::{
+        DocumentStyleListFilter as ListFilter, DocumentStyleSortMethod as SortMethod,
+    };
+    pub use crate::stylesheet::{
+        Style, StyleType as Kind, TableStyleConditionalFormatting as TableConditional,
+    };
+}
+
+/// Passive document metadata and protection declarations.
+pub mod metadata {
+    pub use crate::info::{
+        DocumentInfo as Info, DocumentProtection as Protection, ProtectionLevel, ProtectionType,
+        RtfTimestamp as Timestamp,
+    };
+    pub use crate::user_property::{
+        UserProperty, UserPropertyDateTime as DateTime, UserPropertyType as PropertyType,
+        UserPropertyValue as Value,
+    };
+}
+
+/// Comments, notes, and tracked revisions.
+pub mod review {
+    pub use crate::annotation::{
+        Annotation, AnnotationType as AnnotationKind, Revision, RevisionAuthor,
+        RevisionType as RevisionKind,
+    };
+    pub use crate::section::Note;
+}
+
+pub use error::{RtfError as Error, RtfResult as Result};
+pub use facade::Document;
+
+// The parser model historically occupied the entire crate root. Keep those
+// names available to the workspace while the semantic facade migrates, but do
+// not present them as the ordinary documented API.
+mod legacy {
+    use super::*;
+
+    pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
+    pub use bookmark::{Bookmark, BookmarkTable};
+    pub use border::{
+        Border, BorderStyle, Borders, CharacterBorder, CharacterBorderStyle, CharacterShading,
+        MAX_PARAGRAPH_TAB_STOPS, Shading, ShadingPattern, TabAlignment, TabLeader, TabStop,
+        TabStops,
+    };
+    pub use character_positioning::{
+        CharacterBaseline, CharacterExpansion, CharacterPositioning,
+        MAX_CHARACTER_BASELINE_HALF_POINTS, MAX_CHARACTER_EXPANSION,
+        MAX_CHARACTER_KERNING_HALF_POINTS, MAX_CHARACTER_SCALE_PERCENT,
+    };
+    pub use compressed::{
+        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
+        decompress_with_limits, is_compressed_rtf,
+    };
+    pub use custom_xml::{CustomXmlAttribute, CustomXmlTag};
+    pub use data_store::DocumentDataStore;
+    pub use document::RtfDocument;
+    pub use document_asian_grid_compatibility::DocumentAsianGridCompatibility;
+    pub use document_booklet_printing::DocumentBookletPrinting;
+    pub use document_compatibility_policy::{DocumentCompatibilityPolicy, DocumentFeatureThrottle};
+    pub use document_default_formatting::{
+        DefaultCharacterProperties, DefaultFormattingDestination, DefaultParagraphProperties,
+        DocumentDefaultFonts, DocumentDefaultFormatting,
+    };
+    pub use document_drawing_grid::{
+        DocumentDrawingGrid, DrawingGridLineInterval, DrawingGridSpacing,
+    };
+    pub use document_east_asian_compatibility::DocumentEastAsianCompatibility;
+    pub use document_embedding_policies::DocumentEmbeddingPolicies;
+    pub use document_file_settings::DocumentFileSettings;
+    pub use document_legacy_layout_compatibility::DocumentLegacyLayoutCompatibility;
+    pub use document_line_spacing_compatibility::DocumentLineSpacingCompatibility;
+    pub use document_origin::{
+        DocumentAutoFormatType, DocumentOrigin, DocumentOriginMetadata, HtmlEmailVersion,
+    };
+    pub use document_output_settings::DocumentOutputSettings;
+    pub use document_print_layout_settings::{
+        DocumentPrintLayoutSettings, MAX_DOCUMENT_GUTTER_TWIPS,
+    };
+    pub use document_privacy_policies::DocumentPrivacyPolicies;
+    pub use document_processing_settings::{
+        AbstractNumberingCleanupStatus, DocumentEventMask, DocumentProcessingSettings,
+    };
+    pub use document_rendering_settings::{
+        DocumentJustificationMode, DocumentRenderingOrientation, DocumentRenderingSettings,
+    };
+    pub use document_revision_policies::DocumentRevisionPolicies;
+    pub use document_save_preferences::{
+        DocumentReadOnlyRecommendation, DocumentSavePreferences, DocumentThumbnailPreference,
+    };
+    pub use document_style_policies::DocumentStylePolicies;
+    pub use document_style_restrictions::DocumentStyleRestrictions;
+    pub use document_table_layout_compatibility::DocumentTableLayoutCompatibility;
+    pub use document_theme_languages::DocumentThemeLanguages;
+    pub use document_variable::DocumentVariable;
+    pub use document_view::{
+        DocumentView, DocumentViewKind, DocumentZoomKind, MAX_DOCUMENT_VIEW_SCALE_PERCENT,
+    };
+    pub use document_word_2003_compatibility::DocumentWord2003Compatibility;
+    pub use document_xml_policies::DocumentXmlPolicies;
+    pub use editable_region::EditableRegion;
+    pub use equation::{
+        EquationAlignment, EquationArray, EquationBox, EquationBracket, EquationDisplace,
+        EquationGroup, EquationIntegral, EquationIntegralSymbol, EquationModel, EquationOverstrike,
+        EquationScript, EquationSegment, EquationSpacing, EquationSwitch,
+    };
+    pub use error::{RtfError, RtfResult};
+    pub use external_reference::{
+        DocumentExternalReferences, MAX_DOCUMENT_EXTERNAL_REFERENCE_BYTES,
+        MAX_DOCUMENT_EXTERNAL_REFERENCE_TOTAL_BYTES,
+    };
+    pub use field::CompareField;
+    pub use field::{
+        ActiveContentField, ActiveContentFieldKind, AddressBlockCountryInclusion, AutoNumberField,
+        AutoNumberFieldKind, AutoTextField, AutoTextFieldKind, AutoTextListField,
+        AutoTextListOption, BarcodeDisplayField, BarcodeDisplayFieldKind, BarcodeField,
+        BibliographyField, BibliographyOption, BidiOutlineField, BodyStoryEvent, CitationField,
+        CitationOption, ColumnBreak, DatabaseField, DdeField, DdeFieldKind, DdeRepresentation,
+        DocumentContextField, DocumentContextFieldKind, DocumentInformationField,
+        DocumentInformationFieldKind, DocumentPropertyField, DocumentVariableField, EmbedField,
+        EquationField, ExternalIncludeField, ExternalIncludeOption, Field, FieldCodeError,
+        FieldCodeToken, FieldOwner, FieldStatus, FieldSwitch, FieldType, FormulaField,
+        GoToButtonField, HyperlinkCode, HyperlinkField, IfField, IncludeFieldKind, IndexEntryField,
+        IndexEntryOption, IndexField, IndexOption, InfoField, LegacyFormField, LegacyFormFieldKind,
+        LinkField, LinkFormatting, LinkResultOption, ListNumberField, MacroButtonField,
+        MailMergeConditionalControlField, MailMergeConditionalControlKind, MailMergeCounterField,
+        MailMergeCounterKind, MailMergeDataField, MailMergeNextField, MailMergeRecipientField,
+        MailMergeRecipientFieldKind, MergeField, PageBreak, ParsedFieldCode, PrintField,
+        PrivateField, PromptField, PromptFieldKind, QuoteField, ReferenceCode, ReferenceField,
+        ReferenceFieldKind, ReferencedDocumentField, SectionBreak, SequenceField, SetField,
+        ShapeField, SoftBreak, SoftBreakKind, StoryEvent, StoryField, StyleReferenceField,
+        StyleReferenceFieldOption, SymbolField, TableOfAuthoritiesEntryField,
+        TableOfAuthoritiesEntryOption, TableOfAuthoritiesField, TableOfAuthoritiesOption,
+        TableOfContentsEntryField, TableOfContentsEntryOption, TableOfContentsField,
+        TableOfContentsOption, UserIdentityField, UserIdentityFieldKind, UserIdentityFormatting,
+        parse_field_code,
+    };
+    pub use field::{AdvanceField, AdvanceFieldAdjustment, AdvanceFieldOperation};
+    pub use file_table::{FileLocation, FileSystemValidity, FileTable, FileTableEntry};
+    pub use form_field::{FormField, FormFieldType, FormTextType};
+    pub use generated_list_marker::{GeneratedListMarker, GeneratedListMarkerKind};
+    pub use generator::DocumentGenerator;
+    pub use hyphenation::{
+        DocumentHyphenation, MAX_HYPHENATION_CONSECUTIVE_LINES, MAX_HYPHENATION_HOT_ZONE_TWIPS,
+    };
+    pub use info::{
+        DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp,
+    };
+    pub use kinsoku::DocumentKinsoku;
+    pub use language::{DocumentLanguageDefaults, LanguageId};
+    pub use latent_style::{LatentStyleException, LatentStyles};
+    pub use legacy_drawing::{
+        LegacyCallout, LegacyCalloutAttachment, LegacyCalloutType, LegacyDrawing,
+        LegacyDrawingArrow, LegacyDrawingArrowFill, LegacyDrawingArrowSize, LegacyDrawingColor,
+        LegacyDrawingFill, LegacyDrawingFillPattern, LegacyDrawingGeometry, LegacyDrawingLine,
+        LegacyDrawingLineStyle, LegacyDrawingPoint, LegacyDrawingPrimitive,
+        LegacyDrawingProperties, LegacyDrawingShadow, MAX_LEGACY_DRAWING_DEPTH,
+        MAX_LEGACY_DRAWING_POINTS, MAX_LEGACY_DRAWING_PRIMITIVES, MAX_LEGACY_DRAWING_TOTAL_POINTS,
+        MAX_LEGACY_DRAWINGS,
+    };
+    pub use legacy_numbering::{
+        LegacyNumberingAlignment, LegacyNumberingFormat, LegacySectionNumbering,
+        LegacySectionNumberingLevel,
+    };
+    pub use legacy_paragraph_numbering::{
+        LegacyParagraphNumbering, LegacyParagraphNumberingAlignment, LegacyParagraphNumberingBidi,
+        LegacyParagraphNumberingFormat, LegacyParagraphNumberingLevel,
+        LegacyParagraphNumberingRevision, LegacyParagraphNumberingUnderline,
+        MAX_LEGACY_PARAGRAPH_NUMBERING_RECORDS, MAX_LEGACY_PARAGRAPH_NUMBERING_TEXT_BYTES,
+    };
+    pub use legacy_text_box::{
+        LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
+    };
+    pub use lexer::CharacterSet;
+    pub use limits::ParseLimits;
+    pub use list::{
+        List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride,
+        ListOverrideLevel, ListOverrideTable, ListTable,
+    };
+    pub use mail_merge::{
+        MAX_MAIL_MERGE_FIELD_MAPPINGS, MAX_MAIL_MERGE_NESTING_DEPTH, MAX_MAIL_MERGE_RECIPIENT_DATA,
+        MAX_MAIL_MERGE_STRING_BYTES, MAX_MAIL_MERGE_TOTAL_BYTES, MailMerge, MailMergeColumnIndex,
+        MailMergeDataSourceObject, MailMergeDataSourceType, MailMergeFieldMapping,
+    };
+    pub use math::{
+        MathElement, MathElementRole, MathMatrixColumn, MathMatrixRow, MathObject, MathProperties,
+        MathPropertiesKind, MathProperty, MathPropertyName, MathRun, MathStructure,
+        MathStructureChild, MathStructureKind, MathZone, MathZoneKind,
+    };
+    pub use math_properties::{
+        DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,
+        MathJustification, MathLimitPlacement,
+    };
+    pub use navigation_entry::{
+        IndexEntry, IndexPageReference, NavigationEntry, TableOfContentsEntry,
+    };
+    pub use note_options::{
+        EndnoteRestart, FootnoteRestart, NoteNumberingStyle, NoteOptions, NotePlacement,
+        PresentNoteKinds,
+    };
+    pub use note_separator::{
+        NoteSeparator, NoteSeparatorElement, NoteSeparatorKind, NoteSeparatorTable,
+    };
+    pub use object::{
+        EmbeddedObject, MAX_EMBEDDED_OBJECTS, MAX_OBJECT_DATA_BYTES, MAX_OBJECT_METADATA_BYTES,
+        ObjectKind, ObjectResultKind, OleObjectHeader,
+    };
+    pub use page_border::{
+        PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderSide,
+        PageBorderStyle, PageBorders,
+    };
+    pub use paragraph_group::{ParagraphGroupProperty, ParagraphGroupPropertyTable};
+    pub use picture::{
+        ImageType, MAX_PICTURE_SHAPE_PROPERTIES, MAX_PICTURE_SHAPE_PROPERTY_BYTES, Picture,
+        PictureBitmapMetadata, PictureCrop, PictureIdentity, PictureShapeProperties,
+        detect_image_type,
+    };
+    pub use picture_compatibility::{
+        MAX_PICTURE_COMPATIBILITY_RECORDS, PictureCompatibilityKind, PictureCompatibilityRecord,
+    };
+    pub use protection_range::ProtectionRange;
+    pub use protection_user::{
+        MAX_PROTECTION_USER_BYTES, MAX_PROTECTION_USER_TOTAL_BYTES, MAX_PROTECTION_USERS,
+        ProtectionUser, ProtectionUserTable,
+    };
+    pub use review_display::DocumentReviewDisplay;
+    pub use revision_save::RevisionSaveMetadata;
+    pub use section::{
+        HeaderFooter, HeaderFooterParagraph, HeaderFooterType, MAX_PAGE_NUMBER_HEADING_LEVEL,
+        MAX_SECTION_COLUMN_TWIPS, MAX_SECTION_COLUMNS, MAX_SECTION_LINE_DISTANCE,
+        MAX_SECTION_LINE_GRID_TWIPS, MAX_SECTION_LINE_INCREMENT, MAX_SECTION_LINE_START, Note,
+        PageNumberFormat, PageNumberHeadingSeparator, PageNumberRestart, PageOrientation, Section,
+        SectionBreakType, SectionColumn, SectionColumns, SectionDocumentGrid,
+        SectionDocumentGridType, SectionLineNumberRestart, SectionLineNumbering,
+        SectionPageNumberHeading, SectionProperties, SectionRendering, VerticalAlignment,
+    };
+    pub use section::{SectionFootnotePlacement, SectionNoteOptions};
+    pub use shape::{
+        Fill, FillType, GradientDirection, MAX_SHAPE_PROPERTY_BINARY_BYTES, OfficeArtColor,
+        OfficeArtOpacity, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
+        ShapeHorizontalAnchor, ShapeHyperlink, ShapeLine, ShapeProperty, ShapeResult,
+        ShapeRotationDegrees, ShapeThemeColor, ShapeThemeValue, ShapeTwips, ShapeType,
+        ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing, WrapMode,
+    };
+    pub use style_list_filter::{DocumentStyleListFilter, DocumentStyleSortMethod};
+    pub use stylesheet::{Style, StyleSheet, StyleType, TableStyleConditionalFormatting};
+    pub use table::{
+        Cell, CellNestedTable, CellRevision, CellRevisionKind, CellStoryEvent, CellStoryReference,
+        FloatingTablePosition, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW,
+        MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_GEOMETRY_TWIPS, MAX_TABLE_NESTING_DEPTH,
+        MAX_TABLE_ROW_INDEX, MAX_TABLE_WIDTH_PERCENT, Row, Table, TableAutoformatFlag,
+        TableAutoformatFlags, TableCellBorderSide, TableCellBorders, TableCellCoordinate,
+        TableCellLayout, TableCellMergeAxis, TableCellMergeRole, TableCellMergeState,
+        TableCellPath, TableCellTextFlow, TableCellVerticalAlignment, TableDistanceKind,
+        TableDistanceScope, TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances,
+        TableHorizontalPosition, TableHorizontalReference, TableIndent, TableIndentUnit,
+        TablePreferredWidth, TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex,
+        TableRowBanding, TableRowBorderSide, TableRowBorders, TableRowCellDefaults,
+        TableRowGeometry, TableRowHeight, TableRowLayout, TableShading, TableSideDistance,
+        TableStyleBorderSide, TableStyleDefaultBorders, TableVerticalPosition,
+        TableVerticalReference, TableWrapDistances,
+    };
+    pub use theme::DocumentTheme;
+    pub use types::{
+        Alignment, AnimatedTextEffect, AssociatedCharacterBaseline, AssociatedCharacterFormatting,
+        AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
+        DocumentElement, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font,
+        FontCharset, FontFamily, FontPage, FontPitch, FontRef, FontTable, FontTheme, Formatting,
+        Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphContent, ParagraphDropCap,
+        ParagraphDropCapKind, ParagraphFontAlignment, ParagraphLineBreaking,
+        ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata,
+        Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
+    };
+    pub use user_property::{
+        UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue,
+    };
+    pub use window_caption::{DocumentWindowCaption, MAX_WINDOW_CAPTION_BYTES};
+    pub use write_reservation::{
+        DocumentWriteReservations, LegacyWriteReservation, MAX_WRITE_RESERVATION_BYTES,
+        WriteReservationHash,
+    };
+    pub use writer::{
+        Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy, MAX_DEFAULT_TAB_WIDTH_TWIPS,
+        RtfWriter, WriterOptions,
+    };
+    pub use xml_namespace::XmlNamespace;
+    pub use xsl_transform::{
+        DocumentXslTransform, DocumentXslTransformUsage, MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES,
+    };
+}
+
+#[cfg(doc)]
+pub(crate) use legacy::*;
+
+#[cfg(not(doc))]
+#[doc(hidden)]
+pub use legacy::*;

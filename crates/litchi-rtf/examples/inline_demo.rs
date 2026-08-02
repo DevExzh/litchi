@@ -6,50 +6,41 @@
 //! cargo run -p litchi-rtf --example inline_demo
 //! ```
 
-use litchi_rtf::RtfDocument;
+use litchi_rtf::Document;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The exact snippet shown in the litchi-rtf README / lib.rs doc-comment.
-    let rtf = r"{\rtf1\ansi{\fonttbl\f0\fswiss Helvetica;}\f0\pard Hello World!\par}";
+    let rtf = r"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}";
 
     println!("Input RTF source:");
     println!("{}", rtf);
     println!("{}", "=".repeat(60));
 
-    let doc = RtfDocument::parse(rtf)?;
+    let doc = Document::parse(rtf)?;
 
     println!("Plain text       : {:?}", doc.text());
     println!("Paragraph count  : {}", doc.paragraph_count());
     println!("Style blocks     : {}", doc.blocks().len());
-    println!("Fonts in table   : {}", doc.font_table().fonts().len());
+    println!("Fonts in table   : {}", doc.fonts().len());
 
     // Show each font defined in the document.
-    for (i, font) in doc.font_table().fonts().iter().enumerate() {
+    for (i, font) in doc.fonts().iter().enumerate() {
         println!(
             "  font[{}] name={:?} family={:?} charset={:?}",
             i, font.name, font.family, font.charset
         );
     }
 
-    // Dump the runs (text + formatting) using `paragraphs_with_content`.
-    println!("\nParagraphs with runs:");
+    // Traverse the parser's borrowed text/formatting blocks without cloning
+    // the snapshot or its retained resources.
+    println!("\nText blocks:");
     println!("{}", "-".repeat(60));
-    for (i, para) in doc.paragraphs_with_content().iter().enumerate() {
-        println!("Paragraph {} (text={:?})", i + 1, para.text());
-        for (j, run) in para.runs().iter().enumerate() {
-            println!(
-                "  run[{}] text={:?} bold={:?} italic={:?} underline={}",
-                j,
-                run.text(),
-                run.bold(),
-                run.italic(),
-                run.underline()
-            );
-        }
+    for (index, block) in doc.blocks().iter().enumerate() {
+        println!(
+            "  block[{index}] text={:?} bold={} italic={} underline={:?}",
+            block.text, block.formatting.bold, block.formatting.italic, block.formatting.underline
+        );
     }
-
-    // `runs()` returns a flat view across the whole document.
-    println!("\nTotal runs (flattened): {}", doc.runs().len());
 
     Ok(())
 }

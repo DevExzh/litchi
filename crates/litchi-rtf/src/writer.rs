@@ -59,7 +59,7 @@ impl Charset {
     pub const WINDOWS_1252: Self = Self::Ansi(Mbcs::WINDOWS_1252);
 
     /// Validate a raw byte-stream page for an ANSI declaration.
-    pub fn ansi(page: u32) -> Result<Self, litchi_codepage::Error> {
+    pub fn ansi(page: u32) -> std::result::Result<Self, litchi_codepage::Error> {
         Mbcs::require(page).map(Self::Ansi)
     }
 }
@@ -178,6 +178,11 @@ impl<W: Write> RtfWriter<W> {
             color_table: ColorTable::new(),
             legacy_paragraph_numbering: Vec::new(),
         }
+    }
+
+    /// Serialize an immutable document snapshot.
+    pub fn write(&mut self, document: &crate::Document) -> io::Result<()> {
+        self.write_document(document.model())
     }
 
     /// Write a complete RTF document

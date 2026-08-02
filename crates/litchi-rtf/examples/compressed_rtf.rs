@@ -10,7 +10,7 @@
 //! cargo run -p litchi-rtf --example compressed_rtf
 //! ```
 
-use litchi_rtf::{compress, decompress, is_compressed_rtf};
+use litchi_rtf::transport::{compress, decompress, is_compressed_rtf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let original: &[u8] = b"{\\rtf1\\ansi{\\fonttbl\\f0\\fswiss Helvetica;}\\f0\\pard \

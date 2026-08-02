@@ -19,12 +19,12 @@ litchi-rtf = "0.0.1"
 ```
 
 ```rust
-use litchi_rtf::RtfDocument;
+use litchi_rtf::Document;
 
-let rtf = r"{\rtf1\ansi{\fonttbl\f0\fswiss Helvetica;}\f0\pard Hello World!\par}";
-let doc = RtfDocument::parse(rtf)?;
+let rtf = r"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}";
+let doc = Document::parse(rtf)?;
 let text = doc.text();
-# Ok::<(), litchi_rtf::RtfError>(())
+# Ok::<(), litchi_rtf::Error>(())
 ```
 
 ## Features
@@ -33,14 +33,17 @@ let text = doc.text();
 - Document model: paragraphs, runs, tables, lists, sections, fields, pictures, shapes
 - Stylesheet, font table, and color table handling
 - Compressed RTF (`MS-OXRTFCP`) encode/decode
-- `RtfWriter` with configurable `WriterOptions` for round-tripping documents
+- Immutable, cheap-to-share `Document` snapshots for ordinary reads
+- Concise `read`, `write`, and `transport` modules for format operations
+- Streaming `write::Writer` with configurable `write::Options`
 
-`decompress` enforces a finite 256 MiB expansion ceiling before allocation.
-Applications with a different document budget can call `decompress_with_limits`
-with an explicit `DecompressionLimits` value. Document parsing and file opening
-also use finite source, token, binary-payload, and expansion ceilings through
-`ParseLimits`; custom profiles are accepted by `parse_with_limits`,
-`parse_bytes_with_limits`, and `open_with_limits`.
+`transport::decompress` enforces a finite 256 MiB expansion ceiling before
+allocation. Applications with a different document budget can call
+`transport::decompress_with_limits` with an explicit `transport::Limits`
+value. Document parsing and file opening also use finite source, token,
+binary-payload, and expansion ceilings through `read::Limits`; custom profiles
+are accepted by `Document::parse_with_limits`, `Document::from_bytes_with_limits`,
+and `Document::open_with_limits`.
 
 ## License
 
