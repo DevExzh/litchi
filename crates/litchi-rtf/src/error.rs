@@ -32,6 +32,13 @@ pub enum RtfError {
         /// Configured maximum value.
         limit: usize,
     },
+    /// A fallible allocation could not reserve the requested capacity.
+    AllocationFailed {
+        /// Stable name of the resource being allocated.
+        resource: &'static str,
+        /// Logical byte capacity requested by the operation.
+        requested: usize,
+    },
 }
 
 impl fmt::Display for RtfError {
@@ -51,6 +58,13 @@ impl fmt::Display for RtfError {
             } => write!(
                 f,
                 "RTF resource limit exceeded for {resource}: observed {observed}, limit {limit}"
+            ),
+            RtfError::AllocationFailed {
+                resource,
+                requested,
+            } => write!(
+                f,
+                "RTF allocation failed for {resource}: requested {requested} bytes"
             ),
         }
     }

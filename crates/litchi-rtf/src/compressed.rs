@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::indexing_slicing))]
+
 //! Compressed RTF support.
 //!
 //! This module implements the RTF compression algorithm as specified in:
@@ -34,13 +36,50 @@ Times New RomanCourier{\\colortbl\\red0\\green0\\blue0\r\n\\par \\pard\\plain\\f
 \\b\\i\\u\\tab\\tx";
 
 /// Size of initial dictionary
-const INIT_DICT_SIZE: usize = 207;
+const INIT_DICT_SIZE: usize = INIT_DICT.len();
 
 /// Maximum dictionary size
 const MAX_DICT_SIZE: usize = 4096;
 
 const POSITION_WORD_BITS: usize = u64::BITS as usize;
 const POSITION_WORDS: usize = MAX_DICT_SIZE / POSITION_WORD_BITS;
+const POSITION_BUCKETS: usize = u8::MAX as usize + 1;
+
+const _: () = assert!(INIT_DICT_SIZE <= MAX_DICT_SIZE);
+const _: () = assert!(MAX_DICT_SIZE.is_multiple_of(POSITION_WORD_BITS));
+
+fn codec_invariant(message: &'static str) -> RtfError {
+    RtfError::InvalidStructure(format!("compressed-RTF codec invariant failed: {message}"))
+}
+
+fn allocation_failed(resource: &'static str, requested: usize) -> RtfError {
+    RtfError::AllocationFailed {
+        resource,
+        requested,
+    }
+}
+
+fn reserve_exact_bytes(
+    output: &mut Vec<u8>,
+    capacity: usize,
+    resource: &'static str,
+) -> RtfResult<()> {
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_| allocation_failed(resource, capacity))
+}
+
+fn extend_bytes(output: &mut Vec<u8>, bytes: &[u8], resource: &'static str) -> RtfResult<()> {
+    let requested = output
+        .len()
+        .checked_add(bytes.len())
+        .ok_or_else(|| codec_invariant("output size overflow"))?;
+    output
+        .try_reserve(bytes.len())
+        .map_err(|_| allocation_failed(resource, requested))?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
 
 /// Resource limits used while expanding a compressed-RTF payload.
 ///
@@ -204,7 +243,10 @@ fn parse_frame(data: &[u8]) -> RtfResult<(CompressedRtfHeader, &[u8])> {
             data.len()
         )));
     }
-    Ok((header, &data[HEADER_SIZE..]))
+    let contents = data.get(HEADER_SIZE..).ok_or_else(|| {
+        RtfError::InvalidStructure("compressed-RTF content boundary is invalid".to_string())
+    })?;
+    Ok((header, contents))
 }
 
 /// Decompress LZFu-compressed data.
@@ -222,10 +264,14 @@ fn decompress_lzfu(
     }
 
     let mut dictionary = DecodeDictionary::new();
-    let mut output = Vec::with_capacity(raw_size);
+    let mut output = Vec::new();
+    reserve_exact_bytes(&mut output, raw_size, "decompressed RTF output")?;
     let mut cursor = 0usize;
+    let mut saw_artificial_empty_literal = false;
     while let Some(&control) = data.get(cursor) {
-        cursor += 1;
+        cursor = cursor
+            .checked_add(1)
+            .ok_or_else(|| codec_invariant("input cursor overflow"))?;
         for bit in 0..8 {
             if control & (1 << bit) == 0 {
                 let literal = *data.get(cursor).ok_or_else(|| {
@@ -233,18 +279,28 @@ fn decompress_lzfu(
                         "compressed RTF ends inside a literal token".to_string(),
                     )
                 })?;
-                cursor += 1;
-                let canonical_empty_literal = raw_size == 0 && output.is_empty() && literal == 0;
-                if !canonical_empty_literal {
-                    ensure_output_growth(output.len(), 1, raw_size)?;
+                cursor = cursor
+                    .checked_add(1)
+                    .ok_or_else(|| codec_invariant("input cursor overflow"))?;
+                let canonical_empty_literal = raw_size == 0
+                    && output.is_empty()
+                    && literal == 0
+                    && !saw_artificial_empty_literal;
+                dictionary.write(literal)?;
+                if canonical_empty_literal {
+                    saw_artificial_empty_literal = true;
+                    continue;
                 }
+                ensure_output_growth(output.len(), 1, raw_size)?;
                 output.push(literal);
-                dictionary.write(literal);
                 continue;
             }
 
+            let token_end = cursor
+                .checked_add(2)
+                .ok_or_else(|| codec_invariant("dictionary-reference cursor overflow"))?;
             let token_bytes: [u8; 2] = data
-                .get(cursor..cursor + 2)
+                .get(cursor..token_end)
                 .ok_or_else(|| {
                     RtfError::InvalidStructure(
                         "compressed RTF ends inside a dictionary reference".to_string(),
@@ -256,17 +312,11 @@ fn decompress_lzfu(
                         "invalid compressed-RTF dictionary reference".to_string(),
                     )
                 })?;
-            cursor += 2;
+            cursor = token_end;
             let token = u16::from_be_bytes(token_bytes);
             let offset = usize::from(token >> 4);
             if offset == dictionary.write_offset {
                 if output.len() == raw_size {
-                    return Ok(output);
-                }
-                // [MS-OXRTFCP] mandates one artificial NUL literal for the
-                // otherwise-empty compressed stream.
-                if raw_size == 0 && output.as_slice() == [0] {
-                    output.clear();
                     return Ok(output);
                 }
                 return Err(raw_size_mismatch(output.len(), raw_size));
@@ -281,10 +331,13 @@ fn decompress_lzfu(
             ensure_output_growth(output.len(), length, raw_size)?;
             let mut read_offset = offset;
             for _ in 0..length {
-                let byte = dictionary.bytes[read_offset];
+                let byte = dictionary.read(read_offset)?;
                 output.push(byte);
-                dictionary.write(byte);
-                read_offset = (read_offset + 1) % MAX_DICT_SIZE;
+                dictionary.write(byte)?;
+                read_offset = read_offset
+                    .checked_add(1)
+                    .ok_or_else(|| codec_invariant("dictionary read offset overflow"))?
+                    % MAX_DICT_SIZE;
             }
         }
     }
@@ -324,7 +377,10 @@ fn decompress_uncompressed(
     if data.len() != raw_size {
         return Err(raw_size_mismatch(data.len(), raw_size));
     }
-    Ok(data.to_vec())
+    let mut output = Vec::new();
+    reserve_exact_bytes(&mut output, raw_size, "uncompressed RTF output")?;
+    output.extend_from_slice(data);
+    Ok(output)
 }
 
 struct DecodeDictionary {
@@ -336,7 +392,9 @@ struct DecodeDictionary {
 impl DecodeDictionary {
     fn new() -> Self {
         let mut bytes = [0; MAX_DICT_SIZE];
-        bytes[..INIT_DICT_SIZE].copy_from_slice(INIT_DICT);
+        for (slot, byte) in bytes.iter_mut().zip(INIT_DICT.iter().copied()) {
+            *slot = byte;
+        }
         Self {
             bytes,
             write_offset: INIT_DICT_SIZE,
@@ -348,10 +406,26 @@ impl DecodeDictionary {
         offset < self.len || self.len == MAX_DICT_SIZE
     }
 
-    fn write(&mut self, byte: u8) {
-        self.bytes[self.write_offset] = byte;
-        self.write_offset = (self.write_offset + 1) % MAX_DICT_SIZE;
+    fn read(&self, offset: usize) -> RtfResult<u8> {
+        self.bytes
+            .get(offset)
+            .copied()
+            .ok_or_else(|| codec_invariant("dictionary read offset is out of range"))
+    }
+
+    fn write(&mut self, byte: u8) -> RtfResult<()> {
+        let slot = self
+            .bytes
+            .get_mut(self.write_offset)
+            .ok_or_else(|| codec_invariant("dictionary write offset is out of range"))?;
+        *slot = byte;
+        self.write_offset = self
+            .write_offset
+            .checked_add(1)
+            .ok_or_else(|| codec_invariant("dictionary write offset overflow"))?
+            % MAX_DICT_SIZE;
         self.len = self.len.saturating_add(1).min(MAX_DICT_SIZE);
+        Ok(())
     }
 }
 
@@ -361,54 +435,138 @@ struct DictionaryMatch {
     len: usize,
 }
 
+/// One control byte followed by at most eight two-byte dictionary references.
+struct EncodeRun {
+    bytes: [u8; 17],
+    len: usize,
+}
+
+impl EncodeRun {
+    fn new() -> Self {
+        Self {
+            bytes: [0; 17],
+            len: 1,
+        }
+    }
+
+    fn mark_reference(&mut self, bit: usize) -> RtfResult<()> {
+        if bit >= u8::BITS as usize {
+            return Err(codec_invariant("encode-run control bit is out of range"));
+        }
+        let control = self
+            .bytes
+            .first_mut()
+            .ok_or_else(|| codec_invariant("encode-run control byte is missing"))?;
+        *control |= 1u8 << bit;
+        Ok(())
+    }
+
+    fn push_literal(&mut self, literal: u8) -> RtfResult<()> {
+        let slot = self
+            .bytes
+            .get_mut(self.len)
+            .ok_or_else(|| codec_invariant("encode run exceeds its byte capacity"))?;
+        *slot = literal;
+        self.len = self
+            .len
+            .checked_add(1)
+            .ok_or_else(|| codec_invariant("encode-run length overflow"))?;
+        Ok(())
+    }
+
+    fn push_reference(&mut self, bit: usize, reference: [u8; 2]) -> RtfResult<()> {
+        self.mark_reference(bit)?;
+        let end = self
+            .len
+            .checked_add(reference.len())
+            .ok_or_else(|| codec_invariant("encode-run length overflow"))?;
+        let target = self
+            .bytes
+            .get_mut(self.len..end)
+            .ok_or_else(|| codec_invariant("encode run exceeds its byte capacity"))?;
+        target.copy_from_slice(&reference);
+        self.len = end;
+        Ok(())
+    }
+
+    fn as_bytes(&self) -> RtfResult<&[u8]> {
+        self.bytes
+            .get(..self.len)
+            .ok_or_else(|| codec_invariant("encode-run length is out of range"))
+    }
+}
+
 struct EncodeDictionary {
     ring: DecodeDictionary,
-    positions: Box<[[u64; POSITION_WORDS]]>,
+    positions: Vec<[u64; POSITION_WORDS]>,
 }
 
 impl EncodeDictionary {
-    fn new() -> Self {
+    fn new() -> RtfResult<Self> {
         let ring = DecodeDictionary::new();
-        let mut positions = vec![[0; POSITION_WORDS]; 256].into_boxed_slice();
+        let position_bytes = POSITION_BUCKETS
+            .checked_mul(std::mem::size_of::<[u64; POSITION_WORDS]>())
+            .ok_or_else(|| codec_invariant("encoder position-table size overflow"))?;
+        let mut positions = Vec::new();
+        positions
+            .try_reserve_exact(POSITION_BUCKETS)
+            .map_err(|_| allocation_failed("compressed RTF position table", position_bytes))?;
+        positions.resize(POSITION_BUCKETS, [0; POSITION_WORDS]);
         for (offset, &byte) in INIT_DICT.iter().enumerate() {
-            set_position(&mut positions[usize::from(byte)], offset);
+            let words = positions
+                .get_mut(usize::from(byte))
+                .ok_or_else(|| codec_invariant("position bucket is out of range"))?;
+            set_position(words, offset)?;
         }
-        Self { ring, positions }
+        Ok(Self { ring, positions })
     }
 
-    fn write(&mut self, byte: u8) {
+    fn write(&mut self, byte: u8) -> RtfResult<()> {
         let offset = self.ring.write_offset;
         if self.ring.len == MAX_DICT_SIZE {
-            let previous = self.ring.bytes[offset];
-            clear_position(&mut self.positions[usize::from(previous)], offset);
+            let previous = self.ring.read(offset)?;
+            let words = self
+                .positions
+                .get_mut(usize::from(previous))
+                .ok_or_else(|| codec_invariant("position bucket is out of range"))?;
+            clear_position(words, offset)?;
         }
-        self.ring.write(byte);
-        set_position(&mut self.positions[usize::from(byte)], offset);
+        self.ring.write(byte)?;
+        let words = self
+            .positions
+            .get_mut(usize::from(byte))
+            .ok_or_else(|| codec_invariant("position bucket is out of range"))?;
+        set_position(words, offset)
     }
 
     /// Find the spec-defined longest match while mirroring each newly proven
     /// byte into the ring. That mutation is what lets references overlap the
     /// current write position during decoding.
-    fn find_longest_match(&mut self, input: &[u8]) -> Option<DictionaryMatch> {
-        let (&first, _) = input.split_first()?;
+    fn find_longest_match(&mut self, input: &[u8]) -> RtfResult<Option<DictionaryMatch>> {
+        let Some((&first, _)) = input.split_first() else {
+            return Ok(None);
+        };
         let final_offset = self.ring.write_offset;
         let mut best = None;
 
         if self.ring.len < MAX_DICT_SIZE {
-            self.scan_candidates(first, 0, final_offset, input, &mut best);
+            self.scan_candidates(first, 0, final_offset, input, &mut best)?;
         } else {
-            if final_offset + 1 < MAX_DICT_SIZE {
-                self.scan_candidates(first, final_offset + 1, MAX_DICT_SIZE, input, &mut best);
+            let next_offset = final_offset
+                .checked_add(1)
+                .ok_or_else(|| codec_invariant("candidate offset overflow"))?;
+            if next_offset < MAX_DICT_SIZE {
+                self.scan_candidates(first, next_offset, MAX_DICT_SIZE, input, &mut best)?;
             }
             if best.is_none_or(|matched| matched.len < 17) {
-                self.scan_candidates(first, 0, final_offset, input, &mut best);
+                self.scan_candidates(first, 0, final_offset, input, &mut best)?;
             }
         }
 
         if best.is_none() {
-            self.write(first);
+            self.write(first)?;
         }
-        best.filter(|matched| matched.len >= 2)
+        Ok(best.filter(|matched| matched.len >= 2))
     }
 
     fn scan_candidates(
@@ -418,63 +576,119 @@ impl EncodeDictionary {
         end: usize,
         input: &[u8],
         best: &mut Option<DictionaryMatch>,
-    ) {
+    ) -> RtfResult<()> {
         let mut next = start;
-        while let Some(offset) = next_position(&self.positions[usize::from(first)], next, end) {
+        loop {
+            let offset = {
+                let words = self
+                    .positions
+                    .get(usize::from(first))
+                    .ok_or_else(|| codec_invariant("position bucket is out of range"))?;
+                next_position(words, next, end)?
+            };
+            let Some(offset) = offset else {
+                break;
+            };
             let best_len = best.map_or(0, |matched| matched.len);
-            let match_len = self.match_at(offset, input, best_len);
+            let match_len = self.match_at(offset, input, best_len)?;
             if match_len > best_len {
                 *best = Some(DictionaryMatch {
                     offset,
                     len: match_len,
                 });
                 if match_len == 17 {
-                    return;
+                    return Ok(());
                 }
             }
-            next = offset + 1;
+            next = offset
+                .checked_add(1)
+                .ok_or_else(|| codec_invariant("candidate offset overflow"))?;
         }
+        Ok(())
     }
 
-    fn match_at(&mut self, offset: usize, input: &[u8], best_len: usize) -> usize {
+    fn match_at(&mut self, offset: usize, input: &[u8], best_len: usize) -> RtfResult<usize> {
         let max_len = input.len().min(17);
         let mut dictionary_offset = offset;
         let mut match_len = 0usize;
-        while match_len < max_len && self.ring.bytes[dictionary_offset] == input[match_len] {
+        while match_len < max_len {
+            let dictionary_byte = self.ring.read(dictionary_offset)?;
+            let input_byte = *input
+                .get(match_len)
+                .ok_or_else(|| codec_invariant("match input offset is out of range"))?;
+            if dictionary_byte != input_byte {
+                break;
+            }
             match_len += 1;
             if match_len > best_len {
-                self.write(input[match_len - 1]);
+                self.write(input_byte)?;
             }
-            dictionary_offset = (dictionary_offset + 1) % MAX_DICT_SIZE;
+            dictionary_offset = dictionary_offset
+                .checked_add(1)
+                .ok_or_else(|| codec_invariant("dictionary match offset overflow"))?
+                % MAX_DICT_SIZE;
         }
-        match_len
+        Ok(match_len)
     }
 }
 
-fn set_position(words: &mut [u64; POSITION_WORDS], offset: usize) {
-    words[offset / POSITION_WORD_BITS] |= 1 << (offset % POSITION_WORD_BITS);
+fn set_position(words: &mut [u64; POSITION_WORDS], offset: usize) -> RtfResult<()> {
+    let word = words
+        .get_mut(offset / POSITION_WORD_BITS)
+        .ok_or_else(|| codec_invariant("position-set offset is out of range"))?;
+    *word |= 1 << (offset % POSITION_WORD_BITS);
+    Ok(())
 }
 
-fn clear_position(words: &mut [u64; POSITION_WORDS], offset: usize) {
-    words[offset / POSITION_WORD_BITS] &= !(1 << (offset % POSITION_WORD_BITS));
+fn clear_position(words: &mut [u64; POSITION_WORDS], offset: usize) -> RtfResult<()> {
+    let word = words
+        .get_mut(offset / POSITION_WORD_BITS)
+        .ok_or_else(|| codec_invariant("position-clear offset is out of range"))?;
+    *word &= !(1 << (offset % POSITION_WORD_BITS));
+    Ok(())
 }
 
-fn next_position(words: &[u64; POSITION_WORDS], start: usize, end: usize) -> Option<usize> {
+fn next_position(
+    words: &[u64; POSITION_WORDS],
+    start: usize,
+    end: usize,
+) -> RtfResult<Option<usize>> {
+    if start > end || end > MAX_DICT_SIZE {
+        return Err(codec_invariant("position scan range is invalid"));
+    }
     let mut position = start;
     while position < end {
         let word_index = position / POSITION_WORD_BITS;
         let bit_index = position % POSITION_WORD_BITS;
-        let mut word = words[word_index] & (u64::MAX << bit_index);
-        let valid_bits = (end - word_index * POSITION_WORD_BITS).min(POSITION_WORD_BITS);
+        let word_start = word_index
+            .checked_mul(POSITION_WORD_BITS)
+            .ok_or_else(|| codec_invariant("position word offset overflow"))?;
+        let mut word = words
+            .get(word_index)
+            .copied()
+            .ok_or_else(|| codec_invariant("position word is out of range"))?
+            & (u64::MAX << bit_index);
+        let valid_bits = end
+            .checked_sub(word_start)
+            .ok_or_else(|| codec_invariant("position word exceeds scan end"))?
+            .min(POSITION_WORD_BITS);
         if valid_bits < POSITION_WORD_BITS {
             word &= (1u64 << valid_bits) - 1;
         }
         if word != 0 {
-            return Some(word_index * POSITION_WORD_BITS + word.trailing_zeros() as usize);
+            let bit = usize::try_from(word.trailing_zeros())
+                .map_err(|_| codec_invariant("position bit cannot be represented"))?;
+            let found = word_start
+                .checked_add(bit)
+                .ok_or_else(|| codec_invariant("position result overflow"))?;
+            return Ok(Some(found));
         }
-        position = (word_index + 1) * POSITION_WORD_BITS;
+        position = word_index
+            .checked_add(1)
+            .and_then(|index| index.checked_mul(POSITION_WORD_BITS))
+            .ok_or_else(|| codec_invariant("position scan overflow"))?;
     }
-    None
+    Ok(None)
 }
 
 /// Compress RTF data
@@ -498,41 +712,51 @@ pub fn compress(data: &[u8], compress: bool) -> RtfResult<Vec<u8>> {
 /// Compress data using LZFu algorithm
 fn compress_lzfu(data: &[u8]) -> RtfResult<Vec<u8>> {
     checked_u32_size(data.len(), "uncompressed RTF")?;
-    let mut dictionary = EncodeDictionary::new();
+    let mut dictionary = EncodeDictionary::new()?;
     let mut output = Vec::new();
 
     if data.is_empty() {
         // Required by [MS-OXRTFCP] 2.3.3.2: the canonical empty stream
         // carries one artificial NUL literal before its end reference.
-        dictionary.write(0);
-        output.extend_from_slice(&[0b0000_0010, 0]);
-        output.extend_from_slice(&dictionary_reference(dictionary.ring.write_offset, 0)?);
+        dictionary.write(0)?;
+        let mut run = EncodeRun::new();
+        run.push_literal(0)?;
+        run.push_reference(1, dictionary_reference(dictionary.ring.write_offset, 0)?)?;
+        extend_bytes(&mut output, run.as_bytes()?, "compressed RTF output")?;
     } else {
         let mut input_offset = 0usize;
         'runs: loop {
-            let mut control = 0u8;
-            let mut tokens = Vec::with_capacity(16);
-            for bit in 0..8 {
+            let mut run = EncodeRun::new();
+            for bit in 0..8usize {
                 if input_offset == data.len() {
-                    control |= 1 << bit;
-                    tokens
-                        .extend_from_slice(&dictionary_reference(dictionary.ring.write_offset, 0)?);
-                    output.push(control);
-                    output.extend_from_slice(&tokens);
+                    run.push_reference(
+                        bit,
+                        dictionary_reference(dictionary.ring.write_offset, 0)?,
+                    )?;
+                    extend_bytes(&mut output, run.as_bytes()?, "compressed RTF output")?;
                     break 'runs;
                 }
 
-                if let Some(matched) = dictionary.find_longest_match(&data[input_offset..]) {
-                    control |= 1 << bit;
-                    tokens.extend_from_slice(&dictionary_reference(matched.offset, matched.len)?);
-                    input_offset += matched.len;
+                let remaining = data
+                    .get(input_offset..)
+                    .ok_or_else(|| codec_invariant("compressor input offset is out of range"))?;
+                if let Some(matched) = dictionary.find_longest_match(remaining)? {
+                    run.push_reference(bit, dictionary_reference(matched.offset, matched.len)?)?;
+                    input_offset = input_offset
+                        .checked_add(matched.len)
+                        .filter(|offset| *offset <= data.len())
+                        .ok_or_else(|| codec_invariant("compressor input offset overflow"))?;
                 } else {
-                    tokens.push(data[input_offset]);
-                    input_offset += 1;
+                    let literal = *data
+                        .get(input_offset)
+                        .ok_or_else(|| codec_invariant("compressor literal is out of range"))?;
+                    run.push_literal(literal)?;
+                    input_offset = input_offset
+                        .checked_add(1)
+                        .ok_or_else(|| codec_invariant("compressor input offset overflow"))?;
                 }
             }
-            output.push(control);
-            output.extend_from_slice(&tokens);
+            extend_bytes(&mut output, run.as_bytes()?, "compressed RTF output")?;
         }
     }
 
@@ -589,7 +813,8 @@ fn build_frame(
         .checked_add(contents.len())
         .ok_or_else(|| RtfError::InvalidStructure("compressed-RTF size overflow".to_string()))?;
     let header = CompressedRtfHeader::new(compressed_size, raw_size, compression_type, crc32);
-    let mut result = Vec::with_capacity(total_size);
+    let mut result = Vec::new();
+    reserve_exact_bytes(&mut result, total_size, "compressed RTF frame")?;
     result.extend_from_slice(IntoBytes::as_bytes(&header));
     result.extend_from_slice(contents);
     Ok(result)
@@ -750,6 +975,35 @@ mod tests {
     }
 
     #[test]
+    fn failed_capacity_reservations_are_typed() {
+        let mut output = Vec::new();
+        let error = reserve_exact_bytes(&mut output, usize::MAX, "test output").unwrap_err();
+
+        assert!(matches!(
+            error,
+            RtfError::AllocationFailed {
+                resource: "test output",
+                requested: usize::MAX,
+            }
+        ));
+    }
+
+    #[test]
+    fn codec_helpers_reject_impossible_indices_and_ranges() {
+        let dictionary = DecodeDictionary::new();
+        assert!(dictionary.read(MAX_DICT_SIZE).is_err());
+
+        let mut positions = [0; POSITION_WORDS];
+        assert!(set_position(&mut positions, MAX_DICT_SIZE).is_err());
+        assert!(clear_position(&mut positions, MAX_DICT_SIZE).is_err());
+        assert!(next_position(&positions, 2, 1).is_err());
+        assert!(next_position(&positions, 0, MAX_DICT_SIZE + 1).is_err());
+
+        let mut run = EncodeRun::new();
+        assert!(run.mark_reference(u8::BITS as usize).is_err());
+    }
+
+    #[test]
     fn malformed_token_streams_fail_instead_of_returning_partial_output() {
         let missing_end = build_frame(
             1,
@@ -796,6 +1050,19 @@ mod tests {
         .unwrap();
         assert!(matches!(
             decompress(&oversized_literal),
+            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+        ));
+
+        let duplicate_artificial_literal_contents = [0x04, 0x00, 0x00, 0x0d, 0x10];
+        let duplicate_artificial_literal = build_frame(
+            0,
+            &duplicate_artificial_literal_contents,
+            *COMPRESSED_SIGNATURE,
+            crc32(&duplicate_artificial_literal_contents).unwrap(),
+        )
+        .unwrap();
+        assert!(matches!(
+            decompress(&duplicate_artificial_literal),
             Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
     }
