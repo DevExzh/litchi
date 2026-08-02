@@ -1,13 +1,12 @@
 //! Compressed RTF support.
 //!
 //! This module implements the RTF compression algorithm as specified in:
-//! <https://msdn.microsoft.com/en-us/library/cc463890(v=exchg.80).aspx>
+//! <https://learn.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxrtfcp/65dfe2df-1b69-43fc-8ebd-21819a7463fb>
 //!
 //! Compressed RTF is commonly used in email attachments and other scenarios
 //! where file size reduction is important.
 
 use super::error::{RtfError, RtfResult};
-use std::io::{Cursor, Read, Write};
 use zerocopy::{FromBytes, IntoBytes};
 use zerocopy_derive::{
     FromBytes as DeriveFromBytes, Immutable, IntoBytes as DeriveIntoBytes, KnownLayout,
@@ -18,6 +17,15 @@ const COMPRESSED_SIGNATURE: &[u8; 4] = b"LZFu";
 
 /// Magic signature for uncompressed RTF (stored with compression header)
 const UNCOMPRESSED_SIGNATURE: &[u8; 4] = b"MELA";
+
+/// Header size, including the four-byte `COMPSIZE` field.
+const HEADER_SIZE: usize = 16;
+
+/// Header bytes counted by `COMPSIZE` in addition to the content bytes.
+const COUNTED_HEADER_SIZE: usize = HEADER_SIZE - std::mem::size_of::<u32>();
+
+/// Default finite ceiling for a decompressed compressed-RTF payload (256 MiB).
+pub const DEFAULT_MAX_DECOMPRESSED_RTF_BYTES: usize = 256 * 1_048_576;
 
 /// Initial dictionary for compression/decompression
 const INIT_DICT: &[u8] = b"{\\rtf1\\ansi\\mac\\deff0\\deftab720{\\fonttbl;}\
@@ -31,11 +39,42 @@ const INIT_DICT_SIZE: usize = 207;
 /// Maximum dictionary size
 const MAX_DICT_SIZE: usize = 4096;
 
+const POSITION_WORD_BITS: usize = u64::BITS as usize;
+const POSITION_WORDS: usize = MAX_DICT_SIZE / POSITION_WORD_BITS;
+
+/// Resource limits used while expanding a compressed-RTF payload.
+///
+/// The declared `RAWSIZE` is checked before allocating the output buffer, and
+/// the decoder independently prevents every literal or reference from crossing
+/// the same boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DecompressionLimits {
+    max_output_bytes: usize,
+}
+
+impl DecompressionLimits {
+    /// Create a limit profile with a caller-selected output ceiling.
+    pub const fn new(max_output_bytes: usize) -> Self {
+        Self { max_output_bytes }
+    }
+
+    /// Maximum number of bytes the decoder may produce.
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+}
+
+impl Default for DecompressionLimits {
+    fn default() -> Self {
+        Self::new(DEFAULT_MAX_DECOMPRESSED_RTF_BYTES)
+    }
+}
+
 /// Compressed RTF header (16 bytes)
 #[repr(C)]
 #[derive(Debug, Clone, Copy, DeriveIntoBytes, DeriveFromBytes, Immutable, KnownLayout)]
 struct CompressedRtfHeader {
-    /// Total size of compressed data including header (little-endian)
+    /// Content size plus the remaining 12 header bytes (little-endian).
     compressed_size: [u8; 4],
     /// Size of uncompressed data (little-endian)
     raw_size: [u8; 4],
@@ -46,6 +85,12 @@ struct CompressedRtfHeader {
 }
 
 impl CompressedRtfHeader {
+    /// Get compressed size as u32.
+    #[inline]
+    fn get_compressed_size(&self) -> u32 {
+        u32::from_le_bytes(self.compressed_size)
+    }
+
     /// Get raw size as u32
     #[inline]
     fn get_raw_size(&self) -> u32 {
@@ -81,13 +126,9 @@ impl CompressedRtfHeader {
 
 /// Detect if data is compressed RTF
 pub fn is_compressed_rtf(data: &[u8]) -> bool {
-    if data.len() < 16 {
-        return false;
-    }
-
-    // Check for LZFu or MELA signature
-    let signature = &data[8..12];
-    signature == COMPRESSED_SIGNATURE || signature == UNCOMPRESSED_SIGNATURE
+    data.get(8..12).is_some_and(|signature| {
+        signature == COMPRESSED_SIGNATURE || signature == UNCOMPRESSED_SIGNATURE
+    })
 }
 
 /// Decompress RTF data
@@ -102,124 +143,338 @@ pub fn is_compressed_rtf(data: &[u8]) -> bool {
 ///
 /// # Errors
 ///
-/// Returns error if:
-/// - Data is too small
-/// - CRC check fails
-/// - Unknown compression type
+/// Returns an error when the frame, token stream, declared size, compression
+/// type, checksum, or default output budget is invalid.
 pub fn decompress(data: &[u8]) -> RtfResult<Vec<u8>> {
-    // Parse header using zerocopy
-    if data.len() < 16 {
-        return Err(RtfError::InvalidStructure(
-            "Compressed RTF header must be at least 16 bytes".to_string(),
-        ));
+    decompress_with_limits(data, DecompressionLimits::default())
+}
+
+/// Decompress compressed RTF with an explicit finite output budget.
+pub fn decompress_with_limits(data: &[u8], limits: DecompressionLimits) -> RtfResult<Vec<u8>> {
+    let (header, contents) = parse_frame(data)?;
+    let raw_size = usize::try_from(header.get_raw_size()).map_err(|_| {
+        RtfError::InvalidStructure("RTF RAWSIZE is not representable on this target".to_string())
+    })?;
+    if raw_size > limits.max_output_bytes {
+        return Err(RtfError::LimitExceeded {
+            resource: "decompressed bytes",
+            observed: raw_size,
+            limit: limits.max_output_bytes,
+        });
     }
 
-    let header = <CompressedRtfHeader as FromBytes>::ref_from_bytes(&data[..16]).map_err(|_| {
-        RtfError::InvalidStructure("Failed to parse compressed RTF header".to_string())
-    })?;
-    let header = *header;
-
-    // Get compressed data (excluding 16-byte header)
-    let compressed_data = &data[16..];
-
     if header.is_compressed() {
-        decompress_lzfu(compressed_data, &header)
+        decompress_lzfu(contents, &header, raw_size)
     } else if header.is_uncompressed() {
-        decompress_uncompressed(compressed_data, &header)
+        decompress_uncompressed(contents, &header, raw_size)
     } else {
         Err(RtfError::InvalidStructure(format!(
-            "Unknown compression type: {:?}",
+            "unknown compressed-RTF compression type: {:?}",
             header.compression_type
         )))
     }
 }
 
-/// Decompress LZFu compressed data
-fn decompress_lzfu(data: &[u8], header: &CompressedRtfHeader) -> RtfResult<Vec<u8>> {
-    // Verify CRC32
-    let calculated_crc = crc_fast::checksum(crc_fast::CrcAlgorithm::Crc32IsoHdlc, data) as u32;
+fn parse_frame(data: &[u8]) -> RtfResult<(CompressedRtfHeader, &[u8])> {
+    let bytes = data.get(..HEADER_SIZE).ok_or_else(|| {
+        RtfError::InvalidStructure(format!(
+            "compressed-RTF header requires {HEADER_SIZE} bytes, found {}",
+            data.len()
+        ))
+    })?;
+    let header = *<CompressedRtfHeader as FromBytes>::ref_from_bytes(bytes).map_err(|_| {
+        RtfError::InvalidStructure("failed to parse compressed-RTF header".to_string())
+    })?;
+    let compressed_size = usize::try_from(header.get_compressed_size()).map_err(|_| {
+        RtfError::InvalidStructure("RTF COMPSIZE is not representable on this target".to_string())
+    })?;
+    if compressed_size < COUNTED_HEADER_SIZE {
+        return Err(RtfError::InvalidStructure(format!(
+            "RTF COMPSIZE {compressed_size} is smaller than the {COUNTED_HEADER_SIZE}-byte counted header"
+        )));
+    }
+    let declared_total = compressed_size
+        .checked_add(HEADER_SIZE - COUNTED_HEADER_SIZE)
+        .ok_or_else(|| {
+            RtfError::InvalidStructure("compressed-RTF total size overflow".to_string())
+        })?;
+    if declared_total != data.len() {
+        return Err(RtfError::InvalidStructure(format!(
+            "RTF COMPSIZE declares {declared_total} total bytes, found {}",
+            data.len()
+        )));
+    }
+    Ok((header, &data[HEADER_SIZE..]))
+}
 
+/// Decompress LZFu-compressed data.
+fn decompress_lzfu(
+    data: &[u8],
+    header: &CompressedRtfHeader,
+    raw_size: usize,
+) -> RtfResult<Vec<u8>> {
+    let calculated_crc = crc32(data)?;
     if calculated_crc != header.get_crc32() {
         return Err(RtfError::InvalidStructure(format!(
-            "CRC32 mismatch: expected {:#x}, got {:#x}",
-            header.get_crc32(),
-            calculated_crc
+            "compressed-RTF CRC32 mismatch: expected {:#010x}, got {calculated_crc:#010x}",
+            header.get_crc32()
         )));
     }
 
-    // Initialize dictionary
-    let mut dict = vec![0u8; MAX_DICT_SIZE];
-    dict[..INIT_DICT_SIZE].copy_from_slice(INIT_DICT);
-    dict[INIT_DICT_SIZE..].fill(b' ');
-
-    let mut write_offset = INIT_DICT_SIZE;
-    let mut output = Vec::with_capacity(header.get_raw_size() as usize);
-    let mut cursor = Cursor::new(data);
-
-    loop {
-        // Read control byte
-        let mut control_byte = [0u8; 1];
-        if cursor.read_exact(&mut control_byte).is_err() {
-            break;
-        }
-        let control = control_byte[0];
-
-        // Process each bit in control byte (LSB to MSB)
+    let mut dictionary = DecodeDictionary::new();
+    let mut output = Vec::with_capacity(raw_size);
+    let mut cursor = 0usize;
+    while let Some(&control) = data.get(cursor) {
+        cursor += 1;
         for bit in 0..8 {
-            if (control & (1 << bit)) != 0 {
-                // Bit is 1: token is a reference (16-bit)
-                let mut token_bytes = [0u8; 2];
-                if cursor.read_exact(&mut token_bytes).is_err() {
-                    break;
+            if control & (1 << bit) == 0 {
+                let literal = *data.get(cursor).ok_or_else(|| {
+                    RtfError::InvalidStructure(
+                        "compressed RTF ends inside a literal token".to_string(),
+                    )
+                })?;
+                cursor += 1;
+                let canonical_empty_literal = raw_size == 0 && output.is_empty() && literal == 0;
+                if !canonical_empty_literal {
+                    ensure_output_growth(output.len(), 1, raw_size)?;
                 }
-                let token = u16::from_be_bytes(token_bytes);
+                output.push(literal);
+                dictionary.write(literal);
+                continue;
+            }
 
-                // Extract offset (12 bits) and length (4 bits)
-                let offset = ((token >> 4) & 0x0FFF) as usize;
-                let length = (token & 0x0F) as usize;
-
-                // Check for end indicator
-                if write_offset == offset {
+            let token_bytes: [u8; 2] = data
+                .get(cursor..cursor + 2)
+                .ok_or_else(|| {
+                    RtfError::InvalidStructure(
+                        "compressed RTF ends inside a dictionary reference".to_string(),
+                    )
+                })?
+                .try_into()
+                .map_err(|_| {
+                    RtfError::InvalidStructure(
+                        "invalid compressed-RTF dictionary reference".to_string(),
+                    )
+                })?;
+            cursor += 2;
+            let token = u16::from_be_bytes(token_bytes);
+            let offset = usize::from(token >> 4);
+            if offset == dictionary.write_offset {
+                if output.len() == raw_size {
                     return Ok(output);
                 }
+                // [MS-OXRTFCP] mandates one artificial NUL literal for the
+                // otherwise-empty compressed stream.
+                if raw_size == 0 && output.as_slice() == [0] {
+                    output.clear();
+                    return Ok(output);
+                }
+                return Err(raw_size_mismatch(output.len(), raw_size));
+            }
+            if !dictionary.contains(offset) {
+                return Err(RtfError::InvalidStructure(format!(
+                    "compressed RTF references unavailable dictionary offset {offset}"
+                )));
+            }
 
-                // Copy from dictionary
-                let actual_length = length + 2;
-                for step in 0..actual_length {
-                    let read_offset = (offset + step) % MAX_DICT_SIZE;
-                    let byte = dict[read_offset];
-                    output.push(byte);
-                    dict[write_offset] = byte;
-                    write_offset = (write_offset + 1) % MAX_DICT_SIZE;
-                }
-            } else {
-                // Bit is 0: token is a literal (8-bit)
-                let mut literal = [0u8; 1];
-                if cursor.read_exact(&mut literal).is_err() {
-                    break;
-                }
-                output.push(literal[0]);
-                dict[write_offset] = literal[0];
-                write_offset = (write_offset + 1) % MAX_DICT_SIZE;
+            let length = usize::from(token & 0x000f) + 2;
+            ensure_output_growth(output.len(), length, raw_size)?;
+            let mut read_offset = offset;
+            for _ in 0..length {
+                let byte = dictionary.bytes[read_offset];
+                output.push(byte);
+                dictionary.write(byte);
+                read_offset = (read_offset + 1) % MAX_DICT_SIZE;
             }
         }
     }
 
-    Ok(output)
+    Err(RtfError::InvalidStructure(
+        "compressed RTF has no terminating dictionary reference".to_string(),
+    ))
 }
 
-/// Decompress uncompressed RTF data
-fn decompress_uncompressed(data: &[u8], header: &CompressedRtfHeader) -> RtfResult<Vec<u8>> {
-    // Verify CRC32 is zero for uncompressed
-    if header.get_crc32() != 0x00000000 {
+fn ensure_output_growth(current: usize, additional: usize, declared: usize) -> RtfResult<()> {
+    let observed = current
+        .checked_add(additional)
+        .ok_or_else(|| RtfError::InvalidStructure("decompressed RTF size overflow".to_string()))?;
+    if observed > declared {
+        return Err(raw_size_mismatch(observed, declared));
+    }
+    Ok(())
+}
+
+fn raw_size_mismatch(observed: usize, declared: usize) -> RtfError {
+    RtfError::InvalidStructure(format!(
+        "RTF RAWSIZE declares {declared} bytes, decoder produced {observed}"
+    ))
+}
+
+/// Decompress uncompressed RTF data.
+fn decompress_uncompressed(
+    data: &[u8],
+    header: &CompressedRtfHeader,
+    raw_size: usize,
+) -> RtfResult<Vec<u8>> {
+    if header.get_crc32() != 0 {
         return Err(RtfError::InvalidStructure(
             "CRC32 must be 0x00000000 for uncompressed RTF".to_string(),
         ));
     }
+    if data.len() != raw_size {
+        return Err(raw_size_mismatch(data.len(), raw_size));
+    }
+    Ok(data.to_vec())
+}
 
-    // Return raw data up to raw_size
-    let size = (header.get_raw_size() as usize).min(data.len());
-    Ok(data[..size].to_vec())
+struct DecodeDictionary {
+    bytes: [u8; MAX_DICT_SIZE],
+    write_offset: usize,
+    len: usize,
+}
+
+impl DecodeDictionary {
+    fn new() -> Self {
+        let mut bytes = [0; MAX_DICT_SIZE];
+        bytes[..INIT_DICT_SIZE].copy_from_slice(INIT_DICT);
+        Self {
+            bytes,
+            write_offset: INIT_DICT_SIZE,
+            len: INIT_DICT_SIZE,
+        }
+    }
+
+    fn contains(&self, offset: usize) -> bool {
+        offset < self.len || self.len == MAX_DICT_SIZE
+    }
+
+    fn write(&mut self, byte: u8) {
+        self.bytes[self.write_offset] = byte;
+        self.write_offset = (self.write_offset + 1) % MAX_DICT_SIZE;
+        self.len = self.len.saturating_add(1).min(MAX_DICT_SIZE);
+    }
+}
+
+#[derive(Clone, Copy)]
+struct DictionaryMatch {
+    offset: usize,
+    len: usize,
+}
+
+struct EncodeDictionary {
+    ring: DecodeDictionary,
+    positions: Box<[[u64; POSITION_WORDS]]>,
+}
+
+impl EncodeDictionary {
+    fn new() -> Self {
+        let ring = DecodeDictionary::new();
+        let mut positions = vec![[0; POSITION_WORDS]; 256].into_boxed_slice();
+        for (offset, &byte) in INIT_DICT.iter().enumerate() {
+            set_position(&mut positions[usize::from(byte)], offset);
+        }
+        Self { ring, positions }
+    }
+
+    fn write(&mut self, byte: u8) {
+        let offset = self.ring.write_offset;
+        if self.ring.len == MAX_DICT_SIZE {
+            let previous = self.ring.bytes[offset];
+            clear_position(&mut self.positions[usize::from(previous)], offset);
+        }
+        self.ring.write(byte);
+        set_position(&mut self.positions[usize::from(byte)], offset);
+    }
+
+    /// Find the spec-defined longest match while mirroring each newly proven
+    /// byte into the ring. That mutation is what lets references overlap the
+    /// current write position during decoding.
+    fn find_longest_match(&mut self, input: &[u8]) -> Option<DictionaryMatch> {
+        let (&first, _) = input.split_first()?;
+        let final_offset = self.ring.write_offset;
+        let mut best = None;
+
+        if self.ring.len < MAX_DICT_SIZE {
+            self.scan_candidates(first, 0, final_offset, input, &mut best);
+        } else {
+            if final_offset + 1 < MAX_DICT_SIZE {
+                self.scan_candidates(first, final_offset + 1, MAX_DICT_SIZE, input, &mut best);
+            }
+            if best.is_none_or(|matched| matched.len < 17) {
+                self.scan_candidates(first, 0, final_offset, input, &mut best);
+            }
+        }
+
+        if best.is_none() {
+            self.write(first);
+        }
+        best.filter(|matched| matched.len >= 2)
+    }
+
+    fn scan_candidates(
+        &mut self,
+        first: u8,
+        start: usize,
+        end: usize,
+        input: &[u8],
+        best: &mut Option<DictionaryMatch>,
+    ) {
+        let mut next = start;
+        while let Some(offset) = next_position(&self.positions[usize::from(first)], next, end) {
+            let best_len = best.map_or(0, |matched| matched.len);
+            let match_len = self.match_at(offset, input, best_len);
+            if match_len > best_len {
+                *best = Some(DictionaryMatch {
+                    offset,
+                    len: match_len,
+                });
+                if match_len == 17 {
+                    return;
+                }
+            }
+            next = offset + 1;
+        }
+    }
+
+    fn match_at(&mut self, offset: usize, input: &[u8], best_len: usize) -> usize {
+        let max_len = input.len().min(17);
+        let mut dictionary_offset = offset;
+        let mut match_len = 0usize;
+        while match_len < max_len && self.ring.bytes[dictionary_offset] == input[match_len] {
+            match_len += 1;
+            if match_len > best_len {
+                self.write(input[match_len - 1]);
+            }
+            dictionary_offset = (dictionary_offset + 1) % MAX_DICT_SIZE;
+        }
+        match_len
+    }
+}
+
+fn set_position(words: &mut [u64; POSITION_WORDS], offset: usize) {
+    words[offset / POSITION_WORD_BITS] |= 1 << (offset % POSITION_WORD_BITS);
+}
+
+fn clear_position(words: &mut [u64; POSITION_WORDS], offset: usize) {
+    words[offset / POSITION_WORD_BITS] &= !(1 << (offset % POSITION_WORD_BITS));
+}
+
+fn next_position(words: &[u64; POSITION_WORDS], start: usize, end: usize) -> Option<usize> {
+    let mut position = start;
+    while position < end {
+        let word_index = position / POSITION_WORD_BITS;
+        let bit_index = position % POSITION_WORD_BITS;
+        let mut word = words[word_index] & (u64::MAX << bit_index);
+        let valid_bits = (end - word_index * POSITION_WORD_BITS).min(POSITION_WORD_BITS);
+        if valid_bits < POSITION_WORD_BITS {
+            word &= (1u64 << valid_bits) - 1;
+        }
+        if word != 0 {
+            return Some(word_index * POSITION_WORD_BITS + word.trailing_zeros() as usize);
+        }
+        position = (word_index + 1) * POSITION_WORD_BITS;
+    }
+    None
 }
 
 /// Compress RTF data
@@ -242,170 +497,125 @@ pub fn compress(data: &[u8], compress: bool) -> RtfResult<Vec<u8>> {
 
 /// Compress data using LZFu algorithm
 fn compress_lzfu(data: &[u8]) -> RtfResult<Vec<u8>> {
-    // Initialize dictionary
-    let mut dict = vec![0u8; MAX_DICT_SIZE];
-    dict[..INIT_DICT_SIZE].copy_from_slice(INIT_DICT);
-    dict[INIT_DICT_SIZE..].fill(b' ');
-
-    let mut write_offset = INIT_DICT_SIZE;
+    checked_u32_size(data.len(), "uncompressed RTF")?;
+    let mut dictionary = EncodeDictionary::new();
     let mut output = Vec::new();
-    let mut cursor = Cursor::new(data);
 
-    let mut control_byte: u8 = 0;
-    let mut control_bit = 0;
-    let mut token_buffer = Vec::new();
+    if data.is_empty() {
+        // Required by [MS-OXRTFCP] 2.3.3.2: the canonical empty stream
+        // carries one artificial NUL literal before its end reference.
+        dictionary.write(0);
+        output.extend_from_slice(&[0b0000_0010, 0]);
+        output.extend_from_slice(&dictionary_reference(dictionary.ring.write_offset, 0)?);
+    } else {
+        let mut input_offset = 0usize;
+        'runs: loop {
+            let mut control = 0u8;
+            let mut tokens = Vec::with_capacity(16);
+            for bit in 0..8 {
+                if input_offset == data.len() {
+                    control |= 1 << bit;
+                    tokens
+                        .extend_from_slice(&dictionary_reference(dictionary.ring.write_offset, 0)?);
+                    output.push(control);
+                    output.extend_from_slice(&tokens);
+                    break 'runs;
+                }
 
-    loop {
-        // Find longest match
-        let (dict_offset, longest_match) = find_longest_match(&mut dict, &mut cursor, write_offset);
-
-        let mut read_buf = vec![0u8; if longest_match > 1 { longest_match } else { 1 }];
-        let bytes_read = cursor.read(&mut read_buf).unwrap_or(0);
-
-        // EOF
-        if bytes_read == 0 {
-            // Add end marker
-            control_byte |= 1 << control_bit;
-
-            let dict_ref = ((write_offset & 0xFFF) << 4) as u16;
-            token_buffer.write_all(&dict_ref.to_be_bytes()).unwrap();
-
-            // Flush final control byte and tokens
-            output.push(control_byte);
-            output.write_all(&token_buffer).unwrap();
-            break;
-        }
-
-        if longest_match > 1 {
-            // Dictionary reference
-            control_byte |= 1 << control_bit;
-            control_bit += 1;
-
-            let dict_ref = (((dict_offset & 0xFFF) << 4) | ((longest_match - 2) & 0xF)) as u16;
-            token_buffer.write_all(&dict_ref.to_be_bytes()).unwrap();
-        } else {
-            // Literal
-            if longest_match == 0 {
-                dict[write_offset] = read_buf[0];
-                write_offset = (write_offset + 1) % MAX_DICT_SIZE;
+                if let Some(matched) = dictionary.find_longest_match(&data[input_offset..]) {
+                    control |= 1 << bit;
+                    tokens.extend_from_slice(&dictionary_reference(matched.offset, matched.len)?);
+                    input_offset += matched.len;
+                } else {
+                    tokens.push(data[input_offset]);
+                    input_offset += 1;
+                }
             }
-
-            control_byte |= 0 << control_bit;
-            control_bit += 1;
-            token_buffer.push(read_buf[0]);
-        }
-
-        // Flush when control byte is full
-        if control_bit >= 8 {
-            output.push(control_byte);
-            output.write_all(&token_buffer).unwrap();
-            control_byte = 0;
-            control_bit = 0;
-            token_buffer.clear();
+            output.push(control);
+            output.extend_from_slice(&tokens);
         }
     }
 
-    // Calculate CRC32
-    let crc32 = crc_fast::checksum(crc_fast::CrcAlgorithm::Crc32IsoHdlc, &output) as u32;
-
-    // Build header
-    let header = CompressedRtfHeader::new(
-        (output.len() + 12) as u32,
-        data.len() as u32,
-        *COMPRESSED_SIGNATURE,
-        crc32,
-    );
-
-    // Combine header and compressed data
-    let mut result = Vec::new();
-    result.write_all(IntoBytes::as_bytes(&header)).unwrap();
-    result.write_all(&output).unwrap();
-
-    Ok(result)
+    let crc32 = crc32(&output)?;
+    build_frame(data.len(), &output, *COMPRESSED_SIGNATURE, crc32)
 }
 
 /// Compress data without compression (just add header)
 fn compress_uncompressed(data: &[u8]) -> RtfResult<Vec<u8>> {
-    let header = CompressedRtfHeader::new(
-        (data.len() + 12) as u32,
-        data.len() as u32,
-        *UNCOMPRESSED_SIGNATURE,
-        0x00000000,
-    );
+    build_frame(data.len(), data, *UNCOMPRESSED_SIGNATURE, 0)
+}
 
-    let mut result = Vec::new();
-    result.write_all(IntoBytes::as_bytes(&header)).unwrap();
-    result.write_all(data).unwrap();
+fn dictionary_reference(offset: usize, length: usize) -> RtfResult<[u8; 2]> {
+    if offset >= MAX_DICT_SIZE {
+        return Err(RtfError::InvalidStructure(format!(
+            "dictionary offset {offset} is not representable in compressed RTF"
+        )));
+    }
+    if length != 0 && !(2..=17).contains(&length) {
+        return Err(RtfError::InvalidStructure(format!(
+            "dictionary match length {length} is not representable in compressed RTF"
+        )));
+    }
+    let offset = u16::try_from(offset).map_err(|_| {
+        RtfError::InvalidStructure("compressed-RTF dictionary offset overflow".to_string())
+    })?;
+    let encoded_length = u16::try_from(length.saturating_sub(2)).map_err(|_| {
+        RtfError::InvalidStructure("compressed-RTF match length overflow".to_string())
+    })?;
+    Ok(((offset << 4) | encoded_length).to_be_bytes())
+}
 
+fn checked_u32_size(value: usize, description: &str) -> RtfResult<u32> {
+    u32::try_from(value).map_err(|_| {
+        RtfError::InvalidStructure(format!(
+            "{description} size {value} exceeds the compressed-RTF 32-bit wire limit"
+        ))
+    })
+}
+
+fn build_frame(
+    raw_len: usize,
+    contents: &[u8],
+    compression_type: [u8; 4],
+    crc32: u32,
+) -> RtfResult<Vec<u8>> {
+    let raw_size = checked_u32_size(raw_len, "uncompressed RTF")?;
+    let counted_size = contents
+        .len()
+        .checked_add(COUNTED_HEADER_SIZE)
+        .ok_or_else(|| RtfError::InvalidStructure("RTF COMPSIZE overflow".to_string()))?;
+    let compressed_size = checked_u32_size(counted_size, "compressed RTF")?;
+    let total_size = HEADER_SIZE
+        .checked_add(contents.len())
+        .ok_or_else(|| RtfError::InvalidStructure("compressed-RTF size overflow".to_string()))?;
+    let header = CompressedRtfHeader::new(compressed_size, raw_size, compression_type, crc32);
+    let mut result = Vec::with_capacity(total_size);
+    result.extend_from_slice(IntoBytes::as_bytes(&header));
+    result.extend_from_slice(contents);
     Ok(result)
 }
 
-/// Find the longest match in the dictionary
-fn find_longest_match(
-    dict: &mut [u8],
-    stream: &mut Cursor<&[u8]>,
-    write_offset: usize,
-) -> (usize, usize) {
-    let start_pos = stream.position();
-
-    // Read first byte
-    let mut byte_buf = [0u8; 1];
-    if stream.read_exact(&mut byte_buf).is_err() {
-        stream.set_position(start_pos);
-        return (0, 0);
-    }
-
-    let first_byte = byte_buf[0];
-    let prev_write_offset = write_offset;
-    let mut dict_index = 0;
-    let mut match_len = 0;
-    let mut longest_match_len = 0;
-    let mut dict_offset = 0;
-
-    // Search dictionary
-    loop {
-        if dict[dict_index % MAX_DICT_SIZE] == first_byte {
-            match_len += 1;
-
-            if longest_match_len < match_len && match_len <= 17 {
-                dict_offset = dict_index - match_len + 1;
-                dict[write_offset + match_len - 1] = first_byte;
-                longest_match_len = match_len;
-            }
-
-            // Try to extend match
-            if stream.read_exact(&mut byte_buf).is_ok()
-                && dict[(dict_index + 1) % MAX_DICT_SIZE] == byte_buf[0]
-            {
-                dict_index += 1;
-                continue;
-            }
-
-            // No more bytes or no match
-            stream.set_position(start_pos + longest_match_len as u64);
-            return (dict_offset, longest_match_len);
-        }
-
-        // Reset match and try next position
-        stream.set_position(start_pos);
-        if stream.read_exact(&mut byte_buf).is_err() {
-            break;
-        }
-        match_len = 0;
-
-        dict_index += 1;
-        if dict_index >= prev_write_offset + longest_match_len {
-            break;
-        }
-    }
-
-    stream.set_position(start_pos + longest_match_len as u64);
-    (dict_offset, longest_match_len)
+fn crc32(data: &[u8]) -> RtfResult<u32> {
+    // [MS-OXRTFCP] uses the reflected ISO polynomial with an all-zero
+    // initial state and no final XOR. `crc-fast` supplies the accelerated
+    // polynomial implementation; remove its ISO-HDLC final XOR here.
+    let mut digest = crc_fast::Digest::new_with_init_state(crc_fast::CrcAlgorithm::Crc32IsoHdlc, 0);
+    digest.update(data);
+    u32::try_from(digest.finalize() ^ u64::from(u32::MAX))
+        .map_err(|_| RtfError::InvalidStructure("compressed-RTF CRC32 overflow".to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SPEC_RAW: &[u8] = b"{\\rtf1\\ansi\\ansicpg1252\\pard hello world}\r\n";
+    const SPEC_COMPRESSED: &[u8] = &[
+        0x2d, 0x00, 0x00, 0x00, 0x2b, 0x00, 0x00, 0x00, 0x4c, 0x5a, 0x46, 0x75, 0xf1, 0xc5, 0xc7,
+        0xa7, 0x03, 0x00, 0x0a, 0x00, 0x72, 0x63, 0x70, 0x67, 0x31, 0x32, 0x35, 0x42, 0x32, 0x0a,
+        0xf3, 0x20, 0x68, 0x65, 0x6c, 0x09, 0x00, 0x20, 0x62, 0x77, 0x05, 0xb0, 0x6c, 0x64, 0x7d,
+        0x0a, 0x80, 0x0f, 0xa0,
+    ];
 
     #[test]
     fn test_is_compressed_rtf() {
@@ -434,5 +644,210 @@ mod tests {
         let compressed = compress(original, false).unwrap();
         let decompressed = decompress(&compressed).unwrap();
         assert_eq!(original, decompressed.as_slice());
+    }
+
+    #[test]
+    fn specification_example_is_byte_exact() {
+        assert_eq!(decompress(SPEC_COMPRESSED).unwrap(), SPEC_RAW);
+        assert_eq!(compress(SPEC_RAW, true).unwrap(), SPEC_COMPRESSED);
+        assert_eq!(
+            crate::RtfDocument::from_bytes(SPEC_COMPRESSED)
+                .unwrap()
+                .text(),
+            "hello world"
+        );
+    }
+
+    #[test]
+    fn compressed_round_trip_crosses_and_wraps_the_dictionary_write_position() {
+        let mut original = b"{\\rtf1 WXYZWXYZWXYZWXYZWXYZ}".repeat(512);
+        for index in 0..12_000usize {
+            original.push(((index * 37 + index / 17 * 11) % 251) as u8);
+        }
+
+        let encoded = compress(&original, true).unwrap();
+        assert!(encoded.len() < original.len());
+        assert_eq!(decompress(&encoded).unwrap(), original);
+    }
+
+    #[test]
+    fn compressed_round_trip_handles_varied_binary_corpus() {
+        const LENGTHS: &[usize] = &[
+            0, 1, 2, 3, 16, 17, 18, 255, 256, 257, 4095, 4096, 4097, 8193,
+        ];
+
+        for case in 0..3u64 {
+            for &len in LENGTHS {
+                let mut state = 0x9e37_79b9_7f4a_7c15u64
+                    ^ case.wrapping_mul(0xd1b5_4a32_d192_ed03)
+                    ^ len as u64;
+                let mut original = Vec::with_capacity(len);
+                for index in 0..len {
+                    state ^= state << 13;
+                    state ^= state >> 7;
+                    state ^= state << 17;
+                    let byte = match case {
+                        0 => state as u8,
+                        1 => (state & 0x07) as u8,
+                        _ => ((index % 251) as u8).wrapping_add((state & 0x03) as u8),
+                    };
+                    original.push(byte);
+                }
+
+                let encoded = compress(&original, true).unwrap();
+                assert_eq!(
+                    decompress(&encoded).unwrap(),
+                    original,
+                    "round trip failed for corpus case {case} at length {len}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn canonical_empty_compressed_stream_round_trips() {
+        let encoded = compress(&[], true).unwrap();
+        assert_eq!(&encoded[HEADER_SIZE..], &[0x02, 0x00, 0x0d, 0x00]);
+        assert!(decompress(&encoded).unwrap().is_empty());
+    }
+
+    #[test]
+    fn declared_frame_and_raw_sizes_are_exact() {
+        let mut stored = compress(b"abc", false).unwrap();
+        stored[0..4].copy_from_slice(&14u32.to_le_bytes());
+        assert!(matches!(
+            decompress(&stored),
+            Err(RtfError::InvalidStructure(message)) if message.contains("COMPSIZE")
+        ));
+
+        let stored = build_frame(4, b"abc", *UNCOMPRESSED_SIGNATURE, 0).unwrap();
+        assert!(matches!(
+            decompress(&stored),
+            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+        ));
+
+        let stored = build_frame(2, b"abc", *UNCOMPRESSED_SIGNATURE, 0).unwrap();
+        assert!(matches!(
+            decompress(&stored),
+            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+        ));
+    }
+
+    #[test]
+    fn declared_output_is_budgeted_before_allocation() {
+        let mut stored = compress(&[], false).unwrap();
+        stored[4..8].copy_from_slice(&u32::MAX.to_le_bytes());
+        let limits = DecompressionLimits::new(1024);
+        assert_eq!(limits.max_output_bytes(), 1024);
+        assert!(matches!(
+            decompress_with_limits(&stored, limits),
+            Err(RtfError::LimitExceeded {
+                resource: "decompressed bytes",
+                observed,
+                limit: 1024,
+            }) if observed == u32::MAX as usize
+        ));
+    }
+
+    #[test]
+    fn malformed_token_streams_fail_instead_of_returning_partial_output() {
+        let missing_end = build_frame(
+            1,
+            &[0x00, b'A'],
+            *COMPRESSED_SIGNATURE,
+            crc32(&[0x00, b'A']).unwrap(),
+        )
+        .unwrap();
+        assert!(matches!(
+            decompress(&missing_end),
+            Err(RtfError::InvalidStructure(message)) if message.contains("ends")
+        ));
+
+        let truncated_reference = build_frame(
+            0,
+            &[0x01, 0x0c],
+            *COMPRESSED_SIGNATURE,
+            crc32(&[0x01, 0x0c]).unwrap(),
+        )
+        .unwrap();
+        assert!(matches!(
+            decompress(&truncated_reference),
+            Err(RtfError::InvalidStructure(message)) if message.contains("dictionary reference")
+        ));
+
+        let unavailable_reference = build_frame(
+            2,
+            &[0x01, 0x12, 0xc0],
+            *COMPRESSED_SIGNATURE,
+            crc32(&[0x01, 0x12, 0xc0]).unwrap(),
+        )
+        .unwrap();
+        assert!(matches!(
+            decompress(&unavailable_reference),
+            Err(RtfError::InvalidStructure(message)) if message.contains("unavailable")
+        ));
+
+        let oversized_literal = build_frame(
+            0,
+            &[0x02, b'A', 0x0d, 0x00],
+            *COMPRESSED_SIGNATURE,
+            crc32(&[0x02, b'A', 0x0d, 0x00]).unwrap(),
+        )
+        .unwrap();
+        assert!(matches!(
+            decompress(&oversized_literal),
+            Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
+        ));
+    }
+
+    #[test]
+    fn padding_is_counted_by_crc_but_not_decoded() {
+        let contents = [&SPEC_COMPRESSED[HEADER_SIZE..], &[0xaa, 0x55]].concat();
+        let padded = build_frame(
+            SPEC_RAW.len(),
+            &contents,
+            *COMPRESSED_SIGNATURE,
+            crc32(&contents).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decompress(&padded).unwrap(), SPEC_RAW);
+    }
+
+    #[test]
+    fn corrupt_crc_and_zero_crc_rule_are_rejected() {
+        let mut compressed = SPEC_COMPRESSED.to_vec();
+        compressed[12] ^= 0x80;
+        assert!(matches!(
+            decompress(&compressed),
+            Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
+        ));
+
+        let stored = build_frame(3, b"abc", *UNCOMPRESSED_SIGNATURE, 1).unwrap();
+        assert!(matches!(
+            decompress(&stored),
+            Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
+        ));
+    }
+
+    #[test]
+    fn truncation_and_single_byte_mutation_never_panic() {
+        for end in 0..SPEC_COMPRESSED.len() {
+            assert!(decompress(&SPEC_COMPRESSED[..end]).is_err());
+        }
+        for index in 0..SPEC_COMPRESSED.len() {
+            for replacement in [0x00, 0x01, 0x7f, 0xff] {
+                let mut mutated = SPEC_COMPRESSED.to_vec();
+                mutated[index] = replacement;
+                let _ = decompress(&mutated);
+            }
+        }
+    }
+
+    #[test]
+    fn wire_size_helpers_reject_unrepresentable_lengths() {
+        if usize::BITS > u32::BITS {
+            assert!(checked_u32_size(u32::MAX as usize + 1, "test").is_err());
+            assert!(build_frame(u32::MAX as usize + 1, &[], *UNCOMPRESSED_SIGNATURE, 0).is_err());
+        }
     }
 }

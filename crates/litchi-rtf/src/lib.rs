@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 #![allow(missing_docs)]
 
 //! RTF (Rich Text Format) parser module.
@@ -122,7 +123,10 @@ pub use character_positioning::{
     MAX_CHARACTER_BASELINE_HALF_POINTS, MAX_CHARACTER_EXPANSION, MAX_CHARACTER_KERNING_HALF_POINTS,
     MAX_CHARACTER_SCALE_PERCENT,
 };
-pub use compressed::{compress, decompress, is_compressed_rtf};
+pub use compressed::{
+    DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
+    decompress_with_limits, is_compressed_rtf,
+};
 pub use custom_xml::{CustomXmlAttribute, CustomXmlTag};
 pub use data_store::DocumentDataStore;
 pub use document::RtfDocument;

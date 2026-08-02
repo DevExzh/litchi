@@ -23,6 +23,15 @@ pub enum RtfError {
     InvalidControlWord(String),
     /// Malformed document
     MalformedDocument(String),
+    /// A finite resource budget was exceeded.
+    LimitExceeded {
+        /// Stable name of the exhausted resource.
+        resource: &'static str,
+        /// Value declared or observed by the operation.
+        observed: usize,
+        /// Configured maximum value.
+        limit: usize,
+    },
 }
 
 impl fmt::Display for RtfError {
@@ -35,6 +44,14 @@ impl fmt::Display for RtfError {
             RtfError::UnexpectedEof => write!(f, "Unexpected end of input"),
             RtfError::InvalidControlWord(msg) => write!(f, "Invalid control word: {}", msg),
             RtfError::MalformedDocument(msg) => write!(f, "Malformed RTF document: {}", msg),
+            RtfError::LimitExceeded {
+                resource,
+                observed,
+                limit,
+            } => write!(
+                f,
+                "RTF resource limit exceeded for {resource}: observed {observed}, limit {limit}"
+            ),
         }
     }
 }

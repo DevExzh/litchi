@@ -35,6 +35,10 @@ let text = doc.text();
 - Compressed RTF (`MS-OXRTFCP`) encode/decode
 - `RtfWriter` with configurable `WriterOptions` for round-tripping documents
 
+`decompress` enforces a finite 256 MiB expansion ceiling before allocation.
+Applications with a different document budget can call `decompress_with_limits`
+with a checked `DecompressionLimits` value.
+
 ## License
 
 Licensed under the Apache License, Version 2.0. Part of the [Litchi](https://github.com/DevExzh/litchi) workspace.
