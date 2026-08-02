@@ -1595,28 +1595,28 @@ fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sy
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_opc::{BlobPart, Part};
-    use soapberry_zip::office::{LazyArchiveReader, StreamingArchiveWriter};
+    use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
+    use litchi_opc::{BlobPart, PackURI, Part};
     fn f(b: &[u8]) -> Connections {
         let p = OpcPackage::from_bytes(b).unwrap();
         load_from_package(&p).unwrap().unwrap()
     }
     fn f_without_broken_thumbnail(b: &[u8]) -> Connections {
-        let r = LazyArchiveReader::new(b).unwrap();
-        let mut w = StreamingArchiveWriter::new();
-        for n in r.file_names() {
-            let mut d = match r.read(n) {
-                Ok(d) => d,
-                Err(_) if n == "docProps/thumbnail.jpeg" => continue,
-                Err(e) => panic!("failed to copy fixture entry {n}: {e}"),
-            };
-            if n == "_rels/.rels" {
-                let s = String::from_utf8(d).unwrap();
-                d=s.replace("<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail\" Target=\"docProps/thumbnail.jpeg\"/>","").into_bytes();
+        let reader = PhysPkgReader::new(b).unwrap();
+        let mut writer = PhysPkgWriter::new();
+        for name in reader.member_names().unwrap() {
+            if name == "docProps/thumbnail.jpeg" {
+                continue;
             }
-            w.write_deflated(n, &d).unwrap();
+            let uri = PackURI::new(format!("/{name}")).unwrap();
+            let mut data = reader.blob_for(&uri).unwrap();
+            if name == "_rels/.rels" {
+                let xml = String::from_utf8(data).unwrap();
+                data = xml.replace("<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail\" Target=\"docProps/thumbnail.jpeg\"/>", "").into_bytes();
+            }
+            writer.write(&uri, &data).unwrap();
         }
-        f(&w.finish_to_bytes().unwrap())
+        f(&writer.finish().unwrap())
     }
     #[test]
     fn poi_web_paths_are_inert() {

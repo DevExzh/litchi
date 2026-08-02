@@ -40,7 +40,6 @@ roaring         = { workspace = true }
 ryu             = { workspace = true }
 sha2            = { workspace = true, features = ["zeroize"] }
 smallvec        = { workspace = true }
-soapberry-zip   = { workspace = true }
 thiserror       = { workspace = true }
 xml-minifier    = { workspace = true }
 zeroize         = { workspace = true }

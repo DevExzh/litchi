@@ -2838,6 +2838,24 @@ Office build, or unsupported extension. Per explicit user direction, this
 slice uses focused gates and does not repeat the previously green
 full-workspace run.
 
+## OOXML physical-package ownership
+
+The OOXML migration host no longer depends directly on `soapberry-zip`.
+Embedded chart workbooks now write canonical `PackURI` members through
+`litchi-opc::phys_pkg::PhysPkgWriter`; the one malformed-fixture filter uses
+the matching OPC reader/writer boundary without naming or exposing the archive
+implementation. The unused string-only XLSB ZIP error variant and its concrete
+error conversion are deleted. Generated embedded workbooks are reopened as
+logical `OpcPackage` values in both example and property tests, which proves
+required part discovery rather than only a ZIP magic prefix.
+
+Focused embedded-workbook and malformed-fixture regressions pass, as do
+warning-denied all-target Clippy for the migration host, warning-denied rustdoc,
+format and manifest checks, and the executable dependency policy. The boundary
+checker now accepts 35 workspace packages and 107 direct internal dependencies
+with 14 explicit debt items. Per explicit user direction, the previously green
+full-workspace test run is not repeated for this ownership-only slice.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

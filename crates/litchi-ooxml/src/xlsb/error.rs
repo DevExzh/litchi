@@ -11,8 +11,6 @@ pub type XlsbResult<T> = Result<T, XlsbError>;
 pub enum XlsbError {
     /// I/O error
     Io(std::io::Error),
-    /// ZIP error
-    Zip(String),
     /// XML parsing error
     Xml(quick_xml::Error),
     /// Validated BIFF12 wire-kernel error.
@@ -87,7 +85,6 @@ impl fmt::Display for XlsbError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             XlsbError::Io(e) => write!(f, "I/O error: {}", e),
-            XlsbError::Zip(e) => write!(f, "ZIP error: {}", e),
             XlsbError::Xml(e) => write!(f, "XML error: {}", e),
             XlsbError::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
             XlsbError::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
@@ -169,12 +166,6 @@ impl std::error::Error for XlsbError {
 impl From<std::io::Error> for XlsbError {
     fn from(err: std::io::Error) -> Self {
         XlsbError::Io(err)
-    }
-}
-
-impl From<soapberry_zip::Error> for XlsbError {
-    fn from(err: soapberry_zip::Error) -> Self {
-        XlsbError::Zip(err.to_string())
     }
 }
 

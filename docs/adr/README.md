@@ -23,6 +23,7 @@ Office round trips.
 | [0008](0008-migration-and-verification.md) | Buildable migration phases and evidence gates |
 | [0009](0009-odf-detection-ownership.md) | ODF detection ownership and fuzz boundary |
 | [0010](0010-facade-archive-ownership.md) | Archive ownership below the facade |
+| [0011](0011-ooxml-physical-package-ownership.md) | Physical OPC package ownership below the OOXML migration host |
 
 ## Decision hierarchy
 
