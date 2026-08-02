@@ -1320,20 +1320,32 @@ impl<'a> Lexer<'a> {
         Ok(tokens)
     }
 
+    fn invalid_cursor() -> RtfError {
+        RtfError::MalformedDocument("RTF lexer cursor is not on a UTF-8 boundary".to_string())
+    }
+
+    fn source_range(&self, start: usize, end: usize) -> RtfResult<&'a str> {
+        self.input.get(start..end).ok_or_else(Self::invalid_cursor)
+    }
+
+    fn remaining(&self) -> RtfResult<&'a str> {
+        self.input.get(self.pos..).ok_or_else(Self::invalid_cursor)
+    }
+
     /// Get the next token.
     fn next_token(&mut self) -> RtfResult<Token<'a>> {
         if self.pos >= self.input.len() {
             return Err(RtfError::UnexpectedEof);
         }
 
-        let ch = self.current_char();
+        let ch = self.current_char()?;
         match ch {
             '{' => {
-                self.advance();
+                self.advance()?;
                 Ok(Token::OpenBrace)
             },
             '}' => {
-                self.advance();
+                self.advance()?;
                 Ok(Token::CloseBrace)
             },
             '\\' => self.parse_control_word(),
@@ -1343,40 +1355,42 @@ impl<'a> Lexer<'a> {
 
     /// Parse a control word or control symbol.
     fn parse_control_word(&mut self) -> RtfResult<Token<'a>> {
-        self.advance(); // Skip '\'
+        self.advance()?; // Skip '\'
 
         if self.pos >= self.input.len() {
             return Err(RtfError::UnexpectedEof);
         }
 
-        let ch = self.current_char();
+        let ch = self.current_char()?;
 
         // Handle special control symbols
         match ch {
             '\\' | '{' | '}' => {
                 let start = self.pos;
-                self.advance();
-                return Ok(Token::Text(Cow::Borrowed(&self.input[start..self.pos])));
+                self.advance()?;
+                return Ok(Token::Text(Cow::Borrowed(
+                    self.source_range(start, self.pos)?,
+                )));
             },
             '\'' => return self.parse_hex_char(),
             '*' => {
-                self.advance();
+                self.advance()?;
                 return Ok(Token::Control(ControlWord::IgnorableDestination));
             },
             '\n' | '\r' => {
-                self.advance();
+                self.advance()?;
                 return Ok(Token::Control(ControlWord::Par));
             },
             '~' => {
-                self.advance();
+                self.advance()?;
                 return Ok(Token::Control(ControlWord::NonBreakingSpace));
             },
             '-' => {
-                self.advance();
+                self.advance()?;
                 return Ok(Token::Control(ControlWord::OptionalHyphen));
             },
             '_' => {
-                self.advance();
+                self.advance()?;
                 return Ok(Token::Control(ControlWord::NonBreakingHyphen));
             },
             _ => {},
@@ -1386,8 +1400,8 @@ impl<'a> Lexer<'a> {
         let start = self.pos;
 
         // Read alphabetic characters
-        while self.pos < self.input.len() && self.current_char().is_ascii_alphabetic() {
-            self.advance();
+        while self.pos < self.input.len() && self.current_char()?.is_ascii_alphabetic() {
+            self.advance()?;
         }
 
         if start == self.pos {
@@ -1398,14 +1412,14 @@ impl<'a> Lexer<'a> {
             )));
         }
 
-        let word = &self.input[start..self.pos];
+        let word = self.source_range(start, self.pos)?;
 
         // Parse optional numeric parameter
         let param = self.parse_numeric_parameter()?;
 
         // Skip optional space delimiter after control word
-        if self.pos < self.input.len() && self.current_char() == ' ' {
-            self.advance();
+        if self.pos < self.input.len() && self.current_char()? == ' ' {
+            self.advance()?;
         }
 
         // Match control word to enum variant
@@ -1459,11 +1473,9 @@ impl<'a> Lexer<'a> {
                 payload_end += ch.len_utf8();
             }
 
+            let payload = self.source_range(payload_start, payload_end)?;
             let allocated = self.arena.alloc_slice_fill_copy(size, 0u8);
-            for (slot, ch) in allocated
-                .iter_mut()
-                .zip(self.input[payload_start..payload_end].chars())
-            {
+            for (slot, ch) in allocated.iter_mut().zip(payload.chars()) {
                 *slot = u8::try_from(u32::from(ch)).map_err(|_| {
                     RtfError::MalformedDocument(
                         "RTF binary payload is not byte-preserving".to_string(),
@@ -1484,21 +1496,21 @@ impl<'a> Lexer<'a> {
             return Ok(None);
         }
 
-        let ch = self.current_char();
+        let ch = self.current_char()?;
         if !ch.is_ascii_digit() && ch != '-' {
             return Ok(None);
         }
 
         let start = self.pos;
         if ch == '-' {
-            self.advance();
+            self.advance()?;
         }
 
-        while self.pos < self.input.len() && self.current_char().is_ascii_digit() {
-            self.advance();
+        while self.pos < self.input.len() && self.current_char()?.is_ascii_digit() {
+            self.advance()?;
         }
 
-        let num_str = &self.input[start..self.pos];
+        let num_str = self.source_range(start, self.pos)?;
         let num = num_str.parse::<i32>()?;
         Ok(Some(num))
     }
@@ -3965,7 +3977,7 @@ impl<'a> Lexer<'a> {
     fn parse_hex_char(&mut self) -> RtfResult<Token<'a>> {
         let mut bytes = String::new();
         loop {
-            self.advance(); // Skip '\''
+            self.advance()?; // Skip '\''
             let pair = self
                 .input
                 .as_bytes()
@@ -3979,10 +3991,10 @@ impl<'a> Lexer<'a> {
             let byte = u8::from_str_radix(hex, 16)
                 .map_err(|_| RtfError::InvalidUnicode(format!("Invalid hex escape: {hex}")))?;
             bytes.push(char::from(byte));
-            if !self.input[self.pos..].starts_with("\\'") {
+            if !self.remaining()?.starts_with("\\'") {
                 break;
             }
-            self.advance(); // Skip the next backslash; the loop skips its quote.
+            self.advance()?; // Skip the next backslash; the loop skips its quote.
         }
 
         // Preserve source bytes. The parser applies the active code page after
@@ -3997,40 +4009,48 @@ impl<'a> Lexer<'a> {
         let mut start = self.pos;
 
         while self.pos < self.input.len() {
-            let ch = self.current_char();
+            let ch = self.current_char()?;
             match ch {
                 '\\' | '{' | '}' => break,
                 '\r' | '\n' => {
                     let end = self.pos;
-                    self.advance();
+                    self.advance()?;
                     if end > start {
-                        return Ok(Token::Text(Cow::Borrowed(&self.input[start..end])));
+                        return Ok(Token::Text(Cow::Borrowed(self.source_range(start, end)?)));
                     }
                     start = self.pos;
                 },
-                _ => self.advance(),
+                _ => self.advance()?,
             }
         }
 
         // Plain text already lives in the source and needs no arena copy. An
         // empty slice preserves the previous behavior for physical line breaks
         // immediately before EOF or a structural token.
-        Ok(Token::Text(Cow::Borrowed(&self.input[start..self.pos])))
+        Ok(Token::Text(Cow::Borrowed(
+            self.source_range(start, self.pos)?,
+        )))
     }
 
     /// Get current character without advancing.
     #[inline]
-    fn current_char(&self) -> char {
-        self.input[self.pos..].chars().next().unwrap_or('\0')
+    fn current_char(&self) -> RtfResult<char> {
+        self.remaining()?
+            .chars()
+            .next()
+            .ok_or(RtfError::UnexpectedEof)
     }
 
     /// Advance position by one character.
     #[inline]
-    fn advance(&mut self) {
-        if self.pos < self.input.len() {
-            let ch = self.current_char();
-            self.pos += ch.len_utf8();
-        }
+    fn advance(&mut self) -> RtfResult<()> {
+        let width = self.current_char()?.len_utf8();
+        self.pos = self
+            .pos
+            .checked_add(width)
+            .filter(|position| *position <= self.input.len())
+            .ok_or_else(Self::invalid_cursor)?;
+        Ok(())
     }
 }
 
@@ -4626,6 +4646,18 @@ mod tests {
         let mut lexer = Lexer::new("\\bin2 \u{80}\u{ff}", &arena);
         let tokens = lexer.tokenize().unwrap();
         assert!(matches!(&tokens[0], Token::Binary(data) if data.as_ref() == [0x80, 0xff]));
+    }
+
+    #[test]
+    fn invalid_private_utf8_cursor_returns_a_typed_error() {
+        let arena = Bump::new();
+        let mut lexer = Lexer::new("你", &arena);
+        lexer.pos = 1;
+        assert!(matches!(
+            lexer.next_token(),
+            Err(RtfError::MalformedDocument(message))
+                if message.contains("UTF-8 boundary")
+        ));
     }
 
     #[test]

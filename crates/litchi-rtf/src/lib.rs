@@ -6,6 +6,7 @@
         clippy::indexing_slicing,
         clippy::panic,
         clippy::panic_in_result_fn,
+        clippy::string_slice,
         clippy::todo,
         clippy::unimplemented,
         clippy::unreachable,

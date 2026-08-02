@@ -1,4 +1,4 @@
-use litchi_rtf::{LatentStyleException, LatentStyles, RtfDocument, RtfWriter};
+use litchi_rtf::{LatentStyleException, LatentStyles, RtfDocument, RtfError, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
 
@@ -34,6 +34,23 @@ fn parses_full_unicode_latent_styles_and_round_trips_order() {
     let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.latent_styles(), Some(styles));
+}
+
+#[test]
+fn parses_multiple_exception_names_from_one_text_token() {
+    let document = RtfDocument::parse(
+        r"{\rtf1{\*\latentstyles\lsdstimax3{\lsdlockedexcept\lsdlocked1 Alpha;Beta;Gamma;}}}",
+    )
+    .unwrap();
+    let exceptions = &document.latent_styles().unwrap().exceptions;
+    let names: Vec<_> = exceptions
+        .iter()
+        .map(|exception| exception.name.as_ref())
+        .collect();
+    assert_eq!(names, ["Alpha", "Beta", "Gamma"]);
+    assert_eq!(exceptions[0].locked, Some(true));
+    assert_eq!(exceptions[1].locked, None);
+    assert_eq!(exceptions[2].locked, None);
 }
 
 #[test]
@@ -84,6 +101,16 @@ fn rejects_malformed_or_active_latent_style_grammar() {
     for rtf in cases {
         assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
+
+    let mut oversized_unicode =
+        String::from(r"{\rtf1{\*\latentstyles\lsdstimax1{\lsdlockedexcept ");
+    oversized_unicode.push_str(&r"\u20320?".repeat(21_846));
+    oversized_unicode.push_str(";}}}");
+    assert!(matches!(
+        RtfDocument::parse(&oversized_unicode),
+        Err(RtfError::MalformedDocument(message))
+            if message == "RTF latent-style exception name exceeds the safety limit"
+    ));
 }
 
 #[test]

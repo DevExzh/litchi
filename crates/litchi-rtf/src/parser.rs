@@ -11928,6 +11928,7 @@ impl<'a> Parser<'a> {
         let mut entries = Vec::new();
         let mut builder = LatentStyleExceptionBuilder::default();
         let mut name = String::new();
+        let mut text_bytes = 0usize;
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         loop {
             match self.tokens.get(self.pos) {
@@ -12000,31 +12001,17 @@ impl<'a> Parser<'a> {
                         ),
                         ControlWord::Unicode(first) => {
                             name.push_str(&self.parse_style_unicode(*first, unicode_skip)?);
-                            while let Some(separator) = name.find(';') {
-                                let remainder = name.split_off(separator + 1);
-                                let entry_name = name[..separator].trim();
-                                if entry_name.is_empty() {
-                                    return Err(RtfError::MalformedDocument(
-                                        "RTF latent-style exception name cannot be empty"
-                                            .to_string(),
-                                    ));
-                                }
-                                if entries.len() >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS
-                                {
-                                    return Err(RtfError::MalformedDocument(
-                                        "RTF latent-style exception count exceeds the safety limit"
-                                            .to_string(),
-                                    ));
-                                }
-                                entries.push(crate::LatentStyleException {
-                                    name: Cow::Borrowed(self.arena.alloc_str(entry_name)),
-                                    locked: builder.locked.take(),
-                                    semi_hidden: builder.semi_hidden.take(),
-                                    unhide_when_used: builder.unhide_when_used.take(),
-                                    quick_format: builder.quick_format.take(),
-                                    priority: builder.priority.take(),
-                                });
-                                name = remainder;
+                            self.drain_latent_style_exception_names(
+                                &mut name,
+                                &mut builder,
+                                &mut entries,
+                                &mut text_bytes,
+                            )?;
+                            if name.len() > crate::latent_style::MAX_LATENT_STYLE_NAME_BYTES {
+                                return Err(RtfError::MalformedDocument(
+                                    "RTF latent-style exception name exceeds the safety limit"
+                                        .to_string(),
+                                ));
                             }
                             continue;
                         },
@@ -12050,30 +12037,12 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) => {
                     name.push_str(&self.decode_transport_text(text)?);
                     self.pos += 1;
-                    while let Some(separator) = name.find(';') {
-                        let remainder = name.split_off(separator + 1);
-                        let entry_name = name[..separator].trim();
-                        if entry_name.is_empty() {
-                            return Err(RtfError::MalformedDocument(
-                                "RTF latent-style exception name cannot be empty".to_string(),
-                            ));
-                        }
-                        if entries.len() >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS {
-                            return Err(RtfError::MalformedDocument(
-                                "RTF latent-style exception count exceeds the safety limit"
-                                    .to_string(),
-                            ));
-                        }
-                        entries.push(crate::LatentStyleException {
-                            name: Cow::Borrowed(self.arena.alloc_str(entry_name)),
-                            locked: builder.locked.take(),
-                            semi_hidden: builder.semi_hidden.take(),
-                            unhide_when_used: builder.unhide_when_used.take(),
-                            quick_format: builder.quick_format.take(),
-                            priority: builder.priority.take(),
-                        });
-                        name = remainder;
-                    }
+                    self.drain_latent_style_exception_names(
+                        &mut name,
+                        &mut builder,
+                        &mut entries,
+                        &mut text_bytes,
+                    )?;
                 },
                 Some(Token::OpenBrace | Token::Binary(_)) => {
                     return Err(RtfError::MalformedDocument(
@@ -12089,6 +12058,67 @@ impl<'a> Parser<'a> {
                 ));
             }
         }
+    }
+
+    fn drain_latent_style_exception_names(
+        &self,
+        name: &mut String,
+        builder: &mut LatentStyleExceptionBuilder,
+        entries: &mut Vec<crate::LatentStyleException<'a>>,
+        text_bytes: &mut usize,
+    ) -> RtfResult<()> {
+        let Some(last_separator) = name.rfind(';') else {
+            return Ok(());
+        };
+        let completed = name.get(..=last_separator).ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF latent-style parser found an invalid text boundary".to_string(),
+            )
+        })?;
+        let completed = completed.strip_suffix(';').ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF latent-style parser lost an exception delimiter".to_string(),
+            )
+        })?;
+        for entry_name in completed.split(';') {
+            let entry_name = entry_name.trim();
+            let candidate = crate::LatentStyleException {
+                name: Cow::Borrowed(entry_name),
+                locked: builder.locked,
+                semi_hidden: builder.semi_hidden,
+                unhide_when_used: builder.unhide_when_used,
+                quick_format: builder.quick_format,
+                priority: builder.priority,
+            };
+            candidate.validate()?;
+            if entries.len() >= crate::latent_style::MAX_LATENT_STYLE_EXCEPTIONS {
+                return Err(RtfError::MalformedDocument(
+                    "RTF latent-style exception count exceeds the safety limit".to_string(),
+                ));
+            }
+            let next_text_bytes = text_bytes.checked_add(entry_name.len()).ok_or_else(|| {
+                RtfError::MalformedDocument(
+                    "RTF latent-style aggregate text size overflow".to_string(),
+                )
+            })?;
+            if next_text_bytes > crate::latent_style::MAX_LATENT_STYLE_TEXT_BYTES {
+                return Err(RtfError::MalformedDocument(
+                    "RTF latent-style text exceeds the safety limit".to_string(),
+                ));
+            }
+            crate::error::try_reserve_one(entries, "latent-style exceptions")?;
+            entries.push(crate::LatentStyleException {
+                name: Cow::Borrowed(self.arena.alloc_str(entry_name)),
+                locked: builder.locked.take(),
+                semi_hidden: builder.semi_hidden.take(),
+                unhide_when_used: builder.unhide_when_used.take(),
+                quick_format: builder.quick_format.take(),
+                priority: builder.priority.take(),
+            });
+            *text_bytes = next_text_bytes;
+        }
+        drop(name.drain(..=last_separator));
+        Ok(())
     }
 
     fn parse_latent_style_bool(value: i32) -> RtfResult<bool> {
@@ -12885,12 +12915,23 @@ impl<'a> Parser<'a> {
     }
 
     fn push_direct_revision_authors(&mut self, text: &mut String) -> RtfResult<()> {
-        while let Some(separator) = text.find(';') {
-            let remainder = text.split_off(separator + 1);
-            let author = text[..separator].trim().to_string();
-            self.push_revision_author(author)?;
-            *text = remainder;
+        let Some(last_separator) = text.rfind(';') else {
+            return Ok(());
+        };
+        let completed = text.get(..=last_separator).ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF revision-author parser found an invalid text boundary".to_string(),
+            )
+        })?;
+        let completed = completed.strip_suffix(';').ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF revision-author parser lost an author delimiter".to_string(),
+            )
+        })?;
+        for author in completed.split(';') {
+            self.push_revision_author(author.trim().to_string())?;
         }
+        drop(text.drain(..=last_separator));
         Ok(())
     }
 
@@ -12900,7 +12941,7 @@ impl<'a> Parser<'a> {
                 "RTF revision author count exceeds the safety limit".to_string(),
             ));
         }
-        self.revision_author_text_bytes = self
+        let revision_author_text_bytes = self
             .revision_author_text_bytes
             .checked_add(author.len())
             .ok_or_else(|| {
@@ -12908,16 +12949,17 @@ impl<'a> Parser<'a> {
                     "RTF aggregate revision-author size overflow".to_string(),
                 )
             })?;
-        if self.revision_author_text_bytes > super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES
-        {
+        if revision_author_text_bytes > super::annotation::MAX_REVISION_AUTHOR_TEXT_TOTAL_BYTES {
             return Err(RtfError::MalformedDocument(
                 "RTF aggregate revision-author text exceeds the safety limit".to_string(),
             ));
         }
+        crate::error::try_reserve_one(&mut self.revision_authors, "revision authors")?;
         let author =
             super::annotation::RevisionAuthor::new(Cow::Borrowed(self.arena.alloc_str(&author)))?;
         author.validate()?;
         self.revision_authors.push(author);
+        self.revision_author_text_bytes = revision_author_text_bytes;
         Ok(())
     }
 
@@ -16120,13 +16162,19 @@ impl<'a> Parser<'a> {
                         ));
                     }
                     let mut panose = [0u8; 10];
-                    for (index, byte) in panose.iter_mut().enumerate() {
-                        *byte = u8::from_str_radix(&compact[index * 2..index * 2 + 2], 16)
-                            .map_err(|_| {
-                                RtfError::MalformedDocument(
-                                    "invalid RTF panose payload".to_string(),
-                                )
-                            })?;
+                    for (byte, pair) in panose.iter_mut().zip(compact.as_bytes().chunks_exact(2)) {
+                        let &[high, low] = pair else {
+                            return Err(RtfError::MalformedDocument(
+                                "invalid RTF panose payload".to_string(),
+                            ));
+                        };
+                        let high = Self::hex_nibble(high).ok_or_else(|| {
+                            RtfError::MalformedDocument("invalid RTF panose payload".to_string())
+                        })?;
+                        let low = Self::hex_nibble(low).ok_or_else(|| {
+                            RtfError::MalformedDocument("invalid RTF panose payload".to_string())
+                        })?;
+                        *byte = (high << 4) | low;
                     }
                     return Ok(panose);
                 },

@@ -256,47 +256,65 @@ impl<'a> Parser<'a> {
     }
 
     fn run(mut self) -> RtfResult<EquationModel<'a>> {
-        while let Some(byte) = self.input.as_bytes().get(self.position).copied() {
+        while let Some(byte) = self.remaining()?.as_bytes().first().copied() {
             if byte == b'\\' {
-                self.flush_literal();
+                self.flush_literal()?;
                 self.parse_group()?;
             } else {
                 if self.literal_start.is_none() {
                     self.literal_start = Some(self.position);
                 }
-                self.advance_char();
+                self.advance_char()?;
             }
         }
-        self.flush_literal();
+        self.flush_literal()?;
         Ok(EquationModel {
             segments: self.segments,
         })
     }
 
-    fn flush_literal(&mut self) {
+    fn source_range(&self, start: usize, end: usize) -> RtfResult<&'a str> {
+        self.input
+            .get(start..end)
+            .ok_or_else(|| malformed("RTF EQ parser cursor is not on a UTF-8 boundary"))
+    }
+
+    fn remaining(&self) -> RtfResult<&'a str> {
+        self.input
+            .get(self.position..)
+            .ok_or_else(|| malformed("RTF EQ parser cursor is not on a UTF-8 boundary"))
+    }
+
+    fn flush_literal(&mut self) -> RtfResult<()> {
         if let Some(start) = self.literal_start.take() {
-            let text = self.input[start..self.position].trim();
+            let text = self.source_range(start, self.position)?.trim();
             if !text.is_empty() {
                 self.segments.push(EquationSegment::Literal(text));
             }
         }
+        Ok(())
     }
 
-    fn advance_char(&mut self) {
-        let width = self.input[self.position..]
+    fn advance_char(&mut self) -> RtfResult<()> {
+        let width = self
+            .remaining()?
             .chars()
             .next()
             .map(char::len_utf8)
-            .unwrap_or(1);
-        self.position += width;
+            .ok_or_else(|| malformed("RTF EQ parser cannot advance past end of input"))?;
+        self.position = self
+            .position
+            .checked_add(width)
+            .ok_or_else(|| malformed("RTF EQ parser cursor overflow"))?;
+        Ok(())
     }
 
-    fn peek(&self) -> Option<char> {
-        self.input[self.position..].chars().next()
+    fn peek(&self) -> RtfResult<Option<char>> {
+        Ok(self.remaining()?.chars().next())
     }
 
     fn expect_backslash(&mut self) -> RtfResult<()> {
-        if self.peek() == Some('\\') {
+        if self.peek()? == Some('\\') {
             self.position += 1;
             Ok(())
         } else {
@@ -324,7 +342,7 @@ impl<'a> Parser<'a> {
     fn read_number(&mut self) -> RtfResult<EquationSpacing> {
         let start = self.position;
         while self
-            .peek()
+            .peek()?
             .is_some_and(|character| character.is_ascii_digit())
         {
             self.position += 1;
@@ -332,7 +350,7 @@ impl<'a> Parser<'a> {
         if self.position == start {
             return Err(malformed("RTF EQ switch option lacks a numeric argument"));
         }
-        EquationSpacing::parse(&self.input[start..self.position])
+        EquationSpacing::parse(self.source_range(start, self.position)?)
     }
 
     /// Read the escaped single character argument of `\lc`, `\rc`, `\bc`,
@@ -341,10 +359,10 @@ impl<'a> Parser<'a> {
     fn read_char(&mut self) -> RtfResult<char> {
         self.expect_backslash()
             .map_err(|_| malformed("RTF EQ switch option lacks a character argument"))?;
-        let Some(character) = self.peek() else {
+        let Some(character) = self.peek()? else {
             return Err(malformed("RTF EQ switch option lacks a character argument"));
         };
-        self.advance_char();
+        self.advance_char()?;
         Ok(character)
     }
 
@@ -379,7 +397,7 @@ impl<'a> Parser<'a> {
                 )));
             },
         };
-        while self.peek() == Some('\\') {
+        while self.peek()? == Some('\\') {
             options += 1;
             if options > MAX_SWITCH_OPTIONS {
                 return Err(malformed("RTF EQ switch exceeds the option limit"));
@@ -538,7 +556,7 @@ impl<'a> Parser<'a> {
 
     /// Parse the optional parenthesized element list after a switch.
     fn parse_elements(&mut self) -> RtfResult<Vec<&'a str>> {
-        if self.peek() != Some('(') {
+        if self.peek()? != Some('(') {
             return Ok(Vec::new());
         }
         self.position += 1;
@@ -546,7 +564,7 @@ impl<'a> Parser<'a> {
         let mut depth = 1usize;
         let mut element_start = self.position;
         loop {
-            let Some(character) = self.peek() else {
+            let Some(character) = self.peek()? else {
                 return Err(malformed("RTF EQ element list is unterminated"));
             };
             match character {
@@ -554,7 +572,7 @@ impl<'a> Parser<'a> {
                 ')' => {
                     depth -= 1;
                     if depth == 0 {
-                        elements.push(self.input[element_start..self.position].trim());
+                        elements.push(self.source_range(element_start, self.position)?.trim());
                         self.position += 1;
                         if elements.len() > MAX_GROUP_ELEMENTS {
                             return Err(malformed("RTF EQ group exceeds the element limit"));
@@ -563,7 +581,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 ',' if depth == 1 => {
-                    elements.push(self.input[element_start..self.position].trim());
+                    elements.push(self.source_range(element_start, self.position)?.trim());
                     if elements.len() > MAX_GROUP_ELEMENTS {
                         return Err(malformed("RTF EQ group exceeds the element limit"));
                     }
@@ -571,7 +589,7 @@ impl<'a> Parser<'a> {
                 },
                 _ => {},
             }
-            self.advance_char();
+            self.advance_char()?;
         }
     }
 }
@@ -776,6 +794,17 @@ mod tests {
                 }),
             ]
         );
+    }
+
+    #[test]
+    fn invalid_private_utf8_cursor_returns_a_typed_error() {
+        let mut parser = Parser::new("你");
+        parser.position = 1;
+        assert!(matches!(
+            parser.run(),
+            Err(RtfError::MalformedDocument(message))
+                if message.contains("UTF-8 boundary")
+        ));
     }
 
     #[test]
