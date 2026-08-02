@@ -27,6 +27,15 @@ struct Inner {
 /// let mut document = Document::parse(r"{\rtf1 immutable}").unwrap();
 /// document.clear_fields();
 /// ```
+///
+/// Parser storage is not part of the ordinary facade:
+///
+/// ```compile_fail
+/// use litchi_rtf::Document;
+///
+/// let document = Document::parse(r"{\rtf1 semantic}").unwrap();
+/// let parser_blocks = document.blocks();
+/// ```
 #[derive(Clone)]
 pub struct Document {
     inner: Arc<Inner>,
@@ -96,11 +105,7 @@ impl Document {
 
     /// Whether the body contains no text.
     pub fn is_empty(&self) -> bool {
-        self.inner
-            .model
-            .blocks()
-            .iter()
-            .all(|block| block.text.is_empty())
+        self.body().is_empty()
     }
 
     /// Number of logical body paragraphs.
@@ -110,12 +115,15 @@ impl Document {
         *self
             .inner
             .paragraph_count
-            .get_or_init(|| self.inner.model.paragraph_count())
+            .get_or_init(|| self.body().paragraphs().count())
     }
 
-    /// Borrow the ordered text and formatting blocks retained by the parser.
-    pub fn blocks(&self) -> &[crate::text::Block<'_>] {
-        self.inner.model.blocks()
+    /// Borrow the main text story through lazy semantic views.
+    pub fn body(&self) -> crate::text::Story<'_> {
+        crate::text::Story::new(
+            self.inner.model.retained_blocks(),
+            self.inner.model.body_boundaries(),
+        )
     }
 
     /// Borrow the document font resources.
@@ -209,11 +217,34 @@ impl fmt::Debug for Document {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Document")
-            .field("blocks", &self.blocks().len())
+            .field("paragraphs", &self.paragraph_count())
             .field("tables", &self.tables().len())
             .field("pictures", &self.pictures().len())
             .field("fields", &self.fields().len())
             .field("sections", &self.sections().len())
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Document;
+
+    #[test]
+    fn semantic_story_traversal_does_not_flatten_the_snapshot() {
+        let document = Document::parse(r"{\rtf1 one\line two\par three}").unwrap();
+        assert!(document.inner.text.get().is_none());
+        assert!(document.inner.paragraph_count.get().is_none());
+
+        let run_bytes: usize = document
+            .body()
+            .paragraphs()
+            .flat_map(|paragraph| paragraph.runs())
+            .map(|run| run.text().len())
+            .sum();
+
+        assert_eq!(run_bytes, "onetwothree".len());
+        assert!(document.inner.text.get().is_none());
+        assert!(document.inner.paragraph_count.get().is_none());
     }
 }

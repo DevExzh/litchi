@@ -24,10 +24,19 @@
 //!
 //! # Architecture
 //!
-//! The parser is organized into several components:
-//! - **Lexer**: Tokenizes RTF input into control words, symbols, and text
-//! - **Parser**: Builds a structured document from tokens
-//! - **Document**: High-level document representation with paragraphs, runs, and tables
+//! The crate keeps format mechanics behind responsibility-focused boundaries:
+//!
+//! - `api` owns the immutable [`Document`] facade and borrowed [`text::Story`]
+//!   views.
+//! - `codec` owns bounded transport decoding, tokenization, parsing, and
+//!   serialization.
+//! - `model` owns the retained lossless RTF snapshot used by [`raw`].
+//! - `text`, `content`, `drawing`, `review`, `metadata`, `numbering`, and
+//!   `policy` group the corresponding native RTF vocabularies.
+//!
+//! These private ownership modules keep dependency direction explicit. Stable
+//! public entry points use the concise facade modules below rather than
+//! mirroring internal file paths.
 //!
 //! # Example
 //!
@@ -38,113 +47,78 @@
 //! let rtf_text = r#"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}"#;
 //! let doc = Document::parse(rtf_text)?;
 //! assert_eq!(doc.text(), "Hello World!\n");
+//! assert_eq!(doc.body().paragraphs().count(), 1);
 //! # Ok(())
 //! # }
 //! ```
 
-mod annotation;
-mod bookmark;
-mod border;
-mod character_positioning;
-mod compressed;
-mod custom_xml;
-mod data_store;
-mod document;
-mod document_asian_grid_compatibility;
-mod document_booklet_printing;
-mod document_compatibility_policy;
-mod document_default_formatting;
-mod document_drawing_grid;
-mod document_east_asian_compatibility;
-mod document_embedding_policies;
-mod document_file_settings;
-mod document_legacy_layout_compatibility;
-mod document_line_spacing_compatibility;
-mod document_origin;
-mod document_output_settings;
-mod document_print_layout_settings;
-mod document_privacy_policies;
-mod document_processing_settings;
-mod document_rendering_settings;
-mod document_revision_policies;
-mod document_save_preferences;
-mod document_style_policies;
-mod document_style_restrictions;
-mod document_table_layout_compatibility;
-mod document_theme_languages;
-mod document_variable;
-mod document_view;
-mod document_word_2003_compatibility;
-mod document_xml_policies;
-mod editable_region;
-mod equation;
-mod error;
-mod external_reference;
-mod facade;
-pub mod field;
-mod file_table;
-mod form_field;
-mod generated_list_marker;
-mod generator;
-mod hyphenation;
-mod info;
-mod kinsoku;
-mod language;
-mod latent_style;
-mod legacy_drawing;
-mod legacy_numbering;
-mod legacy_paragraph_numbering;
-mod legacy_text_box;
-mod lexer;
-mod limits;
-pub mod list;
-mod mail_merge;
-pub mod math;
-mod math_properties;
-mod navigation_entry;
-mod note_options;
-mod note_separator;
-mod object;
-mod page_border;
-mod paragraph_group;
-mod parser;
-pub mod picture;
-mod picture_compatibility;
-mod protection_range;
-mod protection_user;
-mod review_display;
-mod revision_save;
-pub mod section;
-pub mod shape;
-mod style_list_filter;
-mod stylesheet;
-pub mod table;
-mod theme;
-mod types;
-mod user_property;
-mod window_caption;
-mod write_reservation;
-mod writer;
-mod xml_namespace;
-mod xsl_transform;
+mod api;
+mod codec;
+mod content;
+mod drawing;
+pub mod metadata;
+mod model;
+mod numbering;
+mod policy;
+pub mod review;
+pub mod text;
+
+pub use content::{field, math, section, table};
+pub use drawing::{picture, shape};
+pub use numbering::list;
+
+// Crate-private compatibility aliases keep the retained model isolated from
+// the source layout. New code should depend on its responsibility module.
+use api::story;
+use codec::{compressed, error, lexer, limits, parser, writer};
+use content::{equation, form_field, math_properties};
+use drawing::{legacy_drawing, legacy_text_box, object, page_border, picture_compatibility};
+use metadata::{
+    custom_xml, data_store, document_origin, document_variable, external_reference, file_table,
+    generator, info, mail_merge, theme, user_property, window_caption, write_reservation,
+    xml_namespace, xsl_transform,
+};
+use model::{document, types};
+use numbering::{
+    generated_list_marker, legacy_numbering, legacy_paragraph_numbering, navigation_entry,
+};
+use policy::{
+    document_asian_grid_compatibility, document_booklet_printing, document_compatibility_policy,
+    document_drawing_grid, document_east_asian_compatibility, document_embedding_policies,
+    document_file_settings, document_legacy_layout_compatibility,
+    document_line_spacing_compatibility, document_output_settings, document_print_layout_settings,
+    document_privacy_policies, document_processing_settings, document_rendering_settings,
+    document_revision_policies, document_save_preferences, document_style_policies,
+    document_style_restrictions, document_table_layout_compatibility, document_theme_languages,
+    document_view, document_word_2003_compatibility, document_xml_policies,
+};
+use review::{
+    annotation, bookmark, editable_region, note_options, note_separator, protection_range,
+    protection_user, review_display, revision_save,
+};
+use text::{
+    border, character_positioning, document_default_formatting, hyphenation, kinsoku, language,
+    latent_style, paragraph_group, style_list_filter, stylesheet,
+};
 
 /// Concise document-opening facade.
 pub mod read {
-    pub use crate::facade::Document;
-    pub use crate::limits::ParseLimits as Limits;
+    pub use crate::api::Document;
+    pub use crate::codec::limits::ParseLimits as Limits;
 }
 
 /// Concise streaming writer facade.
 pub mod write {
-    pub use crate::writer::{
+    pub use crate::codec::writer::{
         Charset, DEFAULT_TAB_WIDTH_TWIPS, DefaultTabWidthPolicy as TabWidth,
         MAX_DEFAULT_TAB_WIDTH_TWIPS, RtfWriter as Writer, WriterOptions as Options,
     };
+    pub use crate::model::types::Formatting as Format;
 }
 
 /// Bounded Outlook/MAPI compressed-RTF transport codec.
 pub mod transport {
-    pub use crate::compressed::{
+    pub use crate::codec::compressed::{
         DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits as Limits, compress, decompress,
         decompress_with_limits, is_compressed_rtf,
     };
@@ -155,27 +129,8 @@ pub mod transport {
 /// This interface exposes format-specific structure. Ordinary read-only code
 /// should prefer [`crate::Document`].
 pub mod raw {
-    pub use crate::document::RtfDocument as Document;
-    pub use crate::legacy::*;
-}
-
-/// Body text, local formatting, and paragraph values.
-pub mod text {
-    pub use crate::border::{
-        Border, BorderStyle, Borders, CharacterBorder, CharacterBorderStyle, CharacterShading,
-        Shading, ShadingPattern, TabAlignment, TabLeader, TabStop, TabStops,
-    };
-    pub use crate::character_positioning::{
-        CharacterBaseline as Baseline, CharacterExpansion as Expansion,
-        CharacterPositioning as Positioning,
-    };
-    pub use crate::types::{
-        Alignment, AnimatedTextEffect, AssociatedCharacterFormatting, CharacterGrid, CharacterType,
-        EmphasisMark, FitText, Formatting, Indentation, Paragraph, ParagraphContent,
-        ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment, ParagraphLineBreaking,
-        ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata,
-        Run, Spacing, StyleBlock as Block, TextDirection, UnderlineStyle,
-    };
+    pub use crate::model::document::RtfDocument as Document;
+    pub use crate::native::*;
 }
 
 /// Font resources and checked references.
@@ -203,34 +158,12 @@ pub mod style {
     };
 }
 
-/// Passive document metadata and protection declarations.
-pub mod metadata {
-    pub use crate::info::{
-        DocumentInfo as Info, DocumentProtection as Protection, ProtectionLevel, ProtectionType,
-        RtfTimestamp as Timestamp,
-    };
-    pub use crate::user_property::{
-        UserProperty, UserPropertyDateTime as DateTime, UserPropertyType as PropertyType,
-        UserPropertyValue as Value,
-    };
-}
+pub use api::Document;
+pub use codec::error::{RtfError as Error, RtfResult as Result};
 
-/// Comments, notes, and tracked revisions.
-pub mod review {
-    pub use crate::annotation::{
-        Annotation, AnnotationType as AnnotationKind, Revision, RevisionAuthor,
-        RevisionType as RevisionKind,
-    };
-    pub use crate::section::Note;
-}
-
-pub use error::{RtfError as Error, RtfResult as Result};
-pub use facade::Document;
-
-// The parser model historically occupied the entire crate root. Keep those
-// names available to the workspace while the semantic facade migrates, but do
-// not present them as the ordinary documented API.
-mod legacy {
+// Canonical native RTF vocabulary used by the retained model and writer. The
+// ordinary facade selects a smaller contextual subset from this module.
+mod native {
     use super::*;
 
     pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
@@ -487,8 +420,8 @@ mod legacy {
 }
 
 #[cfg(doc)]
-pub(crate) use legacy::*;
+pub(crate) use native::*;
 
 #[cfg(not(doc))]
 #[doc(hidden)]
-pub use legacy::*;
+pub use native::*;

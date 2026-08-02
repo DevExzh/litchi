@@ -7,6 +7,7 @@
 //! ```
 
 use litchi_rtf::Document;
+use litchi_rtf::text::Inline;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The exact snippet shown in the litchi-rtf README / lib.rs doc-comment.
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Plain text       : {:?}", doc.text());
     println!("Paragraph count  : {}", doc.paragraph_count());
-    println!("Style blocks     : {}", doc.blocks().len());
+    println!("Text runs        : {}", doc.body().runs().count());
     println!("Fonts in table   : {}", doc.fonts().len());
 
     // Show each font defined in the document.
@@ -31,15 +32,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    // Traverse the parser's borrowed text/formatting blocks without cloning
-    // the snapshot or its retained resources.
-    println!("\nText blocks:");
+    // Traverse semantic paragraphs and inline runs without flattening or
+    // cloning the snapshot's retained text.
+    println!("\nParagraphs and inlines:");
     println!("{}", "-".repeat(60));
-    for (index, block) in doc.blocks().iter().enumerate() {
+    for (paragraph_index, paragraph) in doc.body().paragraphs().enumerate() {
         println!(
-            "  block[{index}] text={:?} bold={} italic={} underline={:?}",
-            block.text, block.formatting.bold, block.formatting.italic, block.formatting.underline
+            "Paragraph {} ({} UTF-8 bytes)",
+            paragraph_index + 1,
+            paragraph.len()
         );
+        for inline in paragraph.inlines() {
+            match inline {
+                Inline::Text(run) => println!(
+                    "  text={:?} bold={} italic={} underline={:?}",
+                    run.text(),
+                    run.format().bold(),
+                    run.format().italic(),
+                    run.format().underline()
+                ),
+                Inline::Break(kind) => println!("  break={kind:?}"),
+                _ => println!("  other inline content"),
+            }
+        }
     }
 
     Ok(())

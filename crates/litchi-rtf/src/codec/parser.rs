@@ -1507,6 +1507,8 @@ pub struct Parser<'a> {
     bookmark_spans: Vec<BookmarkSpan>,
     /// UTF-8 byte length of body text emitted into style blocks.
     body_text_len: usize,
+    /// Structural paragraph and line breaks retained independently from text.
+    body_boundaries: Vec<crate::story::Boundary>,
     /// Stable source order for bookmark ranges.
     next_bookmark_order: usize,
     /// Shapes
@@ -2063,6 +2065,7 @@ impl<'a> Parser<'a> {
             open_bookmarks: HashMap::new(),
             bookmark_spans: Vec::new(),
             body_text_len: 0,
+            body_boundaries: Vec::new(),
             next_bookmark_order: 0,
             shapes: Vec::new(),
             drawing_order: Vec::new(),
@@ -2337,6 +2340,7 @@ impl<'a> Parser<'a> {
         self.finalize_protection_ranges()?;
         self.finalize_editable_regions()?;
         self.finalize_annotations()?;
+        crate::story::validate_boundaries(&self.blocks, &self.body_boundaries)?;
         let body_story_events = self.finalize_body_story_events()?;
 
         let revision_save = if self.saw_revision_save_table || self.saw_revision_save_root {
@@ -2449,6 +2453,7 @@ impl<'a> Parser<'a> {
             bookmarks: self.bookmarks,
             shapes: self.shapes,
             drawing_order: self.drawing_order,
+            body_boundaries: self.body_boundaries,
             body_story_events,
             background_shape_index: self.background_shape_index,
             legacy_text_boxes: self.legacy_text_boxes,
@@ -5265,11 +5270,30 @@ impl<'a> Parser<'a> {
                     self.flush_text_buffer(text_buffer)?;
                 }
                 if !structural_table_boundary {
+                    if self.current_state().is_ok_and(|state| {
+                        state.destination == Destination::DocumentBody
+                            && state.revision_type
+                                != Some(super::annotation::RevisionType::Deletion)
+                    }) {
+                        crate::error::try_reserve_one(
+                            &mut self.body_boundaries,
+                            "body text boundaries",
+                        )?;
+                        let kind = if matches!(control, ControlWord::Par) {
+                            crate::text::Break::Paragraph
+                        } else {
+                            crate::text::Break::Line
+                        };
+                        self.body_boundaries
+                            .push(crate::story::Boundary::new(self.body_text_len, kind));
+                    }
                     text_buffer.push(b'\n');
                 }
-                let state = self.current_state_mut()?;
-                state.paragraph_content_started = false;
-                state.paragraph_numbering_declared = false;
+                if matches!(control, ControlWord::Par) {
+                    let state = self.current_state_mut()?;
+                    state.paragraph_content_started = false;
+                    state.paragraph_numbering_declared = false;
+                }
             },
             ControlWord::Page(param) => {
                 require_parameterless(*param, "page")?;
@@ -25418,6 +25442,7 @@ pub struct ParsedDocument<'a> {
     pub shapes: Vec<super::shape::Shape<'a>>,
     /// Exact source order of non-background root drawings in the body story.
     pub drawing_order: Vec<crate::StoryDrawing>,
+    pub body_boundaries: Vec<crate::story::Boundary>,
     pub body_story_events: Vec<crate::BodyStoryEvent>,
     /// Index in `shapes` owned by the unique document-background destination.
     pub background_shape_index: Option<usize>,

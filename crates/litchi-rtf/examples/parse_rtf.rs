@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Paragraph count    : {}", doc.paragraph_count());
     println!("Font table entries : {}", doc.fonts().len());
     println!("Color table entries: {}", doc.colors().len());
-    println!("Style blocks       : {}", doc.blocks().len());
+    println!("Text runs          : {}", doc.body().runs().count());
     println!("Tables             : {}", doc.tables().len());
     println!("Pictures           : {}", doc.pictures().len());
     println!("Fields             : {}", doc.fields().len());

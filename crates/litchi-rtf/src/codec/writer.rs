@@ -190,6 +190,8 @@ impl<W: Write> RtfWriter<W> {
         Self::validate_table_story_metadata_ownership(doc)?;
         Self::validate_generic_field_ownership(doc)?;
         Self::validate_section_boundary_mapping(doc.sections(), doc.body_story_events())?;
+        crate::story::validate_boundaries(doc.blocks(), doc.body_boundaries())
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         // Collect font and color tables from document by cloning them
         // We need to convert the lifetime to 'static for storage
         let font_table: FontTable<'static> = FontTable {
@@ -377,6 +379,7 @@ impl<W: Write> RtfWriter<W> {
         // Write document content and reinsert positional bookmark/comment markers.
         self.write_blocks_with_markup(
             doc.blocks(),
+            doc.body_boundaries(),
             doc.bookmarks(),
             doc.custom_xml_tags(),
             doc.math_zones(),
@@ -4385,6 +4388,7 @@ impl<W: Write> RtfWriter<W> {
     fn write_blocks_with_markup(
         &mut self,
         blocks: &[StyleBlock<'_>],
+        body_boundaries: &[crate::story::Boundary],
         bookmarks: &BookmarkTable<'_>,
         custom_xml_tags: &[crate::CustomXmlTag<'_>],
         math_zones: &[crate::MathZone<'_>],
@@ -4430,8 +4434,24 @@ impl<W: Write> RtfWriter<W> {
                 .all(|field| !matches!(field.owner, crate::FieldOwner::Body))
             && body_story_events.is_empty()
         {
+            let mut boundary = 0usize;
+            let mut body_position = 0usize;
             for block in blocks {
-                self.write_style_block(block)?;
+                self.write_style_block_with_boundaries(
+                    block,
+                    body_position,
+                    body_boundaries,
+                    &mut boundary,
+                )?;
+                body_position = body_position.checked_add(block.text.len()).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "RTF body text size overflow")
+                })?;
+            }
+            if boundary != body_boundaries.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF body text boundaries are incomplete",
+                ));
             }
             return Ok(());
         }
@@ -5501,6 +5521,7 @@ impl<W: Write> RtfWriter<W> {
         events.sort_by_key(|event| (event.offset, event.order));
 
         let mut event_index = 0usize;
+        let mut boundary_index = 0usize;
         let mut body_offset = 0usize;
         for block in blocks {
             let block_end = body_offset.checked_add(block.text.len()).ok_or_else(|| {
@@ -5526,7 +5547,14 @@ impl<W: Write> RtfWriter<W> {
                     )
                 })?;
                 if local_end > local_offset {
-                    self.write_style_block_fragment(block, local_offset, local_end)?;
+                    self.write_style_block_fragment(
+                        block,
+                        local_offset,
+                        local_end,
+                        body_offset,
+                        body_boundaries,
+                        &mut boundary_index,
+                    )?;
                     local_offset = local_end;
                 }
                 while let Some(event) = events
@@ -5539,7 +5567,14 @@ impl<W: Write> RtfWriter<W> {
                 }
             }
             if local_offset < block.text.len() {
-                self.write_style_block_fragment(block, local_offset, block.text.len())?;
+                self.write_style_block_fragment(
+                    block,
+                    local_offset,
+                    block.text.len(),
+                    body_offset,
+                    body_boundaries,
+                    &mut boundary_index,
+                )?;
             }
             body_offset = block_end;
         }
@@ -5555,6 +5590,12 @@ impl<W: Write> RtfWriter<W> {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "RTF bookmark range extends beyond body text",
+            ));
+        }
+        if boundary_index != body_boundaries.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF body text boundaries are incomplete",
             ));
         }
         Ok(())
@@ -6517,6 +6558,9 @@ impl<W: Write> RtfWriter<W> {
         block: &StyleBlock<'_>,
         start: usize,
         end: usize,
+        body_position: usize,
+        boundaries: &[crate::story::Boundary],
+        boundary: &mut usize,
     ) -> io::Result<()> {
         let text = block.text.get(start..end).ok_or_else(|| {
             io::Error::new(
@@ -6529,11 +6573,19 @@ impl<W: Write> RtfWriter<W> {
             block.formatting,
             block.paragraph,
         );
-        self.write_style_block(&fragment)
+        let fragment_position = body_position.checked_add(start).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "RTF body text size overflow")
+        })?;
+        self.write_style_block_with_boundaries(&fragment, fragment_position, boundaries, boundary)
     }
 
-    /// Write a style block
-    fn write_style_block(&mut self, block: &StyleBlock) -> io::Result<()> {
+    fn write_style_block_with_boundaries(
+        &mut self,
+        block: &StyleBlock<'_>,
+        body_position: usize,
+        boundaries: &[crate::story::Boundary],
+        boundary: &mut usize,
+    ) -> io::Result<()> {
         self.write_str("{")?;
 
         // Write character formatting
@@ -6545,11 +6597,65 @@ impl<W: Write> RtfWriter<W> {
         // Delimit the final control word from body text that starts with a letter.
         self.write_str(" ")?;
 
-        // Write text content
-        self.write_text(block.text.as_ref())?;
+        self.write_body_text(block.text.as_ref(), body_position, boundaries, boundary)?;
 
         self.write_str("}")?;
         Ok(())
+    }
+
+    fn write_body_text(
+        &mut self,
+        text: &str,
+        body_position: usize,
+        boundaries: &[crate::story::Boundary],
+        boundary: &mut usize,
+    ) -> io::Result<()> {
+        let mut fragment_start = 0usize;
+        for (offset, character) in text.char_indices() {
+            if character != '\n' {
+                continue;
+            }
+            let fragment = text.get(fragment_start..offset).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF body text boundary splits a UTF-8 character",
+                )
+            })?;
+            self.write_text(fragment)?;
+
+            let position = body_position.checked_add(offset).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "RTF body text size overflow")
+            })?;
+            match boundaries.get(*boundary).copied() {
+                Some(value) if value.position == position => {
+                    self.write_str(match value.kind {
+                        crate::text::Break::Paragraph => "\\par ",
+                        crate::text::Break::Line => "\\line ",
+                    })?;
+                    *boundary = (*boundary).checked_add(1).ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF body text boundary index overflow",
+                        )
+                    })?;
+                },
+                Some(value) if value.position < position => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF body text boundary precedes its line-feed byte",
+                    ));
+                },
+                _ => self.write_str("\\'0a")?,
+            }
+            fragment_start = offset.saturating_add(character.len_utf8());
+        }
+        let remainder = text.get(fragment_start..).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF body text boundary splits a UTF-8 character",
+            )
+        })?;
+        self.write_text(remainder)
     }
 
     /// Write character formatting
@@ -9170,6 +9276,7 @@ mod tests {
             let mut writer = RtfWriter::new(&mut output);
             writer.write_blocks_with_markup(
                 &[],
+                &[],
                 &bookmarks,
                 &[],
                 &[],
@@ -9700,9 +9807,10 @@ mod tests {
 
     #[test]
     fn document_writer_round_trips_libreoffice_multi_section_fixture() {
-        let document = RtfDocument::parse(include_str!(
-            "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
-        ))
+        let document = RtfDocument::parse(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
+        )))
         .unwrap();
         assert!(document.sections().len() >= 3);
         assert!(document.section_breaks().count() >= 3);

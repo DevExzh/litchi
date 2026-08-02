@@ -261,6 +261,8 @@ pub struct RtfDocument<'a> {
     shapes: Vec<super::shape::Shape<'a>>,
     /// Exact source order of non-background root drawings in the body story.
     drawing_order: Vec<crate::StoryDrawing>,
+    /// Structural paragraph and line boundaries in flattened body text.
+    body_boundaries: Vec<crate::story::Boundary>,
     body_story_events: Vec<crate::BodyStoryEvent>,
     /// Index in `shapes` owned by the unique document-background destination.
     background_shape_index: Option<usize>,
@@ -605,6 +607,7 @@ impl<'a> RtfDocument<'a> {
             bookmarks: Self::convert_bookmarks_to_owned(parsed.bookmarks),
             shapes: Self::convert_shapes_to_owned(parsed.shapes),
             drawing_order: parsed.drawing_order,
+            body_boundaries: parsed.body_boundaries,
             body_story_events: parsed.body_story_events,
             background_shape_index: parsed.background_shape_index,
             legacy_text_boxes: parsed
@@ -911,6 +914,10 @@ impl<'a> RtfDocument<'a> {
 
     /// Get all style blocks.
     pub fn blocks(&self) -> &[StyleBlock<'_>] {
+        &self.blocks
+    }
+
+    pub(crate) fn retained_blocks(&self) -> &[StyleBlock<'a>] {
         &self.blocks
     }
 
@@ -3554,6 +3561,10 @@ impl<'a> RtfDocument<'a> {
         &self.body_story_events
     }
 
+    pub(crate) fn body_boundaries(&self) -> &[crate::story::Boundary] {
+        &self.body_boundaries
+    }
+
     pub fn page_breaks(&self) -> impl Iterator<Item = &crate::PageBreak> {
         self.body_story_events
             .iter()
@@ -5308,7 +5319,10 @@ mod tests {
 
     #[test]
     fn parses_real_background_shape_fixture_with_trailing_newline() {
-        let rtf = include_str!("../../../test-data/rtf/background.rtf");
+        let rtf = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/rtf/background.rtf"
+        ));
         let doc = RtfDocument::parse(rtf).unwrap();
 
         assert_eq!(doc.shapes().len(), 2);
@@ -5328,7 +5342,10 @@ mod tests {
 
     #[test]
     fn preserves_real_watermark_office_art_properties() {
-        let rtf = include_str!("../../../test-data/rtf/watermark.rtf");
+        let rtf = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/rtf/watermark.rtf"
+        ));
         let doc = RtfDocument::parse(rtf).unwrap();
 
         assert!(doc.shapes().is_empty());
@@ -5352,7 +5369,10 @@ mod tests {
 
     #[test]
     fn parses_shape_from_ignorable_page_background_destination() {
-        let rtf = include_str!("../../../test-data/rtf/page-background.rtf");
+        let rtf = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/rtf/page-background.rtf"
+        ));
         let doc = RtfDocument::parse(rtf).unwrap();
 
         assert_eq!(doc.shapes().len(), 1);

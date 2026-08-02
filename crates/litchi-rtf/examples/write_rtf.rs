@@ -14,8 +14,7 @@
 use litchi_rtf::Document;
 use litchi_rtf::field::{Field, FieldType};
 use litchi_rtf::review::{Note, Revision};
-use litchi_rtf::text::Formatting;
-use litchi_rtf::write::{Charset, Options, TabWidth, Writer};
+use litchi_rtf::write::{Charset, Format, Options, TabWidth, Writer};
 use std::borrow::Cow;
 use std::num::NonZeroU16;
 
@@ -67,9 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.write_field(&page_field)?;
     writer.write_str(" of document.\\par}\\par")?;
 
-    // A short emphasised paragraph using an explicit `Formatting` value to
+    // A short emphasised paragraph using an explicit `write::Format` value to
     // show that the model types are usable from this crate as a library.
-    let emphasis = Formatting {
+    let emphasis = Format {
         bold: true,
         italic: true,
         font_size: NonZeroU16::new(28).expect("non-zero"),
@@ -83,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         writer.write_str("\\i")?;
     }
     writer.write_str(&format!(
-        "\\fs{} Bold + italic line via Formatting.\\par",
+        "\\fs{} Bold + italic line via write::Format.\\par",
         emphasis.font_size.get()
     ))?;
     writer.write_str("}\\par")?;
