@@ -439,21 +439,21 @@ pub fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> 
 
 pub fn write_window2_options<W: Write>(
     writer: &mut W,
-    options: &crate::writer::view::XlsWorksheetViewOptions,
+    options: &crate::writer::view::View,
 ) -> XlsResult<()> {
     worksheet::write_window2_options(writer, options)
 }
 
 pub fn write_pane_options<W: Write>(
     writer: &mut W,
-    pane: &crate::writer::view::XlsWorksheetPaneOptions,
+    pane: &crate::writer::view::Pane,
 ) -> XlsResult<()> {
     worksheet::write_pane_options(writer, pane)
 }
 
 pub fn write_selection_options<W: Write>(
     writer: &mut W,
-    selection: &crate::writer::view::XlsWorksheetSelectionOptions,
+    selection: &crate::writer::view::Selection,
 ) -> XlsResult<()> {
     worksheet::write_selection_options(writer, selection)
 }

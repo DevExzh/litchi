@@ -1,35 +1,30 @@
 use std::io::Cursor;
 
-use litchi_xls::writer::{
-    XlsViewScale, XlsWorksheetPaneOptions, XlsWorksheetSelectionOptions, XlsWorksheetViewOptions,
-    XlsWriter,
-};
+use litchi_xls::writer::XlsWriter;
+use litchi_xls::writer::view::{Pane, Scale, Selection, View};
 use litchi_xls::{XlsPaneType, XlsSelectionRange, XlsWorkbook};
 
 #[test]
 fn writes_and_reads_typed_view_state() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("View").unwrap();
-    let pane = XlsWorksheetPaneOptions::split(1_200, 800, 7, 4, XlsPaneType::LowerRight).unwrap();
-    let options = XlsWorksheetViewOptions {
-        show_formulas: true,
-        show_gridlines: false,
-        first_visible_row: 2,
-        first_visible_column: 1,
-        gridline_color_index: Some(8),
-        normal_zoom_percent: Some(125),
-        scale: Some(XlsViewScale::new(5, 4).unwrap()),
-        pane: Some(pane),
-        selections: vec![XlsWorksheetSelectionOptions {
-            pane: XlsPaneType::LowerRight,
-            active_row: 8,
-            active_column: 5,
-            active_range_index: 0,
-            ranges: vec![XlsSelectionRange::new(8, 10, 5, 6)],
-        }],
-        ..XlsWorksheetViewOptions::default()
-    };
-    writer.set_worksheet_view(sheet, options).unwrap();
+    let pane = Pane::split(1_200, 800, 7, 4, XlsPaneType::LowerRight).unwrap();
+    let selection = Selection::new(
+        XlsPaneType::LowerRight,
+        8,
+        5,
+        0,
+        vec![XlsSelectionRange::new(8, 10, 5, 6).unwrap()],
+    )
+    .unwrap();
+    let mut view = View::default();
+    view.formulas(true).gridlines(false);
+    view.origin(2, 1).unwrap();
+    view.grid_color(Some(8)).unwrap();
+    view.normal_zoom(Some(125)).unwrap();
+    view.put_scale(Some(Scale::new(5, 4).unwrap()));
+    view.put_pane(pane, vec![selection]).unwrap();
+    writer.put_view(sheet, view).unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
@@ -45,16 +40,18 @@ fn writes_and_reads_typed_view_state() {
     assert_eq!(view.pane().unwrap().active_pane(), XlsPaneType::LowerRight);
     assert_eq!(
         view.selections()[0].ranges()[0],
-        XlsSelectionRange::new(8, 10, 5, 6)
+        XlsSelectionRange::new(8, 10, 5, 6).unwrap()
     );
 }
 
 #[test]
-fn compatibility_freeze_and_zoom_round_trip() {
+fn freeze_and_scale_round_trip() {
     let mut writer = XlsWriter::new();
     let sheet = writer.add_worksheet("Compat").unwrap();
     writer.freeze_panes(sheet, 7, 5).unwrap();
-    writer.set_zoom(sheet, 3, 4).unwrap();
+    writer
+        .put_scale(sheet, Some(Scale::new(3, 4).unwrap()))
+        .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
     let workbook = XlsWorkbook::new(Cursor::new(bytes.into_inner())).unwrap();

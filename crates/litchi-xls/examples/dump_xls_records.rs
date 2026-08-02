@@ -82,12 +82,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 sheet_index += 1;
             }
+        } else if in_workbook {
+            println!("{offset:06X}: {name} (0x{sid:04X}) len={len}");
         } else {
-            if in_workbook {
-                println!("{offset:06X}: {name} (0x{sid:04X}) len={len}");
-            } else {
-                println!("{offset:06X}: [Sheet#{sheet_index}] {name} (0x{sid:04X}) len={len}",);
-            }
+            println!("{offset:06X}: [Sheet#{sheet_index}] {name} (0x{sid:04X}) len={len}",);
         }
 
         offset += 4 + len as u64;

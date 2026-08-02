@@ -3935,33 +3935,31 @@ impl ListObjectCollector {
                 ));
             }
             self.sort_continuations = u32_at(data, 30, rt, "sort condition count")? as usize;
-        } else {
-            if let Some(future) = self.pending_future.as_mut() {
-                if future.payload.len() < 60 {
-                    return Err(invalid(
-                        rt,
-                        "ContinueFrt12 follows a truncated AutoFilter12 base",
-                    ));
-                }
-                if !(12..=MAX_PAYLOAD).contains(&data.len()) {
-                    return Err(invalid(rt, "invalid ContinueFrt12 length"));
-                }
-                validate_frt_any(data, rt)?;
-                let total = future.payload.len()
-                    + future.continuations.iter().map(Vec::len).sum::<usize>()
-                    + data.len();
-                if total > MAX_FEATURE_BYTES {
-                    return Err(invalid(
-                        rt,
-                        "AutoFilter12 continuation chain exceeds resource bound",
-                    ));
-                }
-                future.continuations.push(data.to_vec());
-            } else if self.sort_continuations != 0 {
-                self.sort_continuations -= 1;
-            } else {
-                return Err(invalid(rt, "orphan ContinueFrt12 in table feature family"));
+        } else if let Some(future) = self.pending_future.as_mut() {
+            if future.payload.len() < 60 {
+                return Err(invalid(
+                    rt,
+                    "ContinueFrt12 follows a truncated AutoFilter12 base",
+                ));
             }
+            if !(12..=MAX_PAYLOAD).contains(&data.len()) {
+                return Err(invalid(rt, "invalid ContinueFrt12 length"));
+            }
+            validate_frt_any(data, rt)?;
+            let total = future.payload.len()
+                + future.continuations.iter().map(Vec::len).sum::<usize>()
+                + data.len();
+            if total > MAX_FEATURE_BYTES {
+                return Err(invalid(
+                    rt,
+                    "AutoFilter12 continuation chain exceeds resource bound",
+                ));
+            }
+            future.continuations.push(data.to_vec());
+        } else if self.sort_continuations != 0 {
+            self.sort_continuations -= 1;
+        } else {
+            return Err(invalid(rt, "orphan ContinueFrt12 in table feature family"));
         }
         Ok(())
     }

@@ -2884,70 +2884,48 @@ impl XlsWriter {
         Ok(())
     }
 
-    /// Set worksheet zoom as a BIFF8 SCL fraction between 10% and 400%.
-    pub fn set_zoom(&mut self, sheet: usize, numerator: u16, denominator: u16) -> XlsResult<()> {
-        if numerator == 0
-            || denominator == 0
-            || numerator > i16::MAX as u16
-            || denominator > i16::MAX as u16
-            || u32::from(numerator) * 10 < u32::from(denominator)
-            || u32::from(numerator) > u32::from(denominator) * 4
-        {
-            return Err(XlsError::InvalidData(
-                "worksheet zoom must be between 1/10 and 4 with positive terms".to_string(),
-            ));
-        }
-        let worksheet = self
-            .worksheets
-            .get_mut(sheet)
-            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        worksheet.set_zoom(numerator, denominator);
-        Ok(())
-    }
-
-    pub fn set_worksheet_view(
+    /// Replace the worksheet's checked BIFF8 zoom scale.
+    pub fn put_scale(
         &mut self,
         sheet: usize,
-        options: crate::writer::view::XlsWorksheetViewOptions,
-    ) -> XlsResult<()> {
-        options.validate()?;
+        scale: Option<crate::writer::view::Scale>,
+    ) -> XlsResult<Option<crate::writer::view::Scale>> {
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        worksheet.view = options;
-        Ok(())
+        Ok(worksheet.put_scale(scale))
     }
 
-    pub fn split_panes(
+    /// Replace a worksheet view after validating the complete prospective state.
+    pub fn put_view(
         &mut self,
         sheet: usize,
-        horizontal_twips: u16,
-        vertical_twips: u16,
-        bottom_pane_top_row: u16,
-        right_pane_left_column: u8,
-        active_pane: crate::XlsPaneType,
-    ) -> XlsResult<()> {
-        let pane = crate::writer::view::XlsWorksheetPaneOptions::split(
-            horizontal_twips,
-            vertical_twips,
-            bottom_pane_top_row,
-            right_pane_left_column,
-            active_pane,
-        )?;
+        view: crate::writer::view::View,
+    ) -> XlsResult<crate::writer::view::View> {
+        view.validate()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
-        worksheet.view.pane = Some(pane);
-        worksheet.view.selections = vec![
-            crate::writer::view::XlsWorksheetSelectionOptions::single_cell(
-                active_pane,
-                bottom_pane_top_row,
-                right_pane_left_column,
-            ),
-        ];
-        worksheet.view.validate()
+        Ok(std::mem::replace(&mut worksheet.view, view))
+    }
+
+    /// Replace a worksheet pane and its selections as one failure-atomic edit.
+    pub fn put_pane(
+        &mut self,
+        sheet: usize,
+        pane: crate::writer::view::Pane,
+        selections: Vec<crate::writer::view::Selection>,
+    ) -> XlsResult<(
+        Option<crate::writer::view::Pane>,
+        Vec<crate::writer::view::Selection>,
+    )> {
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| XlsError::WorksheetNotFound(format!("Sheet {}", sheet)))?;
+        worksheet.view.put_pane(pane, selections)
     }
 
     /// Set the height of a row in points.
@@ -3422,7 +3400,7 @@ impl XlsWriter {
         let first_selected = active.min(sheet_count - selected_count);
         let selected_range = first_selected..first_selected + selected_count;
         for (index, worksheet) in self.worksheets.iter_mut().enumerate() {
-            worksheet.view.selected = selected_range.contains(&index);
+            worksheet.view.select(selected_range.contains(&index));
         }
     }
 
@@ -4960,11 +4938,11 @@ mod tests {
     #[test]
     fn test_writableworksheet_freeze_panes() {
         let mut ws = WritableWorksheet::new("Sheet1".to_string());
-        assert!(ws.view.pane.is_none());
+        assert!(ws.view.pane().is_none());
         ws.set_freeze_panes(1, 2).unwrap();
-        let pane = ws.view.pane.unwrap();
-        assert_eq!(pane.vertical_split, 1);
-        assert_eq!(pane.horizontal_split, 2);
+        let pane = ws.view.pane().unwrap();
+        assert_eq!(pane.vertical(), 1);
+        assert_eq!(pane.horizontal(), 2);
     }
 
     #[test]

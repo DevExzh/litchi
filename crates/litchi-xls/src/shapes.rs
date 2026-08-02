@@ -506,7 +506,7 @@ mod tests {
 
     #[test]
     fn test_xls_shape_variants() {
-        let shape_types = vec![
+        let shape_types = [
             Kind::Rectangle,
             Kind::Ellipse,
             Kind::Line,

@@ -61,7 +61,3 @@ pub use formatting::{
     HorizontalAlignment, VerticalAlignment,
 };
 pub use formula::{Area, FormulaTokenizer, Ptg, Ref};
-pub use view::{
-    XlsPaneMode, XlsViewScale, XlsWorksheetPaneOptions, XlsWorksheetSelectionOptions,
-    XlsWorksheetViewOptions,
-};

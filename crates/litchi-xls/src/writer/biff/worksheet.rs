@@ -1032,34 +1032,34 @@ pub fn write_scl<W: Write>(writer: &mut W, numerator: u16, denominator: u16) -> 
 
 pub fn write_window2_options<W: Write>(
     writer: &mut W,
-    options: &crate::writer::view::XlsWorksheetViewOptions,
+    options: &crate::writer::view::View,
 ) -> XlsResult<()> {
     options.validate()?;
     let mut flags = 0u16;
-    flags |= u16::from(options.show_formulas);
-    flags |= u16::from(options.show_gridlines) << 1;
-    flags |= u16::from(options.show_row_column_headers) << 2;
+    flags |= u16::from(options.shows_formulas());
+    flags |= u16::from(options.shows_gridlines()) << 1;
+    flags |= u16::from(options.shows_headers()) << 2;
     if options
-        .pane
-        .is_some_and(|pane| pane.mode == crate::writer::view::XlsPaneMode::Frozen)
+        .pane()
+        .is_some_and(|pane| pane.mode() == crate::writer::view::Mode::Frozen)
     {
         flags |= 0x0108;
     }
-    flags |= u16::from(options.show_zero_values) << 4;
-    flags |= u16::from(options.gridline_color_index.is_none()) << 5;
-    flags |= u16::from(options.right_to_left) << 6;
-    flags |= u16::from(options.show_outline_symbols) << 7;
-    flags |= u16::from(options.selected) << 9;
-    flags |= u16::from(options.displayed) << 10;
-    flags |= u16::from(options.page_break_preview) << 11;
+    flags |= u16::from(options.shows_zeros()) << 4;
+    flags |= u16::from(options.grid_color_index().is_none()) << 5;
+    flags |= u16::from(options.right_to_left()) << 6;
+    flags |= u16::from(options.shows_outlines()) << 7;
+    flags |= u16::from(options.is_selected()) << 9;
+    flags |= u16::from(options.is_displayed()) << 10;
+    flags |= u16::from(options.is_page_break_preview()) << 11;
     write_record_header(writer, 0x023e, 18)?;
     writer.write_all(&flags.to_le_bytes())?;
-    writer.write_all(&options.first_visible_row.to_le_bytes())?;
-    writer.write_all(&u16::from(options.first_visible_column).to_le_bytes())?;
-    writer.write_all(&options.gridline_color_index.unwrap_or(64).to_le_bytes())?;
+    writer.write_all(&options.row().to_le_bytes())?;
+    writer.write_all(&u16::from(options.column()).to_le_bytes())?;
+    writer.write_all(&options.grid_color_index().unwrap_or(64).to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
-    writer.write_all(&options.page_break_zoom_percent.unwrap_or(0).to_le_bytes())?;
-    writer.write_all(&options.normal_zoom_percent.unwrap_or(0).to_le_bytes())?;
+    writer.write_all(&options.page_zoom_percent().unwrap_or(0).to_le_bytes())?;
+    writer.write_all(&options.normal_zoom_percent().unwrap_or(0).to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     Ok(())
@@ -1067,31 +1067,25 @@ pub fn write_window2_options<W: Write>(
 
 pub fn write_pane_options<W: Write>(
     writer: &mut W,
-    pane: &crate::writer::view::XlsWorksheetPaneOptions,
+    pane: &crate::writer::view::Pane,
 ) -> XlsResult<()> {
     pane.validate()?;
     write_record_header(writer, 0x0041, 10)?;
-    writer.write_all(&pane.horizontal_split.to_le_bytes())?;
-    writer.write_all(&pane.vertical_split.to_le_bytes())?;
-    writer.write_all(&pane.bottom_pane_top_row.to_le_bytes())?;
-    writer.write_all(&u16::from(pane.right_pane_left_column).to_le_bytes())?;
-    writer.write_all(&[pane.active_pane.code(), 0])?;
+    writer.write_all(&pane.horizontal().to_le_bytes())?;
+    writer.write_all(&pane.vertical().to_le_bytes())?;
+    writer.write_all(&pane.row().to_le_bytes())?;
+    writer.write_all(&u16::from(pane.column()).to_le_bytes())?;
+    writer.write_all(&[pane.active().code(), 0])?;
     Ok(())
 }
 
 pub fn write_selection_options<W: Write>(
     writer: &mut W,
-    selection: &crate::writer::view::XlsWorksheetSelectionOptions,
+    selection: &crate::writer::view::Selection,
 ) -> XlsResult<()> {
-    if selection.ranges.is_empty()
-        || selection.ranges.len() > crate::writer::view::MAX_SELECTION_RANGES
-    {
-        return Err(XlsError::InvalidData(
-            "SELECTION range count must be 1..=1369".to_string(),
-        ));
-    }
+    crate::writer::view::validate_selection(selection)?;
     let payload_len = 9usize
-        .checked_add(selection.ranges.len().checked_mul(6).ok_or_else(|| {
+        .checked_add(selection.ranges().len().checked_mul(6).ok_or_else(|| {
             XlsError::InvalidData("SELECTION payload length overflow".to_string())
         })?)
         .ok_or_else(|| XlsError::InvalidData("SELECTION payload length overflow".to_string()))?;
@@ -1102,12 +1096,12 @@ pub fn write_selection_options<W: Write>(
             XlsError::InvalidData("SELECTION payload exceeds BIFF8 limit".to_string())
         })?,
     )?;
-    writer.write_all(&[selection.pane.code()])?;
-    writer.write_all(&selection.active_row.to_le_bytes())?;
-    writer.write_all(&u16::from(selection.active_column).to_le_bytes())?;
-    writer.write_all(&selection.active_range_index.to_le_bytes())?;
-    writer.write_all(&(selection.ranges.len() as u16).to_le_bytes())?;
-    for range in &selection.ranges {
+    writer.write_all(&[selection.pane().code()])?;
+    writer.write_all(&selection.row().to_le_bytes())?;
+    writer.write_all(&u16::from(selection.column()).to_le_bytes())?;
+    writer.write_all(&selection.active().to_le_bytes())?;
+    writer.write_all(&(selection.ranges().len() as u16).to_le_bytes())?;
+    for range in selection.ranges() {
         writer.write_all(&range.first_row().to_le_bytes())?;
         writer.write_all(&range.last_row().to_le_bytes())?;
         writer.write_all(&[range.first_column(), range.last_column()])?;

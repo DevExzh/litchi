@@ -257,7 +257,7 @@ pub(super) struct WritableWorksheet {
     pub data_validation_table_options: Option<XlsDataValidationTableOptions>,
     pub conditional_formats: Vec<XlsConditionalFormatGroup>,
     pub conditional_formats12: Vec<XlsConditionalFormat12Group>,
-    pub view: crate::writer::view::XlsWorksheetViewOptions,
+    pub view: crate::writer::view::View,
     pub sheet_protection: Option<XlsSheetProtection>,
     pub sheet_layout: super::XlsWorksheetLayoutOptions,
     pub page_setup: Option<XlsPageSetupOptions>,
@@ -333,7 +333,7 @@ impl WritableWorksheet {
             data_validation_table_options: None,
             conditional_formats: Vec::new(),
             conditional_formats12: Vec::new(),
-            view: crate::writer::view::XlsWorksheetViewOptions::default(),
+            view: crate::writer::view::View::default(),
             sheet_protection: None,
             sheet_layout: super::XlsWorksheetLayoutOptions::default(),
             page_setup: None,
@@ -442,11 +442,11 @@ impl WritableWorksheet {
         self.view.clear_pane();
     }
 
-    pub(super) fn set_zoom(&mut self, numerator: u16, denominator: u16) {
-        self.view.scale = (numerator != denominator).then_some(crate::writer::view::XlsViewScale {
-            numerator,
-            denominator,
-        });
+    pub(super) fn put_scale(
+        &mut self,
+        scale: Option<crate::writer::view::Scale>,
+    ) -> Option<crate::writer::view::Scale> {
+        self.view.put_scale(scale)
     }
 
     pub(super) fn set_column_width(&mut self, col: u16, width: u16) {

@@ -119,14 +119,14 @@ pub(crate) fn generate_workbook_stream(
     )?;
     workbook_window.validate_for_sheet_count(worksheets.len())?;
     let active_sheet = usize::from(workbook_window.active_sheet_index);
-    if !worksheets[active_sheet].view.selected {
+    if !worksheets[active_sheet].view.is_selected() {
         return Err(XlsError::InvalidData(format!(
             "active worksheet {active_sheet} must be selected in Window2"
         )));
     }
     let selected_sheet_count = worksheets
         .iter()
-        .filter(|sheet| sheet.view.selected)
+        .filter(|sheet| sheet.view.is_selected())
         .count();
     if selected_sheet_count != usize::from(workbook_window.selected_sheet_count) {
         return Err(XlsError::InvalidData(format!(
@@ -711,15 +711,15 @@ pub(crate) fn generate_workbook_stream(
         // pane as a generic split window.
         if worksheet.pivot_tables.is_empty() {
             biff::write_window2_options(&mut stream, &worksheet.view)?;
-            if let Some(scale) = worksheet.view.scale
-                && scale.numerator != scale.denominator
+            if let Some(scale) = worksheet.view.scale()
+                && scale.numerator() != scale.denominator()
             {
-                biff::write_scl(&mut stream, scale.numerator, scale.denominator)?;
+                biff::write_scl(&mut stream, scale.numerator(), scale.denominator())?;
             }
-            if let Some(pane) = worksheet.view.pane.as_ref() {
+            if let Some(pane) = worksheet.view.pane() {
                 biff::write_pane_options(&mut stream, pane)?;
             }
-            for selection in &worksheet.view.selections {
+            for selection in worksheet.view.selections() {
                 biff::write_selection_options(&mut stream, selection)?;
             }
         }
@@ -1431,7 +1431,7 @@ pub(crate) fn generate_workbook_stream(
                 .collect();
 
             biff::write_pivot_modern_extensions(&mut stream, &pt.name, &pivot_field_names)?;
-            biff::write_pivot_window2(&mut stream, worksheet.view.selected)?;
+            biff::write_pivot_window2(&mut stream, worksheet.view.is_selected())?;
             biff::write_plv(&mut stream)?;
             biff::write_selection(&mut stream)?;
             biff::write_sheet_ext(&mut stream)?;

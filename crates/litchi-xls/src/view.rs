@@ -59,25 +59,46 @@ pub struct XlsSelectionRange {
 }
 
 impl XlsSelectionRange {
-    pub fn new(first_row: u16, last_row: u16, first_column: u8, last_column: u8) -> Self {
-        Self {
+    /// Create an inclusive range, rejecting inverted endpoints.
+    pub fn new(
+        first_row: u16,
+        last_row: u16,
+        first_column: u8,
+        last_column: u8,
+    ) -> XlsResult<Self> {
+        if first_row > last_row || first_column > last_column {
+            return Err(XlsError::InvalidData(
+                "selection range endpoints must be ordered".to_string(),
+            ));
+        }
+        Ok(Self {
             first_row,
             last_row,
             first_column,
             last_column,
+        })
+    }
+
+    /// Create a one-cell range.
+    pub const fn cell(row: u16, column: u8) -> Self {
+        Self {
+            first_row: row,
+            last_row: row,
+            first_column: column,
+            last_column: column,
         }
     }
 
-    pub fn first_row(&self) -> u16 {
+    pub const fn first_row(&self) -> u16 {
         self.first_row
     }
-    pub fn last_row(&self) -> u16 {
+    pub const fn last_row(&self) -> u16 {
         self.last_row
     }
-    pub fn first_column(&self) -> u8 {
+    pub const fn first_column(&self) -> u8 {
         self.first_column
     }
-    pub fn last_column(&self) -> u8 {
+    pub const fn last_column(&self) -> u8 {
         self.last_column
     }
 }
@@ -249,7 +270,12 @@ impl XlsWorksheetView {
                 }
                 remaining -= selection.ranges.len();
             }
-            let range = active_range.expect("validated active selection index");
+            let range = active_range.ok_or_else(|| {
+                invalid(
+                    SELECTION_RECORD_TYPE,
+                    "SELECTION active range could not be resolved",
+                )
+            })?;
             if first.active_row < range.first_row
                 || first.active_row > range.last_row
                 || first.active_column < range.first_column

@@ -125,20 +125,14 @@ fn reads_poi_simple_workbook_window_and_sheet_ids() {
 
 #[test]
 fn writer_rejects_window1_window2_selection_disagreement() {
-    use litchi_xls::writer::XlsWorksheetViewOptions;
+    use litchi_xls::writer::view::View;
 
     let mut writer = XlsWriter::new();
     writer.add_worksheet("One").unwrap();
     let second = writer.add_worksheet("Two").unwrap();
-    writer
-        .set_worksheet_view(
-            second,
-            XlsWorksheetViewOptions {
-                selected: true,
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let mut view = View::default();
+    view.select(true);
+    writer.put_view(second, view).unwrap();
     assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
 }
 

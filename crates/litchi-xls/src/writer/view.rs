@@ -5,12 +5,14 @@ const MAX_SCL_TERM: u16 = i16::MAX as u16;
 pub(crate) const MAX_SELECTION_RANGES: usize = 1_369;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsViewScale {
-    pub numerator: u16,
-    pub denominator: u16,
+/// A checked BIFF8 worksheet zoom fraction between 10% and 400%.
+pub struct Scale {
+    numerator: u16,
+    denominator: u16,
 }
 
-impl XlsViewScale {
+impl Scale {
+    /// Create a scale from positive terms no larger than 32767.
     pub fn new(numerator: u16, denominator: u16) -> XlsResult<Self> {
         let value = Self {
             numerator,
@@ -18,6 +20,16 @@ impl XlsViewScale {
         };
         value.validate()?;
         Ok(value)
+    }
+
+    /// Return the fraction numerator.
+    pub const fn numerator(self) -> u16 {
+        self.numerator
+    }
+
+    /// Return the fraction denominator.
+    pub const fn denominator(self) -> u16 {
+        self.denominator
     }
 
     pub(crate) fn validate(self) -> XlsResult<()> {
@@ -38,25 +50,30 @@ impl XlsViewScale {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum XlsPaneMode {
+/// How a worksheet pane divides its window.
+pub enum Mode {
+    /// Rows and columns remain visible while scrolling.
     Frozen,
+    /// The window is divided at twip positions.
     Split,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct XlsWorksheetPaneOptions {
-    pub mode: XlsPaneMode,
-    pub horizontal_split: u16,
-    pub vertical_split: u16,
-    pub bottom_pane_top_row: u16,
-    pub right_pane_left_column: u8,
-    pub active_pane: XlsPaneType,
+/// A checked frozen or split worksheet pane.
+pub struct Pane {
+    mode: Mode,
+    horizontal_split: u16,
+    vertical_split: u16,
+    bottom_pane_top_row: u16,
+    right_pane_left_column: u8,
+    active_pane: XlsPaneType,
 }
 
-impl XlsWorksheetPaneOptions {
+impl Pane {
+    /// Freeze `rows` rows and `columns` columns from the top-left corner.
     pub fn frozen(rows: u16, columns: u8) -> XlsResult<Self> {
         let value = Self {
-            mode: XlsPaneMode::Frozen,
+            mode: Mode::Frozen,
             horizontal_split: u16::from(columns),
             vertical_split: rows,
             bottom_pane_top_row: rows,
@@ -67,6 +84,7 @@ impl XlsWorksheetPaneOptions {
         Ok(value)
     }
 
+    /// Create a split pane with BIFF8 twip offsets and scroll origins.
     pub fn split(
         horizontal_twips: u16,
         vertical_twips: u16,
@@ -75,7 +93,7 @@ impl XlsWorksheetPaneOptions {
         active_pane: XlsPaneType,
     ) -> XlsResult<Self> {
         let value = Self {
-            mode: XlsPaneMode::Split,
+            mode: Mode::Split,
             horizontal_split: horizontal_twips,
             vertical_split: vertical_twips,
             bottom_pane_top_row,
@@ -86,20 +104,50 @@ impl XlsWorksheetPaneOptions {
         Ok(value)
     }
 
+    /// Return whether this pane is frozen or split.
+    pub const fn mode(self) -> Mode {
+        self.mode
+    }
+
+    /// Return the horizontal split in columns when frozen, otherwise twips.
+    pub const fn horizontal(self) -> u16 {
+        self.horizontal_split
+    }
+
+    /// Return the vertical split in rows when frozen, otherwise twips.
+    pub const fn vertical(self) -> u16 {
+        self.vertical_split
+    }
+
+    /// Return the first row shown in the bottom pane.
+    pub const fn row(self) -> u16 {
+        self.bottom_pane_top_row
+    }
+
+    /// Return the first column shown in the right pane.
+    pub const fn column(self) -> u8 {
+        self.right_pane_left_column
+    }
+
+    /// Return the pane that owns the active selection.
+    pub const fn active(self) -> XlsPaneType {
+        self.active_pane
+    }
+
     pub(crate) fn validate(self) -> XlsResult<()> {
         if self.horizontal_split == 0 && self.vertical_split == 0 {
             return Err(XlsError::InvalidData(
                 "PANE must split at least one axis".to_string(),
             ));
         }
-        if self.mode == XlsPaneMode::Split
+        if self.mode == Mode::Split
             && (self.horizontal_split > i16::MAX as u16 || self.vertical_split > i16::MAX as u16)
         {
             return Err(XlsError::InvalidData(
                 "split positions exceed 32767 twips".to_string(),
             ));
         }
-        if self.mode == XlsPaneMode::Frozen && self.horizontal_split > 255 {
+        if self.mode == Mode::Frozen && self.horizontal_split > 255 {
             return Err(XlsError::InvalidData(
                 "frozen horizontal split exceeds 255 columns".to_string(),
             ));
@@ -114,149 +162,418 @@ impl XlsWorksheetPaneOptions {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsWorksheetSelectionOptions {
-    pub pane: XlsPaneType,
-    pub active_row: u16,
-    pub active_column: u8,
-    pub active_range_index: u16,
-    pub ranges: Vec<XlsSelectionRange>,
+/// A checked active cell and its selected ranges for one pane.
+pub struct Selection {
+    pane: XlsPaneType,
+    active_row: u16,
+    active_column: u8,
+    active_range_index: u16,
+    ranges: Vec<XlsSelectionRange>,
 }
 
-impl XlsWorksheetSelectionOptions {
-    pub fn single_cell(pane: XlsPaneType, row: u16, column: u8) -> Self {
+impl Selection {
+    /// Create a selection record from ordered, nonempty ranges.
+    pub fn new(
+        pane: XlsPaneType,
+        active_row: u16,
+        active_column: u8,
+        active_range_index: u16,
+        ranges: Vec<XlsSelectionRange>,
+    ) -> XlsResult<Self> {
+        let value = Self {
+            pane,
+            active_row,
+            active_column,
+            active_range_index,
+            ranges,
+        };
+        validate_selection(&value)?;
+        Ok(value)
+    }
+
+    /// Select one cell in `pane`.
+    pub fn cell(pane: XlsPaneType, row: u16, column: u8) -> Self {
         Self {
             pane,
             active_row: row,
             active_column: column,
             active_range_index: 0,
-            ranges: vec![XlsSelectionRange::new(row, row, column, column)],
+            ranges: vec![XlsSelectionRange::cell(row, column)],
         }
+    }
+
+    /// Return the pane containing this selection.
+    pub const fn pane(&self) -> XlsPaneType {
+        self.pane
+    }
+
+    /// Return the active row.
+    pub const fn row(&self) -> u16 {
+        self.active_row
+    }
+
+    /// Return the active column.
+    pub const fn column(&self) -> u8 {
+        self.active_column
+    }
+
+    /// Return the zero-based active range index.
+    pub const fn active(&self) -> u16 {
+        self.active_range_index
+    }
+
+    /// Borrow the inclusive selected ranges.
+    pub fn ranges(&self) -> &[XlsSelectionRange] {
+        &self.ranges
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct Flags: u16 {
+        const FORMULAS = 0x0001;
+        const GRIDLINES = 0x0002;
+        const HEADERS = 0x0004;
+        const ZEROS = 0x0010;
+        const RIGHT_TO_LEFT = 0x0040;
+        const OUTLINES = 0x0080;
+        const SELECTED = 0x0200;
+        const DISPLAYED = 0x0400;
+        const PAGE_BREAKS = 0x0800;
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XlsWorksheetViewOptions {
-    pub show_formulas: bool,
-    pub show_gridlines: bool,
-    pub show_row_column_headers: bool,
-    pub show_zero_values: bool,
+/// Checked display, navigation, pane, and selection state for a worksheet.
+pub struct View {
+    flags: Flags,
     /// `None` uses the window default color; custom palette indices are 0..=63.
-    pub gridline_color_index: Option<u16>,
-    pub right_to_left: bool,
-    pub show_outline_symbols: bool,
-    pub selected: bool,
-    pub displayed: bool,
-    pub page_break_preview: bool,
-    pub first_visible_row: u16,
-    pub first_visible_column: u8,
-    pub page_break_zoom_percent: Option<u16>,
-    pub normal_zoom_percent: Option<u16>,
-    pub scale: Option<XlsViewScale>,
-    pub pane: Option<XlsWorksheetPaneOptions>,
-    pub selections: Vec<XlsWorksheetSelectionOptions>,
+    gridline_color_index: Option<u16>,
+    first_visible_row: u16,
+    first_visible_column: u8,
+    page_break_zoom_percent: Option<u16>,
+    normal_zoom_percent: Option<u16>,
+    scale: Option<Scale>,
+    pane: Option<Pane>,
+    selections: Vec<Selection>,
 }
 
-impl Default for XlsWorksheetViewOptions {
+impl Default for View {
     fn default() -> Self {
         Self {
-            show_formulas: false,
-            show_gridlines: true,
-            show_row_column_headers: true,
-            show_zero_values: true,
+            flags: Flags::GRIDLINES
+                | Flags::HEADERS
+                | Flags::ZEROS
+                | Flags::OUTLINES
+                | Flags::SELECTED
+                | Flags::DISPLAYED,
             gridline_color_index: None,
-            right_to_left: false,
-            show_outline_symbols: true,
-            selected: true,
-            displayed: true,
-            page_break_preview: false,
             first_visible_row: 0,
             first_visible_column: 0,
             page_break_zoom_percent: None,
             normal_zoom_percent: None,
             scale: None,
             pane: None,
-            selections: vec![XlsWorksheetSelectionOptions::single_cell(
-                XlsPaneType::UpperLeft,
-                0,
-                0,
-            )],
+            selections: vec![Selection::cell(XlsPaneType::UpperLeft, 0, 0)],
         }
     }
 }
 
-impl XlsWorksheetViewOptions {
+impl View {
+    /// Return whether formulas are shown instead of their results.
+    pub const fn shows_formulas(&self) -> bool {
+        self.flags.contains(Flags::FORMULAS)
+    }
+
+    /// Return whether gridlines are shown.
+    pub const fn shows_gridlines(&self) -> bool {
+        self.flags.contains(Flags::GRIDLINES)
+    }
+
+    /// Return whether row and column headers are shown.
+    pub const fn shows_headers(&self) -> bool {
+        self.flags.contains(Flags::HEADERS)
+    }
+
+    /// Return whether zero-valued cells are shown.
+    pub const fn shows_zeros(&self) -> bool {
+        self.flags.contains(Flags::ZEROS)
+    }
+
+    /// Return the custom palette index, or `None` for the default color.
+    pub const fn grid_color_index(&self) -> Option<u16> {
+        self.gridline_color_index
+    }
+
+    /// Return whether the worksheet is laid out right-to-left.
+    pub const fn right_to_left(&self) -> bool {
+        self.flags.contains(Flags::RIGHT_TO_LEFT)
+    }
+
+    /// Return whether outline symbols are shown.
+    pub const fn shows_outlines(&self) -> bool {
+        self.flags.contains(Flags::OUTLINES)
+    }
+
+    /// Return whether this worksheet is selected in the workbook window.
+    pub const fn is_selected(&self) -> bool {
+        self.flags.contains(Flags::SELECTED)
+    }
+
+    /// Return whether this worksheet window is displayed.
+    pub const fn is_displayed(&self) -> bool {
+        self.flags.contains(Flags::DISPLAYED)
+    }
+
+    /// Return whether page-break preview is active.
+    pub const fn is_page_break_preview(&self) -> bool {
+        self.flags.contains(Flags::PAGE_BREAKS)
+    }
+
+    /// Return the first visible row.
+    pub const fn row(&self) -> u16 {
+        self.first_visible_row
+    }
+
+    /// Return the first visible column.
+    pub const fn column(&self) -> u8 {
+        self.first_visible_column
+    }
+
+    /// Return the page-break preview zoom percentage.
+    pub const fn page_zoom_percent(&self) -> Option<u16> {
+        self.page_break_zoom_percent
+    }
+
+    /// Return the normal-view zoom percentage.
+    pub const fn normal_zoom_percent(&self) -> Option<u16> {
+        self.normal_zoom_percent
+    }
+
+    /// Return the optional exact zoom fraction.
+    pub const fn scale(&self) -> Option<Scale> {
+        self.scale
+    }
+
+    /// Borrow the current pane.
+    pub const fn pane(&self) -> Option<&Pane> {
+        self.pane.as_ref()
+    }
+
+    /// Borrow all pane selections.
+    pub fn selections(&self) -> &[Selection] {
+        &self.selections
+    }
+
+    /// Choose whether formulas are shown instead of their results.
+    pub fn formulas(&mut self, show: bool) -> &mut Self {
+        self.flags.set(Flags::FORMULAS, show);
+        self
+    }
+
+    /// Choose whether gridlines are shown.
+    pub fn gridlines(&mut self, show: bool) -> &mut Self {
+        self.flags.set(Flags::GRIDLINES, show);
+        self
+    }
+
+    /// Choose whether row and column headers are shown.
+    pub fn headers(&mut self, show: bool) -> &mut Self {
+        self.flags.set(Flags::HEADERS, show);
+        self
+    }
+
+    /// Choose whether zero-valued cells are shown.
+    pub fn zeros(&mut self, show: bool) -> &mut Self {
+        self.flags.set(Flags::ZEROS, show);
+        self
+    }
+
+    /// Choose right-to-left worksheet layout.
+    pub fn rtl(&mut self, enabled: bool) -> &mut Self {
+        self.flags.set(Flags::RIGHT_TO_LEFT, enabled);
+        self
+    }
+
+    /// Choose whether outline symbols are shown.
+    pub fn outlines(&mut self, show: bool) -> &mut Self {
+        self.flags.set(Flags::OUTLINES, show);
+        self
+    }
+
+    /// Choose whether this worksheet is selected in the workbook window.
+    pub fn select(&mut self, selected: bool) -> &mut Self {
+        self.flags.set(Flags::SELECTED, selected);
+        self
+    }
+
+    /// Choose whether this worksheet window is displayed.
+    pub fn display(&mut self, displayed: bool) -> &mut Self {
+        self.flags.set(Flags::DISPLAYED, displayed);
+        self
+    }
+
+    /// Choose whether page-break preview is active.
+    pub fn page_breaks(&mut self, enabled: bool) -> &mut Self {
+        self.flags.set(Flags::PAGE_BREAKS, enabled);
+        self
+    }
+
+    /// Set the first visible cell after checking pane-specific sentinels.
+    pub fn origin(&mut self, row: u16, column: u8) -> XlsResult<&mut Self> {
+        validate_origin(row, column, self.pane.as_ref())?;
+        self.first_visible_row = row;
+        self.first_visible_column = column;
+        Ok(self)
+    }
+
+    /// Set a palette index in `0..=63`, or use the default with `None`.
+    pub fn grid_color(&mut self, index: Option<u16>) -> XlsResult<&mut Self> {
+        if index.is_some_and(|value| value > 63) {
+            return Err(XlsError::InvalidData(
+                "custom gridline color index must be <= 63".to_string(),
+            ));
+        }
+        self.gridline_color_index = index;
+        Ok(self)
+    }
+
+    /// Set page-break preview zoom in `10..=400`, or clear it with `None`.
+    pub fn page_zoom(&mut self, percent: Option<u16>) -> XlsResult<&mut Self> {
+        validate_zoom(percent)?;
+        self.page_break_zoom_percent = percent;
+        Ok(self)
+    }
+
+    /// Set normal-view zoom in `10..=400`, or clear it with `None`.
+    pub fn normal_zoom(&mut self, percent: Option<u16>) -> XlsResult<&mut Self> {
+        validate_zoom(percent)?;
+        self.normal_zoom_percent = percent;
+        Ok(self)
+    }
+
+    /// Replace the exact zoom fraction and return the previous value.
+    pub fn put_scale(&mut self, scale: Option<Scale>) -> Option<Scale> {
+        std::mem::replace(&mut self.scale, scale)
+    }
+
+    /// Atomically replace the pane and its selections after preflight checks.
+    pub fn put_pane(
+        &mut self,
+        pane: Pane,
+        selections: Vec<Selection>,
+    ) -> XlsResult<(Option<Pane>, Vec<Selection>)> {
+        self.validate_with(Some(&pane), &selections)?;
+        let previous_pane = self.pane.replace(pane);
+        let previous_selections = std::mem::replace(&mut self.selections, selections);
+        Ok((previous_pane, previous_selections))
+    }
+
+    /// Atomically replace selections after checking them against the pane.
+    pub fn put_selections(&mut self, selections: Vec<Selection>) -> XlsResult<Vec<Selection>> {
+        self.validate_with(self.pane.as_ref(), &selections)?;
+        Ok(std::mem::replace(&mut self.selections, selections))
+    }
+
+    /// Remove the pane and return the previous owned pane and selections.
+    pub fn clear_pane(&mut self) -> (Option<Pane>, Vec<Selection>) {
+        let previous_pane = self.pane.take();
+        let previous_selections = std::mem::replace(
+            &mut self.selections,
+            vec![Selection::cell(XlsPaneType::UpperLeft, 0, 0)],
+        );
+        (previous_pane, previous_selections)
+    }
+
     pub(crate) fn validate(&self) -> XlsResult<()> {
+        self.validate_with(self.pane.as_ref(), &self.selections)
+    }
+
+    fn validate_with(&self, pane: Option<&Pane>, selections: &[Selection]) -> XlsResult<()> {
         if self.gridline_color_index.is_some_and(|value| value > 63) {
             return Err(XlsError::InvalidData(
                 "custom gridline color index must be <= 63".to_string(),
             ));
         }
-        for zoom in [self.page_break_zoom_percent, self.normal_zoom_percent]
-            .into_iter()
-            .flatten()
-        {
-            if !(10..=400).contains(&zoom) {
-                return Err(XlsError::InvalidData(
-                    "view zoom percent must be between 10 and 400".to_string(),
-                ));
-            }
-        }
+        validate_zoom(self.page_break_zoom_percent)?;
+        validate_zoom(self.normal_zoom_percent)?;
         if let Some(scale) = self.scale {
             scale.validate()?;
         }
-        if let Some(pane) = self.pane {
+        if let Some(pane) = pane {
             pane.validate()?;
-            if pane.mode == XlsPaneMode::Frozen
-                && (self.first_visible_row == u16::MAX || self.first_visible_column == u8::MAX)
-            {
-                return Err(XlsError::InvalidData(
-                    "frozen view cannot use sentinel origins".to_string(),
-                ));
-            }
         }
-        validate_selections(self.pane.as_ref(), &self.selections)
+        validate_origin(self.first_visible_row, self.first_visible_column, pane)?;
+        validate_selections(pane, selections)
     }
 
     pub(crate) fn set_frozen(&mut self, rows: u16, columns: u8) -> XlsResult<()> {
-        let pane = XlsWorksheetPaneOptions::frozen(rows, columns)?;
-        self.selections = vec![XlsWorksheetSelectionOptions::single_cell(
-            pane.active_pane,
-            rows,
-            columns,
-        )];
-        self.pane = Some(pane);
+        let pane = Pane::frozen(rows, columns)?;
+        self.put_pane(pane, vec![Selection::cell(pane.active(), rows, columns)])?;
         Ok(())
-    }
-
-    pub(crate) fn clear_pane(&mut self) {
-        self.pane = None;
-        self.selections = vec![XlsWorksheetSelectionOptions::single_cell(
-            XlsPaneType::UpperLeft,
-            0,
-            0,
-        )];
     }
 }
 
-fn validate_selections(
-    pane: Option<&XlsWorksheetPaneOptions>,
-    selections: &[XlsWorksheetSelectionOptions],
-) -> XlsResult<()> {
+fn validate_origin(row: u16, column: u8, pane: Option<&Pane>) -> XlsResult<()> {
+    if pane.is_some_and(|value| value.mode == Mode::Frozen)
+        && (row == u16::MAX || column == u8::MAX)
+    {
+        return Err(XlsError::InvalidData(
+            "frozen view cannot use sentinel origins".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_zoom(percent: Option<u16>) -> XlsResult<()> {
+    if percent.is_some_and(|value| !(10..=400).contains(&value)) {
+        return Err(XlsError::InvalidData(
+            "view zoom percent must be between 10 and 400".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_selection(selection: &Selection) -> XlsResult<()> {
+    if selection.active_range_index & 0x8000 != 0 {
+        return Err(XlsError::InvalidData(
+            "active range index must be a signed nonnegative integer".to_string(),
+        ));
+    }
+    if selection.ranges.is_empty() || selection.ranges.len() > MAX_SELECTION_RANGES {
+        return Err(XlsError::InvalidData(
+            "each SELECTION needs 1..=1369 ranges".to_string(),
+        ));
+    }
+    if selection.ranges.iter().any(|range| {
+        range.first_row() > range.last_row() || range.first_column() > range.last_column()
+    }) {
+        return Err(XlsError::InvalidData(
+            "SELECTION contains an inverted range".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_selections(pane: Option<&Pane>, selections: &[Selection]) -> XlsResult<()> {
     if selections.is_empty() {
-        return Ok(());
+        return if pane.is_none() {
+            Ok(())
+        } else {
+            Err(XlsError::InvalidData(
+                "a pane view needs at least one SELECTION".to_string(),
+            ))
+        };
     }
     let active_pane = pane.map_or(XlsPaneType::UpperLeft, |value| value.active_pane);
     let mut has_active = false;
-    let mut seen = Vec::new();
+    let mut seen = 0u8;
     let mut start = 0usize;
     while start < selections.len() {
         let first = &selections[start];
-        if first.active_range_index & 0x8000 != 0 {
-            return Err(XlsError::InvalidData(
-                "active range index must be a signed nonnegative integer".to_string(),
-            ));
-        }
-        if seen.contains(&first.pane) {
+        validate_selection(first)?;
+        let pane_bit = 1u8 << first.pane.code();
+        if seen & pane_bit != 0 {
             return Err(XlsError::InvalidData(
                 "SELECTION pane groups must be contiguous".to_string(),
             ));
@@ -270,14 +587,9 @@ fn validate_selections(
         }
         has_active |= first.pane == active_pane;
         let mut end = start;
-        let mut count = 0usize;
         while end < selections.len() && selections[end].pane == first.pane {
             let current = &selections[end];
-            if current.ranges.is_empty() || current.ranges.len() > MAX_SELECTION_RANGES {
-                return Err(XlsError::InvalidData(
-                    "each SELECTION needs 1..=1369 ranges".to_string(),
-                ));
-            }
+            validate_selection(current)?;
             if (
                 current.active_row,
                 current.active_column,
@@ -291,16 +603,6 @@ fn validate_selections(
                     "contiguous SELECTION records disagree".to_string(),
                 ));
             }
-            if current.ranges.iter().any(|range| {
-                range.first_row() > range.last_row() || range.first_column() > range.last_column()
-            }) {
-                return Err(XlsError::InvalidData(
-                    "SELECTION contains an inverted range".to_string(),
-                ));
-            }
-            count = count.checked_add(current.ranges.len()).ok_or_else(|| {
-                XlsError::InvalidData("SELECTION range count overflow".to_string())
-            })?;
             end += 1;
         }
         let active = selections[start..end]
@@ -319,7 +621,7 @@ fn validate_selections(
                 "active range does not contain the active cell".to_string(),
             ));
         }
-        seen.push(first.pane);
+        seen |= pane_bit;
         start = end;
     }
     if !has_active {
@@ -352,31 +654,23 @@ pub(crate) fn pane_exists(x: u16, y: u16, pane: XlsPaneType) -> bool {
 mod tests {
     use super::*;
     use crate::writer::biff;
+    use std::panic::{AssertUnwindSafe, catch_unwind};
 
     #[test]
     fn serializes_exact_view_records() {
-        let pane =
-            XlsWorksheetPaneOptions::split(1_200, 800, 7, 4, XlsPaneType::LowerRight).unwrap();
-        let options = XlsWorksheetViewOptions {
-            show_formulas: true,
-            show_gridlines: false,
-            gridline_color_index: Some(8),
-            first_visible_row: 2,
-            first_visible_column: 1,
-            pane: Some(pane),
-            selections: vec![XlsWorksheetSelectionOptions::single_cell(
-                XlsPaneType::LowerRight,
-                7,
-                4,
-            )],
-            ..XlsWorksheetViewOptions::default()
-        };
+        let pane = Pane::split(1_200, 800, 7, 4, XlsPaneType::LowerRight).unwrap();
+        let mut view = View::default();
+        view.formulas(true).gridlines(false);
+        view.grid_color(Some(8)).unwrap();
+        view.origin(2, 1).unwrap();
+        view.put_pane(pane, vec![Selection::cell(XlsPaneType::LowerRight, 7, 4)])
+            .unwrap();
         let mut window = Vec::new();
         let mut pane_bytes = Vec::new();
         let mut selection = Vec::new();
-        biff::write_window2_options(&mut window, &options).unwrap();
+        biff::write_window2_options(&mut window, &view).unwrap();
         biff::write_pane_options(&mut pane_bytes, &pane).unwrap();
-        biff::write_selection_options(&mut selection, &options.selections[0]).unwrap();
+        biff::write_selection_options(&mut selection, &view.selections()[0]).unwrap();
         assert_eq!(
             window,
             vec![
@@ -394,34 +688,104 @@ mod tests {
     }
 
     #[test]
-    fn rejects_inconsistent_view_options() {
-        let mut options = XlsWorksheetViewOptions::default();
-        options.selections[0].pane = XlsPaneType::LowerRight;
-        assert!(options.validate().is_err());
-        assert!(XlsViewScale::new(32_768, 32_768).is_err());
-        assert!(XlsWorksheetPaneOptions::split(32_768, 0, 0, 0, XlsPaneType::UpperRight).is_err());
+    fn checked_values_cover_biff8_boundaries() {
+        assert!(Scale::new(1, 10).is_ok());
+        assert!(Scale::new(4, 1).is_ok());
+        assert!(Scale::new(32_767, 32_767).is_ok());
+        assert!(Scale::new(32_768, 32_768).is_err());
+        assert!(Scale::new(1, 11).is_err());
+        assert!(Scale::new(5, 1).is_err());
 
-        let mut no_selection = XlsWorksheetViewOptions::default();
-        no_selection.selections.clear();
-        assert!(no_selection.validate().is_ok());
+        assert!(Pane::split(32_767, 0, 0, 0, XlsPaneType::UpperRight).is_ok());
+        assert!(Pane::split(32_768, 0, 0, 0, XlsPaneType::UpperRight).is_err());
+        assert!(Pane::split(0, 32_767, 0, 0, XlsPaneType::LowerLeft).is_ok());
+        assert!(Pane::split(0, 0, 0, 0, XlsPaneType::UpperLeft).is_err());
+        assert!(Pane::frozen(0, 0).is_err());
 
-        let invalid_frozen = XlsWorksheetPaneOptions {
-            mode: XlsPaneMode::Frozen,
-            horizontal_split: 256,
-            vertical_split: 0,
-            bottom_pane_top_row: 0,
-            right_pane_left_column: 0,
-            active_pane: XlsPaneType::UpperRight,
-        };
-        assert!(invalid_frozen.validate().is_err());
+        assert!(XlsSelectionRange::new(0, u16::MAX, 0, u8::MAX).is_ok());
+        assert!(XlsSelectionRange::new(1, 0, 0, 0).is_err());
+        assert!(XlsSelectionRange::new(0, 0, 1, 0).is_err());
+        assert!(Selection::new(XlsPaneType::UpperLeft, 0, 0, 0, Vec::new()).is_err());
+        assert!(
+            Selection::new(
+                XlsPaneType::UpperLeft,
+                0,
+                0,
+                0,
+                vec![XlsSelectionRange::cell(0, 0); MAX_SELECTION_RANGES + 1],
+            )
+            .is_err()
+        );
+    }
 
-        let mut signed_index = XlsWorksheetViewOptions::default();
-        signed_index.selections[0].active_range_index = 0x8000;
-        assert!(signed_index.validate().is_err());
+    #[test]
+    fn display_options_share_one_biff_word() {
+        assert_eq!(std::mem::size_of::<Flags>(), std::mem::size_of::<u16>());
+        let mut view = View::default();
+        view.formulas(true)
+            .gridlines(false)
+            .headers(false)
+            .zeros(false)
+            .rtl(true)
+            .outlines(false)
+            .select(false)
+            .display(false)
+            .page_breaks(true);
+        assert!(view.shows_formulas());
+        assert!(!view.shows_gridlines());
+        assert!(!view.shows_headers());
+        assert!(!view.shows_zeros());
+        assert!(view.right_to_left());
+        assert!(!view.shows_outlines());
+        assert!(!view.is_selected());
+        assert!(!view.is_displayed());
+        assert!(view.is_page_break_preview());
+    }
 
-        let mut too_many_ranges = XlsWorksheetViewOptions::default();
-        too_many_ranges.selections[0].ranges =
-            vec![XlsSelectionRange::new(0, 0, 0, 0); MAX_SELECTION_RANGES + 1];
-        assert!(too_many_ranges.validate().is_err());
+    #[test]
+    fn pane_preflight_does_not_unwind_or_mutate_on_error() {
+        let mut view = View::default();
+        view.formulas(true);
+        let before = view.clone();
+        let pane = Pane::split(1_200, 0, 0, 4, XlsPaneType::UpperRight).unwrap();
+        let invalid = vec![Selection::cell(XlsPaneType::LowerLeft, 0, 0)];
+
+        let outcome = catch_unwind(AssertUnwindSafe(|| view.put_pane(pane, invalid)));
+        assert!(outcome.is_ok());
+        assert!(outcome.unwrap().is_err());
+        assert_eq!(view, before);
+    }
+
+    #[test]
+    fn frozen_origin_preflight_is_failure_atomic() {
+        let mut view = View::default();
+        view.origin(u16::MAX, u8::MAX).unwrap();
+        let before = view.clone();
+        let pane = Pane::frozen(1, 1).unwrap();
+
+        assert!(
+            view.put_pane(pane, vec![Selection::cell(XlsPaneType::LowerRight, 1, 1)],)
+                .is_err()
+        );
+        assert_eq!(view, before);
+    }
+
+    #[test]
+    fn pane_replacement_returns_owned_previous_state() {
+        let mut view = View::default();
+        let frozen = Pane::frozen(1, 1).unwrap();
+        let (old_pane, old_selections) = view
+            .put_pane(frozen, vec![Selection::cell(XlsPaneType::LowerRight, 1, 1)])
+            .unwrap();
+        assert!(old_pane.is_none());
+        assert_eq!(old_selections.len(), 1);
+
+        let split = Pane::split(600, 0, 0, 2, XlsPaneType::UpperRight).unwrap();
+        let (old_pane, old_selections) = view
+            .put_pane(split, vec![Selection::cell(XlsPaneType::UpperRight, 0, 2)])
+            .unwrap();
+        assert_eq!(old_pane, Some(frozen));
+        assert_eq!(old_selections[0].pane(), XlsPaneType::LowerRight);
+        assert_eq!(view.pane(), Some(&split));
     }
 }
