@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::indexing_slicing))]
+
 //! RTF parser that builds document structure from tokens.
 
 use super::error::{RtfError, RtfResult};
@@ -170,7 +172,11 @@ fn decode_dos_codepage<'a>(bytes: &'a [u8], high: &[char; 128]) -> Cow<'a, str> 
         if byte.is_ascii() {
             output.push(char::from(byte));
         } else {
-            output.push(high[usize::from(byte - 0x80)]);
+            output.push(
+                high.get(usize::from(byte - 0x80))
+                    .copied()
+                    .unwrap_or('\u{FFFD}'),
+            );
         }
     }
     Cow::Owned(output)
@@ -2471,8 +2477,8 @@ impl<'a> Parser<'a> {
     /// group-nesting path and blow the stack after only a handful of levels.
     #[inline(never)]
     fn dispatch_group_destination(&mut self) -> RtfResult<bool> {
-        if self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        if let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::Control(
                     ControlWord::FileTable | ControlWord::FileEntry | ControlWord::BlipUid,
                 ) => {
@@ -4323,6 +4329,7 @@ impl<'a> Parser<'a> {
         let added = entry.text_bytes().ok_or_else(|| {
             RtfError::MalformedDocument("RTF navigation-entry size overflow".to_string())
         })?;
+        let position = entry.position();
         self.navigation_entry_text_bytes = self
             .navigation_entry_text_bytes
             .checked_add(added)
@@ -4341,7 +4348,7 @@ impl<'a> Parser<'a> {
                 state.table_nesting_level,
                 crate::CellStoryEvent::NavigationEntry(crate::CellStoryReference {
                     index,
-                    position: self.navigation_entries[index].position(),
+                    position,
                 }),
             )?;
         } else {
@@ -5145,7 +5152,7 @@ impl<'a> Parser<'a> {
                     let skip = usize::try_from(skip_fallback.max(0)).unwrap_or(usize::MAX);
                     let skipped = skip.min(transport.len());
                     skip_fallback -= i32::try_from(skipped).unwrap_or(i32::MAX);
-                    bytes.extend_from_slice(&transport[skipped..]);
+                    bytes.extend(transport.into_iter().skip(skipped));
                     self.pos += 1;
                 },
                 Token::Control(ControlWord::UnicodeSkip(value)) => {
@@ -5509,8 +5516,8 @@ impl<'a> Parser<'a> {
     fn parse_content(&mut self) -> RtfResult<()> {
         let mut text_buffer = SmallVec::<[u8; 256]>::new();
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     // Flush any buffered text
                     if !text_buffer.is_empty() {
@@ -5815,7 +5822,14 @@ impl<'a> Parser<'a> {
             previous.content.to_mut().push_str(text);
             previous.range_end = end;
             if let Some(event_id) = state.revision_event_id {
-                self.revision_event_indices[event_id] = Some(self.revisions.len() - 1);
+                *self
+                    .revision_event_indices
+                    .get_mut(event_id)
+                    .ok_or_else(|| {
+                        RtfError::ParserError(
+                            "RTF revision event state references a missing slot".to_string(),
+                        )
+                    })? = Some(self.revisions.len() - 1);
             }
             return Ok(());
         }
@@ -5836,7 +5850,14 @@ impl<'a> Parser<'a> {
         revision.validate()?;
         self.revisions.push(revision);
         if let Some(event_id) = state.revision_event_id {
-            self.revision_event_indices[event_id] = Some(self.revisions.len() - 1);
+            *self
+                .revision_event_indices
+                .get_mut(event_id)
+                .ok_or_else(|| {
+                    RtfError::ParserError(
+                        "RTF revision event state references a missing slot".to_string(),
+                    )
+                })? = Some(self.revisions.len() - 1);
         }
         if (state.in_table || state.table_nesting_level >= 2) && previous_event_revision.is_none() {
             let index = self.revisions.len() - 1;
@@ -11323,7 +11344,9 @@ impl<'a> Parser<'a> {
         let parent = self.states.len().checked_sub(2).ok_or_else(|| {
             RtfError::MalformedDocument("RTF pn destination has no paragraph owner".to_string())
         })?;
-        let owner = &self.states[parent];
+        let owner = self.states.get(parent).ok_or_else(|| {
+            RtfError::ParserError("RTF pn paragraph owner state is missing".to_string())
+        })?;
         if owner.destination != Destination::DocumentBody
             || owner.in_table
             || owner.table_nesting_level >= 2
@@ -11436,8 +11459,11 @@ impl<'a> Parser<'a> {
                             RtfError::MalformedDocument("RTF pn record index overflow".to_string())
                         })?;
                     self.legacy_paragraph_numbering.push(record);
-                    self.states[parent].paragraph.legacy_numbering = Some(index);
-                    self.states[parent].paragraph_numbering_declared = true;
+                    let owner = self.states.get_mut(parent).ok_or_else(|| {
+                        RtfError::ParserError("RTF pn paragraph owner state is missing".to_string())
+                    })?;
+                    owner.paragraph.legacy_numbering = Some(index);
+                    owner.paragraph_numbering_declared = true;
                     if let Some(state) = self.states.last_mut() {
                         state.paragraph.legacy_numbering = Some(index);
                         state.paragraph_numbering_declared = true;
@@ -13671,7 +13697,10 @@ impl<'a> Parser<'a> {
     ) -> RtfResult<()> {
         if self.states.len() != 3
             || self.section_note_options_closed
-            || self.states[self.states.len() - 2].destination != Destination::DocumentBody
+            || self
+                .states
+                .get(1)
+                .is_none_or(|state| state.destination != Destination::DocumentBody)
         {
             return Err(RtfError::MalformedDocument(
                 "RTF default-formatting destination must occur once in the root document header"
@@ -15708,8 +15737,8 @@ impl<'a> Parser<'a> {
     fn parse_font_table(&mut self) -> RtfResult<()> {
         self.pos += 1; // Skip \fonttbl
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     self.font_table.borrow().validate()?;
                     return Ok(());
@@ -15744,8 +15773,8 @@ impl<'a> Parser<'a> {
         let mut unicode_skip = self.current_state()?.unicode_skip.max(0);
         let mut seen = std::collections::HashSet::new();
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     self.pos += 1;
                     break;
@@ -16130,8 +16159,8 @@ impl<'a> Parser<'a> {
         let mut file_seen = false;
         let mut data = Vec::new();
         let mut high_nibble: Option<u8> = None;
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     self.pos += 1;
                     if high_nibble.is_some() {
@@ -16310,8 +16339,8 @@ impl<'a> Parser<'a> {
         let mut current_green = 0;
         let mut current_blue = 0;
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     // Add final color if any
                     let color = Color::new(current_red, current_green, current_blue);
@@ -18289,12 +18318,12 @@ impl<'a> Parser<'a> {
                             &mut shape_groups,
                             &mut drawing_order,
                         )?;
-                        story_events.extend(
-                            drawing_order[order_start..]
-                                .iter()
-                                .copied()
-                                .map(crate::StoryEvent::Drawing),
-                        );
+                        let added = drawing_order.get(order_start..).ok_or_else(|| {
+                            RtfError::ParserError(
+                                "RTF annotation drawing order shrank during parsing".to_string(),
+                            )
+                        })?;
+                        story_events.extend(added.iter().copied().map(crate::StoryEvent::Drawing));
                         continue;
                     }
                     let nested =
@@ -18866,8 +18895,11 @@ impl<'a> Parser<'a> {
     fn skip_until_close_brace(&mut self) -> RtfResult<()> {
         let mut depth = 1;
 
-        while self.pos < self.tokens.len() && depth > 0 {
-            match &self.tokens[self.pos] {
+        while depth > 0 {
+            let Some(token) = self.tokens.get(self.pos) else {
+                break;
+            };
+            match token {
                 Token::OpenBrace => depth += 1,
                 Token::CloseBrace => depth -= 1,
                 _ => {},
@@ -18888,8 +18920,11 @@ impl<'a> Parser<'a> {
         self.pos += 1; // Skip the OpenBrace
         let mut depth = 1;
 
-        while self.pos < self.tokens.len() && depth > 0 {
-            match &self.tokens[self.pos] {
+        while depth > 0 {
+            let Some(token) = self.tokens.get(self.pos) else {
+                break;
+            };
+            match token {
                 Token::OpenBrace => depth += 1,
                 Token::CloseBrace => depth -= 1,
                 _ => {},
@@ -18902,14 +18937,11 @@ impl<'a> Parser<'a> {
 
     /// Expect a specific token.
     fn expect_token(&mut self, expected: Token) -> RtfResult<()> {
-        if self.pos >= self.tokens.len() {
-            return Err(RtfError::UnexpectedEof);
-        }
-
-        if self.tokens[self.pos] != expected {
+        let actual = self.tokens.get(self.pos).ok_or(RtfError::UnexpectedEof)?;
+        if actual != &expected {
             return Err(RtfError::ParserError(format!(
                 "Expected {:?}, found {:?}",
-                expected, self.tokens[self.pos]
+                expected, actual
             )));
         }
 
@@ -18960,8 +18992,8 @@ impl<'a> Parser<'a> {
         self.pos += 1;
 
         // Look ahead for additional Unicode characters (compound characters)
-        while self.pos < self.tokens.len() {
-            if let Token::Control(ControlWord::Unicode(code)) = &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            if let Token::Control(ControlWord::Unicode(code)) = token {
                 unicode_values.push(*code as u16);
                 self.pos += 1;
             } else {
@@ -18975,8 +19007,11 @@ impl<'a> Parser<'a> {
         let mut fallback_remainder = None;
 
         // Handle fallback: skip the next N characters/tokens
-        while fallback_skip > 0 && self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while fallback_skip > 0 {
+            let Some(token) = self.tokens.get(self.pos) else {
+                break;
+            };
+            match token {
                 Token::Text(text) => {
                     let character_count = text.chars().count();
                     if character_count <= fallback_skip {
@@ -19073,7 +19108,9 @@ impl<'a> Parser<'a> {
             self.nested_table_builders
                 .push(NestedTableBuilder::new(level));
         }
-        Ok(&mut self.nested_table_builders[index])
+        self.nested_table_builders.get_mut(index).ok_or_else(|| {
+            RtfError::ParserError("RTF nested-table builder state is missing".to_string())
+        })
     }
 
     fn append_table_text(&mut self, text: &[u8], raw_level: u8) -> RtfResult<()> {
@@ -19485,8 +19522,8 @@ impl<'a> Parser<'a> {
         }
         self.pos += 1; // consume \object
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::OpenBrace
                     if self.nested_control_word() == Some(ControlWord::ObjectClass) =>
                 {
@@ -19974,8 +20011,8 @@ impl<'a> Parser<'a> {
         }
         self.pos += 1;
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     self.pos += 1;
                     return Ok((text.trim().to_string(), picture_indices));
@@ -20019,8 +20056,8 @@ impl<'a> Parser<'a> {
     fn parse_object_text_destination(&mut self) -> RtfResult<String> {
         let mut text = String::new();
         self.pos += 1; // opening brace
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::OpenBrace => {
                     return Err(RtfError::MalformedDocument(
                         "nested groups are not allowed in RTF object text metadata".to_string(),
@@ -20100,8 +20137,8 @@ impl<'a> Parser<'a> {
         let mut high_nibble = None;
         let mut depth = 0usize;
         self.pos += 1; // opening brace
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::OpenBrace => {
                     depth += 1;
                     self.pos += 1;
@@ -20251,8 +20288,8 @@ impl<'a> Parser<'a> {
         require_parameterless(parameter, "shp")?;
         self.pos += 1;
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::OpenBrace
                     if self
                         .nested_control_word()
@@ -20693,12 +20730,12 @@ impl<'a> Parser<'a> {
                         &mut shape_groups,
                         &mut drawing_order,
                     )?;
-                    story_events.extend(
-                        drawing_order[order_start..]
-                            .iter()
-                            .copied()
-                            .map(crate::StoryEvent::Drawing),
-                    );
+                    let added = drawing_order.get(order_start..).ok_or_else(|| {
+                        RtfError::ParserError(
+                            "RTF shape-text drawing order shrank during parsing".to_string(),
+                        )
+                    })?;
+                    story_events.extend(added.iter().copied().map(crate::StoryEvent::Drawing));
                 },
                 Some(Token::OpenBrace) if self.is_custom_xml_markup_group() => {
                     return Err(RtfError::MalformedDocument(
@@ -21039,8 +21076,8 @@ impl<'a> Parser<'a> {
         let mut part_depth = None;
         let mut depth = 0usize;
         self.pos += 1; // consume the opening brace
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::OpenBrace
                     if matches!(
                         self.tokens.get(self.pos + 1),
@@ -21510,8 +21547,11 @@ impl<'a> Parser<'a> {
 
     fn apply_shape_properties(shape: &mut super::shape::Shape<'a>) {
         for index in 0..shape.properties.len() {
-            let name = shape.properties[index].name.to_string();
-            let value = shape.properties[index].value.to_string();
+            let Some(property) = shape.properties.get(index) else {
+                break;
+            };
+            let name = property.name.to_string();
+            let value = property.value.to_string();
             Self::apply_shape_property(shape, &name, &value);
         }
 
@@ -21587,8 +21627,8 @@ impl<'a> Parser<'a> {
         require_parameterless(parameter, "shpgrp")?;
         self.pos += 1;
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::OpenBrace
                     if matches!(
                         self.tokens.get(self.pos..self.pos + 3),
@@ -22308,7 +22348,9 @@ impl<'a> Parser<'a> {
     }
 
     fn legacy_do_starts_with_text_box(&self) -> bool {
-        self.tokens[self.pos.saturating_add(2)..]
+        self.tokens
+            .get(self.pos.saturating_add(2)..)
+            .unwrap_or_default()
             .iter()
             .find_map(|token| match token {
                 Token::Control(control) if Self::legacy_primitive_start(control) => {
@@ -23045,8 +23087,8 @@ impl<'a> Parser<'a> {
         let mut high_nibble = None;
 
         // Parse picture properties and data
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     break;
                 },
@@ -23846,8 +23888,8 @@ impl<'a> Parser<'a> {
         let mut in_result;
 
         // Parse field groups
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     // End of outer field group
                     break;
@@ -23953,8 +23995,8 @@ impl<'a> Parser<'a> {
                         // wrap or split field instructions in formatting groups; those groups
                         // do not change the field-code text and must not discard it.
                         let mut nested_depth = 0usize;
-                        while self.pos < self.tokens.len() {
-                            match &self.tokens[self.pos] {
+                        while let Some(token) = self.tokens.get(self.pos) {
+                            match token {
                                 Token::CloseBrace if nested_depth == 0 => {
                                     self.pos += 1;
                                     break;
@@ -24635,8 +24677,8 @@ impl<'a> Parser<'a> {
         let default_state = State::default();
         let mut inert_section_format = false;
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     if !text_buffer.is_empty() {
                         if let Ok(text) = std::str::from_utf8(&text_buffer) {
@@ -25008,8 +25050,8 @@ impl<'a> Parser<'a> {
         self.current_note_story_events.clear();
         let mut reference = String::from(if is_footnote { "1" } else { "i" });
 
-        while self.pos < self.tokens.len() {
-            match &self.tokens[self.pos] {
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
                 Token::CloseBrace => {
                     self.pos += 1;
                     break;

@@ -35,6 +35,13 @@ const SEEDS: &[(&str, &str)] = &[
         ),
     ),
     (
+        "legacy-drawing",
+        concat!(
+            r"{\rtf1 A{\*\do\dobxpage\dobypara\dodhgt1\dpline",
+            r"\dpptx0\dppty0\dpptx10\dppty10\dpx0\dpy0\dpxsize10\dpysize10}B}",
+        ),
+    ),
+    (
         "field",
         concat!(
             r#"{\rtf1 before{\field{\*\fldinst HYPERLINK "http://example.test" }"#,
