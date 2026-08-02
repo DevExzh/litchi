@@ -4595,6 +4595,33 @@ mod tests {
     }
 
     #[test]
+    fn page_break_entry_limits_are_failure_atomic() {
+        let mut writer = XlsWriter::new();
+        let sheet = writer.add_worksheet("Break limits").unwrap();
+
+        for row in 0..1_026 {
+            writer.add_horizontal_page_break(sheet, row, 0, 1).unwrap();
+        }
+        for column in 0..255 {
+            writer.add_vertical_page_break(sheet, column, 0, 1).unwrap();
+        }
+        assert_eq!(writer.worksheets[sheet].horizontal_page_breaks.len(), 1_026);
+        assert_eq!(writer.worksheets[sheet].vertical_page_breaks.len(), 255);
+
+        let horizontal = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_horizontal_page_break(sheet, 1_026, 0, 1)
+        }));
+        assert!(matches!(horizontal, Ok(Err(XlsError::InvalidData(_)))));
+        assert_eq!(writer.worksheets[sheet].horizontal_page_breaks.len(), 1_026);
+
+        let vertical = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_vertical_page_break(sheet, 255, 0, 1)
+        }));
+        assert!(matches!(vertical, Ok(Err(XlsError::InvalidData(_)))));
+        assert_eq!(writer.worksheets[sheet].vertical_page_breaks.len(), 255);
+    }
+
+    #[test]
     fn filter_sort_and_pivot_locations_fail_before_mutation() {
         let mut writer = XlsWriter::new();
         let sheet = writer.add_worksheet("Locations").unwrap();
