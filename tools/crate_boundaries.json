@@ -231,7 +231,7 @@
       "order": 41,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-pptx",
-      "reason": "The OOXML migration host temporarily anchors slides around the extracted concrete transition capability.",
+      "reason": "The OOXML migration host temporarily anchors slides around extracted transition, shape, tag, and notes capabilities.",
       "exit": "Move the remaining PPTX package and semantic model into litchi-pptx, then delete the host adapter."
     },
     {
@@ -245,8 +245,8 @@
       "order": 43,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-xlsx",
-      "reason": "A reverse adapter keeps legacy callers working while XLSX migrates first.",
-      "exit": "Move callers to litchi-xlsx and delete the reverse adapter with the monolith."
+      "reason": "The OOXML migration host temporarily anchors workbook state around extracted XLSX capabilities, including the canonical calculation-chain owner.",
+      "exit": "Move the remaining XLSX package and semantic model into litchi-xlsx, then delete the host adapter."
     },
     {
       "order": 47,

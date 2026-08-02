@@ -25,11 +25,12 @@ Office round trips.
 | [0010](0010-facade-archive-ownership.md) | Archive ownership below the facade |
 | [0011](0011-ooxml-physical-package-ownership.md) | Physical OPC package ownership below the OOXML migration host |
 | [0012](0012-biff8-formula-reference-types.md) | Checked BIFF8 formula references and panic-free encoding |
-| [0013](0013-pptx-notes-deletion.md) | Atomic, package-aware PowerPoint notes deletion |
+| [0013](0013-pptx-notes-deletion.md) | PowerPoint notes ownership and atomic deletion |
 | [0014](0014-core-properties-reader-ownership.md) | Core-properties reader ownership in the OOXML common crate (amended by 0015) |
 | [0015](0015-lossless-core-properties-crud.md) | Lossless, schema-typed OOXML core-properties CRUD |
 | [0016](0016-biff8-writer-location-types.md) | Checked BIFF8 writer locations beyond ordinary cells |
 | [0017](0017-ooxml-producer-template-ownership.md) | Format-owned deterministic OOXML producer templates |
+| [0018](0018-xlsx-calculation-chain-ownership.md) | Typed XLSX calculation-chain ownership |
 
 ## Decision hierarchy
 

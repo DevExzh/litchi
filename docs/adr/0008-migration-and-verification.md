@@ -3011,6 +3011,83 @@ green. The boundary policy records 35 packages, 106 direct internal
 dependencies, and 13 explicit migration debts. Determinism and ownership do
 not imply unmeasured speedups or universal native Office compatibility.
 
+## Typed XLSX calculation-chain ownership
+
+The calculation-chain implementation now lives exclusively in
+`litchi-xlsx::chain`. Its short `Sheet`, `Step`, `Flags`, `Cell`, and `Chain`
+model makes the native sheet-ID range, `l`/`s` exclusion, packed orthogonal
+markers, checked grid addresses, and nonempty ordering explicit. Semantic
+sheet/address lookup and CRUD are primary; checked calculation-order operations
+remain available, and duplicate malformed producer keys are retained for
+numeric repair while semantic selection reports ambiguity.
+
+The bounded Strict/Transitional reader applies MCE, preserves extension XML and
+qualified attributes, and does not evaluate formulas. Package `load`, `put`,
+and `remove` reject incoherent, external, duplicate, orphaned, or shared graph
+states before mutation. Exact stores preserve signatures; changed stores keep
+the part and relationship conformance aligned, and removal retains a part that
+another relationship still references. The migration host now caches the
+canonical owner and exposes only `chain`, `chain_conformance`, consuming
+`put_chain`, and `remove_chain`; the former host module and aliases are gone.
+
+Nine owner tests and two host integration tests pass, together with warning-
+denied Clippy and rustdoc. The executable boundary checker remains green at 35
+packages, 106 direct internal dependencies, and 13 explicit debts. This is a
+typed ownership and byte-preservation slice. The legacy host's larger save
+transaction, representative performance measurements, and new native Office
+evidence remain separate work.
+
+## PPTX speaker-notes owner extraction
+
+`litchi-pptx::notes` now owns the bounded notes graph, XML codec, package
+service, text producer, and both source and generated notes-master assets. Its
+public model uses `Conformance`, `Theme`, `Master`, `Slide`, and `Graph`; OPC
+identities remain private. `load` produces an independently editable graph with
+one bounded copy of each validated payload, focused `slide` copies only the
+selected notes resource, and metadata-only delete operations copy none.
+Presentation, slideshow, and template main parts are accepted in both macro-
+free and macro-enabled families.
+
+Consuming `put` stages the complete edit before commit and moves the caller's
+buffers into OPC parts. Exact no-ops retain signatures. The text producer has
+an explicit Strict/Transitional path, while fresh-package master generation is
+the Transitional profile already used by the legacy authoring flow.
+
+The OOXML host now keeps only semantic slide selection and dirty-writer guards
+around graph reads and mutation. The former notes module, forwarding names,
+template accessor, and duplicate slide XML writer are deleted. Focused owner,
+host CRUD/graph, and minified-asset parity tests pass with warning-denied Clippy
+and rustdoc. The `pptx_with_fonts` example produced a six-slide Transitional
+artifact. Through Computer Use, desktop PowerPoint for macOS opened it without
+repair, marked slide 1 as having notes, and displayed the expected speaker-note
+text in the Notes pane. This is open-and-inspect evidence only: no Office edit,
+resave, Strict master/theme synthesis, application-version matrix, or measured-
+performance claim follows. The lifetime-free graph's one-copy read cost and
+the remaining package-host adapter are explicit migration debt.
+
+## Failure-atomic BIFF8 worksheet views
+
+The XLS writer replaces public field bags with checked
+`view::{Scale, Mode, Pane, Selection, View}` values. Frozen and split panes
+encode their distinct cell-count and twip limits, selections validate pane
+existence, grouping, range order, active index, and active-cell containment,
+and a view rejects invalid origins, palette indices, or zooms before
+publication. Nine display switches occupy a private BIFF-aligned `u16`; pane
+group validation uses a non-allocating `u8` mask.
+
+`put_scale`, `put_view`, and `put_pane` move new state in and return the old
+owned state only after whole-state preflight. The old option names and raw
+setters are removed, and `XlsSelectionRange::new` is now fallible. Six view
+unit tests, two typed writer round trips, five workbook-view tests, and two
+lint regressions pass. Warning-denied all-target/all-feature Clippy and rustdoc
+are green for `litchi-xls`. The `xls_styles_example` artifact opened in desktop
+Excel for macOS without repair, in expected BIFF8 Compatibility Mode. After
+jumping to `M30`, Excel kept row 1 and column A visible, confirming its
+interpretation of the frozen-pane records. This does not cover Office resave,
+all view combinations, or an application-version matrix. The compact layout is
+a structural result; cache, allocation, and latency claims still require
+measurement.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

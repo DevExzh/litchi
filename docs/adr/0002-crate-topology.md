@@ -328,6 +328,31 @@ remove a target only after a package-wide inbound-edge scan proves it orphaned.
 A dirty legacy presentation writer is rejected because a later materialization
 could overwrite the edited slide markup and relationships.
 
+`litchi-pptx::notes` owns the bounded PresentationML speaker-notes graph,
+Strict/Transitional XML validation, plain-text notes producer, deterministic
+notes-master asset, and transactional OPC mutation. Its contextual vocabulary
+is `Conformance`, `Theme`, `Master`, `Slide`, and `Graph`; physical relationship
+and part identities remain private. `load` returns a lifetime-free editable
+graph and copies each validated payload once, while focused `slide` copies only
+the selected notes payload and metadata-only deletion copies none. Consuming
+`put` validates and stages every graph and relationship change before commit,
+then moves the owned XML buffers into OPC parts. Exact no-ops preserve
+signatures. The migration host retains only semantic slide selection and dirty-
+writer guards around `notes`, `put_notes`, `remove_notes`, and `clear_notes`;
+the former host owner and forwarding aliases are deleted.
+
+`litchi-xlsx::chain` owns SpreadsheetML calculation-chain grammar, its typed
+ordered model, and the single-part workbook relationship service. Short types
+`Sheet`, `Step`, `Flags`, `Cell`, and `Chain` encode the native sheet-ID range,
+mutually exclusive dependency roles, packed orthogonal markers, checked grid
+addresses, and nonempty ordering. Semantic sheet/address CRUD is primary;
+checked numeric order remains available for repair, and malformed duplicate
+keys are inspectable but make semantic selection ambiguous. `load`, `put`, and
+`remove` validate the complete Strict or Transitional OPC graph, preserve
+bounded extension markup, retain signatures on exact no-ops, and never evaluate
+formulas. The migration host caches this canonical model only until the XLSX
+package owner itself moves out of the monolith.
+
 `litchi-xlsb::raw` owns the BIFF12 record wire kernel: `Kind`, `Header`,
 borrowed `Record`/`Records`, bounded `Cursor`, and `Writer`, with constants
 under `raw::kind`. Following `[MS-XLSB]` section 2.1.4, record kinds use exactly
