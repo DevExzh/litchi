@@ -5,7 +5,7 @@
 
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
-use crate::plcf::PlcfParser;
+use crate::doc::plcf::Plcf;
 
 /// Table-pointer index of `fcPlcfAsumy`/`lcbPlcfAsumy`.
 const PLCF_ASUMY: usize = 89;
@@ -87,10 +87,10 @@ impl DocumentAutoSummary {
 
     /// Parse one complete `PlcfAsumy` payload.
     pub fn parse_bytes(data: &[u8]) -> Result<DocumentAutoSummary> {
-        let plcf = PlcfParser::parse(data, ASUMY_SIZE)
+        let plcf = Plcf::parse(data, ASUMY_SIZE)
             .filter(|plcf| plcf.count() <= MAX_ASUMY_ENTRIES)
             .ok_or_else(|| corrupted("PlcfAsumy is malformed"))?;
-        // PlcfParser tolerates trailing bytes; a whole PlcfAsumy must not
+        // `Plcf` tolerates trailing bytes; a whole PlcfAsumy must not
         // contain any.
         let expected = 4 * (plcf.count() + 1) + plcf.count() * ASUMY_SIZE;
         if expected != data.len() {

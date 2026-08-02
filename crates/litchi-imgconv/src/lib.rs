@@ -8,9 +8,11 @@
 
 mod codec;
 pub mod emf;
+mod file;
 pub mod pict;
 pub mod svg;
 pub mod svg_utils;
 pub mod wmf;
 
 pub use codec::{Limits, Options, convert, decode_data, to_jpeg, to_png, to_svg, to_webp};
+pub use file::Convert;

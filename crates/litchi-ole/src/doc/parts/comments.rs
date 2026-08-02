@@ -6,7 +6,7 @@
 use super::super::package::{DocError, Result};
 use super::super::{CommentDateTime, CommentExtendedMetadata};
 use super::fib::FileInformationBlock;
-use crate::plcf::PlcfParser;
+use crate::doc::plcf::Plcf;
 use std::collections::{HashMap, HashSet};
 
 const ATRD_PRE10_SIZE: usize = 30;
@@ -125,7 +125,7 @@ impl CommentsTable {
                 "PlcfandRef has an invalid byte length".to_string(),
             ));
         }
-        let ref_plcf = PlcfParser::parse(ref_data, ATRD_PRE10_SIZE)
+        let ref_plcf = Plcf::parse(ref_data, ATRD_PRE10_SIZE)
             .ok_or_else(|| DocError::Corrupted("PlcfandRef is malformed".to_string()))?;
         if ref_plcf.count() == 0 {
             return Err(DocError::Corrupted(
@@ -371,7 +371,7 @@ fn parse_annotation_ranges(
             "PlcfAtnBkf has an invalid byte length".to_string(),
         ));
     }
-    let starts = PlcfParser::parse(starts_data, 4)
+    let starts = Plcf::parse(starts_data, 4)
         .ok_or_else(|| DocError::Corrupted("PlcfAtnBkf is malformed".to_string()))?;
     if starts.count() != tags.len() {
         return Err(DocError::Corrupted(
@@ -487,7 +487,7 @@ fn parse_annotation_bookmark_tags(data: &[u8]) -> Result<Vec<u32>> {
     Ok(tags)
 }
 
-fn validate_bookmark_cps(plcf: &PlcfParser, main_end: u32, name: &str) -> Result<()> {
+fn validate_bookmark_cps(plcf: &Plcf<'_>, main_end: u32, name: &str) -> Result<()> {
     // Every CP except the last must be inside the main document and
     // monotonic. The final CP of a bookmark PLC is ignored per [MS-DOC]
     // 2.8.10, so no constraint is placed on it.

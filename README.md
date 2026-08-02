@@ -117,7 +117,9 @@ litchi = { git = "https://github.com/DevExzh/litchi.git" }
 
 ### Optional Features
 
-By default, Microsoft Office format support is enabled (`ole`, `ooxml`), along with `ooxml_encryption` and `eval_engine`. Enable additional features as needed:
+By default, Microsoft Office format support is enabled (`ole`, `ppt`, `xls`,
+`ooxml`), along with `ooxml_encryption` and `eval_engine`. Enable additional
+features as needed:
 
 ```toml
 [dependencies]
@@ -144,7 +146,8 @@ litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion suppo
 
 **Available Features:**
 - `full` - Enable all supported formats and functionality
-- `ole` (default) - Legacy Word and PowerPoint formats (.doc, .ppt)
+- `ole` (default) - Legacy Word binary format (.doc)
+- `ppt` (default) - Legacy PowerPoint binary format (.ppt)
 - `xls` (default) - Legacy Excel BIFF format (.xls)
 - `ooxml` (default) - Modern Office formats (.docx, .xlsx, .pptx)
 - `ooxml_encryption` (default) - OOXML encryption/decryption support

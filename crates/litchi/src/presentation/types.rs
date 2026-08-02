@@ -5,8 +5,8 @@ use litchi_core::detection::FileFormat;
 use litchi_core::{Error, Result};
 use std::io::{Read, Seek};
 
-#[cfg(feature = "ole")]
-use crate::ole;
+#[cfg(feature = "ppt")]
+use crate::ppt;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -34,8 +34,8 @@ pub struct PptSlideData {
 #[allow(clippy::large_enum_variant)]
 pub(super) enum PresentationImpl {
     /// Legacy .ppt format
-    #[cfg(feature = "ole")]
-    Ppt(ole::ppt::Presentation),
+    #[cfg(feature = "ppt")]
+    Ppt(ppt::Presentation),
     /// Modern .pptx format
     #[cfg(feature = "ooxml")]
     Pptx(Box<ooxml::pptx::Package>),

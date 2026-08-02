@@ -98,6 +98,7 @@ use crate::doc::{
     ProofingStateTable, ProofingTables, SavedByTable, SmartTagRecognizerRange,
 };
 use crate::sprm_operations::*;
+use litchi_cfb::OleError;
 use litchi_cfb::writer::OleWriter;
 use std::collections::HashMap;
 use zeroize::Zeroizing;
@@ -115,7 +116,7 @@ pub enum DocWriteError {
     /// Invalid data
     InvalidData(String),
     /// OLE error
-    Ole(crate::OleError),
+    Ole(OleError),
     /// MS-OVBA project authoring error
     Vba(litchi_vba::Error),
 }
@@ -126,8 +127,8 @@ impl From<std::io::Error> for DocWriteError {
     }
 }
 
-impl From<crate::OleError> for DocWriteError {
-    fn from(err: crate::OleError) -> Self {
+impl From<OleError> for DocWriteError {
+    fn from(err: OleError) -> Self {
         DocWriteError::Ole(err)
     }
 }

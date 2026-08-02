@@ -1288,11 +1288,6 @@ impl MarkdownWriter {
         self.buffer
     }
 
-    /// Append text to the buffer.
-    pub fn push_str(&mut self, text: &str) {
-        self.buffer.push_str(text);
-    }
-
     /// Append a single character to the buffer.
     #[allow(dead_code)]
     pub fn push(&mut self, ch: char) {

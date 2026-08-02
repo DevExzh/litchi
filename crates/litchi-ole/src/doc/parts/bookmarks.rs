@@ -3,7 +3,7 @@
 use super::super::bookmark::Bookmark;
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
-use crate::plcf::PlcfParser;
+use crate::doc::plcf::Plcf;
 use std::collections::HashSet;
 
 /// Parsed standard bookmarks in start-CP order.
@@ -36,7 +36,7 @@ impl BookmarksTable {
                 "PlcfBkf has an invalid byte length".to_string(),
             ));
         }
-        let starts = PlcfParser::parse(starts_data, 4)
+        let starts = Plcf::parse(starts_data, 4)
             .ok_or_else(|| DocError::Corrupted("PlcfBkf is malformed".to_string()))?;
         if starts.count() != names.len() {
             return Err(DocError::Corrupted(
@@ -191,7 +191,7 @@ fn parse_names(data: &[u8]) -> Result<Vec<String>> {
     Ok(names)
 }
 
-fn validate_cps(plcf: &PlcfParser, document_end: u32, name: &str) -> Result<()> {
+fn validate_cps(plcf: &Plcf<'_>, document_end: u32, name: &str) -> Result<()> {
     // Every CP except the last must lie within the document parts and be
     // monotonic. The final CP of a bookmark PLC is ignored per [MS-DOC]
     // 2.8.10, so no constraint is placed on it.

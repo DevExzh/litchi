@@ -4,8 +4,6 @@
 //! floating text box, then re-opens it with the crate's own reader: header
 //! text, header text box text/shape metadata, and both drawing layers must
 //! resolve correctly without disturbing the main stories.
-#![cfg(feature = "imgconv")]
-
 use litchi_odraw::{Record, shape::Kind};
 use litchi_ole::doc::parts::headers::HeaderFooterType;
 use litchi_ole::doc::shapes::{extract_drawing_shapes, extract_shape_text};

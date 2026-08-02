@@ -1,4 +1,4 @@
-use litchi::ole::OleFile;
+use litchi_cfb::OleFile;
 use std::fs::File;
 use std::io::BufReader;
 

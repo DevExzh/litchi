@@ -1,15 +1,15 @@
 # litchi-ole
 
-Migration host for the legacy Microsoft Word (`.doc`) and PowerPoint (`.ppt`)
-binary formats.
+Migration host for the legacy Microsoft Word (`.doc`) binary format.
 
 ## Overview
 
-This crate parses and writes the remaining OLE2-based Word and PowerPoint
-formats while their concrete crates are extracted. Excel BIFF ownership has
-moved to `litchi-xls`; this crate intentionally provides no `xls` module or
-compatibility re-export. It builds on `litchi-cfb` for the CFB storage
-substrate and retains only the DOC/PPT migration-host infrastructure.
+This crate parses and writes the remaining OLE2-based Word format while its
+concrete `litchi-doc` crate is extracted. PowerPoint ownership has moved to
+`litchi-ppt`, and Excel BIFF ownership has moved to `litchi-xls`. This crate
+intentionally provides neither `ppt`/`xls` modules nor compatibility
+re-exports. It builds on `litchi-cfb` for the CFB storage substrate and retains
+only DOC migration-host infrastructure.
 
 ## Usage
 
@@ -30,9 +30,11 @@ println!("paragraphs: {}", document.paragraph_count()?);
 ## Features
 
 - `.doc` (Word 97-2003) reader and writer with full PLCF/SPRM handling
-- `.ppt` (PowerPoint 97-2003) reader and writer with Escher drawings
 - Optional `formula` feature for MathType (MTEF) extraction
-- Optional `imgconv` feature for EMF/WMF/PICT image bridges
+
+Format-neutral OfficeArt image discovery lives in `litchi-odraw`; optional
+codec operations are provided by the separate `litchi-imgconv::Convert`
+extension trait.
 
 ## License
 

@@ -373,6 +373,9 @@ conversion, fonts, and image conversion are optional.
 
 ## PowerPoint binary presentations (PPT)
 
+The canonical implementation owner is `litchi-ppt`, exposed independently as
+`litchi::ppt` by the umbrella crate's `ppt` feature.
+
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Open/create/save | ✅ | ✅ | ✅ | OLE2 presentation streams and writer/editor APIs |
@@ -742,7 +745,8 @@ The implementation and its tests are the source of truth for this matrix. Princi
 - Legacy text, OLE/CFB, OfficeArt, and OGraph infrastructure: `crates/litchi-codepage/src/`, `crates/litchi-cfb/src/`, `crates/litchi-ole-common/src/`, `crates/litchi-odraw/src/`, and `crates/litchi-ograph/src/`
 - Shared inert VBA codec and project model: `crates/litchi-vba/src/`
 - XLS: `crates/litchi-xls/src/`
-- DOC and PPT migration host: `crates/litchi-ole/src/doc/` and `crates/litchi-ole/src/ppt/`
+- PPT: `crates/litchi-ppt/src/`
+- DOC migration host: `crates/litchi-ole/src/doc/`
 - OpenDocument: `crates/litchi-odf/src/`
 - Rich Text Format: `crates/litchi-rtf/src/`
 - Apple iWork: `crates/litchi-iwa/src/`

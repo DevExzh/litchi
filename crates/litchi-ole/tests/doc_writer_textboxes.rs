@@ -4,8 +4,6 @@
 //! boxes, then re-opens it with the crate's own reader: the textbox story
 //! (ccpTxbx + PlcftxbxTxt) and the OfficeArtClientTextbox links must resolve
 //! to the right shapes and text.
-#![cfg(feature = "imgconv")]
-
 use litchi_odraw::{Record, shape::Kind};
 use litchi_ole::doc::shapes::{extract_drawing_shapes, extract_shape_text};
 use litchi_ole::doc::writer::{

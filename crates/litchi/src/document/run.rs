@@ -130,7 +130,7 @@ impl Run {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(all(feature = "ooxml", feature = "ole"), feature = "rtf")))]
 mod tests {
     use super::super::Document;
     use std::path::PathBuf;

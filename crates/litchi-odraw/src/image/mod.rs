@@ -8,7 +8,10 @@ use core::num::NonZeroU16;
 
 use crate::{Error, ImageLimit, Record, RecordKind, Result};
 
+mod file;
 pub mod write;
+
+pub use file::{File, all, container, delay, get, record, record_with_delay, scan, store};
 
 const FBSE_FIXED_LEN: usize = 36;
 const MAX_STORE_ENTRIES: u16 = 0x0FFF;

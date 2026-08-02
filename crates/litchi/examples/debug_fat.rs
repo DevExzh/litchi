@@ -1,4 +1,4 @@
-use litchi::ole::writer::OleWriter;
+use litchi_cfb::writer::OleWriter;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = OleWriter::new();

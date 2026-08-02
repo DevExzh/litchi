@@ -68,7 +68,7 @@ mod tests {
     #[test]
     #[cfg(feature = "ole")]
     fn test_ole_metadata_conversion() {
-        let ole_metadata = crate::ole::OleMetadata {
+        let ole_metadata = litchi_cfb::OleMetadata {
             title: Some("OLE Document".to_string()),
             author: Some("OLE Author".to_string()),
             codepage: Some(65001),

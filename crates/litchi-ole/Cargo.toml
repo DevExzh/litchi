@@ -1,6 +1,6 @@
 [package]
 name        = "litchi-ole"
-description = "Migration host for legacy Microsoft Word (.doc) and PowerPoint (.ppt) readers and writers."
+description = "Migration host for the legacy Microsoft Word (.doc) reader and writer."
 version.workspace      = true
 edition.workspace      = true
 authors.workspace      = true
@@ -11,37 +11,29 @@ rust-version.workspace = true
 [features]
 default = []
 formula = ["dep:litchi-formula"]
-imgconv = ["dep:litchi-imgconv"]
 
 [dependencies]
-bitflags        = { workspace = true }
-bumpalo         = { workspace = true }
-bytes           = { workspace = true }
-chrono          = { workspace = true }
-encoding_rs     = { workspace = true }
-flate2          = { workspace = true }
-litchi-cfb      = { workspace = true }
-litchi-codepage = { workspace = true }
-litchi-core     = { workspace = true }
-litchi-crypto   = { workspace = true }
-litchi-formula  = { workspace = true, optional = true }
-litchi-imgconv  = { workspace = true, optional = true }
-litchi-odraw    = { workspace = true }
-litchi-ograph   = { workspace = true }
+bitflags          = { workspace = true }
+bumpalo           = { workspace = true }
+encoding_rs       = { workspace = true }
+litchi-cfb        = { workspace = true }
+litchi-codepage   = { workspace = true }
+litchi-core       = { workspace = true }
+litchi-crypto     = { workspace = true }
+litchi-formula    = { workspace = true, optional = true }
+litchi-odraw      = { workspace = true }
 litchi-ole-common = { workspace = true }
-litchi-opc      = { workspace = true }
-litchi-sign     = { workspace = true }
-litchi-vba      = { workspace = true }
-md-5            = { workspace = true }
-once_cell       = { workspace = true }
-quick-xml       = { workspace = true }
-rand            = { workspace = true }
-rc4             = { workspace = true }
-sha1            = { workspace = true }
-smallvec        = { workspace = true }
-subtle          = { workspace = true }
-thiserror       = { workspace = true }
-url             = { workspace = true }
-zerocopy        = { workspace = true }
-zerocopy-derive = { workspace = true }
-zeroize         = { workspace = true }
+litchi-sign       = { workspace = true }
+litchi-vba        = { workspace = true }
+md-5              = { workspace = true }
+rand              = { workspace = true }
+rc4               = { workspace = true }
+smallvec          = { workspace = true }
+subtle            = { workspace = true }
+thiserror          = { workspace = true }
+zerocopy           = { workspace = true }
+zerocopy-derive    = { workspace = true }
+zeroize            = { workspace = true }
+
+[dev-dependencies]
+flate2 = { workspace = true }

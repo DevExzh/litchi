@@ -485,7 +485,6 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
             .flat_map(|paragraph| paragraph.runs().unwrap())
             .any(|run| run.has_image())
     );
-    #[cfg(feature = "imgconv")]
     assert_eq!(
         document
             .image_data(&attached.images()[0])

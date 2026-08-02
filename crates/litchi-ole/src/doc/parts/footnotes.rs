@@ -4,7 +4,7 @@
 /// Footnotes and endnotes are stored in separate subdocuments with references in the main text.
 use super::super::package::{DocError, Result};
 use super::fib::FileInformationBlock;
-use crate::plcf::PlcfParser;
+use crate::doc::plcf::Plcf;
 
 /// Reference descriptor for footnote/endnote (FRD structure - 2 bytes)
 #[derive(Debug, Clone, Copy)]
@@ -95,7 +95,7 @@ impl FootnotesTable {
 
                 if plcf_len >= 4 {
                     // Parse reference PLCF with 2-byte FRD descriptors
-                    if let Some(ref_plcf) = PlcfParser::parse(&plcf_data[..plcf_len], 2) {
+                    if let Some(ref_plcf) = Plcf::parse(&plcf_data[..plcf_len], 2) {
                         // Parse footnote text PLCF (plcfFndTxt)
                         // FIB index 3: fcPlcfFndTxt and lcbPlcfFndTxt
                         if let Some((txt_offset, txt_length)) = fib.get_table_pointer(3)
@@ -124,13 +124,13 @@ impl FootnotesTable {
 
     /// Parse footnote PLCF structures
     fn parse_footnote_plcfs(
-        ref_plcf: &PlcfParser,
+        ref_plcf: &Plcf<'_>,
         txt_plcf_data: &[u8],
         subdoc_start: u32,
         subdoc_end: u32,
     ) -> Result<Vec<FootnoteReference>> {
         // Parse text PLCF with element_size = 0 (just CPs)
-        // Manually parse since PlcfParser expects element_size > 0
+        // Manually parse since `Plcf` expects element_size > 0.
         if !txt_plcf_data.len().is_multiple_of(4) {
             return Err(DocError::Corrupted(
                 "note text PLCF contains a partial CP".to_string(),
@@ -266,7 +266,7 @@ impl EndnotesTable {
 
                 if plcf_len >= 4 {
                     // Parse reference PLCF with 2-byte FRD descriptors
-                    if let Some(ref_plcf) = PlcfParser::parse(&plcf_data[..plcf_len], 2) {
+                    if let Some(ref_plcf) = Plcf::parse(&plcf_data[..plcf_len], 2) {
                         // Parse endnote text PLCF (plcfEndTxt)
                         // FIB index 47: fcPlcfEndTxt and lcbPlcfEndTxt
                         if let Some((txt_offset, txt_length)) = fib.get_table_pointer(47)
@@ -313,7 +313,7 @@ impl EndnotesTable {
 mod tests {
     use super::*;
 
-    fn reference_plcf(cps: &[u32], descriptors: &[u16]) -> PlcfParser {
+    fn reference_plcf_bytes(cps: &[u32], descriptors: &[u16]) -> Vec<u8> {
         let mut bytes = Vec::new();
         for cp in cps {
             bytes.extend_from_slice(&cp.to_le_bytes());
@@ -321,7 +321,7 @@ mod tests {
         for descriptor in descriptors {
             bytes.extend_from_slice(&descriptor.to_le_bytes());
         }
-        PlcfParser::parse(&bytes, 2).unwrap()
+        bytes
     }
 
     #[test]
@@ -341,7 +341,8 @@ mod tests {
 
     #[test]
     fn parses_spec_terminal_note_character_positions() {
-        let references = reference_plcf(&[1, 10], &[1]);
+        let reference_data = reference_plcf_bytes(&[1, 10], &[1]);
+        let references = Plcf::parse(&reference_data, 2).unwrap();
         let text_cps = [0u32, 5, 6]
             .into_iter()
             .flat_map(u32::to_le_bytes)
@@ -356,7 +357,8 @@ mod tests {
 
     #[test]
     fn rejects_malformed_note_character_positions() {
-        let references = reference_plcf(&[1, 10], &[1]);
+        let reference_data = reference_plcf_bytes(&[1, 10], &[1]);
+        let references = Plcf::parse(&reference_data, 2).unwrap();
         let encode = |cps: &[u32]| {
             cps.iter()
                 .flat_map(|cp| cp.to_le_bytes())

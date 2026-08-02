@@ -18,6 +18,8 @@ pub enum BlockType {
 pub enum ImageError {
     #[error("Invalid picture offset: {0}")]
     InvalidPicOffset(u32),
+    #[error("Invalid picture block length: {0}")]
+    InvalidPictureLength(i32),
     #[error("Invalid block type: {0}")]
     InvalidBlockType(u8),
     #[error("No picture found")]
@@ -29,7 +31,7 @@ pub enum ImageError {
     DecodeOfficeArtRecord(litchi_odraw::Error),
 
     #[error("Failed to extract image from container: {0}")]
-    ExtractImageFailed(litchi_core::Error),
+    ExtractImageFailed(litchi_odraw::Error),
 }
 
 impl TryFrom<u8> for BlockType {
@@ -49,15 +51,23 @@ impl TryFrom<u8> for BlockType {
 }
 
 fn get_block_type(data_buff: &[u8], pic_offset: u32) -> Result<BlockType, ImageError> {
+    let offset = usize::try_from(pic_offset)
+        .ok()
+        .and_then(|offset| offset.checked_add(BLOCK_TYPE_OFFSET))
+        .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
     let block_type = data_buff
-        .get(pic_offset as usize + BLOCK_TYPE_OFFSET)
+        .get(offset)
         .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
     BlockType::try_from(*block_type)
 }
 
 fn get_mm_mode_type(data_buff: &[u8], pic_offset: u32) -> Result<u8, ImageError> {
+    let offset = usize::try_from(pic_offset)
+        .ok()
+        .and_then(|offset| offset.checked_add(MM_MODE_TYPE_OFFSET))
+        .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
     let mm_mode_type = data_buff
-        .get(pic_offset as usize + MM_MODE_TYPE_OFFSET)
+        .get(offset)
         .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
     Ok(*mm_mode_type)
 }
@@ -227,16 +237,25 @@ impl Image {
         &self,
         data_stream: &'data [u8],
         word_document: &'data [u8],
-    ) -> Result<crate::extractor::ExtractedImage<'data>, ImageError> {
-        use crate::extractor::ImageExtractor;
+    ) -> Result<litchi_odraw::image::File<'data>, ImageError> {
         use litchi_odraw::Record;
 
-        let mut offset = self.pic_offset as usize;
+        let base = usize::try_from(self.pic_offset)
+            .map_err(|_| ImageError::InvalidPicOffset(self.pic_offset))?;
 
-        let pic_fields = PictureFields::try_parse(data_stream, offset)
+        let pic_fields = PictureFields::try_parse(data_stream, base)
             .ok_or(ImageError::InvalidPicOffset(self.pic_offset))?;
+        let block_len = usize::try_from(pic_fields.lcb)
+            .map_err(|_| ImageError::InvalidPictureLength(pic_fields.lcb))?;
+        let block_end = base
+            .checked_add(block_len)
+            .filter(|end| *end <= data_stream.len())
+            .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
-        offset += std::mem::size_of::<PictureFields>();
+        let mut offset = base
+            .checked_add(std::mem::size_of::<PictureFields>())
+            .filter(|offset| *offset <= block_end)
+            .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
         // Handle picture name if mm == 0x66
         if pic_fields.mm == 0x66 {
@@ -244,17 +263,23 @@ impl Image {
                 Some(&b) => b,
                 None => return Err(ImageError::InvalidPicOffset(self.pic_offset)),
             };
-            offset += 1;
-            offset += cch_pic_name as usize;
+            offset = offset
+                .checked_add(1)
+                .and_then(|offset| offset.checked_add(usize::from(cch_pic_name)))
+                .filter(|offset| *offset <= block_end)
+                .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
         }
 
         // Parse the first Escher record (usually SpContainer or BStoreContainer)
         let (_, record_size) =
             Record::parse(data_stream, offset).map_err(ImageError::DecodeOfficeArtRecord)?;
-        offset += record_size;
+        offset = offset
+            .checked_add(record_size)
+            .filter(|offset| *offset <= block_end)
+            .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
         // Continue parsing remaining records looking for BSE or BLIP
-        while (offset - self.pic_offset as usize) < pic_fields.lcb as usize {
+        while offset < block_end {
             let (next_record, next_record_size) = match Record::parse(data_stream, offset) {
                 Ok(r) => r,
                 Err(_) => break,
@@ -266,11 +291,14 @@ impl Image {
             {
                 break;
             }
-            offset += next_record_size;
+            offset = offset
+                .checked_add(next_record_size)
+                .filter(|offset| *offset <= block_end)
+                .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
 
             // Try to extract image from this record
             // Pass data_stream for delay-loaded BLIPs
-            match ImageExtractor::from_record_with_delay(&next_record, Some(word_document)) {
+            match litchi_odraw::image::record_with_delay(&next_record, Some(word_document)) {
                 Ok(img) => return Ok(img),
                 Err(_) => {
                     // TODO: log this error?
@@ -335,6 +363,23 @@ mod tests {
 
         let has = has_picture(&data, "\u{0001}\u{0015}", &props).unwrap();
         assert!(has);
+    }
+
+    #[test]
+    fn image_data_rejects_negative_or_out_of_bounds_block_lengths() {
+        let image = Image::new(0);
+        let mut data = vec![0; std::mem::size_of::<PictureFields>()];
+        data[..4].copy_from_slice(&(-1i32).to_le_bytes());
+        assert!(matches!(
+            image.data(&data, &[]),
+            Err(ImageError::InvalidPictureLength(-1))
+        ));
+
+        data[..4].copy_from_slice(&(1024i32).to_le_bytes());
+        assert!(matches!(
+            image.data(&data, &[]),
+            Err(ImageError::InvalidPictureLength(1024))
+        ));
     }
 
     #[test]

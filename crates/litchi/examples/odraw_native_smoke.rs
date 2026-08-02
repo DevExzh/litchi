@@ -5,11 +5,9 @@
 
 use std::{error::Error, fs, path::PathBuf};
 
-use litchi::ole::{
-    doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition},
-    ppt::writer::{
-        FillStyle, LineStyleConfig, PptWriter, ShapeColor, ShapeStyle, ShapeType, Table,
-    },
+use litchi::ole::doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition};
+use litchi::ppt::writer::{
+    FillStyle, LineStyleConfig, PptWriter, ShapeColor, ShapeStyle, ShapeType, Table,
 };
 use litchi::xls::writer::{
     XlsGroupRect, XlsShapeAnchor, XlsShapeColor, XlsShapeFill, XlsShapeGroupChild,

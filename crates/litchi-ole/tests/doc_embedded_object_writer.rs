@@ -1,7 +1,7 @@
+use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole::doc::embedded_object::Limits;
 use litchi_ole::doc::writer::DocWriter;
 use litchi_ole::doc::{DocEmbeddedObjectEditor, DocEmbeddedObjectWriteOptions, Package};
-use litchi_ole::{OleFile, OleWriter};
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;

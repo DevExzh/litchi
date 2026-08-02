@@ -1,11 +1,11 @@
-use super::writer::MarkdownWriter;
+use crate::MetadataYaml;
 use crate::presentation::{Presentation, Slide};
 /// ToMarkdown implementations for Presentation types.
 ///
 /// This module implements the `ToMarkdown` trait for PowerPoint presentation types,
 /// including Presentation and Slide.
 ///
-/// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
+/// **Note**: This module is only available when a presentation feature is enabled.
 use litchi_core::Result;
 use litchi_markdown::{MarkdownOptions, ToMarkdown};
 use rayon::prelude::*;
@@ -19,9 +19,7 @@ impl ToMarkdown for Presentation {
         let metadata_md = if options.include_metadata
             && let Some(metadata) = self.metadata()?
         {
-            let mut metadata_writer = MarkdownWriter::new(*options);
-            metadata_writer.write_metadata(&metadata)?;
-            metadata_writer.finish()
+            metadata.to_yaml_front_matter()?
         } else {
             String::new()
         };
@@ -37,7 +35,7 @@ impl ToMarkdown for Presentation {
             let slide_strings: Vec<String> = slide_texts
                 .into_par_iter()
                 .map(|(slide_num, text)| {
-                    let mut writer = MarkdownWriter::new(*options);
+                    let mut output = String::new();
 
                     // Format slide header with first line as title
                     let first_line = text.lines().next().unwrap_or("");
@@ -47,16 +45,16 @@ impl ToMarkdown for Presentation {
                         format!("# Slide {} {}", slide_num, first_line)
                     };
 
-                    writer.push_str(&header_text);
-                    writer.push_str("\n\n");
+                    output.push_str(&header_text);
+                    output.push_str("\n\n");
 
                     // Add slide content
                     if !text.is_empty() {
-                        writer.push_str(&text);
-                        writer.push_str("\n\n");
+                        output.push_str(&text);
+                        output.push_str("\n\n");
                     }
 
-                    writer.finish()
+                    output
                 })
                 .collect();
 
@@ -76,11 +74,11 @@ impl ToMarkdown for Presentation {
             result
         } else {
             // SEQUENTIAL PATH: Process slides sequentially for small presentations
-            let mut writer = MarkdownWriter::new(*options);
+            let mut output = String::new();
 
             for (i, (slide_num, text)) in slide_texts.iter().enumerate() {
                 if i > 0 {
-                    writer.push_str("\n\n---\n\n");
+                    output.push_str("\n\n---\n\n");
                 }
 
                 // Format slide header with first line as title
@@ -91,17 +89,17 @@ impl ToMarkdown for Presentation {
                     format!("# Slide {} {}", slide_num, first_line)
                 };
 
-                writer.push_str(&header_text);
-                writer.push_str("\n\n");
+                output.push_str(&header_text);
+                output.push_str("\n\n");
 
                 // Add slide content
                 if !text.is_empty() {
-                    writer.push_str(text);
-                    writer.push_str("\n\n");
+                    output.push_str(text);
+                    output.push_str("\n\n");
                 }
             }
 
-            writer.finish()
+            output
         };
 
         // Combine metadata and content

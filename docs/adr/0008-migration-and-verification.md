@@ -1778,6 +1778,74 @@ rustdoc pass with warnings denied. The boundary checker accepts 31 workspace
 packages and 89 direct internal dependencies with 31 explicit migration-debt
 entries; all seven checker regressions and edited-file diff validation pass.
 
+The thirty-fifth implementation slice completes the atomic PPT ownership
+extraction. The complete legacy PowerPoint source tree, integration tests, and
+examples move from the temporary `litchi-ole` migration host into the concrete
+`litchi-ppt` crate. Its reader, writer, shape model, persist graph, presentation
+metadata, OfficeArt integration, embedded OGraph charts, security adapters, and
+inert VBA support therefore have one format owner. The residual `litchi-ole`
+crate is now a DOC-only migration host; its PPT-only `litchi-ograph` and
+`litchi-opc` edges and its unused image-codec edge close rather than becoming
+permanent host tunnels.
+
+This is an intentionally breaking ownership and feature-gating change. The
+canonical direct entry is `litchi_ppt`, and the concise umbrella entry is the
+independent `ppt` feature and `litchi::ppt` module. The umbrella default and
+`full` sets enable `ppt`, while `ole` gates only the remaining DOC host. There
+is deliberately no `litchi_ole::ppt` or `litchi::ole::ppt` compatibility alias.
+Presentation detection and high-level PPT opening follow `ppt`, so disabling
+DOC does not disable PPT and enabling PPT does not pull in the DOC host. The
+optional umbrella `formula` feature forwards to `litchi-ppt?/formula` without
+coupling either legacy format to an async runtime.
+
+The canonical internal dependency ceiling for `litchi-ppt` is `litchi-cfb`,
+`litchi-codepage`, `litchi-core`, `litchi-crypto`, optional `litchi-formula`,
+`litchi-odraw`, `litchi-ograph`, `litchi-ole-common`, `litchi-opc`,
+`litchi-sign`, and `litchi-vba`. The crate has no dependency on a peer concrete
+format, an async runtime, or the former `litchi-ole` host. This keeps the PPT
+implementation above focused storage, drawing, graph, package, code-page, and
+security capabilities while preventing DOC state from leaking into its API.
+
+The extraction also closes the shared-image ownership seam. Host-neutral,
+move-first OfficeArt discovery now returns `litchi_odraw::image::File` values
+that either borrow validated input bytes or consume themselves into owned
+storage. Optional codec verbs are the separate `litchi_imgconv::Convert`
+extension trait. Thus `litchi-odraw` stays independent of codecs, format crates
+stay independent of `litchi-imgconv`, and callers opt into decoding without an
+OfficeArt-to-codec dependency cycle. The former host-private Escher facade is
+removed; the few PPT writer constants and record constructors that remain
+format-specific live in the crate-private `officeart_wire` module on top of
+`litchi-odraw` rather than reintroducing a second public OfficeArt model.
+
+The new ownership seams are strict at malformed-input boundaries. PPT record
+headers and payload extents use checked offset arithmetic and exact slice
+validation, including regressions for `usize::MAX`, near-overflow offsets, and
+maximal declared payloads. DOC picture lengths, name extents, and OfficeArt
+record extents are checked before advancing. The DOC-only PLCF helper moves
+under DOC ownership as a borrowed view, removing its property-buffer copy, and
+OfficeArt owned image files cache a checked data range rather than reparsing on
+every native-byte access. Producer filenames are reduced to bounded portable
+basenames before any facade suggests a filesystem path.
+
+This ownership move and image seam do not intentionally change supported PPT
+wire output or package topology, so they create no new native Microsoft Office
+artifact claim. Focused warning-denied gates pass for all features and targets
+of `litchi-ppt`, the residual `litchi-ole`, and the umbrella crate. The complete
+PPT package test surface passes (including its moved integration targets and
+examples); the DOC-only host reports 947 passing tests and two ignored tests.
+The isolated umbrella combinations `ppt`, `ppt,imgconv`, `ole,imgconv`,
+`ppt,ooxml`, and `ooxml_encryption` compile independently, the `ppt` facade's
+unit tests pass, and `ooxml_encryption` no longer activates DOC. Clippy passes
+with warnings denied across all affected crates and targets; rustdoc passes for
+`litchi-ppt` and the isolated `ppt,imgconv` umbrella facade. Formatting,
+manifest order, diff validation, and the boundary checker are green. The
+boundary checker accepts 32 workspace packages and 98 direct internal
+dependency declarations with 28 explicit migration-debt entries, and all seven
+checker regressions pass. Per the explicit review direction, the full workspace
+gate and Computer Use/native Microsoft Office reruns are skipped: the
+previously green workspace and native Office baselines remain the applicable
+evidence for unchanged wire semantics.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

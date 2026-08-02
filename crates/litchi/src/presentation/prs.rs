@@ -4,8 +4,8 @@ use super::Slide;
 use super::types::PresentationImpl;
 use litchi_core::{Error, Result};
 
-#[cfg(feature = "ole")]
-use crate::ole;
+#[cfg(feature = "ppt")]
+use crate::ppt;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -118,11 +118,11 @@ impl Presentation {
         let detected = detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
 
         match detected {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "ppt")]
             DetectedFormat::Ppt(ole_file) => {
                 // OLE file already parsed - reuse it!
                 let mut package =
-                    Box::new(ole::ppt::Package::from_ole_file(ole_file).map_err(Error::from)?);
+                    Box::new(ppt::Package::from_ole_file(ole_file).map_err(Error::from)?);
 
                 // Extract metadata from OLE property streams
                 let cached_metadata =
@@ -220,7 +220,7 @@ impl Presentation {
     /// ```
     pub fn text(&self) -> Result<String> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(pres) => pres.text().map_err(Error::from),
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => {
@@ -262,7 +262,7 @@ impl Presentation {
     /// ```
     pub fn slide_count(&self) -> Result<usize> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(pres) => Ok(pres.slide_count()),
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => package
@@ -299,7 +299,7 @@ impl Presentation {
     /// ```
     pub fn slides(&self) -> Result<Vec<Slide>> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(pres) => {
                 use super::types::PptSlideData;
                 // Extract slide data to avoid lifetime issues
@@ -367,7 +367,7 @@ impl Presentation {
     /// ```
     pub fn slide_width(&self) -> Result<Option<i64>> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(_) => Ok(None),
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => package
@@ -399,7 +399,7 @@ impl Presentation {
     /// ```
     pub fn slide_height(&self) -> Result<Option<i64>> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(_) => Ok(None),
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => package
@@ -456,11 +456,11 @@ impl Presentation {
     /// Vector of (slide_number, text) tuples for each slide
     #[doc(hidden)]
     pub fn extract_text_for_markdown(&self) -> Result<Vec<(usize, String)>> {
-        // Fast PPT path when only `ole` is enabled. In this configuration
+        // Fast PPT path when only `ppt` is enabled. In this configuration
         // PresentationImpl can only be Ppt, so we destructure directly and
         // return early.
         #[cfg(all(
-            feature = "ole",
+            feature = "ppt",
             not(any(feature = "ooxml", feature = "iwa", feature = "odf"))
         ))]
         {
@@ -472,11 +472,11 @@ impl Presentation {
         // PPT extractor but keep the generic slide-based fallback for other
         // formats.
         #[cfg(not(all(
-            feature = "ole",
+            feature = "ppt",
             not(any(feature = "ooxml", feature = "iwa", feature = "odf"))
         )))]
         {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "ppt")]
             if let PresentationImpl::Ppt(pres) = &self.inner {
                 return pres.extract_text_fast().map_err(Error::from);
             }
@@ -494,7 +494,7 @@ impl Presentation {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ooxml", feature = "ppt"))]
 mod tests {
     use super::*;
     use std::path::PathBuf;
@@ -504,7 +504,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_open_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path);
@@ -512,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_open_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path);
@@ -520,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_from_bytes_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -533,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_from_bytes_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_text_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -555,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_text_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -563,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_slide_count_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -572,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_slide_count_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -581,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_slides_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -595,7 +595,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_slides_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -608,7 +608,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_slide_dimensions_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -617,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_metadata_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -627,7 +627,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_metadata_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -636,7 +636,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_open_nonexistent_file() {
         let path = test_data_path().join("nonexistent_file.pptx");
         let result = Presentation::open(&path);
@@ -644,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_from_bytes_invalid_data() {
         let bytes = b"This is not a valid presentation file".to_vec();
         let result = Presentation::from_bytes(bytes);
@@ -652,7 +652,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_charts_pptx() {
         // Test presentations with various chart types
         let chart_files = [
@@ -677,7 +677,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_connectors_pptx() {
         let test_files = [
             "ooxml/pptx/connectorConnection.pptx",
@@ -695,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_text_shapes_ppt() {
         // Use SampleShow.ppt to avoid metadata overflow issues in some test files
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
@@ -710,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_extract_text_for_markdown_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -722,7 +722,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_presentation_extract_text_for_markdown_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");

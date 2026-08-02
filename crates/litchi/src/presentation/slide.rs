@@ -139,7 +139,7 @@ impl Slide {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ooxml", feature = "ppt"))]
 mod tests {
     use super::super::Presentation;
     use std::path::PathBuf;
@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_slide_text_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_slide_text_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -173,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_slide_number_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -187,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_slide_shape_count_ppt() {
         // Use SampleShow.ppt to avoid metadata overflow issues
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "ppt"))]
     fn test_slide_name_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");

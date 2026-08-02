@@ -1,4 +1,4 @@
-use crate::plcf::PlcfParser;
+use crate::doc::plcf::Plcf;
 /// Piece Table parser for DOC files.
 ///
 /// Based on Apache POI's ComplexFileTable and TextPieceTable.
@@ -177,7 +177,7 @@ impl PieceTable {
 
         // Parse PlcPcd using PLCF parser
         // Each Pcd is 8 bytes (according to [MS-DOC])
-        let plcf = PlcfParser::parse(plcpcd_data, 8)?;
+        let plcf = Plcf::parse(plcpcd_data, 8)?;
 
         let mut pieces = Vec::new();
 

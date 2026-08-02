@@ -1,4 +1,3 @@
-use super::super::OleFile;
 use super::bookmark::Bookmark;
 /// Document - the main API for working with Word document content.
 use super::comment::Comment;
@@ -64,6 +63,7 @@ use super::parts::xml_schemas::DocumentXmlSchemas;
 use super::table::Table;
 #[cfg(feature = "formula")]
 use crate::mtef_extractor::MtefExtractor;
+use litchi_cfb::OleFile;
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 use std::sync::Arc;
@@ -2450,7 +2450,7 @@ impl Document {
     pub fn image_data(
         &self,
         image: &super::image::Image,
-    ) -> std::result::Result<crate::extractor::ExtractedImage<'_>, super::image::ImageError> {
+    ) -> std::result::Result<litchi_odraw::image::File<'_>, super::image::ImageError> {
         // Use the appropriate stream based on pic_offset
         let data_stream = self.get_data_stream(image.pic_offset()).ok_or(
             super::image::ImageError::InvalidPicOffset(image.pic_offset()),
@@ -3073,12 +3073,9 @@ impl Document {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "imgconv")]
     use super::super::{Image, ImageError, Package};
-    #[cfg(feature = "imgconv")]
     use std::path::Path;
 
-    #[cfg(feature = "imgconv")]
     #[test]
     fn test_extract_png_image_from_doc() {
         let base = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -3113,7 +3110,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "imgconv")]
     #[test]
     fn test_image_data_with_invalid_offset() {
         let base = Path::new(env!("CARGO_MANIFEST_DIR"))

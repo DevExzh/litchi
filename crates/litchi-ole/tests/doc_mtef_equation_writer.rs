@@ -1,4 +1,4 @@
-use litchi_ole::OleFile;
+use litchi_cfb::OleFile;
 use litchi_ole::doc::embedded_object::{Info, Limits};
 use litchi_ole::doc::writer::{DocPicture, DocWriter};
 use litchi_ole::doc::{

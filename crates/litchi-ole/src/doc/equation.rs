@@ -10,7 +10,7 @@ use super::embedded_object::{
 };
 use super::package::{DocError, Result};
 use super::writer::images::{DocPicture, write_picture_block};
-use crate::OleWriter;
+use litchi_cfb::OleWriter;
 use std::io::Cursor;
 
 const EQNOLE_HEADER_SIZE: usize = 28;

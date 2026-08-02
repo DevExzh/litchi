@@ -1,6 +1,6 @@
 //! Verify generated PPT files match POI reference
 
-use litchi::ole::OleFile;
+use litchi_cfb::OleFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Verify minimal.ppt matches POI

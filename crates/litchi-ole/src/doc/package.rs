@@ -1,6 +1,6 @@
-use super::super::{OleError, OleFile};
 /// Package implementation for legacy Word documents (.doc).
 use super::document::Document;
+use litchi_cfb::{OleError, OleFile};
 use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::Path;
@@ -196,7 +196,8 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ole::{OleFile, doc::Package};
+    /// use litchi_cfb::OleFile;
+    /// use litchi_ole::doc::Package;
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.doc")?;

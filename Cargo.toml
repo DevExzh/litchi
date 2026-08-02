@@ -56,6 +56,7 @@ litchi-ole-common = { version = "0.0.1", path = "crates/litchi-ole-common" }
 litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
 litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }
 litchi-opc       = { version = "0.0.1", path = "crates/litchi-opc" }
+litchi-ppt       = { version = "0.0.1", path = "crates/litchi-ppt" }
 litchi-rtf       = { version = "0.0.1", path = "crates/litchi-rtf" }
 litchi-sheet     = { version = "0.0.1", path = "crates/litchi-sheet" }
 litchi-sign      = { version = "0.0.1", path = "crates/litchi-sign" }

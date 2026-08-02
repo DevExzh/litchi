@@ -156,7 +156,8 @@
 //!
 //! ## Low-Level Modules (Advanced Use)
 //!
-//! - `ole` - Direct access to OLE2 format parsers
+//! - `ole` - Direct access to the legacy Word parser
+//! - `ppt` - Direct access to the legacy PowerPoint parser and writer
 //! - `xls` - Direct access to legacy Excel BIFF parsers and writers
 //! - `ooxml` - Direct access to OOXML format parsers
 //!
@@ -179,6 +180,7 @@ pub mod common {
     // `litchi::common::detect_file_format(...)` keep working.
     #[cfg(any(
         feature = "ole",
+        feature = "ppt",
         feature = "xls",
         feature = "ooxml",
         feature = "iwa",
@@ -192,6 +194,7 @@ pub mod common {
     pub mod detection {
         #[cfg(any(
             feature = "ole",
+            feature = "ppt",
             feature = "xls",
             feature = "ooxml",
             feature = "iwa",
@@ -209,6 +212,7 @@ pub mod common {
 // Smart format detection (depends on per-format crates; can't live in litchi-core).
 #[cfg(any(
     feature = "ole",
+    feature = "ppt",
     feature = "xls",
     feature = "ooxml",
     feature = "iwa",
@@ -248,8 +252,8 @@ pub mod images;
 /// Provides format-agnostic interface for both .ppt and .pptx files.
 /// Use [`Presentation::open()`] to get started.
 ///
-/// **Note**: This requires at least one of the `ole` or `ooxml` features to be enabled.
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
+/// **Note**: This requires at least one presentation-format feature to be enabled.
+#[cfg(any(feature = "ppt", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub mod presentation;
 
 /// Unified Excel/Spreadsheet API (.xls, .xlsx, .xlsb, .ods, .numbers)
@@ -269,16 +273,28 @@ pub mod sheet;
 pub mod markdown;
 
 // Low-level format-specific modules (advanced use)
-/// OLE2 format parser (legacy .doc, .ppt files)
+/// Legacy Word binary parser (`.doc`).
 ///
-/// This module provides direct access to OLE2 parsing functionality.
-/// Most users should use the high-level [`Document`] and [`Presentation`]
-/// APIs instead, which automatically handle format detection.
+/// This migration facade provides direct access to the legacy Word
+/// implementation. Compound-file primitives live in `litchi-cfb`, while
+/// legacy PowerPoint support is exposed independently through [`ppt`].
+/// Most users should use the high-level [`Document`] API instead.
 ///
 /// **Note**: This requires the `ole` feature to be enabled.
 #[cfg(feature = "ole")]
 pub mod ole {
     pub use litchi_ole::*;
+}
+
+/// Legacy PowerPoint binary parser and writer (`.ppt`).
+///
+/// This is the canonical low-level facade for the independently owned
+/// `litchi-ppt` package. It is intentionally not nested below `litchi::ole`.
+///
+/// **Note**: This requires the `ppt` feature to be enabled.
+#[cfg(feature = "ppt")]
+pub mod ppt {
+    pub use litchi_ppt::*;
 }
 
 /// Legacy Excel BIFF parser and writer (`.xls`).
@@ -383,7 +399,7 @@ pub use common::{Error, Result};
 ))]
 pub use document::{Document, DocumentElement};
 
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "ppt", feature = "ooxml", feature = "odf", feature = "iwa"))]
 pub use presentation::Presentation;
 
 #[cfg(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwa"))]
@@ -394,6 +410,7 @@ pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
 
 #[cfg(any(
     feature = "ole",
+    feature = "ppt",
     feature = "xls",
     feature = "ooxml",
     feature = "iwa",

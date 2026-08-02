@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\nCreating file with COMPLETE reference structures...");
 
-    let mut ole = litchi::ole::writer::OleWriter::new();
+    let mut ole = litchi_cfb::writer::OleWriter::new();
     // CRITICAL: Allocation order determines sector numbers!
     // WordDocument MUST be first to get sector 0
     // Directory entry order is determined by BST, not creation order

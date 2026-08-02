@@ -609,7 +609,7 @@ impl Workbook {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ooxml", feature = "xls"))]
 mod tests {
     use super::*;
     use std::path::PathBuf;

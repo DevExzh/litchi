@@ -118,7 +118,7 @@ mod writer;
 ))]
 mod document;
 
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "ppt", feature = "ooxml", feature = "odf", feature = "iwa"))]
 mod presentation;
 
 // Re-export public API (format-agnostic helpers live in litchi-markdown)

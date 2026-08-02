@@ -1,0 +1,229 @@
+//! PPT record parser - orchestrates document parsing and text extraction.
+//!
+//! Based on Apache POI's HSLFSlideShow and QuickButCruddyTextExtractor.
+
+use crate::consts::PptRecordType;
+use crate::package::{PptError, Result};
+use crate::records::PptRecord;
+
+/// Parser for PPT binary format that extracts document structure and content.
+pub struct PptRecordParser {
+    /// All parsed records
+    records: Vec<PptRecord>,
+    /// Slide text organized by SlideAtomsSets (following POI's architecture)
+    slide_atoms_sets: Vec<Vec<u8>>,
+}
+
+impl PptRecordParser {
+    /// Create a new PPT record parser.
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+            slide_atoms_sets: Vec::new(),
+        }
+    }
+
+    /// Parse a complete PPT document.
+    ///
+    /// This method follows POI's parsing approach:
+    /// 1. Parse all records in the document
+    /// 2. Find the Document record
+    /// 3. Extract text from all records
+    pub fn parse_document(&mut self, data: &[u8]) -> Result<()> {
+        if data.is_empty() {
+            return Ok(());
+        }
+
+        // Parse all top-level records
+        let mut offset = 0;
+        while offset + 8 <= data.len() {
+            match PptRecord::parse(data, offset) {
+                Ok((record, consumed)) => {
+                    self.records.push(record);
+                    offset += consumed;
+
+                    if consumed == 0 {
+                        break;
+                    }
+                },
+                Err(_) => {
+                    offset += 1;
+                    if offset + 8 > data.len() {
+                        break;
+                    }
+                },
+            }
+        }
+
+        // Extract slide text
+        self.extract_slide_text_from_document()?;
+
+        Ok(())
+    }
+
+    /// Parse only the validated live persist objects of an encrypted document.
+    pub(crate) fn parse_document_at_offsets(
+        &mut self,
+        data: &[u8],
+        offsets: &[usize],
+    ) -> Result<()> {
+        for &offset in offsets {
+            let (record, _) = PptRecord::parse_strict(data, offset)?;
+            self.records.push(record);
+        }
+        self.extract_slide_text_from_document()
+    }
+
+    /// Extract slide text from the document.
+    /// Based on POI's QuickButCruddyTextExtractor approach.
+    fn extract_slide_text_from_document(&mut self) -> Result<()> {
+        let all_text = self.extract_all_text()?;
+
+        // For now, treat all text as a single slide
+        // Note: Full slide association would require parsing SlideListWithText structure
+        if !all_text.is_empty() && all_text != "No text content found" {
+            self.slide_atoms_sets.push(all_text.into_bytes());
+        }
+
+        Ok(())
+    }
+
+    /// Get all slide text data extracted from the document.
+    pub fn slides(&self) -> &[Vec<u8>] {
+        &self.slide_atoms_sets
+    }
+
+    /// Get the number of slides in the document.
+    pub fn slide_count(&self) -> usize {
+        self.slide_atoms_sets.len()
+    }
+
+    /// Find a record of a specific type.
+    pub fn find_record(&self, record_type: PptRecordType) -> Option<&PptRecord> {
+        self.records
+            .iter()
+            .find(|record| record.record_type == record_type)
+    }
+
+    /// Get all records recursively (for building persist mapping).
+    ///
+    /// # Deprecated
+    ///
+    /// This method clones all records including their data. Use `find_records_ref()` instead
+    /// for zero-copy access.
+    #[deprecated(note = "Use find_records_ref() instead to avoid expensive cloning")]
+    #[allow(dead_code)]
+    #[allow(deprecated)]
+    pub fn find_records(&self, _record_type: PptRecordType) -> Vec<PptRecord> {
+        // Collect all records recursively
+        let mut all_records = Vec::new();
+        Self::collect_records_recursive(&self.records, &mut all_records);
+        all_records
+    }
+
+    /// Get all record references recursively (zero-copy version).
+    ///
+    /// # Performance
+    ///
+    /// - Zero-copy: returns references instead of cloning records
+    /// - Significantly faster than `find_records()` for large presentations
+    /// - Preferred method for building persist mappings and iterating records
+    pub fn find_records_ref(&self) -> Vec<&PptRecord> {
+        let mut all_records = Vec::new();
+        Self::collect_records_recursive_ref(&self.records, &mut all_records);
+        all_records
+    }
+
+    /// Recursively collect all records including children (cloning version).
+    ///
+    /// # Deprecated
+    ///
+    /// This clones all records including their Vec<u8> data, causing expensive memory copies.
+    /// Use `collect_records_recursive_ref` instead for zero-copy collection.
+    #[deprecated(note = "Use collect_records_recursive_ref instead to avoid expensive cloning")]
+    #[allow(dead_code)]
+    #[allow(deprecated)]
+    fn collect_records_recursive(records: &[PptRecord], collector: &mut Vec<PptRecord>) {
+        for record in records {
+            collector.push(record.clone());
+            if !record.children.is_empty() {
+                Self::collect_records_recursive(&record.children, collector);
+            }
+        }
+    }
+
+    /// Recursively collect all record references including children (zero-copy).
+    fn collect_records_recursive_ref<'a>(
+        records: &'a [PptRecord],
+        collector: &mut Vec<&'a PptRecord>,
+    ) {
+        for record in records {
+            collector.push(record);
+            if !record.children.is_empty() {
+                Self::collect_records_recursive_ref(&record.children, collector);
+            }
+        }
+    }
+
+    /// Find all records matching a specific type (filtered).
+    pub fn filter_records(&self, record_type: PptRecordType) -> impl Iterator<Item = &PptRecord> {
+        self.records
+            .iter()
+            .filter(move |record| record.record_type == record_type)
+    }
+
+    /// Extract all text content from the document.
+    pub fn extract_all_text(&self) -> Result<String> {
+        let mut text_parts = Vec::new();
+
+        for record in &self.records {
+            match record.extract_text() {
+                Ok(record_text) => {
+                    if !record_text.is_empty() {
+                        for line in record_text.lines() {
+                            let trimmed = line.trim();
+                            if !trimmed.is_empty() {
+                                text_parts.push(trimmed.to_string());
+                            }
+                        }
+                    }
+                },
+                Err(_) => continue,
+            }
+        }
+
+        if text_parts.is_empty() {
+            Ok("No text content found".to_string())
+        } else {
+            Ok(text_parts.join("\n"))
+        }
+    }
+
+    /// Extract text content from slide data.
+    pub fn extract_text_from_slide_data(slide_data: &[u8]) -> Result<String> {
+        if slide_data.is_empty() {
+            return Ok(String::new());
+        }
+
+        String::from_utf8(slide_data.to_vec())
+            .map_err(|e| PptError::InvalidFormat(format!("Invalid UTF-8 in slide text: {}", e)))
+    }
+}
+
+impl Default for PptRecordParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parser_creation() {
+        let parser = PptRecordParser::new();
+        assert_eq!(parser.slide_count(), 0);
+        assert!(parser.slides().is_empty());
+    }
+}

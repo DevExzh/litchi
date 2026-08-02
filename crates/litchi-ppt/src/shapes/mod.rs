@@ -1,0 +1,63 @@
+pub mod autoshape;
+/// Shape and placeholder parsing for PowerPoint presentations.
+///
+/// This module provides functionality to parse shapes and placeholders
+/// from PPT binary format, following the Apache POI HSLF structure.
+///
+/// # Architecture
+///
+/// The module is organized around these key types:
+/// - `Shape`: Base trait for all shape types
+/// - `TextBox`: Text box shapes
+/// - `Placeholder`: Placeholder shapes for titles, content, etc.
+/// - `AutoShape`: Auto shapes (rectangles, ovals, etc.)
+/// - `PictureShape`: Picture shapes with embedded images
+/// - typed OfficeArt records supplied by `litchi-odraw`
+///
+/// # PPT Shape Structure
+///
+/// Shapes in PPT are stored in Escher format within the slide data.
+/// Each shape has properties like position, size, text content, and formatting.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use litchi_ppt::{Package, shapes::ShapeEnum};
+///
+/// let mut pkg = Package::open("presentation.ppt")?;
+/// let pres = pkg.presentation()?;
+///
+/// for slide in pres.slides()? {
+///     for shape in slide.shapes()? {
+///         match shape {
+///             ShapeEnum::TextBox(textbox) => {
+///                 println!("Text box: {}", textbox.text());
+///             }
+///             ShapeEnum::Placeholder(placeholder) => {
+///                 println!("Placeholder type: {:?}", placeholder.placeholder_type());
+///             }
+///             _ => {}
+///         }
+///     }
+/// }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub mod geometry;
+pub mod picture;
+pub mod placeholder;
+pub mod shape;
+pub mod shape_enum;
+pub mod textbox;
+
+// Re-export the trait and type
+pub use shape::{Shape, ShapeType};
+
+// Re-export the high-performance enum
+pub use shape_enum::ShapeEnum;
+
+// Re-export concrete shape types
+pub use autoshape::{AutoShape, AutoShapeGeometry};
+pub use picture::extract_blip_id;
+pub use picture::{PictureFrameKind, PictureShape};
+pub use placeholder::{Placeholder, PlaceholderSize, PlaceholderType};
+pub use textbox::TextBox;

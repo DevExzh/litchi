@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create OLE file with all streams
     // CRITICAL: WordDocument MUST be added first to get sector 0!
-    let mut ole = litchi::ole::writer::OleWriter::new();
+    let mut ole = litchi_cfb::writer::OleWriter::new();
     ole.create_stream(&["WordDocument"], &word_doc)?;
     ole.create_stream(&["1Table"], &table)?;
     ole.create_stream(&["SummaryInformation"], &summary)?;

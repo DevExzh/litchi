@@ -1,0 +1,39 @@
+[package]
+name = "litchi-ppt"
+description = "Typed legacy Microsoft PowerPoint reader and writer for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+formula = ["dep:litchi-formula"]
+
+[dependencies]
+bitflags           = { workspace = true }
+chrono             = { workspace = true }
+flate2             = { workspace = true }
+litchi-cfb         = { workspace = true }
+litchi-codepage    = { workspace = true }
+litchi-core        = { workspace = true }
+litchi-crypto      = { workspace = true }
+litchi-formula     = { workspace = true, optional = true }
+litchi-odraw       = { workspace = true }
+litchi-ograph      = { workspace = true }
+litchi-ole-common  = { workspace = true }
+litchi-opc         = { workspace = true }
+litchi-sign        = { workspace = true }
+litchi-vba         = { workspace = true }
+once_cell          = { workspace = true }
+quick-xml          = { workspace = true }
+rand               = { workspace = true }
+url                = { workspace = true }
+zerocopy           = { workspace = true }
+zerocopy-derive    = { workspace = true }
+zeroize            = { workspace = true }
+
+[dev-dependencies]
+sha1 = { workspace = true }
