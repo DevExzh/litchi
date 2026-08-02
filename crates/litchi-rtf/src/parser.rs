@@ -85,6 +85,11 @@ fn strict_paragraph_toggle(value: Option<i32>, name: &str) -> std::result::Resul
     }
 }
 
+#[cold]
+fn parser_classification_error() -> RtfError {
+    RtfError::ParserError("RTF parser control classification invariant failed".to_string())
+}
+
 fn strict_paragraph_selector(value: Option<i32>, name: &str) -> std::result::Result<(), RtfError> {
     if value.is_some() {
         return Err(RtfError::MalformedDocument(format!(
@@ -3019,7 +3024,7 @@ impl<'a> Parser<'a> {
                                     self.write_reservations.hash =
                                         Some(self.parse_write_reservation_hash_destination()?);
                                 },
-                                _ => unreachable!(),
+                                _ => return Err(parser_classification_error()),
                             }
                             self.states.pop();
                             return Ok(true);
@@ -3096,7 +3101,7 @@ impl<'a> Parser<'a> {
                                 ControlWord::DocumentTemplate => {
                                     self.external_references.template.is_some()
                                 },
-                                _ => unreachable!(),
+                                _ => return Err(parser_classification_error()),
                             };
                             if duplicate {
                                 return Err(RtfError::MalformedDocument(
@@ -3112,7 +3117,7 @@ impl<'a> Parser<'a> {
                                 ControlWord::DocumentTemplate => {
                                     self.external_references.template = Some(value)
                                 },
-                                _ => unreachable!(),
+                                _ => return Err(parser_classification_error()),
                             }
                             self.external_references.validate()?;
                             self.states.pop();
@@ -5445,22 +5450,25 @@ impl<'a> Parser<'a> {
                 }
                 let in_table = self.current_state()?.in_table
                     || self.current_state()?.table_nesting_level >= 2;
-                let event_id = starting.map(|kind| {
+                let event_id = if let Some(kind) = starting {
                     let id = self.revision_event_indices.len();
                     self.revision_event_indices.push(None);
                     if !in_table {
-                        self.body_story_events.push(match kind {
+                        let event = match kind {
                             super::annotation::RevisionType::Insertion => {
                                 ParsedBodyStoryEvent::RevisionStart(id)
                             },
                             super::annotation::RevisionType::Deletion => {
                                 ParsedBodyStoryEvent::RevisionDeletion(id)
                             },
-                            _ => unreachable!(),
-                        });
+                            _ => return Err(parser_classification_error()),
+                        };
+                        self.body_story_events.push(event);
                     }
-                    id
-                });
+                    Some(id)
+                } else {
+                    None
+                };
                 self.pos += 1;
                 self.apply_control_word(control)?;
                 if let Some(id) = event_id {
@@ -5845,7 +5853,7 @@ impl<'a> Parser<'a> {
                         position: start,
                     })
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             self.push_cell_story_event(state.table_nesting_level, event)?;
         }
@@ -5867,7 +5875,7 @@ impl<'a> Parser<'a> {
                     super::annotation::RevisionType::Deletion => {
                         ParsedBodyStoryEvent::RevisionDeletion(id)
                     },
-                    _ => unreachable!(),
+                    _ => return Err(parser_classification_error()),
                 });
             }
             state.revision_event_id = Some(id);
@@ -5999,7 +6007,7 @@ impl<'a> Parser<'a> {
                 ControlWord::StylesheetDefaultDoubleByteFont(v) => (8, "stshfdbch", v),
                 ControlWord::StylesheetDefaultHighAnsiFont(v) => (16, "stshfhich", v),
                 ControlWord::StylesheetDefaultLowAnsiFont(v) => (32, "stshfloch", v),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.default_font_selectors_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6027,7 +6035,7 @@ impl<'a> Parser<'a> {
                 ControlWord::StylesheetDefaultLowAnsiFont(_) => {
                     fonts.stylesheet_low_ansi = Some(value)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6099,7 +6107,7 @@ impl<'a> Parser<'a> {
                 ControlWord::MakeBackup(parameter) => (1, "makebackup", parameter),
                 ControlWord::DefaultSaveFormat(parameter) => (2, "defformat", parameter),
                 ControlWord::BoilerplateDocument(parameter) => (4, "doctemp", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6120,7 +6128,7 @@ impl<'a> Parser<'a> {
                 ControlWord::BoilerplateDocument(_) => {
                     self.file_settings.template_or_stationery = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6137,7 +6145,7 @@ impl<'a> Parser<'a> {
             let (bit, name, parameter) = match control {
                 ControlWord::Word97CompatibilityMode(parameter) => (1, "muser", parameter),
                 ControlWord::PostScriptOverText(parameter) => (2, "psover", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6157,7 +6165,7 @@ impl<'a> Parser<'a> {
                 ControlWord::PostScriptOverText(_) => {
                     self.output_settings.postscript_over_text = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6180,7 +6188,7 @@ impl<'a> Parser<'a> {
                 ControlWord::CompressJustification(parameter) => (2, "jcompress", parameter),
                 ControlWord::ExpandJustification(parameter) => (2, "jexpand", parameter),
                 ControlWord::LineBasedOnGrid(parameter) => (4, "lnongrid", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6213,7 +6221,7 @@ impl<'a> Parser<'a> {
                 ControlWord::LineBasedOnGrid(_) => {
                     self.rendering_settings.line_based_on_grid = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6235,7 +6243,7 @@ impl<'a> Parser<'a> {
                     (2, "ilfomacatclnup", parameter)
                 },
                 ControlWord::DocumentEventMask(parameter) => (4, "grfdocevents", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.processing_settings_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6280,7 +6288,7 @@ impl<'a> Parser<'a> {
                         "RTF grfdocevents must have a value from 0 through 32767".to_string(),
                     ));
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6310,7 +6318,7 @@ impl<'a> Parser<'a> {
                 ControlWord::DrawingGridVerticalOrigin(_) => (32, "dgvorigin"),
                 ControlWord::DrawingGridHorizontalShow(_) => (64, "dghshow"),
                 ControlWord::DrawingGridVerticalShow(_) => (128, "dgvshow"),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.drawing_grid_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6401,7 +6409,7 @@ impl<'a> Parser<'a> {
                 ControlWord::DocumentGutter(_) => (4, "gutter"),
                 ControlWord::ParallelGutter(_) => (8, "gutterprl"),
                 ControlWord::PrintTwoOnOne(_) => (16, "twoonone"),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.print_layout_settings_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6458,7 +6466,7 @@ impl<'a> Parser<'a> {
                     self.print_layout_settings
                         .two_logical_pages_per_physical_page = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6477,7 +6485,7 @@ impl<'a> Parser<'a> {
                 ControlWord::ThemeLanguage(parameter) => (1, "themelang", parameter),
                 ControlWord::ThemeLanguageEastAsian(parameter) => (2, "themelangfe", parameter),
                 ControlWord::ThemeLanguageComplexScript(parameter) => (4, "themelangcs", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.theme_languages_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6499,7 +6507,7 @@ impl<'a> Parser<'a> {
                 ControlWord::ThemeLanguageComplexScript(_) => {
                     self.theme_languages.complex_script = Some(language);
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6524,7 +6532,7 @@ impl<'a> Parser<'a> {
                 ControlWord::IgnoreMixedContent(parameter) => (8, "ignoremixedcontent", parameter),
                 ControlWord::SaveInvalidXml(parameter) => (16, "saveinvalidxml", parameter),
                 ControlWord::ShowXmlErrors(parameter) => (32, "showxmlerrors", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.xml_policies_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6558,7 +6566,7 @@ impl<'a> Parser<'a> {
                 ControlWord::ShowXmlErrors(_) => {
                     self.xml_policies.show_xml_errors = Some(enabled);
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6578,7 +6586,7 @@ impl<'a> Parser<'a> {
                 ControlWord::DoNotEmbedLinguisticData(parameter) => {
                     (2, "donotembedlingdata", parameter)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.embedding_policies_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6602,7 +6610,7 @@ impl<'a> Parser<'a> {
                 ControlWord::DoNotEmbedLinguisticData(_) => {
                     self.embedding_policies.do_not_embed_linguistic_data = Some(enabled);
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6618,7 +6626,7 @@ impl<'a> Parser<'a> {
             let (bit, name, parameter) = match control {
                 ControlWord::TrackMoves(parameter) => (1, "trackmoves", parameter),
                 ControlWord::TrackFormatting(parameter) => (2, "trackformatting", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.revision_policies_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6640,7 +6648,7 @@ impl<'a> Parser<'a> {
                 ControlWord::TrackFormatting(_) => {
                     self.revision_policies.track_formatting = Some(enabled);
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6663,7 +6671,7 @@ impl<'a> Parser<'a> {
                     (4, "usenormstyforlist", parameter)
                 },
                 ControlWord::UpdateStylesFromTemplate(parameter) => (8, "linkstyles", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6687,7 +6695,7 @@ impl<'a> Parser<'a> {
                 ControlWord::UpdateStylesFromTemplate(_) => {
                     self.style_policies.update_styles_from_template = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6714,7 +6722,7 @@ impl<'a> Parser<'a> {
                 ControlWord::AllowAutoFormatOverride(parameter) => {
                     (8, "autofmtoverride", parameter)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6740,7 +6748,7 @@ impl<'a> Parser<'a> {
                 ControlWord::AllowAutoFormatOverride(_) => {
                     self.style_restrictions.allow_auto_format_override = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6760,7 +6768,7 @@ impl<'a> Parser<'a> {
                 ControlWord::BookFold(parameter) => (1, "bookfold", parameter, false),
                 ControlWord::ReverseBookFold(parameter) => (2, "bookfoldrev", parameter, false),
                 ControlWord::BookFoldSheets(parameter) => (4, "bookfoldsheets", parameter, true),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if requires_parameter != parameter.is_some() {
                 let requirement = if requires_parameter {
@@ -6790,7 +6798,7 @@ impl<'a> Parser<'a> {
                     ControlWord::ReverseBookFold(_) => {
                         self.booklet_printing.reverse_book_fold = true;
                     },
-                    _ => unreachable!(),
+                    _ => return Err(parser_classification_error()),
                 }
             }
             self.booklet_printing_seen |= bit;
@@ -6810,7 +6818,7 @@ impl<'a> Parser<'a> {
                     (1, "rempersonalinfo", parameter)
                 },
                 ControlWord::RemoveDateTimeInformation(parameter) => (2, "remdttm", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6830,7 +6838,7 @@ impl<'a> Parser<'a> {
                 ControlWord::RemoveDateTimeInformation(_) => {
                     self.privacy_policies.remove_date_time_information = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6890,7 +6898,7 @@ impl<'a> Parser<'a> {
                     (4096, "notbrkcnstfrctbl", parameter)
                 },
                 ControlWord::UseAnsiKerningPairs(parameter) => (8192, "krnprsnet", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -6954,7 +6962,7 @@ impl<'a> Parser<'a> {
                 ControlWord::UseAnsiKerningPairs(_) => {
                     self.word_2003_compatibility.use_ansi_kerning_pairs = true
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -6976,7 +6984,7 @@ impl<'a> Parser<'a> {
                 ControlWord::NoUiCompatibility(parameter) => (2, "nouicompat", parameter),
                 ControlWord::NoFeatureThrottle(parameter) => (4, "nofeaturethrottle", parameter),
                 ControlWord::ForceCompatibilityUpgrade(parameter) => (8, "forceupgrade", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if self.compatibility_policy_seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(format!(
@@ -7013,7 +7021,7 @@ impl<'a> Parser<'a> {
                 ControlWord::ForceCompatibilityUpgrade(_) => {
                     self.compatibility_policy.force_upgrade = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             self.compatibility_policy_seen |= bit;
             return Ok(());
@@ -7044,7 +7052,7 @@ impl<'a> Parser<'a> {
                 ControlWord::CompressPunctuationAtLineStart(parameter) => {
                     (16, "toplinepunct", parameter)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -7074,7 +7082,7 @@ impl<'a> Parser<'a> {
                     self.asian_grid_compatibility
                         .compress_punctuation_at_line_start = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -7098,7 +7106,7 @@ impl<'a> Parser<'a> {
                 ControlWord::UseHtmlParagraphAutoSpacing(parameter) => (4, "htmautsp", parameter),
                 ControlWord::PreserveLastTabAlignment(parameter) => (8, "useltbaln", parameter),
                 ControlWord::UseWord95AutoSpacing(parameter) => (16, "oldas", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -7129,7 +7137,7 @@ impl<'a> Parser<'a> {
                 ControlWord::UseWord95AutoSpacing(_) => {
                     self.legacy_layout_compatibility.use_word_95_auto_spacing = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -7169,7 +7177,7 @@ impl<'a> Parser<'a> {
                 ControlWord::UseWord2003TableStyleRules(parameter) => {
                     (128, "newtblstyruls", parameter)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -7211,7 +7219,7 @@ impl<'a> Parser<'a> {
                     self.table_layout_compatibility
                         .use_word_2003_table_style_rules = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -7243,7 +7251,7 @@ impl<'a> Parser<'a> {
                 ControlWord::LegacyAsianLineBreakingRules(parameter) => {
                     (32, "lnbrkrule", parameter)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -7277,7 +7285,7 @@ impl<'a> Parser<'a> {
                 ControlWord::LegacyAsianLineBreakingRules(_) => {
                     self.east_asian_compatibility.use_legacy_line_breaking_rules = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -7309,7 +7317,7 @@ impl<'a> Parser<'a> {
                 ControlWord::SuppressBottomPageExtraSpacing(parameter) => {
                     (16, "sprsbsp", parameter)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -7343,7 +7351,7 @@ impl<'a> Parser<'a> {
                     self.line_spacing_compatibility
                         .suppress_extra_spacing_at_bottom_of_page = true;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -7371,7 +7379,7 @@ impl<'a> Parser<'a> {
                         .map(crate::HtmlEmailVersion::from_rtf_value)
                         .transpose()?,
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             });
             return Ok(());
         }
@@ -7405,7 +7413,7 @@ impl<'a> Parser<'a> {
                     (1, "readonlyrecommended", parameter)
                 },
                 ControlWord::SavePreviousPicture(parameter) => (2, "saveprevpict", parameter),
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if parameter.is_some() {
                 return Err(RtfError::MalformedDocument(format!(
@@ -7427,7 +7435,7 @@ impl<'a> Parser<'a> {
                     self.save_preferences.thumbnail =
                         crate::DocumentThumbnailPreference::RequiredIfSupported;
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(());
         }
@@ -7661,7 +7669,7 @@ impl<'a> Parser<'a> {
                     ControlWord::EndnoteNumbering(value) => {
                         self.note_options.endnote_numbering = Some(*value);
                     },
-                    _ => unreachable!(),
+                    _ => return Err(parser_classification_error()),
                 }
                 return Ok(());
             },
@@ -9154,7 +9162,7 @@ impl<'a> Parser<'a> {
             ControlWord::HideReviewInsertionsAndDeletions(_) => {
                 self.review_display.hide_insertions_and_deletions = true;
             },
-            _ => unreachable!(),
+            _ => return Err(parser_classification_error()),
         }
         Ok(())
     }
@@ -9189,7 +9197,7 @@ impl<'a> Parser<'a> {
                 }
                 0
             },
-            _ => unreachable!(),
+            _ => return Err(parser_classification_error()),
         };
         match control {
             ControlWord::DocumentViewKind(_) => {
@@ -9227,7 +9235,7 @@ impl<'a> Parser<'a> {
             ControlWord::DocumentViewNoPageBoundaries(_) => {
                 self.document_view.hide_page_boundaries = true;
             },
-            _ => unreachable!(),
+            _ => return Err(parser_classification_error()),
         }
         Ok(())
     }
@@ -13786,7 +13794,7 @@ impl<'a> Parser<'a> {
                                 ControlWord::LowAnsiCharacter(v) => (v, "loch", 0u8),
                                 ControlWord::HighAnsiCharacter(v) => (v, "hich", 1),
                                 ControlWord::DoubleByteCharacter(v) => (v, "dbch", 2),
-                                _ => unreachable!(),
+                                _ => return Err(parser_classification_error()),
                             };
                             require_parameterless(*parameter, key)?;
                             if !seen.insert(key) {
@@ -14174,7 +14182,7 @@ impl<'a> Parser<'a> {
                                     Some(value)
                                 );
                             },
-                            _ => unreachable!(),
+                            _ => return Err(parser_classification_error()),
                         }
                     },
                     ControlWord::StyleBasedOn(value) => {
@@ -14484,7 +14492,7 @@ impl<'a> Parser<'a> {
                 | ControlWord::TableShadingBackground(scope, _)
                 | ControlWord::TableShadingPattern(scope, _, _) => *scope,
                 ControlWord::TableRowShadingPatternIndex(_) => crate::TableDistanceScope::Row,
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             let (shading, seen) = match scope {
                 crate::TableDistanceScope::Row => (
@@ -14502,7 +14510,7 @@ impl<'a> Parser<'a> {
                 ControlWord::TableShadingBackground(..) => 4,
                 ControlWord::TableShadingPattern(..)
                 | ControlWord::TableRowShadingPatternIndex(..) => 8,
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             };
             if *seen & bit != 0 {
                 return Err(RtfError::MalformedDocument(
@@ -14535,7 +14543,7 @@ impl<'a> Parser<'a> {
                 ControlWord::TableRowShadingPatternIndex(value) => {
                     shading.pattern_index = Some(required_table_value(*value, "trpat", u16::MAX)?)
                 },
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
             return Ok(true);
         }
@@ -14601,7 +14609,7 @@ impl<'a> Parser<'a> {
                 },
                 ControlWord::BorderShadow => border.shadow = true,
                 ControlWord::BorderFrame => border.frame = true,
-                _ => unreachable!(),
+                _ => return Err(parser_classification_error()),
             }
         }
         Ok(true)
@@ -14739,7 +14747,7 @@ impl<'a> Parser<'a> {
                 },
                 ControlWord::BorderShadow => border.shadow = true,
                 ControlWord::BorderFrame => border.frame = true,
-                _ => unreachable!("classified character-border component"),
+                _ => return Err(parser_classification_error()),
             }
         }
         Ok(true)
@@ -18368,7 +18376,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::Unicode(_))) => {
                     let code = match self.tokens.get(self.pos) {
                         Some(Token::Control(ControlWord::Unicode(code))) => *code,
-                        _ => unreachable!(),
+                        _ => return Err(parser_classification_error()),
                     };
                     text.push_str(&self.parse_navigation_unicode_sequence(code)?);
                     fallback_skip = 0;
@@ -23875,7 +23883,7 @@ impl<'a> Parser<'a> {
                             ControlWord::FieldEdit(_) => field_status.edited = true,
                             ControlWord::FieldLock(_) => field_status.locked = true,
                             ControlWord::FieldPrivate(_) => field_status.private = true,
-                            _ => unreachable!(),
+                            _ => return Err(parser_classification_error()),
                         }
                     }
                     self.pos += 1;
@@ -25334,4 +25342,18 @@ pub struct ParsedDocument<'a> {
     pub revisions: Vec<super::annotation::Revision<'a>>,
     /// Ordered inert revision-author table.
     pub revision_authors: Vec<super::annotation::RevisionAuthor<'a>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parser_classification_failures_use_the_typed_error_channel() {
+        assert!(matches!(
+            parser_classification_error(),
+            RtfError::ParserError(message)
+                if message == "RTF parser control classification invariant failed"
+        ));
+    }
 }

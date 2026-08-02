@@ -4,8 +4,10 @@
     deny(
         clippy::expect_used,
         clippy::panic,
+        clippy::panic_in_result_fn,
         clippy::todo,
         clippy::unimplemented,
+        clippy::unreachable,
         clippy::unwrap_used
     )
 )]
