@@ -13,6 +13,7 @@ pub(crate) mod reference_scan;
 pub(crate) mod sheet_view_edit;
 pub(crate) mod strings;
 pub(crate) mod styles;
+pub mod web;
 pub(crate) mod worksheet;
 
 pub use catalog::{parse_catalog, parse_sheet};

@@ -62,9 +62,6 @@ use super::sort::SortState;
 use super::sparkline::{SparklineGroup, parse_sparkline_groups_from_worksheet_xml};
 use super::table::{Table, parse_table_xml};
 use super::views::SheetView;
-use super::web_extension_bindings::{
-    WorksheetWebExtensionBinding, parse_worksheet_web_extension_bindings,
-};
 use super::writer::sheet::Image;
 use super::{
     ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship, ChartRelationshipTarget,
@@ -75,6 +72,8 @@ use super::{
         is_chart_user_shapes_relationship_type, parse_chart_from_xml,
     },
 };
+use litchi_xlsx::raw::web as raw_web;
+use litchi_xlsx::web::Bindings;
 
 /// Information about a worksheet
 #[derive(Debug, Clone)]
@@ -322,7 +321,7 @@ pub struct Worksheet<'a> {
     col_breaks: Vec<PageBreak>,
     rich_text_cells: HashMap<(u32, u32), Vec<RichTextRun>>,
     sparkline_groups: Vec<SparklineGroup>,
-    web_extension_bindings: Vec<WorksheetWebExtensionBinding>,
+    web_bindings: Bindings,
     tables: Vec<Table>,
     query_tables: Vec<WorksheetQueryTable>,
     images: Vec<Image>,
@@ -371,7 +370,7 @@ impl<'a> Worksheet<'a> {
             col_breaks: Vec::new(),
             rich_text_cells: HashMap::new(),
             sparkline_groups: Vec::new(),
-            web_extension_bindings: Vec::new(),
+            web_bindings: Bindings::new(),
             tables: Vec::new(),
             query_tables: Vec::new(),
             images: Vec::new(),
@@ -404,7 +403,7 @@ impl<'a> Worksheet<'a> {
             discover_named_sheet_views(self.workbook.package(), relationships)?;
 
         self.sparkline_groups = parse_sparkline_groups_from_worksheet_xml(content)?;
-        self.web_extension_bindings = parse_worksheet_web_extension_bindings(content.as_bytes())?;
+        self.web_bindings = raw_web::read(content.as_bytes())?;
 
         Ok(())
     }
@@ -444,8 +443,8 @@ impl<'a> Worksheet<'a> {
     }
 
     /// Inert Office Add-in range bindings embedded in this worksheet.
-    pub fn web_extension_bindings(&self) -> &[WorksheetWebExtensionBinding] {
-        &self.web_extension_bindings
+    pub fn web_bindings(&self) -> &Bindings {
+        &self.web_bindings
     }
 
     /// Structured tables defined on this worksheet.

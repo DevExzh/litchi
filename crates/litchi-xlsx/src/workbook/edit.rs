@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map::Entry};
 use std::fmt;
 use std::sync::Arc;
 
+use litchi_ooxml_common::web as common_web;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationship, TargetMode};
 use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
@@ -24,6 +25,7 @@ use crate::raw::worksheet::edit::{
 use crate::row::{Flags as RowFlags, HeightAt, Props as RowProps, State as RowState};
 use crate::sheet::Name;
 use crate::style::StyleLineage;
+use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 use crate::{Style, StyleKey, StyleState};
 
 /// Cell state recorded before or after one semantic change.
@@ -610,6 +612,12 @@ pub enum Change {
         before: Option<Defaults>,
         after: Option<Defaults>,
     },
+    /// Worksheet Office Add-in range bindings changed as one validated set.
+    Web {
+        sheet: Box<str>,
+        before: WebBindings,
+        after: WebBindings,
+    },
     Merge {
         sheet: Box<str>,
         range: Rect,
@@ -644,6 +652,7 @@ impl Change {
             Self::Move { sheet, .. }
             | Self::Visibility { sheet, .. }
             | Self::Defaults { sheet, .. }
+            | Self::Web { sheet, .. }
             | Self::Merge { sheet, .. }
             | Self::Cell { sheet, .. }
             | Self::Row { sheet, .. }
@@ -661,6 +670,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
@@ -682,6 +692,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
@@ -699,6 +710,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
@@ -721,6 +733,7 @@ impl Change {
             | Self::Move { .. }
             | Self::Active { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. }
@@ -732,6 +745,14 @@ impl Change {
     pub fn defaults(&self) -> Option<(Option<&Defaults>, Option<&Defaults>)> {
         match self {
             Self::Defaults { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            _ => None,
+        }
+    }
+
+    /// Office Add-in range-binding transition, when applicable.
+    pub fn web(&self) -> Option<(&WebBindings, &WebBindings)> {
+        match self {
+            Self::Web { before, after, .. } => Some((before, after)),
             _ => None,
         }
     }
@@ -760,6 +781,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Row { .. }
             | Self::Column { .. } => None,
@@ -779,6 +801,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Column { .. } => None,
@@ -801,6 +824,7 @@ impl Change {
             | Self::Active { .. }
             | Self::Visibility { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merge { .. }
             | Self::Cell { .. }
             | Self::Row { .. } => None,
@@ -881,6 +905,15 @@ impl Change {
                 before,
                 after,
             } => Self::Defaults {
+                sheet: sheet.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Web {
+                sheet,
+                before,
+                after,
+            } => Self::Web {
                 sheet: sheet.clone(),
                 before: after.clone(),
                 after: before.clone(),
@@ -993,6 +1026,10 @@ pub enum Conflict {
         position: usize,
         fields: layout::Fields,
     },
+    Web {
+        sheet: Box<str>,
+        position: usize,
+    },
     Merges {
         sheet: Box<str>,
         position: usize,
@@ -1025,6 +1062,7 @@ impl Conflict {
             | Self::Active { sheet, .. }
             | Self::Tab { sheet, .. }
             | Self::Defaults { sheet, .. }
+            | Self::Web { sheet, .. }
             | Self::Merges { sheet, .. }
             | Self::Cells { sheet, .. }
             | Self::Rows { sheet, .. }
@@ -1041,6 +1079,7 @@ impl Conflict {
             | Self::Active { position, .. }
             | Self::Tab { position, .. }
             | Self::Defaults { position, .. }
+            | Self::Web { position, .. }
             | Self::Merges { position, .. }
             | Self::Cells { position, .. }
             | Self::Rows { position, .. }
@@ -1081,6 +1120,11 @@ impl Conflict {
         }
     }
 
+    /// Whether both edits replace bindings on the same worksheet.
+    pub const fn is_web(&self) -> bool {
+        matches!(self, Self::Web { .. })
+    }
+
     /// Structurally overlapping merged ranges, when applicable.
     pub fn merges(&self) -> Option<&[Rect]> {
         match self {
@@ -1099,6 +1143,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Rows { .. }
             | Self::Columns { .. } => None,
@@ -1115,6 +1160,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
             | Self::Columns { .. } => None,
@@ -1132,6 +1178,7 @@ impl Conflict {
             | Self::Active { .. }
             | Self::Tab { .. }
             | Self::Defaults { .. }
+            | Self::Web { .. }
             | Self::Merges { .. }
             | Self::Cells { .. }
             | Self::Rows { .. } => None,
@@ -1144,7 +1191,8 @@ impl Conflict {
             | Self::Name { .. }
             | Self::Order { .. }
             | Self::Active { .. }
-            | Self::Tab { .. } => 1,
+            | Self::Tab { .. }
+            | Self::Web { .. } => 1,
             Self::Defaults { fields, .. } => fields.bits().count_ones() as usize,
             Self::Merges { ranges, .. } => ranges.len(),
             Self::Cells { addresses, .. } => addresses.len(),
@@ -1196,6 +1244,8 @@ pub enum JoinFailure {
     DifferentSnapshot,
     /// Both edits write at least one of the same effect facets.
     Overlap(ConflictSet),
+    /// Both edits replace the workbook's one persisted task-pane graph.
+    TaskPanes,
 }
 
 /// Recoverable join failure that returns ownership of the rejected edit.
@@ -1224,7 +1274,7 @@ impl JoinError {
     pub fn conflicts(&self) -> Option<&ConflictSet> {
         match &self.failure {
             JoinFailure::Overlap(conflicts) => Some(conflicts),
-            JoinFailure::DifferentSnapshot => None,
+            JoinFailure::DifferentSnapshot | JoinFailure::TaskPanes => None,
         }
     }
 
@@ -1253,11 +1303,43 @@ impl fmt::Display for JoinError {
             JoinFailure::Overlap(conflicts) => {
                 write!(formatter, "edit effects overlap: {conflicts}")
             },
+            JoinFailure::TaskPanes => {
+                formatter.write_str("both edits replace the persisted task-pane graph")
+            },
         }
     }
 }
 
 impl std::error::Error for JoinError {}
+
+/// One workbook-scoped semantic change that has no worksheet identity.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum PackageChange {
+    /// Persisted Office Add-in task panes and their inert package graph changed.
+    TaskPanes {
+        before: Option<common_web::Panes>,
+        after: Option<common_web::Panes>,
+    },
+}
+
+impl PackageChange {
+    /// Borrow the task-pane transition represented by this change.
+    pub fn task_panes(&self) -> (Option<&common_web::Panes>, Option<&common_web::Panes>) {
+        match self {
+            Self::TaskPanes { before, after } => (before.as_ref(), after.as_ref()),
+        }
+    }
+
+    fn inverse(&self) -> Self {
+        match self {
+            Self::TaskPanes { before, after } => Self::TaskPanes {
+                before: after.clone(),
+                after: before.clone(),
+            },
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 struct PartChange {
@@ -1325,8 +1407,10 @@ impl std::fmt::Debug for GraphChange {
 #[derive(Debug, Clone, Default)]
 pub struct Patch {
     changes: Box<[Change]>,
+    package_changes: Box<[PackageChange]>,
     parts: Box<[PartChange]>,
     graph: Box<[GraphChange]>,
+    web: Option<common_web::Patch>,
     style_guard: Option<StyleGuard>,
 }
 
@@ -1341,12 +1425,19 @@ impl Patch {
         &self.changes
     }
 
+    /// Workbook-scoped semantic changes, kept separate from sheet changes.
+    pub fn package_changes(&self) -> &[PackageChange] {
+        &self.package_changes
+    }
+
     pub fn len(&self) -> usize {
-        self.changes.len()
+        self.changes
+            .len()
+            .saturating_add(self.package_changes.len())
     }
 
     pub fn is_empty(&self) -> bool {
-        self.changes.is_empty()
+        self.changes.is_empty() && self.package_changes.is_empty()
     }
 
     /// Build the inverse without copying part payloads.
@@ -1357,6 +1448,13 @@ impl Patch {
                 .iter()
                 .rev()
                 .map(Change::inverse)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            package_changes: self
+                .package_changes
+                .iter()
+                .rev()
+                .map(PackageChange::inverse)
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             parts: self
@@ -1385,6 +1483,7 @@ impl Patch {
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
+            web: self.web.as_ref().map(common_web::Patch::inverse),
             style_guard: self.style_guard.clone(),
         }
     }
@@ -1394,7 +1493,7 @@ impl Patch {
         if let Some(guard) = &self.style_guard {
             guard.validate(workbook)?;
         }
-        if self.parts.is_empty() && self.graph.is_empty() {
+        if self.parts.is_empty() && self.graph.is_empty() && self.web.is_none() {
             return Ok(Commit {
                 workbook: workbook.clone(),
                 patch: self.clone(),
@@ -1420,7 +1519,18 @@ impl Patch {
         for change in &self.graph {
             change.apply(&mut package)?;
         }
+        if let Some(web) = &self.web {
+            let _ = web.apply(&mut package)?;
+        }
         let workbook = Workbook::from_package_with_styles(package, Some(workbook))?;
+        if self.web.is_some()
+            || self
+                .changes
+                .iter()
+                .any(|change| matches!(change, Change::Web { .. }))
+        {
+            validate_web_integrity(&workbook)?;
+        }
         let mut patch = self.clone();
         for change in &mut patch.changes {
             change.rebind_style(&workbook);
@@ -1530,6 +1640,7 @@ struct SheetActions {
     rename: Option<Name>,
     visibility: Option<TabAction>,
     defaults: Option<DefaultsAction>,
+    web: Option<WebBindings>,
     cells: BTreeMap<Address, Action>,
     rows: BTreeMap<RowIndex, RowAction>,
     columns: BTreeMap<ColumnIndex, ColumnAction>,
@@ -1541,6 +1652,7 @@ impl SheetActions {
         usize::from(self.rename.is_some())
             .saturating_add(usize::from(self.visibility.is_some()))
             .saturating_add(usize::from(self.defaults.is_some()))
+            .saturating_add(usize::from(self.web.is_some()))
             .saturating_add(self.cells.len())
             .saturating_add(self.rows.len())
             .saturating_add(self.columns.len())
@@ -1551,6 +1663,7 @@ impl SheetActions {
         self.rename.is_none()
             && self.visibility.is_none()
             && self.defaults.is_none()
+            && self.web.is_none()
             && self.cells.is_empty()
             && self.rows.is_empty()
             && self.columns.is_empty()
@@ -1650,6 +1763,15 @@ struct Added {
     name: Name,
     actions: SheetActions,
     placement: Placement,
+}
+
+#[derive(Debug)]
+enum PanesAction {
+    Put {
+        panes: common_web::Panes,
+        conformance: common_web::Conformance,
+    },
+    Remove,
 }
 
 #[derive(Debug, Default)]
@@ -1815,6 +1937,7 @@ impl FinalOrder {
 #[derive(Debug)]
 pub struct Edit {
     base: Workbook,
+    panes: Option<PanesAction>,
     active: Option<Target>,
     order: Option<OrderPlan>,
     sheets: BTreeMap<usize, SheetActions>,
@@ -1827,12 +1950,40 @@ impl Edit {
         ensure_unsigned(&base)?;
         Ok(Self {
             base,
+            panes: None,
             active: None,
             order: None,
             sheets: BTreeMap::new(),
             added: Vec::new(),
             removed: BTreeSet::new(),
         })
+    }
+
+    /// Create or replace the complete persisted Office Add-in task-pane graph.
+    ///
+    /// The owned model is moved into this isolated transaction. Its worksheet
+    /// `appRef` dependencies are checked against the transaction's combined
+    /// final state before any package part is changed.
+    pub fn put_task_panes(
+        &mut self,
+        panes: common_web::Panes,
+        conformance: common_web::Conformance,
+    ) -> Result<&mut Self> {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "task panes"));
+        }
+        self.panes = Some(PanesAction::Put { panes, conformance });
+        Ok(self)
+    }
+
+    /// Remove persisted task panes when no effective worksheet binding would
+    /// dangle in the same transaction.
+    pub fn remove_task_panes(&mut self) -> Result<&mut Self> {
+        if !self.removed.is_empty() {
+            return Err(self.remove_block(RemoveBlock::MixedEdit, "task panes"));
+        }
+        self.panes = Some(PanesAction::Remove);
+        Ok(self)
     }
 
     /// Append a validated worksheet and borrow its transaction-local editor.
@@ -2040,6 +2191,7 @@ impl Edit {
         let existing = self.sheets.values().fold(
             self.removed
                 .len()
+                .saturating_add(usize::from(self.panes.is_some()))
                 .saturating_add(usize::from(self.active.is_some()))
                 .saturating_add(
                     self.order
@@ -2052,6 +2204,7 @@ impl Edit {
         self.added.iter().fold(existing, |len, added| {
             len.saturating_add(1)
                 .saturating_add(usize::from(added.actions.defaults.is_some()))
+                .saturating_add(usize::from(added.actions.web.is_some()))
                 .saturating_add(added.actions.cells.len())
                 .saturating_add(added.actions.rows.len())
                 .saturating_add(added.actions.columns.len())
@@ -2061,6 +2214,7 @@ impl Edit {
 
     pub fn is_empty(&self) -> bool {
         self.active.is_none()
+            && self.panes.is_none()
             && self
                 .order
                 .as_ref()
@@ -2082,6 +2236,12 @@ impl Edit {
                 rejected: Box::new(other),
             });
         }
+        if self.panes.is_some() && other.panes.is_some() {
+            return Err(JoinError {
+                failure: JoinFailure::TaskPanes,
+                rejected: Box::new(other),
+            });
+        }
         let conflicts = self.conflicts_with(&other);
         if !conflicts.is_empty() {
             return Err(JoinError {
@@ -2091,6 +2251,9 @@ impl Edit {
         }
 
         let added_offset = self.added.len();
+        if self.panes.is_none() {
+            self.panes = other.panes;
+        }
         if self.active.is_none() {
             self.active = other.active.map(|target| match target {
                 Target::Base(position) => Target::Base(position),
@@ -2116,6 +2279,9 @@ impl Edit {
                     }
                     if accepted.visibility.is_none() {
                         accepted.visibility = actions.visibility;
+                    }
+                    if accepted.web.is_none() {
+                        accepted.web = actions.web;
                     }
                     match (accepted.defaults.as_mut(), actions.defaults) {
                         (None, defaults) => accepted.defaults = defaults,
@@ -2171,13 +2337,55 @@ impl Edit {
         }
         let Self {
             base,
+            panes: requested_panes,
             active: requested_active,
             order: requested_order,
             mut sheets,
             added,
             removed: _,
         } = self;
+        let validates_web = requested_panes.is_some()
+            || sheets.values().any(|actions| actions.web.is_some())
+            || added.iter().any(|sheet| sheet.actions.web.is_some());
+        let web_refs = if validates_web {
+            let final_panes = match &requested_panes {
+                Some(PanesAction::Put { panes, .. }) => Some(panes),
+                Some(PanesAction::Remove) => None,
+                None => base.task_panes()?,
+            };
+            Some(match final_panes {
+                Some(panes) => crate::web::Refs::from_panes(panes)?,
+                None => crate::web::Refs::new(std::iter::empty::<&str>())?,
+            })
+        } else {
+            None
+        };
+        if let Some(refs) = &web_refs {
+            for (position, data) in base.inner.sheets.iter().enumerate() {
+                if data.kind != SheetKind::Worksheet {
+                    continue;
+                }
+                if let Some(bindings) = sheets
+                    .get(&position)
+                    .and_then(|actions| actions.web.as_ref())
+                {
+                    check_web_bindings(refs, &data.name, bindings)?;
+                } else {
+                    let sheet = Sheet {
+                        owner: Arc::clone(&base.inner),
+                        data: Arc::clone(data),
+                    };
+                    check_web_bindings(refs, &data.name, sheet.web_bindings()?)?;
+                }
+            }
+            for sheet in &added {
+                if let Some(bindings) = &sheet.actions.web {
+                    check_web_bindings(refs, sheet.name.as_str(), bindings)?;
+                }
+            }
+        }
         let mut changes = Vec::new();
+        let mut package_changes = Vec::new();
         let mut parts = Vec::new();
         let mut needs_recalculation = false;
 
@@ -2500,12 +2708,14 @@ impl Edit {
                 rename: _,
                 visibility: _,
                 defaults,
+                web,
                 cells,
                 rows,
                 columns,
                 merges,
             } = requested;
             if defaults.is_none()
+                && web.is_none()
                 && cells.is_empty()
                 && rows.is_empty()
                 && columns.is_empty()
@@ -2524,6 +2734,22 @@ impl Edit {
             };
             let store = sheet.store()?;
             let change_start = changes.len();
+            let effective_web = match web {
+                Some(after) => {
+                    let before = sheet.web_bindings()?.clone();
+                    if before == after {
+                        None
+                    } else {
+                        changes.push(Change::Web {
+                            sheet: data.name.clone().into_boxed_str(),
+                            before: before.clone(),
+                            after: after.clone(),
+                        });
+                        Some(after)
+                    }
+                },
+                None => None,
+            };
             let merge_projection = project_merges(&data.name, Some(store), merges, &cells)?;
             for (range, change) in &merge_projection.changes {
                 changes.push(Change::Merge {
@@ -2610,6 +2836,7 @@ impl Edit {
                 });
             }
             if effective_defaults.is_none()
+                && effective_web.is_none()
                 && effective_cells.is_empty()
                 && effective_rows.is_empty()
                 && effective_columns.is_empty()
@@ -2654,9 +2881,14 @@ impl Edit {
                     },
                 )?);
             }
+            if let Some(bindings) = &effective_web {
+                let input = after.as_deref().unwrap_or(&before);
+                after = Some(raw::web::replace(input, bindings)?);
+            }
             let after =
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
+            let parsed_web = raw::web::read(&after)?;
             base.inner.validate_styles(&parsed)?;
             for change in &changes[change_start..] {
                 match change {
@@ -2666,6 +2898,17 @@ impl Edit {
                     | Change::Move { .. }
                     | Change::Active { .. }
                     | Change::Visibility { .. } => {},
+                    Change::Web {
+                        sheet,
+                        after: expected,
+                        ..
+                    } => {
+                        if &parsed_web != expected {
+                            return Err(invalid(format!(
+                                "worksheet web-binding verification failed at {sheet}"
+                            )));
+                        }
+                    },
                     Change::Merge {
                         sheet,
                         range,
@@ -2887,6 +3130,31 @@ impl Edit {
                     {
                         *after = State::read(parsed.entry(*address), &base);
                     }
+                }
+            }
+            for change in &mut changes {
+                let Change::Web { sheet, after, .. } = change else {
+                    continue;
+                };
+                if let Some(data) = base
+                    .inner
+                    .sheets
+                    .iter()
+                    .find(|data| data.name.as_str() == sheet.as_ref())
+                {
+                    let content = parts
+                        .iter()
+                        .find(|part| part.uri == data.part_uri)
+                        .map_or_else(
+                            || base.inner.package.get_part(&data.part_uri).map(Part::blob),
+                            |part| Ok(part.after.as_slice()),
+                        )?;
+                    *after = raw::web::read(content)?;
+                } else if let Some(created) = created
+                    .iter()
+                    .find(|created| created.name.as_str() == sheet.as_ref())
+                {
+                    *after = raw::web::read(created.graph.part.blob())?;
                 }
             }
         }
@@ -3287,7 +3555,41 @@ impl Edit {
         graph.extend(created.into_iter().map(|sheet| sheet.graph));
         graph.extend(calculation_graph);
 
-        if changes.is_empty() && parts.is_empty() && graph.is_empty() {
+        let web_patch = match requested_panes {
+            Some(PanesAction::Put { panes, conformance }) => {
+                let after = panes.clone();
+                let patch = common_web::plan_put(&base.inner.package, panes, conformance)?;
+                if patch.is_empty() {
+                    None
+                } else {
+                    package_changes.push(PackageChange::TaskPanes {
+                        before: base.task_panes()?.cloned(),
+                        after: Some(after),
+                    });
+                    Some(patch)
+                }
+            },
+            Some(PanesAction::Remove) => {
+                let patch = common_web::plan_remove(&base.inner.package)?;
+                if patch.is_empty() {
+                    None
+                } else {
+                    package_changes.push(PackageChange::TaskPanes {
+                        before: base.task_panes()?.cloned(),
+                        after: None,
+                    });
+                    Some(patch)
+                }
+            },
+            None => None,
+        };
+
+        if changes.is_empty()
+            && package_changes.is_empty()
+            && parts.is_empty()
+            && graph.is_empty()
+            && web_patch.is_none()
+        {
             return Ok(Commit {
                 workbook: base,
                 patch: Patch::default(),
@@ -3303,13 +3605,25 @@ impl Edit {
             change.validate(&package)?;
             change.apply(&mut package)?;
         }
+        if let Some(web) = &web_patch {
+            web.apply(&mut package)?;
+        }
         let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
+        if web_patch.is_some()
+            || changes
+                .iter()
+                .any(|change| matches!(change, Change::Web { .. }))
+        {
+            validate_web_integrity(&workbook)?;
+        }
         Ok(Commit {
             workbook,
             patch: Patch {
                 changes: changes.into_boxed_slice(),
+                package_changes: package_changes.into_boxed_slice(),
                 parts: parts.into_boxed_slice(),
                 graph: graph.into_boxed_slice(),
+                web: web_patch,
                 style_guard,
             },
         })
@@ -3381,6 +3695,37 @@ impl Edit {
 
     fn actions(&mut self, position: usize) -> &mut BTreeMap<Address, Action> {
         &mut self.sheets.entry(position).or_default().cells
+    }
+
+    fn web_bindings(&mut self, position: usize) -> Result<&mut WebBindings> {
+        let needs_source = self
+            .sheets
+            .get(&position)
+            .is_none_or(|actions| actions.web.is_none());
+        if needs_source {
+            let data = self
+                .base
+                .inner
+                .sheets
+                .get(position)
+                .cloned()
+                .ok_or_else(|| invalid("web-binding target disappeared"))?;
+            if data.kind != SheetKind::Worksheet {
+                return Err(Error::NotWorksheet {
+                    sheet: data.name.clone(),
+                });
+            }
+            let sheet = Sheet {
+                owner: Arc::clone(&self.base.inner),
+                data,
+            };
+            let source = sheet.web_bindings()?.clone();
+            self.sheets.entry(position).or_default().web = Some(source);
+        }
+        self.sheets
+            .get_mut(&position)
+            .and_then(|actions| actions.web.as_mut())
+            .ok_or_else(|| invalid("web-binding edit initialization failed"))
     }
 
     fn set_visibility(&mut self, position: usize, action: TabAction) {
@@ -3588,6 +3933,12 @@ impl Edit {
                     position: *position,
                 });
             }
+            if left.web.is_some() && right.web.is_some() {
+                conflicts.push(Conflict::Web {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
             if let (Some(left), Some(right)) = (left.defaults, right.defaults) {
                 let fields = left.fields() & right.fields();
                 if left.overlaps(right) {
@@ -3713,7 +4064,8 @@ impl Edit {
     }
 
     fn has_non_removal(&self) -> bool {
-        self.active.is_some()
+        self.panes.is_some()
+            || self.active.is_some()
             || self.order.as_ref().is_some_and(OrderPlan::is_effective)
             || self.sheets.values().any(|actions| !actions.is_empty())
             || !self.added.is_empty()
@@ -3792,6 +4144,42 @@ pub struct SheetEdit<'a> {
 }
 
 impl SheetEdit<'_> {
+    /// Replace all worksheet Office Add-in range bindings by moving one
+    /// already-validated collection into the transaction.
+    pub fn set_bindings(&mut self, bindings: WebBindings) -> &mut Self {
+        self.edit.sheets.entry(self.position).or_default().web = Some(bindings);
+        self
+    }
+
+    /// Insert or replace one range binding, keyed by its semantic `appRef`.
+    pub fn bind(&mut self, binding: WebBinding) -> Result<&mut Self> {
+        let _ = self.edit.web_bindings(self.position)?.put(binding)?;
+        Ok(self)
+    }
+
+    /// Edit one range binding transactionally by semantic `appRef` or checked
+    /// numeric position. A failed closure leaves the staged value unchanged.
+    pub fn edit_binding<'key>(
+        &mut self,
+        selector: impl Into<crate::web::Selector<'key>>,
+        edit: impl FnOnce(&mut WebBinding) -> Result<()>,
+    ) -> Result<bool> {
+        self.edit.web_bindings(self.position)?.edit(selector, edit)
+    }
+
+    /// Remove one range binding by semantic `appRef` or checked position.
+    pub fn unbind<'key>(
+        &mut self,
+        selector: impl Into<crate::web::Selector<'key>>,
+    ) -> Result<Option<WebBinding>> {
+        Ok(self.edit.web_bindings(self.position)?.remove(selector))
+    }
+
+    /// Remove every worksheet range binding.
+    pub fn clear_bindings(&mut self) -> Result<bool> {
+        Ok(self.edit.web_bindings(self.position)?.clear())
+    }
+
     /// Borrow the worksheet-wide grid-default editor.
     pub fn defaults(&mut self) -> DefaultsEdit<'_> {
         DefaultsEdit {
@@ -4025,6 +4413,28 @@ impl NewSheet<'_> {
     pub fn very_hide(&mut self) -> &mut Self {
         self.added.actions.visibility = Some(TabAction::VeryHide);
         self
+    }
+
+    /// Move a complete checked Office Add-in range-binding collection onto
+    /// this pending worksheet.
+    pub fn set_bindings(&mut self, bindings: WebBindings) -> &mut Self {
+        self.added.actions.web = Some(bindings);
+        self
+    }
+
+    /// Insert or replace one range binding by semantic `appRef`.
+    pub fn bind(&mut self, binding: WebBinding) -> Result<&mut Self> {
+        let bindings = self.added.actions.web.get_or_insert_with(WebBindings::new);
+        let _ = bindings.put(binding)?;
+        Ok(self)
+    }
+
+    /// Remove one pending binding by semantic `appRef` or checked position.
+    pub fn unbind<'key>(
+        &mut self,
+        selector: impl Into<crate::web::Selector<'key>>,
+    ) -> Option<WebBinding> {
+        self.added.actions.web.as_mut()?.remove(selector)
     }
 
     /// Borrow the pending worksheet's grid-default editor.
@@ -4496,6 +4906,7 @@ fn commit_removals(edit: Edit) -> Result<Commit> {
     }
     let Edit {
         base,
+        panes: _,
         active: _,
         order: _,
         sheets: _,
@@ -4814,8 +5225,10 @@ fn commit_removals(edit: Edit) -> Result<Commit> {
         workbook,
         patch: Patch {
             changes: changes.into_boxed_slice(),
+            package_changes: Box::new([]),
             parts: parts.into_boxed_slice(),
             graph: graph.into_boxed_slice(),
+            web: None,
             style_guard: None,
         },
     })
@@ -5255,6 +5668,42 @@ fn ensure_unsigned(workbook: &Workbook) -> Result<()> {
     }
 }
 
+fn validate_web_integrity(workbook: &Workbook) -> Result<()> {
+    let refs = match workbook.task_panes()? {
+        Some(panes) => crate::web::Refs::from_panes(panes)?,
+        None => crate::web::Refs::new(std::iter::empty::<&str>())?,
+    };
+    for data in &workbook.inner.sheets {
+        if data.kind != SheetKind::Worksheet {
+            continue;
+        }
+        let sheet = Sheet {
+            owner: Arc::clone(&workbook.inner),
+            data: Arc::clone(data),
+        };
+        check_web_bindings(&refs, &data.name, sheet.web_bindings()?)?;
+    }
+    Ok(())
+}
+
+fn check_web_bindings(
+    refs: &crate::web::Refs<'_>,
+    sheet: &str,
+    bindings: &WebBindings,
+) -> Result<()> {
+    bindings.validate_all()?;
+    if let Some(binding) = bindings
+        .iter()
+        .find(|binding| !refs.contains(binding.app_ref()))
+    {
+        return Err(Error::DanglingWebBinding {
+            sheet: sheet.to_owned(),
+            app_ref: binding.app_ref().to_owned(),
+        });
+    }
+    Ok(())
+}
+
 fn create_sheets(
     workbook: &Workbook,
     added: Vec<Added>,
@@ -5382,12 +5831,22 @@ fn create_sheets(
             rename: _,
             visibility: _,
             defaults,
+            web,
             cells,
             rows,
             columns,
             merges,
         } = actions;
         let change_start = changes.len();
+        if let Some(after) = &web
+            && !after.is_empty()
+        {
+            changes.push(Change::Web {
+                sheet: name.as_str().into(),
+                before: WebBindings::new(),
+                after: after.clone(),
+            });
+        }
         let merge_projection = project_merges(name.as_str(), None, merges, &cells)?;
         for (range, change) in &merge_projection.changes {
             changes.push(Change::Merge {
@@ -5494,6 +5953,9 @@ fn create_sheets(
                 },
             )?;
         }
+        if let Some(bindings) = &web {
+            content = raw::web::replace(&content, bindings)?;
+        }
         if active == Some(index) {
             content = raw::sheet_view_edit::rewrite(
                 &content,
@@ -5559,6 +6021,17 @@ fn create_sheets(
                     if parsed.defaults() != after.as_ref() {
                         return Err(invalid(format!(
                             "new worksheet defaults verification failed at {sheet}"
+                        )));
+                    }
+                },
+                Change::Web {
+                    sheet,
+                    after: expected,
+                    ..
+                } => {
+                    if raw::web::read(&content)? != *expected {
+                        return Err(invalid(format!(
+                            "new worksheet web-binding verification failed at {sheet}"
                         )));
                     }
                 },
@@ -5702,6 +6175,272 @@ mod tests {
     use crate::cell::{Number, Value};
     use crate::formula::Formula;
     use litchi_opc::{BlobPart, TargetMode};
+
+    fn task_panes(app_ref: &str) -> common_web::Panes {
+        let reference = common_web::Reference::new("test-add-in", "1.0", common_web::Store::Omex)
+            .expect("reference");
+        let add_in = common_web::AddIn::new("test-add-in", reference)
+            .and_then(|add_in| add_in.bind(common_web::Binding::new("table", "table", app_ref)?))
+            .expect("add-in");
+        let mut panes = common_web::Panes::new();
+        panes
+            .push(common_web::Pane::new(add_in))
+            .expect("task pane");
+        panes
+    }
+
+    #[test]
+    fn web_bindings_and_task_panes_commit_join_and_reverse_atomically() {
+        let source = Workbook::new().expect("source workbook");
+        let source_bytes = source.to_bytes().expect("source bytes");
+
+        let mut pane_edit = source.edit().expect("pane edit");
+        pane_edit
+            .put_task_panes(
+                task_panes("sheet-table"),
+                common_web::Conformance::Transitional,
+            )
+            .expect("stage panes");
+        let mut binding_edit = source.edit().expect("binding edit");
+        binding_edit
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("worksheet")
+            .bind(WebBinding::new("sheet-table", "Sheet1!$A$1:$B$4").expect("binding"))
+            .expect("stage binding");
+        pane_edit.join(binding_edit).expect("dependent edits join");
+
+        let committed = pane_edit.commit().expect("atomic web commit");
+        assert_eq!(committed.patch().package_changes().len(), 1);
+        assert!(committed.patch().changes().iter().any(|change| {
+            matches!(change, Change::Web { sheet, .. } if sheet.as_ref() == "Sheet1")
+        }));
+        assert_eq!(
+            committed
+                .workbook()
+                .task_panes()
+                .expect("task panes")
+                .expect("present")
+                .len(),
+            1
+        );
+        let sheet = committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("worksheet");
+        assert_eq!(
+            sheet
+                .web_bindings()
+                .expect("bindings")
+                .get("sheet-table")
+                .map(crate::web::Binding::formula),
+            Some("Sheet1!$A$1:$B$4")
+        );
+
+        let before_rename = committed.workbook().to_bytes().expect("pre-rename bytes");
+        let mut rename = committed.workbook().edit().expect("rename edit");
+        rename
+            .tab("Sheet1")
+            .expect("tab lookup")
+            .expect("tab")
+            .rename("Data")
+            .expect("rename");
+        let renamed = rename.commit().expect("dependency-aware rename");
+        assert_eq!(
+            renamed
+                .workbook()
+                .sheet("Data")
+                .expect("renamed lookup")
+                .expect("renamed worksheet")
+                .web_bindings()
+                .expect("renamed bindings")
+                .get("sheet-table")
+                .map(crate::web::Binding::formula),
+            Some("Data!$A$1:$B$4")
+        );
+        assert_eq!(
+            renamed
+                .workbook()
+                .apply(&renamed.patch().inverse())
+                .expect("inverse rename")
+                .workbook()
+                .to_bytes()
+                .expect("inverse rename bytes"),
+            before_rename
+        );
+
+        let mut left = committed.workbook().edit().expect("left web edit");
+        left.sheet("Sheet1")
+            .expect("left lookup")
+            .expect("left worksheet")
+            .bind(WebBinding::new("sheet-table", "Sheet1!A1").expect("left binding"))
+            .expect("left stage");
+        let mut right = committed.workbook().edit().expect("right web edit");
+        right
+            .sheet("Sheet1")
+            .expect("right lookup")
+            .expect("right worksheet")
+            .bind(WebBinding::new("sheet-table", "Sheet1!B2").expect("right binding"))
+            .expect("right stage");
+        let conflict = left.join(right).expect_err("whole binding sets overlap");
+        assert!(
+            conflict
+                .conflicts()
+                .expect("web conflict set")
+                .conflicts()
+                .iter()
+                .any(Conflict::is_web)
+        );
+
+        let restored = committed
+            .workbook()
+            .apply(&committed.patch().inverse())
+            .expect("inverse web patch");
+        assert_eq!(
+            restored.workbook().to_bytes().expect("restored bytes"),
+            source_bytes
+        );
+
+        let mut unsafe_remove = committed.workbook().edit().expect("remove edit");
+        unsafe_remove
+            .remove_task_panes()
+            .expect("stage unsafe removal");
+        assert!(matches!(
+            unsafe_remove.commit(),
+            Err(Error::DanglingWebBinding { sheet, app_ref })
+                if sheet == "Sheet1" && app_ref == "sheet-table"
+        ));
+
+        let mut safe_remove = committed.workbook().edit().expect("safe remove edit");
+        safe_remove.remove_task_panes().expect("stage pane removal");
+        assert!(
+            safe_remove
+                .sheet("Sheet1")
+                .expect("lookup")
+                .expect("worksheet")
+                .clear_bindings()
+                .expect("clear bindings")
+        );
+        let removed = safe_remove.commit().expect("combined removal");
+        assert!(
+            removed
+                .workbook()
+                .task_panes()
+                .expect("task panes")
+                .is_none()
+        );
+        assert!(
+            removed
+                .workbook()
+                .sheet("Sheet1")
+                .expect("lookup")
+                .expect("worksheet")
+                .web_bindings()
+                .expect("bindings")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn task_panes_and_sheet_removal_join_conflicts_are_symmetric() {
+        let baseline = Workbook::new().expect("baseline");
+        let mut create = baseline.edit().expect("create edit");
+        create.add("Delete").expect("new worksheet");
+        let source = create.commit().expect("source").into_workbook();
+
+        for panes_first in [true, false] {
+            let mut panes = source.edit().expect("pane edit");
+            panes
+                .put_task_panes(
+                    task_panes("sheet-table"),
+                    common_web::Conformance::Transitional,
+                )
+                .expect("stage panes");
+            let mut removal = source.edit().expect("removal edit");
+            removal
+                .remove("Delete")
+                .expect("lookup")
+                .expect("worksheet");
+
+            let error = if panes_first {
+                panes.join(removal).expect_err("panes then removal")
+            } else {
+                removal.join(panes).expect_err("removal then panes")
+            };
+            assert!(matches!(
+                error.failure(),
+                JoinFailure::Overlap(conflicts)
+                    if conflicts.conflicts().iter().any(Conflict::is_remove)
+            ));
+        }
+    }
+
+    #[test]
+    fn web_patch_cross_graph_validation_is_atomic_on_alternate_snapshots() {
+        fn with_bindings(workbook: &Workbook, bindings: WebBindings) -> Workbook {
+            let mut package = workbook.inner.package.clone();
+            let uri = workbook.inner.sheets[0].part_uri.clone();
+            let source = package
+                .get_part(&uri)
+                .expect("worksheet part")
+                .blob()
+                .to_vec();
+            let after = crate::raw::web::replace(&source, &bindings).expect("write bindings");
+            package
+                .get_part_mut(&uri)
+                .expect("worksheet part")
+                .set_blob(after);
+            Workbook::from_package(package).expect("reopen alternate workbook")
+        }
+
+        let baseline = Workbook::new().expect("baseline");
+        let mut install = baseline.edit().expect("install edit");
+        install
+            .put_task_panes(
+                task_panes("sheet-table"),
+                common_web::Conformance::Transitional,
+            )
+            .expect("stage panes");
+        let with_panes = install.commit().expect("install panes").into_workbook();
+
+        let mut bind = with_panes.edit().expect("binding edit");
+        bind.sheet("Sheet1")
+            .expect("lookup")
+            .expect("worksheet")
+            .bind(WebBinding::new("sheet-table", "Sheet1!A1").expect("binding"))
+            .expect("stage binding");
+        let binding_commit = bind.commit().expect("binding commit");
+        let alternate = Workbook::new().expect("alternate without panes");
+        let before = alternate.to_bytes().expect("alternate bytes");
+        assert!(matches!(
+            alternate.apply(binding_commit.patch()),
+            Err(Error::DanglingWebBinding { sheet, app_ref })
+                if sheet == "Sheet1" && app_ref == "sheet-table"
+        ));
+        assert_eq!(alternate.to_bytes().expect("unchanged bytes"), before);
+
+        let old_bindings = WebBindings::try_from(vec![
+            WebBinding::new("sheet-table", "Sheet1!A1").expect("old binding"),
+        ])
+        .expect("binding collection");
+        let alternate = with_bindings(&with_panes, old_bindings);
+        let before = alternate.to_bytes().expect("alternate bytes");
+        let mut replace = with_panes.edit().expect("pane replacement");
+        replace
+            .put_task_panes(
+                task_panes("replacement-table"),
+                common_web::Conformance::Transitional,
+            )
+            .expect("stage replacement panes");
+        let pane_commit = replace.commit().expect("pane replacement commit");
+        assert!(matches!(
+            alternate.apply(pane_commit.patch()),
+            Err(Error::DanglingWebBinding { sheet, app_ref })
+                if sheet == "Sheet1" && app_ref == "sheet-table"
+        ));
+        assert_eq!(alternate.to_bytes().expect("unchanged bytes"), before);
+    }
 
     #[test]
     fn cell_crud_is_atomic_reversible_and_source_preserving() {

@@ -16,6 +16,7 @@ pub mod raw;
 pub mod row;
 pub mod sheet;
 pub mod style;
+pub mod web;
 mod workbook;
 
 pub use cell::{Cell, Cells, Content, Date, ErrorValue, Extents, Number, Text, Value};
@@ -33,6 +34,6 @@ pub use row::{Height, HeightAt, Row, Rows};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
-    Flavor, JoinError, JoinFailure, NewSheet, Patch, RowEdit, Sheet, SheetEdit, SheetKind,
-    SheetSelector, State, TabEdit, Visibility, Workbook,
+    Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Sheet, SheetEdit,
+    SheetKind, SheetSelector, State, TabEdit, Visibility, Workbook,
 };

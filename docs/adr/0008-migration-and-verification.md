@@ -2238,6 +2238,132 @@ No native Microsoft Office artifact was opened, edited, resaved, and
 reverse-read for this slice, so it adds no Office compatibility or measured
 performance claim.
 
+The forty-second implementation slice moves the remaining worksheet Web
+Extensions ownership into `litchi-xlsx`. The canonical public vocabulary is
+the short `web::{Binding, Bindings, Selector, Refs}` surface. Application
+references are semantic primary keys; checked zero-based positions remain
+available for ordered workflows. `add`, `put`, `edit`, `remove`, and `clear`
+provide bounded CRUD without exposing relationship IDs. Inserts and
+replacements consume values, removals return ownership, and transactional
+`edit` clones only the selected small binding before validating and swapping
+it. Whole binding collections can be moved directly into an edit. The old
+migration-host codec and its long names are deleted without compatibility
+aliases; `litchi-ooxml` now delegates its four worksheet-binding operations to
+the canonical crate.
+
+`Workbook::task_panes` and `Sheet::web_bindings` return borrowed models owned by
+their immutable snapshot. Independent per-resource
+`once_cell::sync::OnceCell` caches provide fallible single-flight first reads:
+successful concurrent readers of one resource share one parse, while a failed
+initialization remains retryable and unrelated sheets do not contend on a
+workbook-global lock. Snapshot clones share the cached model and later
+snapshots receive fresh caches, so no `Arc<RwLock<_>>` or mutable global facade
+leaks into the API. The cache regression exercises concurrent first access,
+pointer identity, absent package state, and snapshot scoping.
+
+The worksheet codec `raw::web::{read, write, replace}` is bounded by XML size,
+depth, item, individual-string, and aggregate-string ceilings. It rejects DTDs,
+unknown prefixes, duplicate selected extensions and `appRef` values, malformed
+roots, unexpected binding children or attributes, and any binding without
+exactly one `xm:f`. Replacement changes only the selected extension byte span,
+retaining unrelated worksheet XML, and derives the output SpreadsheetML
+namespace from the source so Strict and Transitional worksheets stay in their
+original vocabulary. Empty replacement removes only the selected extension;
+an absent extension is a semantic no-op.
+
+The implementation follows the published `[MS-XLSX]`
+[worksheet extension rule](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/07d607af-5618-4ca2-b683-6a78dc0d9627),
+including URI `{F7C9EE02-42E1-4005-9D12-6889AFFD525C}`, and the
+[`CT_WebExtension` rule](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/386851b6-b7b6-42b8-8cf1-d94bab7b0731)
+that requires one formula and an `appRef` matching the package-level
+MS-OWEXML binding. The high-level constructor currently accepts a valid
+`external-cell-reference` subset: a single sheet-qualified A1 cell or
+rectangular area, including quoted worksheet names and absolute coordinates.
+This is distinct from the forbidden `bang-reference` form `!A1`; an unqualified
+local `A1` and a multi-sheet `Sheet1:Sheet2!A1` are also rejected. Optional
+external-book prefixes and the wider permitted `ref-nospace-expression`
+surface are not yet implemented, so this is not a claim of complete
+formula-grammar conformance. The checked-in `3rdparty/`
+mirror contains neither `[MS-XLSX]` nor `[MS-OWEXML]`; vendoring the applicable
+published sources and completing the broader grammar audit remain
+certification work.
+
+`Workbook::Edit` now owns package task panes and worksheet bindings in one
+transaction. Independently prepared pane and range edits can join when their
+effects are disjoint, then commit validates every effective existing and new
+worksheet reference against the final task-pane graph. Same-sheet whole-set
+binding writes conflict deterministically; sheet removals conflict with pane
+edits in either join direction. Removing task panes while a range remains
+returns `DanglingWebBinding { sheet, app_ref }`. Clearing those ranges and
+removing the graph in the same edit succeeds. A tab rename rewrites the
+qualifying worksheet name in `xm:f` and records the final semantic before/after
+state rather than leaving the patch metadata stale.
+
+The resulting workbook patch combines exact `Arc<Vec<u8>>` worksheet-part
+deltas with the common crate's opaque task-pane graph patch. All source parts,
+relationships, destination names, and newly shared source or destination
+parts are checked before the caller-visible snapshot can change. Applying to a
+stale or different package fails; inverse patches swap shared allocations
+rather than copy payload bytes. No-op plans preserve the original snapshot and
+signature state, while a real common graph change invalidates signatures only
+after its staged checks. Commit and patch application reparse the candidate
+package and revalidate the complete cross-graph invariant before publication.
+
+Computer Use verification against desktop Excel on macOS found one additional
+safe-authoring invariant that schema-only tests missed. A generated workbook
+whose primary reference used `storeType="FileSystem"` without `store` caused
+Excel's repair dialog and could not be opened. Differential artifacts then
+changed one factor at a time: arbitrary synchronized extension-instance and
+`appRef` strings opened cleanly when `store="C:\Example"` was present, while
+removing only that attribute reproduced the repair. ZIP integrity and package
+topology were otherwise identical. The generic MS-OWEXML schema makes `store`
+optional, but Microsoft's
+[provider tuple guidance](https://learn.microsoft.com/en-us/office/dev/add-ins/develop/automatically-open-a-task-pane-with-a-document#use-open-xml-to-tag-the-document)
+defines it as the file-system share for this provider, matching the observed
+desktop behavior. The evidence does not justify imposing a GUID grammar on
+the extension instance or `appRef`; their normative types remain strings and
+cross-part equality remains the XLSX invariant.
+
+The safe common model therefore cannot represent a store-less file reference.
+`Reference::file(id, version, location)` requires all three fields in one call
+and rejects an empty location; generic
+`Reference::new(..., Store::FileSystem)` and parsing of that location-less form
+fail with typed errors. It does not yet validate manifest identity/version or
+whether the location resolves to a deployed share. The misleading `catalog`
+builder/accessor was replaced by `location`/`location_name` without an alias.
+This is deliberately an Office-safe presence invariant over the permissive raw
+schema; a future lower-level repair API may retain malformed source markup
+without admitting it into the authoring model.
+
+After that correction, Excel opened the generated example with the same
+arbitrary instance and `appRef` strings without repair, changed B2 from 42 to
+84, saved, and reopened it without a compatibility or repair dialog. Excel
+relocated the web-extension parts under `xl/webextensions`, added its ordinary
+producer metadata, and retained the file-system location, package binding,
+worksheet `appRef`, and `xm:f`. `Workbook::task_panes`,
+`Sheet::web_bindings`, and the ordinary cell facade reverse-read the
+Office-saved artifact as `sales-range`, `Sheet1!$A$1:$B$2`, and numeric 84.
+The `web_bindings` example now demonstrates atomic authoring and graph
+readback; the existing `open` example supplied the ordinary cell readback.
+This certifies only the tested inert binding graph and open/edit/save/reopen
+path; it does not certify manifest discovery or add-in activation, other
+providers, Windows or older Office builds, the wider formula grammar, or
+performance.
+
+Focused verification is green: 44 common Web Extensions tests, ten canonical
+XLSX web/raw/cache/transaction tests, the symmetric pane/removal join
+regression, three migration-host worksheet-binding tests, one host
+task-pane-integrity test, and three package integration tests pass.
+Warning-denied all-target Clippy and warning-denied rustdoc pass for
+`litchi-ooxml-common`, `litchi-xlsx`, and `litchi-ooxml`. Formatting, diff
+validation, and the boundary checker are green; the checker still accepts 32
+workspace packages and 102 direct internal dependency declarations with 18
+explicit migration-debt items. Per explicit direction, the previously green
+full-workspace gate was not repeated. Single-flight behavior and shared
+payload ownership are topology guarantees, not measured memory, latency, CPU,
+cache, affinity, or contention results; ADR 0005 benchmarks and flame graphs
+remain required before making those performance claims.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

@@ -82,7 +82,6 @@ pub mod threaded_comments;
 pub mod vba_project;
 pub mod views;
 pub mod volatile_dependencies;
-pub mod web_extension_bindings;
 pub mod workbook;
 pub mod workbook_metadata;
 pub mod workbook_protection;
@@ -193,6 +192,7 @@ pub use ignored_errors::{
     IgnoredErrorRangeReference, WorksheetIgnoredError, WorksheetIgnoredErrorType,
     WorksheetIgnoredErrors, WorksheetIgnoredErrorsExtension, parse_worksheet_ignored_errors,
 };
+pub use litchi_xlsx::web;
 pub use named_sheet_view::{
     NamedSheetView, NamedSheetViewColumnFilter, NamedSheetViewDifferentialFormat,
     NamedSheetViewExtension, NamedSheetViewFilter, NamedSheetViewGuid, NamedSheetViewIconSet,
@@ -301,11 +301,6 @@ pub use volatile_dependencies::{
     load_from_package_with_conformance as load_volatile_dependencies_from_package_with_conformance,
     remove_from_package as remove_volatile_dependencies_from_package,
     store_in_package as store_volatile_dependencies_in_package,
-};
-pub use web_extension_bindings::{
-    WEB_EXTENSIONS_EXTENSION_URI, WorksheetWebExtensionBinding,
-    parse_worksheet_web_extension_bindings, replace_worksheet_web_extension_bindings,
-    validate_worksheet_web_extension_apprefs, write_worksheet_web_extension_bindings,
 };
 pub use workbook::Workbook;
 pub use workbook_protection::{

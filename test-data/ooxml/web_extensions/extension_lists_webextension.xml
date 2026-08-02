@@ -4,7 +4,7 @@
                  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
                  xmlns:vendor="urn:litchi:test:web-extension"
                  id="{00000000-0000-0000-0000-000000000004}">
-  <we:reference id="extension-lists" version="1.0.0.0" storeType="FileSystem">
+  <we:reference id="extension-lists" version="1.0.0.0" store="C:\AddIns" storeType="FileSystem">
     <we:extLst>
       <a:ext uri="urn:litchi:reference">
         <vendor:reference r:id="rIdInert">reference text<![CDATA[<opaque>]]><!--kept--></vendor:reference>

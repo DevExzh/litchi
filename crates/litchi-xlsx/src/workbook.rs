@@ -4,7 +4,7 @@ mod edit;
 
 pub use edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
-    JoinFailure, NewSheet, Patch, RowEdit, SheetEdit, State, TabEdit,
+    JoinFailure, NewSheet, PackageChange, Patch, RowEdit, SheetEdit, State, TabEdit,
 };
 
 use std::collections::HashMap;
@@ -17,6 +17,7 @@ use litchi_core::Selector;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
+use once_cell::sync::OnceCell;
 
 #[cfg(test)]
 use crate::Cell;
@@ -143,6 +144,7 @@ struct SheetData {
     visibility: Visibility,
     part_uri: PackURI,
     cells: OnceLock<Store>,
+    web_bindings: OnceCell<crate::web::Bindings>,
     #[allow(dead_code)]
     native_id: u32,
     relationship_id: String,
@@ -157,6 +159,7 @@ pub(crate) struct Inner {
     shared_strings: OnceLock<Box<[Text]>>,
     styles_uri: Option<PackURI>,
     styles: OnceLock<raw::styles::Catalog>,
+    task_panes: OnceCell<Option<litchi_ooxml_common::web::Panes>>,
     pub(crate) style_lineage: Arc<StyleLineage>,
     flavor: Flavor,
     date_system: DateSystem,
@@ -322,6 +325,7 @@ impl Workbook {
                     visibility: sheet.visibility.into(),
                     part_uri: part.uri,
                     cells: OnceLock::new(),
+                    web_bindings: OnceCell::new(),
                     native_id: sheet.sheet_id,
                     relationship_id: sheet.relationship_id,
                 })
@@ -337,6 +341,7 @@ impl Workbook {
                 shared_strings: OnceLock::new(),
                 styles_uri,
                 styles: OnceLock::new(),
+                task_panes: OnceCell::new(),
                 style_lineage,
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
@@ -430,6 +435,18 @@ impl Workbook {
         &self.inner.external_reference_ids
     }
 
+    /// Persisted Office Add-in task panes, when this package contains them.
+    ///
+    /// The complete package graph is validated on first access. Later calls
+    /// borrow the model retained by this immutable workbook snapshot.
+    pub fn task_panes(&self) -> Result<Option<&litchi_ooxml_common::web::Panes>> {
+        let panes = self
+            .inner
+            .task_panes
+            .get_or_try_init(|| litchi_ooxml_common::web::load(&self.inner.package))?;
+        Ok(panes.as_ref())
+    }
+
     /// Shared immutable cell formats in this workbook snapshot.
     pub fn styles(&self) -> Result<Styles> {
         let len = self.inner.style_count()?;
@@ -505,6 +522,23 @@ impl Sheet {
     /// Whether two handles belong to the same immutable workbook snapshot.
     pub fn same_workbook(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.owner, &other.owner)
+    }
+
+    /// Borrow this worksheet's Office Add-in range bindings.
+    ///
+    /// Bindings are decoded and validated on first access, then retained by
+    /// the immutable sheet snapshot. Non-worksheet handles return a typed
+    /// error instead of attempting to interpret another sheet kind as XML.
+    pub fn web_bindings(&self) -> Result<&crate::web::Bindings> {
+        if self.data.kind != SheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        self.data.web_bindings.get_or_try_init(|| {
+            let part = self.owner.package.get_part(&self.data.part_uri)?;
+            crate::raw::web::read(part.blob())
+        })
     }
 
     /// Look up one exact logical cell state by A1 or checked coordinate.
@@ -1043,6 +1077,96 @@ mod tests {
         assert!(std::mem::size_of::<Workbook>() <= 2 * std::mem::size_of::<usize>());
         assert!(std::mem::size_of::<Style>() <= 2 * std::mem::size_of::<usize>());
         assert!(std::mem::size_of::<Styles>() <= 2 * std::mem::size_of::<usize>());
+    }
+
+    #[test]
+    fn web_facades_are_lazy_borrowed_and_snapshot_scoped() {
+        use litchi_ooxml_common::web::{
+            AddIn, Conformance, Pane, Panes, Reference, Store as CatalogStore,
+        };
+
+        let baseline = Workbook::new().expect("valid baseline");
+        assert!(baseline.task_panes().expect("load absent panes").is_none());
+        assert!(baseline.task_panes().expect("reuse absent panes").is_none());
+
+        let mut package = baseline.inner.package.clone();
+        let reference =
+            Reference::new("wa1", "1.0.0.0", CatalogStore::Omex).expect("valid reference");
+        let mut panes = Panes::new();
+        panes
+            .push(Pane::new(
+                AddIn::new("add-in-1", reference).expect("valid add-in"),
+            ))
+            .expect("valid pane");
+        litchi_ooxml_common::web::put(&mut package, panes, Conformance::Transitional)
+            .expect("install task panes");
+
+        let with_panes = Workbook::from_package(package).expect("reopen task-pane workbook");
+        std::thread::scope(|scope| {
+            let reads = (0..8)
+                .map(|_| {
+                    let workbook = with_panes.clone();
+                    scope.spawn(move || {
+                        workbook
+                            .task_panes()
+                            .expect("load task panes concurrently")
+                            .expect("task panes present")
+                            .len()
+                    })
+                })
+                .collect::<Vec<_>>();
+            for read in reads {
+                assert_eq!(read.join().expect("task-pane reader"), 1);
+            }
+        });
+        let first = with_panes
+            .task_panes()
+            .expect("load task panes")
+            .expect("task panes present");
+        let second = with_panes
+            .task_panes()
+            .expect("reuse task panes")
+            .expect("task panes present");
+        assert!(std::ptr::eq(first, second));
+        assert_eq!(first.len(), 1);
+        assert!(first.get("add-in-1").is_some());
+
+        let mut package = baseline.inner.package.clone();
+        let sheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").expect("valid URI");
+        package
+            .get_part_mut(&sheet_uri)
+            .expect("worksheet part")
+            .set_blob(
+                include_bytes!("../../../test-data/ooxml/web_extensions/worksheet_bindings.xml")
+                    .to_vec(),
+            );
+        let with_bindings = Workbook::from_package(package).expect("reopen binding workbook");
+        let sheet = with_bindings
+            .sheet("Sheet1")
+            .expect("lookup")
+            .expect("worksheet present");
+        std::thread::scope(|scope| {
+            let reads = (0..8)
+                .map(|_| {
+                    let sheet = sheet.clone();
+                    scope.spawn(move || {
+                        sheet
+                            .web_bindings()
+                            .expect("load bindings concurrently")
+                            .len()
+                    })
+                })
+                .collect::<Vec<_>>();
+            for read in reads {
+                assert_eq!(read.join().expect("web-binding reader"), 2);
+            }
+        });
+        let first = sheet.web_bindings().expect("load bindings");
+        let second = sheet.web_bindings().expect("reuse bindings");
+        assert!(std::ptr::eq(first, second));
+        assert_eq!(first.len(), 2);
+        let first_binding = first.iter().next().expect("first binding");
+        assert_eq!(first_binding.app_ref(), "sales-table");
     }
 
     #[test]

@@ -4,7 +4,7 @@
                  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
                  id="{00000000-0000-0000-0000-000000000003}"
                  frozen="0">
-  <we:reference id="snapshot-effects" version="1.0.0.0" storeType="FileSystem"/>
+  <we:reference id="snapshot-effects" version="1.0.0.0" store="C:\AddIns" storeType="FileSystem"/>
   <we:properties/>
   <we:bindings/>
   <we:snapshot r:embed="rIdSnapshot" cstate="hqprint">

@@ -200,6 +200,7 @@ pub enum Store {
     SharePointCatalog,
     SharePointApp,
     Exchange,
+    /// File-system provider. Author references with [`Reference::file`].
     FileSystem,
     Registry,
     ExchangeCatalog,
@@ -239,18 +240,27 @@ impl Store {
 pub struct Reference {
     id: String,
     version: String,
-    catalog: Option<String>,
+    location: Option<String>,
     store: Store,
     extension_list: Option<ExtList>,
 }
 
 impl Reference {
-    /// Create a validated catalog reference.
+    /// Create a validated reference for a catalog-backed provider.
+    ///
+    /// File-system references require a location and must be created with
+    /// [`Self::file`]. Keeping the location in the constructor prevents the
+    /// safe model from representing the store-less form rejected by Office.
     pub fn new(id: impl Into<String>, version: impl Into<String>, store: Store) -> Result<Self> {
+        if store == Store::FileSystem {
+            return invalid(
+                "FileSystem references require Reference::file(id, version, location)".into(),
+            );
+        }
         let value = Self {
             id: id.into(),
             version: version.into(),
-            catalog: None,
+            location: None,
             store,
             extension_list: None,
         };
@@ -258,11 +268,28 @@ impl Reference {
         Ok(value)
     }
 
-    /// Add the optional catalog/location discriminator.
-    pub fn catalog(mut self, value: impl Into<String>) -> Result<Self> {
+    /// Create a validated file-system reference with its required location.
+    pub fn file(
+        id: impl Into<String>,
+        version: impl Into<String>,
+        location: impl Into<String>,
+    ) -> Result<Self> {
+        let value = Self {
+            id: id.into(),
+            version: version.into(),
+            location: Some(location.into()),
+            store: Store::FileSystem,
+            extension_list: None,
+        };
+        validate_store_reference(&value)?;
+        Ok(value)
+    }
+
+    /// Add or replace the optional provider-specific location.
+    pub fn location(mut self, value: impl Into<String>) -> Result<Self> {
         let value = value.into();
-        require_nonempty("reference catalog", &value)?;
-        self.catalog = Some(value);
+        require_nonempty("reference location", &value)?;
+        self.location = Some(value);
         Ok(self)
     }
 
@@ -282,8 +309,8 @@ impl Reference {
     }
 
     #[must_use]
-    pub fn catalog_name(&self) -> Option<&str> {
-        self.catalog.as_deref()
+    pub fn location_name(&self) -> Option<&str> {
+        self.location.as_deref()
     }
 
     #[must_use]
@@ -2313,6 +2340,27 @@ pub fn put_with(
     conformance: Conformance,
     limits: &Limits,
 ) -> Result<()> {
+    plan_put_with(package, task_panes, conformance, limits)?
+        .apply(package)
+        .map(|_| ())
+}
+
+/// Plan an exact, source-checked replacement of the persisted task-pane graph.
+///
+/// The returned patch is opaque: physical part names and relationship IDs stay
+/// private to the graph owner. Payload allocations are shared with the patch,
+/// and [`Patch::inverse`] does not copy them.
+pub fn plan_put(package: &OpcPackage, panes: Panes, conformance: Conformance) -> Result<Patch> {
+    plan_put_with(package, panes, conformance, &Limits::standard())
+}
+
+/// Plan a task-pane graph replacement with explicit resource limits.
+pub fn plan_put_with(
+    package: &OpcPackage,
+    task_panes: Panes,
+    conformance: Conformance,
+    limits: &Limits,
+) -> Result<Patch> {
     let mut budget = OperationBudget::default();
     let index = PackageGraphIndex::build(package, limits, &mut budget)?;
     charge_authored_metadata(&task_panes, &mut budget, limits)?;
@@ -2450,7 +2498,7 @@ pub fn put_with(
         .as_ref()
         .is_some_and(|graph| graph_matches_plan(package, &planned, graph, &reserved_names))
     {
-        return Ok(());
+        return Ok(Patch::default());
     }
     let deletions = planned_deletions(old_parts, &reserved_names, &protected, limits)?;
     validate_plan_counts(package, &index, &planned, existing.as_ref(), limits)?;
@@ -2458,23 +2506,43 @@ pub fn put_with(
         .as_ref()
         .map(|graph| graph.root_relationship_id.clone())
         .map_or_else(|| next_package_relationship_id(package, limits), Ok)?;
-    install_planned_parts(package, planned)?;
-
-    if existing.is_some() {
-        package.rels_mut().remove(&root_relationship_id);
-    }
-    package.rels_mut().add_relationship(
-        TASK_PANES_RELATIONSHIP.into(),
-        task_panes_name.as_str().trim_start_matches('/').into(),
-        root_relationship_id,
-        false,
-    );
-
-    for name in deletions {
-        package.remove_part(&name);
-    }
-    package.unsign();
-    Ok(())
+    let root_before = existing
+        .as_ref()
+        .map(|graph| {
+            package
+                .rels()
+                .get(&graph.root_relationship_id)
+                .map(RelationshipState::capture)
+                .ok_or_else(|| {
+                    Error::Relationship(
+                        "task-pane root relationship disappeared while planning".into(),
+                    )
+                })
+        })
+        .transpose()?;
+    let root_after = Some(RelationshipState {
+        id: root_relationship_id,
+        relationship_type: TASK_PANES_RELATIONSHIP.into(),
+        target: task_panes_name.as_str().trim_start_matches('/').into(),
+        external: false,
+    });
+    let destination_parts = planned.iter().map(|part| part.name.clone()).collect();
+    Patch::planned(
+        package,
+        PatchPlan {
+            before: PlannedGraph {
+                root: root_before,
+                owned_parts: old_parts.to_vec(),
+            },
+            after: PlannedGraph {
+                root: root_after,
+                owned_parts: destination_parts,
+            },
+            parts: planned,
+            deletions,
+            limits: *limits,
+        },
+    )
 }
 
 /// Remove the package-level task-pane relationship and graph.
@@ -2486,22 +2554,602 @@ pub fn remove(package: &mut OpcPackage) -> Result<bool> {
 
 /// Remove the task-pane graph with explicit package graph and deletion ceilings.
 pub fn remove_with(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
+    plan_remove_with(package, limits)?.apply(package)
+}
+
+/// Plan removal of the package-level task-pane relationship and owned graph.
+///
+/// An absent graph produces an empty patch, so applying it is a
+/// signature-preserving no-op.
+pub fn plan_remove(package: &OpcPackage) -> Result<Patch> {
+    plan_remove_with(package, &Limits::standard())
+}
+
+/// Plan task-pane graph removal with explicit graph and deletion ceilings.
+pub fn plan_remove_with(package: &OpcPackage, limits: &Limits) -> Result<Patch> {
     if !has_task_panes_relationship(package, limits)? {
-        return Ok(false);
+        return Ok(Patch::default());
     }
     let mut budget = OperationBudget::default();
     let index = PackageGraphIndex::build(package, limits, &mut budget)?;
     let Some(existing) = existing_web_extension_graph(package, limits, &index, &mut budget)? else {
-        return Ok(false);
+        return Ok(Patch::default());
     };
     let protected = index.protected_closure(&existing.owned_parts, &existing.root_relationship_id);
     let deletions = planned_deletions(&existing.owned_parts, &BTreeSet::new(), &protected, limits)?;
-    package.rels_mut().remove(&existing.root_relationship_id);
-    for name in deletions {
-        package.remove_part(&name);
+    let root_before = package
+        .rels()
+        .get(&existing.root_relationship_id)
+        .map(RelationshipState::capture)
+        .ok_or_else(|| {
+            Error::Relationship("task-pane root relationship disappeared while planning".into())
+        })?;
+    Patch::planned(
+        package,
+        PatchPlan {
+            before: PlannedGraph {
+                root: Some(root_before),
+                owned_parts: existing.owned_parts,
+            },
+            after: PlannedGraph {
+                root: None,
+                owned_parts: Vec::new(),
+            },
+            parts: Vec::new(),
+            deletions,
+            limits: *limits,
+        },
+    )
+}
+
+/// Opaque, exact, reversible task-pane graph transaction.
+///
+/// A patch records the precise source and destination state of every affected
+/// relationship and part. Applying a stale patch fails before mutation. Empty
+/// patches preserve package signatures; a changed package is always unsigned.
+#[must_use = "a planned Web Extensions patch has no effect until it is applied"]
+#[derive(Clone, Default)]
+pub struct Patch {
+    root: Option<RootChange>,
+    parts: Box<[PartChange]>,
+    protection: Option<ProtectionGuard>,
+}
+
+struct PatchPlan {
+    before: PlannedGraph,
+    after: PlannedGraph,
+    parts: Vec<PlannedPart>,
+    deletions: Vec<PackURI>,
+    limits: Limits,
+}
+
+struct PlannedGraph {
+    root: Option<RelationshipState>,
+    owned_parts: Vec<PackURI>,
+}
+
+impl std::fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("empty", &self.is_empty())
+            .field("affected_parts", &self.parts.len())
+            .finish_non_exhaustive()
     }
-    package.unsign();
-    Ok(true)
+}
+
+impl Patch {
+    fn planned(package: &OpcPackage, plan: PatchPlan) -> Result<Self> {
+        let PatchPlan {
+            before,
+            after,
+            parts: planned,
+            deletions,
+            limits,
+        } = plan;
+        let affected_parts = planned
+            .len()
+            .checked_add(deletions.len())
+            .ok_or(Error::Limit {
+                resource: "Web Extensions patch parts",
+                max: usize::MAX,
+                actual: usize::MAX,
+            })?;
+        let mut parts = Vec::with_capacity(affected_parts);
+        let mut planned_names = HashSet::with_capacity(planned.len());
+        for part in planned {
+            let name = part.name.clone();
+            planned_names.insert(fold_part_name(&name));
+            let before = package.get_part(&name).ok().map(PartState::capture);
+            parts.push(PartChange {
+                name,
+                before,
+                after: Some(PartState::from_planned(part)),
+            });
+        }
+        for name in deletions {
+            if planned_names.contains(&fold_part_name(&name)) {
+                return invalid("planned Web Extensions part is also marked for deletion".into());
+            }
+            let before = package
+                .get_part(&name)
+                .ok()
+                .map(PartState::capture)
+                .ok_or_else(|| {
+                    Error::Missing("Web Extensions patch source part disappeared".into())
+                })?;
+            parts.push(PartChange {
+                name,
+                before: Some(before),
+                after: None,
+            });
+        }
+        parts.sort_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
+        let protection = ProtectionGuard {
+            source: GraphScope {
+                root_relationship_id: before.root.as_ref().map(|root| root.id.clone()),
+                owned_parts: before.owned_parts.into_boxed_slice(),
+            },
+            destination: GraphScope {
+                root_relationship_id: after.root.as_ref().map(|root| root.id.clone()),
+                owned_parts: after.owned_parts.into_boxed_slice(),
+            },
+            limits,
+        };
+        let patch = Self {
+            root: Some(RootChange {
+                before: before.root,
+                after: after.root,
+            }),
+            parts: parts.into_boxed_slice(),
+            protection: Some(protection),
+        };
+        if patch.has_changes() {
+            Ok(patch)
+        } else {
+            Ok(Self::default())
+        }
+    }
+
+    /// Return whether this patch makes no changes.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        !self.has_changes()
+    }
+
+    /// Build the exact inverse without copying part payloads.
+    #[must_use = "the inverse has no effect until it is applied"]
+    pub fn inverse(&self) -> Self {
+        Self {
+            root: self.root.as_ref().map(|root| RootChange {
+                before: root.after.clone(),
+                after: root.before.clone(),
+            }),
+            parts: self
+                .parts
+                .iter()
+                .map(|part| PartChange {
+                    name: part.name.clone(),
+                    before: part.after.clone(),
+                    after: part.before.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            protection: self.protection.as_ref().map(ProtectionGuard::inverse),
+        }
+    }
+
+    /// Apply this patch after checking its exact source graph.
+    ///
+    /// Returns `true` when the package changed. Source checks, destination-name
+    /// checks, and relationship staging all finish before the first mutation.
+    pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
+        if self.is_empty() {
+            return Ok(false);
+        }
+        self.validate_source(package)?;
+        self.validate_protection(package)?;
+        self.validate_destination_names(package)?;
+        let staged = self
+            .parts
+            .iter()
+            .filter(|part| part.before != part.after)
+            .filter_map(|part| {
+                part.after
+                    .as_ref()
+                    .map(|after| after.blob_part(part.name.clone()))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        for part in staged {
+            package.add_part(Box::new(part));
+        }
+        if let Some(root) = self.root.as_ref().filter(|root| root.before != root.after) {
+            if let Some(before) = &root.before {
+                package.rels_mut().remove(&before.id);
+            }
+            if let Some(after) = &root.after {
+                package.rels_mut().add_relationship(
+                    after.relationship_type.clone(),
+                    after.target.clone(),
+                    after.id.clone(),
+                    after.external,
+                );
+            }
+        }
+        for part in self
+            .parts
+            .iter()
+            .filter(|part| part.before != part.after && part.after.is_none())
+        {
+            package.remove_part(&part.name);
+        }
+        package.unsign();
+        Ok(true)
+    }
+
+    fn has_changes(&self) -> bool {
+        self.root
+            .as_ref()
+            .is_some_and(|root| root.before != root.after)
+            || self.parts.iter().any(|part| part.before != part.after)
+    }
+
+    fn validate_source(&self, package: &OpcPackage) -> Result<()> {
+        if let Some(root) = &self.root {
+            let mut task_relationships = package
+                .rels()
+                .iter()
+                .filter(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP);
+            let first = task_relationships.next();
+            let unique = task_relationships.next().is_none();
+            let root_matches = match &root.before {
+                Some(before) => first.is_some_and(|actual| before.matches(actual)) && unique,
+                None => first.is_none(),
+            };
+            if !root_matches {
+                return Err(Error::Relationship(
+                    "Web Extensions patch source relationship changed".into(),
+                ));
+            }
+            if let Some(after) = &root.after {
+                let reuses_source_id = root
+                    .before
+                    .as_ref()
+                    .is_some_and(|before| before.id == after.id);
+                if !reuses_source_id && package.rels().get(&after.id).is_some() {
+                    return Err(Error::Relationship(
+                        "Web Extensions patch destination relationship is occupied".into(),
+                    ));
+                }
+            }
+        }
+        for change in &self.parts {
+            let actual = package.get_part(&change.name).ok();
+            let matches = match (&change.before, actual) {
+                (Some(before), Some(actual)) => before.matches(actual),
+                (None, None) => true,
+                _ => false,
+            };
+            if !matches {
+                return Err(Error::Relationship(
+                    "Web Extensions patch source part changed".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_protection(&self, package: &OpcPackage) -> Result<()> {
+        let Some(guard) = &self.protection else {
+            return Ok(());
+        };
+        let changed_existing: HashSet<_> = self
+            .parts
+            .iter()
+            .filter(|part| part.before.is_some() && part.before != part.after)
+            .map(|part| fold_part_name(&part.name))
+            .collect();
+        if !changed_existing.is_empty() {
+            let protected = protected_parts(package, &guard.source, &guard.limits)?;
+            if changed_existing.iter().any(|name| protected.contains(name)) {
+                return Err(Error::Relationship(
+                    "Web Extensions patch would change a newly shared source part".into(),
+                ));
+            }
+        }
+
+        let changed_destinations: HashSet<_> = self
+            .parts
+            .iter()
+            .filter(|part| part.after.is_some() && part.before != part.after)
+            .map(|part| fold_part_name(&part.name))
+            .collect();
+        if !changed_destinations.is_empty() {
+            let protected = protected_parts(package, &guard.destination, &guard.limits)?;
+            if changed_destinations
+                .iter()
+                .any(|name| protected.contains(name))
+            {
+                return Err(Error::Relationship(
+                    "Web Extensions patch would create a newly shared destination part".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_destination_names(&self, package: &OpcPackage) -> Result<()> {
+        let changed = self
+            .parts
+            .iter()
+            .filter(|change| change.before != change.after && change.after.is_some());
+        let mut destinations = BTreeSet::new();
+        let mut replacements = HashMap::new();
+        for change in changed {
+            let folded = fold_part_name(&change.name);
+            if folded_name_conflicts(&destinations, &folded) {
+                return invalid("Web Extensions patch destination parts conflict".into());
+            }
+            destinations.insert(folded.clone());
+            if change.before.is_some() {
+                replacements.insert(folded, &change.name);
+            }
+        }
+        if destinations.is_empty() {
+            return Ok(());
+        }
+        for existing in package.iter_parts() {
+            let folded = fold_part_name(existing.partname());
+            if !folded_name_conflicts(&destinations, &folded) {
+                continue;
+            }
+            let is_replaced_source = replacements
+                .get(&folded)
+                .is_some_and(|name| *name == existing.partname());
+            if !is_replaced_source {
+                return invalid("Web Extensions patch destination part is occupied".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct RootChange {
+    before: Option<RelationshipState>,
+    after: Option<RelationshipState>,
+}
+
+#[derive(Clone)]
+struct ProtectionGuard {
+    source: GraphScope,
+    destination: GraphScope,
+    limits: Limits,
+}
+
+impl ProtectionGuard {
+    fn inverse(&self) -> Self {
+        Self {
+            source: self.destination.clone(),
+            destination: self.source.clone(),
+            limits: self.limits,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct GraphScope {
+    root_relationship_id: Option<String>,
+    owned_parts: Box<[PackURI]>,
+}
+
+fn protected_parts(
+    package: &OpcPackage,
+    scope: &GraphScope,
+    limits: &Limits,
+) -> Result<HashSet<String>> {
+    let part_count = package.part_count();
+    if part_count > limits.package_parts {
+        return limit("package parts", limits.package_parts, part_count);
+    }
+    if scope.owned_parts.is_empty() {
+        return Ok(HashSet::new());
+    }
+
+    let mut names = Vec::with_capacity(scope.owned_parts.len());
+    let mut by_name = HashMap::with_capacity(scope.owned_parts.len());
+    for name in &scope.owned_parts {
+        let folded = fold_part_name(name);
+        if by_name.insert(folded.clone(), names.len()).is_some() {
+            return invalid("duplicate part in Web Extensions patch protection scope".into());
+        }
+        names.push(folded);
+    }
+
+    let mut outbound = vec![Vec::new(); names.len()];
+    let mut protected = vec![false; names.len()];
+    let mut queue = VecDeque::new();
+    let mut relationships = 0usize;
+
+    for relationship in package.rels().iter() {
+        charge_patch_relationship(&mut relationships, limits)?;
+        if relationship.is_external() {
+            continue;
+        }
+        let Ok(target) = relationship.target_partname() else {
+            continue;
+        };
+        let Some(&target) = by_name.get(&fold_part_name(&target)) else {
+            continue;
+        };
+        if scope.root_relationship_id.as_deref() != Some(relationship.r_id()) && !protected[target]
+        {
+            protected[target] = true;
+            queue.push_back(target);
+        }
+    }
+
+    for part in package.iter_parts() {
+        let source = by_name.get(&fold_part_name(part.partname())).copied();
+        for relationship in part.rels().iter() {
+            charge_patch_relationship(&mut relationships, limits)?;
+            if relationship.is_external() {
+                continue;
+            }
+            let Ok(target_name) = relationship.target_partname() else {
+                continue;
+            };
+            let Some(&target) = by_name.get(&fold_part_name(&target_name)) else {
+                continue;
+            };
+            if let Some(source) = source {
+                outbound[source].push(target);
+            } else if !protected[target] {
+                protected[target] = true;
+                queue.push_back(target);
+            }
+        }
+    }
+
+    while let Some(source) = queue.pop_front() {
+        for &target in &outbound[source] {
+            if !protected[target] {
+                protected[target] = true;
+                queue.push_back(target);
+            }
+        }
+    }
+
+    Ok(names
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, name)| protected[index].then_some(name))
+        .collect())
+}
+
+fn charge_patch_relationship(relationships: &mut usize, limits: &Limits) -> Result<()> {
+    *relationships = relationships.checked_add(1).ok_or(Error::Limit {
+        resource: "package relationships",
+        max: limits.package_relationships,
+        actual: usize::MAX,
+    })?;
+    if *relationships > limits.package_relationships {
+        return limit(
+            "package relationships",
+            limits.package_relationships,
+            *relationships,
+        );
+    }
+    Ok(())
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct PartChange {
+    name: PackURI,
+    before: Option<PartState>,
+    after: Option<PartState>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct PartState {
+    content_type: String,
+    data: Arc<Vec<u8>>,
+    relationships: Box<[RelationshipState]>,
+}
+
+impl PartState {
+    fn capture(part: &dyn Part) -> Self {
+        let mut relationships = part
+            .rels()
+            .iter()
+            .map(RelationshipState::capture)
+            .collect::<Vec<_>>();
+        relationships.sort_by(|left, right| left.id.cmp(&right.id));
+        Self {
+            content_type: part.content_type().to_owned(),
+            data: part.blob_arc(),
+            relationships: relationships.into_boxed_slice(),
+        }
+    }
+
+    fn from_planned(part: PlannedPart) -> Self {
+        let mut relationships = part
+            .relationships
+            .into_iter()
+            .map(RelationshipState::from_planned)
+            .collect::<Vec<_>>();
+        relationships.sort_by(|left, right| left.id.cmp(&right.id));
+        Self {
+            content_type: part.content_type,
+            data: part.data,
+            relationships: relationships.into_boxed_slice(),
+        }
+    }
+
+    fn matches(&self, part: &dyn Part) -> bool {
+        self.content_type == part.content_type()
+            && self.data.as_slice() == part.blob()
+            && self.relationships.len() == part.rels().len()
+            && self.relationships.iter().all(|expected| {
+                part.rels()
+                    .get(&expected.id)
+                    .is_some_and(|actual| expected.matches(actual))
+            })
+    }
+
+    fn blob_part(&self, name: PackURI) -> Result<BlobPart> {
+        let mut part =
+            BlobPart::new_shared(name, self.content_type.clone(), Arc::clone(&self.data));
+        for relationship in &self.relationships {
+            part.rels_mut().try_add_relationship(
+                relationship.relationship_type.clone(),
+                relationship.target.clone(),
+                relationship.id.clone(),
+                if relationship.external {
+                    TargetMode::External
+                } else {
+                    TargetMode::Internal
+                },
+            )?;
+        }
+        Ok(part)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct RelationshipState {
+    id: String,
+    relationship_type: String,
+    target: String,
+    external: bool,
+}
+
+impl RelationshipState {
+    fn capture(relationship: &litchi_opc::Relationship) -> Self {
+        Self {
+            id: relationship.r_id().to_owned(),
+            relationship_type: relationship.reltype().to_owned(),
+            target: relationship.target_ref().to_owned(),
+            external: relationship.is_external(),
+        }
+    }
+
+    fn from_planned(relationship: PlannedRelationship) -> Self {
+        Self {
+            id: relationship.id,
+            relationship_type: relationship.relationship_type,
+            target: relationship.target,
+            external: relationship.external,
+        }
+    }
+
+    fn matches(&self, relationship: &litchi_opc::Relationship) -> bool {
+        self.id == relationship.r_id()
+            && self.relationship_type == relationship.reltype()
+            && self.target == relationship.target_ref()
+            && self.external == relationship.is_external()
+    }
 }
 
 #[derive(Debug)]
@@ -3110,37 +3758,6 @@ fn planned_part_matches_existing(existing: &dyn Part, planned: &PlannedPart) -> 
         })
 }
 
-fn install_planned_parts(package: &mut OpcPackage, planned: Vec<PlannedPart>) -> Result<()> {
-    let staged = planned
-        .into_iter()
-        .map(planned_blob_part)
-        .collect::<Result<Vec<_>>>()?;
-    // Preflight and relationship construction complete before this point. The
-    // remaining map replacements are infallible, so callers never observe a
-    // partially installed Web Extensions graph on error.
-    for part in staged {
-        package.add_part(Box::new(part));
-    }
-    Ok(())
-}
-
-fn planned_blob_part(part: PlannedPart) -> Result<BlobPart> {
-    let mut value = BlobPart::new_shared(part.name, part.content_type, part.data);
-    for relationship in part.relationships {
-        value.rels_mut().try_add_relationship(
-            relationship.relationship_type,
-            relationship.target,
-            relationship.id,
-            if relationship.external {
-                TargetMode::External
-            } else {
-                TargetMode::Internal
-            },
-        )?;
-    }
-    Ok(value)
-}
-
 /// Deterministically serialize a single web extension part.
 #[cfg(test)]
 fn write_add_in(extension: &AddIn, conformance: Conformance) -> Result<Vec<u8>> {
@@ -3384,10 +4001,10 @@ fn parse_store_reference(node: &Node, document: &XmlDocument) -> Result<Referenc
     {
         return invalid("reference permits only one trailing extLst".into());
     }
-    Ok(Reference {
+    let reference = Reference {
         id: required_attr(node, "", "id")?.to_owned(),
         version: required_attr(node, "", "version")?.to_owned(),
-        catalog: attr(node, "", "store").map(str::to_owned),
+        location: attr(node, "", "store").map(str::to_owned),
         store: attr(node, "", "storeType")
             .map(Store::parse)
             .transpose()?
@@ -3396,7 +4013,9 @@ fn parse_store_reference(node: &Node, document: &XmlDocument) -> Result<Referenc
             .first()
             .map(|node| ExtList::from_node(node, document))
             .transpose()?,
-    })
+    };
+    validate_store_reference(&reference)?;
+    Ok(reference)
 }
 
 fn parse_property(node: &Node) -> Result<Property> {
@@ -3614,6 +4233,11 @@ fn validate_binding(binding: &Binding) -> Result<()> {
 fn validate_store_reference(reference: &Reference) -> Result<()> {
     require_nonempty("reference id", &reference.id)?;
     require_nonempty("reference version", &reference.version)?;
+    if let Some(location) = &reference.location {
+        require_nonempty("reference location", location)?;
+    } else if reference.store == Store::FileSystem {
+        return invalid("FileSystem reference requires a non-empty location".into());
+    }
     validate_extension_list(reference.extension_list.as_ref(), &[ExtKind::AddIn])
 }
 
@@ -3761,8 +4385,8 @@ fn add_reference_budget(total: &mut usize, reference: &Reference, limits: &Limit
     add_xml_budget(total, 128, limits)?;
     add_escaped_xml_budget(total, &reference.id, limits)?;
     add_escaped_xml_budget(total, &reference.version, limits)?;
-    if let Some(catalog) = &reference.catalog {
-        add_escaped_xml_budget(total, catalog, limits)?;
+    if let Some(location) = &reference.location {
+        add_escaped_xml_budget(total, location, limits)?;
     }
     if let Some(extension_list) = &reference.extension_list {
         add_xml_budget(total, extension_list.xml.len(), limits)?;
@@ -3910,7 +4534,7 @@ fn write_store_reference(out: &mut String, element: &str, reference: &Reference)
     escape_attr(out, &reference.id);
     out.push_str("\" version=\"");
     escape_attr(out, &reference.version);
-    if let Some(store) = &reference.catalog {
+    if let Some(store) = &reference.location {
         out.push_str("\" store=\"");
         escape_attr(out, store);
     }
@@ -4938,6 +5562,41 @@ mod tests {
     }
 
     #[test]
+    fn file_references_require_an_atomic_nonempty_location() {
+        let error = Reference::new("Example3", "15.0", Store::FileSystem).unwrap_err();
+        assert!(error.to_string().contains("Reference::file"));
+        assert!(Reference::file("Example3", "15.0", "").is_err());
+
+        let reference = Reference::file("Example3", "15.0", r"C:\Example").unwrap();
+        assert_eq!(reference.store(), Store::FileSystem);
+        assert_eq!(reference.location_name(), Some(r"C:\Example"));
+
+        let extension = AddIn::new("plain-instance-id", reference)
+            .unwrap()
+            .bind(Binding::new("Matrix1", "matrix", "plain-app-ref").unwrap())
+            .unwrap();
+        let xml = write_add_in(&extension, Conformance::Transitional).unwrap();
+        assert!(
+            std::str::from_utf8(&xml)
+                .unwrap()
+                .contains(r#"store="C:\Example" storeType="FileSystem""#)
+        );
+        assert_eq!(parse_add_in(&xml).unwrap(), extension);
+    }
+
+    #[test]
+    fn office_safe_parser_rejects_a_storeless_file_reference() {
+        let xml = format!(
+            r#"<we:webextension xmlns:we="{WEB_EXTENSION_NAMESPACE}" id="plain-instance-id">
+                 <we:reference id="Example3" version="15.0" storeType="FileSystem"/>
+                 <we:properties/><we:bindings/>
+               </we:webextension>"#
+        );
+        let error = parse_add_in(xml.as_bytes()).unwrap_err();
+        assert!(error.to_string().contains("non-empty location"));
+    }
+
+    #[test]
     fn strict_writer_is_deterministic_and_round_trips() {
         let extension = sample_extension();
         let first = write_add_in(&extension, Conformance::Strict).unwrap();
@@ -5275,9 +5934,266 @@ mod tests {
         assert!(package.is_signed());
 
         let loaded = load(&package).unwrap().unwrap();
+        let patch = plan_put(&package, loaded.clone(), Conformance::Transitional).unwrap();
+        assert!(patch.is_empty());
+        assert!(patch.inverse().is_empty());
+        assert!(!patch.apply(&mut package).unwrap());
+        assert_eq!(
+            format!("{patch:?}"),
+            "Patch { empty: true, affected_parts: 0, .. }"
+        );
         put(&mut package, loaded, Conformance::Transitional).unwrap();
 
         assert!(package.is_signed());
+    }
+
+    #[test]
+    fn put_patch_is_exact_reversible_and_arc_shared() {
+        let mut package = OpcPackage::new();
+        let original = sample_task_panes();
+        put(&mut package, original.clone(), Conformance::Transitional).unwrap();
+        let image_name = PackURI::new("/media/web-extension-snapshot.png").unwrap();
+        let original_image = package.get_part(&image_name).unwrap().blob_arc();
+        let original_root = package
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP)
+            .map(RelationshipState::capture)
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+
+        let replacement_image = Arc::new(vec![1, 2, 3, 4, 5, 6]);
+        let mut replacement = load(&package).unwrap().unwrap();
+        assert!(
+            replacement
+                .edit(0usize, |pane| {
+                    pane.set_visible(false);
+                    pane.set_image(
+                        image_name.as_str(),
+                        "image/png",
+                        Arc::clone(&replacement_image),
+                    )?;
+                    Ok(())
+                })
+                .unwrap()
+        );
+
+        let patch = plan_put(&package, replacement.clone(), Conformance::Transitional).unwrap();
+        assert!(!patch.is_empty());
+        let image_change = patch
+            .parts
+            .iter()
+            .find(|part| part.name == image_name)
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            &image_change.after.as_ref().unwrap().data,
+            &replacement_image,
+        ));
+        let inverse = patch.inverse();
+        let inverse_image = inverse
+            .parts
+            .iter()
+            .find(|part| part.name == image_name)
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            &image_change.before.as_ref().unwrap().data,
+            &inverse_image.after.as_ref().unwrap().data,
+        ));
+        assert!(!format!("{patch:?}").contains("rId"));
+        assert!(!format!("{patch:?}").contains("/webextensions"));
+
+        assert!(patch.apply(&mut package).unwrap());
+        assert!(!package.is_signed());
+        let applied = load(&package).unwrap().unwrap();
+        assert!(!applied.get(0usize).unwrap().visible());
+        assert_eq!(
+            applied.get(0usize).unwrap().image().unwrap().bytes(),
+            replacement_image.as_slice(),
+        );
+        assert_eq!(
+            applied.get(0usize).unwrap().link().unwrap().external(),
+            Some("https://example.invalid/inert-snapshot.png"),
+        );
+        assert!(Arc::ptr_eq(
+            &package.get_part(&image_name).unwrap().blob_arc(),
+            &replacement_image,
+        ));
+
+        assert!(inverse.apply(&mut package).unwrap());
+        let restored = load(&package).unwrap().unwrap();
+        assert!(restored.get(0usize).unwrap().visible());
+        assert_eq!(
+            restored.get(0usize).unwrap().add_in(),
+            original.get(0usize).unwrap().add_in(),
+        );
+        assert_eq!(
+            restored.get(0usize).unwrap().image().unwrap().bytes(),
+            original.get(0usize).unwrap().image().unwrap().bytes(),
+        );
+        assert!(Arc::ptr_eq(
+            &package.get_part(&image_name).unwrap().blob_arc(),
+            &original_image,
+        ));
+        let restored_root = package
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP)
+            .unwrap();
+        assert!(original_root.matches(restored_root));
+    }
+
+    #[test]
+    fn remove_patch_restores_exact_shared_parts() {
+        let mut package = OpcPackage::new();
+        let original = sample_task_panes();
+        put(&mut package, original.clone(), Conformance::Transitional).unwrap();
+        let image_name = PackURI::new("/media/web-extension-snapshot.png").unwrap();
+        let original_image = package.get_part(&image_name).unwrap().blob_arc();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+
+        let patch = plan_remove(&package).unwrap();
+        let inverse = patch.inverse();
+        let restored_image = inverse
+            .parts
+            .iter()
+            .find(|part| part.name == image_name)
+            .and_then(|part| part.after.as_ref())
+            .unwrap();
+        assert!(Arc::ptr_eq(&restored_image.data, &original_image));
+
+        assert!(patch.apply(&mut package).unwrap());
+        assert!(!package.is_signed());
+        assert!(load(&package).unwrap().is_none());
+        assert!(package.get_part(&image_name).is_err());
+
+        assert!(inverse.apply(&mut package).unwrap());
+        assert_eq!(load(&package).unwrap(), Some(original));
+        assert!(Arc::ptr_eq(
+            &package.get_part(&image_name).unwrap().blob_arc(),
+            &original_image,
+        ));
+    }
+
+    #[test]
+    fn patch_rejects_changed_root_and_part_before_mutation() {
+        let mut root_changed = OpcPackage::new();
+        put(
+            &mut root_changed,
+            sample_task_panes(),
+            Conformance::Transitional,
+        )
+        .unwrap();
+        root_changed.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        let mut replacement = load(&root_changed).unwrap().unwrap();
+        replacement.panes[0].visible = false;
+        let patch = plan_put(&root_changed, replacement, Conformance::Transitional).unwrap();
+        let root = root_changed
+            .rels()
+            .iter()
+            .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP)
+            .map(RelationshipState::capture)
+            .unwrap();
+        root_changed.rels_mut().remove(&root.id);
+        root_changed.rels_mut().add_relationship(
+            root.relationship_type,
+            format!("{}#changed", root.target),
+            root.id,
+            root.external,
+        );
+        let task_name = PackURI::new("/webextensions/taskpanes.xml").unwrap();
+        let task_before = root_changed.get_part(&task_name).unwrap().blob_arc();
+        assert!(patch.apply(&mut root_changed).is_err());
+        assert!(root_changed.is_signed());
+        assert!(Arc::ptr_eq(
+            &root_changed.get_part(&task_name).unwrap().blob_arc(),
+            &task_before,
+        ));
+
+        let mut part_changed = OpcPackage::new();
+        put(
+            &mut part_changed,
+            sample_task_panes(),
+            Conformance::Transitional,
+        )
+        .unwrap();
+        part_changed.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        let mut replacement = load(&part_changed).unwrap().unwrap();
+        replacement.panes[0].visible = false;
+        let patch = plan_put(&part_changed, replacement, Conformance::Transitional).unwrap();
+        let image_name = PackURI::new("/media/web-extension-snapshot.png").unwrap();
+        part_changed
+            .get_part_mut(&image_name)
+            .unwrap()
+            .set_blob(vec![9, 8, 7]);
+        let task_before = part_changed.get_part(&task_name).unwrap().blob_arc();
+        assert!(patch.apply(&mut part_changed).is_err());
+        assert!(part_changed.is_signed());
+        assert!(Arc::ptr_eq(
+            &part_changed.get_part(&task_name).unwrap().blob_arc(),
+            &task_before,
+        ));
+        assert_eq!(
+            part_changed.get_part(&image_name).unwrap().blob(),
+            &[9, 8, 7]
+        );
+    }
+
+    #[test]
+    fn patch_rechecks_shared_graph_protection_before_mutation() {
+        let mut stale = OpcPackage::new();
+        put(&mut stale, sample_task_panes(), Conformance::Transitional).unwrap();
+        stale.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        let patch = plan_remove(&stale).unwrap();
+        let task_name = add_shared_task_pane_ingress(&mut stale);
+        let before_parts = stale.part_count();
+
+        assert!(patch.apply(&mut stale).is_err());
+        assert!(stale.is_signed());
+        assert_eq!(stale.part_count(), before_parts);
+        assert!(stale.get_part(&task_name).is_ok());
+        assert!(load(&stale).unwrap().is_some());
+
+        let mut shared_before_planning = OpcPackage::new();
+        put(
+            &mut shared_before_planning,
+            sample_task_panes(),
+            Conformance::Transitional,
+        )
+        .unwrap();
+        let task_name = add_shared_task_pane_ingress(&mut shared_before_planning);
+        assert!(remove(&mut shared_before_planning).unwrap());
+        assert!(load(&shared_before_planning).unwrap().is_none());
+        assert!(shared_before_planning.get_part(&task_name).is_ok());
+    }
+
+    #[test]
+    fn patch_rejects_new_inbound_relationship_to_absent_destination() {
+        let mut package = OpcPackage::new();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        let patch = plan_put(&package, sample_task_panes(), Conformance::Transitional).unwrap();
+        package.rels_mut().add_relationship(
+            "urn:litchi:test:new-shared-target".into(),
+            "media/web-extension-snapshot.png".into(),
+            "rIdNewSharedTarget".into(),
+            false,
+        );
+
+        assert!(patch.apply(&mut package).is_err());
+        assert!(package.is_signed());
+        assert_eq!(package.part_count(), 0);
+        assert!(
+            package
+                .get_part(&PackURI::new("/media/web-extension-snapshot.png").unwrap())
+                .is_err()
+        );
+        assert!(
+            package
+                .rels()
+                .get("rIdNewSharedTarget")
+                .is_some_and(|relationship| {
+                    relationship.reltype() == "urn:litchi:test:new-shared-target"
+                })
+        );
     }
 
     #[test]
@@ -5816,7 +6732,7 @@ mod tests {
             .set_reference(Reference::new("primary-2", "2", Store::Registry).unwrap())
             .unwrap();
         add_in
-            .push_reference(Reference::new("alternate", "1", Store::FileSystem).unwrap())
+            .push_reference(Reference::file("alternate", "1", r"C:\AddIns").unwrap())
             .unwrap();
         add_in
             .upsert_reference(Reference::new("alternate", "2", Store::Registry).unwrap())
@@ -6227,7 +7143,7 @@ mod tests {
             reference: Reference {
                 id: "wa1".into(),
                 version: "1.0.0.0".into(),
-                catalog: Some("en-us".into()),
+                location: Some("en-us".into()),
                 store: Store::Omex,
                 extension_list: None,
             },

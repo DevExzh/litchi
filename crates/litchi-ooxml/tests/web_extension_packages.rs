@@ -88,7 +88,7 @@ fn public_web_facade_updates_and_round_trips_crud() {
         .unwrap()
         .with_ext(test_ext(ExtKind::AddIn, "primary-old"))
         .unwrap();
-    let alternate = Reference::new("alternate", "1", Store::FileSystem)
+    let alternate = Reference::file("alternate", "1", r"C:\AddIns")
         .unwrap()
         .with_ext(test_ext(ExtKind::AddIn, "alternate-old"))
         .unwrap();
@@ -316,7 +316,7 @@ fn assert_task_pane(task_panes: Panes) {
 fn authored_task_panes() -> Panes {
     let reference = Reference::new("inert-test-add-in", "1.0", Store::Omex)
         .unwrap()
-        .catalog("en-US")
+        .location("en-US")
         .unwrap();
     let add_in = AddIn::new("{10000000-0000-0000-0000-000000000001}", reference)
         .unwrap()

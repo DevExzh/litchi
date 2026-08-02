@@ -44,11 +44,6 @@ use crate::xlsx::volatile_dependencies::{
     remove_from_package as remove_volatile_dependencies,
     store_in_package as store_volatile_dependencies,
 };
-use crate::xlsx::web_extension_bindings::{
-    PackageAppRefs, WorksheetWebExtensionBinding, parse_worksheet_web_extension_bindings,
-    replace_worksheet_web_extension_bindings as patch_worksheet_web_extension_bindings,
-    validate_worksheet_web_extension_apprefs,
-};
 use crate::xlsx::workbook_protection::{WorkbookProtectionMetadata, parse_workbook_protection};
 use crate::xlsx::writer::workbook::{
     generate_pivot_cache_definition_xml, generate_pivot_cache_records_xml,
@@ -68,6 +63,8 @@ use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsx::raw::web as raw_web;
+use litchi_xlsx::web::{Bindings, Refs};
 use std::collections::{HashMap, HashSet};
 
 use super::parsers::workbook_parser;
@@ -218,7 +215,7 @@ pub struct Workbook {
     defined_names: Vec<NamedRange>,
     worksheet_protection_mutations: HashMap<usize, WorksheetProtectionMetadata>,
     worksheet_data_validation_mutations: HashMap<usize, Vec<DataValidationCollection>>,
-    worksheet_web_extension_binding_mutations: HashMap<usize, Vec<WorksheetWebExtensionBinding>>,
+    worksheet_web_binding_mutations: HashMap<usize, Bindings>,
 }
 
 fn patch_workbook_external_references(
@@ -515,21 +512,20 @@ impl Workbook {
         let invalid = |error: Box<dyn std::error::Error + Send + Sync>| {
             crate::error::OoxmlError::InvalidFormat(error.to_string())
         };
-        let package_refs = PackageAppRefs::new(
-            panes
-                .iter()
-                .flat_map(|pane| pane.add_in().bindings().iter()),
-        )
-        .map_err(invalid)?;
+        let package_refs = Refs::from_panes(panes).map_err(|error| invalid(Box::new(error)))?;
         for (index, worksheet) in self.worksheets.iter().enumerate() {
-            if let Some(bindings) = self.worksheet_web_extension_binding_mutations.get(&index) {
-                package_refs.validate(bindings).map_err(invalid)?;
+            if let Some(bindings) = self.worksheet_web_binding_mutations.get(&index) {
+                package_refs
+                    .check(bindings)
+                    .map_err(|error| invalid(Box::new(error)))?;
                 continue;
             }
             let uri = self.worksheet_part_uri(worksheet).map_err(invalid)?;
             let part = self.package.get_part(&uri)?;
-            let bindings = parse_worksheet_web_extension_bindings(part.blob()).map_err(invalid)?;
-            package_refs.validate(&bindings).map_err(invalid)?;
+            let bindings = raw_web::read(part.blob()).map_err(|error| invalid(Box::new(error)))?;
+            package_refs
+                .check(&bindings)
+                .map_err(|error| invalid(Box::new(error)))?;
         }
         Ok(())
     }
@@ -705,7 +701,7 @@ impl Workbook {
             defined_names: Vec::new(),
             worksheet_protection_mutations: HashMap::new(),
             worksheet_data_validation_mutations: HashMap::new(),
-            worksheet_web_extension_binding_mutations: HashMap::new(),
+            worksheet_web_binding_mutations: HashMap::new(),
         };
 
         workbook.load_workbook_info()?;
@@ -1817,11 +1813,8 @@ impl Workbook {
     }
 
     /// Return inert Office Add-in range bindings, including any queued mutation.
-    pub fn worksheet_web_extension_bindings(
-        &self,
-        index: usize,
-    ) -> SheetResult<Vec<WorksheetWebExtensionBinding>> {
-        if let Some(value) = self.worksheet_web_extension_binding_mutations.get(&index) {
+    pub fn worksheet_web_bindings(&self, index: usize) -> SheetResult<Bindings> {
+        if let Some(value) = self.worksheet_web_binding_mutations.get(&index) {
             return Ok(value.clone());
         }
         let info = self
@@ -1830,64 +1823,54 @@ impl Workbook {
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
-        parse_worksheet_web_extension_bindings(part.blob())
+        Ok(raw_web::read(part.blob())?)
     }
 
-    /// Atomically replace all Office Add-in range bindings on one worksheet.
+    /// Atomically put all Office Add-in range bindings on one worksheet.
     ///
     /// Every non-empty worksheet `appRef` must resolve to exactly one binding
-    /// in the package-level MS-OWEXML task-pane graph.
-    pub fn replace_worksheet_web_extension_bindings(
+    /// in the package-level MS-OWEXML task-pane graph. Returns whether the
+    /// worksheet bytes differ from the package snapshot.
+    pub fn put_worksheet_web_bindings(
         &mut self,
         index: usize,
-        bindings: Vec<WorksheetWebExtensionBinding>,
-    ) -> SheetResult<()> {
+        bindings: Bindings,
+    ) -> SheetResult<bool> {
         let info = self
             .worksheets
             .get(index)
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
-        let replacement = patch_worksheet_web_extension_bindings(part.blob(), &bindings)?;
+        let replacement = raw_web::replace(part.blob(), &bindings)?;
         let changes_bytes = replacement.as_slice() != part.blob();
         if !bindings.is_empty() {
             let task_panes = web::load(&self.package)?
                 .ok_or("Worksheet add-in bindings require package task panes")?;
-            validate_worksheet_web_extension_apprefs(
-                &bindings,
-                task_panes
-                    .iter()
-                    .flat_map(|pane| pane.add_in().bindings().iter()),
-            )?;
+            Refs::from_panes(&task_panes)?.check(&bindings)?;
         }
         if changes_bytes {
-            self.worksheet_web_extension_binding_mutations
-                .insert(index, bindings);
+            self.worksheet_web_binding_mutations.insert(index, bindings);
             self.package.unsign();
         } else {
-            self.worksheet_web_extension_binding_mutations
-                .remove(&index);
+            self.worksheet_web_binding_mutations.remove(&index);
         }
-        Ok(())
+        Ok(changes_bytes)
     }
 
-    /// Atomically update cloned Office Add-in bindings and queue them if valid.
-    pub fn update_worksheet_web_extension_bindings<F>(
-        &mut self,
-        index: usize,
-        update: F,
-    ) -> SheetResult<()>
+    /// Atomically edit cloned Office Add-in bindings and queue them if valid.
+    pub fn edit_worksheet_web_bindings<F>(&mut self, index: usize, edit: F) -> SheetResult<bool>
     where
-        F: FnOnce(&mut Vec<WorksheetWebExtensionBinding>),
+        F: FnOnce(&mut Bindings) -> litchi_xlsx::Result<()>,
     {
-        let mut candidate = self.worksheet_web_extension_bindings(index)?;
-        update(&mut candidate);
-        self.replace_worksheet_web_extension_bindings(index, candidate)
+        let mut candidate = self.worksheet_web_bindings(index)?;
+        edit(&mut candidate)?;
+        self.put_worksheet_web_bindings(index, candidate)
     }
 
     /// Remove all worksheet-side Office Add-in bindings.
-    pub fn remove_worksheet_web_extension_bindings(&mut self, index: usize) -> SheetResult<()> {
-        self.replace_worksheet_web_extension_bindings(index, Vec::new())
+    pub fn remove_worksheet_web_bindings(&mut self, index: usize) -> SheetResult<bool> {
+        self.put_worksheet_web_bindings(index, Bindings::new())
     }
 
     pub fn remove_worksheet_data_validations(&mut self, index: usize) -> SheetResult<()> {
@@ -2054,7 +2037,7 @@ impl Workbook {
         let removed = data.remove_worksheet(index)?;
         shift_index_keyed_mutations(&mut self.worksheet_protection_mutations, index);
         shift_index_keyed_mutations(&mut self.worksheet_data_validation_mutations, index);
-        shift_index_keyed_mutations(&mut self.worksheet_web_extension_binding_mutations, index);
+        shift_index_keyed_mutations(&mut self.worksheet_web_binding_mutations, index);
         Ok(removed)
     }
 
@@ -2319,14 +2302,12 @@ impl Workbook {
         if should_update {
             // Take mutable_data temporarily to avoid borrow issues
             if let Some(mut mutable_data) = self.mutable_data.take() {
-                let worksheet_web_extension_bindings = (0..self.worksheets.len())
+                let worksheet_web_bindings = (0..self.worksheets.len())
                     .filter(|index| self.is_spreadsheetml_worksheet(*index))
                     .map(|index| {
-                        let bindings = self.worksheet_web_extension_bindings(index)?;
+                        let bindings = self.worksheet_web_bindings(index)?;
                         Ok((!bindings.is_empty()
-                            || self
-                                .worksheet_web_extension_binding_mutations
-                                .contains_key(&index))
+                            || self.worksheet_web_binding_mutations.contains_key(&index))
                         .then_some((index, bindings)))
                     })
                     .collect::<SheetResult<Vec<_>>>()?
@@ -2417,9 +2398,9 @@ impl Workbook {
                     }
                     store_worksheet_active_x(&mut self.package, &uri, &controls)?;
                 }
-                self.restore_worksheet_web_extension_bindings_after_materialization(
+                self.restore_worksheet_web_bindings_after_materialization(
                     &mutable_data,
-                    &worksheet_web_extension_bindings,
+                    &worksheet_web_bindings,
                 )?;
                 self.mutable_data = Some(mutable_data);
 
@@ -2468,7 +2449,7 @@ impl Workbook {
             .worksheet_protection_mutations
             .keys()
             .chain(self.worksheet_data_validation_mutations.keys())
-            .chain(self.worksheet_web_extension_binding_mutations.keys())
+            .chain(self.worksheet_web_binding_mutations.keys())
             .copied()
             .collect();
         let mut staged = Vec::with_capacity(indexes.len());
@@ -2495,8 +2476,8 @@ impl Workbook {
             if let Some(collections) = self.worksheet_data_validation_mutations.get(&index) {
                 replacement = replace_data_validation_collections(&replacement, collections)?;
             }
-            if let Some(bindings) = self.worksheet_web_extension_binding_mutations.get(&index) {
-                replacement = patch_worksheet_web_extension_bindings(&replacement, bindings)?;
+            if let Some(bindings) = self.worksheet_web_binding_mutations.get(&index) {
+                replacement = raw_web::replace(&replacement, bindings)?;
             }
             staged.push((uri, original, replacement));
         }
@@ -2517,10 +2498,10 @@ impl Workbook {
         Ok(())
     }
 
-    fn restore_worksheet_web_extension_bindings_after_materialization(
+    fn restore_worksheet_web_bindings_after_materialization(
         &mut self,
         data: &MutableWorkbookData,
-        bindings_by_index: &[(usize, Vec<WorksheetWebExtensionBinding>)],
+        bindings_by_index: &[(usize, Bindings)],
     ) -> SheetResult<()> {
         for (index, bindings) in bindings_by_index {
             let worksheet = data
@@ -2529,9 +2510,9 @@ impl Workbook {
                 .ok_or("Worksheet index out of bounds after materialization")?;
             let uri = PackURI::new(format!("/xl/worksheets/sheet{}.xml", worksheet.sheet_id()))?;
             let part = self.package.get_part_mut(&uri)?;
-            let replacement = patch_worksheet_web_extension_bindings(part.blob(), bindings)?;
+            let replacement = raw_web::replace(part.blob(), bindings)?;
             part.set_blob(replacement);
-            self.worksheet_web_extension_binding_mutations.remove(index);
+            self.worksheet_web_binding_mutations.remove(index);
         }
         Ok(())
     }
@@ -4358,13 +4339,13 @@ mod tests {
     use litchi_ooxml_common::web;
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+    use litchi_xlsx::web::{Binding as SheetBinding, Bindings};
 
     use crate::xlsx::{
         ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartRelationship,
         ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
         ChartUserShapesRelationshipTarget, Mention, Person, PersonList, ProtectionPasswordVerifier,
         StrongProtectionPasswordVerifier, Table, TableColumn, ThreadedComment, WorksheetChart,
-        WorksheetWebExtensionBinding,
     };
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -5285,7 +5266,7 @@ mod tests {
     }
 
     #[test]
-    fn exposes_and_transactionally_removes_worksheet_web_extension_bindings() {
+    fn exposes_and_transactionally_removes_worksheet_web_bindings() {
         let mut package = package_with_worksheet_relationship(rt::WORKSHEET, false);
         let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
         package.get_part_mut(&worksheet_uri).unwrap().set_blob(
@@ -5294,49 +5275,36 @@ mod tests {
         );
         let mut workbook = Workbook::new(package).unwrap();
 
-        let bindings = workbook.worksheet_web_extension_bindings(0).unwrap();
+        let bindings = workbook.worksheet_web_bindings(0).unwrap();
         assert_eq!(bindings.len(), 2);
-        assert_eq!(bindings[0].application_reference(), "sales-table");
-        let worksheet = workbook.get_worksheet(0).unwrap();
-        assert_eq!(worksheet.web_extension_bindings(), bindings);
-
-        workbook.remove_worksheet_web_extension_bindings(0).unwrap();
-        assert!(
-            workbook
-                .worksheet_web_extension_bindings(0)
-                .unwrap()
-                .is_empty()
+        assert_eq!(
+            bindings.get(0).map(SheetBinding::app_ref),
+            Some("sales-table")
         );
+        let worksheet = workbook.get_worksheet(0).unwrap();
+        assert_eq!(worksheet.web_bindings(), &bindings);
+
+        assert!(workbook.remove_worksheet_web_bindings(0).unwrap());
+        assert!(workbook.worksheet_web_bindings(0).unwrap().is_empty());
 
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("bindings-removed.xlsx");
         workbook.save(&path).unwrap();
         let reopened = Workbook::open(&path).unwrap();
-        assert!(
-            reopened
-                .worksheet_web_extension_bindings(0)
-                .unwrap()
-                .is_empty()
-        );
+        assert!(reopened.worksheet_web_bindings(0).unwrap().is_empty());
     }
 
     #[test]
-    fn worksheet_web_extension_binding_queue_unsigns_only_for_byte_changes() {
+    fn worksheet_web_binding_queue_unsigns_only_for_byte_changes() {
         let mut unchanged = package_with_worksheet_relationship(rt::WORKSHEET, false);
         unchanged.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
         let mut unchanged = Workbook::new(unchanged).unwrap();
         assert!(unchanged.is_signed());
 
-        unchanged
-            .remove_worksheet_web_extension_bindings(0)
-            .unwrap();
+        assert!(!unchanged.remove_worksheet_web_bindings(0).unwrap());
 
         assert!(unchanged.is_signed());
-        assert!(
-            !unchanged
-                .worksheet_web_extension_binding_mutations
-                .contains_key(&0)
-        );
+        assert!(!unchanged.worksheet_web_binding_mutations.contains_key(&0));
 
         let mut changed = package_with_worksheet_relationship(rt::WORKSHEET, false);
         let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
@@ -5348,19 +5316,15 @@ mod tests {
         let mut changed = Workbook::new(changed).unwrap();
         assert!(changed.is_signed());
 
-        changed.remove_worksheet_web_extension_bindings(0).unwrap();
+        assert!(changed.remove_worksheet_web_bindings(0).unwrap());
 
         assert!(!changed.is_signed());
-        assert!(
-            changed
-                .worksheet_web_extension_binding_mutations
-                .contains_key(&0)
-        );
+        assert!(changed.worksheet_web_binding_mutations.contains_key(&0));
     }
 
     #[test]
     fn task_pane_facade_consumes_common_model() {
-        let reference = web::Reference::new("local", "1.0", web::Store::FileSystem).unwrap();
+        let reference = web::Reference::file("local", "1.0", r"C:\AddIns").unwrap();
         let add_in = web::AddIn::new("{10000000-0000-0000-0000-000000000001}", reference).unwrap();
         let mut panes = web::Panes::new();
         panes.push(web::Pane::new(add_in)).unwrap();
@@ -5382,7 +5346,7 @@ mod tests {
 
     #[test]
     fn task_pane_mutation_preserves_worksheet_binding_integrity() {
-        let reference = web::Reference::new("local", "1.0", web::Store::FileSystem).unwrap();
+        let reference = web::Reference::file("local", "1.0", r"C:\AddIns").unwrap();
         let add_in = web::AddIn::new("add-in-1", reference)
             .unwrap()
             .bind(web::Binding::new("binding-1", "table", "sheet-ref").unwrap())
@@ -5394,9 +5358,10 @@ mod tests {
             .put_task_panes(panes, web::Conformance::Transitional)
             .unwrap();
         workbook
-            .replace_worksheet_web_extension_bindings(
+            .put_worksheet_web_bindings(
                 0,
-                vec![WorksheetWebExtensionBinding::new("sheet-ref", "Sheet1!A1").unwrap()],
+                Bindings::try_from(vec![SheetBinding::new("sheet-ref", "Sheet1!A1").unwrap()])
+                    .unwrap(),
             )
             .unwrap();
 
@@ -5431,7 +5396,7 @@ mod tests {
     }
 
     #[test]
-    fn preserves_worksheet_web_extension_bindings_during_materialization() {
+    fn preserves_worksheet_web_bindings_during_materialization() {
         let mut workbook = Workbook::create().unwrap();
         workbook
             .package
@@ -5450,9 +5415,12 @@ mod tests {
         let path = directory.path().join("bindings-preserved.xlsx");
         workbook.save(&path).unwrap();
         let reopened = Workbook::open(&path).unwrap();
-        let bindings = reopened.worksheet_web_extension_bindings(0).unwrap();
+        let bindings = reopened.worksheet_web_bindings(0).unwrap();
         assert_eq!(bindings.len(), 2);
-        assert_eq!(bindings[1].application_reference(), "sales-point");
+        assert_eq!(
+            bindings.get(1).map(SheetBinding::app_ref),
+            Some("sales-point")
+        );
     }
 
     #[test]

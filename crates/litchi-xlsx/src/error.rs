@@ -29,6 +29,9 @@ pub enum Error {
     /// Shared OOXML decoding failed.
     #[error("OOXML decoding error: {0}")]
     Xml(#[from] litchi_ooxml_common::XmlError),
+    /// A host-neutral OOXML package service failed.
+    #[error("shared OOXML service error: {0}")]
+    Common(#[from] litchi_ooxml_common::Error),
     /// A spreadsheet coordinate lies outside its typed domain.
     #[error(transparent)]
     Coordinate(#[from] litchi_sheet::CoordinateError),
@@ -74,6 +77,11 @@ pub enum Error {
     /// A worksheet-only operation targeted another sheet kind.
     #[error("sheet '{sheet}' is not a worksheet")]
     NotWorksheet { sheet: String },
+    /// A worksheet Office Add-in binding has no unique package-level target.
+    #[error(
+        "worksheet '{sheet}' Office Add-in binding '{app_ref}' has no package-level MS-OWEXML binding"
+    )]
+    DanglingWebBinding { sheet: String, app_ref: String },
     /// A safe edit requires a capability or dependency-aware operation that
     /// this transaction does not have.
     #[error("cannot edit {address} on sheet '{sheet}': {reason}")]
