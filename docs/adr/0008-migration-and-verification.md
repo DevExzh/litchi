@@ -2021,6 +2021,55 @@ custom-property and Custom XML writing behavior, so it makes no new native
 Microsoft Office compatibility claim without a future artifact/open/edit/
 resave/reverse-read run.
 
+The thirty-ninth implementation slice completes the first dependency in that
+audit by moving embedded-object and embedded-package inventory into the sole
+canonical owner `litchi-ooxml-common::embedded`. The migration host's former
+`embedded_object` module and root `EmbeddedPart*` aliases are deleted. The
+compact shared vocabulary is `Kind::{Object, Package}`, borrowed `Payload`,
+`Target`, `Entry`, and configurable `Limits`; `scan` applies safe defaults and
+`scan_with` is the explicit lower-layer resource seam. DOCX, PPTX, XLSX, and
+XLSB expose only the concise safe-default `embedded` facade. The umbrella
+exports the common module directly as `litchi::ooxml::embedded`.
+
+Every internal payload remains owned by its OPC part. `Payload::bytes` lends
+that allocation, so inventory construction performs no payload copy and
+entries cannot outlive their package. Duplicate relationship occurrences stay
+visible, but canonical target names memoize outbound-relationship validation
+and charge the aggregate payload budget only once. Entry and aggregate payload
+relationship counters use checked arithmetic, result ordering is deterministic
+by source and relationship ID, and production paths contain no panic macro.
+These are allocation and validation-topology properties, not measured latency,
+CPU, cache, or contention claims; those still require ADR 0005 profiling.
+
+The source policy now covers every ISO OOXML Word, SpreadsheetML,
+PresentationML, and chart source used by the two relationship families,
+including Word document/template macro main-part content types. It also applies
+the kind-specific additions in local `[MS-XLSB]` File Structure sections
+2.1.7.36 and 2.1.7.37: binary worksheet, macro-sheet, and dialog-sheet parts may
+source Object or Package relationships, while a binary external-link part may
+source Object only. A real POI workbook proves that an Object target can
+legitimately declare the server-specific `application/vnd.ms-excel` content
+type; the common layer therefore preserves declared MIME opaquely instead of
+guessing from bytes or enforcing a single container type. Strict and
+transitional relationships are accepted, internal query/fragment targets and
+missing or forbidden graphs fail with typed errors, and payload parts may own
+only hyperlink relationships. External targets are returned inertly and never
+contacted.
+
+Focused verification passes with warnings denied: all 62
+`litchi-ooxml-common` library tests, including 13 embedded inventory tests over
+seven real producer fixtures and hostile synthetic graphs; eight DOCX OLE
+writer tests; seven DOCX SmartArt writer tests; and two XLSX/XLSB facade tests.
+Common and host all-target checks, Clippy, and rustdoc pass, including the
+all-feature/all-target host build. Formatting and diff validation are green.
+The isolated `ooxml` umbrella library and rustdoc, manifest ordering, the
+32-package boundary inventory, and all nine boundary regressions are green; the
+inventory remains at 102 internal dependency edges and 18 explicit
+migration-debt entries. This slice changes only ownership, validation, and read
+facades; it emits no new Office artifact, so the previously green full-workspace
+and native Office baselines are relied upon instead of repeating those gates.
+The next dependency-safe extraction is `ribbon`, followed by `web`.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

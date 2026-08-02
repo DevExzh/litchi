@@ -36,7 +36,6 @@
 //! ```
 pub mod api;
 pub mod docx;
-pub mod embedded_object;
 pub mod error;
 pub mod metadata;
 // OPC implementation lives in the focused litchi-opc crate.
@@ -68,7 +67,3 @@ pub use litchi_ooxml_common::{
 
 // Re-export error types
 pub use error::{OoxmlError, Result};
-
-pub use embedded_object::{
-    EmbeddedPart, EmbeddedPartKind, EmbeddedPayload, EmbeddedTarget, MAX_EMBEDDED_RELATIONSHIPS,
-};

@@ -329,7 +329,7 @@ pub mod drawing {
 #[cfg(feature = "ooxml")]
 pub mod ooxml {
     pub use litchi_ooxml::*;
-    pub use litchi_ooxml_common::{custom, custom_xml};
+    pub use litchi_ooxml_common::{custom, custom_xml, embedded};
 }
 
 /// Trust-neutral Office signature authoring and verification.

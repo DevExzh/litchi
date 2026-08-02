@@ -48,6 +48,7 @@ use litchi_ooxml_common::custom_xml::{
     self, Item as CustomXmlItem, MAX_ITEMS, NewItem as NewCustomXmlItem,
     NewProps as NewCustomXmlProps, Props as CustomXmlProps,
 };
+use litchi_ooxml_common::embedded;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -799,9 +800,13 @@ impl Package {
         self
     }
 
-    /// Discover inert embedded-object and embedded-package relationships.
-    pub fn embedded_parts(&self) -> Result<Vec<crate::EmbeddedPart<'_>>> {
-        crate::embedded_object::discover_embedded_parts(&self.opc)
+    /// Discover inert embedded-object and embedded-package relationships
+    /// using the shared safe default resource limits.
+    ///
+    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// layer needs explicitly tuned limits.
+    pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
+        Ok(embedded::scan(&self.opc)?)
     }
 
     /// Load the bounded, inert classic-chart graph owned by the main document.

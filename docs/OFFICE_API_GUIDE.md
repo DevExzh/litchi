@@ -174,6 +174,32 @@ pkg.set_custom_xml(
 pkg.save("updated.docx")?;
 ```
 
+Embedded Object and Embedded Package discovery uses the same borrowed,
+bounded inventory on DOCX, PPTX, XLSX, and XLSB packages. It reports explicit
+relationship occurrences without opening nested files, activating OLE, or
+fetching external targets.
+
+```rust
+use litchi::ooxml::embedded::Target;
+use litchi::ooxml::docx::Package;
+
+let pkg = Package::open("document.docx")?;
+for entry in pkg.embedded()? {
+    match entry.target() {
+        Target::Internal(payload) => println!(
+            "{:?}: {} bytes in {} ({})",
+            entry.kind(),
+            payload.bytes().len(),
+            payload.part(),
+            payload.content_type(),
+        ),
+        Target::External(target) => {
+            println!("{:?}: inert external target {target}", entry.kind());
+        },
+    }
+}
+```
+
 ### Advanced Document Operations
 
 ```rust

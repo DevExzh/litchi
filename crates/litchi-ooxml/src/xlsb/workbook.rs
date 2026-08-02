@@ -28,6 +28,7 @@ use crate::xlsb::vba_project::{
 use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
+use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
@@ -101,6 +102,15 @@ impl std::fmt::Debug for XlsbWorkbook {
 }
 
 impl XlsbWorkbook {
+    /// Discover inert embedded-object and embedded-package relationships
+    /// using the shared safe default resource limits.
+    ///
+    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// layer needs explicitly tuned limits.
+    pub fn embedded(&self) -> XlsbResult<Vec<embedded::Entry<'_>>> {
+        Ok(embedded::scan(&self.package)?)
+    }
+
     /// Get the underlying OPC package.
     pub fn opc_package(&self) -> &OpcPackage {
         &self.package
@@ -2607,6 +2617,7 @@ mod tests {
     use crate::xlsb::formula::{FormulaConverter, FormulaParser};
     use crate::xlsb::writer::RecordWriter;
     use litchi_core::sheet::{Cell, Worksheet};
+    use litchi_ooxml_common::embedded::{Kind, Target};
     use litchi_opc::part::Part;
     use litchi_opc::{BlobPart, PackURI};
     use std::fs::File;
@@ -2680,6 +2691,69 @@ mod tests {
         let mut strings = Vec::new();
         XlsbWorkbook::read_shared_strings(&mut iter, &mut strings)?;
         Ok(strings)
+    }
+
+    #[test]
+    fn embedded_facade_accepts_binary_worksheet_sources() {
+        let mut bundle_sheet = 0u32.to_le_bytes().to_vec();
+        bundle_sheet.extend_from_slice(&1u32.to_le_bytes());
+        bundle_sheet.extend_from_slice(&wide_string("rIdSheet1"));
+        bundle_sheet.extend_from_slice(&wide_string("Sheet1"));
+
+        let mut workbook_part = BlobPart::new(
+            PackURI::new("/xl/workbook.bin").unwrap(),
+            "application/vnd.ms-excel.sheet.binary.macroEnabled.main".to_string(),
+            external_link_records(&[(record_types::BUNDLE_SH, bundle_sheet)]),
+        );
+        workbook_part.rels_mut().add_relationship(
+            relationship_type::WORKSHEET.to_string(),
+            "worksheets/sheet1.bin".to_string(),
+            "rIdSheet1".to_string(),
+            false,
+        );
+
+        let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+        let mut sheet_part = BlobPart::new(
+            sheet_uri.clone(),
+            "application/vnd.ms-excel.worksheet".to_string(),
+            external_link_records(&[
+                (record_types::BEGIN_SHEET, Vec::new()),
+                (record_types::END_SHEET, Vec::new()),
+            ]),
+        );
+        sheet_part.rels_mut().add_relationship(
+            relationship_type::OLE_OBJECT.to_string(),
+            "../embeddings/oleObject1.bin".to_string(),
+            "rIdObject".to_string(),
+            false,
+        );
+
+        let payload = BlobPart::new(
+            PackURI::new("/xl/embeddings/oleObject1.bin").unwrap(),
+            litchi_opc::constants::content_type::OFC_OLE_OBJECT.to_string(),
+            b"opaque XLSB payload".to_vec(),
+        );
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(workbook_part));
+        package.add_part(Box::new(sheet_part));
+        package.add_part(Box::new(payload));
+
+        let workbook = XlsbWorkbook::from_opc_package(package).unwrap();
+        let entries = workbook.embedded().unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].source(), &sheet_uri);
+        assert_eq!(entries[0].id(), "rIdObject");
+        assert_eq!(entries[0].kind(), Kind::Object);
+        let Target::Internal(payload) = entries[0].target() else {
+            panic!("synthetic XLSB object must be internal")
+        };
+        assert_eq!(payload.part().as_str(), "/xl/embeddings/oleObject1.bin");
+        assert_eq!(
+            payload.content_type(),
+            litchi_opc::constants::content_type::OFC_OLE_OBJECT
+        );
+        assert_eq!(payload.bytes(), b"opaque XLSB payload");
     }
 
     fn external_workbook_records() -> Vec<(u16, Vec<u8>)> {

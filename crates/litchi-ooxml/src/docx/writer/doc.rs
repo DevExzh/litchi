@@ -431,7 +431,7 @@ impl MutableDocument {
     /// IDs that collide with shapes already present in the document. The
     /// payload is stored verbatim as an inert `/word/embeddings/oleObjectN.bin`
     /// part and is discoverable through
-    /// [`crate::docx::Package::embedded_parts`] after save and reopen.
+    /// [`crate::docx::Package::embedded`] after save and reopen.
     pub fn add_ole_object(
         &mut self,
         mut object: MutableOleObject,

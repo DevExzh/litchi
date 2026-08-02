@@ -84,6 +84,22 @@ after commit. Neither service resolves schemas, executes XPath, or depends on a
 concrete document format. The migration host contains no compatibility module
 or alias for either former owner.
 
+`litchi-ooxml-common::embedded` owns inert discovery of normative Embedded
+Object and Embedded Package relationship occurrences. Its complete vocabulary
+is `embedded::{Entry, Kind, Limits, Payload, Target}` and its verbs are `scan`
+and `scan_with`. Entries lend their source, relationship ID, target metadata,
+and payload bytes from the OPC package; discovery never copies, sniffs, opens,
+activates, or recursively parses an embedded payload. Safe defaults bound both
+the occurrence inventory and aggregate relationships on uniquely validated
+payload parts. Duplicate references reuse that validation, strict and
+transitional relationship families are accepted, and output order is stable.
+The source policy includes the ISO OOXML host parts, every Word main-part
+content-type variant, and the additional binary SpreadsheetML sources defined
+by `[MS-XLSB]` sections 2.1.7.36 and 2.1.7.37. External targets remain inert and
+are never fetched. DOCX, PPTX, XLSX, and XLSB expose the same short `embedded`
+facade while retaining responsibility for host anchors and mutations; the
+migration host owns no duplicate module or type alias.
+
 `litchi-word`, `litchi-slide`, and `litchi-sheet` depend only on `litchi-core`.
 They contain selectors, queries, events, detached builders, and semantic values,
 not container parsing or concrete document handles. Concrete imported objects

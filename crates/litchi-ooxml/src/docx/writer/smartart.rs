@@ -445,7 +445,7 @@ mod tests {
         assert_eq!(text_boxes[0].anchor, TextBoxAnchor::Inline);
         assert_eq!(text_boxes[0].text(), "box story");
 
-        let embedded = reopened.embedded_parts().unwrap();
+        let embedded = reopened.embedded().unwrap();
         assert_eq!(embedded.len(), 1);
 
         let picture_count = document

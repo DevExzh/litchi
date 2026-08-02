@@ -7,7 +7,7 @@
 //! `/word/embeddings/oleObjectN.bin` (content type
 //! `application/vnd.openxmlformats-officedocument.oleObject`) with an
 //! `oleObject` relationship from the main document part, matching the inert
-//! discovery contract of [`crate::embedded_object`].
+//! discovery contract of [`litchi_ooxml_common::embedded`].
 //!
 //! Everything is inert: payloads are never parsed, activated, or executed,
 //! and the optional preview is a plain image part.
@@ -248,6 +248,7 @@ pub(crate) fn validate_shape_id(shape_id: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_ooxml_common::embedded::{Kind, Target};
 
     #[test]
     fn validates_prog_ids() {
@@ -315,7 +316,6 @@ mod tests {
     #[test]
     fn round_trips_embedded_object_through_saved_package() {
         use crate::docx::Package;
-        use crate::{EmbeddedPartKind, EmbeddedTarget};
         use tempfile::NamedTempFile;
 
         let file = NamedTempFile::with_suffix(".docx").unwrap();
@@ -335,16 +335,16 @@ mod tests {
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
-        let entries = reopened.embedded_parts().unwrap();
+        let entries = reopened.embedded().unwrap();
         assert_eq!(entries.len(), 1);
         let entry = &entries[0];
-        assert_eq!(entry.kind(), EmbeddedPartKind::OleObject);
-        assert_eq!(entry.source_part_name().as_str(), "/word/document.xml");
-        let EmbeddedTarget::Internal(discovered) = entry.target() else {
+        assert_eq!(entry.kind(), Kind::Object);
+        assert_eq!(entry.source().as_str(), "/word/document.xml");
+        let Target::Internal(discovered) = entry.target() else {
             panic!("expected an internal embedded payload")
         };
         assert_eq!(
-            discovered.part_name().as_str(),
+            discovered.part().as_str(),
             "/word/embeddings/oleObject1.bin"
         );
         assert_eq!(
@@ -378,13 +378,13 @@ mod tests {
         package.save(file.path()).unwrap();
 
         let reopened = Package::open(file.path()).unwrap();
-        let entries = reopened.embedded_parts().unwrap();
+        let entries = reopened.embedded().unwrap();
         assert_eq!(entries.len(), 2);
         let mut part_names: Vec<String> = entries
             .iter()
             .map(|entry| match entry.target() {
-                crate::EmbeddedTarget::Internal(payload) => payload.part_name().as_str().to_owned(),
-                crate::EmbeddedTarget::External { .. } => panic!("expected internal payloads"),
+                Target::Internal(payload) => payload.part().as_str().to_owned(),
+                Target::External(_) => panic!("expected internal payloads"),
             })
             .collect();
         part_names.sort_unstable();
@@ -428,9 +428,9 @@ mod tests {
         let reopened = Package::open(file.path()).unwrap();
         let document = reopened.document().unwrap();
 
-        let entries = reopened.embedded_parts().unwrap();
+        let entries = reopened.embedded().unwrap();
         assert_eq!(entries.len(), 1);
-        let crate::EmbeddedTarget::Internal(discovered) = entries[0].target() else {
+        let Target::Internal(discovered) = entries[0].target() else {
             panic!("expected an internal embedded payload")
         };
         assert_eq!(discovered.bytes(), b"coexist payload");

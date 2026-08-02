@@ -17,6 +17,7 @@ use crate::web_extensions::{
 };
 /// Package implementation for PowerPoint presentations.
 use litchi_ooxml_common::DocumentProperties;
+use litchi_ooxml_common::embedded;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -892,9 +893,13 @@ impl Package {
         self
     }
 
-    /// Discover inert embedded-object and embedded-package relationships.
-    pub fn embedded_parts(&self) -> Result<Vec<crate::EmbeddedPart<'_>>> {
-        crate::embedded_object::discover_embedded_parts(&self.opc)
+    /// Discover inert embedded-object and embedded-package relationships
+    /// using the shared safe default resource limits.
+    ///
+    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// layer needs explicitly tuned limits.
+    pub fn embedded(&self) -> Result<Vec<embedded::Entry<'_>>> {
+        Ok(embedded::scan(&self.opc)?)
     }
 
     /// Load the bounded, inert notes-slide/notes-master graph.

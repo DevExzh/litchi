@@ -72,6 +72,7 @@ use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
 use litchi_ooxml_common::DocumentProperties;
+use litchi_ooxml_common::embedded;
 use litchi_opc::{OpcPackage, PackURI};
 use std::collections::{HashMap, HashSet};
 
@@ -403,9 +404,13 @@ fn patch_workbook_external_references(
 }
 
 impl Workbook {
-    /// Discover inert embedded-object and embedded-package relationships.
-    pub fn embedded_parts(&self) -> crate::error::Result<Vec<crate::EmbeddedPart<'_>>> {
-        crate::embedded_object::discover_embedded_parts(&self.package)
+    /// Discover inert embedded-object and embedded-package relationships
+    /// using the shared safe default resource limits.
+    ///
+    /// Use [`embedded::scan_with`] with [`Self::opc_package`] when a lower
+    /// layer needs explicitly tuned limits.
+    pub fn embedded(&self) -> crate::error::Result<Vec<embedded::Entry<'_>>> {
+        Ok(embedded::scan(&self.package)?)
     }
 
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payload.
@@ -4307,6 +4312,7 @@ mod tests {
     };
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
+    use litchi_ooxml_common::embedded::{Kind, Target};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
@@ -4326,6 +4332,34 @@ mod tests {
     <definedName name="_xlnm.Print_Titles" localSheetId="0">Sales!$1:$2,Sales!$A:$B</definedName>
   </definedNames>
 </workbook>"#;
+
+    #[test]
+    fn embedded_facade_inventories_real_workbook_relationships() {
+        const XLSX: &[u8] =
+            include_bytes!("../../../../test-data/poi/test-data/spreadsheet/WithEmbeded.xlsx");
+
+        let package = OpcPackage::from_bytes(XLSX).unwrap();
+        let workbook = Workbook::new(package).unwrap();
+        let entries = workbook.embedded().unwrap();
+
+        assert_eq!(entries.len(), 2);
+        assert!(entries.iter().all(|entry| entry.kind() == Kind::Object));
+        assert!(
+            entries
+                .iter()
+                .all(|entry| entry.source().as_str() == "/xl/worksheets/sheet1.xml")
+        );
+        assert_eq!(entries[0].id(), "rId3");
+        assert_eq!(entries[1].id(), "rId4");
+        for entry in entries {
+            let Target::Internal(payload) = entry.target() else {
+                panic!("fixture embedded objects must be internal")
+            };
+            assert!(payload.part().as_str().starts_with("/xl/embeddings/"));
+            assert!(!payload.content_type().is_empty());
+            assert!(!payload.bytes().is_empty());
+        }
+    }
 
     #[test]
     fn saves_and_reloads_complete_typed_workbook_protection() {

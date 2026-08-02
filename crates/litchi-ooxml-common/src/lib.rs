@@ -6,6 +6,7 @@ mod error;
 
 pub mod custom;
 pub mod custom_xml;
+pub mod embedded;
 pub mod external_link;
 pub mod mce;
 pub mod properties;
