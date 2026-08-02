@@ -80,6 +80,7 @@ mod legacy_numbering;
 mod legacy_paragraph_numbering;
 mod legacy_text_box;
 mod lexer;
+mod limits;
 mod list;
 mod mail_merge;
 mod math;
@@ -239,6 +240,7 @@ pub use legacy_text_box::{
     LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
 };
 pub use lexer::CharacterSet;
+pub use limits::ParseLimits;
 pub use list::{
     List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride, ListOverrideLevel,
     ListOverrideTable, ListTable,

@@ -37,7 +37,10 @@ let text = doc.text();
 
 `decompress` enforces a finite 256 MiB expansion ceiling before allocation.
 Applications with a different document budget can call `decompress_with_limits`
-with a checked `DecompressionLimits` value.
+with an explicit `DecompressionLimits` value. Document parsing and file opening
+also use finite source, token, binary-payload, and expansion ceilings through
+`ParseLimits`; custom profiles are accepted by `parse_with_limits`,
+`parse_bytes_with_limits`, and `open_with_limits`.
 
 ## License
 

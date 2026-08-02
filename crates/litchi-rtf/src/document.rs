@@ -2,10 +2,47 @@
 
 use super::error::{RtfError, RtfResult};
 use super::lexer::Lexer;
+use super::limits::ParseLimits;
 use super::parser::Parser;
 use super::types::{ColorTable, FontTable, Paragraph as RtfParagraph, Run, StyleBlock};
 use bumpalo::Bump;
 use std::borrow::Cow;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+
+fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
+    let file = File::open(path)
+        .map_err(|error| RtfError::ParserError(format!("Failed to open file: {error}")))?;
+
+    if let Ok(metadata) = file.metadata() {
+        let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
+        if metadata.len() > limit_u64 {
+            return Err(RtfError::LimitExceeded {
+                resource: "source bytes",
+                observed: usize::try_from(metadata.len()).unwrap_or(usize::MAX),
+                limit,
+            });
+        }
+    }
+
+    // Read at most one byte beyond the configured ceiling so special files,
+    // concurrent growth, and inaccurate metadata cannot bypass the budget.
+    let read_ceiling = limit.checked_add(1).unwrap_or(limit);
+    let mut reader = file.take(u64::try_from(read_ceiling).unwrap_or(u64::MAX));
+    let mut bytes = Vec::new();
+    reader
+        .read_to_end(&mut bytes)
+        .map_err(|error| RtfError::ParserError(format!("Failed to read file: {error}")))?;
+    if bytes.len() > limit {
+        return Err(RtfError::LimitExceeded {
+            resource: "source bytes",
+            observed: bytes.len(),
+            limit,
+        });
+    }
+    Ok(bytes)
+}
 
 fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> {
     let mut output = super::table::Table::new();
@@ -66,7 +103,6 @@ fn owned_table(table: &super::table::Table<'_>) -> super::table::Table<'static> 
     }
     output
 }
-use std::path::Path;
 
 /// RTF Document.
 ///
@@ -266,7 +302,12 @@ impl<'a> RtfDocument<'a> {
     /// # Ok::<(), litchi_rtf::RtfError>(())
     /// ```
     pub fn parse(input: &str) -> RtfResult<RtfDocument<'static>> {
-        Self::parse_internal(input.as_bytes())
+        Self::parse_with_limits(input, ParseLimits::default())
+    }
+
+    /// Parse an RTF string with an explicit finite resource profile.
+    pub fn parse_with_limits(input: &str, limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_internal(input.as_bytes(), limits)
     }
 
     /// Parse RTF from its original byte representation.
@@ -274,17 +315,36 @@ impl<'a> RtfDocument<'a> {
     /// Use this entry point when the document can contain `bin` destinations or
     /// legacy-code-page bytes that are not valid UTF-8.
     pub fn parse_bytes(input: &[u8]) -> RtfResult<RtfDocument<'static>> {
-        Self::parse_internal(input)
+        Self::parse_bytes_with_limits(input, ParseLimits::default())
+    }
+
+    /// Parse original RTF bytes with an explicit finite resource profile.
+    pub fn parse_bytes_with_limits(
+        input: &[u8],
+        limits: ParseLimits,
+    ) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_internal(input, limits)
     }
 
     /// Parse RTF from bytes (handles both compressed and uncompressed)
-    fn parse_internal(bytes: &[u8]) -> RtfResult<RtfDocument<'static>> {
+    fn parse_internal(bytes: &[u8], limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
+        if bytes.len() > limits.max_source_bytes() {
+            return Err(RtfError::LimitExceeded {
+                resource: "source bytes",
+                observed: bytes.len(),
+                limit: limits.max_source_bytes(),
+            });
+        }
+
         // Check if it's compressed RTF
         let input_bytes = if super::compressed::is_compressed_rtf(bytes) {
             // Decompress first
-            super::compressed::decompress(bytes)?
+            Cow::Owned(super::compressed::decompress_with_limits(
+                bytes,
+                super::compressed::DecompressionLimits::new(limits.max_decompressed_bytes()),
+            )?)
         } else {
-            bytes.to_vec()
+            Cow::Borrowed(bytes)
         };
 
         // RTF files are NOT UTF-8. They contain bytes in whatever code page is
@@ -296,18 +356,24 @@ impl<'a> RtfDocument<'a> {
         // 3. We can recover original bytes and decode them with correct encoding later
         //
         // The parser will detect \ansicpg and use the proper encoding for text.
-        let input_str: String = input_bytes.iter().map(|byte| char::from(*byte)).collect();
+        let input_str = if input_bytes.is_ascii() {
+            Cow::Borrowed(std::str::from_utf8(input_bytes.as_ref()).map_err(|error| {
+                RtfError::InvalidUnicode(format!("ASCII RTF transport conversion failed: {error}"))
+            })?)
+        } else {
+            Cow::Owned(input_bytes.iter().map(|byte| char::from(*byte)).collect())
+        };
 
-        Self::parse_string(&input_str)
+        Self::parse_string(input_str.as_ref(), limits)
     }
 
     /// Parse an RTF document from a UTF-8 string (internal)
-    fn parse_string(input: &str) -> RtfResult<RtfDocument<'static>> {
+    fn parse_string(input: &str, limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
         // Create arena for temporary allocations during parsing
         let arena = Bump::new();
 
         // Lexer phase
-        let mut lexer = Lexer::new(input, &arena);
+        let mut lexer = Lexer::new_with_limits(input, &arena, limits);
         let tokens = lexer.tokenize()?;
 
         // Parser phase
@@ -579,9 +645,16 @@ impl<'a> RtfDocument<'a> {
     /// # Ok::<(), litchi_rtf::RtfError>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> RtfResult<RtfDocument<'static>> {
-        let bytes = std::fs::read(path)
-            .map_err(|e| RtfError::ParserError(format!("Failed to read file: {}", e)))?;
-        Self::parse_internal(&bytes)
+        Self::open_with_limits(path, ParseLimits::default())
+    }
+
+    /// Open an RTF file with an explicit finite resource profile.
+    pub fn open_with_limits<P: AsRef<Path>>(
+        path: P,
+        limits: ParseLimits,
+    ) -> RtfResult<RtfDocument<'static>> {
+        let bytes = read_file_with_limit(path.as_ref(), limits.max_source_bytes())?;
+        Self::parse_internal(&bytes, limits)
     }
 
     /// Parse an RTF document from bytes.
@@ -599,7 +672,15 @@ impl<'a> RtfDocument<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> RtfResult<RtfDocument<'static>> {
-        Self::parse_internal(bytes)
+        Self::parse_bytes(bytes)
+    }
+
+    /// Parse RTF bytes with an explicit finite resource profile.
+    pub fn from_bytes_with_limits(
+        bytes: &[u8],
+        limits: ParseLimits,
+    ) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_bytes_with_limits(bytes, limits)
     }
 
     /// Get all text content from the document.

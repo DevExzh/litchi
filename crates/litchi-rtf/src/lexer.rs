@@ -4,6 +4,7 @@
 //! using arena allocation for temporary data structures.
 
 use super::error::{RtfError, RtfResult};
+use super::limits::ParseLimits;
 use bumpalo::Bump;
 use std::borrow::Cow;
 
@@ -1273,16 +1274,29 @@ pub struct Lexer<'a> {
     pos: usize,
     /// Arena allocator for temporary strings
     arena: &'a Bump,
+    /// Finite token and binary-payload ceilings.
+    limits: ParseLimits,
+    /// Aggregate bytes claimed by accepted `binN` payloads.
+    total_binary_bytes: usize,
 }
 
 impl<'a> Lexer<'a> {
     /// Create a new lexer.
+    #[cfg(test)]
     #[inline]
     pub fn new(input: &'a str, arena: &'a Bump) -> Self {
+        Self::new_with_limits(input, arena, ParseLimits::default())
+    }
+
+    /// Create a lexer with an explicit finite resource profile.
+    #[inline]
+    pub fn new_with_limits(input: &'a str, arena: &'a Bump, limits: ParseLimits) -> Self {
         Self {
             input,
             pos: 0,
             arena,
+            limits,
+            total_binary_bytes: 0,
         }
     }
 
@@ -1291,6 +1305,14 @@ impl<'a> Lexer<'a> {
         let mut tokens = Vec::new();
 
         while self.pos < self.input.len() {
+            let observed = tokens.len().saturating_add(1);
+            if observed > self.limits.max_tokens() {
+                return Err(RtfError::LimitExceeded {
+                    resource: "lexer tokens",
+                    observed,
+                    limit: self.limits.max_tokens(),
+                });
+            }
             let token = self.next_token()?;
             tokens.push(token);
         }
@@ -1332,9 +1354,9 @@ impl<'a> Lexer<'a> {
         // Handle special control symbols
         match ch {
             '\\' | '{' | '}' => {
-                let text = self.arena.alloc_str(&ch.to_string());
+                let start = self.pos;
                 self.advance();
-                return Ok(Token::Text(Cow::Borrowed(text)));
+                return Ok(Token::Text(Cow::Borrowed(&self.input[start..self.pos])));
             },
             '\'' => return self.parse_hex_char(),
             '*' => {
@@ -1395,20 +1417,61 @@ impl<'a> Lexer<'a> {
             let size = usize::try_from(size).map_err(|_| {
                 RtfError::MalformedDocument("RTF binary length cannot be negative".to_string())
             })?;
-            let mut data = Vec::with_capacity(size);
+            if size > self.limits.max_binary_bytes() {
+                return Err(RtfError::LimitExceeded {
+                    resource: "binary payload bytes",
+                    observed: size,
+                    limit: self.limits.max_binary_bytes(),
+                });
+            }
+            let total_binary_bytes =
+                self.total_binary_bytes
+                    .checked_add(size)
+                    .ok_or(RtfError::LimitExceeded {
+                        resource: "aggregate binary payload bytes",
+                        observed: usize::MAX,
+                        limit: self.limits.max_total_binary_bytes(),
+                    })?;
+            if total_binary_bytes > self.limits.max_total_binary_bytes() {
+                return Err(RtfError::LimitExceeded {
+                    resource: "aggregate binary payload bytes",
+                    observed: total_binary_bytes,
+                    limit: self.limits.max_total_binary_bytes(),
+                });
+            }
+
+            // Validate the entire declared payload before allocating it. A
+            // corrupt `bin2147483647` near EOF must report truncation instead
+            // of first requesting a multi-gigabyte allocation.
+            let payload_start = self.pos;
+            let mut payload_end = payload_start;
             for _ in 0..size {
-                if self.pos >= self.input.len() {
-                    return Err(RtfError::UnexpectedEof);
-                }
-                let value = u8::try_from(self.current_char() as u32).map_err(|_| {
+                let ch = self
+                    .input
+                    .get(payload_end..)
+                    .and_then(|remaining| remaining.chars().next())
+                    .ok_or(RtfError::UnexpectedEof)?;
+                u8::try_from(u32::from(ch)).map_err(|_| {
                     RtfError::MalformedDocument(
                         "RTF binary payload is not byte-preserving".to_string(),
                     )
                 })?;
-                data.push(value);
-                self.advance();
+                payload_end += ch.len_utf8();
             }
-            let allocated = self.arena.alloc_slice_copy(&data);
+
+            let allocated = self.arena.alloc_slice_fill_copy(size, 0u8);
+            for (slot, ch) in allocated
+                .iter_mut()
+                .zip(self.input[payload_start..payload_end].chars())
+            {
+                *slot = u8::try_from(u32::from(ch)).map_err(|_| {
+                    RtfError::MalformedDocument(
+                        "RTF binary payload is not byte-preserving".to_string(),
+                    )
+                })?;
+            }
+            self.pos = payload_end;
+            self.total_binary_bytes = total_binary_bytes;
             return Ok(Token::Binary(Cow::Borrowed(allocated)));
         }
 
@@ -3931,44 +3994,28 @@ impl<'a> Lexer<'a> {
 
     /// Parse plain text until special character.
     fn parse_text(&mut self) -> RtfResult<Token<'a>> {
-        let mut text = String::new();
+        let mut start = self.pos;
 
         while self.pos < self.input.len() {
             let ch = self.current_char();
             match ch {
                 '\\' | '{' | '}' => break,
                 '\r' | '\n' => {
-                    // Skip line breaks in plain text, but track them
+                    let end = self.pos;
                     self.advance();
-                    // If we have accumulated text, break here
-                    if !text.is_empty() {
-                        break;
+                    if end > start {
+                        return Ok(Token::Text(Cow::Borrowed(&self.input[start..end])));
                     }
+                    start = self.pos;
                 },
-                _ => {
-                    text.push(ch);
-                    self.advance();
-                },
+                _ => self.advance(),
             }
         }
 
-        if text.is_empty() {
-            // If we hit only whitespace/newlines, try to consume at least one whitespace
-            // and return a space token, or skip to next token
-            if self.pos >= self.input.len() {
-                // Trailing physical line breaks are insignificant in RTF. Reaching EOF
-                // after consuming only those line breaks is a successful final token,
-                // not a truncated control word or escape.
-                let allocated = self.arena.alloc_str("");
-                return Ok(Token::Text(Cow::Borrowed(allocated)));
-            }
-            // Return empty text for now - parser will handle it
-            let allocated = self.arena.alloc_str("");
-            return Ok(Token::Text(Cow::Borrowed(allocated)));
-        }
-
-        let allocated = self.arena.alloc_str(&text);
-        Ok(Token::Text(Cow::Borrowed(allocated)))
+        // Plain text already lives in the source and needs no arena copy. An
+        // empty slice preserves the previous behavior for physical line breaks
+        // immediately before EOF or a structural token.
+        Ok(Token::Text(Cow::Borrowed(&self.input[start..self.pos])))
     }
 
     /// Get current character without advancing.
@@ -4509,6 +4556,76 @@ mod tests {
         let arena = Bump::new();
         let mut lexer = Lexer::new(r"\bin4 AB", &arena);
         assert!(matches!(lexer.tokenize(), Err(RtfError::UnexpectedEof)));
+    }
+
+    #[test]
+    fn binary_declaration_is_validated_before_allocation() {
+        let arena = Bump::new();
+        let limits = ParseLimits::default()
+            .with_max_binary_bytes(usize::MAX)
+            .with_max_total_binary_bytes(usize::MAX);
+        let mut lexer = Lexer::new_with_limits(r"\bin2147483647 x", &arena, limits);
+        assert!(matches!(lexer.tokenize(), Err(RtfError::UnexpectedEof)));
+    }
+
+    #[test]
+    fn binary_limits_report_per_payload_and_aggregate_usage() {
+        let arena = Bump::new();
+        let limits = ParseLimits::default().with_max_binary_bytes(3);
+        let mut lexer = Lexer::new_with_limits(r"\bin4 ABCD", &arena, limits);
+        assert!(matches!(
+            lexer.tokenize(),
+            Err(RtfError::LimitExceeded {
+                resource: "binary payload bytes",
+                observed: 4,
+                limit: 3,
+            })
+        ));
+
+        let arena = Bump::new();
+        let limits = ParseLimits::default()
+            .with_max_binary_bytes(2)
+            .with_max_total_binary_bytes(3);
+        let mut lexer = Lexer::new_with_limits(r"\bin2 ab\bin2 cd", &arena, limits);
+        assert!(matches!(
+            lexer.tokenize(),
+            Err(RtfError::LimitExceeded {
+                resource: "aggregate binary payload bytes",
+                observed: 4,
+                limit: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn token_limit_is_checked_before_emitting_an_extra_token() {
+        let arena = Bump::new();
+        let limits = ParseLimits::default().with_max_tokens(1);
+        let mut lexer = Lexer::new_with_limits("{}", &arena, limits);
+        assert!(matches!(
+            lexer.tokenize(),
+            Err(RtfError::LimitExceeded {
+                resource: "lexer tokens",
+                observed: 2,
+                limit: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn plain_text_borrows_the_source_and_binary_preserves_latin1_bytes() {
+        let arena = Bump::new();
+        let mut lexer = Lexer::new("plain text", &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(
+            tokens.as_slice(),
+            [Token::Text(Cow::Borrowed("plain text"))]
+        ));
+
+        let arena = Bump::new();
+        let mut lexer = Lexer::new("\\bin2 \u{80}\u{ff}", &arena);
+        let tokens = lexer.tokenize().unwrap();
+        assert!(matches!(&tokens[0], Token::Binary(data) if data.as_ref() == [0x80, 0xff]));
     }
 
     #[test]
