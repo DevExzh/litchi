@@ -250,7 +250,11 @@ impl ParagraphElement {
 
     pub(crate) fn collect_hyperlink_urls(&self, urls: &mut Vec<String>) {
         match self {
-            Self::Hyperlink(link) if let Some(url) = &link.url => urls.push(url.clone()),
+            Self::Hyperlink(link) => {
+                if let Some(url) = &link.url {
+                    urls.push(url.clone());
+                }
+            },
             Self::SmartTag(tag) => tag.collect_hyperlink_urls(urls),
             Self::Revision(revision) => revision.collect_hyperlink_urls(urls),
             _ => {},
