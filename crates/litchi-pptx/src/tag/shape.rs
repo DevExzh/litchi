@@ -58,8 +58,9 @@ pub fn load<'k>(
 /// The owned list moves into a fully staged tag part. The shape XML anchor,
 /// containing-part relationship, and target part commit together only after
 /// bounded re-validation. A byte-identical replacement is a true no-op. When
-/// another active anchor uses the same relationship ID, or any other package
-/// edge reaches the target part, replacement forks the selected attachment.
+/// another preserved raw anchor uses the same relationship ID, or any other
+/// package edge reaches the target part, replacement forks the selected
+/// attachment.
 pub fn put<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -87,7 +88,7 @@ pub fn put<'k>(
         let anchor_uses = layout
             .anchor
             .as_ref()
-            .map(|anchor| active_anchor_uses(owner.blob(), layout.conformance, &anchor.id))
+            .map(|anchor| preserved_anchor_uses(owner.blob(), &anchor.id))
             .transpose()?
             .unwrap_or(0);
         (owner.partname().clone(), layout, attached, anchor_uses)
@@ -206,9 +207,9 @@ pub fn put<'k>(
 ///
 /// An absent attachment is an idempotent, signature-preserving `Ok(None)`.
 /// Customer data, inactive MCE branches, comments, and extension bytes remain
-/// untouched. The relationship remains while another active anchor uses its
-/// ID, and the target part is collected only after the package graph proves it
-/// orphaned.
+/// untouched. The relationship remains while another preserved raw anchor
+/// uses its ID, and the target part is collected only after the package graph
+/// proves it orphaned.
 pub fn remove<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -228,8 +229,7 @@ pub fn remove<'k>(
             .ok_or_else(|| invalid("shape tag relationship disappeared during preflight"))?;
         let relationship_type = relationship.reltype().to_owned();
         let owner_name = owner.partname().clone();
-        let retain_relationship =
-            active_anchor_uses(owner.blob(), layout.conformance, &anchor.id)? > 1;
+        let retain_relationship = preserved_anchor_uses(owner.blob(), &anchor.id)? > 1;
         let owner_xml = remove_anchor(owner.blob(), &layout)?;
         validate_staged_anchor(owner, &owner_xml, key, None)?;
         let orphan = !retain_relationship
@@ -1299,7 +1299,7 @@ fn active_pml_offsets(xml: &[u8], span: &Range<usize>) -> Result<Vec<u32>> {
     .map_err(Into::into)
 }
 
-fn active_anchor_uses(xml: &[u8], expected: Conformance, relationship_id: &str) -> Result<usize> {
+fn preserved_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usize> {
     if xml.len() > MAX_OWNER_BYTES {
         return Err(Error::Limit {
             resource: "shape-tag owner XML bytes",
@@ -1307,35 +1307,7 @@ fn active_anchor_uses(xml: &[u8], expected: Conformance, relationship_id: &str) 
         });
     }
     let mut reader = NsReader::from_reader(xml);
-    let mut offsets = Vec::new();
     let mut nodes = 0usize;
-    loop {
-        let start = xml_position(&reader)?;
-        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
-        let is_tags = pml(&namespace).is_some()
-            && matches!(&event, Event::Start(element) | Event::Empty(element) if element.local_name().as_ref() == b"tags");
-        drop(namespace);
-        match event {
-            Event::Start(_) | Event::Empty(_) => bump_nodes(&mut nodes)?,
-            Event::Eof => break,
-            _ => {},
-        }
-        if is_tags {
-            try_push(
-                &mut offsets,
-                offset_u32(start)?,
-                "shape tag-anchor MCE offsets",
-            )?;
-        }
-    }
-    let active = active_offsets(
-        xml,
-        &offsets,
-        &shape_mce_capabilities(),
-        &ActiveOffsetLimits::default(),
-    )?;
-    let mut active = active.into_iter().peekable();
-    let mut reader = NsReader::from_reader(xml);
     let mut uses = 0usize;
     loop {
         let start = xml_position(&reader)?;
@@ -1346,29 +1318,24 @@ fn active_anchor_uses(xml: &[u8], expected: Conformance, relationship_id: &str) 
             Event::Start(element) | Event::Empty(element)
                 if profile.is_some() && element.local_name().as_ref() == b"tags" =>
             {
-                if !take_active(&mut active, start)? {
-                    continue;
-                }
-                let profile = profile.ok_or_else(|| invalid("active p:tags profile is missing"))?;
-                if profile != expected {
-                    return Err(invalid(
-                        "active tag anchor profile does not match its owner",
-                    ));
-                }
+                bump_nodes(&mut nodes)?;
+                let profile =
+                    profile.ok_or_else(|| invalid("preserved p:tags profile is missing"))?;
                 let (id, _) = anchor_id(
                     &reader,
                     xml,
                     &element,
                     start..xml_position(&reader)?,
-                    expected,
+                    profile,
                 )?;
                 if id == relationship_id {
                     uses = uses.checked_add(1).ok_or(Error::Limit {
-                        resource: "active shape tag-anchor references",
+                        resource: "preserved shape tag-anchor references",
                         limit: MAX_OWNER_NODES,
                     })?;
                 }
             },
+            Event::Start(_) | Event::Empty(_) => bump_nodes(&mut nodes)?,
             Event::Eof => break,
             _ => {},
         }
@@ -1607,6 +1574,35 @@ mod tests {
         )
     }
 
+    fn mce_shared_anchor_package() -> (OpcPackage, PackURI, PackURI) {
+        let anchor = r#"<p:custDataLst><p:tags r:id="rId1"/></p:custDataLst>"#;
+        let active = shape_xml("Active", 2).replace("<p:ph/>", anchor);
+        let inactive = shape_xml("Inactive", 3).replace("<p:ph/>", anchor);
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:r="{REL}" xmlns:mc="{MC}" xmlns:p14="{P14}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><mc:AlternateContent><mc:Choice Requires="p14">{active}</mc:Choice><mc:Fallback>{inactive}</mc:Fallback></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#
+        )
+        .into_bytes();
+        let (mut package, owner) = owner_package(xml);
+        package
+            .get_part_mut(&owner)
+            .expect("owner")
+            .rels_mut()
+            .add_relationship(
+                crate::tag::TAG_REL.into(),
+                "../tags/tag1.xml".into(),
+                "rId1".into(),
+                false,
+            );
+        let part = PackURI::new("/ppt/tags/tag1.xml").expect("part URI");
+        package.add_part(Box::new(XmlPart::new(
+            part.clone(),
+            CONTENT_TYPE.into(),
+            format!(r#"<p:tagLst xmlns:p="{PML}"><p:tag name="Owner" val="Alice"/></p:tagLst>"#)
+                .into_bytes(),
+        )));
+        (package, owner, part)
+    }
+
     #[test]
     fn maps_all_five_families_and_nested_groups_to_raw_source() {
         let xml = format!(
@@ -1720,6 +1716,62 @@ mod tests {
         let inactive = text.find("name=\"Inactive\"").expect("inactive branch");
         let inactive_end = text[inactive..].find("</p:pic>").expect("picture end") + inactive;
         assert!(!text[inactive..inactive_end].contains("rIdTags"));
+    }
+
+    #[test]
+    fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
+        let (mut package, owner, original_part) = mce_shared_anchor_package();
+
+        let old = put(&mut package, &owner, "Active", list("Reviewer", "Bob"))
+            .expect("replace active attachment")
+            .expect("old list");
+        assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
+        let active = load(&package, &owner, "Active")
+            .expect("load active attachment")
+            .expect("active attachment");
+        assert_ne!(active.rel(), "rId1");
+        assert_ne!(active.part(), &original_part);
+        assert_eq!(
+            active.list().get("reviewer").expect("new tag").value(),
+            "Bob"
+        );
+        let owner_part = package.get_part(&owner).expect("owner");
+        assert!(owner_part.rels().get("rId1").is_some());
+        assert!(package.get_part(&original_part).is_ok());
+        let owner_xml = std::str::from_utf8(owner_part.blob()).expect("UTF-8 fixture");
+        assert_eq!(owner_xml.matches(r#"r:id="rId1""#).count(), 1);
+        let inactive = owner_xml
+            .find("name=\"Inactive\"")
+            .expect("inactive branch");
+        let inactive_end = owner_xml[inactive..]
+            .find("</p:sp>")
+            .expect("inactive shape end")
+            + inactive;
+        assert!(owner_xml[inactive..inactive_end].contains(r#"r:id="rId1""#));
+
+        let (mut package, owner, original_part) = mce_shared_anchor_package();
+        let removed = remove(&mut package, &owner, "Active")
+            .expect("remove active attachment")
+            .expect("old list");
+        assert_eq!(removed.get("owner").expect("old tag").value(), "Alice");
+        assert!(
+            load(&package, &owner, "Active")
+                .expect("load active")
+                .is_none()
+        );
+        let owner_part = package.get_part(&owner).expect("owner");
+        assert!(owner_part.rels().get("rId1").is_some());
+        assert!(package.get_part(&original_part).is_ok());
+        let owner_xml = std::str::from_utf8(owner_part.blob()).expect("UTF-8 fixture");
+        assert_eq!(owner_xml.matches(r#"r:id="rId1""#).count(), 1);
+        let inactive = owner_xml
+            .find("name=\"Inactive\"")
+            .expect("inactive branch");
+        let inactive_end = owner_xml[inactive..]
+            .find("</p:sp>")
+            .expect("inactive shape end")
+            + inactive;
+        assert!(owner_xml[inactive..inactive_end].contains(r#"r:id="rId1""#));
     }
 
     #[test]

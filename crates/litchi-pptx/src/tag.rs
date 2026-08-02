@@ -17,7 +17,7 @@
 use crate::{Error, Result};
 use caseless::Caseless;
 use litchi_ooxml_common::mce::{
-    ActiveOffsetLimits, MceCapabilities, active_offsets, process_ooxml,
+    ActiveOffsetLimits, MceCapabilities, MceLimits, active_offsets, process_markup_compatibility,
 };
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::encoding::Decoder;
@@ -57,6 +57,9 @@ const MAX_SOURCE_RELATIONSHIPS: usize = 65_536;
 const MAX_OWNER_NODES: usize = 1_000_000;
 const MAX_OWNER_DEPTH: usize = 512;
 const MAX_RELATIONSHIP_ID_BYTES: usize = 4_096;
+const MAX_OWNER_MARKED_BYTES: usize = MAX_OWNER_BYTES * 2;
+const P14: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
+const P15: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
 const XML_DECL: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
 const ROOT_OPEN: &[u8] = b"<p:tagLst xmlns:p=\"";
 const ROOT_EMPTY_CLOSE: &[u8] = b"/>";
@@ -642,7 +645,7 @@ fn parse_profiled(xml: &[u8]) -> Result<(List, Conformance)> {
             limit: MAX_PART_BYTES,
         });
     }
-    let xml = process_ooxml(xml)?;
+    let xml = process_pptx_ooxml(xml, MAX_PART_BYTES)?;
     if xml.len() > MAX_PART_BYTES {
         return Err(Error::Limit {
             resource: "MCE-expanded tag-list bytes",
@@ -911,7 +914,7 @@ pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>
 /// Shape-level `p:nvPr` anchors and unanchored tag relationships are ignored.
 pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
     let owner = package.get_part(owner)?;
-    let processed = process_ooxml(owner.blob())?;
+    let processed = process_owner_ooxml(owner.blob())?;
     let layout = scan_owner_xml(processed.as_ref(), owner.content_type())?;
     layout
         .anchor
@@ -930,8 +933,7 @@ pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
 pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Option<List>> {
     let (owner_name, layout, attached, anchor_uses) = {
         let owner = package.get_part(owner)?;
-        require_unrewritten_owner(owner.blob(), "direct tag put")?;
-        let layout = scan_owner_xml(owner.blob(), owner.content_type())?;
+        let layout = scan_owner_source(owner.blob(), owner.content_type())?;
         let attached = layout
             .anchor
             .as_ref()
@@ -949,7 +951,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
         let anchor_uses = layout
             .anchor
             .as_ref()
-            .map(|anchor| owner_anchor_uses(owner.blob(), layout.conformance, anchor.id.as_str()))
+            .map(|anchor| owner_anchor_uses(owner.blob(), anchor.id.as_str()))
             .transpose()?
             .unwrap_or(0);
         (owner.partname().clone(), layout, attached, anchor_uses)
@@ -988,7 +990,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
             let relationship_id = available_relationship_id(owner)?;
             let owner_xml =
                 replace_anchor_relationship_id(owner.blob(), &layout, relationship_id.as_str())?;
-            let staged = scan_owner_xml(&owner_xml, owner.content_type())?;
+            let staged = scan_owner_source(&owner_xml, owner.content_type())?;
             if staged.conformance != layout.conformance
                 || staged.anchor.as_ref().map(|anchor| anchor.id.as_str())
                     != Some(relationship_id.as_str())
@@ -1038,7 +1040,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
         let target_ref = part_name.relative_ref(owner_name.base_uri());
         validate_relative_target(&owner_name, &target_ref, &part_name)?;
         let owner_xml = add_anchor(owner.blob(), &layout, &relationship_id)?;
-        let staged = scan_owner_xml(&owner_xml, owner.content_type())?;
+        let staged = scan_owner_source(&owner_xml, owner.content_type())?;
         if staged.conformance != layout.conformance
             || staged.anchor.as_ref().map(|anchor| anchor.id.as_str())
                 != Some(relationship_id.as_str())
@@ -1050,7 +1052,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
     package.validate_new_part_name(&part_name)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
-        let current = scan_owner_xml(owner.blob(), owner.content_type())?;
+        let current = scan_owner_source(owner.blob(), owner.content_type())?;
         if current.anchor.is_some() || owner.rels().get(&relationship_id).is_some() {
             return Err(invalid("tag-owner graph changed during preflight"));
         }
@@ -1076,8 +1078,7 @@ pub fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Opti
 pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>> {
     let (owner_name, layout, attached, owner_xml, retain_relationship, orphan) = {
         let owner = package.get_part(owner)?;
-        require_unrewritten_owner(owner.blob(), "direct tag removal")?;
-        let layout = scan_owner_xml(owner.blob(), owner.content_type())?;
+        let layout = scan_owner_source(owner.blob(), owner.content_type())?;
         let Some(anchor) = layout.anchor.as_ref() else {
             return Ok(None);
         };
@@ -1087,10 +1088,9 @@ pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>>
         })?;
         let relationship_type = relationship.reltype().to_owned();
         let owner_name = owner.partname().clone();
-        let retain_relationship =
-            owner_anchor_uses(owner.blob(), layout.conformance, anchor.id.as_str())? > 1;
+        let retain_relationship = owner_anchor_uses(owner.blob(), anchor.id.as_str())? > 1;
         let owner_xml = remove_anchor(owner.blob(), &layout)?;
-        let staged = scan_owner_xml(&owner_xml, owner.content_type())?;
+        let staged = scan_owner_source(&owner_xml, owner.content_type())?;
         if staged.conformance != layout.conformance || staged.anchor.is_some() {
             return Err(invalid("staged tag-owner removal did not round-trip"));
         }
@@ -1111,7 +1111,7 @@ pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>>
 
     {
         let owner = package.get_part_mut(&owner_name)?;
-        let current = scan_owner_xml(owner.blob(), owner.content_type())?;
+        let current = scan_owner_source(owner.blob(), owner.content_type())?;
         if current.anchor.as_ref().map(|anchor| anchor.id.as_str())
             != layout.anchor.as_ref().map(|anchor| anchor.id.as_str())
         {
@@ -1138,14 +1138,6 @@ pub fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>>
 struct Attached {
     relationship_type: String,
     source: Source,
-}
-
-fn require_unrewritten_owner(xml: &[u8], operation: &'static str) -> Result<()> {
-    if matches!(process_ooxml(xml)?, std::borrow::Cow::Owned(_)) {
-        Err(Error::MceOwnerMutation { operation })
-    } else {
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1275,6 +1267,7 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
     let mut conformance = None;
     let mut root_close = None;
     let mut presentation_insert = None;
+    let mut presentation_later_seen = false;
     let mut common_slide_depth = None;
     let mut common_slide_seen = false;
     let mut common_slide_phase = CommonSlidePhase::Start;
@@ -1328,6 +1321,17 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
                         && presentation_later(local.as_ref())
                     {
                         presentation_insert.get_or_insert(start);
+                        presentation_later_seen = true;
+                    }
+                    if active_kind == OwnerKind::Presentation
+                        && depth == 1
+                        && is_pml
+                        && local.as_ref() == b"custDataLst"
+                        && presentation_later_seen
+                    {
+                        return Err(invalid(
+                            "direct presentation p:custDataLst must precede later root children",
+                        ));
                     }
                     let target_depth = match active_kind {
                         OwnerKind::Presentation => Some(1),
@@ -1408,6 +1412,17 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
                     && presentation_later(local.as_ref())
                 {
                     presentation_insert.get_or_insert(start);
+                    presentation_later_seen = true;
+                }
+                if active_kind == OwnerKind::Presentation
+                    && depth == 1
+                    && is_pml
+                    && local.as_ref() == b"custDataLst"
+                    && presentation_later_seen
+                {
+                    return Err(invalid(
+                        "direct presentation p:custDataLst must precede later root children",
+                    ));
                 }
                 let target_depth = match active_kind {
                     OwnerKind::Presentation => Some(1),
@@ -1587,6 +1602,518 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OwnerMapName {
+    Presentation,
+    Slide,
+    SlideLayout,
+    SlideMaster,
+    Notes,
+    NotesMaster,
+    HandoutMaster,
+    ShapeTree,
+    CustomerDataList,
+    Tags,
+    Kinsoku,
+    DefaultTextStyle,
+    ModifyVerifier,
+    Extensions,
+}
+
+impl OwnerMapName {
+    fn from_local(local: &[u8]) -> Option<Self> {
+        match local {
+            b"presentation" => Some(Self::Presentation),
+            b"sld" => Some(Self::Slide),
+            b"sldLayout" => Some(Self::SlideLayout),
+            b"sldMaster" => Some(Self::SlideMaster),
+            b"notes" => Some(Self::Notes),
+            b"notesMaster" => Some(Self::NotesMaster),
+            b"handoutMaster" => Some(Self::HandoutMaster),
+            b"spTree" => Some(Self::ShapeTree),
+            b"custDataLst" => Some(Self::CustomerDataList),
+            b"tags" => Some(Self::Tags),
+            b"kinsoku" => Some(Self::Kinsoku),
+            b"defaultTextStyle" => Some(Self::DefaultTextStyle),
+            b"modifyVerifier" => Some(Self::ModifyVerifier),
+            b"extLst" => Some(Self::Extensions),
+            _ => None,
+        }
+    }
+
+    fn is_owner_root(self) -> bool {
+        matches!(
+            self,
+            Self::Presentation
+                | Self::Slide
+                | Self::SlideLayout
+                | Self::SlideMaster
+                | Self::Notes
+                | Self::NotesMaster
+                | Self::HandoutMaster
+        )
+    }
+
+    fn is_presentation_later(self) -> bool {
+        matches!(
+            self,
+            Self::Kinsoku | Self::DefaultTextStyle | Self::ModifyVerifier | Self::Extensions
+        )
+    }
+}
+
+#[derive(Debug)]
+struct OwnerMapElement {
+    name: OwnerMapName,
+    conformance: Conformance,
+    span: Range<usize>,
+    open_end: usize,
+    close_start: usize,
+    empty: bool,
+    qualified_name: Vec<u8>,
+    preserve_when_empty: bool,
+}
+
+fn owner_mce_capabilities() -> MceCapabilities {
+    let mut capabilities = MceCapabilities::ooxml_baseline();
+    capabilities.understand_namespace(P14);
+    capabilities.understand_namespace(P15);
+    capabilities
+}
+
+fn owner_mce_limits(max_bytes: usize) -> MceLimits {
+    MceLimits {
+        max_input_bytes: max_bytes,
+        max_output_bytes: max_bytes,
+        max_depth: MAX_OWNER_DEPTH,
+        ..MceLimits::default()
+    }
+}
+
+fn owner_active_offset_limits() -> ActiveOffsetLimits {
+    ActiveOffsetLimits {
+        max_source_bytes: MAX_OWNER_BYTES,
+        max_offsets: MAX_OWNER_NODES,
+        max_marked_bytes: MAX_OWNER_MARKED_BYTES,
+        mce: owner_mce_limits(MAX_OWNER_MARKED_BYTES),
+    }
+}
+
+fn process_owner_ooxml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
+    process_pptx_ooxml(xml, MAX_OWNER_BYTES)
+}
+
+fn process_pptx_ooxml(xml: &[u8], max_bytes: usize) -> Result<std::borrow::Cow<'_, [u8]>> {
+    Ok(
+        process_markup_compatibility(xml, &owner_mce_capabilities(), &owner_mce_limits(max_bytes))?
+            .xml,
+    )
+}
+
+fn scan_owner_source(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
+    let processed = process_owner_ooxml(xml)?;
+    if matches!(processed, std::borrow::Cow::Borrowed(_)) {
+        return scan_owner_xml(xml, content_type);
+    }
+    let semantic = scan_owner_xml(processed.as_ref(), content_type)?;
+    let source_offsets = owner_map_offsets(xml)?;
+    let active = active_offsets(
+        xml,
+        &source_offsets,
+        &owner_mce_capabilities(),
+        &owner_active_offset_limits(),
+    )?;
+    let processed_elements = collect_owner_map_elements(processed.as_ref(), None)?;
+    let source_elements = collect_owner_map_elements(xml, Some(&active))?;
+    map_owner_source(xml, semantic, &processed_elements, source_elements)
+}
+
+fn owner_map_offsets(xml: &[u8]) -> Result<Vec<u32>> {
+    if xml.len() > MAX_OWNER_BYTES {
+        return Err(Error::Limit {
+            resource: "tag-owner XML bytes",
+            limit: MAX_OWNER_BYTES,
+        });
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let mut offsets = Vec::new();
+    let mut nodes = 0usize;
+    let mut depth = 0usize;
+    loop {
+        let start = xml_position(&reader)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        let conformance = pml(&namespace);
+        drop(namespace);
+        match event {
+            Event::Start(element) => {
+                bump_owner_node(&mut nodes)?;
+                let name = conformance
+                    .and_then(|_| OwnerMapName::from_local(element.local_name().as_ref()));
+                if name.is_some_and(|name| !(depth == 0 && name.is_owner_root())) {
+                    offsets
+                        .try_reserve(1)
+                        .map_err(|source| allocation("tag-owner MCE map offsets", source))?;
+                    offsets.push(u32::try_from(start).map_err(|_| {
+                        invalid("tag-owner MCE map offset exceeds the compact u32 domain")
+                    })?);
+                }
+                depth = checked_owner_depth(depth)?;
+            },
+            Event::Empty(element) => {
+                bump_owner_node(&mut nodes)?;
+                let name = conformance
+                    .and_then(|_| OwnerMapName::from_local(element.local_name().as_ref()));
+                if name.is_some_and(|name| !(depth == 0 && name.is_owner_root())) {
+                    offsets
+                        .try_reserve(1)
+                        .map_err(|source| allocation("tag-owner MCE map offsets", source))?;
+                    offsets.push(u32::try_from(start).map_err(|_| {
+                        invalid("tag-owner MCE map offset exceeds the compact u32 domain")
+                    })?);
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("tag-owner MCE offset depth underflow"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(offsets)
+}
+
+fn collect_owner_map_elements(xml: &[u8], active: Option<&[u32]>) -> Result<Vec<OwnerMapElement>> {
+    if xml.len() > MAX_OWNER_BYTES {
+        return Err(Error::Limit {
+            resource: "tag-owner XML bytes",
+            limit: MAX_OWNER_BYTES,
+        });
+    }
+    let mut active = active.map(|offsets| offsets.iter().copied().peekable());
+    let mut reader = NsReader::from_reader(xml);
+    let mut frames = Vec::new();
+    let mut elements = Vec::new();
+    let mut nodes = 0usize;
+    loop {
+        let start = xml_position(&reader)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        let conformance = pml(&namespace);
+        drop(namespace);
+        let end = xml_position(&reader)?;
+        match event {
+            Event::Start(element) => {
+                bump_owner_node(&mut nodes)?;
+                if frames.len() >= MAX_OWNER_DEPTH {
+                    return Err(Error::Limit {
+                        resource: "tag-owner XML nesting depth",
+                        limit: MAX_OWNER_DEPTH,
+                    });
+                }
+                let name = conformance
+                    .and_then(|_| OwnerMapName::from_local(element.local_name().as_ref()));
+                let source_root =
+                    frames.is_empty() && name.is_some_and(OwnerMapName::is_owner_root);
+                let selected = match (&mut active, name) {
+                    (_, Some(_)) if source_root => true,
+                    (Some(offsets), Some(_)) => take_owner_map_offset(offsets, start)?,
+                    (None, Some(_)) => true,
+                    _ => false,
+                };
+                let record =
+                    if let (true, Some(name), Some(conformance)) = (selected, name, conformance) {
+                        let index = elements.len();
+                        elements
+                            .try_reserve(1)
+                            .map_err(|source| allocation("tag-owner MCE source map", source))?;
+                        elements.push(owner_map_element(
+                            name,
+                            conformance,
+                            &element,
+                            start,
+                            end,
+                            false,
+                        )?);
+                        Some(index)
+                    } else {
+                        None
+                    };
+                frames
+                    .try_reserve(1)
+                    .map_err(|source| allocation("tag-owner MCE source stack", source))?;
+                frames.push(record);
+            },
+            Event::Empty(element) => {
+                bump_owner_node(&mut nodes)?;
+                let name = conformance
+                    .and_then(|_| OwnerMapName::from_local(element.local_name().as_ref()));
+                let selected = match (&mut active, name) {
+                    (Some(offsets), Some(_)) => take_owner_map_offset(offsets, start)?,
+                    (None, Some(_)) => true,
+                    _ => false,
+                };
+                if let (true, Some(name), Some(conformance)) = (selected, name, conformance) {
+                    elements
+                        .try_reserve(1)
+                        .map_err(|source| allocation("tag-owner MCE source map", source))?;
+                    elements.push(owner_map_element(
+                        name,
+                        conformance,
+                        &element,
+                        start,
+                        end,
+                        true,
+                    )?);
+                }
+            },
+            Event::End(_) => {
+                let record = frames
+                    .pop()
+                    .ok_or_else(|| invalid("tag-owner MCE source stack underflow"))?;
+                if let Some(index) = record {
+                    let value = elements
+                        .get_mut(index)
+                        .ok_or_else(|| invalid("tag-owner MCE source element was lost"))?;
+                    value.close_start = start;
+                    value.span.end = end;
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("tag-owner XML contains forbidden markup"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !frames.is_empty() {
+        return Err(invalid("tag-owner MCE source XML is unterminated"));
+    }
+    if active
+        .as_mut()
+        .is_some_and(|offsets| offsets.peek().is_some())
+    {
+        return Err(invalid(
+            "tag-owner MCE active offsets were not consumed in source order",
+        ));
+    }
+    Ok(elements)
+}
+
+fn owner_map_element(
+    name: OwnerMapName,
+    conformance: Conformance,
+    element: &BytesStart<'_>,
+    start: usize,
+    end: usize,
+    empty: bool,
+) -> Result<OwnerMapElement> {
+    let mut qualified_name = Vec::new();
+    let preserve_when_empty = if name == OwnerMapName::CustomerDataList {
+        qualified_name
+            .try_reserve_exact(element.name().as_ref().len())
+            .map_err(|source| allocation("tag-owner customer-data qualified name", source))?;
+        qualified_name.extend_from_slice(element.name().as_ref());
+        has_non_namespace_attrs(element)?
+    } else {
+        false
+    };
+    Ok(OwnerMapElement {
+        name,
+        conformance,
+        span: start..end,
+        open_end: end,
+        close_start: end,
+        empty,
+        qualified_name,
+        preserve_when_empty,
+    })
+}
+
+fn take_owner_map_offset<I>(active: &mut std::iter::Peekable<I>, start: usize) -> Result<bool>
+where
+    I: Iterator<Item = u32>,
+{
+    let start = u32::try_from(start)
+        .map_err(|_| invalid("tag-owner MCE source offset exceeds the compact u32 domain"))?;
+    if active.peek().copied() == Some(start) {
+        let _ = active.next();
+        Ok(true)
+    } else if active.peek().is_some_and(|offset| *offset < start) {
+        Err(invalid(
+            "tag-owner MCE active offsets are not in source order",
+        ))
+    } else {
+        Ok(false)
+    }
+}
+
+fn map_owner_source(
+    xml: &[u8],
+    semantic: OwnerXml,
+    processed: &[OwnerMapElement],
+    mut source: Vec<OwnerMapElement>,
+) -> Result<OwnerXml> {
+    if processed.len() != source.len() {
+        return Err(invalid(format!(
+            "raw and MCE-processed tag-owner element maps have different lengths (raw {}, processed {})",
+            source.len(),
+            processed.len(),
+        )));
+    }
+    for (processed, source) in processed.iter().zip(&source) {
+        if processed.name != source.name || processed.conformance != source.conformance {
+            return Err(invalid(
+                "raw and MCE-processed tag-owner element maps diverge",
+            ));
+        }
+    }
+    let insertion = map_owner_insertion(semantic.insertion, processed, &source)?;
+    let anchor = if let Some(value) = semantic.anchor.as_ref() {
+        let index = mapped_owner_index(
+            processed,
+            value.span.start,
+            OwnerMapName::Tags,
+            "direct p:tags",
+        )?;
+        let raw = source
+            .get(index)
+            .ok_or_else(|| invalid("raw direct p:tags mapping is missing"))?;
+        let identity = source_anchor_identity(xml, raw, semantic.conformance)?;
+        if identity.value != value.id {
+            return Err(invalid("raw and MCE-processed direct p:tags IDs diverge"));
+        }
+        Some(Anchor {
+            id: identity.value,
+            id_value: identity.id_value,
+            span: raw.span.clone(),
+        })
+    } else {
+        None
+    };
+    let container = if let Some(value) = semantic.container {
+        let index = mapped_owner_index(
+            processed,
+            value.span.start,
+            OwnerMapName::CustomerDataList,
+            "direct p:custDataLst",
+        )?;
+        let raw = source
+            .get_mut(index)
+            .ok_or_else(|| invalid("raw direct p:custDataLst mapping is missing"))?;
+        let contains_only_anchor = anchor
+            .as_ref()
+            .map(|anchor| raw_container_contains_only_anchor(xml, raw, anchor))
+            .transpose()?
+            .unwrap_or(false);
+        let other_content = value.other_content || (anchor.is_some() && !contains_only_anchor);
+        Some(Container {
+            span: raw.span.clone(),
+            close_start: raw.close_start,
+            empty: raw.empty,
+            qualified_name: std::mem::take(&mut raw.qualified_name),
+            child_elements: value.child_elements,
+            other_content,
+            preserve_when_empty: raw.preserve_when_empty,
+        })
+    } else {
+        None
+    };
+    Ok(OwnerXml {
+        conformance: semantic.conformance,
+        insertion,
+        container,
+        anchor,
+    })
+}
+
+fn mapped_owner_index(
+    processed: &[OwnerMapElement],
+    start: usize,
+    expected: OwnerMapName,
+    resource: &'static str,
+) -> Result<usize> {
+    processed
+        .iter()
+        .position(|element| element.span.start == start && element.name == expected)
+        .ok_or_else(|| {
+            invalid(format!(
+                "MCE-processed {resource} has no raw-source mapping"
+            ))
+        })
+}
+
+fn map_owner_insertion(
+    insertion: usize,
+    processed: &[OwnerMapElement],
+    source: &[OwnerMapElement],
+) -> Result<usize> {
+    for (index, element) in processed.iter().enumerate() {
+        let mapped = if element.name == OwnerMapName::ShapeTree && element.span.end == insertion {
+            source.get(index).map(|value| value.span.end)
+        } else if element.name.is_presentation_later() && element.span.start == insertion {
+            source.get(index).map(|value| value.span.start)
+        } else if element.name.is_owner_root() && element.close_start == insertion {
+            source.get(index).map(|value| value.close_start)
+        } else {
+            None
+        };
+        if let Some(mapped) = mapped {
+            return Ok(mapped);
+        }
+    }
+    Err(invalid(
+        "MCE-processed tag-owner insertion point has no raw-source mapping",
+    ))
+}
+
+fn source_anchor_identity(
+    xml: &[u8],
+    selected: &OwnerMapElement,
+    conformance: Conformance,
+) -> Result<AnchorIdentity> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let start = xml_position(&reader)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        let is_selected = start == selected.span.start
+            && pml(&namespace) == Some(conformance)
+            && matches!(&event, Event::Start(element) | Event::Empty(element) if element.local_name().as_ref() == b"tags");
+        drop(namespace);
+        let end = xml_position(&reader)?;
+        if is_selected {
+            let element = match event {
+                Event::Start(element) | Event::Empty(element) => element,
+                _ => return Err(invalid("raw direct p:tags mapping is not an element")),
+            };
+            if end != selected.open_end {
+                return Err(invalid("raw direct p:tags opening span diverged"));
+            }
+            return anchor_relationship_id(xml, start, end, &reader, &element, conformance);
+        }
+        if start > selected.span.start || matches!(event, Event::Eof) {
+            return Err(invalid("raw direct p:tags mapping was not found"));
+        }
+    }
+}
+
+fn raw_container_contains_only_anchor(
+    xml: &[u8],
+    container: &OwnerMapElement,
+    anchor: &Anchor,
+) -> Result<bool> {
+    if container.empty {
+        return Ok(false);
+    }
+    let before = xml
+        .get(container.open_end..anchor.span.start)
+        .ok_or_else(|| invalid("raw customer-data prefix range is invalid"))?;
+    let after = xml
+        .get(anchor.span.end..container.close_start)
+        .ok_or_else(|| invalid("raw customer-data suffix range is invalid"))?;
+    Ok(before.iter().all(u8::is_ascii_whitespace) && after.iter().all(u8::is_ascii_whitespace))
+}
+
 fn owner_kind(root: &[u8], content_type: &str) -> Result<OwnerKind> {
     let kind = match root {
         b"presentation"
@@ -1723,29 +2250,29 @@ fn has_non_namespace_attrs(element: &BytesStart<'_>) -> Result<bool> {
     Ok(false)
 }
 
-fn owner_anchor_uses(xml: &[u8], conformance: Conformance, relationship_id: &str) -> Result<usize> {
+fn owner_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usize> {
     let mut reader = NsReader::from_reader(xml);
     let mut nodes = 0usize;
-    let mut candidates = Vec::new();
+    let mut uses = 0usize;
     loop {
         let start = xml_position(&reader)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
-        let is_pml = pml(&namespace) == Some(conformance);
+        let conformance = pml(&namespace);
         drop(namespace);
         let end = xml_position(&reader)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 bump_owner_node(&mut nodes)?;
-                if is_pml && element.local_name().as_ref() == b"tags" {
+                if let Some(conformance) = conformance
+                    && element.local_name().as_ref() == b"tags"
+                {
                     let candidate =
                         anchor_relationship_id(xml, start, end, &reader, &element, conformance)?;
                     if candidate.value == relationship_id {
-                        candidates
-                            .try_reserve(1)
-                            .map_err(|source| allocation("tag-owner anchor offsets", source))?;
-                        candidates.push(u32::try_from(start).map_err(|_| {
-                            invalid("tag-owner anchor offset exceeds the compact u32 domain")
-                        })?);
+                        uses = uses.checked_add(1).ok_or(Error::Limit {
+                            resource: "raw tag-owner anchor references",
+                            limit: MAX_OWNER_NODES,
+                        })?;
                     }
                 }
             },
@@ -1753,16 +2280,7 @@ fn owner_anchor_uses(xml: &[u8], conformance: Conformance, relationship_id: &str
             _ => {},
         }
     }
-    let mut capabilities = MceCapabilities::ooxml_baseline();
-    capabilities.understand_namespace("http://schemas.microsoft.com/office/powerpoint/2010/main");
-    capabilities.understand_namespace("http://schemas.microsoft.com/office/powerpoint/2012/main");
-    Ok(active_offsets(
-        xml,
-        &candidates,
-        &capabilities,
-        &ActiveOffsetLimits::default(),
-    )?
-    .len())
+    Ok(uses)
 }
 
 fn resolve_anchor(
@@ -2651,6 +3169,16 @@ mod tests {
     }
 
     #[test]
+    fn mce_p14_choice_matches_powerpoint_capabilities() {
+        let xml = format!(
+            r#"<p:tagLst xmlns:p="{PML_TEXT}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p14="{P14}"><mc:AlternateContent><mc:Choice Requires="p14"><p:tag name="choice" val="selected"/></mc:Choice><mc:Fallback><p:tag name="fallback" val="wrong"/></mc:Fallback></mc:AlternateContent></p:tagLst>"#
+        );
+        let parsed = parse(xml.as_bytes()).unwrap();
+        assert_eq!(parsed.get("choice").unwrap().value(), "selected");
+        assert!(parsed.get("fallback").is_err());
+    }
+
+    #[test]
     fn unicode_caseless_crud_is_checked_and_move_first() {
         let mut list = List::new();
         list.add(Tag::new("Straße", "one").unwrap()).unwrap();
@@ -2969,6 +3497,70 @@ mod tests {
         )
     }
 
+    #[derive(Clone, Copy)]
+    enum MceBranch {
+        Choice,
+        Fallback,
+    }
+
+    #[derive(Clone, Copy)]
+    enum MceContainer {
+        Empty,
+        Missing,
+    }
+
+    fn mce_owner_fixture(
+        root: &str,
+        conformance: Conformance,
+        branch: MceBranch,
+        container: MceContainer,
+    ) -> (Vec<u8>, String) {
+        const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let active_container = match container {
+            MceContainer::Empty => r#"<p:custDataLst data-active="keep"/>"#,
+            MceContainer::Missing => "",
+        };
+        let common_slide = root != "presentation";
+        let active = if common_slide {
+            format!(r#"<p:spTree/>{active_container}<p:extLst/>"#)
+        } else {
+            format!(r#"{active_container}<p:defaultTextStyle/>"#)
+        };
+        let inactive = if common_slide {
+            r#"<p:spTree/><p:custDataLst x:keep="inactive"><!--inactive-comment--><p:tags r:id="rIdInactive"/></p:custDataLst><p:extLst/>"#.to_owned()
+        } else {
+            r#"<p:custDataLst x:keep="inactive"><!--inactive-comment--><p:tags r:id="rIdInactive"/></p:custDataLst><p:defaultTextStyle/>"#.to_owned()
+        };
+        let (alternate, inactive_branch) = match branch {
+            MceBranch::Choice => (
+                format!(
+                    r#"<mc:Choice Requires="p14">{active}</mc:Choice><mc:Fallback>{inactive}</mc:Fallback>"#
+                ),
+                format!(r#"<mc:Fallback>{inactive}</mc:Fallback>"#),
+            ),
+            MceBranch::Fallback => (
+                format!(
+                    r#"<mc:Choice Requires="x">{inactive}</mc:Choice><mc:Fallback>{active}</mc:Fallback>"#
+                ),
+                format!(r#"<mc:Choice Requires="x">{inactive}</mc:Choice>"#),
+            ),
+        };
+        let body = if common_slide {
+            format!(r#"<p:cSld><mc:AlternateContent>{alternate}</mc:AlternateContent></p:cSld>"#)
+        } else {
+            format!(r#"<mc:AlternateContent>{alternate}</mc:AlternateContent>"#)
+        };
+        (
+            format!(
+                r#"<p:{root} xmlns:p="{}" xmlns:r="{}" xmlns:mc="{MC}" xmlns:p14="{P14}" xmlns:x="urn:unsupported" mc:Ignorable="x">{body}</p:{root}>"#,
+                conformance.namespace(),
+                conformance.relationship_namespace(),
+            )
+            .into_bytes(),
+            inactive_branch,
+        )
+    }
+
     fn package_with_slide(conformance: Conformance) -> (OpcPackage, PackURI) {
         let name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let mut package = OpcPackage::new();
@@ -3171,6 +3763,72 @@ mod tests {
     }
 
     #[test]
+    fn presentation_customer_data_after_later_children_is_rejected_atomically_under_mce() {
+        use std::sync::Arc;
+
+        const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let owner = PackURI::new("/ppt/presentation.xml").unwrap();
+        let tag_part = PackURI::new("/ppt/tags/tag1.xml").unwrap();
+        let owner_xml = format!(
+            r#"<p:presentation xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}" xmlns:mc="{MC}" xmlns:p14="{P14}"><mc:AlternateContent><mc:Choice Requires="p14"><p:defaultTextStyle/><p:custDataLst><p:tags r:id="rId1"/></p:custDataLst></mc:Choice><mc:Fallback><p:custDataLst><p:tags r:id="rIdInactive"/></p:custDataLst><p:defaultTextStyle/></mc:Fallback></mc:AlternateContent></p:presentation>"#
+        );
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(XmlPart::new(
+            owner.clone(),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+                .into(),
+            owner_xml.into_bytes(),
+        )));
+        package.add_part(Box::new(XmlPart::new(
+            tag_part.clone(),
+            CONTENT_TYPE.into(),
+            write(&list("Owner", "Alice"), Conformance::Transitional).unwrap(),
+        )));
+        package
+            .get_part_mut(&owner)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                TAG_REL.into(),
+                tag_part.relative_ref(owner.base_uri()),
+                "rId1".into(),
+                false,
+            );
+        let owner_before = package.get_part(&owner).unwrap().blob_arc();
+        let tag_before = package.get_part(&tag_part).unwrap().blob_arc();
+        mark_signed(&mut package);
+
+        for error in [
+            load(&package, &owner).unwrap_err(),
+            put(&mut package, &owner, list("Reviewer", "Bob")).unwrap_err(),
+            remove(&mut package, &owner).unwrap_err(),
+        ] {
+            assert!(matches!(
+                error,
+                Error::Invalid(message)
+                    if message.contains("must precede later root children")
+            ));
+        }
+        assert!(package.is_signed());
+        assert!(Arc::ptr_eq(
+            &owner_before,
+            &package.get_part(&owner).unwrap().blob_arc()
+        ));
+        assert!(Arc::ptr_eq(
+            &tag_before,
+            &package.get_part(&tag_part).unwrap().blob_arc()
+        ));
+        assert!(
+            package
+                .get_part(&owner)
+                .unwrap()
+                .rels()
+                .get("rId1")
+                .is_some()
+        );
+    }
+
+    #[test]
     fn package_shared_target_forks_and_collects_only_orphans() {
         let (mut package, first_owner) = package_with_slide(Conformance::Transitional);
         assert_eq!(
@@ -3305,14 +3963,15 @@ mod tests {
     }
 
     #[test]
-    fn direct_owner_loads_active_mce_branch_and_mutation_fails_closed() {
+    fn direct_owner_mutates_active_mce_fallback_and_preserves_inactive_source() {
         use std::sync::Arc;
 
         const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
         let owner = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let part_name = PackURI::new("/ppt/tags/tag1.xml").unwrap();
+        let inactive = r#"<mc:Choice Requires="x"><p:custDataLst x:keep="inactive"><!--inactive-comment--><p:tags r:id="rIdInactive"/></p:custDataLst></mc:Choice>"#;
         let owner_xml = format!(
-            r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}" xmlns:mc="{MC}" xmlns:x="urn:future" mc:Ignorable="x"><p:cSld><p:spTree/><mc:AlternateContent><mc:Choice Requires="x"><p:custDataLst><p:tags r:id="rIdInactive"/></p:custDataLst></mc:Choice><mc:Fallback><p:custDataLst><p:tags r:id="rIdActive"/></p:custDataLst></mc:Fallback></mc:AlternateContent></p:cSld></p:sld>"#
+            r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}" xmlns:mc="{MC}" xmlns:x="urn:future" mc:Ignorable="x"><p:cSld><p:spTree/><mc:AlternateContent>{inactive}<mc:Fallback><p:custDataLst><p:tags x:keep="active" r:id='rIdActive'><!--active-comment--></p:tags></p:custDataLst></mc:Fallback></mc:AlternateContent></p:cSld></p:sld>"#
         );
         let mut package = OpcPackage::new();
         package.add_part(Box::new(XmlPart::new(
@@ -3349,23 +4008,235 @@ mod tests {
 
         let before = package.get_part(&owner).unwrap().blob_arc();
         mark_signed(&mut package);
-        assert!(matches!(
-            put(&mut package, &owner, list("Reviewer", "Ada")),
-            Err(Error::MceOwnerMutation {
-                operation: "direct tag put"
-            })
-        ));
-        assert!(matches!(
-            remove(&mut package, &owner),
-            Err(Error::MceOwnerMutation {
-                operation: "direct tag removal"
-            })
-        ));
-        assert!(package.is_signed());
+        let old = put(&mut package, &owner, list("Reviewer", "Ada"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(old.get("branch").unwrap().value(), "fallback");
+        assert_eq!(
+            load(&package, &owner)
+                .unwrap()
+                .unwrap()
+                .list()
+                .get("reviewer")
+                .unwrap()
+                .value(),
+            "Ada"
+        );
+        assert!(!package.is_signed());
         assert!(Arc::ptr_eq(
             &before,
             &package.get_part(&owner).unwrap().blob_arc()
         ));
+
+        mark_signed(&mut package);
+        let removed = remove(&mut package, &owner).unwrap().unwrap();
+        assert_eq!(removed.get("reviewer").unwrap().value(), "Ada");
+        assert!(!package.is_signed());
+        assert_eq!(load(&package, &owner).unwrap(), None);
+        let updated = std::str::from_utf8(package.get_part(&owner).unwrap().blob()).unwrap();
+        assert!(updated.contains(inactive));
+        assert!(!updated.contains("rIdActive"));
+        assert!(package.get_part(&part_name).is_err());
+    }
+
+    #[test]
+    fn direct_owner_mce_creation_covers_all_owners_branches_profiles_and_container_states() {
+        let cases = [
+            (
+                "/ppt/presentation.xml",
+                "presentation",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+                Conformance::Strict,
+                MceBranch::Choice,
+                MceContainer::Empty,
+            ),
+            (
+                "/ppt/presentation.xml",
+                "presentation",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+                Conformance::Transitional,
+                MceBranch::Fallback,
+                MceContainer::Missing,
+            ),
+            (
+                "/ppt/slides/slide1.xml",
+                "sld",
+                "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+                Conformance::Transitional,
+                MceBranch::Choice,
+                MceContainer::Missing,
+            ),
+            (
+                "/ppt/slideLayouts/slideLayout1.xml",
+                "sldLayout",
+                "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
+                Conformance::Strict,
+                MceBranch::Fallback,
+                MceContainer::Empty,
+            ),
+            (
+                "/ppt/slideMasters/slideMaster1.xml",
+                "sldMaster",
+                "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+                Conformance::Transitional,
+                MceBranch::Choice,
+                MceContainer::Empty,
+            ),
+            (
+                "/ppt/notesSlides/notesSlide1.xml",
+                "notes",
+                "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml",
+                Conformance::Strict,
+                MceBranch::Fallback,
+                MceContainer::Missing,
+            ),
+            (
+                "/ppt/notesMasters/notesMaster1.xml",
+                "notesMaster",
+                "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml",
+                Conformance::Transitional,
+                MceBranch::Choice,
+                MceContainer::Missing,
+            ),
+            (
+                "/ppt/handoutMasters/handoutMaster1.xml",
+                "handoutMaster",
+                "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml",
+                Conformance::Strict,
+                MceBranch::Fallback,
+                MceContainer::Empty,
+            ),
+        ];
+
+        for (path, root, content_type, conformance, branch, container) in cases {
+            let owner = PackURI::new(path).unwrap();
+            let (xml, inactive) = mce_owner_fixture(root, conformance, branch, container);
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(XmlPart::new(
+                owner.clone(),
+                content_type.into(),
+                xml,
+            )));
+            assert_eq!(load(&package, &owner).unwrap(), None, "{root}");
+            assert_eq!(
+                put(&mut package, &owner, list("Owner", root)).unwrap(),
+                None,
+                "{root}"
+            );
+            let source = load(&package, &owner).unwrap().unwrap();
+            assert_eq!(source.conformance(), conformance, "{root}");
+            assert_eq!(source.list().get("owner").unwrap().value(), root);
+            let tag_part = source.part().clone();
+            let raw = std::str::from_utf8(package.get_part(&owner).unwrap().blob()).unwrap();
+            assert!(
+                raw.contains(&inactive),
+                "inactive branch changed for {root}"
+            );
+            let processed = process_owner_ooxml(raw.as_bytes()).unwrap();
+            let processed = std::str::from_utf8(processed.as_ref()).unwrap();
+            let tags = processed.find("<p:tags ").unwrap();
+            if root == "presentation" {
+                assert!(tags < processed.find("<p:defaultTextStyle").unwrap());
+            } else {
+                assert!(processed.find("<p:spTree").unwrap() < tags);
+                assert!(tags < processed.find("<p:extLst").unwrap());
+            }
+
+            assert!(remove(&mut package, &owner).unwrap().is_some(), "{root}");
+            assert_eq!(load(&package, &owner).unwrap(), None, "{root}");
+            let raw = std::str::from_utf8(package.get_part(&owner).unwrap().blob()).unwrap();
+            assert!(
+                raw.contains(&inactive),
+                "inactive branch changed for {root}"
+            );
+            assert!(
+                package.get_part(&tag_part).is_err(),
+                "orphan retained for {root}"
+            );
+            assert!(
+                discover(package.get_part(&owner).unwrap(), &package)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+    }
+
+    #[test]
+    fn inactive_same_id_forces_active_fork_and_retains_raw_consumer_graph() {
+        const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let owner = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let original_part = PackURI::new("/ppt/tags/tag1.xml").unwrap();
+        let inactive = r#"<mc:Fallback><p:spTree/><p:custDataLst x:keep="inactive"><!--inactive-same-id--><p:tags r:id="rIdShared"/></p:custDataLst></mc:Fallback>"#;
+        let make_package = || {
+            let owner_xml = format!(
+                r#"<p:sld xmlns:p="{PML_TEXT}" xmlns:r="{REL_TEXT}" xmlns:mc="{MC}" xmlns:p14="{P14}" xmlns:x="urn:test"><p:cSld><mc:AlternateContent><mc:Choice Requires="p14"><p:spTree/><p:custDataLst><p:tags x:keep="active" r:id='rIdShared'><!--active-same-id--></p:tags></p:custDataLst></mc:Choice>{inactive}</mc:AlternateContent></p:cSld></p:sld>"#
+            );
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(XmlPart::new(
+                owner.clone(),
+                "application/vnd.openxmlformats-officedocument.presentationml.slide+xml".into(),
+                owner_xml.into_bytes(),
+            )));
+            package.add_part(Box::new(XmlPart::new(
+                original_part.clone(),
+                CONTENT_TYPE.into(),
+                write(&list("Owner", "Alice"), Conformance::Transitional).unwrap(),
+            )));
+            package
+                .get_part_mut(&owner)
+                .unwrap()
+                .rels_mut()
+                .add_relationship(
+                    TAG_REL.into(),
+                    original_part.relative_ref(owner.base_uri()),
+                    "rIdShared".into(),
+                    false,
+                );
+            package
+        };
+
+        let mut package = make_package();
+        let old = put(&mut package, &owner, list("Reviewer", "Bob"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(old.get("owner").unwrap().value(), "Alice");
+        let active = load(&package, &owner).unwrap().unwrap();
+        assert_ne!(active.rel(), "rIdShared");
+        assert_ne!(active.part(), &original_part);
+        assert_eq!(active.list().get("reviewer").unwrap().value(), "Bob");
+        let forked = active.part().clone();
+        let raw = std::str::from_utf8(package.get_part(&owner).unwrap().blob()).unwrap();
+        assert!(raw.contains(inactive));
+        assert!(raw.contains("x:keep=\"active\""));
+        assert!(raw.contains("<!--active-same-id-->"));
+        assert_eq!(raw.matches("rIdShared").count(), 1);
+        assert!(package.get_part(&original_part).is_ok());
+        assert!(remove(&mut package, &owner).unwrap().is_some());
+        assert!(package.get_part(&forked).is_err());
+        assert!(package.get_part(&original_part).is_ok());
+        assert!(
+            package
+                .get_part(&owner)
+                .unwrap()
+                .rels()
+                .get("rIdShared")
+                .is_some()
+        );
+
+        let mut package = make_package();
+        assert!(remove(&mut package, &owner).unwrap().is_some());
+        assert_eq!(load(&package, &owner).unwrap(), None);
+        let raw = std::str::from_utf8(package.get_part(&owner).unwrap().blob()).unwrap();
+        assert!(raw.contains(inactive));
+        assert!(
+            package
+                .get_part(&owner)
+                .unwrap()
+                .rels()
+                .get("rIdShared")
+                .is_some()
+        );
+        assert!(package.get_part(&original_part).is_ok());
     }
 
     #[test]

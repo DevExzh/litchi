@@ -295,8 +295,12 @@ and common-slide-data anchors use singleton `load`, `put`, and `remove`; the
 migration facade exposes short slide-scoped `tags`, `put_tags`, and
 `remove_tags` operations selected first by producer-visible slide name and
 second by checked position; an already-resolved `Slide` reads its attachment
-directly without rescanning unrelated slide parts. Shape-owned lists remain
-distinct objects and are never flattened into the slide result.
+directly without rescanning unrelated slide parts. Direct-owner reads and
+mutations select the same active MCE branch, then map the semantic insertion,
+container, and anchor back to checked raw-source coordinates; inactive branches
+never become mutation targets, while every preserved raw anchor participates in
+shared-edge retention. Shape-owned lists remain distinct objects and are never
+flattened into the slide result.
 `tag::shape::{load, put, remove}` is the focused package layer for those
 anchors and reuses canonical `shape::Key`: exact producer-visible names remain
 the ordinary selector and checked depth-first positions remain available for

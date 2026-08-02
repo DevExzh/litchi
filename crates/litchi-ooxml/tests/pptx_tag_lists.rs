@@ -181,6 +181,86 @@ fn package_tag_put_and_remove_are_singleton_and_persistent() {
 }
 
 #[test]
+fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    let mut package = package_with_named_slides();
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    let inactive_part = PackURI::new("/ppt/tags/tag900.xml").unwrap();
+    package.opc_package_mut().add_part(Box::new(BlobPart::new(
+        inactive_part.clone(),
+        TAG_CONTENT_TYPE.to_owned(),
+        LOCAL_SECONDARY_TAGS.to_vec(),
+    )));
+    package
+        .opc_package_mut()
+        .get_part_mut(&slide_name)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            TAG_RELATIONSHIP_TYPE.to_owned(),
+            "../tags/tag900.xml".to_owned(),
+            "rIdInactiveTags".to_owned(),
+            false,
+        );
+    let alternate = format!(
+        r#"<mc:AlternateContent xmlns:mc="{MC}"><mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/></p:custDataLst></mc:Choice><mc:Fallback><p:custDataLst><!--active-branch--></p:custDataLst></mc:Fallback></mc:AlternateContent>"#
+    );
+    {
+        let slide = package.opc_package_mut().get_part_mut(&slide_name).unwrap();
+        let xml = std::str::from_utf8(slide.blob()).unwrap();
+        let updated = xml.replacen("</p:spTree>", &format!("</p:spTree>{alternate}"), 1);
+        assert_ne!(updated, xml, "generated slide must contain p:spTree");
+        slide.set_blob(updated.into_bytes());
+    }
+
+    assert_eq!(package.tags("Overview").unwrap(), None);
+    let created = tag_list("Owner", "Alice");
+    assert_eq!(package.put_tags("Overview", created.clone()).unwrap(), None);
+    assert_eq!(package.tags("Overview").unwrap(), Some(created.clone()));
+
+    let replacement = tag_list("Owner", "Grace");
+    assert_eq!(
+        package.put_tags("Overview", replacement.clone()).unwrap(),
+        Some(created)
+    );
+    assert_eq!(package.tags("Overview").unwrap(), Some(replacement.clone()));
+    let after_put =
+        std::str::from_utf8(package.opc_package().get_part(&slide_name).unwrap().blob()).unwrap();
+    assert!(after_put.contains(
+        r#"<mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/>"#
+    ));
+    assert!(after_put.contains(r#"<p:custDataLst><!--active-branch--><p:tags "#));
+    assert_eq!(after_put.matches("<p:tags ").count(), 2);
+
+    let output = NamedTempFile::with_suffix(".pptx").unwrap();
+    package.save(output.path()).unwrap();
+    let mut reopened = Package::open(output.path()).unwrap();
+    assert_eq!(
+        reopened.tags("Overview").unwrap(),
+        Some(replacement.clone())
+    );
+    assert_eq!(reopened.remove_tags("Overview").unwrap(), Some(replacement));
+    assert_eq!(reopened.remove_tags("Overview").unwrap(), None);
+    let after_remove =
+        std::str::from_utf8(reopened.opc_package().get_part(&slide_name).unwrap().blob()).unwrap();
+    assert!(after_remove.contains(
+        r#"<mc:Choice xmlns:x="urn:litchi:test:unsupported" Requires="x"><p:custDataLst><!--inactive-branch--><p:tags r:id="rIdInactiveTags"/>"#
+    ));
+    assert!(after_remove.contains(r#"<p:custDataLst><!--active-branch--></p:custDataLst>"#));
+    assert_eq!(after_remove.matches("<p:tags ").count(), 1);
+    assert!(reopened.opc_package().get_part(&inactive_part).is_ok());
+    assert!(
+        reopened
+            .opc_package()
+            .get_part(&slide_name)
+            .unwrap()
+            .rels()
+            .get("rIdInactiveTags")
+            .is_some()
+    );
+}
+
+#[test]
 fn package_tag_edits_reject_a_dirty_legacy_writer() {
     let mut package = Package::new().unwrap();
     package.presentation_mut().unwrap().add_slide().unwrap();

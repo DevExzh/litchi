@@ -2509,9 +2509,10 @@ extension attributes remain inert. Cached exact escaped-wire sizes preflight
 the aggregate 8 MiB writer ceiling before every successful mutation and keep
 replacement/value-set failure atomic without rescanning existing strings.
 Discovery refuses external tag targets, wrong content types, duplicate targets,
-and unexpected relationships on a tag part. Tag package relationship mutation
-is not yet wired, so detached CRUD is not presented as package-level tag
-replacement or deletion; the separate
+and unexpected relationships on a tag part. Direct presentation and
+common-slide-data anchors now have atomic package `load`, `put`, and `remove`;
+the migration facade exposes these through semantic slide selectors while raw
+relationship inventory remains a low-level diagnostic path. The separate
 revision/change package stores remain add-only.
 
 `litchi-xlsb::calc` owns `BrtCalcProp` independently of the OOXML migration
@@ -2791,19 +2792,42 @@ retains shared edges and collects a target only when it is orphaned. Typed
 failures leave the owner XML, relationships, parts, signatures, and shared
 blobs unchanged, and owned `List` values move into successful writes.
 
-Direct-owner `load` also applies bounded MCE branch selection. Until that
-lower-level path has the same raw-coordinate mapping as shape-owned mutation,
-direct-owner `put` and `remove` fail before mutation with the typed
-`MceOwnerMutation` error whenever branch selection rewrites the owner. This is
-an explicit safe-default boundary rather than an attempt to edit processed
-offsets in the raw source; shape-owned mutation already has the required
-mapping and remains supported for those owners.
+Direct-owner `load`, `put`, and `remove` now apply one bounded MCE branch
+selection policy. Mutation maps the processed owner root, insertion point,
+direct `p:custDataLst`, and direct `p:tags` back to the corresponding active
+raw-source elements before constructing a patch. It can therefore create an
+anchor in an active missing or empty container, update an active anchor, and
+remove it without editing a processed offset or touching an inactive
+Choice/Fallback branch. Every preserved raw anchor participates in shared-ID
+use counts, so an inactive branch that reuses the selected relationship forces
+replacement to fork and removal to retain the old relationship and target.
+Owner and tag-list preprocessing share the PowerPoint capability profile:
+baseline OOXML plus the checked-in `p14` and `p15` extension namespaces, with
+first-supported-Choice semantics. The processed and raw element sequences,
+namespace profile, anchor ID, and staged post-edit semantic layout must agree
+before any package graph mutation; divergence is a typed validation failure.
+The temporary `MceOwnerMutation` boundary is removed rather than retained as a
+compatibility alias.
 
-All six focused shape-tag tests are green. They cover the five owner families
-and nested groups, both namespace profiles, raw-source MCE mapping,
-schema-order and byte-preservation cases, atomic/no-op behavior, and
-shared-anchor/target fork and collection.
-Warning-denied Clippy also passes for `litchi-pptx`. For native evidence,
+Focused canonical and facade tests are green. They cover all seven direct
+owner families, the five shape families and nested groups, both namespace
+profiles, `p14` Choice and Fallback selection, missing and empty active
+containers, presentation/common-slide-data schema order, raw-source MCE
+mapping, byte preservation, atomic/no-op behavior, and shared-anchor/target
+fork, retention, and collection. Warning-denied Clippy also passes for
+`litchi-pptx` and the focused migration-host integration target. For native
+direct-owner evidence, PowerPoint for macOS 16.110.2 opened the generated
+`target/native-office/pptx-mce-choice-updated.pptx` p14-Choice deck without a
+repair prompt, rendered its slide, saved a normalized copy, closed, and
+reopened that copy without repair. The public facade reverse-read
+`LITCHI_MCE=updated`. PowerPoint flattened the selected Choice into a direct
+`p:custDataLst` and removed the inactive Fallback relationship and part during
+its own resave; that normalization is recorded as native application behavior,
+not as a Litchi source-preservation claim. The independently generated
+removed-tag artifact also opened without repair and reverse-read with no active
+tag list.
+
+For shape-owned native evidence,
 PowerPoint for macOS 16.110.2 opened the Litchi-mutated LibreOffice fixture
 without a repair prompt, saved a normalized `.pptx` copy, closed it, and
 reopened that copy without repair. A reverse read through the public facade
