@@ -1,253 +1,408 @@
-//! Common document properties for OOXML formats.
+//! Core document properties shared by every OOXML host.
 //!
-//! This module provides document metadata properties that are shared across
-//! DOCX, XLSX, and PPTX formats.
+//! [`Props`] is the concise, owned semantic value. Package operations are
+//! deliberately separate: [`read`] distinguishes an absent part from a present
+//! but empty properties document, [`write()`] consumes a value, and [`clear`]
+//! removes the validated package graph idempotently.
 
+mod graph;
+pub mod keyword;
 mod read;
+pub mod time;
+mod write;
 
 pub use read::read;
+pub use write::{clear, write};
 
-use chrono::{DateTime, Utc};
-use litchi_core::xml::escape_xml;
+use crate::Result;
+use litchi_core::Metadata;
+use litchi_opc::OpcPackage;
 
-/// Document core properties (metadata).
-///
-/// These properties are stored in the `docProps/core.xml` file in the OPC package.
-#[derive(Debug, Clone, Default)]
-pub struct DocumentProperties {
-    /// Document title
-    pub title: Option<String>,
-    /// Document subject
-    pub subject: Option<String>,
-    /// Document creator/author
-    pub creator: Option<String>,
-    /// Document keywords (comma-separated)
-    pub keywords: Option<String>,
-    /// Document description
-    pub description: Option<String>,
-    /// Stable document identifier
-    pub identifier: Option<String>,
-    /// Last modified by
-    pub last_modified_by: Option<String>,
-    /// Document category
-    pub category: Option<String>,
-    /// Content status (e.g., "Draft", "Final")
-    pub content_status: Option<String>,
-    /// Core-properties content type descriptor
-    pub content_type: Option<String>,
-    /// Revision number
-    pub revision: Option<u32>,
-    /// Document version
-    pub version: Option<String>,
-    /// Document language
-    pub language: Option<String>,
-    /// Creation date
-    pub created: Option<DateTime<Utc>>,
-    /// Last modification date
-    pub modified: Option<DateTime<Utc>>,
-    /// Last printed date
-    pub last_printed: Option<DateTime<Utc>>,
+use keyword::Item;
+
+pub(super) const CORE_PROPERTIES_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/package/2006/metadata/core-properties";
+pub(super) const STRICT_CORE_PROPERTIES_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/package/metadata/core-properties";
+pub(super) const STRICT_CORE_PROPERTIES_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties";
+pub(super) const MAX_PROPERTY_TEXT: usize = 1_048_576;
+pub(super) const MAX_XML_BYTES: usize = 20 * 1_048_576;
+pub(super) const MAX_XML_EVENTS: usize = 131_072;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Dialect {
+    Transitional,
+    Strict,
 }
 
-impl DocumentProperties {
-    /// Create a new empty document properties.
+impl Dialect {
+    pub(super) fn namespace(self) -> &'static str {
+        match self {
+            Self::Transitional => {
+                "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+            },
+            Self::Strict => "http://purl.oclc.org/ooxml/package/metadata/core-properties",
+        }
+    }
+}
+
+/// Lossless mixed content for the `cp:keywords` core property.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Keywords {
+    /// Optional language for the mixed keyword content.
+    pub lang: Option<keyword::Lang>,
+    /// Text and `cp:value` children in document order.
+    pub items: Vec<Item>,
+}
+
+impl Keywords {
+    /// Creates a present but empty keyword value.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the document title.
+    /// Adds text directly inside `cp:keywords`.
+    #[must_use]
+    pub fn text(mut self, text: impl Into<String>) -> Self {
+        self.append_text(text.into());
+        self
+    }
+
+    /// Adds a structured `cp:value` child.
+    #[must_use]
+    pub fn value(mut self, value: impl Into<keyword::Value>) -> Self {
+        self.items.push(Item::Value(value.into()));
+        self
+    }
+
+    /// Adds a validated language to the outer `cp:keywords` element.
+    #[must_use]
+    pub fn lang(mut self, lang: keyword::Lang) -> Self {
+        self.lang = Some(lang);
+        self
+    }
+
+    /// Concatenates all text and value content in document order.
+    #[must_use]
+    pub fn joined(&self) -> String {
+        let capacity = self
+            .items
+            .iter()
+            .map(|item| match item {
+                Item::Text(text) => text.len(),
+                Item::Value(value) => value.text.len(),
+            })
+            .sum();
+        let mut joined = String::with_capacity(capacity);
+        for item in &self.items {
+            match item {
+                Item::Text(text) => joined.push_str(text),
+                Item::Value(value) => joined.push_str(&value.text),
+            }
+        }
+        joined
+    }
+
+    /// Returns a direct borrow for the common plain-text form.
+    #[must_use]
+    pub fn plain(&self) -> Option<&str> {
+        if self.lang.is_some() || self.items.len() != 1 {
+            return None;
+        }
+        match &self.items[0] {
+            Item::Text(text) => Some(text),
+            Item::Value(_) => None,
+        }
+    }
+
+    pub(super) fn append_text(&mut self, text: String) {
+        if text.is_empty() {
+            return;
+        }
+        if let Some(Item::Text(previous)) = self.items.last_mut() {
+            previous.push_str(&text);
+        } else {
+            self.items.push(Item::Text(text));
+        }
+    }
+}
+
+impl From<String> for Keywords {
+    fn from(text: String) -> Self {
+        Self::new().text(text)
+    }
+}
+
+impl From<&str> for Keywords {
+    fn from(text: &str) -> Self {
+        Self::new().text(text)
+    }
+}
+
+impl std::fmt::Display for Keywords {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.joined())
+    }
+}
+
+/// Owned OOXML core properties.
+///
+/// Public fields make struct-update syntax natural while package writes still
+/// validate every string before changing the package.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Props {
+    /// Document title.
+    pub title: Option<String>,
+    /// Document subject.
+    pub subject: Option<String>,
+    /// Document creator or author.
+    pub creator: Option<String>,
+    /// Lossless keyword mixed content; plain strings remain the common form.
+    pub keywords: Option<Keywords>,
+    /// Document description.
+    pub description: Option<String>,
+    /// Stable document identifier.
+    pub identifier: Option<String>,
+    /// Person or tool that last modified the document.
+    pub last_modified_by: Option<String>,
+    /// Document category.
+    pub category: Option<String>,
+    /// Content status, such as `Draft` or `Final`.
+    pub content_status: Option<String>,
+    /// Revision lexical value. The OPC schema deliberately permits any string.
+    pub revision: Option<String>,
+    /// Document version.
+    pub version: Option<String>,
+    /// Document language.
+    pub language: Option<String>,
+    /// Lossless W3CDTF creation value.
+    pub created: Option<time::W3c>,
+    /// Lossless W3CDTF last-modification value.
+    pub modified: Option<time::W3c>,
+    /// Lossless `xsd:dateTime` last-printed value.
+    pub last_printed: Option<time::DateTime>,
+}
+
+impl Props {
+    /// Creates a present but semantically empty properties document.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the document title.
+    #[must_use]
     pub fn title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
     }
 
-    /// Set the document subject.
+    /// Sets the document subject.
+    #[must_use]
     pub fn subject(mut self, subject: impl Into<String>) -> Self {
         self.subject = Some(subject.into());
         self
     }
 
-    /// Set the document creator/author.
+    /// Sets the document creator or author.
+    #[must_use]
     pub fn creator(mut self, creator: impl Into<String>) -> Self {
         self.creator = Some(creator.into());
         self
     }
 
-    /// Set the document keywords.
-    pub fn keywords(mut self, keywords: impl Into<String>) -> Self {
+    /// Sets the document keywords.
+    #[must_use]
+    pub fn keywords(mut self, keywords: impl Into<Keywords>) -> Self {
         self.keywords = Some(keywords.into());
         self
     }
 
-    /// Set the document description.
+    /// Sets the document description.
+    #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
-    /// Set the stable document identifier.
+    /// Sets the stable document identifier.
+    #[must_use]
     pub fn identifier(mut self, identifier: impl Into<String>) -> Self {
         self.identifier = Some(identifier.into());
         self
     }
 
-    /// Set who last modified the document.
+    /// Sets who last modified the document.
+    #[must_use]
     pub fn last_modified_by(mut self, name: impl Into<String>) -> Self {
         self.last_modified_by = Some(name.into());
         self
     }
 
-    /// Set the document category.
+    /// Sets the document category.
+    #[must_use]
     pub fn category(mut self, category: impl Into<String>) -> Self {
         self.category = Some(category.into());
         self
     }
 
-    /// Set the content status.
+    /// Sets the content status.
+    #[must_use]
     pub fn content_status(mut self, status: impl Into<String>) -> Self {
         self.content_status = Some(status.into());
         self
     }
 
-    /// Set the core content type descriptor.
-    pub fn content_type(mut self, content_type: impl Into<String>) -> Self {
-        self.content_type = Some(content_type.into());
+    /// Sets the revision lexical value without numeric normalization.
+    #[must_use]
+    pub fn revision(mut self, revision: impl Into<String>) -> Self {
+        self.revision = Some(revision.into());
         self
     }
 
-    /// Set the revision number.
-    pub fn revision(mut self, revision: u32) -> Self {
-        self.revision = Some(revision);
-        self
-    }
-
-    /// Set the document version.
+    /// Sets the document version.
+    #[must_use]
     pub fn version(mut self, version: impl Into<String>) -> Self {
         self.version = Some(version.into());
         self
     }
 
-    /// Set the document language.
+    /// Sets the document language.
+    #[must_use]
     pub fn language(mut self, language: impl Into<String>) -> Self {
         self.language = Some(language.into());
         self
     }
 
-    /// Generate core.xml content for this properties set.
-    pub fn to_xml(&self) -> String {
-        let mut xml = String::with_capacity(1024);
-        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-        xml.push_str(r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">"#);
+    /// Sets a validated W3CDTF creation value.
+    #[must_use]
+    pub fn created(mut self, created: impl Into<time::W3c>) -> Self {
+        self.created = Some(created.into());
+        self
+    }
 
-        // Title
-        if let Some(ref title) = self.title {
-            xml.push_str("<dc:title>");
-            xml.push_str(&escape_xml(title));
-            xml.push_str("</dc:title>");
+    /// Sets a validated W3CDTF modification value.
+    #[must_use]
+    pub fn modified(mut self, modified: impl Into<time::W3c>) -> Self {
+        self.modified = Some(modified.into());
+        self
+    }
+
+    /// Sets a validated `xsd:dateTime` last-printed value.
+    #[must_use]
+    pub fn last_printed(mut self, last_printed: impl Into<time::DateTime>) -> Self {
+        self.last_printed = Some(last_printed.into());
+        self
+    }
+
+    /// Encodes a standalone Transitional core-properties document.
+    ///
+    /// Prefer [`write()`] when an OPC package is available because it preserves
+    /// an existing Strict package's namespace and relationship family.
+    pub fn xml(&self) -> Result<String> {
+        write::encode(self, Dialect::Transitional)
+    }
+}
+
+impl From<Props> for Metadata {
+    fn from(props: Props) -> Self {
+        let created = props.created.as_ref().and_then(time::W3c::utc);
+        let created_local = props.created.as_ref().and_then(time::W3c::local);
+        let modified = props.modified.as_ref().and_then(time::W3c::utc);
+        let modified_local = props.modified.as_ref().and_then(time::W3c::local);
+        let last_printed_time = props.last_printed.as_ref().and_then(time::DateTime::utc);
+        let last_printed_local = props.last_printed.as_ref().and_then(time::DateTime::local);
+        Self {
+            title: props.title,
+            subject: props.subject,
+            author: props.creator,
+            keywords: props.keywords.map(|keywords| keywords.joined()),
+            description: props.description,
+            identifier: props.identifier,
+            language: props.language,
+            last_modified_by: props.last_modified_by,
+            revision: props.revision,
+            category: props.category,
+            content_status: props.content_status,
+            version: props.version,
+            created,
+            created_local,
+            modified,
+            modified_local,
+            last_printed_time,
+            last_printed_local,
+            ..Self::default()
         }
+    }
+}
 
-        // Subject
-        if let Some(ref subject) = self.subject {
-            xml.push_str("<dc:subject>");
-            xml.push_str(&escape_xml(subject));
-            xml.push_str("</dc:subject>");
+/// A host package's authoritative, mutation-tracked core-properties slot.
+///
+/// This is public so host crates can share the implementation, but ordinary
+/// callers should use their DOCX, PPTX, or XLSX package facade.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct Slot {
+    props: Option<Props>,
+    dirty: bool,
+}
+
+impl Slot {
+    /// Reads and validates the package graph while retaining absence exactly.
+    pub fn load(package: &OpcPackage) -> Result<Self> {
+        Ok(Self {
+            props: read(package)?,
+            dirty: false,
+        })
+    }
+
+    /// Borrows the current value without marking it dirty.
+    #[must_use]
+    pub fn get(&self) -> Option<&Props> {
+        self.props.as_ref()
+    }
+
+    /// Mutably borrows an existing value and marks it for validation on flush.
+    pub fn get_mut(&mut self) -> Option<&mut Props> {
+        let props = self.props.as_mut()?;
+        self.dirty = true;
+        Some(props)
+    }
+
+    /// Moves a present value into the slot and returns the previous value.
+    pub fn put(&mut self, props: Props) -> Option<Props> {
+        self.dirty = true;
+        self.props.replace(props)
+    }
+
+    /// Marks the value absent and moves out the previous value.
+    pub fn clear(&mut self) -> Option<Props> {
+        let previous = self.props.take();
+        self.dirty |= previous.is_some();
+        previous
+    }
+
+    /// Applies a staged write or clear only when this slot was edited.
+    ///
+    /// A failed flush leaves the slot dirty so the caller can repair the value
+    /// and retry. A byte-identical write is a true no-op.
+    pub fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
+        if !self.dirty {
+            return Ok(false);
         }
+        let changed = match self.props.as_ref() {
+            Some(props) => write::sync(package, props)?,
+            None => clear(package)?,
+        };
+        self.dirty = false;
+        Ok(changed)
+    }
 
-        // Creator
-        if let Some(ref creator) = self.creator {
-            xml.push_str("<dc:creator>");
-            xml.push_str(&escape_xml(creator));
-            xml.push_str("</dc:creator>");
-        }
-
-        // Keywords
-        if let Some(ref keywords) = self.keywords {
-            xml.push_str("<cp:keywords>");
-            xml.push_str(&escape_xml(keywords));
-            xml.push_str("</cp:keywords>");
-        }
-
-        // Description
-        if let Some(ref description) = self.description {
-            xml.push_str("<dc:description>");
-            xml.push_str(&escape_xml(description));
-            xml.push_str("</dc:description>");
-        }
-
-        if let Some(ref identifier) = self.identifier {
-            xml.push_str("<dc:identifier>");
-            xml.push_str(&escape_xml(identifier));
-            xml.push_str("</dc:identifier>");
-        }
-
-        // Last modified by
-        if let Some(ref last_modified_by) = self.last_modified_by {
-            xml.push_str("<cp:lastModifiedBy>");
-            xml.push_str(&escape_xml(last_modified_by));
-            xml.push_str("</cp:lastModifiedBy>");
-        }
-
-        // Category
-        if let Some(ref category) = self.category {
-            xml.push_str("<cp:category>");
-            xml.push_str(&escape_xml(category));
-            xml.push_str("</cp:category>");
-        }
-
-        // Content status
-        if let Some(ref status) = self.content_status {
-            xml.push_str("<cp:contentStatus>");
-            xml.push_str(&escape_xml(status));
-            xml.push_str("</cp:contentStatus>");
-        }
-
-        if let Some(ref content_type) = self.content_type {
-            xml.push_str("<cp:contentType>");
-            xml.push_str(&escape_xml(content_type));
-            xml.push_str("</cp:contentType>");
-        }
-
-        if let Some(revision) = self.revision {
-            xml.push_str("<cp:revision>");
-            xml.push_str(&revision.to_string());
-            xml.push_str("</cp:revision>");
-        }
-
-        if let Some(ref version) = self.version {
-            xml.push_str("<cp:version>");
-            xml.push_str(&escape_xml(version));
-            xml.push_str("</cp:version>");
-        }
-
-        // Language
-        if let Some(ref language) = self.language {
-            xml.push_str("<dc:language>");
-            xml.push_str(&escape_xml(language));
-            xml.push_str("</dc:language>");
-        }
-
-        // Created date
-        if let Some(ref created) = self.created {
-            xml.push_str("<dcterms:created xsi:type=\"dcterms:W3CDTF\">");
-            xml.push_str(&created.to_rfc3339());
-            xml.push_str("</dcterms:created>");
-        }
-
-        // Modified date
-        if let Some(ref modified) = self.modified {
-            xml.push_str("<dcterms:modified xsi:type=\"dcterms:W3CDTF\">");
-            xml.push_str(&modified.to_rfc3339());
-            xml.push_str("</dcterms:modified>");
-        }
-
-        if let Some(ref last_printed) = self.last_printed {
-            xml.push_str("<cp:lastPrinted>");
-            xml.push_str(&last_printed.to_rfc3339());
-            xml.push_str("</cp:lastPrinted>");
-        }
-
-        xml.push_str("</cp:coreProperties>");
-        xml
+    #[cfg(test)]
+    fn is_dirty(&self) -> bool {
+        self.dirty
     }
 }
 
@@ -256,38 +411,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_document_properties_builder() {
-        let props = DocumentProperties::new()
+    fn builder_and_struct_update_stay_concise() {
+        let first = Props::new()
             .title("Test Document")
-            .creator("John Doe")
-            .subject("Testing")
-            .keywords("test, document, rust");
+            .creator("Ada")
+            .revision("007-alpha");
+        let second = Props {
+            title: Some("Revised".to_owned()),
+            ..first
+        };
 
-        assert_eq!(props.title, Some("Test Document".to_string()));
-        assert_eq!(props.creator, Some("John Doe".to_string()));
-        assert_eq!(props.subject, Some("Testing".to_string()));
-        assert_eq!(props.keywords, Some("test, document, rust".to_string()));
+        assert_eq!(second.title.as_deref(), Some("Revised"));
+        assert_eq!(second.creator.as_deref(), Some("Ada"));
+        assert_eq!(second.revision.as_deref(), Some("007-alpha"));
     }
 
     #[test]
-    fn test_xml_generation() {
-        let props = DocumentProperties::new()
-            .title("My Document")
-            .creator("Test Author");
+    fn xml_escapes_text_and_rejects_forbidden_characters() {
+        let xml = Props::new()
+            .title("A & <B> \"C\"")
+            .xml()
+            .expect("valid XML");
+        assert!(xml.contains("A &amp; &lt;B&gt; &quot;C&quot;"));
 
-        let xml = props.to_xml();
-        assert!(xml.contains("<dc:title>My Document</dc:title>"));
-        assert!(xml.contains("<dc:creator>Test Author</dc:creator>"));
+        let error = Props::new().title("bad\u{0}text").xml().unwrap_err();
+        assert!(matches!(error, crate::Error::Invalid(_)));
     }
 
     #[test]
-    fn test_xml_escaping() {
-        let props = DocumentProperties::new().title("Test & <Special> \"Characters\"");
+    fn slot_tracks_only_real_edit_intent() {
+        let package = OpcPackage::new();
+        let mut slot = Slot::load(&package).expect("load");
+        assert!(slot.get().is_none());
+        assert!(!slot.is_dirty());
+        assert!(slot.clear().is_none());
+        assert!(!slot.is_dirty());
 
-        let xml = props.to_xml();
-        assert!(xml.contains("&amp;"));
-        assert!(xml.contains("&lt;"));
-        assert!(xml.contains("&gt;"));
-        assert!(xml.contains("&quot;"));
+        slot.put(Props::new());
+        assert!(slot.is_dirty());
+        assert!(slot.get_mut().is_some());
     }
 }

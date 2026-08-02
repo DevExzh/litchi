@@ -20,7 +20,7 @@
 //! ### Creating a new document
 //!
 //! ```rust,no_run
-//! use litchi_ooxml::docx::Package;
+//! use litchi_ooxml::{Props, docx::Package};
 //!
 //! // Create a new document
 //! let mut pkg = Package::new()?;
@@ -40,8 +40,7 @@
 //! table.cell(0, 1).unwrap().set_text("Header 2");
 //!
 //! // Set metadata
-//! pkg.properties_mut().title = Some("My Document".to_string());
-//! pkg.properties_mut().creator = Some("John Doe".to_string());
+//! let _ = pkg.put_props(Props::new().title("My Document").creator("John Doe"));
 //!
 //! // Save
 //! pkg.save("output.docx")?;
@@ -84,8 +83,7 @@
 //! }
 //!
 //! // Access metadata
-//! let props = pkg.properties();
-//! if let Some(title) = &props.title {
+//! if let Some(title) = pkg.props().and_then(|props| props.title.as_deref()) {
 //!     println!("Title: {}", title);
 //! }
 //! # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -105,7 +103,9 @@
 //! doc.add_heading("New Section", 2)?;
 //!
 //! // Update metadata
-//! pkg.properties_mut().last_modified_by = Some("Jane Smith".to_string());
+//! if let Some(props) = pkg.props_mut() {
+//!     props.last_modified_by = Some("Jane Smith".to_string());
+//! }
 //!
 //! // Save (can overwrite or save to new file)
 //! pkg.save("updated_document.docx")?;
@@ -176,7 +176,7 @@
 //! wb.define_name("DataRange", "Sheet1!$A$1:$B$3");
 //!
 //! // Set metadata
-//! wb.properties_mut().title = Some("Employee Data".to_string());
+//! let _ = wb.put_props(litchi_ooxml::Props::new().title("Employee Data"));
 //!
 //! // Save
 //! wb.save("output.xlsx")?;
@@ -240,7 +240,7 @@
 //! ### Creating a new presentation
 //!
 //! ```rust,no_run
-//! use litchi_ooxml::pptx::Package;
+//! use litchi_ooxml::{Props, pptx::Package};
 //!
 //! // Create a new presentation
 //! let mut pkg = Package::new()?;
@@ -261,8 +261,7 @@
 //! slide2.add_picture_from_bytes(image_data, 914400, 914400, 1828800, 1828800, None)?;
 //!
 //! // Set metadata
-//! pkg.properties_mut().title = Some("My Presentation".to_string());
-//! pkg.properties_mut().creator = Some("John Doe".to_string());
+//! let _ = pkg.put_props(Props::new().title("My Presentation").creator("John Doe"));
 //!
 //! // Save
 //! pkg.save("output.pptx")?;
@@ -314,7 +313,9 @@
 //! new_slide.add_text_box("Thank you!", 914400, 3657600, 7315200, 914400);
 //!
 //! // Update metadata
-//! pkg.properties_mut().last_modified_by = Some("Jane Smith".to_string());
+//! if let Some(props) = pkg.props_mut() {
+//!     props.last_modified_by = Some("Jane Smith".to_string());
+//! }
 //!
 //! // Save
 //! pkg.save("updated_presentation.pptx")?;
@@ -357,7 +358,7 @@ pub use crate::docx::{Document, MutableDocument, Package as DocxPackage};
 pub use crate::error::{OoxmlError, Result};
 pub use crate::pptx::{MutablePresentation, Package as PptxPackage, Presentation};
 pub use crate::xlsx::{MutableWorksheet, Workbook, Worksheet};
-pub use litchi_ooxml_common::DocumentProperties;
+pub use litchi_ooxml_common::Props;
 
 /// Unified document interface for reading different Office formats.
 ///
@@ -367,7 +368,7 @@ pub trait UnifiedDocument {
     fn extract_text(&self) -> Result<String>;
 
     /// Get document properties/metadata.
-    fn properties(&self) -> Result<DocumentProperties>;
+    fn props(&self) -> Option<&Props>;
 }
 
 impl UnifiedDocument for DocxPackage {
@@ -375,8 +376,8 @@ impl UnifiedDocument for DocxPackage {
         self.document()?.text()
     }
 
-    fn properties(&self) -> Result<DocumentProperties> {
-        Ok(self.properties().clone())
+    fn props(&self) -> Option<&Props> {
+        DocxPackage::props(self)
     }
 }
 
@@ -399,8 +400,8 @@ impl UnifiedDocument for PptxPackage {
         Ok(result)
     }
 
-    fn properties(&self) -> Result<DocumentProperties> {
-        Ok(self.properties().clone())
+    fn props(&self) -> Option<&Props> {
+        PptxPackage::props(self)
     }
 }
 
@@ -453,29 +454,29 @@ pub mod helpers {
     /// ```rust,no_run
     /// use litchi_ooxml::api::helpers;
     ///
-    /// let props = helpers::get_properties("document.docx")?;
-    /// if let Some(title) = props.title {
+    /// let props = helpers::get_props("document.docx")?;
+    /// if let Some(title) = props.and_then(|props| props.title) {
     ///     println!("Title: {}", title);
     /// }
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn get_properties<P: AsRef<std::path::Path>>(path: P) -> Result<DocumentProperties> {
+    pub fn get_props<P: AsRef<std::path::Path>>(path: P) -> Result<Option<Props>> {
         let path_ref = path.as_ref();
         let ext = path_ref.extension().and_then(|s| s.to_str()).unwrap_or("");
 
         match ext.to_lowercase().as_str() {
             "docx" => {
                 let pkg = DocxPackage::open(path)?;
-                Ok(pkg.properties().clone())
+                Ok(pkg.props().cloned())
             },
             "pptx" => {
                 let pkg = PptxPackage::open(path)?;
-                Ok(pkg.properties().clone())
+                Ok(pkg.props().cloned())
             },
             "xlsx" => {
                 let wb =
                     Workbook::open(path).map_err(|e| OoxmlError::InvalidFormat(e.to_string()))?;
-                Ok(wb.properties().clone())
+                Ok(wb.props().cloned())
             },
             _ => Err(OoxmlError::InvalidFormat(format!(
                 "Unsupported file extension: {}",

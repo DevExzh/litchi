@@ -4,6 +4,7 @@
 //! including the newly completed features for hyperlinks, comments,
 //! conditional formatting, images, page setup, and more.
 
+use litchi::ooxml::Props;
 use litchi::ooxml::xlsx::{
     CellBorder, CellBorderLineStyle, CellBorderSide, CellFill, CellFillPatternType, CellFont,
     CellFormat, ConditionalFormatType, HeaderFooter, Workbook,
@@ -16,9 +17,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut workbook = Workbook::create()?;
 
     // Set workbook properties
-    workbook.properties_mut().title = Some("Comprehensive Features Demo".to_string());
-    workbook.properties_mut().creator = Some("Litchi Library".to_string());
-    workbook.properties_mut().subject = Some("Feature Demonstration".to_string());
+    let _ = workbook.put_props(
+        Props::new()
+            .title("Comprehensive Features Demo")
+            .creator("Litchi Library")
+            .subject("Feature Demonstration"),
+    );
 
     // ===== WORKSHEET 1: Basic Features =====
     {

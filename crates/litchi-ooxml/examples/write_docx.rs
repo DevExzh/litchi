@@ -7,7 +7,10 @@
 //! cargo run -p litchi-ooxml --example write_docx --all-features
 //! ```
 
-use litchi_ooxml::docx::{Package, ParagraphAlignment};
+use litchi_ooxml::{
+    Props,
+    docx::{Package, ParagraphAlignment},
+};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,12 +19,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pkg = Package::new()?;
 
     // Set core properties.
-    {
-        let props = pkg.properties_mut();
-        props.title = Some("litchi-ooxml example".to_string());
-        props.creator = Some("litchi-ooxml write_docx example".to_string());
-        props.subject = Some("Round-trip demo".to_string());
-    }
+    let _ = pkg.put_props(
+        Props::new()
+            .title("litchi-ooxml example")
+            .creator("litchi-ooxml write_docx example")
+            .subject("Round-trip demo"),
+    );
 
     // Build the body of the document.
     {
@@ -81,10 +84,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Round-tripped table count    : {}", table_count);
     println!("\n--- Round-tripped text ---\n{}", text);
 
-    let props = reopened.properties();
-    println!("\nRound-tripped title   : {:?}", props.title);
-    println!("Round-tripped creator : {:?}", props.creator);
-    println!("Round-tripped subject : {:?}", props.subject);
+    let props = reopened.props();
+    println!(
+        "\nRound-tripped title   : {:?}",
+        props.and_then(|p| p.title.as_deref())
+    );
+    println!(
+        "Round-tripped creator : {:?}",
+        props.and_then(|p| p.creator.as_deref())
+    );
+    println!(
+        "Round-tripped subject : {:?}",
+        props.and_then(|p| p.subject.as_deref())
+    );
 
     // tmp is dropped here, removing the file.
     Ok(())

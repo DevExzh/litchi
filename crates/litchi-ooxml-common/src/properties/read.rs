@@ -1,34 +1,30 @@
 //! Strict OPC core-properties metadata extraction.
 
+use super::{
+    CORE_PROPERTIES_NAMESPACE, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS,
+    Props, STRICT_CORE_PROPERTIES_NAMESPACE, graph,
+    keyword::{self, Item},
+    time,
+};
 use crate::{Error, Result};
-use chrono::{DateTime, Utc};
-use litchi_core::Metadata;
 use litchi_opc::OpcPackage;
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
 use crate::xml::decode_xml_reference;
 use quick_xml::{
     XmlVersion,
-    events::{BytesStart, Event},
+    events::{BytesEnd, BytesStart, Event},
     name::{Namespace, QName, ResolveResult},
     reader::NsReader,
 };
 
-const CORE_PROPERTIES_NAMESPACE: &[u8] =
-    b"http://schemas.openxmlformats.org/package/2006/metadata/core-properties";
-const STRICT_CORE_PROPERTIES_NAMESPACE: &[u8] =
-    b"http://purl.oclc.org/ooxml/package/metadata/core-properties";
-const STRICT_CORE_PROPERTIES_RELATIONSHIP: &str =
-    "http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties";
 const DUBLIN_CORE_NAMESPACE: &[u8] = b"http://purl.org/dc/elements/1.1/";
 const DUBLIN_CORE_TERMS_NAMESPACE: &[u8] = b"http://purl.org/dc/terms/";
 const XSI_NAMESPACE: &[u8] = b"http://www.w3.org/2001/XMLSchema-instance";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MARKUP_COMPATIBILITY_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const MAX_PROPERTY_TEXT: usize = 1_048_576;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CoreProperty {
     Title,
     Subject,
@@ -41,15 +37,24 @@ enum CoreProperty {
     Revision,
     Category,
     ContentStatus,
-    ContentType,
     Version,
     Created,
     Modified,
     LastPrinted,
 }
 
+#[derive(Debug)]
+enum Active {
+    Text(CoreProperty, String),
+    Keywords {
+        value: Keywords,
+        child: Option<keyword::Value>,
+        bytes: usize,
+    },
+}
+
 impl CoreProperty {
-    const COUNT: usize = 16;
+    const COUNT: usize = Self::LastPrinted as usize + 1;
 
     fn index(self) -> usize {
         self as usize
@@ -62,63 +67,55 @@ impl CoreProperty {
 
 /// Extract relationship-selected core metadata from an OOXML package.
 ///
-/// Absence is valid and returns empty metadata. A present relationship or part
-/// that violates OPC M4.1-M4.5 fails closed.
-pub fn read(package: &OpcPackage) -> Result<Metadata> {
-    let Some(core_part) = find_core_properties_part(package)? else {
-        return Ok(Metadata::default());
-    };
-    let xml = std::str::from_utf8(core_part.blob())
-        .map_err(|error| Error::Xml(format!("invalid UTF-8 in core properties: {error}")))?;
-    parse_core_properties_xml(xml)
-}
-
-fn find_core_properties_part(package: &OpcPackage) -> Result<Option<&dyn litchi_opc::part::Part>> {
-    let mut relationships = package.rels().iter().filter(|relationship| {
-        matches!(
-            relationship.reltype(),
-            rt::CORE_PROPERTIES | STRICT_CORE_PROPERTIES_RELATIONSHIP
-        )
-    });
-    let Some(relationship) = relationships.next() else {
+/// Absence is valid and remains distinguishable from a present empty document.
+/// A present relationship or part that violates OPC M4.1-M4.5 fails closed.
+pub fn read(package: &OpcPackage) -> Result<Option<Props>> {
+    let graph = graph::inspect(package)?;
+    let Some(part_name) = graph.part else {
         return Ok(None);
     };
-    if relationships.next().is_some() {
-        return Err(Error::Relationship(
-            "OPC M4.1 permits at most one core-properties relationship".to_string(),
+    let core_part = package.get_part(&part_name)?;
+    let xml = std::str::from_utf8(core_part.blob())
+        .map_err(|error| Error::Xml(format!("invalid UTF-8 in core properties: {error}")))?;
+    let (props, dialect) = decode(xml)?;
+    if Some(dialect) != graph.dialect {
+        return Err(Error::Invalid(
+            "core-properties XML namespace does not match its relationship dialect".to_owned(),
         ));
     }
-    if relationship.is_external() {
-        return Err(Error::Relationship(
-            "core-properties relationship has an external target".to_string(),
-        ));
-    }
-    let target = relationship.target_partname().map_err(Error::Opc)?;
-    let part = package.get_part(&target).map_err(|_| {
-        Error::Missing(format!(
-            "core-properties relationship target '{}' does not exist",
-            target.as_str()
-        ))
-    })?;
-    if part.content_type() != ct::OPC_CORE_PROPERTIES {
-        return Err(Error::ContentType {
-            expected: ct::OPC_CORE_PROPERTIES.to_string(),
-            actual: part.content_type().to_string(),
-        });
-    }
-    Ok(Some(part))
+    Ok(Some(props))
 }
 
-fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
+pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "core-properties XML bytes",
+            max: MAX_XML_BYTES,
+            actual: xml.len(),
+        });
+    }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut buffer = Vec::new();
-    let mut metadata = Metadata::default();
+    let mut props = Props::new();
     let mut seen = [false; CoreProperty::COUNT];
     let mut root_namespace: Option<Vec<u8>> = None;
     let mut root_closed = false;
-    let mut active: Option<(CoreProperty, String)> = None;
+    let mut active: Option<Active> = None;
+    let mut events = 0usize;
 
     loop {
+        events = events.checked_add(1).ok_or(Error::Limit {
+            resource: "core-properties XML events",
+            max: MAX_XML_EVENTS,
+            actual: usize::MAX,
+        })?;
+        if events > MAX_XML_EVENTS {
+            return Err(Error::Limit {
+                resource: "core-properties XML events",
+                max: MAX_XML_EVENTS,
+                actual: events,
+            });
+        }
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::Xml(format!("core properties XML error: {error}")))?;
@@ -148,19 +145,52 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
             Event::Start(element) if !root_closed && active.is_none() => {
                 let property = parse_property(namespace, element.local_name().as_ref())?;
                 mark_seen(&mut seen, property)?;
-                validate_property_attributes(&reader, &element, property)?;
-                active = Some((property, String::new()));
+                active = Some(if property == CoreProperty::Keywords {
+                    Active::Keywords {
+                        value: Keywords {
+                            lang: keyword_lang(&reader, &element)?,
+                            items: Vec::new(),
+                        },
+                        child: None,
+                        bytes: 0,
+                    }
+                } else {
+                    validate_property_attributes(&reader, &element, property)?;
+                    Active::Text(property, String::new())
+                });
             },
             Event::Empty(element) if !root_closed && active.is_none() => {
                 let property = parse_property(namespace, element.local_name().as_ref())?;
                 mark_seen(&mut seen, property)?;
-                validate_property_attributes(&reader, &element, property)?;
-                apply_property(&mut metadata, property, String::new())?;
+                if property == CoreProperty::Keywords {
+                    props.keywords = Some(Keywords {
+                        lang: keyword_lang(&reader, &element)?,
+                        items: Vec::new(),
+                    });
+                } else {
+                    validate_property_attributes(&reader, &element, property)?;
+                    apply_property(&mut props, property, String::new())?;
+                }
             },
-            Event::Start(_) | Event::Empty(_) if active.is_some() => {
-                return Err(Error::Invalid(
-                    "core property values must not contain child elements".to_string(),
-                ));
+            Event::Start(element) if active.is_some() => {
+                start_keyword_value(
+                    &mut active,
+                    namespace,
+                    root_namespace.as_deref(),
+                    &reader,
+                    &element,
+                    false,
+                )?;
+            },
+            Event::Empty(element) if active.is_some() => {
+                start_keyword_value(
+                    &mut active,
+                    namespace,
+                    root_namespace.as_deref(),
+                    &reader,
+                    &element,
+                    true,
+                )?;
             },
             Event::Start(_) | Event::Empty(_) => {
                 return Err(Error::Invalid(
@@ -185,18 +215,13 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
                 push_property_text(&mut active, &decode_xml_reference(&reference)?)?;
             },
             Event::End(element) if active.is_some() => {
-                let Some((property, value)) = active.take() else {
-                    return Err(Error::Invalid(
-                        "core property closing element has no active property".into(),
-                    ));
-                };
-                let expected = property_name(property);
-                if element.local_name().as_ref() != expected {
-                    return Err(Error::Invalid(
-                        "malformed core property element nesting".to_string(),
-                    ));
-                }
-                apply_property(&mut metadata, property, value)?;
+                close_active(
+                    &mut active,
+                    namespace,
+                    root_namespace.as_deref(),
+                    &element,
+                    &mut props,
+                )?;
             },
             Event::End(element) if !root_closed => {
                 if element.local_name().as_ref() != b"coreProperties"
@@ -228,7 +253,16 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
             "unterminated or missing coreProperties root element".to_string(),
         ));
     }
-    Ok(metadata)
+    let dialect = match root_namespace.as_deref() {
+        Some(CORE_PROPERTIES_NAMESPACE) => Dialect::Transitional,
+        Some(STRICT_CORE_PROPERTIES_NAMESPACE) => Dialect::Strict,
+        _ => {
+            return Err(Error::Invalid(
+                "unsupported core-properties namespace".to_owned(),
+            ));
+        },
+    };
+    Ok((props, dialect))
 }
 
 fn validate_root(
@@ -274,9 +308,6 @@ fn parse_property(namespace: Option<&[u8]>, local: &[u8]) -> Result<CoreProperty
         (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"contentStatus") => {
             CoreProperty::ContentStatus
         },
-        (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"contentType") => {
-            CoreProperty::ContentType
-        },
         (Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE), b"version") => {
             CoreProperty::Version
         },
@@ -304,6 +335,135 @@ fn validate_property_attributes(
     property: CoreProperty,
 ) -> Result<()> {
     validate_attributes(reader, element, Some(property))
+}
+
+fn keyword_lang(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<Option<keyword::Lang>> {
+    let mut language = None;
+    for attribute in element.attributes() {
+        let attribute =
+            attribute.map_err(|error| Error::Xml(format!("invalid keyword attribute: {error}")))?;
+        let raw_key = attribute.key.as_ref();
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if matches!(raw_key, b"xmlns") || raw_key.starts_with(b"xmlns:") {
+            if value.as_bytes() == MARKUP_COMPATIBILITY_NAMESPACE {
+                return Err(Error::Invalid(
+                    "OPC M4.2 forbids the Markup Compatibility namespace".to_string(),
+                ));
+            }
+            continue;
+        }
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let namespace = bound_namespace(&namespace);
+        reject_markup_compatibility(namespace)?;
+        if namespace == Some(XML_NAMESPACE) && local.as_ref() == b"lang" {
+            if language.is_some() {
+                return Err(Error::Invalid(
+                    "keyword contains duplicate xml:lang attributes".to_owned(),
+                ));
+            }
+            language = Some(keyword::Lang::new(value.into_owned())?);
+            continue;
+        }
+        return Err(Error::Invalid(format!(
+            "attribute '{}' is not allowed on keywords",
+            String::from_utf8_lossy(raw_key)
+        )));
+    }
+    Ok(language)
+}
+
+fn start_keyword_value(
+    active: &mut Option<Active>,
+    namespace: Option<&[u8]>,
+    root_namespace: Option<&[u8]>,
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    empty: bool,
+) -> Result<()> {
+    let Some(Active::Keywords {
+        value,
+        child,
+        bytes: _,
+    }) = active.as_mut()
+    else {
+        return Err(Error::Invalid(
+            "only cp:keywords may contain child elements".to_owned(),
+        ));
+    };
+    if child.is_some() || namespace != root_namespace || element.local_name().as_ref() != b"value" {
+        return Err(Error::Invalid(
+            "cp:keywords permits only non-nested cp:value children".to_owned(),
+        ));
+    }
+    let child_value = keyword::Value {
+        text: String::new(),
+        lang: keyword_lang(reader, element)?,
+    };
+    if empty {
+        value.items.push(Item::Value(child_value));
+    } else {
+        *child = Some(child_value);
+    }
+    Ok(())
+}
+
+fn close_active(
+    active: &mut Option<Active>,
+    namespace: Option<&[u8]>,
+    root_namespace: Option<&[u8]>,
+    element: &BytesEnd<'_>,
+    props: &mut Props,
+) -> Result<()> {
+    if matches!(active, Some(Active::Keywords { child: Some(_), .. })) {
+        if namespace != root_namespace || element.local_name().as_ref() != b"value" {
+            return Err(Error::Invalid(
+                "malformed cp:value element nesting".to_owned(),
+            ));
+        }
+        let Some(Active::Keywords { value, child, .. }) = active.as_mut() else {
+            return Err(Error::Invalid("missing keyword state".to_owned()));
+        };
+        let child = child
+            .take()
+            .ok_or_else(|| Error::Invalid("missing cp:value state".to_owned()))?;
+        value.items.push(Item::Value(child));
+        return Ok(());
+    }
+
+    let finished = active
+        .take()
+        .ok_or_else(|| Error::Invalid("core property has no active state".to_owned()))?;
+    match finished {
+        Active::Text(property, value) => {
+            if parse_property(namespace, element.local_name().as_ref())? != property {
+                return Err(Error::Invalid(
+                    "malformed core property element nesting".to_owned(),
+                ));
+            }
+            apply_property(props, property, value)
+        },
+        Active::Keywords {
+            value,
+            child: None,
+            bytes: _,
+        } => {
+            if namespace != root_namespace || element.local_name().as_ref() != b"keywords" {
+                return Err(Error::Invalid(
+                    "malformed cp:keywords element nesting".to_owned(),
+                ));
+            }
+            props.keywords = Some(value);
+            Ok(())
+        },
+        Active::Keywords { child: Some(_), .. } => Err(Error::Invalid(
+            "unterminated cp:value in cp:keywords".to_owned(),
+        )),
+    }
 }
 
 fn validate_attributes(
@@ -348,7 +508,8 @@ fn validate_attributes(
             }
             let (value_namespace, value_local) =
                 reader.resolver().resolve_element(QName(value.as_bytes()));
-            if bound_namespace(&value_namespace) != Some(DUBLIN_CORE_TERMS_NAMESPACE)
+            if value.as_ref() != "dcterms:W3CDTF"
+                || bound_namespace(&value_namespace) != Some(DUBLIN_CORE_TERMS_NAMESPACE)
                 || value_local.as_ref() != b"W3CDTF"
             {
                 return Err(Error::Invalid(
@@ -390,8 +551,8 @@ fn mark_seen(seen: &mut [bool; CoreProperty::COUNT], property: CoreProperty) -> 
     Ok(())
 }
 
-fn push_property_text(active: &mut Option<(CoreProperty, String)>, value: &str) -> Result<()> {
-    let Some((_, text)) = active.as_mut() else {
+fn push_property_text(active: &mut Option<Active>, value: &str) -> Result<()> {
+    let Some(active) = active.as_mut() else {
         if value.trim().is_empty() {
             return Ok(());
         }
@@ -399,6 +560,36 @@ fn push_property_text(active: &mut Option<(CoreProperty, String)>, value: &str) 
             "non-whitespace text outside a core property".to_string(),
         ));
     };
+    match active {
+        Active::Text(_, text) => append_bounded(text, value),
+        Active::Keywords {
+            value: keywords,
+            child,
+            bytes,
+        } => {
+            *bytes = bytes.checked_add(value.len()).ok_or(Error::Limit {
+                resource: "core property text bytes",
+                max: MAX_PROPERTY_TEXT,
+                actual: usize::MAX,
+            })?;
+            if *bytes > MAX_PROPERTY_TEXT {
+                return Err(Error::Limit {
+                    resource: "core property text bytes",
+                    max: MAX_PROPERTY_TEXT,
+                    actual: *bytes,
+                });
+            }
+            if let Some(child) = child.as_mut() {
+                child.text.push_str(value);
+            } else {
+                keywords.append_text(value.to_owned());
+            }
+            Ok(())
+        },
+    }
+}
+
+fn append_bounded(text: &mut String, value: &str) -> Result<()> {
     let length = text.len().checked_add(value.len()).ok_or(Error::Limit {
         resource: "core property text bytes",
         max: MAX_PROPERTY_TEXT,
@@ -415,32 +606,27 @@ fn push_property_text(active: &mut Option<(CoreProperty, String)>, value: &str) 
     Ok(())
 }
 
-fn apply_property(metadata: &mut Metadata, property: CoreProperty, value: String) -> Result<()> {
+fn apply_property(props: &mut Props, property: CoreProperty, value: String) -> Result<()> {
     match property {
-        CoreProperty::Title => metadata.title = Some(value),
-        CoreProperty::Subject => metadata.subject = Some(value),
-        CoreProperty::Author => metadata.author = Some(value),
-        CoreProperty::Keywords => metadata.keywords = Some(value),
-        CoreProperty::Description => metadata.description = Some(value),
-        CoreProperty::Identifier => metadata.identifier = Some(value),
-        CoreProperty::Language => metadata.language = Some(value),
-        CoreProperty::LastModifiedBy => metadata.last_modified_by = Some(value),
-        CoreProperty::Revision => {
-            value
-                .trim()
-                .parse::<u32>()
-                .map_err(|_| Error::Invalid(format!("invalid core revision '{value}'")))?;
-            metadata.revision = Some(value);
+        CoreProperty::Title => props.title = Some(value),
+        CoreProperty::Subject => props.subject = Some(value),
+        CoreProperty::Author => props.creator = Some(value),
+        CoreProperty::Keywords => {
+            return Err(Error::Invalid(
+                "keyword mixed content bypassed its typed parser".to_owned(),
+            ));
         },
-        CoreProperty::Category => metadata.category = Some(value),
-        CoreProperty::ContentStatus => metadata.content_status = Some(value),
-        CoreProperty::ContentType => metadata.content_type = Some(value),
-        CoreProperty::Version => metadata.version = Some(value),
-        CoreProperty::Created => metadata.created = Some(parse_datetime(value.trim())?),
-        CoreProperty::Modified => metadata.modified = Some(parse_datetime(value.trim())?),
-        CoreProperty::LastPrinted => {
-            metadata.last_printed_time = Some(parse_datetime(value.trim())?)
-        },
+        CoreProperty::Description => props.description = Some(value),
+        CoreProperty::Identifier => props.identifier = Some(value),
+        CoreProperty::Language => props.language = Some(value),
+        CoreProperty::LastModifiedBy => props.last_modified_by = Some(value),
+        CoreProperty::Revision => props.revision = Some(value),
+        CoreProperty::Category => props.category = Some(value),
+        CoreProperty::ContentStatus => props.content_status = Some(value),
+        CoreProperty::Version => props.version = Some(value),
+        CoreProperty::Created => props.created = Some(time::W3c::new(value)?),
+        CoreProperty::Modified => props.modified = Some(time::W3c::new(value)?),
+        CoreProperty::LastPrinted => props.last_printed = Some(time::DateTime::new(value)?),
     }
     Ok(())
 }
@@ -458,7 +644,6 @@ fn property_name(property: CoreProperty) -> &'static [u8] {
         CoreProperty::Revision => b"revision",
         CoreProperty::Category => b"category",
         CoreProperty::ContentStatus => b"contentStatus",
-        CoreProperty::ContentType => b"contentType",
         CoreProperty::Version => b"version",
         CoreProperty::Created => b"created",
         CoreProperty::Modified => b"modified",
@@ -473,23 +658,12 @@ fn bound_namespace<'a>(namespace: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
     }
 }
 
-fn parse_datetime(value: &str) -> Result<DateTime<Utc>> {
-    if let Ok(datetime) = DateTime::parse_from_rfc3339(value) {
-        return Ok(datetime.with_timezone(&Utc));
-    }
-    if let Ok(datetime) = chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f") {
-        return Ok(DateTime::from_naive_utc_and_offset(datetime, Utc));
-    }
-    Err(Error::Invalid(format!(
-        "invalid core property datetime '{value}'"
-    )))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::DocumentProperties;
-    use chrono::{Datelike, Timelike};
+    use crate::Props;
+    use chrono::{DateTime, Utc};
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{PackURI, part::BlobPart};
 
     fn package_with_core(path: &str, content_type: &str, xml: &[u8]) -> OpcPackage {
@@ -517,11 +691,14 @@ mod tests {
         let mut package = package_with_core("/custom/real.xml", ct::OPC_CORE_PROPERTIES, valid);
         package.add_part(Box::new(BlobPart::new(
             PackURI::new("/docProps/core.xml").unwrap(),
-            ct::OPC_CORE_PROPERTIES.to_string(),
+            "application/xml".to_owned(),
             decoy.to_vec(),
         )));
-        assert_eq!(read(&package).unwrap().title.as_deref(), Some("Target"));
-        assert!(!read(&OpcPackage::new()).unwrap().has_data());
+        assert_eq!(
+            read(&package).unwrap().unwrap().title.as_deref(),
+            Some("Target")
+        );
+        assert!(read(&OpcPackage::new()).unwrap().is_none());
     }
 
     #[test]
@@ -543,16 +720,27 @@ mod tests {
     }
 
     #[test]
-    fn parses_all_schema_fields_and_normalizes_offsets() {
-        let xml = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>T</dc:title><dc:subject>S</dc:subject><dc:creator>A</dc:creator><dc:description>D</dc:description><dc:identifier>I</dc:identifier><dc:language>en-GB</dc:language><cp:keywords>K</cp:keywords><cp:lastModifiedBy>M</cp:lastModifiedBy><cp:revision>7</cp:revision><cp:category>C</cp:category><cp:contentStatus>Draft</cp:contentStatus><cp:contentType>text</cp:contentType><cp:version>2.0</cp:version><dcterms:created xsi:type="dcterms:W3CDTF">2006-10-13T18:06:00.123+03:00</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">2007-06-20T07:59:00-13:00</dcterms:modified><cp:lastPrinted>2008-01-02T03:04:05Z</cp:lastPrinted></cp:coreProperties>"#;
-        let metadata = parse_core_properties_xml(xml).unwrap();
-        assert_eq!(metadata.identifier.as_deref(), Some("I"));
-        assert_eq!(metadata.language.as_deref(), Some("en-GB"));
-        assert_eq!(metadata.version.as_deref(), Some("2.0"));
-        assert_eq!(metadata.content_type.as_deref(), Some("text"));
-        assert_eq!(metadata.created.unwrap().hour(), 15);
-        assert_eq!(metadata.modified.unwrap().day(), 20);
-        assert!(metadata.last_printed_time.is_some());
+    fn parses_all_schema_fields_without_normalizing_lexical_values() {
+        let xml = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>T</dc:title><dc:subject>S</dc:subject><dc:creator>A</dc:creator><dc:description>D</dc:description><dc:identifier>I</dc:identifier><dc:language>en-GB</dc:language><cp:keywords>K</cp:keywords><cp:lastModifiedBy>M</cp:lastModifiedBy><cp:revision>007</cp:revision><cp:category>C</cp:category><cp:contentStatus>Draft</cp:contentStatus><cp:version>2.0</cp:version><dcterms:created xsi:type="dcterms:W3CDTF">2006-10-13T18:06:00.123+03:00</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">2007-06-20T07:59:00-13:00</dcterms:modified><cp:lastPrinted>2008-01-02T03:04:05Z</cp:lastPrinted></cp:coreProperties>"#;
+        let (props, dialect) = decode(xml).unwrap();
+        assert_eq!(dialect, Dialect::Transitional);
+        assert_eq!(props.identifier.as_deref(), Some("I"));
+        assert_eq!(props.language.as_deref(), Some("en-GB"));
+        assert_eq!(props.version.as_deref(), Some("2.0"));
+        assert_eq!(props.keywords.as_ref().and_then(Keywords::plain), Some("K"));
+        assert_eq!(props.revision.as_deref(), Some("007"));
+        assert_eq!(
+            props.created.as_ref().map(time::W3c::as_str),
+            Some("2006-10-13T18:06:00.123+03:00")
+        );
+        assert_eq!(
+            props.modified.as_ref().map(time::W3c::as_str),
+            Some("2007-06-20T07:59:00-13:00")
+        );
+        assert_eq!(
+            props.last_printed.as_ref().map(time::DateTime::as_str),
+            Some("2008-01-02T03:04:05Z")
+        );
     }
 
     #[test]
@@ -560,41 +748,106 @@ mod tests {
         let created = DateTime::parse_from_rfc3339("2024-03-04T05:06:07+02:00")
             .unwrap()
             .with_timezone(&Utc);
-        let properties = DocumentProperties::new()
+        let properties = Props::new()
             .title("A & B")
             .creator("Writer")
             .identifier("urn:test:42")
             .language("en-US")
-            .content_type("application/test")
-            .revision(12)
-            .version("3.0");
-        let properties = DocumentProperties {
-            created: Some(created),
-            last_printed: Some(created),
-            ..properties
-        };
-        let parsed = parse_core_properties_xml(&properties.to_xml()).unwrap();
+            .revision("12")
+            .version("3.0")
+            .created(created)
+            .last_printed(created);
+        let xml = properties.xml().unwrap();
+        let (parsed, dialect) = decode(&xml).unwrap();
+        assert_eq!(dialect, Dialect::Transitional);
         assert_eq!(parsed.title.as_deref(), Some("A & B"));
-        assert_eq!(parsed.author.as_deref(), Some("Writer"));
+        assert_eq!(parsed.creator.as_deref(), Some("Writer"));
         assert_eq!(parsed.identifier.as_deref(), Some("urn:test:42"));
         assert_eq!(parsed.language.as_deref(), Some("en-US"));
-        assert_eq!(parsed.content_type.as_deref(), Some("application/test"));
         assert_eq!(parsed.revision.as_deref(), Some("12"));
         assert_eq!(parsed.version.as_deref(), Some("3.0"));
-        assert_eq!(parsed.created, Some(created));
-        assert_eq!(parsed.last_printed_time, Some(created));
+        assert_eq!(
+            parsed.created.as_ref().map(time::W3c::as_str),
+            Some("2024-03-04T03:06:07Z")
+        );
+        assert_eq!(
+            parsed.last_printed.as_ref().map(time::DateTime::as_str),
+            Some("2024-03-04T03:06:07Z")
+        );
     }
 
     #[test]
     fn rejects_wrong_root_duplicates_invalid_values_dtd_and_entities() {
-        assert!(parse_core_properties_xml("<props/>").is_err());
+        assert!(decode("<props/>").is_err());
         let duplicate = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>A</dc:title><dc:title>B</dc:title></cp:coreProperties>"#;
-        assert!(parse_core_properties_xml(duplicate).is_err());
-        let bad_revision = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:revision>seven</cp:revision></cp:coreProperties>"#;
-        assert!(parse_core_properties_xml(bad_revision).is_err());
-        assert!(parse_core_properties_xml("<!DOCTYPE x><x/>").is_err());
+        assert!(decode(duplicate).is_err());
+        let non_schema = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:contentType>text/plain</cp:contentType></cp:coreProperties>"#;
+        assert!(decode(non_schema).is_err());
+        let bad_last_printed = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:lastPrinted>2026-08-03</cp:lastPrinted></cp:coreProperties>"#;
+        assert!(decode(bad_last_printed).is_err());
+        assert!(decode("<!DOCTYPE x><x/>").is_err());
         let package = poi_package("CorePropertiesHasEntities.ooxml");
         assert!(read(&package).is_err());
+    }
+
+    #[test]
+    fn revision_is_a_lossless_string_including_empty_values() {
+        for value in ["", "seven", "0007", " 7 "] {
+            let xml = Props::new().revision(value).xml().unwrap();
+            let (parsed, _) = decode(&xml).unwrap();
+            assert_eq!(parsed.revision.as_deref(), Some(value));
+        }
+    }
+
+    #[test]
+    fn keywords_preserve_mixed_content_and_language_annotations() {
+        let xml = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:keywords xml:lang="">lead<cp:value xml:lang="en-CA">colour</cp:value>;<cp:value xml:lang="fr">couleur</cp:value>tail</cp:keywords></cp:coreProperties>"#;
+        let (props, _) = decode(xml).unwrap();
+        let expected = Keywords::new()
+            .lang(keyword::Lang::new("").unwrap())
+            .text("lead")
+            .value(keyword::Value::new("colour").lang(keyword::Lang::new("en-CA").unwrap()))
+            .text(";")
+            .value(keyword::Value::new("couleur").lang(keyword::Lang::new("fr").unwrap()))
+            .text("tail");
+        assert_eq!(props.keywords.as_ref(), Some(&expected));
+        assert_eq!(
+            props.keywords.as_ref().unwrap().joined(),
+            "leadcolour;couleurtail"
+        );
+
+        let encoded = Props::new().keywords(expected.clone()).xml().unwrap();
+        assert!(encoded.contains(r#"<cp:keywords xml:lang="">"#));
+        assert!(encoded.contains(r#"<cp:value xml:lang="en-CA">colour</cp:value>"#));
+        assert_eq!(decode(&encoded).unwrap().0.keywords, Some(expected));
+    }
+
+    #[test]
+    fn rejects_invalid_keyword_children_and_language_placement() {
+        let nested = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"><cp:keywords><cp:value><cp:value>x</cp:value></cp:value></cp:keywords></cp:coreProperties>"#;
+        assert!(decode(nested).is_err());
+        let wrong_child = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:x="urn:test"><cp:keywords><x:value>x</x:value></cp:keywords></cp:coreProperties>"#;
+        assert!(decode(wrong_child).is_err());
+        let illegal_language = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:subject xml:lang="en">x</dc:subject></cp:coreProperties>"#;
+        assert!(decode(illegal_language).is_err());
+    }
+
+    #[test]
+    fn w3cdtf_supports_partial_and_unzoned_forms_but_xsi_type_is_literal() {
+        let xml = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dcterms:created xsi:type="dcterms:W3CDTF">2026</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">2026-08-03T04:05:06</dcterms:modified><cp:lastPrinted>2026-08-03T04:05:06</cp:lastPrinted></cp:coreProperties>"#;
+        let (props, _) = decode(xml).unwrap();
+        assert_eq!(props.created.as_ref().map(time::W3c::as_str), Some("2026"));
+        assert_eq!(
+            props.modified.as_ref().map(time::W3c::as_str),
+            Some("2026-08-03T04:05:06")
+        );
+        assert_eq!(
+            props.last_printed.as_ref().map(time::DateTime::as_str),
+            Some("2026-08-03T04:05:06")
+        );
+
+        let alias = r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:t="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dcterms:created xsi:type="t:W3CDTF">2026</dcterms:created></cp:coreProperties>"#;
+        assert!(decode(alias).is_err());
     }
 
     #[test]
@@ -604,7 +857,7 @@ mod tests {
             r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>{value}</dc:title></cp:coreProperties>"#
         );
         assert!(matches!(
-            parse_core_properties_xml(&xml),
+            decode(&xml),
             Err(Error::Limit {
                 resource: "core property text bytes",
                 max: MAX_PROPERTY_TEXT,
@@ -615,16 +868,25 @@ mod tests {
 
     #[test]
     fn matches_poi_success_timezone_and_m4_conformance_fixtures() {
-        let success = read(&poi_package("OPCCompliance_CoreProperties_SUCCESS.docx")).unwrap();
+        let success = read(&poi_package("OPCCompliance_CoreProperties_SUCCESS.docx"))
+            .unwrap()
+            .unwrap();
         assert_eq!(success.title.as_deref(), Some("MyTitle"));
         assert_eq!(success.revision.as_deref(), Some("2"));
 
         let timezone = read(&poi_package(
             "OPCCompliance_CoreProperties_AlternateTimezones.docx",
         ))
+        .unwrap()
         .unwrap();
-        assert_eq!(timezone.created.unwrap().hour(), 15);
-        assert_eq!(timezone.modified.unwrap().hour(), 20);
+        assert_eq!(
+            timezone.created.as_ref().map(time::W3c::as_str),
+            Some("2006-10-13T18:06:00.123+03:00")
+        );
+        assert_eq!(
+            timezone.modified.as_ref().map(time::W3c::as_str),
+            Some("2007-06-20T07:59:00-13:00")
+        );
 
         for name in [
             "OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx",
@@ -640,7 +902,7 @@ mod tests {
     #[test]
     fn poi_no_core_is_empty_and_multiple_relationships_fail_during_package_load() {
         let empty = read(&poi_package("OPCCompliance_NoCoreProperties.xlsx")).unwrap();
-        assert!(!empty.has_data());
+        assert!(empty.is_none());
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
             "../../test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",
         );

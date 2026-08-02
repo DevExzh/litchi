@@ -10,9 +10,9 @@ use crate::pptx::vba_project::{
     store_vba_project as store_presentation_vba_project,
 };
 use crate::pptx::writer::MutablePresentation;
-/// Package implementation for PowerPoint presentations.
-use litchi_ooxml_common::DocumentProperties;
 use litchi_ooxml_common::embedded;
+/// Package implementation for PowerPoint presentations.
+use litchi_ooxml_common::properties::{Props, Slot};
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
@@ -90,8 +90,8 @@ pub struct Package {
     opc: OpcPackage,
     /// Mutable presentation for writing (cached)
     mutable_pres: Option<MutablePresentation>,
-    /// Document properties (metadata)
-    properties: DocumentProperties,
+    /// Authoritative, mutation-tracked core properties.
+    properties: Slot,
     /// Encryption profile of the opened outer package.
     #[cfg(feature = "encryption")]
     source_encryption: Option<Mode>,
@@ -426,7 +426,7 @@ impl Package {
         let mutable_pres = Some(MutablePresentation::new());
 
         // Initialize document properties
-        let properties = DocumentProperties::new();
+        let properties = Slot::load(&opc)?;
 
         Ok(Self {
             opc,
@@ -461,10 +461,11 @@ impl Package {
 
         validate_presentation_main_content_type(main_part.content_type())?;
 
+        let properties = Slot::load(&opc)?;
         Ok(Self {
             opc,
             mutable_pres: None,
-            properties: DocumentProperties::new(),
+            properties,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -516,10 +517,11 @@ impl Package {
 
         validate_presentation_main_content_type(main_part.content_type())?;
 
+        let properties = Slot::load(&opc)?;
         Ok(Self {
             opc,
             mutable_pres: None,
-            properties: DocumentProperties::new(),
+            properties,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -552,10 +554,11 @@ impl Package {
 
         validate_presentation_main_content_type(main_part.content_type())?;
 
+        let properties = Slot::load(&opc)?;
         Ok(Self {
             opc,
             mutable_pres: None,
-            properties: DocumentProperties::new(),
+            properties,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -1343,7 +1346,7 @@ impl Package {
         })
     }
 
-    /// Get a reference to the presentation properties.
+    /// Borrows the presentation core properties, retaining package absence.
     ///
     /// # Examples
     ///
@@ -1351,14 +1354,14 @@ impl Package {
     /// use litchi_ooxml::pptx::Package;
     ///
     /// let pkg = Package::open("presentation.pptx")?;
-    /// let props = pkg.properties();
+    /// let props = pkg.props();
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn properties(&self) -> &DocumentProperties {
-        &self.properties
+    pub fn props(&self) -> Option<&Props> {
+        self.properties.get()
     }
 
-    /// Get a mutable reference to the presentation properties.
+    /// Mutably borrows existing core properties.
     ///
     /// # Examples
     ///
@@ -1366,13 +1369,24 @@ impl Package {
     /// use litchi_ooxml::pptx::Package;
     ///
     /// let mut pkg = Package::new()?;
-    /// pkg.properties_mut().title = Some("My Presentation".to_string());
-    /// pkg.properties_mut().creator = Some("John Doe".to_string());
+    /// if let Some(props) = pkg.props_mut() {
+    ///     props.title = Some("My Presentation".to_string());
+    /// }
     /// pkg.save("presentation.pptx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn properties_mut(&mut self) -> &mut DocumentProperties {
-        &mut self.properties
+    pub fn props_mut(&mut self) -> Option<&mut Props> {
+        self.properties.get_mut()
+    }
+
+    /// Moves a present core-properties value into the package facade.
+    pub fn put_props(&mut self, props: Props) -> Option<Props> {
+        self.properties.put(props)
+    }
+
+    /// Marks core properties absent and moves out the previous value.
+    pub fn clear_props(&mut self) -> Option<Props> {
+        self.properties.clear()
     }
 
     /// Save the package to a file.
@@ -1494,8 +1508,8 @@ impl Package {
             }
         }
 
-        // Update core properties
-        self.update_core_properties()?;
+        // Flush only an explicitly edited core-properties slot.
+        self.properties.flush(&mut self.opc)?;
 
         // Embed fonts if feature enabled and requested in options
         #[cfg(feature = "fonts")]
@@ -2133,28 +2147,6 @@ impl Package {
 
         // Add the presentation part to the package
         self.opc.add_part(Box::new(temp_pres_part));
-
-        Ok(())
-    }
-
-    /// Update the core.xml properties part.
-    fn update_core_properties(&mut self) -> Result<()> {
-        use litchi_opc::part::BlobPart;
-
-        let core_uri = PackURI::new("/docProps/core.xml")
-            .map_err(|e| OoxmlError::InvalidUri(format!("core.xml URI: {}", e)))?;
-
-        // Generate XML from properties
-        let xml = self.properties.to_xml();
-
-        // Create or update the core properties part
-        let core_part = BlobPart::new(
-            core_uri,
-            ct::OPC_CORE_PROPERTIES.to_string(),
-            xml.into_bytes(),
-        );
-
-        self.opc.add_part(Box::new(core_part));
 
         Ok(())
     }

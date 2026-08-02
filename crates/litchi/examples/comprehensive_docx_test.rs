@@ -12,6 +12,7 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
+use litchi::ooxml::Props;
 use litchi::ooxml::docx::{
     ListType, MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation,
     ParagraphAlignment, TableOfContents, UnderlineStyle, Watermark,
@@ -622,13 +623,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     *package.document_mut()? = doc;
 
     // Set document properties
-    let props = package.properties_mut();
-    props.title = Some("Comprehensive DOCX Feature Test".to_string());
-    props.subject = Some("Feature Verification and Regression Testing".to_string());
-    props.creator = Some("Litchi OOXML Library".to_string());
-    props.keywords =
-        Some("docx, test, verification, regression, features, themes, watermarks, toc".to_string());
-    props.description = Some("Complete test document for all DOCX writer features including new theme, watermark, and TOC support".to_string());
+    let _ = package.put_props(
+        Props::new()
+            .title("Comprehensive DOCX Feature Test")
+            .subject("Feature Verification and Regression Testing")
+            .creator("Litchi OOXML Library")
+            .keywords("docx, test, verification, regression, features, themes, watermarks, toc")
+            .description("Complete test document for all DOCX writer features including new theme, watermark, and TOC support"),
+    );
 
     let filename = "comprehensive_test.docx";
     package.save(filename)?;

@@ -56,8 +56,8 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
             },
         }
 
-        match helpers::get_properties(file) {
-            Ok(props) => {
+        match helpers::get_props(file) {
+            Ok(Some(props)) => {
                 if let Some(title) = props.title {
                     println!("  Title: {}", title);
                 }
@@ -65,6 +65,7 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
                     println!("  Creator: {}", creator);
                 }
             },
+            Ok(None) => println!("  No core properties"),
             Err(e) => {
                 println!("Could not read properties from {}: {}", file, e);
             },
@@ -132,16 +133,17 @@ fn demo_docx_reading() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Metadata
-            let props = pkg.properties();
             println!("  Metadata:");
-            if let Some(title) = &props.title {
-                println!("    Title: {}", title);
-            }
-            if let Some(creator) = &props.creator {
-                println!("    Creator: {}", creator);
-            }
-            if let Some(created) = &props.created {
-                println!("    Created: {}", created);
+            if let Some(props) = pkg.props() {
+                if let Some(title) = &props.title {
+                    println!("    Title: {}", title);
+                }
+                if let Some(creator) = &props.creator {
+                    println!("    Creator: {}", creator);
+                }
+                if let Some(created) = &props.created {
+                    println!("    Created: {}", created);
+                }
             }
         },
         Err(e) => {
@@ -189,13 +191,14 @@ fn demo_xlsx_reading() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Metadata
-            let props = wb.properties();
             println!("  Metadata:");
-            if let Some(title) = &props.title {
-                println!("    Title: {}", title);
-            }
-            if let Some(creator) = &props.creator {
-                println!("    Creator: {}", creator);
+            if let Some(props) = wb.props() {
+                if let Some(title) = &props.title {
+                    println!("    Title: {}", title);
+                }
+                if let Some(creator) = &props.creator {
+                    println!("    Creator: {}", creator);
+                }
             }
         },
         Err(e) => {
@@ -257,13 +260,14 @@ fn demo_pptx_reading() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Metadata
-            let props = pkg.properties();
             println!("  Metadata:");
-            if let Some(title) = &props.title {
-                println!("    Title: {}", title);
-            }
-            if let Some(creator) = &props.creator {
-                println!("    Creator: {}", creator);
+            if let Some(props) = pkg.props() {
+                if let Some(title) = &props.title {
+                    println!("    Title: {}", title);
+                }
+                if let Some(creator) = &props.creator {
+                    println!("    Creator: {}", creator);
+                }
             }
         },
         Err(e) => {

@@ -211,9 +211,12 @@ impl Document {
                 // Validate the read view before retaining the owned package.
                 package.document().map_err(Error::from)?;
 
-                // Extract metadata from OOXML core properties
-                let metadata = litchi_ooxml_common::properties::read(package.opc_package())
-                    .unwrap_or_else(|_| litchi_core::Metadata::default());
+                // Move a clone of the already validated semantic cache across the facade seam.
+                let metadata = package
+                    .props()
+                    .cloned()
+                    .map(litchi_core::Metadata::from)
+                    .unwrap_or_default();
 
                 Ok(Self {
                     inner: DocumentImpl::Docx(package, metadata),

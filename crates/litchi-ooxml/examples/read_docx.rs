@@ -53,19 +53,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ----- Document properties (core.xml metadata) -----
-    let props = pkg.properties();
+    let props = pkg.props();
     println!("\n--- Core document properties ---");
-    println!("Title           : {:?}", props.title);
-    println!("Subject         : {:?}", props.subject);
-    println!("Creator         : {:?}", props.creator);
-    println!("Keywords        : {:?}", props.keywords);
-    println!("Description     : {:?}", props.description);
-    println!("Last modified by: {:?}", props.last_modified_by);
-    println!("Category        : {:?}", props.category);
-    println!("Content status  : {:?}", props.content_status);
-    println!("Language        : {:?}", props.language);
-    println!("Created         : {:?}", props.created);
-    println!("Modified        : {:?}", props.modified);
+    println!(
+        "Title           : {:?}",
+        props.and_then(|p| p.title.as_deref())
+    );
+    println!(
+        "Subject         : {:?}",
+        props.and_then(|p| p.subject.as_deref())
+    );
+    println!(
+        "Creator         : {:?}",
+        props.and_then(|p| p.creator.as_deref())
+    );
+    println!(
+        "Keywords        : {:?}",
+        props
+            .and_then(|p| p.keywords.as_ref())
+            .map(ToString::to_string)
+    );
+    println!(
+        "Description     : {:?}",
+        props.and_then(|p| p.description.as_deref())
+    );
+    println!(
+        "Last modified by: {:?}",
+        props.and_then(|p| p.last_modified_by.as_deref())
+    );
+    println!(
+        "Category        : {:?}",
+        props.and_then(|p| p.category.as_deref())
+    );
+    println!(
+        "Content status  : {:?}",
+        props.and_then(|p| p.content_status.as_deref())
+    );
+    println!(
+        "Language        : {:?}",
+        props.and_then(|p| p.language.as_deref())
+    );
+    println!(
+        "Created         : {:?}",
+        props.and_then(|p| p.created.as_ref())
+    );
+    println!(
+        "Modified        : {:?}",
+        props.and_then(|p| p.modified.as_ref())
+    );
 
     // ----- Custom (app-defined) properties, if any -----
     let custom = pkg.custom_props();

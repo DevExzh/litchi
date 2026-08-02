@@ -1978,7 +1978,7 @@ mod tests {
         let mut workbook =
             crate::xlsx::Workbook::new(litchi_opc::OpcPackage::from_bytes(FIXTURE).unwrap())
                 .unwrap();
-        workbook.properties_mut().title = Some("Unrelated edit".to_owned());
+        workbook.props_mut().unwrap().title = Some("Unrelated edit".to_owned());
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("external-link-roundtrip.xlsx");
         workbook.save(&path).unwrap();

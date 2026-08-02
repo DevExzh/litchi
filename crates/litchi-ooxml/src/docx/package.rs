@@ -33,13 +33,13 @@ use litchi_docx::font;
 use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
-use litchi_ooxml_common::DocumentProperties;
 use litchi_ooxml_common::custom::Props as CustomProps;
 use litchi_ooxml_common::custom_xml::{
     self, Item as CustomXmlItem, MAX_ITEMS, NewItem as NewCustomXmlItem,
     NewProps as NewCustomXmlProps, Props as CustomXmlProps,
 };
 use litchi_ooxml_common::embedded;
+use litchi_ooxml_common::properties::{Props, Slot};
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
@@ -121,8 +121,8 @@ pub struct Package {
     mutable_web_settings: Option<WebSettings>,
     /// Whether the web-settings part must be rewritten.
     web_settings_dirty: bool,
-    /// Document properties (metadata)
-    properties: DocumentProperties,
+    /// Authoritative, mutation-tracked core properties.
+    properties: Slot,
     /// Custom document properties
     custom_props: CustomProps,
     /// Encryption profile of the opened outer package, retained to prevent an
@@ -447,7 +447,7 @@ impl Package {
         let mutable_doc = Some(MutableDocument::new());
 
         // Initialize document properties
-        let properties = DocumentProperties::new();
+        let properties = Slot::load(&opc)?;
 
         // Initialize custom properties
         let custom_props = CustomProps::new();
@@ -489,13 +489,14 @@ impl Package {
         validate_document_main_content_type(main_part.content_type())?;
 
         let custom_props = CustomProps::read(&opc)?;
+        let properties = Slot::load(&opc)?;
 
         Ok(Self {
             opc,
             mutable_doc: None,
             mutable_web_settings: None,
             web_settings_dirty: false,
-            properties: DocumentProperties::new(),
+            properties,
             custom_props,
             #[cfg(feature = "encryption")]
             source_encryption: None,
@@ -549,13 +550,14 @@ impl Package {
         validate_document_main_content_type(main_part.content_type())?;
 
         let custom_props = CustomProps::read(&opc)?;
+        let properties = Slot::load(&opc)?;
 
         Ok(Self {
             opc,
             mutable_doc: None,
             mutable_web_settings: None,
             web_settings_dirty: false,
-            properties: DocumentProperties::new(),
+            properties,
             custom_props,
             #[cfg(feature = "encryption")]
             source_encryption: None,
@@ -590,13 +592,14 @@ impl Package {
         validate_document_main_content_type(main_part.content_type())?;
 
         let custom_props = CustomProps::read(&opc)?;
+        let properties = Slot::load(&opc)?;
 
         Ok(Self {
             opc,
             mutable_doc: None,
             mutable_web_settings: None,
             web_settings_dirty: false,
-            properties: DocumentProperties::new(),
+            properties,
             custom_props,
             #[cfg(feature = "encryption")]
             source_encryption: None,
@@ -2925,8 +2928,8 @@ impl Package {
             self.web_settings_dirty = false;
         }
 
-        // Update core properties
-        self.update_core_properties()?;
+        // Flush only an explicitly edited core-properties slot.
+        self.properties.flush(&mut self.opc)?;
 
         // Update or remove the custom-properties package graph atomically.
         self.custom_props.write(&mut self.opc)?;
@@ -2945,7 +2948,7 @@ impl Package {
         })
     }
 
-    /// Get a reference to the document properties.
+    /// Borrows the document core properties, retaining package absence.
     ///
     /// # Examples
     ///
@@ -2953,14 +2956,14 @@ impl Package {
     /// use litchi_ooxml::docx::Package;
     ///
     /// let pkg = Package::open("document.docx")?;
-    /// let props = pkg.properties();
+    /// let props = pkg.props();
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn properties(&self) -> &DocumentProperties {
-        &self.properties
+    pub fn props(&self) -> Option<&Props> {
+        self.properties.get()
     }
 
-    /// Get a mutable reference to the document properties.
+    /// Mutably borrows existing core properties.
     ///
     /// # Examples
     ///
@@ -2968,13 +2971,24 @@ impl Package {
     /// use litchi_ooxml::docx::Package;
     ///
     /// let mut pkg = Package::new()?;
-    /// pkg.properties_mut().title = Some("My Document".to_string());
-    /// pkg.properties_mut().creator = Some("John Doe".to_string());
+    /// if let Some(props) = pkg.props_mut() {
+    ///     props.title = Some("My Document".to_string());
+    /// }
     /// pkg.save("document.docx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn properties_mut(&mut self) -> &mut DocumentProperties {
-        &mut self.properties
+    pub fn props_mut(&mut self) -> Option<&mut Props> {
+        self.properties.get_mut()
+    }
+
+    /// Moves a present core-properties value into the package facade.
+    pub fn put_props(&mut self, props: Props) -> Option<Props> {
+        self.properties.put(props)
+    }
+
+    /// Marks core properties absent and moves out the previous value.
+    pub fn clear_props(&mut self) -> Option<Props> {
+        self.properties.clear()
     }
 
     /// Get a reference to the custom document properties.
@@ -3018,28 +3032,6 @@ impl Package {
     /// ```
     pub fn custom_props_mut(&mut self) -> &mut CustomProps {
         &mut self.custom_props
-    }
-
-    /// Update the core.xml properties part.
-    fn update_core_properties(&mut self) -> Result<()> {
-        use litchi_opc::part::BlobPart;
-
-        let core_uri = PackURI::new("/docProps/core.xml")
-            .map_err(|e| OoxmlError::InvalidUri(format!("core.xml URI: {}", e)))?;
-
-        // Generate XML from properties
-        let xml = self.properties.to_xml();
-
-        // Create or update the core properties part
-        let core_part = BlobPart::new(
-            core_uri,
-            ct::OPC_CORE_PROPERTIES.to_string(),
-            xml.into_bytes(),
-        );
-
-        self.opc.add_part(Box::new(core_part));
-
-        Ok(())
     }
 
     /// Update the footnotes.xml part with new content.

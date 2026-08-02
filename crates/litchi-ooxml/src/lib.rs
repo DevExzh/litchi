@@ -69,8 +69,8 @@ pub use opc::{OpcPackage, PackURI};
 
 // Re-export common utilities
 pub use litchi_ooxml_common::{
-    DocumentProperties, ExpandedName, MceCapabilities, MceError, MceLimits, MceOutput, MceReport,
-    process_markup_compatibility, ribbon, web,
+    ExpandedName, Keywords, MceCapabilities, MceError, MceLimits, MceOutput, MceReport, Props,
+    process_markup_compatibility, properties, ribbon, web,
 };
 
 // Re-export error types

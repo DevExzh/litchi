@@ -8,6 +8,7 @@
 //! cargo run --example office_crud_demo
 //! ```
 
+use litchi::ooxml::Props;
 use litchi::ooxml::docx::Package as DocxPackage;
 use litchi::ooxml::pptx::Package as PptxPackage;
 use litchi::ooxml::xlsx::Workbook;
@@ -79,9 +80,12 @@ fn demo_docx_operations() -> ExampleResult<()> {
     table.cell(3, 2).unwrap().set_text("200");
 
     // Set metadata
-    pkg.properties_mut().title = Some("Product Catalog".to_string());
-    pkg.properties_mut().creator = Some("Litchi Demo".to_string());
-    pkg.properties_mut().description = Some("Demonstration of DOCX creation".to_string());
+    let _ = pkg.put_props(
+        Props::new()
+            .title("Product Catalog")
+            .creator("Litchi Demo")
+            .description("Demonstration of DOCX creation"),
+    );
 
     // Save
     pkg.save("demo_catalog.docx")?;
@@ -100,7 +104,7 @@ fn demo_docx_operations() -> ExampleResult<()> {
     println!("  Found 'Widget' in {} paragraphs", matches.len());
 
     // Access metadata
-    if let Some(title) = &pkg.properties().title {
+    if let Some(title) = pkg.props().and_then(|props| props.title.as_deref()) {
         println!("  Title: {}", title);
     }
 
@@ -114,7 +118,9 @@ fn demo_docx_operations() -> ExampleResult<()> {
     doc.add_paragraph_with_text("Email: sales@example.com");
     doc.add_paragraph_with_text("Phone: (555) 123-4567");
 
-    pkg.properties_mut().last_modified_by = Some("Litchi Update".to_string());
+    if let Some(props) = pkg.props_mut() {
+        props.last_modified_by = Some("Litchi Update".to_string());
+    }
     pkg.save("demo_catalog_updated.docx")?;
     println!("✓ Updated: demo_catalog_updated.docx");
 
@@ -169,8 +175,11 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
     wb.define_name("EmployeeData", "Sheet1!$A$1:$C$5");
 
     // Set metadata
-    wb.properties_mut().title = Some("Employee Database".to_string());
-    wb.properties_mut().creator = Some("Litchi Demo".to_string());
+    let _ = wb.put_props(
+        Props::new()
+            .title("Employee Database")
+            .creator("Litchi Demo"),
+    );
 
     // Save
     wb.save("demo_employees.xlsx")?;
@@ -205,7 +214,9 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
         ws.set_cell_value(6, 3, 65000);
     }
 
-    wb.properties_mut().last_modified_by = Some("Litchi Update".to_string());
+    if let Some(props) = wb.props_mut() {
+        props.last_modified_by = Some("Litchi Update".to_string());
+    }
     wb.save("demo_employees_updated.xlsx")?;
     println!("✓ Updated: demo_employees_updated.xlsx");
 
@@ -262,8 +273,11 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     );
 
     // Set metadata
-    pkg.properties_mut().title = Some("Company Overview Q4 2024".to_string());
-    pkg.properties_mut().creator = Some("Litchi Demo".to_string());
+    let _ = pkg.put_props(
+        Props::new()
+            .title("Company Overview Q4 2024")
+            .creator("Litchi Demo"),
+    );
 
     // Save
     pkg.save("demo_presentation.pptx")?;
@@ -301,7 +315,9 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     );
     slide4.add_text_box("Questions?", 914400, 3657600, 7315200, 914400);
 
-    pkg.properties_mut().last_modified_by = Some("Litchi Update".to_string());
+    if let Some(props) = pkg.props_mut() {
+        props.last_modified_by = Some("Litchi Update".to_string());
+    }
     pkg.save("demo_presentation_updated.pptx")?;
     println!("✓ Updated: demo_presentation_updated.pptx");
 

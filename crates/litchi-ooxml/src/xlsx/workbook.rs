@@ -60,8 +60,8 @@ use crate::xlsx::{Cell, SharedStrings, Styles};
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as WorksheetTrait, WorksheetIterator,
 };
-use litchi_ooxml_common::DocumentProperties;
 use litchi_ooxml_common::embedded;
+use litchi_ooxml_common::properties::{Props, Slot};
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::{OpcPackage, PackURI};
@@ -204,8 +204,8 @@ pub struct Workbook {
     /// Whether the writer model originated from deterministic fresh creation.
     /// Opened workbooks must not be rebuilt through the empty legacy writer.
     writer_is_fresh: bool,
-    /// Document properties (metadata)
-    properties: DocumentProperties,
+    /// Authoritative, mutation-tracked core properties.
+    properties: Slot,
     /// Whether the workbook uses the 1904 date system
     is_1904_date_system: bool,
     /// Effective workbook formula calculation policy.
@@ -684,6 +684,7 @@ impl Workbook {
             .into());
         }
         let workbook_uri = workbook_part.partname().clone();
+        let properties = Slot::load(&package).map_err(crate::error::OoxmlError::from)?;
         let mut workbook = Workbook {
             package,
             workbook_uri,
@@ -694,7 +695,7 @@ impl Workbook {
             styles: Styles::new(),
             mutable_data: None,
             writer_is_fresh: false,
-            properties: DocumentProperties::new(),
+            properties,
             is_1904_date_system: false,
             calculation_properties: None,
             calculation_chain: None,
@@ -2254,7 +2255,7 @@ impl Workbook {
             .unwrap_or(false)
     }
 
-    /// Get a reference to the workbook properties.
+    /// Borrows the workbook core properties, retaining package absence.
     ///
     /// # Examples
     ///
@@ -2262,14 +2263,14 @@ impl Workbook {
     /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let wb = Workbook::create()?;
-    /// let props = wb.properties();
+    /// let props = wb.props();
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn properties(&self) -> &DocumentProperties {
-        &self.properties
+    pub fn props(&self) -> Option<&Props> {
+        self.properties.get()
     }
 
-    /// Get a mutable reference to the workbook properties.
+    /// Mutably borrows existing core properties.
     ///
     /// # Examples
     ///
@@ -2277,13 +2278,24 @@ impl Workbook {
     /// use litchi_ooxml::xlsx::Workbook;
     ///
     /// let mut wb = Workbook::create()?;
-    /// wb.properties_mut().title = Some("My Workbook".to_string());
-    /// wb.properties_mut().creator = Some("John Doe".to_string());
+    /// if let Some(props) = wb.props_mut() {
+    ///     props.title = Some("My Workbook".to_string());
+    /// }
     /// wb.save("workbook.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
-    pub fn properties_mut(&mut self) -> &mut DocumentProperties {
-        &mut self.properties
+    pub fn props_mut(&mut self) -> Option<&mut Props> {
+        self.properties.get_mut()
+    }
+
+    /// Moves a present core-properties value into the workbook facade.
+    pub fn put_props(&mut self, props: Props) -> Option<Props> {
+        self.properties.put(props)
+    }
+
+    /// Marks core properties absent and moves out the previous value.
+    pub fn clear_props(&mut self) -> Option<Props> {
+        self.properties.clear()
     }
 
     /// Set the person list for threaded comments.
@@ -2565,8 +2577,10 @@ impl Workbook {
             }
         }
 
-        // Update core properties
-        self.update_core_properties()?;
+        // Flush only an explicitly edited core-properties slot.
+        self.properties
+            .flush(&mut self.package)
+            .map_err(crate::error::OoxmlError::from)?;
 
         // Update app properties (extended properties)
         self.update_app_properties()?;
@@ -3825,28 +3839,6 @@ impl Workbook {
 
         // Add the workbook part to the package
         self.package.add_part(Box::new(temp_wb_part));
-
-        Ok(())
-    }
-
-    /// Update the core.xml properties part.
-    fn update_core_properties(&mut self) -> SheetResult<()> {
-        use litchi_opc::constants::content_type as ct;
-        use litchi_opc::part::BlobPart;
-
-        let core_uri = PackURI::new("/docProps/core.xml")?;
-
-        // Generate XML from properties
-        let xml = self.properties.to_xml();
-
-        // Create or update the core properties part
-        let core_part = BlobPart::new(
-            core_uri,
-            ct::OPC_CORE_PROPERTIES.to_string(),
-            xml.into_bytes(),
-        );
-
-        self.package.add_part(Box::new(core_part));
 
         Ok(())
     }

@@ -20,5 +20,5 @@ pub use mce::{
     active_offsets, process_markup_compatibility, process_ooxml, process_part, process_part_arc,
     process_str,
 };
-pub use properties::DocumentProperties;
+pub use properties::{Keywords, Props};
 pub use xml::XmlError;

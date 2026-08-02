@@ -34,12 +34,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Core document properties (some PPTX files leave most of these unset).
-    let props = pkg.properties();
+    let props = pkg.props();
     println!("\n--- Core properties ---");
-    println!("Title   : {:?}", props.title);
-    println!("Creator : {:?}", props.creator);
-    println!("Subject : {:?}", props.subject);
-    println!("Modified: {:?}", props.modified);
+    println!("Title   : {:?}", props.and_then(|p| p.title.as_deref()));
+    println!("Creator : {:?}", props.and_then(|p| p.creator.as_deref()));
+    println!("Subject : {:?}", props.and_then(|p| p.subject.as_deref()));
+    println!("Modified: {:?}", props.and_then(|p| p.modified.as_ref()));
 
     // Iterate slides.
     let slides = pres.slides()?;

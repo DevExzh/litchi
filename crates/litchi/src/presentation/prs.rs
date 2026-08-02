@@ -149,9 +149,11 @@ impl Presentation {
                     ooxml::pptx::Package::from_opc_package(opc_package).map_err(Error::from)?,
                 );
 
-                // Extract metadata from OOXML package before transferring ownership
-                let cached_metadata = litchi_ooxml_common::properties::read(package.opc_package())
-                    .ok()
+                // Reuse the already validated semantic cache.
+                let cached_metadata = package
+                    .props()
+                    .cloned()
+                    .map(litchi_core::Metadata::from)
                     .filter(|metadata| metadata.has_data());
                 Ok(Self {
                     inner: PresentationImpl::Pptx(package),
