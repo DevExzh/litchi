@@ -135,6 +135,18 @@ impl MutableSlide {
         self.notes.is_some()
     }
 
+    /// Remove this slide's speaker notes.
+    ///
+    /// Returns whether notes were present. Repeated removal is a no-op and
+    /// does not mark an already-clean slide as modified.
+    pub fn clear_notes(&mut self) -> bool {
+        let removed = self.notes.take().is_some();
+        if removed {
+            self.modified = true;
+        }
+        removed
+    }
+
     /// Set a transition effect for the slide.
     ///
     /// # Arguments
@@ -1271,6 +1283,20 @@ mod tests {
         slide.set_notes("Speaker notes here");
         assert_eq!(slide.notes(), Some("Speaker notes here"));
         assert!(slide.has_notes());
+    }
+
+    #[test]
+    fn test_clear_notes_is_idempotent() {
+        let mut slide = MutableSlide::new(256);
+        assert!(!slide.clear_notes());
+        assert!(!slide.is_modified());
+
+        slide.set_notes("Speaker notes here");
+        assert!(slide.clear_notes());
+        assert!(!slide.has_notes());
+        assert!(slide.notes().is_none());
+        assert!(slide.is_modified());
+        assert!(!slide.clear_notes());
     }
 
     #[test]

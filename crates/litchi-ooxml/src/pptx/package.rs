@@ -825,6 +825,21 @@ impl Package {
         Ok(())
     }
 
+    fn ensure_notes_graph_current(&self, operation: &'static str) -> Result<()> {
+        if self
+            .mutable_pres
+            .as_ref()
+            .is_some_and(MutablePresentation::is_modified)
+        {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation,
+                reason: "the legacy writer has unflushed changes that could replace slide and notes relationships; save and reopen before removing notes",
+            });
+        }
+        Ok(())
+    }
+
     fn resolve_slide(&self, key: SlideKey<'_>) -> Result<PackURI> {
         match key {
             SlideKey::Index(index) => {
@@ -1093,6 +1108,30 @@ impl Package {
     pub fn store_notes_graph(&mut self, graph: &crate::pptx::notes::PptxNotesGraph) -> Result<()> {
         let presentation = self.opc.main_document_part()?.partname().clone();
         crate::pptx::notes::store_notes_graph(&mut self.opc, &presentation, graph)
+    }
+
+    /// Remove the speaker notes owned by one selected slide.
+    ///
+    /// Exact producer-visible slide names are the primary selector. A checked
+    /// zero-based index is also accepted for ordered workflows; native slide
+    /// and relationship IDs remain below the safe facade. Missing notes are an
+    /// idempotent `Ok(false)`.
+    pub fn remove_notes<'a>(&mut self, slide: impl Into<SlideKey<'a>>) -> Result<bool> {
+        self.ensure_notes_graph_current("remove_notes")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        let presentation = self.opc.main_document_part()?.partname().clone();
+        crate::pptx::notes::remove_slide_notes(&mut self.opc, &presentation, &slide_name)
+    }
+
+    /// Remove speaker notes from every slide, returning the number removed.
+    ///
+    /// The complete Strict or Transitional notes graph is validated before
+    /// any relationship or part is changed. Shared notes-master and theme
+    /// resources remain available for presentation layout.
+    pub fn clear_notes(&mut self) -> Result<usize> {
+        self.ensure_notes_graph_current("clear_notes")?;
+        let presentation = self.opc.main_document_part()?.partname().clone();
+        crate::pptx::notes::clear_presentation_notes(&mut self.opc, &presentation)
     }
 
     /// Create a new slide master with default text styles and reference it

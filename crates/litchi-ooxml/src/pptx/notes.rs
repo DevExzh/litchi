@@ -9,7 +9,7 @@ use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -144,6 +144,38 @@ pub struct PptxNotesGraph {
     pub slides: Vec<PptxNotesSlideResource>,
 }
 
+#[derive(Debug)]
+struct NotesThemeIndex {
+    relationship_id: String,
+    part_name: PackURI,
+    content_type: String,
+}
+
+#[derive(Debug)]
+struct NotesMasterIndex {
+    presentation_relationship_id: String,
+    part_name: PackURI,
+    content_type: String,
+    theme: NotesThemeIndex,
+}
+
+#[derive(Debug)]
+struct NotesSlideIndex {
+    slide_part_name: PackURI,
+    slide_relationship_id: String,
+    part_name: PackURI,
+    content_type: String,
+    backlink_relationship_id: String,
+    notes_master_relationship_id: String,
+}
+
+#[derive(Debug)]
+struct NotesGraphIndex {
+    conformance: PptxNotesConformance,
+    master: NotesMasterIndex,
+    slides: Vec<NotesSlideIndex>,
+}
+
 #[derive(Default)]
 struct XmlScan {
     relationship_attributes: Vec<String>,
@@ -156,6 +188,17 @@ pub fn load_notes_graph(
     package: &OpcPackage,
     presentation_name: &PackURI,
 ) -> Result<Option<PptxNotesGraph>> {
+    let Some(index) = load_notes_graph_index(package, presentation_name)? else {
+        return Ok(None);
+    };
+    Ok(Some(materialize_notes_graph(package, index)?))
+}
+
+/// Validate and index the complete notes graph without copying resource payloads.
+fn load_notes_graph_index(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+) -> Result<Option<NotesGraphIndex>> {
     let presentation = package.get_part(presentation_name)?;
     if presentation.content_type() != ct::PML_PRESENTATION_MAIN {
         return Err(invalid(
@@ -201,7 +244,7 @@ pub fn load_notes_graph(
                 Err(invalid("slide conformance differs from presentation"))
             }
         })?;
-        slide_sources.push((id.clone(), target));
+        slide_sources.push((id.clone(), slide.partname().clone()));
     }
     let master_relationships: Vec<_> = presentation
         .rels()
@@ -248,6 +291,7 @@ pub fn load_notes_graph(
     let master_name = relationship_target(presentation, master_relationship)?;
     validate_leaf_path(&master_name, "/ppt/notesMasters/", "notes master")?;
     let master_part = package.get_part(&master_name)?;
+    let master_part_name = master_part.partname().clone();
     require_content_type(master_part, ct::PML_NOTES_MASTER, "notes master")?;
     validate_resource_xml(
         master_part.blob(),
@@ -275,6 +319,7 @@ pub fn load_notes_graph(
     let theme_name = relationship_target(master_part, theme_relationship)?;
     validate_leaf_path(&theme_name, "/ppt/theme/", "notes-master theme")?;
     let theme_part = package.get_part(&theme_name)?;
+    let theme_part_name = theme_part.partname().clone();
     require_content_type(theme_part, THEME_CT, "notes-master theme")?;
     validate_resource_xml(
         theme_part.blob(),
@@ -316,10 +361,11 @@ pub fn load_notes_graph(
         }
         let notes_name = relationship_target(slide_part, relationship)?;
         validate_leaf_path(&notes_name, "/ppt/notesSlides/", "notes slide")?;
-        if !discovered.insert(notes_name.as_str().to_owned()) {
+        let notes_part = package.get_part(&notes_name)?;
+        let notes_part_name = notes_part.partname().clone();
+        if !discovered.insert(notes_part_name.as_str().to_owned()) {
             return Err(invalid("multiple slides reference the same notes slide"));
         }
-        let notes_part = package.get_part(&notes_name)?;
         require_content_type(notes_part, ct::PML_NOTES_SLIDE, "notes slide")?;
         validate_resource_xml(
             notes_part.blob(),
@@ -359,22 +405,23 @@ pub fn load_notes_graph(
         let backlink = backlink.ok_or_else(|| invalid("notes slide lacks slide backlink"))?;
         let notes_master =
             notes_master.ok_or_else(|| invalid("notes slide lacks notes-master relationship"))?;
-        if relationship_target(notes_part, backlink)? != *slide_name {
+        let backlink_target = relationship_target(notes_part, backlink)?;
+        if package.get_part(&backlink_target)?.partname() != slide_name {
             return Err(invalid("notes slide backlink targets the wrong slide"));
         }
-        if relationship_target(notes_part, notes_master)? != master_name {
+        let notes_master_target = relationship_target(notes_part, notes_master)?;
+        if package.get_part(&notes_master_target)?.partname() != &master_part_name {
             return Err(invalid("notes slide targets the wrong notes master"));
         }
         total = checked_add(total, notes_part.blob().len(), "aggregate bytes")?;
         if total > MAX_TOTAL_BYTES {
             return Err(limit("aggregate bytes"));
         }
-        slides.push(PptxNotesSlideResource {
-            slide_part_name: slide_name.as_str().to_owned(),
+        slides.push(NotesSlideIndex {
+            slide_part_name: slide_part.partname().clone(),
             slide_relationship_id: relationship.r_id().to_owned(),
-            part_name: notes_name.as_str().to_owned(),
+            part_name: notes_part_name,
             content_type: notes_part.content_type().to_owned(),
-            data: notes_part.blob().to_vec(),
             backlink_relationship_id: backlink.r_id().to_owned(),
             notes_master_relationship_id: notes_master.r_id().to_owned(),
         });
@@ -391,22 +438,261 @@ pub fn load_notes_graph(
     {
         return Err(invalid("package contains orphan notes parts"));
     }
-    Ok(Some(PptxNotesGraph {
+    Ok(Some(NotesGraphIndex {
         conformance,
-        master: PptxNotesMasterResource {
+        master: NotesMasterIndex {
             presentation_relationship_id: master_id.clone(),
-            part_name: master_name.as_str().to_owned(),
+            part_name: master_part_name,
             content_type: master_part.content_type().to_owned(),
-            data: master_part.blob().to_vec(),
-            theme: PptxNotesThemeResource {
+            theme: NotesThemeIndex {
                 relationship_id: theme_relationship.r_id().to_owned(),
-                part_name: theme_name.as_str().to_owned(),
+                part_name: theme_part_name,
                 content_type: theme_part.content_type().to_owned(),
-                data: theme_part.blob().to_vec(),
             },
         },
         slides,
     }))
+}
+
+fn materialize_notes_graph(package: &OpcPackage, index: NotesGraphIndex) -> Result<PptxNotesGraph> {
+    let master_data = package.get_part(&index.master.part_name)?.blob().to_vec();
+    let theme_data = package
+        .get_part(&index.master.theme.part_name)?
+        .blob()
+        .to_vec();
+    let mut slides = Vec::new();
+    slides
+        .try_reserve(index.slides.len())
+        .map_err(|error| invalid(format!("notes-slide allocation failed: {error}")))?;
+    for slide in index.slides {
+        let data = package.get_part(&slide.part_name)?.blob().to_vec();
+        slides.push(PptxNotesSlideResource {
+            slide_part_name: slide.slide_part_name.as_str().to_owned(),
+            slide_relationship_id: slide.slide_relationship_id,
+            part_name: slide.part_name.as_str().to_owned(),
+            content_type: slide.content_type,
+            data,
+            backlink_relationship_id: slide.backlink_relationship_id,
+            notes_master_relationship_id: slide.notes_master_relationship_id,
+        });
+    }
+    Ok(PptxNotesGraph {
+        conformance: index.conformance,
+        master: PptxNotesMasterResource {
+            presentation_relationship_id: index.master.presentation_relationship_id,
+            part_name: index.master.part_name.as_str().to_owned(),
+            content_type: index.master.content_type,
+            data: master_data,
+            theme: PptxNotesThemeResource {
+                relationship_id: index.master.theme.relationship_id,
+                part_name: index.master.theme.part_name.as_str().to_owned(),
+                content_type: index.master.theme.content_type,
+                data: theme_data,
+            },
+        },
+        slides,
+    })
+}
+
+#[derive(Debug)]
+struct NotesRemoval {
+    slide_part_name: PackURI,
+    relationship_id: String,
+    notes_part_name: PackURI,
+}
+
+impl From<&NotesSlideIndex> for NotesRemoval {
+    fn from(slide: &NotesSlideIndex) -> Self {
+        Self {
+            slide_part_name: slide.slide_part_name.clone(),
+            relationship_id: slide.slide_relationship_id.clone(),
+            notes_part_name: slide.part_name.clone(),
+        }
+    }
+}
+
+/// Remove the speaker-notes resource owned by one presentation slide.
+///
+/// The complete notes graph and every inbound edge to the selected resource
+/// are validated before mutation. Missing notes are an idempotent `Ok(false)`.
+/// Shared notes-master and theme resources are retained.
+pub fn remove_slide_notes(
+    package: &mut OpcPackage,
+    presentation_name: &PackURI,
+    slide_name: &PackURI,
+) -> Result<bool> {
+    let Some(index) = load_notes_graph_index(package, presentation_name)? else {
+        return Ok(false);
+    };
+    let slide_name = package.get_part(slide_name)?.partname().clone();
+    let Some(slide) = index
+        .slides
+        .iter()
+        .find(|slide| slide.slide_part_name == slide_name)
+    else {
+        return Ok(false);
+    };
+    let removals = [NotesRemoval::from(slide)];
+    validate_notes_removals(package, &removals)?;
+    apply_notes_removals(package, &removals)?;
+    Ok(true)
+}
+
+/// Remove every speaker-notes resource from a presentation.
+///
+/// Returns the number of removed notes slides. The operation is idempotent,
+/// validates the complete graph before mutation, and retains the shared notes
+/// master and its theme so ordinary presentation layout remains unchanged.
+pub fn clear_presentation_notes(
+    package: &mut OpcPackage,
+    presentation_name: &PackURI,
+) -> Result<usize> {
+    let Some(index) = load_notes_graph_index(package, presentation_name)? else {
+        return Ok(0);
+    };
+    let mut removals = Vec::new();
+    removals
+        .try_reserve(index.slides.len())
+        .map_err(|error| invalid(format!("notes-removal allocation failed: {error}")))?;
+    removals.extend(index.slides.iter().map(NotesRemoval::from));
+    if removals.is_empty() {
+        return Ok(0);
+    }
+    validate_notes_removals(package, &removals)?;
+    apply_notes_removals(package, &removals)
+}
+
+fn validate_notes_removals(package: &OpcPackage, removals: &[NotesRemoval]) -> Result<()> {
+    let mut by_target = HashMap::new();
+    by_target
+        .try_reserve(removals.len())
+        .map_err(|error| invalid(format!("notes-removal index allocation failed: {error}")))?;
+    for (index, removal) in removals.iter().enumerate() {
+        if by_target
+            .insert(removal.notes_part_name.clone(), index)
+            .is_some()
+        {
+            return Err(invalid("notes-removal plan contains a duplicate target"));
+        }
+    }
+    let mut inbound_counts = Vec::new();
+    inbound_counts
+        .try_reserve(removals.len())
+        .map_err(|error| invalid(format!("notes-removal count allocation failed: {error}")))?;
+    inbound_counts.resize(removals.len(), 0usize);
+
+    for relationship in package.rels().iter() {
+        validate_notes_inbound(
+            package,
+            None,
+            relationship,
+            removals,
+            &by_target,
+            &mut inbound_counts,
+        )?;
+    }
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            validate_notes_inbound(
+                package,
+                Some(source.partname()),
+                relationship,
+                removals,
+                &by_target,
+                &mut inbound_counts,
+            )?;
+        }
+    }
+    if inbound_counts.iter().any(|count| *count != 1) {
+        return Err(invalid(
+            "notes-removal target does not have exactly one owning slide relationship",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_notes_inbound(
+    package: &OpcPackage,
+    source: Option<&PackURI>,
+    relationship: &litchi_opc::Relationship,
+    removals: &[NotesRemoval],
+    by_target: &HashMap<PackURI, usize>,
+    inbound_counts: &mut [usize],
+) -> Result<()> {
+    if relationship.is_external() {
+        return Ok(());
+    }
+    let Ok(target) = relationship.target_partname() else {
+        return Ok(());
+    };
+    let index = by_target.get(&target).copied().or_else(|| {
+        package
+            .get_part(&target)
+            .ok()
+            .and_then(|part| by_target.get(part.partname()).copied())
+    });
+    let Some(index) = index else {
+        return Ok(());
+    };
+    let removal = &removals[index];
+    if source != Some(&removal.slide_part_name) || relationship.r_id() != removal.relationship_id {
+        let source = source.map_or("package root", PackURI::as_str);
+        return Err(invalid(format!(
+            "notes slide '{}' has an unexpected inbound relationship '{}' from '{}'",
+            removal.notes_part_name.as_str(),
+            relationship.r_id(),
+            source,
+        )));
+    }
+    inbound_counts[index] = inbound_counts[index]
+        .checked_add(1)
+        .ok_or_else(|| limit("inbound relationship count"))?;
+    Ok(())
+}
+
+fn apply_notes_removals(package: &mut OpcPackage, removals: &[NotesRemoval]) -> Result<usize> {
+    // Stage cloned slide owners before the first package mutation. Built-in
+    // parts retain their shared payload allocation while relationships are
+    // detached on the staged clone.
+    let mut staged_slides = Vec::new();
+    staged_slides
+        .try_reserve(removals.len())
+        .map_err(|error| invalid(format!("notes-removal staging failed: {error}")))?;
+    for removal in removals {
+        let slide = package.get_part(&removal.slide_part_name)?;
+        let relationship = slide
+            .rels()
+            .get(&removal.relationship_id)
+            .ok_or_else(|| invalid("validated notes relationship disappeared before commit"))?;
+        if relationship.is_external() {
+            return Err(invalid(
+                "validated notes relationship changed before commit",
+            ));
+        }
+        let target = relationship.target_partname()?;
+        if package.get_part(&target)?.partname() != &removal.notes_part_name {
+            return Err(invalid(
+                "validated notes relationship changed before commit",
+            ));
+        }
+        package.get_part(&removal.notes_part_name)?;
+        let mut staged = slide.clone_part();
+        if staged.rels_mut().remove(&removal.relationship_id).is_none() {
+            return Err(invalid("validated notes relationship was not removed"));
+        }
+        staged_slides.push(staged);
+    }
+
+    // Every operation below is infallible after validation and staging. Exact
+    // stored part names avoid the case-insensitive lookup/exact-removal trap.
+    for staged in staged_slides {
+        package.add_part(staged);
+    }
+    for removal in removals {
+        package.remove_part(&removal.notes_part_name);
+    }
+    package.unsign();
+    Ok(removals.len())
 }
 
 /// Deterministically replace the resources of an already coherent notes graph.
@@ -416,10 +702,10 @@ pub fn store_notes_graph(
     presentation_name: &PackURI,
     graph: &PptxNotesGraph,
 ) -> Result<()> {
-    let current = load_notes_graph(package, presentation_name)?
+    let current = load_notes_graph_index(package, presentation_name)?
         .ok_or_else(|| invalid("store requires an existing coherent notes graph"))?;
     validate_graph_value(graph)?;
-    if ownership(&current) != ownership(graph) {
+    if indexed_ownership(&current) != ownership(graph) {
         return Err(invalid(
             "store cannot retarget or orphan existing notes parts",
         ));
@@ -818,6 +1104,20 @@ fn ownership(graph: &PptxNotesGraph) -> BTreeSet<String> {
         .chain(graph.slides.iter().map(|slide| slide.part_name.clone()))
         .collect()
 }
+
+fn indexed_ownership(graph: &NotesGraphIndex) -> BTreeSet<String> {
+    std::iter::once(graph.master.part_name.as_str().to_owned())
+        .chain(std::iter::once(
+            graph.master.theme.part_name.as_str().to_owned(),
+        ))
+        .chain(
+            graph
+                .slides
+                .iter()
+                .map(|slide| slide.part_name.as_str().to_owned()),
+        )
+        .collect()
+}
 fn relationship_target(
     part: &dyn Part,
     relationship: &litchi_opc::Relationship,
@@ -986,6 +1286,133 @@ mod tests {
         store_notes_graph(&mut package, &name, &graph).unwrap();
         assert_eq!(load_notes_graph(&package, &name).unwrap().unwrap(), graph);
     }
+
+    #[test]
+    fn strict_and_transitional_notes_removal_is_idempotent() {
+        for conformance in [
+            PptxNotesConformance::Transitional,
+            PptxNotesConformance::Strict,
+        ] {
+            let (mut package, name) = synthetic(conformance);
+            let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+            let notes = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+            let master = PackURI::new("/ppt/notesMasters/notesMaster1.xml").unwrap();
+            let theme = PackURI::new("/ppt/theme/theme2.xml").unwrap();
+
+            assert!(remove_slide_notes(&mut package, &name, &slide).unwrap());
+            assert!(!package.contains_part(&notes));
+            assert!(package.contains_part(&master));
+            assert!(package.contains_part(&theme));
+            assert!(
+                package
+                    .get_part(&slide)
+                    .unwrap()
+                    .rels()
+                    .iter()
+                    .all(|relationship| !is_notes_slide_rel(relationship.reltype()))
+            );
+            assert!(
+                load_notes_graph(&package, &name)
+                    .unwrap()
+                    .unwrap()
+                    .slides
+                    .is_empty()
+            );
+            assert!(!remove_slide_notes(&mut package, &name, &slide).unwrap());
+            assert_eq!(clear_presentation_notes(&mut package, &name).unwrap(), 0);
+        }
+    }
+
+    #[test]
+    fn removal_uses_the_actual_stored_part_name_after_case_folded_lookup() {
+        let (mut package, name) = synthetic(PptxNotesConformance::Transitional);
+        let canonical = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+        let mixed_case = PackURI::new("/PPT/NOTESSLIDES/NOTESSLIDE1.XML").unwrap();
+        let data = package.get_part(&canonical).unwrap().blob().to_vec();
+        assert!(package.remove_part(&canonical));
+        let mut notes = BlobPart::new(mixed_case.clone(), ct::PML_NOTES_SLIDE.into(), data);
+        notes.rels_mut().add_relationship(
+            rt::SLIDE.into(),
+            "../slides/slide1.xml".into(),
+            "rIdBack".into(),
+            false,
+        );
+        notes.rels_mut().add_relationship(
+            rt::NOTES_MASTER.into(),
+            "../notesMasters/notesMaster1.xml".into(),
+            "rIdMaster".into(),
+            false,
+        );
+        package.add_part(Box::new(notes));
+
+        let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        assert!(remove_slide_notes(&mut package, &name, &slide).unwrap());
+        assert!(!package.contains_part(&mixed_case));
+        assert!(
+            load_notes_graph(&package, &name)
+                .unwrap()
+                .unwrap()
+                .slides
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn unexpected_inbound_edge_rejects_removal_before_mutation() {
+        let (mut package, name) = synthetic(PptxNotesConformance::Transitional);
+        let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let notes = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+        let observer_name = PackURI::new("/ppt/custom/observer.xml").unwrap();
+        let mut observer = BlobPart::new(
+            observer_name,
+            "application/xml".into(),
+            b"<observer/>".to_vec(),
+        );
+        observer.rels_mut().add_relationship(
+            "urn:test:observes-notes".into(),
+            "../notesSlides/notesSlide1.xml".into(),
+            "rIdObserver".into(),
+            false,
+        );
+        package.add_part(Box::new(observer));
+
+        let before_parts = package.part_count();
+        let before_relationships = package.get_part(&slide).unwrap().rels().len();
+        let error = remove_slide_notes(&mut package, &name, &slide).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("unexpected inbound relationship")
+        );
+        assert_eq!(package.part_count(), before_parts);
+        assert_eq!(
+            package.get_part(&slide).unwrap().rels().len(),
+            before_relationships
+        );
+        assert!(package.contains_part(&notes));
+    }
+
+    #[test]
+    fn malformed_graph_rejects_clear_before_mutation() {
+        let (mut package, name) = synthetic(PptxNotesConformance::Transitional);
+        let slide = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let notes = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+        package
+            .get_part_mut(&notes)
+            .unwrap()
+            .set_blob(format!("<p:wrong xmlns:p=\"{P}\"/>").into_bytes());
+
+        let before_parts = package.part_count();
+        let before_relationships = package.get_part(&slide).unwrap().rels().len();
+        assert!(clear_presentation_notes(&mut package, &name).is_err());
+        assert_eq!(package.part_count(), before_parts);
+        assert_eq!(
+            package.get_part(&slide).unwrap().rels().len(),
+            before_relationships
+        );
+        assert!(package.contains_part(&notes));
+    }
+
     #[test]
     fn rejects_external_wrong_root_outbound_orphan_and_caps_before_mutation() {
         let (mut package, name) = synthetic(PptxNotesConformance::Transitional);

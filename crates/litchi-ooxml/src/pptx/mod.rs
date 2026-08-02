@@ -181,7 +181,8 @@ pub use media_parts::{
 };
 pub use notes::{
     PptxNotesConformance, PptxNotesGraph, PptxNotesMasterResource, PptxNotesSlideResource,
-    PptxNotesThemeResource, load_notes_graph, store_notes_graph,
+    PptxNotesThemeResource, clear_presentation_notes, load_notes_graph, remove_slide_notes,
+    store_notes_graph,
 };
 pub use ole::{PptxOleObject, PptxOleObjectMode, PptxOleObjectTarget, PptxOlePayloadKind};
 pub use ole_object::{AuthoredOleObject, OleObjectFrame, add_ole_object};
