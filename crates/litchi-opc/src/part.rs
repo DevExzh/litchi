@@ -160,11 +160,23 @@ impl BlobPart {
     /// * `content_type` - The content type of this part
     /// * `blob` - The binary content of this part
     pub fn new(partname: PackURI, content_type: String, blob: Vec<u8>) -> Self {
+        Self::new_shared(partname, content_type, Arc::new(blob))
+    }
+
+    /// Create a new `BlobPart` from an already shared allocation.
+    ///
+    /// The part adopts `blob` without copying its contents.
+    ///
+    /// # Arguments
+    /// * `partname` - The partname (URI) of this part
+    /// * `content_type` - The content type of this part
+    /// * `blob` - The shared binary content of this part
+    pub fn new_shared(partname: PackURI, content_type: String, blob: Arc<Vec<u8>>) -> Self {
         let rels = Relationships::for_source(&partname);
         Self {
             partname,
             content_type,
-            blob: Arc::new(blob),
+            blob,
             rels,
         }
     }
@@ -482,6 +494,17 @@ mod tests {
         assert_eq!(part.blob(), content.as_slice());
         part.set_content_type("image/webp".to_string()).unwrap();
         assert_eq!(part.content_type(), "image/webp");
+    }
+
+    #[test]
+    fn blob_part_new_shared_preserves_allocation() {
+        let partname = PackURI::new("/word/media/image1.png").unwrap();
+        let content = Arc::new(vec![0x89, 0x50, 0x4E, 0x47]);
+        let part = BlobPart::new_shared(partname, "image/png".to_string(), Arc::clone(&content));
+
+        let stored = part.blob_arc();
+        assert!(Arc::ptr_eq(&content, &stored));
+        assert_eq!(stored.as_slice(), content.as_slice());
     }
 
     #[test]

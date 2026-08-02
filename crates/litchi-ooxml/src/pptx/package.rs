@@ -7,14 +7,11 @@ use crate::pptx::vba_project::{
     store_vba_project as store_presentation_vba_project,
 };
 use crate::pptx::writer::MutablePresentation;
-use crate::web_extensions::{
-    OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
-    remove_web_extension_task_panes, store_web_extension_task_panes,
-};
 /// Package implementation for PowerPoint presentations.
 use litchi_ooxml_common::DocumentProperties;
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
+use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -788,23 +785,24 @@ impl Package {
         clear_presentation_vba(&mut self.opc, &source)
     }
 
-    /// Load persisted Office Add-in task-pane metadata without activating add-ins.
-    pub fn web_extension_task_panes(&self) -> Result<Option<WebExtensionTaskPanes>> {
-        load_web_extension_task_panes(&self.opc)
+    /// Load inert persisted Office Add-in task panes.
+    pub fn task_panes(&self) -> Result<Option<web::Panes>> {
+        Ok(web::load(&self.opc)?)
     }
 
-    /// Store inert persisted Office Add-in task panes and snapshot resources.
-    pub fn set_web_extension_task_panes(
+    /// Store a validated task-pane graph by moving it into package ownership.
+    pub fn put_task_panes(
         &mut self,
-        task_panes: &WebExtensionTaskPanes,
-        conformance: OoxmlConformance,
-    ) -> Result<()> {
-        store_web_extension_task_panes(&mut self.opc, task_panes, conformance)
+        panes: web::Panes,
+        conformance: web::Conformance,
+    ) -> Result<&mut Self> {
+        web::put(&mut self.opc, panes, conformance)?;
+        Ok(self)
     }
 
-    /// Remove persisted Office Add-in task panes and unreferenced resources.
-    pub fn remove_web_extension_task_panes(&mut self) -> Result<bool> {
-        remove_web_extension_task_panes(&mut self.opc)
+    /// Remove task panes and graph resources no longer shared elsewhere.
+    pub fn remove_task_panes(&mut self) -> Result<bool> {
+        Ok(web::remove(&mut self.opc)?)
     }
 
     /// Read the fixed legacy and modern package-level Ribbon slots.

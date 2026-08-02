@@ -10,6 +10,7 @@ use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
+use litchi_ooxml_common::web;
 use litchi_ooxml_common::xml::decode_xml_reference;
 
 pub const WEB_EXTENSIONS_EXTENSION_URI: &str = "{F7C9EE02-42E1-4005-9D12-6889AFFD525C}";
@@ -147,7 +148,9 @@ pub fn parse_worksheet_web_extension_bindings(
             },
             Event::Text(text) => {
                 if in_formula {
-                    let (_, formula, _) = binding.as_mut().expect("formula is inside binding");
+                    let (_, formula, _) = binding
+                        .as_mut()
+                        .ok_or("xm:f appeared outside x15:webExtension")?;
                     formula.push_str(&text.decode()?);
                     if formula.len() > MAX_STRING_BYTES {
                         return Err("web-extension range formula is too long".into());
@@ -158,7 +161,9 @@ pub fn parse_worksheet_web_extension_bindings(
             },
             Event::CData(text) => {
                 if in_formula {
-                    let (_, formula, _) = binding.as_mut().expect("formula is inside binding");
+                    let (_, formula, _) = binding
+                        .as_mut()
+                        .ok_or("xm:f appeared outside x15:webExtension")?;
                     formula.push_str(&text.decode()?);
                     if formula.len() > MAX_STRING_BYTES {
                         return Err("web-extension range formula is too long".into());
@@ -174,7 +179,7 @@ pub fn parse_worksheet_web_extension_bindings(
                 let (namespace, local) = resolved_name(&reader, element.name())?;
                 if namespace == XM_NAMESPACE.as_bytes() && local == b"f" && depth == 5 {
                     in_formula = false;
-                    binding.as_mut().expect("formula is inside binding").2 = true;
+                    binding.as_mut().ok_or("orphan xm:f end element")?.2 = true;
                 } else if namespace == X15_NAMESPACE.as_bytes()
                     && local == b"webExtension"
                     && depth == 4
@@ -210,7 +215,9 @@ pub fn parse_worksheet_web_extension_bindings(
                 }
             },
             Event::GeneralRef(reference) if in_formula => {
-                let (_, formula, _) = binding.as_mut().expect("formula is inside binding");
+                let (_, formula, _) = binding
+                    .as_mut()
+                    .ok_or("XML reference in xm:f appeared outside x15:webExtension")?;
                 formula.push_str(&decode_xml_reference(&reference)?);
                 if formula.len() > MAX_STRING_BYTES {
                     return Err("web-extension range formula is too long".into());
@@ -275,26 +282,60 @@ pub fn replace_worksheet_web_extension_bindings(
 }
 
 /// Require every worksheet `appRef` to resolve to one package binding.
-pub fn validate_worksheet_web_extension_apprefs(
+pub fn validate_worksheet_web_extension_apprefs<'a>(
     worksheet_bindings: &[WorksheetWebExtensionBinding],
-    package_bindings: &[crate::web_extensions::WebExtensionBinding],
+    package_bindings: impl IntoIterator<Item = &'a web::Binding>,
 ) -> Result<()> {
-    let mut package_refs = HashSet::with_capacity(package_bindings.len());
-    for binding in package_bindings {
-        if !package_refs.insert(binding.application_reference.as_str()) {
-            return Err("duplicate MS-OWEXML binding appref".into());
+    PackageAppRefs::new(package_bindings)?.validate(worksheet_bindings)
+}
+
+pub(crate) struct PackageAppRefs<'a> {
+    values: HashSet<&'a str>,
+}
+
+impl<'a> PackageAppRefs<'a> {
+    pub(crate) fn new(
+        package_bindings: impl IntoIterator<Item = &'a web::Binding>,
+    ) -> Result<Self> {
+        let mut values = HashSet::new();
+        let mut count = 0usize;
+        for binding in package_bindings {
+            count = count
+                .checked_add(1)
+                .ok_or("MS-OWEXML binding count overflow")?;
+            if count > MAX_BINDINGS {
+                return Err("too many MS-OWEXML bindings".into());
+            }
+            if values.len() == values.capacity() {
+                values
+                    .try_reserve(1)
+                    .map_err(|_| "unable to reserve MS-OWEXML binding validation memory")?;
+            }
+            if !values.insert(binding.app_ref()) {
+                return Err("duplicate MS-OWEXML binding appref".into());
+            }
         }
+        Ok(Self { values })
     }
-    for binding in worksheet_bindings {
-        if !package_refs.contains(binding.application_reference()) {
-            return Err(format!(
-                "worksheet web-extension appRef '{}' has no MS-OWEXML binding",
-                binding.application_reference()
-            )
-            .into());
+
+    pub(crate) fn validate(
+        &self,
+        worksheet_bindings: &[WorksheetWebExtensionBinding],
+    ) -> Result<()> {
+        if worksheet_bindings.len() > MAX_BINDINGS {
+            return Err("too many worksheet web-extension bindings".into());
         }
+        for binding in worksheet_bindings {
+            if !self.values.contains(binding.application_reference()) {
+                return Err(format!(
+                    "worksheet web-extension appRef '{}' has no MS-OWEXML binding",
+                    binding.application_reference()
+                )
+                .into());
+            }
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 fn write_bindings_extension(
@@ -374,7 +415,9 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
                     if extension.is_some() || matching_start.is_some() {
                         return Err("duplicate worksheet webExtensions extension".into());
                     }
-                    extension = Some(start..usize::try_from(reader.buffer_position()).unwrap());
+                    let end = usize::try_from(reader.buffer_position())
+                        .map_err(|_| "worksheet XML offset exceeds usize")?;
+                    extension = Some(start..end);
                 }
             },
             Event::End(element) => {
@@ -386,7 +429,9 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
                     && local == b"ext"
                     && is_sml(&namespace)
                 {
-                    let (begin, _) = matching_start.take().expect("matching extension checked");
+                    let (begin, _) = matching_start
+                        .take()
+                        .ok_or("worksheet webExtensions start element is missing")?;
                     extension = Some(
                         begin
                             ..usize::try_from(reader.buffer_position())
@@ -604,6 +649,22 @@ fn is_namespace_declaration(name: &[u8]) -> bool {
 mod tests {
     use super::*;
 
+    struct LyingHint<'a> {
+        value: Option<&'a web::Binding>,
+    }
+
+    impl<'a> Iterator for LyingHint<'a> {
+        type Item = &'a web::Binding;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.value.take()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::MAX, None)
+        }
+    }
+
     #[test]
     fn parses_fixture_and_roundtrips_canonical_xml() {
         let xml =
@@ -704,13 +765,15 @@ mod tests {
     #[test]
     fn validates_package_appref_links() {
         let worksheet = [WorksheetWebExtensionBinding::new("binding", "Sheet1!A1").unwrap()];
-        let package = [crate::web_extensions::WebExtensionBinding {
-            id: "id".into(),
-            binding_type: "table".into(),
-            application_reference: "binding".into(),
-            extension_list: None,
-        }];
+        let package = [web::Binding::new("id", "table", "binding").unwrap()];
         validate_worksheet_web_extension_apprefs(&worksheet, &package).unwrap();
+        validate_worksheet_web_extension_apprefs(
+            &worksheet,
+            LyingHint {
+                value: Some(&package[0]),
+            },
+        )
+        .unwrap();
         assert!(validate_worksheet_web_extension_apprefs(&worksheet, &[]).is_err());
     }
 }

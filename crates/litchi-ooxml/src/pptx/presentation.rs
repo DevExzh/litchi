@@ -16,6 +16,7 @@ use crate::pptx::slide::{Slide, SlideMaster};
 use crate::pptx::tags::{SlideTagList, TagList};
 /// Main presentation object - the high-level API for working with presentations.
 use litchi_ooxml_common::ribbon;
+use litchi_ooxml_common::web;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -569,10 +570,8 @@ impl<'a> Presentation<'a> {
     ///
     /// Add-ins, manifests, catalog entries, and linked content are never
     /// located, opened, fetched, or executed.
-    pub fn web_extension_task_panes(
-        &self,
-    ) -> Result<Option<crate::web_extensions::WebExtensionTaskPanes>> {
-        crate::web_extensions::load_web_extension_task_panes(self.package)
+    pub fn task_panes(&self) -> Result<Option<web::Panes>> {
+        Ok(web::load(self.package)?)
     }
 
     /// Read the fixed legacy and modern Ribbon slots for this presentation.

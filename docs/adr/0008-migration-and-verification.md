@@ -2133,8 +2133,110 @@ The isolated `ooxml` umbrella library and rustdoc, manifest ordering, the
 the inventory remains at 102 internal dependency edges and 18 explicit
 migration-debt entries. Per explicit direction, the already-green
 full-workspace gate and native Microsoft Office baseline are not rerun because
-this ownership and validation slice emits no new Office artifact. The next
-dependency-safe extraction is `web`.
+this ownership and validation slice emits no new Office artifact. At this
+point, the remaining dependency-safe extraction was `web`.
+
+The forty-first implementation slice completes that extraction by making
+`litchi-ooxml-common::web` the sole canonical owner of persisted task panes and
+Office Add-in metadata. The migration host's former `web_extensions` module is
+deleted without compatibility aliases. The compact shared vocabulary is
+`Panes`, `Pane`, `AddIn`, `Reference`, `Property`, `Binding`, `BindingKind`,
+`Store`, `Dock`, `Snapshot`, `Image`, typed `Link::{Internal, External}`,
+`Compression`, `Effect`, `ExtList`, configurable `Limits`, `Conformance`, and
+`Selector`. The semantic entry points are `load`/`load_with`, consuming
+`put`/`put_with`, and `remove`/`remove_with`. DOCX, PPTX, XLSX, and XLSB expose
+`task_panes`, move-owning `put_task_panes`, and `remove_task_panes` on their
+host facades; PowerPoint's immutable `Presentation` view also exposes
+`task_panes`. XLSX worksheet-range validation and XLSB binary binding
+validation consume the canonical `web::Binding` model. The umbrella exports
+the common module directly as `litchi::ooxml::web`. The current XLSX facade and
+`x15:webExtensions` range-binding implementation still live in the migration
+host; extracting their canonical ownership into `litchi-xlsx` remains future
+work.
+
+Semantic record fields remain private behind checked constructors and short
+mutators; `Limits` remains the explicit configurable resource-policy record.
+Add-in IDs are the primary pane selector, while checked numeric positions stay
+available for ordered workflows; relationship IDs do not become application
+keys. `Panes::edit` replaces unrestricted collection-wide mutable access: it
+clones one selected pane, runs a fallible edit closure, rechecks collection
+identity and resource invariants, and swaps the candidate only on success.
+Failure leaves the original pane untouched. `push` and `edit` canonicalize
+internal snapshot resources both within one pane and across panes:
+case-equivalent names with identical content type and bytes reuse one canonical
+part name, while disagreeing resources fail before publication. Bindings,
+properties, alternate references, pane state, every retained `extLst`, and
+embedded or external snapshot resources support semantic CRUD. Embedded
+snapshot bytes use shared `Arc<Vec<u8>>` ownership through
+`BlobPart::new_shared`; transactional pane clones and borrowed `Image` views
+share or lend that payload rather than copying it. External targets remain
+typed, inert data and are never contacted or activated.
+
+One bounded, ASCII-case-folded package graph index records canonical part
+names and inbound and outbound internal edges. `Limits` covers per-part and
+operation-wide XML, retained string, indexed/authored package-metadata, and
+image bytes, plus XML depth and nodes, collection sizes, package parts and
+relationships, name-allocation probes, and deletions. One operation budget is
+threaded through the complete load/put/remove call, and one allocation-probe
+counter covers task-pane and add-in name searches together. XML parsing uses
+persistent, parent-linked `Arc` namespace scopes, including for retained
+fragments, so depth does not require cloning the complete in-scope namespace
+map. These are bounded ownership and algorithm-topology properties, not
+workload performance measurements. Internal task-pane, add-in, and image
+targets reject external-mode misuse and query or fragment suffixes; expected
+roots, namespaces, content types, and outbound relationship families are
+validated. Case-equivalent authored part replacement is rejected before
+mutation. All fallible relationship construction is staged before infallible
+part-map publication.
+
+Sharing is handled conservatively across the whole owned graph. An owned part
+with ingress from outside the task-pane graph protects itself and every owned
+descendant reachable from it. `put` refuses to change a protected part, while
+`remove` retains the protected transitive closure and deletes only unprotected
+old parts. This is safe refusal, not yet copy-on-write graph forking. A
+byte-identical `put` returns before any package mutation or signature
+invalidation; absent removal is likewise a no-op. Successful create, change,
+or removal invalidates signatures only after the staged commit, and errors
+leave the original package and signature state intact. XLSX worksheet binding
+replacement follows the same byte-change rule.
+
+Spreadsheet host facades enforce package/binding integrity in both mutation
+directions. XLSX validates every effective worksheet `appRef`, including queued
+worksheet mutations, against exactly one binding in candidate task panes
+before `put_task_panes`; `remove_task_panes` proves that no worksheet binding
+would dangle, while worksheet binding replacement validates against the
+current package graph. The new XLSB `XlsbWorkbook::{task_panes,
+put_task_panes, remove_task_panes}` facade applies the same rule to every
+binary worksheet `BrtWebExtension.appRef`; candidate task panes are rejected
+when a binary reference is missing or ambiguous, and removal is refused while
+any binary binding remains. These invariants are checked by the host operation
+rather than left as caller convention. This follows the checked-in
+`[MS-XLSB]` sections 2.4.303, 2.4.655, and 2.4.868 record definitions; in
+particular, section 2.4.868 requires `BrtWebExtension.appRef` to equal its
+`CT_OsfWebExtensionBinding` identifier.
+
+The checked-in `3rdparty/` specification mirror does not currently contain an
+`[MS-OWEXML]` source, so this slice does not claim a source-complete local
+conformance audit. The authoritative references are Microsoft's
+[`[MS-OWEXML]` publication page](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-owexml/a2cd741a-4cca-4b1a-ade4-b2c443972afa),
+its [format overview](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-owexml/29f59f30-b835-461a-bd8a-ca400a7bc717),
+and the [content Web Extension binding example](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-owexml/5b150f17-59a1-4bec-874e-83d25ef6eec9).
+Vendoring the applicable published source and completing a section-by-section
+review remain certification work.
+
+Focused verification is green: all 113 `litchi-ooxml-common` library tests;
+ten XLSX/XLSB web-binding tests; three host task-pane tests; the XLSX
+byte-change/signature regression; the shared `BlobPart` allocation regression;
+and three tests in each changed package and PPTX integration suite pass.
+Warning-denied Clippy and rustdoc pass for the common crate, OOXML library, and
+isolated `ooxml` umbrella; their corresponding focused checks pass as well.
+Formatting, diff validation, manifest ordering, the 32-package boundary
+inventory, and all nine boundary regressions are green. The inventory remains
+at 102 internal dependency edges and 18 explicit migration-debt entries. Per
+explicit direction, the previously green full-workspace gate was not repeated.
+No native Microsoft Office artifact was opened, edited, resaved, and
+reverse-read for this slice, so it adds no Office compatibility or measured
+performance claim.
 
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,

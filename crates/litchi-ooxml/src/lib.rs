@@ -45,7 +45,6 @@ pub mod opc {
 pub mod pivot;
 pub mod pptx;
 mod vba_package;
-pub mod web_extensions;
 pub mod xlsb;
 pub mod xlsx;
 
@@ -61,7 +60,7 @@ pub use opc::{OpcPackage, PackURI};
 // Re-export common utilities
 pub use litchi_ooxml_common::{
     DocumentProperties, ExpandedName, MceCapabilities, MceError, MceLimits, MceOutput, MceReport,
-    process_markup_compatibility, ribbon,
+    process_markup_compatibility, ribbon, web,
 };
 
 // Re-export error types

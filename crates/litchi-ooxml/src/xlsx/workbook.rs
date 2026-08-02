@@ -4,10 +4,6 @@
 //! for Excel (.xlsx) files using the Office Open XML format.
 
 use crate::pivot::PivotTable;
-use crate::web_extensions::{
-    OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
-    remove_web_extension_task_panes, store_web_extension_task_panes,
-};
 use crate::xlsx::active_x::{
     ActiveXControlSet, load_from_worksheet as load_worksheet_active_x,
     remove_from_worksheet as remove_worksheet_active_x,
@@ -49,7 +45,7 @@ use crate::xlsx::volatile_dependencies::{
     store_in_package as store_volatile_dependencies,
 };
 use crate::xlsx::web_extension_bindings::{
-    WorksheetWebExtensionBinding, parse_worksheet_web_extension_bindings,
+    PackageAppRefs, WorksheetWebExtensionBinding, parse_worksheet_web_extension_bindings,
     replace_worksheet_web_extension_bindings as patch_worksheet_web_extension_bindings,
     validate_worksheet_web_extension_apprefs,
 };
@@ -70,6 +66,7 @@ use litchi_core::sheet::{
 use litchi_ooxml_common::DocumentProperties;
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
+use litchi_ooxml_common::web;
 use litchi_opc::{OpcPackage, PackURI};
 use std::collections::{HashMap, HashSet};
 
@@ -482,22 +479,59 @@ impl Workbook {
     }
 
     /// Load persisted Office Add-in task-pane metadata without activating add-ins.
-    pub fn web_extension_task_panes(&self) -> crate::error::Result<Option<WebExtensionTaskPanes>> {
-        load_web_extension_task_panes(&self.package)
+    pub fn task_panes(&self) -> crate::error::Result<Option<web::Panes>> {
+        Ok(web::load(&self.package)?)
     }
 
     /// Store inert persisted Office Add-in task panes and snapshot resources.
-    pub fn set_web_extension_task_panes(
+    pub fn put_task_panes(
         &mut self,
-        task_panes: &WebExtensionTaskPanes,
-        conformance: OoxmlConformance,
-    ) -> crate::error::Result<()> {
-        store_web_extension_task_panes(&mut self.package, task_panes, conformance)
+        panes: web::Panes,
+        conformance: web::Conformance,
+    ) -> crate::error::Result<&mut Self> {
+        self.validate_worksheet_task_pane_bindings(&panes)?;
+        web::put(&mut self.package, panes, conformance)?;
+        Ok(self)
     }
 
-    /// Remove persisted Office Add-in task panes and unreferenced resources.
-    pub fn remove_web_extension_task_panes(&mut self) -> crate::error::Result<bool> {
-        remove_web_extension_task_panes(&mut self.package)
+    /// Remove task panes after proving no worksheet bindings would dangle.
+    pub fn remove_task_panes(&mut self) -> crate::error::Result<bool> {
+        if !self
+            .package
+            .rels()
+            .iter()
+            .any(|relationship| relationship.reltype() == web::raw::TASK_PANES_RELATIONSHIP)
+        {
+            return Ok(false);
+        }
+        self.validate_worksheet_task_pane_bindings(&web::Panes::new())?;
+        Ok(web::remove(&mut self.package)?)
+    }
+
+    fn validate_worksheet_task_pane_bindings(
+        &self,
+        panes: &web::Panes,
+    ) -> crate::error::Result<()> {
+        let invalid = |error: Box<dyn std::error::Error + Send + Sync>| {
+            crate::error::OoxmlError::InvalidFormat(error.to_string())
+        };
+        let package_refs = PackageAppRefs::new(
+            panes
+                .iter()
+                .flat_map(|pane| pane.add_in().bindings().iter()),
+        )
+        .map_err(invalid)?;
+        for (index, worksheet) in self.worksheets.iter().enumerate() {
+            if let Some(bindings) = self.worksheet_web_extension_binding_mutations.get(&index) {
+                package_refs.validate(bindings).map_err(invalid)?;
+                continue;
+            }
+            let uri = self.worksheet_part_uri(worksheet).map_err(invalid)?;
+            let part = self.package.get_part(&uri)?;
+            let bindings = parse_worksheet_web_extension_bindings(part.blob()).map_err(invalid)?;
+            package_refs.validate(&bindings).map_err(invalid)?;
+        }
+        Ok(())
     }
 
     /// Read the bounded, inert package-level Ribbon customizations.
@@ -1814,19 +1848,26 @@ impl Workbook {
             .ok_or("Worksheet index out of bounds")?;
         let uri = self.worksheet_part_uri(info)?;
         let part = self.package.get_part(&uri)?;
-        patch_worksheet_web_extension_bindings(part.blob(), &bindings)?;
+        let replacement = patch_worksheet_web_extension_bindings(part.blob(), &bindings)?;
+        let changes_bytes = replacement.as_slice() != part.blob();
         if !bindings.is_empty() {
-            let task_panes = load_web_extension_task_panes(&self.package)?
+            let task_panes = web::load(&self.package)?
                 .ok_or("Worksheet add-in bindings require package task panes")?;
-            let package_bindings = task_panes
-                .panes
-                .iter()
-                .flat_map(|pane| pane.web_extension.bindings.iter().cloned())
-                .collect::<Vec<_>>();
-            validate_worksheet_web_extension_apprefs(&bindings, &package_bindings)?;
+            validate_worksheet_web_extension_apprefs(
+                &bindings,
+                task_panes
+                    .iter()
+                    .flat_map(|pane| pane.add_in().bindings().iter()),
+            )?;
         }
-        self.worksheet_web_extension_binding_mutations
-            .insert(index, bindings);
+        if changes_bytes {
+            self.worksheet_web_extension_binding_mutations
+                .insert(index, bindings);
+            self.package.unsign();
+        } else {
+            self.worksheet_web_extension_binding_mutations
+                .remove(&index);
+        }
         Ok(())
     }
 
@@ -2405,11 +2446,16 @@ impl Workbook {
                 .set_blob(replacement.clone());
         }
         let save_result = self.package.save(path);
+        let mut restore_error = None;
         for (uri, original, _) in staged {
-            self.package
-                .get_part_mut(&uri)
-                .expect("staged worksheet part remains present")
-                .set_blob(original);
+            match self.package.get_part_mut(&uri) {
+                Ok(part) => part.set_blob(original),
+                Err(error) if restore_error.is_none() => restore_error = Some(error),
+                Err(_) => {},
+            }
+        }
+        if let Some(error) = restore_error {
+            return Err(error.into());
         }
         save_result?;
         Ok(())
@@ -4309,6 +4355,7 @@ mod tests {
     use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
     use litchi_drawingml::chart::{ChartExtensionList, ChartShapeProperties, plot_area::TypeGroup};
     use litchi_ooxml_common::embedded::{Kind, Target};
+    use litchi_ooxml_common::web;
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 
@@ -4317,6 +4364,7 @@ mod tests {
         ChartRelationshipTarget, ChartUserShapesPart, ChartUserShapesRelationship,
         ChartUserShapesRelationshipTarget, Mention, Person, PersonList, ProtectionPasswordVerifier,
         StrongProtectionPasswordVerifier, Table, TableColumn, ThreadedComment, WorksheetChart,
+        WorksheetWebExtensionBinding,
     };
 
     const WORKBOOK_XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -5269,6 +5317,116 @@ mod tests {
                 .worksheet_web_extension_bindings(0)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn worksheet_web_extension_binding_queue_unsigns_only_for_byte_changes() {
+        let mut unchanged = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        unchanged.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        let mut unchanged = Workbook::new(unchanged).unwrap();
+        assert!(unchanged.is_signed());
+
+        unchanged
+            .remove_worksheet_web_extension_bindings(0)
+            .unwrap();
+
+        assert!(unchanged.is_signed());
+        assert!(
+            !unchanged
+                .worksheet_web_extension_binding_mutations
+                .contains_key(&0)
+        );
+
+        let mut changed = package_with_worksheet_relationship(rt::WORKSHEET, false);
+        let worksheet_uri = PackURI::new("/xl/custom/sales-data.xml").unwrap();
+        changed.get_part_mut(&worksheet_uri).unwrap().set_blob(
+            include_bytes!("../../../../test-data/ooxml/web_extensions/worksheet_bindings.xml")
+                .to_vec(),
+        );
+        changed.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+        let mut changed = Workbook::new(changed).unwrap();
+        assert!(changed.is_signed());
+
+        changed.remove_worksheet_web_extension_bindings(0).unwrap();
+
+        assert!(!changed.is_signed());
+        assert!(
+            changed
+                .worksheet_web_extension_binding_mutations
+                .contains_key(&0)
+        );
+    }
+
+    #[test]
+    fn task_pane_facade_consumes_common_model() {
+        let reference = web::Reference::new("local", "1.0", web::Store::FileSystem).unwrap();
+        let add_in = web::AddIn::new("{10000000-0000-0000-0000-000000000001}", reference).unwrap();
+        let mut panes = web::Panes::new();
+        panes.push(web::Pane::new(add_in)).unwrap();
+        let mut workbook = Workbook::create().unwrap();
+
+        workbook
+            .put_task_panes(panes, web::Conformance::Transitional)
+            .unwrap();
+
+        let loaded = workbook.task_panes().unwrap().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(
+            loaded.iter().next().map(|pane| pane.add_in().id()),
+            Some("{10000000-0000-0000-0000-000000000001}")
+        );
+        assert!(workbook.remove_task_panes().unwrap());
+        assert!(workbook.task_panes().unwrap().is_none());
+    }
+
+    #[test]
+    fn task_pane_mutation_preserves_worksheet_binding_integrity() {
+        let reference = web::Reference::new("local", "1.0", web::Store::FileSystem).unwrap();
+        let add_in = web::AddIn::new("add-in-1", reference)
+            .unwrap()
+            .bind(web::Binding::new("binding-1", "table", "sheet-ref").unwrap())
+            .unwrap();
+        let mut panes = web::Panes::new();
+        panes.push(web::Pane::new(add_in)).unwrap();
+        let mut workbook = Workbook::create().unwrap();
+        workbook
+            .put_task_panes(panes, web::Conformance::Transitional)
+            .unwrap();
+        workbook
+            .replace_worksheet_web_extension_bindings(
+                0,
+                vec![WorksheetWebExtensionBinding::new("sheet-ref", "Sheet1!A1").unwrap()],
+            )
+            .unwrap();
+
+        let mut incompatible = web::Panes::new();
+        incompatible
+            .push(web::Pane::new(
+                web::AddIn::new(
+                    "add-in-2",
+                    web::Reference::new("other", "1.0", web::Store::Omex).unwrap(),
+                )
+                .unwrap(),
+            ))
+            .unwrap();
+        assert!(
+            workbook
+                .put_task_panes(incompatible, web::Conformance::Transitional)
+                .is_err()
+        );
+        assert!(workbook.remove_task_panes().is_err());
+
+        let retained = workbook.task_panes().unwrap().unwrap();
+        assert_eq!(
+            retained
+                .get("add-in-1")
+                .unwrap()
+                .add_in()
+                .binding("binding-1")
+                .unwrap()
+                .app_ref(),
+            "sheet-ref"
         );
     }
 

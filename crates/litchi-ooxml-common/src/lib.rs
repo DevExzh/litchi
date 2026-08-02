@@ -11,6 +11,7 @@ pub mod external_link;
 pub mod mce;
 pub mod properties;
 pub mod ribbon;
+pub mod web;
 pub mod xml;
 
 pub use error::{Error, Result};

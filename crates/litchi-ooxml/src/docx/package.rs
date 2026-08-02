@@ -31,10 +31,6 @@ use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
-use crate::web_extensions::{
-    OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
-    remove_web_extension_task_panes, store_web_extension_task_panes,
-};
 use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
@@ -46,6 +42,7 @@ use litchi_ooxml_common::custom_xml::{
 };
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
+use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -670,23 +667,24 @@ impl Package {
         clear_vba_graph_from_document(&mut self.opc, &source)
     }
 
-    /// Load persisted Office Add-in task-pane metadata without activating add-ins.
-    pub fn web_extension_task_panes(&self) -> Result<Option<WebExtensionTaskPanes>> {
-        load_web_extension_task_panes(&self.opc)
+    /// Load inert persisted Office Add-in task panes.
+    pub fn task_panes(&self) -> Result<Option<web::Panes>> {
+        Ok(web::load(&self.opc)?)
     }
 
-    /// Store inert persisted Office Add-in task panes and snapshot resources.
-    pub fn set_web_extension_task_panes(
+    /// Store a validated task-pane graph by moving it into package ownership.
+    pub fn put_task_panes(
         &mut self,
-        task_panes: &WebExtensionTaskPanes,
-        conformance: OoxmlConformance,
-    ) -> Result<()> {
-        store_web_extension_task_panes(&mut self.opc, task_panes, conformance)
+        panes: web::Panes,
+        conformance: web::Conformance,
+    ) -> Result<&mut Self> {
+        web::put(&mut self.opc, panes, conformance)?;
+        Ok(self)
     }
 
-    /// Remove persisted Office Add-in task panes and unreferenced resources.
-    pub fn remove_web_extension_task_panes(&mut self) -> Result<bool> {
-        remove_web_extension_task_panes(&mut self.opc)
+    /// Remove task panes and graph resources no longer shared elsewhere.
+    pub fn remove_task_panes(&mut self) -> Result<bool> {
+        Ok(web::remove(&mut self.opc)?)
     }
 
     /// Read the fixed legacy and modern package-level Ribbon slots.

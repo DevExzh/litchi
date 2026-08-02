@@ -14,5 +14,7 @@ chrono = { workspace = true }
 litchi-core = { workspace = true }
 litchi-opc = { workspace = true }
 quick-xml = { workspace = true }
+ryu = { workspace = true }
 thiserror = { workspace = true }
 unicode-normalization = { workspace = true }
+url = { workspace = true }

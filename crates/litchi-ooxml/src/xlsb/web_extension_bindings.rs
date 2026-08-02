@@ -3,6 +3,8 @@
 use std::collections::HashSet;
 use std::io::Cursor;
 
+use litchi_ooxml_common::web;
+
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{CellParsedFormula, FormulaParser, FormulaToken};
 use crate::xlsb::frt::{parse_formula_header, serialize_formula_header};
@@ -70,8 +72,17 @@ impl XlsbWebExtensionBinding {
                 "FRTHeader must contain exactly one formula",
             ));
         }
-        let formula = formulas.pop().expect("formula count checked");
-        let application_reference = parse_wide_string_exact(&data[consumed..])?;
+        let formula = formulas.pop().ok_or_else(|| {
+            invalid(
+                "BrtWebExtension",
+                "FRTHeader must contain exactly one formula",
+            )
+        })?;
+        let string_data = data.get(consumed..).ok_or(XlsbError::InvalidLength {
+            expected: consumed,
+            found: data.len(),
+        })?;
+        let application_reference = parse_wide_string_exact(string_data)?;
         Self::new(application_reference, formula, valid_external_sheet)
     }
 
@@ -177,31 +188,74 @@ pub fn write_xlsb_web_extension_bindings(
 }
 
 /// Require every binary worksheet `appRef` to resolve to one package binding.
-pub fn validate_xlsb_web_extension_apprefs(
+pub fn validate_xlsb_web_extension_apprefs<'a>(
     worksheet_bindings: &[XlsbWebExtensionBinding],
-    package_bindings: &[crate::web_extensions::WebExtensionBinding],
+    package_bindings: impl IntoIterator<Item = &'a web::Binding>,
 ) -> XlsbResult<()> {
-    let mut package_refs = HashSet::with_capacity(package_bindings.len());
-    for binding in package_bindings {
-        if !package_refs.insert(binding.application_reference.as_str()) {
+    PackageAppRefs::new(package_bindings)?.validate(worksheet_bindings)
+}
+
+pub(crate) struct PackageAppRefs<'a> {
+    values: HashSet<&'a str>,
+}
+
+impl<'a> PackageAppRefs<'a> {
+    pub(crate) fn new(
+        package_bindings: impl IntoIterator<Item = &'a web::Binding>,
+    ) -> XlsbResult<Self> {
+        let mut values = HashSet::new();
+        let mut count = 0usize;
+        for binding in package_bindings {
+            count = count
+                .checked_add(1)
+                .ok_or_else(|| invalid("MS-OWEXML bindings", "package binding count overflow"))?;
+            if count > MAX_BINDINGS {
+                return Err(invalid(
+                    "MS-OWEXML bindings",
+                    "package binding count exceeds 65,536",
+                ));
+            }
+            if values.len() == values.capacity() {
+                values.try_reserve(1).map_err(|_| {
+                    invalid(
+                        "MS-OWEXML bindings",
+                        "unable to reserve binding validation memory",
+                    )
+                })?;
+            }
+            if !values.insert(binding.app_ref()) {
+                return Err(invalid(
+                    "MS-OWEXML bindings",
+                    "duplicate package binding appref",
+                ));
+            }
+        }
+        Ok(Self { values })
+    }
+
+    pub(crate) fn validate(
+        &self,
+        worksheet_bindings: &[XlsbWebExtensionBinding],
+    ) -> XlsbResult<()> {
+        if worksheet_bindings.len() > MAX_BINDINGS {
             return Err(invalid(
-                "MS-OWEXML bindings",
-                "duplicate package binding appref",
+                "WEBEXTENSIONS",
+                "worksheet binding count exceeds 65,536",
             ));
         }
-    }
-    for binding in worksheet_bindings {
-        if !package_refs.contains(binding.application_reference.as_str()) {
-            return Err(invalid(
-                "BrtWebExtension.appRef",
-                format!(
-                    "'{}' has no matching MS-OWEXML binding",
-                    binding.application_reference
-                ),
-            ));
+        for binding in worksheet_bindings {
+            if !self.values.contains(binding.application_reference.as_str()) {
+                return Err(invalid(
+                    "BrtWebExtension.appRef",
+                    format!(
+                        "'{}' has no matching MS-OWEXML binding",
+                        binding.application_reference
+                    ),
+                ));
+            }
         }
+        Ok(())
     }
-    Ok(())
 }
 
 fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensionRange> {
@@ -222,7 +276,13 @@ fn range_from_formula(formula: &CellParsedFormula) -> XlsbResult<XlsbWebExtensio
             "binding formula must be one reference expression",
         ));
     }
-    match tokens.into_iter().next().expect("token count checked") {
+    let token = tokens.into_iter().next().ok_or_else(|| {
+        invalid(
+            "BrtWebExtension",
+            "binding formula must be one reference expression",
+        )
+    })?;
+    match token {
         FormulaToken::CellRef3d {
             sheet_index,
             row,
@@ -280,13 +340,15 @@ fn validate_app_ref(value: &str) -> XlsbResult<()> {
 }
 
 fn parse_wide_string_exact(data: &[u8]) -> XlsbResult<String> {
-    if data.len() < 4 {
-        return Err(XlsbError::InvalidLength {
-            expected: 4,
-            found: data.len(),
-        });
-    }
-    let count = u32::from_le_bytes(data[..4].try_into().expect("four-byte length")) as usize;
+    let length_bytes = data.get(..4).ok_or(XlsbError::InvalidLength {
+        expected: 4,
+        found: data.len(),
+    })?;
+    let length_bytes = <[u8; 4]>::try_from(length_bytes).map_err(|_| XlsbError::InvalidLength {
+        expected: 4,
+        found: data.len(),
+    })?;
+    let count = u32::from_le_bytes(length_bytes) as usize;
     if count == 0 || count > MAX_APP_REF_CODE_UNITS {
         return Err(invalid("BrtWebExtension.appRef", "invalid string length"));
     }
@@ -303,10 +365,18 @@ fn parse_wide_string_exact(data: &[u8]) -> XlsbResult<String> {
             found: data.len(),
         });
     }
-    let units = data[4..]
+    let encoded = data.get(4..).ok_or(XlsbError::InvalidLength {
+        expected,
+        found: data.len(),
+    })?;
+    let units = encoded
         .chunks_exact(2)
-        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-        .collect::<Vec<_>>();
+        .map(|bytes| {
+            <[u8; 2]>::try_from(bytes)
+                .map(u16::from_le_bytes)
+                .map_err(|_| invalid("BrtWebExtension.appRef", "invalid UTF-16 unit"))
+        })
+        .collect::<XlsbResult<Vec<_>>>()?;
     String::from_utf16(&units)
         .map_err(|_| invalid("BrtWebExtension.appRef", "invalid UTF-16 string"))
 }
@@ -335,6 +405,22 @@ fn invalid(typ: impl Into<String>, val: impl Into<String>) -> XlsbError {
 mod tests {
     use super::*;
     use crate::xlsb::formula::FormulaCompiler;
+
+    struct LyingHint<'a> {
+        value: Option<&'a web::Binding>,
+    }
+
+    impl<'a> Iterator for LyingHint<'a> {
+        type Item = &'a web::Binding;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.value.take()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::MAX, None)
+        }
+    }
 
     fn binding() -> XlsbWebExtensionBinding {
         // Public context-free compilation intentionally rejects 3D formulas;
@@ -376,13 +462,15 @@ mod tests {
     #[test]
     fn validates_package_appref_links() {
         let worksheet = [binding()];
-        let package = [crate::web_extensions::WebExtensionBinding {
-            id: "id".into(),
-            binding_type: "table".into(),
-            application_reference: "sales-table".into(),
-            extension_list: None,
-        }];
+        let package = [web::Binding::new("id", "table", "sales-table").unwrap()];
         validate_xlsb_web_extension_apprefs(&worksheet, &package).unwrap();
+        validate_xlsb_web_extension_apprefs(
+            &worksheet,
+            LyingHint {
+                value: Some(&package[0]),
+            },
+        )
+        .unwrap();
         assert!(validate_xlsb_web_extension_apprefs(&worksheet, &[]).is_err());
     }
 }

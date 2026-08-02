@@ -25,12 +25,14 @@ use crate::xlsb::vba_project::{
     VbaProject, discover_vba_project, remove_vba_project as clear_workbook_vba,
     store_vba_project as store_workbook_vba_project,
 };
+use crate::xlsb::web_extension_bindings::PackageAppRefs;
 use crate::xlsb::worksheet::XlsbWorksheet;
 use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use litchi_ooxml_common::ribbon;
+use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
 use std::cmp::Reverse;
@@ -103,6 +105,48 @@ impl std::fmt::Debug for XlsbWorkbook {
 }
 
 impl XlsbWorkbook {
+    /// Load inert persisted Office Add-in task panes.
+    pub fn task_panes(&self) -> XlsbResult<Option<web::Panes>> {
+        Ok(web::load(&self.package)?)
+    }
+
+    /// Store task panes after validating every binary worksheet `appRef`.
+    pub fn put_task_panes(
+        &mut self,
+        panes: web::Panes,
+        conformance: web::Conformance,
+    ) -> XlsbResult<&mut Self> {
+        self.validate_task_pane_bindings(&panes)?;
+        web::put(&mut self.package, panes, conformance)?;
+        Ok(self)
+    }
+
+    /// Remove task panes only when no binary worksheet binding would dangle.
+    pub fn remove_task_panes(&mut self) -> XlsbResult<bool> {
+        if !self
+            .package
+            .rels()
+            .iter()
+            .any(|relationship| relationship.reltype() == web::raw::TASK_PANES_RELATIONSHIP)
+        {
+            return Ok(false);
+        }
+        self.validate_task_pane_bindings(&web::Panes::new())?;
+        Ok(web::remove(&mut self.package)?)
+    }
+
+    fn validate_task_pane_bindings(&self, panes: &web::Panes) -> XlsbResult<()> {
+        let package_refs = PackageAppRefs::new(
+            panes
+                .iter()
+                .flat_map(|pane| pane.add_in().bindings().iter()),
+        )?;
+        for worksheet in &self.worksheets {
+            package_refs.validate(worksheet.web_extension_bindings())?;
+        }
+        Ok(())
+    }
+
     /// Read the bounded, inert package-level Ribbon customizations.
     pub fn ribbon(&self) -> XlsbResult<ribbon::Set<'_>> {
         Ok(ribbon::load(&self.package)?)
@@ -2655,6 +2699,44 @@ mod tests {
             writer.write_record(*record_type, payload).unwrap();
         }
         data
+    }
+
+    fn empty_workbook() -> XlsbWorkbook {
+        XlsbWorkbook {
+            package: OpcPackage::new(),
+            worksheets: Vec::new(),
+            worksheet_rel_ids: Vec::new(),
+            formula_context: FormulaResolutionContext::default(),
+            shared_strings: Vec::new(),
+            styles: StylesTable::default(),
+            calculation_properties: CalculationProperties::default(),
+            is_1904: false,
+            pivot_cache_definitions: Vec::new(),
+            structured_tables: Vec::new(),
+            chart_sheets: Vec::new(),
+            sheet_drawings: Vec::new(),
+            connections: None,
+        }
+    }
+
+    #[test]
+    fn task_pane_facade_round_trips_common_model() {
+        let mut workbook = empty_workbook();
+        let add_in = web::AddIn::new(
+            "add-in-1",
+            web::Reference::new("ref-1", "1", web::Store::Registry).unwrap(),
+        )
+        .unwrap();
+        let mut panes = web::Panes::new();
+        panes.push(web::Pane::new(add_in)).unwrap();
+
+        workbook
+            .put_task_panes(panes, web::Conformance::Transitional)
+            .unwrap();
+        let loaded = workbook.task_panes().unwrap().unwrap();
+        assert_eq!(loaded.get("add-in-1").unwrap().add_in().id(), "add-in-1");
+        assert!(workbook.remove_task_panes().unwrap());
+        assert!(workbook.task_panes().unwrap().is_none());
     }
 
     fn parse_external_link(records: &[(u16, Vec<u8>)]) -> XlsbResult<FormulaExternalBook> {
