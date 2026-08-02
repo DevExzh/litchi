@@ -7,7 +7,7 @@
 use litchi::rtf::*;
 use std::borrow::Cow;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("Creating RTF document with new features using public writer API...\n");
 
     let mut output = Vec::new();

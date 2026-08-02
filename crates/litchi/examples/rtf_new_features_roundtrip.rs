@@ -4,7 +4,7 @@
 
 use litchi::rtf::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("RTF New Features Round-Trip Test");
     println!("{}", "=".repeat(70));
 
@@ -202,7 +202,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Create an RTF document with all new features
-fn create_rtf_with_features() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn create_rtf_with_features() -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
     // Create RTF content as a string for simplicity
     let rtf_content = r#"{\rtf1\ansi\deff0
 {\fonttbl{\f0\fswiss Arial;}}

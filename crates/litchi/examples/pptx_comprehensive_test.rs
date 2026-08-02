@@ -537,7 +537,7 @@ fn test_advanced_features(path: &str) -> Result<(), Box<dyn Error>> {
 
         // Test getting text shapes only
         if let Ok(text_shapes) = first_slide.text_shapes() {
-            println!("    First slide text shapes: {}", text_shapes.len());
+            println!("    First slide text shapes: {}", text_shapes.count());
         }
     }
 

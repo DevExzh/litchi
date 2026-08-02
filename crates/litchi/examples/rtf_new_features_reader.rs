@@ -6,7 +6,7 @@
 
 use litchi::rtf::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("RTF Document Feature Reader\n");
     println!("{}", "=".repeat(60));
 

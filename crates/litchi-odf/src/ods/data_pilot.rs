@@ -948,7 +948,7 @@ fn parse_table(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
             Event::Start(ref element) if !is_table_namespace(&namespace) => {
                 skip_foreign_element(reader, element)?;
             },
-            Event::Empty(ref element) if !is_table_namespace(&namespace) => {},
+            Event::Empty(_) if !is_table_namespace(&namespace) => {},
             other => {
                 return Err(invalid_message(&format!(
                     "invalid child in table:data-pilot-table: {other:?}"
@@ -1139,7 +1139,7 @@ fn parse_level(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<D
             Event::Start(ref element) if !is_table_namespace(&namespace) => {
                 skip_foreign_element(reader, element)?
             },
-            Event::Empty(ref element) if !is_table_namespace(&namespace) => {},
+            Event::Empty(_) if !is_table_namespace(&namespace) => {},
             Event::Eof => return Err(invalid_message("unterminated table:data-pilot-level")),
             _ => return Err(invalid_message("invalid child in table:data-pilot-level")),
         }
