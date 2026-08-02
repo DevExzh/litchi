@@ -4,6 +4,7 @@
 //! version information, and FAT/directory locations.
 
 use super::super::consts::*;
+use super::super::file::OleError;
 
 /// OLE2 header builder
 pub struct HeaderBuilder {
@@ -23,6 +24,8 @@ pub struct HeaderBuilder {
     num_difat_sectors: u32,
     /// FAT sector IDs (first 109 in header)
     fat_sectors: Vec<u32>,
+    /// Total FAT sector count, including IDs stored in DIFAT sectors.
+    num_fat_sectors: u32,
 }
 
 impl HeaderBuilder {
@@ -31,8 +34,13 @@ impl HeaderBuilder {
     /// # Arguments
     ///
     /// * `sector_size` - Sector size (512 or 4096 bytes)
-    pub fn new(sector_size: usize) -> Self {
-        Self {
+    pub fn new(sector_size: usize) -> Result<Self, OleError> {
+        if !matches!(sector_size, 512 | 4096) {
+            return Err(OleError::InvalidData(format!(
+                "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
+            )));
+        }
+        Ok(Self {
             sector_size,
             first_dir_sector: 0,
             num_dir_sectors: 0,
@@ -41,7 +49,8 @@ impl HeaderBuilder {
             first_difat_sector: ENDOFCHAIN,
             num_difat_sectors: 0,
             fat_sectors: Vec::new(),
-        }
+            num_fat_sectors: 0,
+        })
     }
 
     /// Set the first directory sector
@@ -70,16 +79,30 @@ impl HeaderBuilder {
     /// Add FAT sectors to the header
     ///
     /// The first 109 FAT sector IDs are stored in the header.
-    pub fn add_fat_sectors(&mut self, sectors: &[u32]) {
-        self.fat_sectors.extend_from_slice(sectors);
+    pub fn set_fat_sectors(&mut self, sectors: &[u32]) -> Result<(), OleError> {
+        let count = u32::try_from(sectors.len())
+            .map_err(|_| OleError::InvalidData("too many CFB FAT sectors".to_string()))?;
+        let header_count = sectors.len().min(109);
+        let mut header_sectors = Vec::new();
+        header_sectors
+            .try_reserve_exact(header_count)
+            .map_err(|source| OleError::allocation("header DIFAT entries", source))?;
+        header_sectors.extend_from_slice(&sectors[..header_count]);
+        self.fat_sectors = header_sectors;
+        self.num_fat_sectors = count;
+        Ok(())
     }
 
     /// Generate the OLE2 header block
-    pub fn generate(&self) -> Vec<u8> {
+    pub fn generate(&self) -> Result<Vec<u8>, OleError> {
         // The on-disk header data is 512 bytes, but for DLL version 4 (4096-byte sectors)
         // the first big block spans 4096 bytes. We return a buffer of sector_size bytes
         // with the 512-byte header populated and the rest zero-filled.
-        let mut header = vec![0u8; self.sector_size];
+        let mut header = Vec::new();
+        header
+            .try_reserve_exact(self.sector_size)
+            .map_err(|source| OleError::allocation("CFB header", source))?;
+        header.resize(self.sector_size, 0);
 
         // Magic bytes (8 bytes)
         header[0..8].copy_from_slice(MAGIC);
@@ -111,8 +134,7 @@ impl HeaderBuilder {
         header[40..44].copy_from_slice(&self.num_dir_sectors.to_le_bytes());
 
         // Number of FAT sectors (4 bytes)
-        let num_fat_sectors = self.fat_sectors.len() as u32;
-        header[44..48].copy_from_slice(&num_fat_sectors.to_le_bytes());
+        header[44..48].copy_from_slice(&self.num_fat_sectors.to_le_bytes());
 
         // First directory sector (4 bytes)
         header[48..52].copy_from_slice(&self.first_dir_sector.to_le_bytes());
@@ -147,7 +169,7 @@ impl HeaderBuilder {
             header[offset..offset + 4].copy_from_slice(&FREESECT.to_le_bytes());
         }
 
-        header
+        Ok(header)
     }
 }
 
@@ -157,11 +179,11 @@ mod tests {
 
     #[test]
     fn test_header_generation() {
-        let mut builder = HeaderBuilder::new(512);
+        let mut builder = HeaderBuilder::new(512).unwrap();
         builder.set_first_dir_sector(10);
-        builder.add_fat_sectors(&[1, 2, 3]);
+        builder.set_fat_sectors(&[1, 2, 3]).unwrap();
 
-        let header = builder.generate();
+        let header = builder.generate().unwrap();
 
         assert_eq!(header.len(), 512);
         assert_eq!(&header[0..8], MAGIC);
@@ -170,8 +192,8 @@ mod tests {
 
     #[test]
     fn test_sector_size_512() {
-        let builder = HeaderBuilder::new(512);
-        let header = builder.generate();
+        let builder = HeaderBuilder::new(512).unwrap();
+        let header = builder.generate().unwrap();
 
         // DLL version should be 3
         assert_eq!(&header[26..28], &3u16.to_le_bytes());
@@ -181,13 +203,21 @@ mod tests {
 
     #[test]
     fn test_sector_size_4096() {
-        let builder = HeaderBuilder::new(4096);
-        let header = builder.generate();
+        let builder = HeaderBuilder::new(4096).unwrap();
+        let header = builder.generate().unwrap();
 
         assert_eq!(header.len(), 4096);
         // DLL version should be 4
         assert_eq!(&header[26..28], &4u16.to_le_bytes());
         // Sector shift should be 12 (2^12 = 4096)
         assert_eq!(&header[30..32], &12u16.to_le_bytes());
+    }
+
+    #[test]
+    fn invalid_sector_geometry_is_typed() {
+        assert!(matches!(
+            HeaderBuilder::new(1024),
+            Err(OleError::InvalidData(_))
+        ));
     }
 }

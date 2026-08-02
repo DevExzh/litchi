@@ -3,6 +3,8 @@
 //! This module provides the concrete implementation of the Workbook trait
 //! for Excel (.xlsx) files using the Office Open XML format.
 
+#[cfg(feature = "encryption")]
+use crate::encryption::{Limits, Mode};
 use crate::pivot::PivotTable;
 use crate::xlsx::active_x::{
     ActiveXControlSet, load_from_worksheet as load_worksheet_active_x,
@@ -66,6 +68,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsx::raw::web as raw_web;
 use litchi_xlsx::web::{Bindings, Refs};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use super::parsers::workbook_parser;
 use super::worksheet::{
@@ -216,6 +219,9 @@ pub struct Workbook {
     worksheet_protection_mutations: HashMap<usize, WorksheetProtectionMetadata>,
     worksheet_data_validation_mutations: HashMap<usize, Vec<DataValidationCollection>>,
     worksheet_web_binding_mutations: HashMap<usize, Bindings>,
+    /// Encryption profile of the opened outer package.
+    #[cfg(feature = "encryption")]
+    source_encryption: Option<Mode>,
 }
 
 fn patch_workbook_external_references(
@@ -702,6 +708,8 @@ impl Workbook {
             worksheet_protection_mutations: HashMap::new(),
             worksheet_data_validation_mutations: HashMap::new(),
             worksheet_web_binding_mutations: HashMap::new(),
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         };
 
         workbook.load_workbook_info()?;
@@ -1641,10 +1649,60 @@ impl Workbook {
         path: P,
         password: &str,
     ) -> SheetResult<Self> {
-        let data = std::fs::read(path.as_ref())?;
-        let decrypted = crate::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
-        let package = OpcPackage::from_bytes(&decrypted.package_bytes)?;
-        Self::new(package)
+        let file = std::fs::File::open(path.as_ref())?;
+        let opened =
+            crate::encryption::load(file, password).map_err(crate::error::OoxmlError::from)?;
+        Self::from_opened(opened)
+    }
+
+    /// Open with explicit outer-encryption limits.
+    ///
+    /// The decrypted OPC archive is parsed under its independently bounded
+    /// default policy; a composite host policy remains migration work.
+    #[cfg(feature = "encryption")]
+    pub fn open_with<P: AsRef<std::path::Path>>(
+        path: P,
+        password: &str,
+        limits: &Limits,
+    ) -> SheetResult<Self> {
+        let file = std::fs::File::open(path.as_ref())?;
+        let opened = crate::encryption::load_with(file, password, limits)
+            .map_err(crate::error::OoxmlError::from)?;
+        Self::from_opened(opened)
+    }
+
+    /// Open a reader with a password and safe default resource limits.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with_password<R: std::io::Read>(
+        reader: R,
+        password: &str,
+    ) -> SheetResult<Self> {
+        let opened =
+            crate::encryption::load(reader, password).map_err(crate::error::OoxmlError::from)?;
+        Self::from_opened(opened)
+    }
+
+    /// Open a reader with explicit outer-encryption limits.
+    ///
+    /// The decrypted OPC archive uses its independently bounded defaults.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with<R: std::io::Read>(
+        reader: R,
+        password: &str,
+        limits: &Limits,
+    ) -> SheetResult<Self> {
+        let opened = crate::encryption::load_with(reader, password, limits)
+            .map_err(crate::error::OoxmlError::from)?;
+        Self::from_opened(opened)
+    }
+
+    #[cfg(feature = "encryption")]
+    fn from_opened(opened: crate::encryption::Opened) -> SheetResult<Self> {
+        let source_encryption = opened.mode();
+        let package = OpcPackage::from_vec(opened.into_bytes())?;
+        let mut workbook = Self::new(package)?;
+        workbook.source_encryption = source_encryption;
+        Ok(workbook)
     }
 
     /// Get a mutable worksheet for writing and modification.
@@ -2284,6 +2342,103 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> SheetResult<()> {
+        self.ensure_plain_output("save")?;
+        self.save_plain_impl(path)
+    }
+
+    /// Explicitly save a plaintext workbook, even when the source was encrypted.
+    pub fn save_plain<P: AsRef<std::path::Path>>(&mut self, path: P) -> SheetResult<()> {
+        self.save_plain_impl(path)
+    }
+
+    fn save_plain_impl<P: AsRef<std::path::Path>>(&mut self, path: P) -> SheetResult<()> {
+        self.write_with(|package| {
+            package.save(path)?;
+            Ok(())
+        })
+    }
+
+    /// Serialize and encrypt this workbook entirely in memory.
+    #[cfg(feature = "encryption")]
+    pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> SheetResult<Vec<u8>> {
+        use litchi_opc::pkgwriter::PackageWriter;
+
+        let package = self.write_with(|package| Ok(PackageWriter::to_bytes(package)?))?;
+        crate::encryption::encrypt(package, password, mode)
+            .map_err(crate::error::OoxmlError::from)
+            .map_err(Into::into)
+    }
+
+    /// Serialize and encrypt using the source workbook's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn to_reencrypted(&mut self, password: &str) -> SheetResult<Vec<u8>> {
+        let mode = self.preserved_mode("to_reencrypted")?;
+        self.to_encrypted(password, mode)
+    }
+
+    /// Save with an explicit encryption profile and a borrowed password.
+    #[cfg(feature = "encryption")]
+    pub fn save_encrypted<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+        password: &str,
+        mode: Mode,
+    ) -> SheetResult<()> {
+        use std::io::Write;
+
+        let output = self.to_encrypted(password, mode)?;
+        litchi_opc::atomic::replace(path.as_ref(), |temporary| {
+            temporary.write_all(&output)?;
+            Ok(())
+        })?;
+        self.source_encryption = Some(mode);
+        Ok(())
+    }
+
+    /// Save using the encrypted source's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn save_reencrypted<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+        password: &str,
+    ) -> SheetResult<()> {
+        let mode = self.preserved_mode("save_reencrypted")?;
+        self.save_encrypted(path, password, mode)
+    }
+
+    /// Encryption profile of the opened or most recently encrypted workbook.
+    #[cfg(feature = "encryption")]
+    pub const fn encryption(&self) -> Option<Mode> {
+        self.source_encryption
+    }
+
+    fn ensure_plain_output(&self, _operation: &'static str) -> SheetResult<()> {
+        #[cfg(feature = "encryption")]
+        if self.source_encryption.is_some() {
+            return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation: _operation,
+                reason: "the source workbook was encrypted; use save_reencrypted or save_plain",
+            }));
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "encryption")]
+    fn preserved_mode(&self, operation: &'static str) -> SheetResult<Mode> {
+        self.source_encryption.ok_or_else(|| {
+            Box::new(crate::error::OoxmlError::UnsafeEdit {
+                format: "XLSX",
+                operation,
+                reason: "the source workbook has no encryption profile; supply an explicit Mode",
+            }) as Box<dyn std::error::Error + Send + Sync>
+        })
+    }
+
+    fn write_with<T>(
+        &mut self,
+        write: impl FnOnce(&OpcPackage) -> SheetResult<T>,
+    ) -> SheetResult<T> {
         if self.mutable_data.is_some() && !self.writer_is_fresh {
             return Err(Box::new(crate::error::OoxmlError::UnsafeEdit {
                 format: "XLSX",
@@ -2421,16 +2576,19 @@ impl Workbook {
         self.update_app_properties()?;
 
         let staged = self.stage_worksheet_mutations()?;
-        for (uri, _, replacement) in &staged {
-            self.package
-                .get_part_mut(uri)?
-                .set_blob(replacement.clone());
+        let mut originals = Vec::new();
+        originals
+            .try_reserve_exact(staged.len())
+            .map_err(|_| crate::error::OoxmlError::Allocation("worksheet restoration plan"))?;
+        for (uri, original, replacement) in staged {
+            self.package.get_part_mut(&uri)?.set_blob(replacement);
+            originals.push((uri, original));
         }
-        let save_result = self.package.save(path);
+        let save_result = write(&self.package);
         let mut restore_error = None;
-        for (uri, original, _) in staged {
+        for (uri, original) in originals {
             match self.package.get_part_mut(&uri) {
-                Ok(part) => part.set_blob(original),
+                Ok(part) => part.set_blob_shared(original),
                 Err(error) if restore_error.is_none() => restore_error = Some(error),
                 Err(_) => {},
             }
@@ -2438,12 +2596,11 @@ impl Workbook {
         if let Some(error) = restore_error {
             return Err(error.into());
         }
-        save_result?;
-        Ok(())
+        save_result
     }
 
     #[allow(clippy::type_complexity)]
-    fn stage_worksheet_mutations(&self) -> SheetResult<Vec<(PackURI, Vec<u8>, Vec<u8>)>> {
+    fn stage_worksheet_mutations(&self) -> SheetResult<Vec<(PackURI, Arc<Vec<u8>>, Vec<u8>)>> {
         use litchi_opc::constants::content_type as ct;
         let indexes: HashSet<usize> = self
             .worksheet_protection_mutations
@@ -2468,8 +2625,8 @@ impl Workbook {
                 )
                 .into());
             }
-            let original = part.blob().to_vec();
-            let mut replacement = original.clone();
+            let original = part.blob_arc();
+            let mut replacement = original.as_ref().clone();
             if let Some(metadata) = self.worksheet_protection_mutations.get(&index) {
                 replacement = replace_worksheet_protection(&replacement, metadata)?;
             }

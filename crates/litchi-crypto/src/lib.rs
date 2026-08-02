@@ -8,6 +8,8 @@
 
 pub mod integrity;
 pub mod labels;
+#[cfg(feature = "ooxml")]
+pub mod ooxml;
 pub mod protected;
 pub mod rc4;
 pub mod spaces;

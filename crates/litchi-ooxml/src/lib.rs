@@ -48,8 +48,13 @@ mod vba_package;
 pub mod xlsb;
 pub mod xlsx;
 
+/// Bounded, runtime-neutral OOXML package encryption.
+///
+/// The contextual facade keeps callers on concise names such as
+/// `encryption::Mode` and `encryption::Limits` while the canonical
+/// implementation remains owned by `litchi-crypto`.
 #[cfg(feature = "encryption")]
-pub mod crypto;
+pub use litchi_crypto::ooxml as encryption;
 
 #[cfg(feature = "fonts")]
 pub mod fonts;

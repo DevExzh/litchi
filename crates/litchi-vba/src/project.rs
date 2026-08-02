@@ -4,7 +4,7 @@ use super::dir::{Dir, Kind};
 use super::{Error, Limits, check_limit, codec, invalid};
 use litchi_cfb::{OleError, OleFile};
 use litchi_codepage::Mbcs;
-use std::io::{Read, Seek};
+use std::io::{Cursor, Read, Seek};
 
 const VBA_STORAGE_NAME: &str = "VBA";
 const DIR_STREAM_NAME: &str = "dir";
@@ -107,6 +107,28 @@ pub struct Project {
 }
 
 impl Project {
+    /// Parse a standalone `vbaProject.bin` payload with safe default limits.
+    ///
+    /// The CFB bytes are borrowed and never copied.
+    pub fn read(bytes: &[u8]) -> Result<Self, Error> {
+        Self::read_with(bytes, &Limits::default())
+    }
+
+    /// Parse a standalone `vbaProject.bin` payload with explicit limits.
+    ///
+    /// This is the container-independent entry point for OOXML hosts. The
+    /// borrowed payload is retained only for the duration of parsing; the
+    /// returned project owns its bounded semantic metadata and inert source.
+    pub fn read_with(bytes: &[u8], limits: &Limits) -> Result<Self, Error> {
+        check_limit(
+            "standalone VBA CFB bytes",
+            bytes.len(),
+            limits.max_cfb_bytes,
+        )?;
+        let mut ole = OleFile::open(Cursor::new(bytes))?;
+        Self::open(&mut ole, &[], limits)
+    }
+
     /// Load an MS-OVBA project rooted at `project_root_path`.
     ///
     /// For an OOXML `vbaProject.bin` part, the project root is normally the
@@ -315,6 +337,59 @@ mod tests {
         bytes.extend_from_slice(&0x0010u16.to_le_bytes());
         bytes.extend_from_slice(&0u32.to_le_bytes());
         literal_container(&bytes)
+    }
+
+    fn sample_project_bytes(source: &[u8]) -> Vec<u8> {
+        let mut module_stream = vec![7, 8, 9];
+        module_stream.extend_from_slice(&literal_container(source));
+
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["PROJECT"], b"ID=\"Sample\"\r\nModule=Module1\r\n")
+            .expect("PROJECT stream");
+        writer
+            .create_stream(&["VBA", "_VBA_PROJECT"], &[0; 8])
+            .expect("version stream");
+        writer
+            .create_stream(&["VBA", "dir"], &sample_dir())
+            .expect("dir stream");
+        writer
+            .create_stream(&["VBA", "Module1"], &module_stream)
+            .expect("module stream");
+        let mut cursor = Cursor::new(Vec::new());
+        writer.write_to(&mut cursor).expect("standalone CFB");
+        cursor.into_inner()
+    }
+
+    #[test]
+    fn reads_borrowed_standalone_project_with_a_preparse_size_bound() {
+        let source = b"Attribute VB_Name = \"Module1\"\r\nSub Main()\r\nEnd Sub\r\n";
+        let bytes = sample_project_bytes(source);
+        let project = Project::read(&bytes).expect("borrowed project");
+
+        assert_eq!(project.name(), "Sample");
+        assert_eq!(project.modules()[0].source().raw(), source);
+
+        let limits = Limits {
+            max_cfb_bytes: bytes.len().saturating_sub(1),
+            ..Limits::default()
+        };
+        assert!(matches!(
+            Project::read_with(&bytes, &limits),
+            Err(Error::LimitExceeded {
+                limit: "standalone VBA CFB bytes",
+                actual,
+                maximum,
+            }) if actual == bytes.len() && maximum == limits.max_cfb_bytes
+        ));
+    }
+
+    #[test]
+    fn borrowed_standalone_reader_returns_typed_cfb_errors() {
+        assert!(matches!(
+            Project::read(b"not a compound file"),
+            Err(Error::Cfb(_))
+        ));
     }
 
     #[test]

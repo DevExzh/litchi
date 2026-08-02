@@ -1,3 +1,5 @@
+#[cfg(feature = "encryption")]
+use crate::encryption::{Limits, Mode};
 use crate::error::{OoxmlError, Result};
 use crate::pptx::parts::PresentationPart;
 use crate::pptx::presentation::{PptxChart, PptxTagList, Presentation};
@@ -88,6 +90,9 @@ pub struct Package {
     mutable_pres: Option<MutablePresentation>,
     /// Document properties (metadata)
     properties: DocumentProperties,
+    /// Encryption profile of the opened outer package.
+    #[cfg(feature = "encryption")]
+    source_encryption: Option<Mode>,
 }
 
 #[cfg(feature = "fonts")]
@@ -425,6 +430,8 @@ impl Package {
             opc,
             mutable_pres,
             properties,
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
     }
 
@@ -456,15 +463,27 @@ impl Package {
             opc,
             mutable_pres: None,
             properties: DocumentProperties::new(),
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
     }
 
     #[cfg(feature = "encryption")]
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
-        let data = std::fs::read(path.as_ref()).map_err(OoxmlError::Io)?;
-        let decrypted = crate::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
-        let opc = OpcPackage::from_bytes(&decrypted.package_bytes)?;
-        Self::from_opc_package(opc)
+        let file = std::fs::File::open(path.as_ref()).map_err(OoxmlError::Io)?;
+        let opened = crate::encryption::load(file, password)?;
+        Self::from_opened(opened)
+    }
+
+    /// Open with explicit outer-encryption limits.
+    ///
+    /// The decrypted OPC archive is parsed under its independently bounded
+    /// default policy; a composite host policy remains migration work.
+    #[cfg(feature = "encryption")]
+    pub fn open_with<P: AsRef<Path>>(path: P, password: &str, limits: &Limits) -> Result<Self> {
+        let file = std::fs::File::open(path.as_ref()).map_err(OoxmlError::Io)?;
+        let opened = crate::encryption::load_with(file, password, limits)?;
+        Self::from_opened(opened)
     }
 
     /// Create a Package from an already-parsed OPC package.
@@ -499,6 +518,8 @@ impl Package {
             opc,
             mutable_pres: None,
             properties: DocumentProperties::new(),
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
     }
 
@@ -533,7 +554,34 @@ impl Package {
             opc,
             mutable_pres: None,
             properties: DocumentProperties::new(),
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
+    }
+
+    /// Open a reader with a password and safe default resource limits.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
+        let opened = crate::encryption::load(reader, password)?;
+        Self::from_opened(opened)
+    }
+
+    /// Open a reader with explicit outer-encryption limits.
+    ///
+    /// The decrypted OPC archive uses its independently bounded defaults.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Self> {
+        let opened = crate::encryption::load_with(reader, password, limits)?;
+        Self::from_opened(opened)
+    }
+
+    #[cfg(feature = "encryption")]
+    fn from_opened(opened: crate::encryption::Opened) -> Result<Self> {
+        let source_encryption = opened.mode();
+        let opc = OpcPackage::from_vec(opened.into_bytes())?;
+        let mut package = Self::from_opc_package(opc)?;
+        package.source_encryption = source_encryption;
+        Ok(package)
     }
 
     /// Get the main presentation for reading.
@@ -1167,6 +1215,91 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.ensure_plain_output("save")?;
+        self.save_plain_impl(path)
+    }
+
+    /// Explicitly save a plaintext package, even when the source was encrypted.
+    pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.save_plain_impl(path)
+    }
+
+    fn save_plain_impl<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.prepare_for_save()?;
+        self.opc.save(path).map_err(Into::into)
+    }
+
+    /// Serialize and encrypt this package entirely in memory.
+    #[cfg(feature = "encryption")]
+    pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
+        use litchi_opc::pkgwriter::PackageWriter;
+
+        self.prepare_for_save()?;
+        let package = PackageWriter::to_bytes(&self.opc)?;
+        crate::encryption::encrypt(package, password, mode).map_err(Into::into)
+    }
+
+    /// Serialize and encrypt using the source package's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn to_reencrypted(&mut self, password: &str) -> Result<Vec<u8>> {
+        let mode = self.preserved_mode("to_reencrypted")?;
+        self.to_encrypted(password, mode)
+    }
+
+    /// Save with an explicit encryption profile and a borrowed password.
+    #[cfg(feature = "encryption")]
+    pub fn save_encrypted<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        password: &str,
+        mode: Mode,
+    ) -> Result<()> {
+        use std::io::Write;
+
+        let output = self.to_encrypted(password, mode)?;
+        litchi_opc::atomic::replace(path.as_ref(), |temporary| {
+            temporary.write_all(&output)?;
+            Ok(())
+        })?;
+        self.source_encryption = Some(mode);
+        Ok(())
+    }
+
+    /// Save using the encrypted source's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn save_reencrypted<P: AsRef<Path>>(&mut self, path: P, password: &str) -> Result<()> {
+        let mode = self.preserved_mode("save_reencrypted")?;
+        self.save_encrypted(path, password, mode)
+    }
+
+    /// Encryption profile of the opened or most recently encrypted package.
+    #[cfg(feature = "encryption")]
+    pub const fn encryption(&self) -> Option<Mode> {
+        self.source_encryption
+    }
+
+    fn ensure_plain_output(&self, _operation: &'static str) -> Result<()> {
+        #[cfg(feature = "encryption")]
+        if self.source_encryption.is_some() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: _operation,
+                reason: "the source package was encrypted; use save_reencrypted or save_plain",
+            });
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "encryption")]
+    fn preserved_mode(&self, operation: &'static str) -> Result<Mode> {
+        self.source_encryption.ok_or(OoxmlError::UnsafeEdit {
+            format: "PPTX",
+            operation,
+            reason: "the source package has no encryption profile; supply an explicit Mode",
+        })
+    }
+
+    fn prepare_for_save(&mut self) -> Result<()> {
         // If we have a mutable presentation, update the presentation parts
         let should_update = self
             .mutable_pres
@@ -1190,50 +1323,7 @@ impl Package {
         {
             self.embed_fonts()?;
         }
-
-        #[cfg(feature = "encryption")]
-        #[allow(clippy::collapsible_if)]
-        {
-            if let Some(pres) = self.mutable_pres.as_ref() {
-                let prot = pres.protection();
-                if prot.open_password_protected {
-                    if let Some(password) = prot.open_password() {
-                        use crate::crypto::{
-                            encrypt_ooxml_package_agile, encrypt_ooxml_package_standard_2007,
-                        };
-                        use crate::pptx::OpenPasswordEncryption;
-                        use litchi_opc::pkgwriter::PackageWriter;
-
-                        let pkg_bytes = PackageWriter::to_bytes(&self.opc)?;
-
-                        let ole_bytes = match prot.open_password_encryption() {
-                            OpenPasswordEncryption::Standard2007 => {
-                                encrypt_ooxml_package_standard_2007(&pkg_bytes, password)?
-                            },
-                            OpenPasswordEncryption::Agile => {
-                                encrypt_ooxml_package_agile(&pkg_bytes, password)?
-                            },
-                        };
-
-                        std::fs::write(&path, ole_bytes).map_err(|e| {
-                            OoxmlError::Io(std::io::Error::other(format!(
-                                "Failed to save encrypted package: {}",
-                                e
-                            )))
-                        })?;
-
-                        return Ok(());
-                    }
-                }
-            }
-        }
-
-        self.opc.save(path).map_err(|e| {
-            OoxmlError::Io(std::io::Error::other(format!(
-                "Failed to save package: {}",
-                e
-            )))
-        })
+        Ok(())
     }
 
     /// Update presentation parts with modified data.

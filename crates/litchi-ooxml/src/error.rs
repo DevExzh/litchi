@@ -48,6 +48,11 @@ pub enum OoxmlError {
     #[error("XLSB error: {0}")]
     Xlsb(#[from] litchi_xlsb::Error),
 
+    /// Canonical bounded Office encrypted-package failure.
+    #[cfg(feature = "encryption")]
+    #[error("Office cryptography error: {0}")]
+    Crypto(#[from] litchi_crypto::ooxml::Error),
+
     /// Shared host-neutral OOXML package-service error.
     #[error("shared OOXML error: {0}")]
     Common(#[from] litchi_ooxml_common::Error),
@@ -59,6 +64,10 @@ pub enum OoxmlError {
     /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// A bounded host-side operation could not reserve required memory.
+    #[error("OOXML allocation failed for {0}")]
+    Allocation(&'static str),
 
     /// Invalid URI
     #[error("Invalid URI: {0}")]
@@ -108,9 +117,14 @@ impl From<OoxmlError> for litchi_core::Error {
             OoxmlError::Docx(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Pptx(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Xlsb(e) => litchi_core::Error::InvalidFormat(e.to_string()),
+            #[cfg(feature = "encryption")]
+            OoxmlError::Crypto(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Common(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Vba(e) => litchi_core::Error::InvalidFormat(e.to_string()),
             OoxmlError::Opc(e) => litchi_core::Error::from(e),
+            OoxmlError::Allocation(resource) => {
+                litchi_core::Error::Other(format!("OOXML allocation failed for {resource}"))
+            },
             OoxmlError::InvalidUri(s) => litchi_core::Error::Other(s),
             OoxmlError::UnsafeEdit {
                 format,

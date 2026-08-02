@@ -8,12 +8,29 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+ooxml = [
+    "dep:aes",
+    "dep:base64",
+    "dep:cbc",
+    "dep:hmac",
+    "dep:rand",
+    "dep:thiserror",
+]
+
 [dependencies]
+aes = { workspace = true, optional = true, features = ["zeroize"] }
+base64 = { workspace = true, optional = true }
 bitflags = { workspace = true }
+cbc = { workspace = true, optional = true, features = ["zeroize"] }
+hmac = { workspace = true, optional = true, features = ["zeroize"] }
 litchi-cfb = { workspace = true }
 litchi-ole-common = { workspace = true }
 quick-xml = { workspace = true }
+rand = { workspace = true, optional = true }
 rc4 = { workspace = true }
 sha1 = { workspace = true }
 subtle = { workspace = true }
+thiserror = { workspace = true, optional = true }
 zeroize = { workspace = true }

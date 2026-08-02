@@ -6,9 +6,10 @@
 ///
 /// # Architecture
 ///
-/// The writer uses a transactional approach where changes are accumulated in memory
-/// and written atomically when `save()` is called. This ensures file integrity even
-/// if the write operation fails partway through.
+/// The writer accumulates a complete logical model in memory before serialization.
+/// `write_to` and `save` write directly to their destination, so a sink failure can
+/// leave partial output; callers that require filesystem replacement semantics must
+/// finalize through an atomic temporary-file layer.
 ///
 /// # Stream Allocation vs Directory Ordering
 ///
@@ -65,6 +66,14 @@ use super::header::HeaderBuilder;
 use super::minifat::MiniFatBuilder;
 use std::collections::HashMap;
 use std::io::{Seek, SeekFrom, Write};
+
+const V3_MAX_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy)]
+struct StreamPlan {
+    index: usize,
+    start_sector: u32,
+}
 
 /// Represents a pending stream write operation
 #[derive(Debug, Clone)]
@@ -245,18 +254,34 @@ impl OleWriter {
         if path.is_empty() {
             return Err(OleError::InvalidData("Empty path".to_string()));
         }
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(data.len())
+            .map_err(|source| OleError::allocation("stream payload", source))?;
+        owned.extend_from_slice(data);
+        self.create_stream_owned(path, owned)
+    }
 
-        // Convert path to owned strings
-        let owned_path: Vec<String> = path.iter().map(|s| s.to_string()).collect();
-
-        // Check if stream already exists and update it
-        if let Some(pos) = self.streams.iter().position(|(p, _)| p == &owned_path) {
-            self.streams[pos].1 = data.to_vec();
-        } else {
-            // Store stream data in insertion order
-            self.streams.push((owned_path, data.to_vec()));
+    /// Create or replace a stream by taking ownership of its payload allocation.
+    ///
+    /// Unlike [`Self::create_stream`], this method never clones `data`. The
+    /// allocation remains owned by the writer after this call and is reused by
+    /// subsequent [`Self::write_to`] calls.
+    pub fn create_stream_owned(&mut self, path: &[&str], data: Vec<u8>) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
         }
 
+        if let Some(position) = self.stream_position(path) {
+            self.streams[position].1 = data;
+            return Ok(());
+        }
+
+        let owned_path = own_path(path)?;
+        self.streams
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("stream table", source))?;
+        self.streams.push((owned_path, data));
         Ok(())
     }
 
@@ -271,6 +296,16 @@ impl OleWriter {
     /// * `data` - New stream contents
     pub fn update_stream(&mut self, path: &[&str], data: &[u8]) -> Result<(), OleError> {
         self.create_stream(path, data)
+    }
+
+    fn stream_position(&self, path: &[&str]) -> Option<usize> {
+        self.streams.iter().position(|(candidate, _)| {
+            candidate.len() == path.len()
+                && candidate
+                    .iter()
+                    .zip(path)
+                    .all(|(owned, borrowed)| owned == borrowed)
+        })
     }
 
     /// Delete a stream
@@ -391,49 +426,72 @@ impl OleWriter {
     ///
     /// This is based on Apache POI's POIFSFileSystem.writeFilesystem() method.
     pub fn write_to<W: Write + Seek>(&mut self, writer: &mut W) -> Result<(), OleError> {
+        for (_, data) in &self.streams {
+            validate_stream_size(self.sector_size, data.len(), "user stream")?;
+        }
+
         // Initialize builders
-        let mut fat = FatBuilder::new_with_size(self.sector_size);
+        let mut fat = FatBuilder::new_with_size(self.sector_size)?;
         let mut minifat = MiniFatBuilder::new(self.mini_sector_size);
 
-        // Separate small and large streams
-        let mut small_streams: Vec<(Vec<String>, Vec<u8>)> = Vec::new();
-        let mut large_streams: Vec<(Vec<String>, Vec<u8>)> = Vec::new();
+        // Classify by insertion-order index. Plans retain only compact metadata;
+        // stream paths and payload allocations stay in `self.streams`.
+        let mut small_streams = Vec::new();
+        let mut large_streams = Vec::new();
+        let small_count = self
+            .streams
+            .iter()
+            .filter(|(_, data)| data.len() < self.mini_stream_cutoff as usize)
+            .count();
+        let large_count = self.streams.len().checked_sub(small_count).ok_or_else(|| {
+            OleError::InvalidData("CFB stream classification underflow".to_string())
+        })?;
+        small_streams
+            .try_reserve_exact(small_count)
+            .map_err(|source| OleError::allocation("small-stream plan", source))?;
+        large_streams
+            .try_reserve_exact(large_count)
+            .map_err(|source| OleError::allocation("large-stream plan", source))?;
 
-        for (path, data) in &self.streams {
+        for (index, (_, data)) in self.streams.iter().enumerate() {
             if data.len() < self.mini_stream_cutoff as usize {
-                small_streams.push((path.clone(), data.clone()));
+                small_streams.push(StreamPlan {
+                    index,
+                    start_sector: ENDOFCHAIN,
+                });
             } else {
-                large_streams.push((path.clone(), data.clone()));
+                large_streams.push(StreamPlan {
+                    index,
+                    start_sector: ENDOFCHAIN,
+                });
             }
         }
 
         // Allocate mini sectors for small streams and track their start sectors
-        let mut small_stream_sectors: Vec<(Vec<String>, Vec<u8>, u32)> = Vec::new();
-        for (path, data) in &small_streams {
-            let start_mini_sector = minifat.allocate_mini_chain(data);
-            small_stream_sectors.push((path.clone(), data.clone(), start_mini_sector));
+        for plan in &mut small_streams {
+            let data = &self.streams[plan.index].1;
+            plan.start_sector = minifat.allocate_mini_chain(data)?;
         }
 
         // CRITICAL: Allocate large streams FIRST to ensure WordDocument gets sector 0
         // Microsoft Word requires WordDocument at sector 0!
 
         // Add large streams to directory (using FAT) - BEFORE ministream
-        let mut large_stream_data: Vec<(u32, Vec<u8>, Vec<String>)> = Vec::new();
-        for (path, data) in &large_streams {
-            let start_sector = if data.is_empty() {
+        for plan in &mut large_streams {
+            let data = &self.streams[plan.index].1;
+            plan.start_sector = if data.is_empty() {
                 ENDOFCHAIN
             } else {
-                fat.allocate_chain(data.len())
+                fat.allocate_chain(data.len())?
             };
-
-            large_stream_data.push((start_sector, data.clone(), path.clone()));
         }
 
         // NOW allocate ministream (after large streams)
         let (ministream_start, ministream_size) = if !minifat.is_empty() {
             let ministream_data = minifat.ministream_data();
-            let start = fat.allocate_chain(ministream_data.len());
-            (start, minifat.ministream_size())
+            validate_stream_size(self.sector_size, ministream_data.len(), "mini stream")?;
+            let start = fat.allocate_chain(ministream_data.len())?;
+            (start, minifat.ministream_size()?)
         } else {
             (ENDOFCHAIN, 0u64)
         };
@@ -455,99 +513,99 @@ impl OleWriter {
         }
 
         // Add large streams to directory using full path
-        for (start_sector, data, path) in &large_stream_data {
-            let full: Vec<String> = path.clone();
-            let _sid = directory.add_stream_path(&full, *start_sector, data.len() as u64)?;
+        for plan in &large_streams {
+            let (path, data) = &self.streams[plan.index];
+            let size = u64::try_from(data.len()).map_err(|_| {
+                OleError::InvalidData("CFB stream size does not fit u64".to_string())
+            })?;
+            let _sid = directory.add_stream_path(path, plan.start_sector, size)?;
         }
 
         // Add small streams to directory (using MiniFAT) with full path
-        for (path, data, start_mini_sector) in &small_stream_sectors {
-            let full: Vec<String> = path.clone();
-            let _sid = directory.add_stream_path(&full, *start_mini_sector, data.len() as u64)?;
+        for plan in &small_streams {
+            let (path, data) = &self.streams[plan.index];
+            let size = u64::try_from(data.len()).map_err(|_| {
+                OleError::InvalidData("CFB stream size does not fit u64".to_string())
+            })?;
+            let _sid = directory.add_stream_path(path, plan.start_sector, size)?;
         }
 
         // Generate directory stream
         let dir_stream = directory.generate_directory_stream()?;
-        let dir_sector_count = (dir_stream.len().div_ceil(self.sector_size)) as u32;
-        let dir_start_sector = fat.allocate_chain(dir_stream.len());
+        validate_stream_size(self.sector_size, dir_stream.len(), "directory stream")?;
+        let dir_sector_count =
+            sector_count(dir_stream.len(), self.sector_size, "directory stream")?;
+        let dir_start_sector = fat.allocate_chain(dir_stream.len())?;
 
         // Generate MiniFAT sectors (if needed)
-        let (minifat_start_sector, num_minifat_sectors) = if !minifat.is_empty() {
-            let minifat_sectors = minifat.generate_minifat_sectors(self.sector_size);
-            let num_sectors = minifat_sectors.len() as u32;
-
-            if num_sectors > 0 {
-                let start = fat.allocate_chain(num_sectors as usize * self.sector_size);
-                (start, num_sectors)
-            } else {
-                (ENDOFCHAIN, 0)
-            }
+        let minifat_sectors = if minifat.is_empty() {
+            Vec::new()
         } else {
-            (ENDOFCHAIN, 0)
+            minifat.generate_minifat_sectors(self.sector_size)?
+        };
+        let num_minifat_sectors = u32::try_from(minifat_sectors.len())
+            .map_err(|_| OleError::InvalidData("too many MiniFAT sectors".to_string()))?;
+        let minifat_bytes = minifat_sectors
+            .len()
+            .checked_mul(self.sector_size)
+            .ok_or_else(|| OleError::InvalidData("MiniFAT size overflows usize".to_string()))?;
+        let minifat_start_sector = if minifat_bytes == 0 {
+            ENDOFCHAIN
+        } else {
+            fat.allocate_chain(minifat_bytes)?
         };
 
         // === Compute FAT/DIFAT sectors requirement iteratively ===
-        let entries_per_fat_sector = self.sector_size as u32 / 4;
-        let ids_per_difat_sector = entries_per_fat_sector - 1; // last u32 is next pointer
-
         let n_used = fat.total_sectors();
-        let mut n_fat: u32 = 0;
-        let mut n_difat: u32 = 0;
-        for _ in 0..8 {
-            let total_entries = n_used + n_fat + n_difat;
-            let new_n_fat = total_entries.div_ceil(entries_per_fat_sector);
-            let new_n_difat = if new_n_fat > 109 {
-                let over = new_n_fat - 109;
-                over.div_ceil(ids_per_difat_sector)
-            } else {
-                0
-            };
-            if new_n_fat == n_fat && new_n_difat == n_difat {
-                break;
-            }
-            n_fat = new_n_fat;
-            n_difat = new_n_difat;
-        }
+        let (n_fat, n_difat) = allocation_table_sector_counts(n_used, self.sector_size)?;
 
         // Reserve DIFAT sectors then FAT sectors
         let difat_start_sector = if n_difat > 0 {
-            fat.allocate_special(n_difat, DIFSECT)
+            fat.allocate_special(n_difat, DIFSECT)?
         } else {
             ENDOFCHAIN
         };
         let fat_start_sector = if n_fat > 0 {
-            fat.allocate_special(n_fat, FATSECT)
+            fat.allocate_special(n_fat, FATSECT)?
         } else {
             ENDOFCHAIN
         };
+        validate_output_size(self.sector_size, fat.total_sectors())?;
 
         // Prepare FAT sector data now that reservations are included
-        let fat_sectors_data = fat.generate_fat_sectors();
+        let fat_sectors_data = fat.generate_fat_sectors()?;
         let num_fat_sectors = n_fat;
+        let generated_fat_count = u32::try_from(fat_sectors_data.len())
+            .map_err(|_| OleError::InvalidData("too many serialized FAT sectors".to_string()))?;
+        if generated_fat_count != num_fat_sectors {
+            return Err(OleError::InvalidData(format!(
+                "CFB FAT planning mismatch: planned {num_fat_sectors}, generated {generated_fat_count}"
+            )));
+        }
 
         // Validate FAT
-        fat.validate()
-            .map_err(|e| OleError::InvalidData(format!("FAT validation failed: {}", e)))?;
+        fat.validate()?;
 
         // Build header
-        let mut header_builder = HeaderBuilder::new(self.sector_size);
+        let mut header_builder = HeaderBuilder::new(self.sector_size)?;
         header_builder.set_first_dir_sector(dir_start_sector);
         header_builder.set_num_dir_sectors(dir_sector_count);
         header_builder.set_minifat(minifat_start_sector, num_minifat_sectors);
 
         // Handle DIFAT if needed (> 109 FAT sectors)
-        let fat_sector_ids: Vec<u32> = if num_fat_sectors > 0 {
-            (fat_start_sector..fat_start_sector + num_fat_sectors).collect()
-        } else {
-            Vec::new()
-        };
+        let fat_sector_ids = sector_ids(fat_start_sector, num_fat_sectors, "FAT sector IDs")?;
 
         let (num_difat_sectors, difat_sectors) = if num_fat_sectors > 109 {
-            let mut difat = DifatBuilder::new(self.sector_size);
-            difat.set_fat_sectors(&fat_sector_ids);
-            let num_difat = difat.calculate_difat_sector_count();
+            let mut difat = DifatBuilder::new(self.sector_size)?;
+            difat.set_fat_sectors(&fat_sector_ids)?;
+            let num_difat = difat.calculate_difat_sector_count()?;
+            if num_difat != n_difat {
+                return Err(OleError::InvalidData(format!(
+                    "CFB DIFAT planning mismatch: planned {n_difat}, generated {num_difat}"
+                )));
+            }
             let sectors = if num_difat > 0 {
-                difat.generate_difat_sectors(difat_start_sector)
+                difat.generate_difat_sectors(difat_start_sector)?
             } else {
                 Vec::new()
             };
@@ -557,65 +615,57 @@ impl OleWriter {
         };
 
         // Add first 109 FAT sector IDs to header
-        header_builder.add_fat_sectors(&fat_sector_ids);
+        header_builder.set_fat_sectors(&fat_sector_ids)?;
 
         // Set DIFAT info in header
         if num_difat_sectors > 0 {
             header_builder.set_difat(difat_start_sector, num_difat_sectors);
         }
 
-        let header = header_builder.generate();
+        let header = header_builder.generate()?;
 
         // === Write the file ===
 
-        // Write header (sector 0 position is offset 0, but actual sectors start at +1)
+        // All sector offsets are absolute from the CFB header, so normalize a
+        // caller-provided seekable sink before emitting any bytes.
+        writer.seek(SeekFrom::Start(0))?;
         writer.write_all(&header)?;
 
         // Write ministream data (if any)
         if !minifat.is_empty() && ministream_start != ENDOFCHAIN {
-            let position = ((ministream_start as u64) + 1) * (self.sector_size as u64);
+            let position = sector_offset(ministream_start, self.sector_size)?;
             writer.seek(SeekFrom::Start(position))?;
 
             let ministream_data = minifat.ministream_data();
-            let padded_size = ministream_data.len().div_ceil(self.sector_size) * self.sector_size;
-            let mut padded_data = ministream_data.to_vec();
-            padded_data.resize(padded_size, 0);
-            writer.write_all(&padded_data)?;
+            write_sector_aligned(writer, ministream_data, self.sector_size)?;
         }
 
         // Write large stream data sectors
-        for (start_sector, data, _path) in &large_stream_data {
-            if *start_sector == ENDOFCHAIN {
+        for plan in &large_streams {
+            if plan.start_sector == ENDOFCHAIN {
                 continue;
             }
+            let data = &self.streams[plan.index].1;
 
             // Calculate file position for this sector
-            let position = ((*start_sector as u64) + 1) * (self.sector_size as u64);
+            let position = sector_offset(plan.start_sector, self.sector_size)?;
             writer.seek(SeekFrom::Start(position))?;
 
-            // Write data (padded to sector boundaries)
-            let padded_size = data.len().div_ceil(self.sector_size) * self.sector_size;
-            let mut padded_data = data.clone();
-            padded_data.resize(padded_size, 0);
-            writer.write_all(&padded_data)?;
+            // Write the retained payload allocation, then at most one sector of
+            // zero padding from a fixed stack buffer.
+            write_sector_aligned(writer, data, self.sector_size)?;
         }
 
         // Write directory stream
-        let dir_position = ((dir_start_sector as u64) + 1) * (self.sector_size as u64);
+        let dir_position = sector_offset(dir_start_sector, self.sector_size)?;
         writer.seek(SeekFrom::Start(dir_position))?;
-        let dir_padded_size = dir_stream.len().div_ceil(self.sector_size) * self.sector_size;
-        let mut dir_padded = dir_stream;
-        dir_padded.resize(dir_padded_size, 0);
-        writer.write_all(&dir_padded)?;
+        write_sector_aligned(writer, &dir_stream, self.sector_size)?;
 
         // Write MiniFAT sectors (if any)
-        if !minifat.is_empty() && minifat_start_sector != ENDOFCHAIN {
-            let minifat_sectors = minifat.generate_minifat_sectors(self.sector_size);
-
-            for (current_sector, minifat_sector_data) in
-                (minifat_start_sector..).zip(minifat_sectors.iter())
-            {
-                let position = ((current_sector as u64) + 1) * (self.sector_size as u64);
+        if minifat_start_sector != ENDOFCHAIN {
+            for (index, minifat_sector_data) in minifat_sectors.iter().enumerate() {
+                let current_sector = sector_at(minifat_start_sector, index)?;
+                let position = sector_offset(current_sector, self.sector_size)?;
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(minifat_sector_data)?;
             }
@@ -623,18 +673,17 @@ impl OleWriter {
 
         // Write FAT sectors
         for (i, fat_sector_data) in fat_sectors_data.iter().enumerate() {
-            let sector_id = fat_start_sector + i as u32;
-            let position = ((sector_id as u64) + 1) * (self.sector_size as u64);
+            let sector_id = sector_at(fat_start_sector, i)?;
+            let position = sector_offset(sector_id, self.sector_size)?;
             writer.seek(SeekFrom::Start(position))?;
             writer.write_all(fat_sector_data)?;
         }
 
         // Write DIFAT sectors (if any)
         if !difat_sectors.is_empty() {
-            for (current_sector, difat_sector_data) in
-                (difat_start_sector..).zip(difat_sectors.iter())
-            {
-                let position = ((current_sector as u64) + 1) * (self.sector_size as u64);
+            for (index, difat_sector_data) in difat_sectors.iter().enumerate() {
+                let current_sector = sector_at(difat_start_sector, index)?;
+                let position = sector_offset(current_sector, self.sector_size)?;
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(difat_sector_data)?;
             }
@@ -673,6 +722,189 @@ impl OleWriter {
     }
 }
 
+fn own_path(path: &[&str]) -> Result<Vec<String>, OleError> {
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(path.len())
+        .map_err(|source| OleError::allocation("stream path", source))?;
+    for component in path {
+        let mut value = String::new();
+        value
+            .try_reserve_exact(component.len())
+            .map_err(|source| OleError::allocation("stream path component", source))?;
+        value.push_str(component);
+        owned.push(value);
+    }
+    Ok(owned)
+}
+
+fn validate_stream_size(
+    sector_size: usize,
+    size: usize,
+    resource: &'static str,
+) -> Result<(), OleError> {
+    checked_sector_size(sector_size)?;
+    if sector_size != 512 {
+        return Ok(());
+    }
+    let size = u64::try_from(size)
+        .map_err(|_| OleError::InvalidData("CFB stream size does not fit u64".to_string()))?;
+    if size >= V3_MAX_FILE_BYTES {
+        return Err(OleError::InvalidData(format!(
+            "version 3 CFB {resource} must be smaller than 2 GiB"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_output_size(sector_size: usize, sector_count: u32) -> Result<(), OleError> {
+    let sector_size_u64 = checked_sector_size(sector_size)?;
+    if sector_count > MAXREGSECT {
+        return Err(OleError::InvalidData(
+            "CFB output exceeds MAXREGSECT".to_string(),
+        ));
+    }
+    let bytes = u64::from(sector_count)
+        .checked_add(1)
+        .and_then(|count| count.checked_mul(sector_size_u64))
+        .ok_or_else(|| OleError::InvalidData("CFB output size overflows u64".to_string()))?;
+    if sector_size == 512 && bytes > V3_MAX_FILE_BYTES {
+        return Err(OleError::InvalidData(
+            "version 3 CFB output cannot exceed 2 GiB".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn sector_count(
+    byte_len: usize,
+    sector_size: usize,
+    resource: &'static str,
+) -> Result<u32, OleError> {
+    checked_sector_size(sector_size)?;
+    let count = byte_len.div_ceil(sector_size);
+    let count = u32::try_from(count)
+        .map_err(|_| OleError::InvalidData(format!("CFB {resource} has too many sectors")))?;
+    if count > MAXREGSECT {
+        return Err(OleError::InvalidData(format!(
+            "CFB {resource} exceeds MAXREGSECT"
+        )));
+    }
+    Ok(count)
+}
+
+fn allocation_table_sector_counts(used: u32, sector_size: usize) -> Result<(u32, u32), OleError> {
+    checked_sector_size(sector_size)?;
+    let entries_per_fat_sector = u32::try_from(sector_size / 4)
+        .map_err(|_| OleError::InvalidData("CFB FAT geometry exceeds u32".to_string()))?;
+    let ids_per_difat_sector = entries_per_fat_sector
+        .checked_sub(1)
+        .ok_or_else(|| OleError::InvalidData("CFB DIFAT sector has no ID slots".to_string()))?;
+    let mut fat = 0u32;
+    let mut difat = 0u32;
+    for _ in 0..32 {
+        let total = used
+            .checked_add(fat)
+            .and_then(|value| value.checked_add(difat))
+            .ok_or_else(|| OleError::InvalidData("CFB sector count overflows u32".to_string()))?;
+        if total > MAXREGSECT {
+            return Err(OleError::InvalidData(
+                "CFB sector count exceeds MAXREGSECT".to_string(),
+            ));
+        }
+        let new_fat = total.div_ceil(entries_per_fat_sector);
+        let new_difat = new_fat.saturating_sub(109).div_ceil(ids_per_difat_sector);
+        if new_fat == fat && new_difat == difat {
+            return Ok((fat, difat));
+        }
+        fat = new_fat;
+        difat = new_difat;
+    }
+    Err(OleError::InvalidData(
+        "CFB FAT/DIFAT planning did not converge".to_string(),
+    ))
+}
+
+fn sector_ids(start: u32, count: u32, resource: &'static str) -> Result<Vec<u32>, OleError> {
+    if count == 0 {
+        return Ok(Vec::new());
+    }
+    let end = start
+        .checked_add(count)
+        .ok_or_else(|| OleError::InvalidData(format!("CFB {resource} range overflows u32")))?;
+    if start >= MAXREGSECT || end > MAXREGSECT {
+        return Err(OleError::InvalidData(format!(
+            "CFB {resource} range exceeds MAXREGSECT"
+        )));
+    }
+    let count = usize::try_from(count)
+        .map_err(|_| OleError::InvalidData(format!("CFB {resource} count exceeds usize")))?;
+    let mut ids = Vec::new();
+    ids.try_reserve_exact(count)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    ids.extend(start..end);
+    Ok(ids)
+}
+
+fn sector_at(start: u32, index: usize) -> Result<u32, OleError> {
+    let index = u32::try_from(index)
+        .map_err(|_| OleError::InvalidData("CFB sector offset exceeds u32".to_string()))?;
+    let sector = start
+        .checked_add(index)
+        .ok_or_else(|| OleError::InvalidData("CFB sector index overflows u32".to_string()))?;
+    if sector >= MAXREGSECT {
+        return Err(OleError::InvalidData(
+            "CFB sector index exceeds MAXREGSECT".to_string(),
+        ));
+    }
+    Ok(sector)
+}
+
+fn sector_offset(sector: u32, sector_size: usize) -> Result<u64, OleError> {
+    let sector_size = checked_sector_size(sector_size)?;
+    if sector >= MAXREGSECT {
+        return Err(OleError::InvalidData(
+            "CFB sector index exceeds MAXREGSECT".to_string(),
+        ));
+    }
+    (u64::from(sector) + 1)
+        .checked_mul(sector_size)
+        .ok_or_else(|| OleError::InvalidData("CFB sector offset overflows u64".to_string()))
+}
+
+fn checked_sector_size(sector_size: usize) -> Result<u64, OleError> {
+    if !matches!(sector_size, 512 | 4096) {
+        return Err(OleError::InvalidData(format!(
+            "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
+        )));
+    }
+    u64::try_from(sector_size)
+        .map_err(|_| OleError::InvalidData("CFB sector size does not fit u64".to_string()))
+}
+
+fn write_sector_aligned<W: Write>(
+    writer: &mut W,
+    data: &[u8],
+    sector_size: usize,
+) -> Result<(), OleError> {
+    if !matches!(sector_size, 512 | 4096) {
+        return Err(OleError::InvalidData(format!(
+            "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
+        )));
+    }
+    writer.write_all(data)?;
+    let remainder = data.len() % sector_size;
+    if remainder != 0 {
+        const ZEROES: [u8; 4096] = [0; 4096];
+        let padding = sector_size - remainder;
+        let bytes = ZEROES.get(..padding).ok_or_else(|| {
+            OleError::InvalidData("CFB sector padding exceeds 4096 bytes".to_string())
+        })?;
+        writer.write_all(bytes)?;
+    }
+    Ok(())
+}
+
 impl Default for OleWriter {
     fn default() -> Self {
         Self::new()
@@ -703,14 +935,12 @@ impl Default for OleWriter {
 #[allow(dead_code)] // Reserved for future implementation
 fn encode_name_utf16le(name: &str) -> [u8; 64] {
     let mut result = [0u8; 64];
-    let utf16: Vec<u16> = name.encode_utf16().collect();
-
-    // Copy UTF-16 data (max 31 characters + null terminator)
-    let max_chars = 31.min(utf16.len());
-    for (i, &ch) in utf16.iter().take(max_chars).enumerate() {
+    let mut max_chars = 0;
+    for (i, ch) in name.encode_utf16().take(31).enumerate() {
         let bytes = ch.to_le_bytes();
         result[i * 2] = bytes[0];
         result[i * 2 + 1] = bytes[1];
+        max_chars = i + 1;
     }
 
     // Null terminator
@@ -725,6 +955,7 @@ fn encode_name_utf16le(name: &str) -> [u8; 64] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error as _;
 
     #[test]
     fn test_create_writer() {
@@ -743,6 +974,34 @@ mod tests {
     }
 
     #[test]
+    fn owned_stream_retains_payload_allocation_through_write() {
+        let mut writer = OleWriter::new();
+        let data = vec![0x5a; 5_003];
+        let pointer = data.as_ptr();
+
+        writer
+            .create_stream_owned(&["Owned"], data)
+            .expect("move stream payload");
+        assert_eq!(writer.streams[0].1.as_ptr(), pointer);
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("write owned stream");
+        assert_eq!(writer.streams[0].1.as_ptr(), pointer);
+    }
+
+    #[test]
+    fn serialization_normalizes_the_sink_position() {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Test"], b"payload").unwrap();
+        let mut output = std::io::Cursor::new(Vec::new());
+        output.set_position(17);
+
+        writer.write_to(&mut output).unwrap();
+
+        assert_eq!(&output.into_inner()[..MAGIC.len()], MAGIC);
+    }
+
+    #[test]
     fn test_create_storage() {
         let mut writer = OleWriter::new();
         writer.create_storage(&["Storage"]).unwrap();
@@ -757,5 +1016,51 @@ mod tests {
         assert_eq!(encoded[1], 0x00); // 'T' high byte
         assert_eq!(encoded[2], 0x65); // 'e' low byte
         assert_eq!(encoded[3], 0x00); // 'e' high byte
+    }
+
+    #[test]
+    fn version_three_limits_are_checked_without_large_allocations() {
+        let last_stream_byte = usize::try_from(V3_MAX_FILE_BYTES - 1).unwrap();
+        let first_invalid_stream = usize::try_from(V3_MAX_FILE_BYTES).unwrap();
+        assert!(validate_stream_size(512, last_stream_byte, "test stream").is_ok());
+        assert!(validate_stream_size(512, first_invalid_stream, "test stream").is_err());
+        assert!(validate_stream_size(4096, first_invalid_stream, "test stream").is_ok());
+
+        let maximum_v3_sectors = u32::try_from(V3_MAX_FILE_BYTES / 512).unwrap();
+        assert!(validate_output_size(512, maximum_v3_sectors - 1).is_ok());
+        assert!(validate_output_size(512, maximum_v3_sectors).is_err());
+        assert!(validate_output_size(4096, maximum_v3_sectors).is_ok());
+    }
+
+    #[test]
+    fn allocation_table_planning_is_checked_and_converges() {
+        assert_eq!(allocation_table_sector_counts(1, 512).unwrap(), (1, 0));
+        assert_eq!(allocation_table_sector_counts(128, 512).unwrap(), (2, 0));
+        assert!(allocation_table_sector_counts(MAXREGSECT, 512).is_err());
+        assert!(allocation_table_sector_counts(1, 0).is_err());
+    }
+
+    #[test]
+    fn sector_id_ranges_use_maxregsect_as_an_exclusive_end() {
+        assert_eq!(
+            sector_ids(MAXREGSECT - 1, 1, "test IDs").unwrap(),
+            [MAXREGSECT - 1]
+        );
+        assert!(sector_ids(MAXREGSECT, 1, "test IDs").is_err());
+    }
+
+    #[test]
+    fn allocation_errors_preserve_resource_and_source() {
+        let mut probe = Vec::<u8>::new();
+        let source = probe.try_reserve(usize::MAX).unwrap_err();
+        let error = OleError::allocation("test buffer", source);
+        assert!(matches!(
+            &error,
+            OleError::Allocation {
+                resource: "test buffer",
+                ..
+            }
+        ));
+        assert!(error.source().is_some());
     }
 }

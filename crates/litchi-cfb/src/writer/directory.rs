@@ -389,31 +389,37 @@ impl DirectoryBuilder {
     ///
     /// * `Vec<u8>` - Concatenated directory entries (128 bytes each)
     pub fn generate_directory_stream(&mut self) -> Result<Vec<u8>, OleError> {
-        let storage_sids: Vec<u32> = self
-            .entries
-            .iter()
-            .enumerate()
-            .filter_map(|(sid, e)| {
-                if e.entry_type == STGTY_ROOT || e.entry_type == STGTY_STORAGE {
-                    Some(sid as u32)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let mut storage_sids = Vec::new();
+        storage_sids
+            .try_reserve_exact(self.entries.len())
+            .map_err(|source| OleError::allocation("directory storage IDs", source))?;
+        for (sid, entry) in self.entries.iter().enumerate() {
+            if entry.entry_type == STGTY_ROOT || entry.entry_type == STGTY_STORAGE {
+                storage_sids.push(u32::try_from(sid).map_err(|_| {
+                    OleError::InvalidData("CFB directory contains too many entries".to_string())
+                })?);
+            }
+        }
 
+        let children = &self.children;
+        let entries = &mut self.entries;
         for parent_sid in storage_sids {
-            if let Some(children) = self.children.get(&parent_sid).cloned() {
-                Self::link_children(parent_sid, &children, &mut self.entries)?;
+            if let Some(child_sids) = children.get(&parent_sid) {
+                Self::link_children(parent_sid, child_sids, entries)?;
             } else {
                 // no children: ensure sid_child remains NOSTREAM
-                self.entries[parent_sid as usize].sid_child = NOSTREAM;
+                entries[parent_sid as usize].sid_child = NOSTREAM;
             }
         }
 
         // Serialize entries in SID order
-        let mut data = Vec::with_capacity(self.entries.len() * 128);
-        for entry in &self.entries {
+        let byte_len = entries.len().checked_mul(DIRENTRY_SIZE).ok_or_else(|| {
+            OleError::InvalidData("CFB directory stream size overflows usize".to_string())
+        })?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(byte_len)
+            .map_err(|source| OleError::allocation("directory stream", source))?;
+        for entry in entries {
             data.extend_from_slice(&entry.to_bytes()?);
         }
         Ok(data)

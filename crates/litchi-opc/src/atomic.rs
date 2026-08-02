@@ -6,30 +6,63 @@ use std::path::Path;
 
 use crate::error::{OpcError, Result};
 
-pub(crate) fn replace(path: &Path, write: impl FnOnce(&mut File) -> Result<()>) -> Result<()> {
+/// Finalize an artifact in a sibling temporary file, then replace `path`.
+///
+/// The destination is left untouched when `write` fails. Existing regular-file
+/// permissions are preserved on Unix, and symbolic-link or non-file
+/// destinations are rejected before any replacement is attempted. Windows
+/// permission preservation is not currently promised.
+pub fn replace(path: &Path, write: impl FnOnce(&mut File) -> Result<()>) -> Result<()> {
+    replace_with(path, write)
+}
+
+/// Atomically replace `path` while preserving a caller-owned typed error.
+///
+/// Filesystem validation and persistence failures are converted from
+/// [`OpcError`], while an error returned by `write` is passed through exactly.
+pub fn replace_with<E>(
+    path: &Path,
+    write: impl FnOnce(&mut File) -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+{
     if path.file_name().is_none() {
-        return Err(invalid_path("package destination must name a file"));
+        return Err(E::from(invalid_path(
+            "package destination must name a file",
+        )));
     }
 
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let permissions = destination_permissions(path)?;
+    let permissions = destination_permissions(path).map_err(E::from)?;
     let mut temporary = tempfile::Builder::new()
         .prefix(".litchi-")
         .suffix(".tmp")
-        .tempfile_in(parent)?;
+        .tempfile_in(parent)
+        .map_err(OpcError::from)
+        .map_err(E::from)?;
 
     write(temporary.as_file_mut())?;
     if let Some(permissions) = permissions {
-        temporary.as_file().set_permissions(permissions)?;
+        temporary
+            .as_file()
+            .set_permissions(permissions)
+            .map_err(OpcError::from)
+            .map_err(E::from)?;
     }
-    temporary.as_file_mut().sync_all()?;
+    temporary
+        .as_file_mut()
+        .sync_all()
+        .map_err(OpcError::from)
+        .map_err(E::from)?;
     let _persisted = temporary
         .persist(path)
-        .map_err(|error| OpcError::IoError(error.error))?;
-    sync_parent(parent)?;
+        .map_err(|error| OpcError::IoError(error.error))
+        .map_err(E::from)?;
+    sync_parent(parent).map_err(E::from)?;
     Ok(())
 }
 
@@ -78,6 +111,29 @@ mod tests {
 
     use super::*;
 
+    #[derive(Debug)]
+    enum TypedError {
+        Opc(OpcError),
+        Write,
+    }
+
+    impl From<OpcError> for TypedError {
+        fn from(error: OpcError) -> Self {
+            Self::Opc(error)
+        }
+    }
+
+    impl std::fmt::Display for TypedError {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Opc(error) => write!(formatter, "{error}"),
+                Self::Write => formatter.write_str("typed write failure"),
+            }
+        }
+    }
+
+    impl std::error::Error for TypedError {}
+
     #[test]
     fn failed_finalization_leaves_the_destination_untouched() {
         let directory = tempfile::tempdir().expect("temporary directory");
@@ -117,6 +173,21 @@ mod tests {
         .expect("atomic replacement");
 
         assert_eq!(fs::read(destination).expect("read destination"), b"new");
+    }
+
+    #[test]
+    fn caller_owned_write_error_is_not_erased() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.docx");
+        fs::write(&destination, b"original").expect("seed destination");
+
+        let result = replace_with::<TypedError>(&destination, |_temporary| Err(TypedError::Write));
+
+        assert!(matches!(result, Err(TypedError::Write)));
+        assert_eq!(
+            fs::read(destination).expect("read destination"),
+            b"original"
+        );
     }
 
     #[cfg(unix)]

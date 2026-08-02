@@ -199,6 +199,17 @@ provide short typed names such as `rc4::{Flags, Header, Context, Error}`;
 format crates remain responsible for locating native records and mapping
 crypto failures into their own error vocabulary. Secret-bearing contexts keep
 their material private and zeroizing, and the crate has no async-runtime edge.
+`ooxml::{Kind, Mode, Limits, Password, Opened, Error}` owns the supported
+Standard and Agile encrypted-package profiles plus the
+StrongEncryptionDataSpace CFB adapter. Password-free `inspect`, move-consuming
+`open`/`encrypt`/`rekey`, and runtime-neutral `load` are the complete envelope
+service; ordinary unencrypted input returns the same allocation, while explicit
+`_with` variants apply caller-selected resource ceilings. The migration host
+re-exports this vocabulary under its contextual `encryption` module. DOCX,
+PPTX, and XLSX retain the detected mode, refuse an implicit plaintext save,
+name plaintext output explicitly, and atomically replace path destinations.
+They depend only on this service and never import a CFB parser, cipher
+primitive, or encrypted-container implementation directly.
 
 `litchi-vba` owns the inert, bounded `[MS-OVBA]` codec and project model. It
 depends downward only on `litchi-cfb` and `litchi-codepage`; it does not own

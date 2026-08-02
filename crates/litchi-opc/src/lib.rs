@@ -17,7 +17,7 @@
 //! - Minimizes allocations by borrowing data where possible
 //! - Uses hash maps for O(1) lookups
 
-mod atomic;
+pub mod atomic;
 
 pub mod constants;
 pub mod content_type;

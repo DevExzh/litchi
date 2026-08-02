@@ -75,6 +75,44 @@ fn test_write_multiple_streams() {
 }
 
 #[test]
+fn test_write_owned_streams_round_trip() {
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream_owned(&["SmallOwned"], vec![0x2a; 127])
+        .unwrap();
+    writer
+        .create_stream_owned(&["LargeOwned"], vec![0x7b; 5_003])
+        .unwrap();
+
+    let mut buffer = Cursor::new(Vec::new());
+    writer.write_to(&mut buffer).unwrap();
+
+    let mut ole = OleFile::open(Cursor::new(buffer.into_inner())).unwrap();
+    assert_eq!(ole.open_stream(&["SmallOwned"]).unwrap(), vec![0x2a; 127]);
+    assert_eq!(ole.open_stream(&["LargeOwned"]).unwrap(), vec![0x7b; 5_003]);
+}
+
+#[test]
+fn test_owned_streams_preserve_borrowed_wire_layout() {
+    let small = vec![0x11; 73];
+    let large = vec![0x22; 4_097];
+
+    let mut borrowed = OleWriter::new();
+    borrowed.create_stream(&["Small"], &small).unwrap();
+    borrowed.create_stream(&["Large"], &large).unwrap();
+    let mut borrowed_bytes = Cursor::new(Vec::new());
+    borrowed.write_to(&mut borrowed_bytes).unwrap();
+
+    let mut owned = OleWriter::new();
+    owned.create_stream_owned(&["Small"], small).unwrap();
+    owned.create_stream_owned(&["Large"], large).unwrap();
+    let mut owned_bytes = Cursor::new(Vec::new());
+    owned.write_to(&mut owned_bytes).unwrap();
+
+    assert_eq!(owned_bytes.into_inner(), borrowed_bytes.into_inner());
+}
+
+#[test]
 fn test_write_empty_stream() {
     let mut writer = OleWriter::new();
     writer.create_stream(&["Empty"], b"").unwrap();

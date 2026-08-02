@@ -148,9 +148,10 @@ points over this substrate.
 
 Ordinary filesystem save now writes a sibling temporary artifact, finalizes and
 flushes the ZIP, synchronizes the file, and only then replaces the destination.
-It preserves an existing regular file's permissions, refuses symbolic-link and
-non-file destinations, cleans up a failed temporary artifact, and synchronizes
-the parent directory where the platform supports it. Tests inject a failure
+On Unix it preserves an existing regular file's permissions. On all supported
+platforms it refuses symbolic-link and non-file destinations, cleans up a
+failed temporary artifact, and synchronizes the parent directory where the
+platform supports it. Tests inject a failure
 after a partial temporary write and prove the original bytes remain unchanged.
 A separate 2 MiB incompressible-payload test uses a non-seekable sink that
 rejects any write over 64 KiB; direct streaming succeeds and an injected sink
@@ -2582,6 +2583,99 @@ move-owned payload identity, and absence of production runtime edges are
 structural facts, not latency, allocation, CPU, cache, affinity, contention, or
 scaling measurements. No performance claim follows without the ADR 0005
 benchmark and flame-graph work.
+
+### Canonical OOXML encrypted-container ownership
+
+The next dependency slice moves the application-neutral `[MS-OFFCRYPTO]`
+envelope out of the OOXML migration host and into the feature-gated
+`litchi-crypto::ooxml` owner. Its concise vocabulary is `Kind`, `Mode`,
+`Limits`, `Password`, `Opened`, and `Error`; the host exposes the same owner
+contextually as `litchi_ooxml::encryption`. Password-free `inspect`,
+move-consuming `open`, `encrypt`, and `rekey`, and runtime-neutral bounded
+`load` are the low-level operations. The `_with` variants accept one explicit
+outer-encryption resource policy. Concrete hosts still apply the OPC archive's
+independently bounded defaults after decryption; exposing a composite host open
+policy is subsequent migration work. Ordinary OPC input moves through `open`
+without reallocating, and `Password` is move-owned, non-cloneable, redacted in
+`Debug`, and zeroized on drop. Public errors distinguish invalid policy,
+resource ceiling, allocation, unsupported profile, malformed container,
+incorrect password, missing authoring password, integrity, randomness, XML,
+and I/O failures.
+
+This owner implements the strictly validated AES-128/SHA-1 Standard and Agile
+compatibility profiles. It does not claim AES-192/256 or SHA-2 Agile support;
+those profiles fail as typed `Unsupported`. Standard encryption has no package
+integrity mechanism in its specification. Agile authenticates the complete
+encrypted package before trusting its declared clear size. Parsing bounds the
+outer input, `EncryptionInfo`, Agile XML bytes, nesting, events, attributes,
+spin count, password characters, clear package, encrypted stream, and emitted
+CFB container. StrongEncryptionDataSpace validation is strict by default, with
+the LibreOffice missing-graph exception available only through an explicit
+policy flag. Length arithmetic is checked, fallible growth reports typed
+allocation or limit failures, internally encoded password bytes and derived-key
+material are zeroized, and verifier comparisons are constant-time.
+
+The CFB handoff consumes the outer buffer and moves the encrypted-package
+stream into `OleWriter`; it does not clone either large payload at that seam.
+Writer plans use checked sector arithmetic and fallible FAT, MiniFAT, and DIFAT
+construction, and reject the version-3 2 GiB stream boundary before emitting
+output. These are structural copy and bound properties, not benchmark results.
+The inert VBA bridge likewise borrows its source bytes and applies an explicit
+CFB limit instead of copying the whole project before parsing.
+
+DOCX, PPTX, and XLSX retain the opened package's `Mode`. Their ordinary `save`
+paths reject an encrypted source before touching the destination; callers must
+choose `save_reencrypted` or the conspicuous `save_plain`. New encrypted output
+requires a non-empty password, borrows that password only for the operation,
+and atomically replaces a path destination after serialization and encryption
+succeed. PPTX presentation modify-password metadata remains a separate concern
+from outer-package encryption. This is the fail-closed migration seam; it does
+not yet claim the final consuming `Locked<T>`/`Sensitive<T>` type-state facade
+required when each concrete format leaves the migration host.
+
+Presentation modification protection is also made structurally separate and
+safe. `PresentationProtection` owns an optional private `ModifyVerifier`
+aggregate instead of public independent algorithm, spin-count, salt, hash, and
+enabled fields. Callers can inspect it through short read-only accessors but
+can construct it only through strict parsing or atomic password setting. The
+SHA-512 initial input follows PowerPoint's checked-in conformance rule,
+`UTF-16LE(password) || salt`, followed by the little-endian iteration counter.
+Unknown algorithms/SIDs, malformed attributes, missing or duplicate fields,
+invalid Base64, wrong digest lengths, and out-of-policy spin counts remain
+typed errors rather than silently becoming SHA-1 or default values.
+
+The dependency fence removes the migration host's direct CFB, cipher, HMAC,
+hash, and random-source ownership for outer encryption. `litchi-crypto` keeps
+those dependencies optional behind `ooxml`, and the umbrella re-exports the
+canonical crypto owner only when the encryption capability is selected. This
+does not assert that all transitive CFB use has disappeared: VBA and other
+focused Office capabilities still legitimately depend on the CFB owner.
+
+Focused evidence for this slice is green. CFB passes 87 unit tests, four
+property-set integration tests, and six executed doctests (one documentation
+case is intentionally ignored). The crypto owner passes 49 unit tests, two
+compile doctests, and one compile-fail doctest. The OOXML host passes all five
+encrypted-package integration scenarios and six focused presentation
+protection tests. The focused OPC filter passes seven tests and VBA passes all
+26 unit tests. Warning-denied Clippy passes for CFB, crypto, OPC, VBA, the
+OOXML host/test/example targets, and both umbrella PowerPoint examples;
+warning-denied rustdoc passes for the touched owners. The isolated umbrella
+examples compile with and without encryption as their declared features
+require. The boundary checker accepts 35 workspace packages and 110 internal
+dependency declarations with 19 explicit debt items; all 13 policy regressions,
+Python bytecode compilation, formatting, and diff validation pass. Per explicit
+user direction, the previously green full-workspace gate was not repeated.
+
+Computer Use verification on current macOS Microsoft Word opened both a
+generated Agile and a generated Standard encrypted DOCX. Word presented its
+native password prompt for each file, accepted the synthetic test password,
+showed no repair dialog, and displayed the exact two-line marker headed
+`Litchi encrypted DOCX verification`. Neither encrypted document nor the
+previously open unrelated Word document was edited or saved. This certifies
+password open and visible content for the implemented AES-128/SHA-1 Standard
+and Agile profiles on that Word build. It does not certify Office edit/resave,
+PowerPoint or Excel UI behavior, AES-192/256 or SHA-2 profiles, Windows/web or
+older Office releases, or performance.
 
 ## Evidence levels
 

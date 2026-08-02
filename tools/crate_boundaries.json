@@ -4,6 +4,7 @@
     "litchi": [
       "litchi-cfb",
       "litchi-core",
+      "litchi-crypto",
       "litchi-doc",
       "litchi-drawingml",
       "litchi-eval",
@@ -178,13 +179,6 @@
       "exit": "Move DOCX, PPTX, XLSB, and XLSX into concrete crates that depend directly on litchi-vba, then delete the host."
     },
     {
-      "order": 32,
-      "dependent": "litchi-ooxml",
-      "dependency": "litchi-cfb",
-      "reason": "The OOXML monolith still owns encrypted-container integration.",
-      "exit": "Move encryption/container integration to focused optional capability crates, then delete the host."
-    },
-    {
       "order": 33,
       "dependent": "litchi-ooxml",
       "dependency": "litchi-core",
@@ -288,13 +282,6 @@
       "dependency": "soapberry-zip",
       "reason": "The facade still owns format implementation dependencies.",
       "exit": "Move archive use behind concrete crates so the facade only re-exports canonical APIs."
-    },
-    {
-      "order": 49,
-      "dependent": "litchi",
-      "dependency": "xml-minifier",
-      "reason": "The facade still owns format implementation dependencies.",
-      "exit": "Move XML implementation use behind concrete crates so the facade only re-exports canonical APIs."
     }
   ],
   "runtime_neutral": [

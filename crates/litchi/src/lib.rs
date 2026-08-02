@@ -332,6 +332,16 @@ pub mod ooxml {
     pub use litchi_ooxml_common::{custom, custom_xml, embedded, ribbon, web};
 }
 
+/// Runtime-neutral Microsoft Office cryptography.
+///
+/// The concrete format packages retain responsibility for locating encrypted
+/// records; this facade exposes the canonical bounded cryptographic codecs and
+/// OOXML encrypted-package service without a CFB type in their APIs.
+#[cfg(feature = "ooxml_encryption")]
+pub mod crypto {
+    pub use litchi_crypto::*;
+}
+
 /// Trust-neutral Office signature authoring and verification.
 ///
 /// The concise facade re-exports the canonical types without aliases. Format

@@ -1,7 +1,8 @@
 //! Presentation protection support for PowerPoint presentations.
 //!
-//! This module provides support for password protection, read-only mode,
-//! and other security settings for presentations.
+//! This module provides PresentationML modification protection, read-only
+//! recommendations, and slide restrictions. File-open encryption belongs to
+//! the outer package and is configured when the package is saved.
 
 use crate::error::{OoxmlError, Result};
 use base64::Engine;
@@ -10,7 +11,42 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use rand::TryRng;
 use rand::rngs::SysRng;
+use sha2::digest::Output;
 use sha2::{Digest, Sha512};
+use zeroize::{Zeroize, Zeroizing};
+
+/// SHA-512 output whose storage is erased when it leaves scope.
+///
+/// `digest::Output` deliberately does not implement [`Zeroize`], so this
+/// local wrapper provides the operation without allocating an intermediate
+/// password-hash `Vec`.
+struct Sha512Output(Output<Sha512>);
+
+impl Zeroize for Sha512Output {
+    fn zeroize(&mut self) {
+        self.0.as_mut_slice().fill(0);
+    }
+}
+
+fn modify_password_hash(password: &str, salt: &[u8], spin_count: u32) -> Zeroizing<Sha512Output> {
+    // [MS-OE376] requires H(password || salt), followed by
+    // H(previous || little_endian_iteration) for iterations starting at zero.
+    let mut hasher = Sha512::new();
+    for unit in password.encode_utf16() {
+        hasher.update(unit.to_le_bytes());
+    }
+    hasher.update(salt);
+    let mut hash = Zeroizing::new(Sha512Output(Output::<Sha512>::default()));
+    hasher.finalize_into(&mut hash.0);
+
+    for iteration in 0..spin_count {
+        let mut hasher = Sha512::new();
+        hasher.update(hash.0.as_slice());
+        hasher.update(iteration.to_le_bytes());
+        hasher.finalize_into(&mut hash.0);
+    }
+    hash
+}
 
 /// Type of protection applied to a presentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,10 +57,6 @@ pub enum ProtectionType {
     ReadOnlyRecommended,
     /// Password required to modify
     ModifyPassword,
-    /// Password required to open
-    OpenPassword,
-    /// Both open and modify passwords required
-    FullProtection,
 }
 
 /// Cryptographic algorithm for password hashing.
@@ -52,28 +84,98 @@ impl CryptoAlgorithm {
         }
     }
 
-    /// Parse from URI string.
-    pub fn from_uri(uri: &str) -> Self {
-        if uri.contains("sha512") {
-            CryptoAlgorithm::Sha512
-        } else if uri.contains("sha384") {
-            CryptoAlgorithm::Sha384
-        } else if uri.contains("sha256") {
-            CryptoAlgorithm::Sha256
-        } else {
-            CryptoAlgorithm::Sha1
+    /// Parse an exact OOXML algorithm URI or registered algorithm name.
+    pub fn from_uri(value: &str) -> Result<Self> {
+        match value {
+            "http://www.w3.org/2000/09/xmldsig#sha1" | "SHA-1" => Ok(Self::Sha1),
+            "http://www.w3.org/2001/04/xmlenc#sha256" | "SHA-256" => Ok(Self::Sha256),
+            "http://www.w3.org/2001/04/xmldsig-more#sha384" | "SHA-384" => Ok(Self::Sha384),
+            "http://www.w3.org/2001/04/xmlenc#sha512" | "SHA-512" => Ok(Self::Sha512),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "unsupported presentation protection hash algorithm '{value}'"
+            ))),
+        }
+    }
+
+    fn from_sid(sid: u32) -> Result<Self> {
+        match sid {
+            4 => Ok(Self::Sha1),
+            12 => Ok(Self::Sha256),
+            13 => Ok(Self::Sha384),
+            14 => Ok(Self::Sha512),
+            _ => Err(OoxmlError::InvalidFormat(format!(
+                "unsupported presentation protection hash SID {sid}"
+            ))),
+        }
+    }
+
+    const fn output_bytes(self) -> usize {
+        match self {
+            Self::Sha1 => 20,
+            Self::Sha256 => 32,
+            Self::Sha384 => 48,
+            Self::Sha512 => 64,
         }
     }
 }
 
-/// Encryption mode used for open-password (file-level) protection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OpenPasswordEncryption {
-    /// ECMA-376 Standard 2007 encryption (binary EncryptionInfo, AES-128/SHA1).
-    #[default]
-    Standard2007,
-    /// Agile OOXML encryption (XML EncryptionInfo, segmented AES-CBC + HMAC).
-    Agile,
+fn set_once<T>(slot: &mut Option<T>, value: T, field: &'static str) -> Result<()> {
+    if slot.is_some() {
+        return Err(OoxmlError::InvalidFormat(format!(
+            "duplicate presentation modify-verifier {field}"
+        )));
+    }
+    *slot = Some(value);
+    Ok(())
+}
+
+fn verifier_value<'a>(bytes: &'a [u8], field: &'static str) -> Result<&'a str> {
+    std::str::from_utf8(bytes).map_err(|_| {
+        OoxmlError::InvalidFormat(format!("presentation modify-verifier {field} is not UTF-8"))
+    })
+}
+
+/// Validated, read-only presentation modification verifier.
+#[derive(Clone)]
+pub struct ModifyVerifier {
+    algorithm: CryptoAlgorithm,
+    spin_count: u32,
+    hash: String,
+    salt: String,
+}
+
+impl ModifyVerifier {
+    /// Hash algorithm recorded by the verifier.
+    pub const fn algorithm(&self) -> CryptoAlgorithm {
+        self.algorithm
+    }
+
+    /// Number of iterative hash rounds after the initial password/salt hash.
+    pub const fn spins(&self) -> u32 {
+        self.spin_count
+    }
+
+    /// Borrow the Base64-encoded verifier hash.
+    pub fn hash(&self) -> &str {
+        &self.hash
+    }
+
+    /// Borrow the Base64-encoded verifier salt.
+    pub fn salt(&self) -> &str {
+        &self.salt
+    }
+}
+
+impl std::fmt::Debug for ModifyVerifier {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ModifyVerifier")
+            .field("algorithm", &self.algorithm)
+            .field("spin_count", &self.spin_count)
+            .field("hash_bytes", &self.hash.len())
+            .field("salt_bytes", &self.salt.len())
+            .finish_non_exhaustive()
+    }
 }
 
 /// Protection settings for a presentation.
@@ -81,21 +183,9 @@ pub enum OpenPasswordEncryption {
 pub struct PresentationProtection {
     /// Whether the presentation is marked as read-only recommended
     pub read_only_recommended: bool,
-    /// Whether modification requires a password
-    pub modify_password_protected: bool,
-    /// Hashed modify password (base64 encoded)
-    pub modify_password_hash: Option<String>,
-    /// Salt for modify password (base64 encoded)
-    pub modify_password_salt: Option<String>,
-    /// Spin count for modify password hashing
-    pub modify_spin_count: u32,
-    /// Algorithm used for modify password
-    pub modify_algorithm: CryptoAlgorithm,
-    /// Whether opening requires a password (handled by encryption, not here)
-    pub open_password_protected: bool,
-    open_password: Option<String>,
-    /// Encryption mode for open-password protection
-    pub open_password_encryption: OpenPasswordEncryption,
+    /// Modification protection is one validated aggregate, so callers cannot
+    /// independently desynchronize its algorithm, rounds, salt, and hash.
+    modify: Option<ModifyVerifier>,
     /// Prevent editing of individual slides
     pub protect_structure: bool,
     /// Prevent changing windows/views
@@ -129,19 +219,14 @@ impl PresentationProtection {
     /// Check if any protection is enabled.
     pub fn is_protected(&self) -> bool {
         self.read_only_recommended
-            || self.modify_password_protected
-            || self.open_password_protected
+            || self.modify.is_some()
             || self.protect_structure
             || self.protect_windows
     }
 
     /// Get the protection type.
     pub fn protection_type(&self) -> ProtectionType {
-        if self.open_password_protected && self.modify_password_protected {
-            ProtectionType::FullProtection
-        } else if self.open_password_protected {
-            ProtectionType::OpenPassword
-        } else if self.modify_password_protected {
+        if self.modify.is_some() {
             ProtectionType::ModifyPassword
         } else if self.read_only_recommended {
             ProtectionType::ReadOnlyRecommended
@@ -150,14 +235,17 @@ impl PresentationProtection {
         }
     }
 
-    /// Set modify password (hashes the password).
-    /// Note: This is a simplified implementation. Real implementation would use
-    /// proper OOXML password hashing algorithm.
+    /// Borrow the validated modification verifier, when present.
+    pub fn modify(&self) -> Option<&ModifyVerifier> {
+        self.modify.as_ref()
+    }
+
+    /// Set the Office-compatible modify-password verifier.
+    ///
+    /// New verifier state is staged and committed together, so a random-source
+    /// failure leaves the previous protection settings unchanged.
     pub fn set_modify_password(&mut self, password: &str) -> Result<()> {
-        // Enable modify protection and configure algorithm parameters
-        self.modify_password_protected = true;
-        self.modify_spin_count = 100000;
-        self.modify_algorithm = CryptoAlgorithm::Sha512;
+        const SPIN_COUNT: u32 = 100_000;
 
         // Generate random salt (16 bytes, as commonly used by Office)
         let mut salt = [0u8; 16];
@@ -168,77 +256,22 @@ impl PresentationProtection {
             ))
         })?;
 
-        // Encode password as UTF-16LE bytes
-        let mut pw_bytes = Vec::with_capacity(password.len() * 2);
-        for ch in password.encode_utf16() {
-            pw_bytes.extend_from_slice(&ch.to_le_bytes());
-        }
+        let hash = modify_password_hash(password, &salt, SPIN_COUNT);
+        let encoded_hash = BASE64_ENGINE.encode(hash.0.as_slice());
+        let encoded_salt = BASE64_ENGINE.encode(salt);
 
-        // Initial hash: H[init] = H(salt || password)
-        let mut hasher = Sha512::new();
-        hasher.update(salt);
-        hasher.update(&pw_bytes);
-        let mut hash = hasher.finalize().to_vec();
-
-        // Iterative hashing: H[n] = H(H[n-1] || count_le_u32), for spinCount cycles
-        for i in 0..self.modify_spin_count {
-            let mut hasher = Sha512::new();
-            hasher.update(&hash);
-            hasher.update(i.to_le_bytes());
-            hash = hasher.finalize().to_vec();
-        }
-
-        self.modify_password_hash = Some(BASE64_ENGINE.encode(&hash));
-        self.modify_password_salt = Some(BASE64_ENGINE.encode(salt));
+        self.modify = Some(ModifyVerifier {
+            algorithm: CryptoAlgorithm::Sha512,
+            spin_count: SPIN_COUNT,
+            hash: encoded_hash,
+            salt: encoded_salt,
+        });
         Ok(())
     }
 
     /// Clear modify password protection.
     pub fn clear_modify_password(&mut self) {
-        self.modify_password_protected = false;
-        self.modify_password_hash = None;
-        self.modify_password_salt = None;
-    }
-
-    /// Get the open-password encryption mode.
-    pub fn open_password_encryption(&self) -> OpenPasswordEncryption {
-        self.open_password_encryption
-    }
-
-    /// Set the open-password encryption mode (Standard 2007 vs Agile).
-    pub fn set_open_password_encryption(&mut self, mode: OpenPasswordEncryption) {
-        self.open_password_encryption = mode;
-    }
-
-    #[cfg(feature = "encryption")]
-    pub fn set_open_password(&mut self, password: &str) -> Result<()> {
-        if password.is_empty() {
-            return Err(OoxmlError::InvalidFormat(
-                "open password cannot be empty".to_string(),
-            ));
-        }
-
-        self.open_password_protected = true;
-        self.open_password = Some(password.to_string());
-        Ok(())
-    }
-
-    #[cfg(not(feature = "encryption"))]
-    pub fn set_open_password(&mut self, _password: &str) -> Result<()> {
-        Err(OoxmlError::Other(
-            "PPTX open-password protection requires the `ooxml_encryption` feature to be enabled"
-                .to_string(),
-        ))
-    }
-
-    pub fn clear_open_password(&mut self) {
-        self.open_password_protected = false;
-        self.open_password = None;
-    }
-
-    #[cfg(feature = "encryption")]
-    pub(crate) fn open_password(&self) -> Option<&str> {
-        self.open_password.as_deref()
+        self.modify = None;
     }
 
     /// Parse protection settings from presentation properties XML.
@@ -247,54 +280,142 @@ impl PresentationProtection {
         let xml = litchi_ooxml_common::mce::process_str(xml)?;
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
+        let mut verifier_seen = false;
 
         loop {
             match reader.read_event() {
                 Ok(Event::Empty(e)) | Ok(Event::Start(e))
                     if e.local_name().as_ref() == b"modifyVerifier" =>
                 {
-                    protection.modify_password_protected = true;
-                    for attr in e.attributes().flatten() {
+                    if verifier_seen {
+                        return Err(OoxmlError::InvalidFormat(
+                            "duplicate presentation modifyVerifier".to_string(),
+                        ));
+                    }
+                    verifier_seen = true;
+
+                    let mut hash = None;
+                    let mut salt = None;
+                    let mut spin_count = None;
+                    let mut algorithm = None;
+                    for attr in e.attributes() {
+                        let attr = attr.map_err(|error| OoxmlError::Xml(error.to_string()))?;
                         match attr.key.as_ref() {
                             // ISO-style attributes
                             b"hashValue" | b"hashData" => {
-                                protection.modify_password_hash = Some(
-                                    std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
-                                );
+                                let value = verifier_value(attr.value.as_ref(), "hash")?;
+                                set_once(&mut hash, value.to_owned(), "hash")?;
                             },
                             b"saltValue" | b"saltData" => {
-                                protection.modify_password_salt = Some(
-                                    std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
-                                );
+                                let value = verifier_value(attr.value.as_ref(), "salt")?;
+                                set_once(&mut salt, value.to_owned(), "salt")?;
                             },
                             b"spinCount" | b"spinValue" => {
-                                protection.modify_spin_count = std::str::from_utf8(&attr.value)
-                                    .ok()
-                                    .and_then(|s| s.parse().ok())
-                                    .unwrap_or(100000);
-                            },
-                            b"algorithmName" | b"algIdExt" => {
-                                if let Ok(uri) = std::str::from_utf8(&attr.value) {
-                                    protection.modify_algorithm = CryptoAlgorithm::from_uri(uri);
+                                let value = verifier_value(attr.value.as_ref(), "spin count")?;
+                                let value = value.parse::<u32>().map_err(|_| {
+                                    OoxmlError::InvalidFormat(
+                                        "presentation modify-verifier spin count is not a u32"
+                                            .to_string(),
+                                    )
+                                })?;
+                                if !(1..=10_000_000).contains(&value) {
+                                    return Err(OoxmlError::InvalidFormat(
+                                        "presentation modify-verifier spin count must be between 1 and 10000000"
+                                            .to_string(),
+                                    ));
                                 }
+                                set_once(&mut spin_count, value, "spin count")?;
+                            },
+                            b"algorithmName" => {
+                                let value = verifier_value(attr.value.as_ref(), "algorithm")?;
+                                set_once(
+                                    &mut algorithm,
+                                    CryptoAlgorithm::from_uri(value)?,
+                                    "algorithm",
+                                )?;
+                            },
+                            b"algIdExt" => {
+                                return Err(OoxmlError::InvalidFormat(
+                                    "extended CryptoAPI presentation protection algorithms are unsupported"
+                                        .to_string(),
+                                ));
                             },
                             // Legacy SID-based form
                             b"cryptAlgorithmSid" => {
-                                if let Ok(text) = std::str::from_utf8(&attr.value)
-                                    && let Ok(sid) = text.parse::<u32>()
-                                {
-                                    protection.modify_algorithm = match sid {
-                                        4 => CryptoAlgorithm::Sha1,
-                                        12 => CryptoAlgorithm::Sha256,
-                                        13 => CryptoAlgorithm::Sha384,
-                                        14 => CryptoAlgorithm::Sha512,
-                                        _ => protection.modify_algorithm,
-                                    };
-                                }
+                                let value = verifier_value(attr.value.as_ref(), "algorithm SID")?;
+                                let sid = value.parse::<u32>().map_err(|_| {
+                                    OoxmlError::InvalidFormat(
+                                        "presentation modify-verifier algorithm SID is not a u32"
+                                            .to_string(),
+                                    )
+                                })?;
+                                set_once(
+                                    &mut algorithm,
+                                    CryptoAlgorithm::from_sid(sid)?,
+                                    "algorithm",
+                                )?;
                             },
                             _ => {},
                         }
                     }
+
+                    let hash = hash.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "presentation modifyVerifier is missing its hash".to_string(),
+                        )
+                    })?;
+                    let salt = salt.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "presentation modifyVerifier is missing its salt".to_string(),
+                        )
+                    })?;
+                    let spin_count = spin_count.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "presentation modifyVerifier is missing its spin count".to_string(),
+                        )
+                    })?;
+                    let algorithm = algorithm.ok_or_else(|| {
+                        OoxmlError::InvalidFormat(
+                            "presentation modifyVerifier is missing its hash algorithm".to_string(),
+                        )
+                    })?;
+
+                    if hash.len() > 128 || salt.len() > 1_368 {
+                        return Err(OoxmlError::InvalidFormat(
+                            "presentation modify-verifier Base64 field exceeds its bound"
+                                .to_string(),
+                        ));
+                    }
+                    let decoded_hash = BASE64_ENGINE.decode(&hash).map_err(|_| {
+                        OoxmlError::InvalidFormat(
+                            "presentation modify-verifier hash is not valid Base64".to_string(),
+                        )
+                    })?;
+                    if decoded_hash.len() != algorithm.output_bytes() {
+                        return Err(OoxmlError::InvalidFormat(format!(
+                            "presentation modify-verifier hash has {} bytes, expected {}",
+                            decoded_hash.len(),
+                            algorithm.output_bytes()
+                        )));
+                    }
+                    let decoded_salt = BASE64_ENGINE.decode(&salt).map_err(|_| {
+                        OoxmlError::InvalidFormat(
+                            "presentation modify-verifier salt is not valid Base64".to_string(),
+                        )
+                    })?;
+                    if decoded_salt.is_empty() || decoded_salt.len() > 1_024 {
+                        return Err(OoxmlError::InvalidFormat(
+                            "presentation modify-verifier salt must contain 1 to 1024 bytes"
+                                .to_string(),
+                        ));
+                    }
+
+                    protection.modify = Some(ModifyVerifier {
+                        algorithm,
+                        spin_count,
+                        hash,
+                        salt,
+                    });
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(OoxmlError::Xml(e.to_string())),
@@ -309,41 +430,23 @@ impl PresentationProtection {
     pub fn to_xml(&self) -> String {
         let mut xml = String::new();
 
-        if self.modify_password_protected
-            && let (Some(hash), Some(salt)) =
-                (&self.modify_password_hash, &self.modify_password_salt)
-        {
-            let sid = match self.modify_algorithm {
-                CryptoAlgorithm::Sha1 => Some(4u32),
-                CryptoAlgorithm::Sha256 => Some(12u32),
-                CryptoAlgorithm::Sha384 => Some(13u32),
-                CryptoAlgorithm::Sha512 => Some(14u32),
+        if let Some(verifier) = &self.modify {
+            let sid = match verifier.algorithm {
+                CryptoAlgorithm::Sha1 => 4u32,
+                CryptoAlgorithm::Sha256 => 12u32,
+                CryptoAlgorithm::Sha384 => 13u32,
+                CryptoAlgorithm::Sha512 => 14u32,
             };
 
-            if let Some(sid) = sid {
-                // Emit only the legacy SID-based attributes, matching
-                // PowerPoint's own output for modify password protection.
-                // Example (from a PowerPoint-generated file):
-                // <p:modifyVerifier cryptProviderType="rsaAES" cryptAlgorithmClass="hash"
-                //                  cryptAlgorithmType="typeAny" cryptAlgorithmSid="14"
-                //                  spinCount="100000" saltData="..." hashData="..."/>
-                xml.push_str(&format!(
-                    r#"<p:modifyVerifier cryptProviderType="rsaAES" cryptAlgorithmClass="hash" cryptAlgorithmType="typeAny" cryptAlgorithmSid="{}" spinCount="{}" saltData="{}" hashData="{}"/>"#,
-                    sid,
-                    self.modify_spin_count,
-                    salt,
-                    hash,
-                ));
-            } else {
-                // Fallback: ISO-style only, in case we ever have an
-                // algorithm without a corresponding SID.
-                xml.push_str(&format!(
-                    r#"<p:modifyVerifier algorithmName="SHA-512" hashValue="{}" saltValue="{}" spinCount="{}"/>"#,
-                    hash,
-                    salt,
-                    self.modify_spin_count,
-                ));
-            }
+            // Emit only the legacy SID-based attributes, matching
+            // PowerPoint's own output for modify password protection.
+            xml.push_str(&format!(
+                r#"<p:modifyVerifier cryptProviderType="rsaAES" cryptAlgorithmClass="hash" cryptAlgorithmType="typeAny" cryptAlgorithmSid="{}" spinCount="{}" saltData="{}" hashData="{}"/>"#,
+                sid,
+                verifier.spin_count,
+                verifier.salt,
+                verifier.hash,
+            ));
         }
 
         xml
@@ -418,16 +521,79 @@ mod tests {
         prot.read_only_recommended = true;
         assert_eq!(prot.protection_type(), ProtectionType::ReadOnlyRecommended);
 
-        prot.modify_password_protected = true;
+        prot.modify = Some(ModifyVerifier {
+            algorithm: CryptoAlgorithm::Sha512,
+            spin_count: 1,
+            hash: BASE64_ENGINE.encode([0; 64]),
+            salt: BASE64_ENGINE.encode([0; 16]),
+        });
         assert_eq!(prot.protection_type(), ProtectionType::ModifyPassword);
     }
 
     #[test]
     fn test_crypto_algorithm() {
-        assert_eq!(
+        assert!(matches!(
             CryptoAlgorithm::from_uri("http://www.w3.org/2001/04/xmlenc#sha256"),
-            CryptoAlgorithm::Sha256
+            Ok(CryptoAlgorithm::Sha256)
+        ));
+        assert!(CryptoAlgorithm::from_uri("vendor-sha512-ish").is_err());
+    }
+
+    #[test]
+    fn modify_password_hashing_does_not_retain_or_debug_the_password() {
+        let password = "unique plaintext password 9bQ!";
+        let mut protection = PresentationProtection::new();
+
+        protection.set_modify_password(password).unwrap();
+
+        let verifier = protection.modify().expect("modify verifier");
+        assert_eq!(verifier.algorithm(), CryptoAlgorithm::Sha512);
+        assert_eq!(verifier.spins(), 100_000);
+        assert_eq!(BASE64_ENGINE.decode(verifier.hash()).unwrap().len(), 64);
+        assert_eq!(BASE64_ENGINE.decode(verifier.salt()).unwrap().len(), 16);
+        assert!(!format!("{protection:?}").contains(password));
+        assert!(!format!("{:?}", protection.clone()).contains(password));
+    }
+
+    #[test]
+    fn modify_password_hash_matches_office_password_then_salt_order() {
+        let salt: Vec<u8> = (0..16).collect();
+        let hash = modify_password_hash("Päss😀", &salt, 2);
+
+        assert_eq!(
+            BASE64_ENGINE.encode(hash.0.as_slice()),
+            "3ACFcYR0/M+PsEwOXR4/mcgYsTN1VMXMunIrbpt1lY+1Kal3nCkZOJjIEw+LWRlQzI3rL5HZnVIoL87I6R8tNw=="
         );
+    }
+
+    #[test]
+    fn modify_verifier_parser_requires_exact_typed_metadata() {
+        let hash = BASE64_ENGINE.encode([0x5a; 64]);
+        let salt = BASE64_ENGINE.encode([0xa5; 16]);
+        let xml = format!(
+            r#"<p:modifyVerifier xmlns:p="urn:p" cryptAlgorithmSid="14" spinCount="100000" saltData="{salt}" hashData="{hash}"/>"#
+        );
+        let parsed = PresentationProtection::parse_xml(&xml).expect("valid verifier");
+        let verifier = parsed.modify().expect("parsed verifier");
+        assert_eq!(verifier.algorithm(), CryptoAlgorithm::Sha512);
+        assert_eq!(verifier.spins(), 100_000);
+
+        for malformed in [
+            format!(
+                r#"<p:modifyVerifier xmlns:p="urn:p" cryptAlgorithmSid="99" spinCount="100000" saltData="{salt}" hashData="{hash}"/>"#
+            ),
+            format!(
+                r#"<p:modifyVerifier xmlns:p="urn:p" cryptAlgorithmSid="14" spinCount="many" saltData="{salt}" hashData="{hash}"/>"#
+            ),
+            format!(
+                r#"<p:modifyVerifier xmlns:p="urn:p" cryptAlgorithmSid="14" spinCount="100000" saltData="{salt}" hashData="not-base64"/>"#
+            ),
+            format!(
+                r#"<p:modifyVerifier xmlns:p="urn:p" cryptAlgorithmSid="14" spinCount="100000" saltData="{salt}"/>"#
+            ),
+        ] {
+            assert!(PresentationProtection::parse_xml(&malformed).is_err());
+        }
     }
 
     #[test]

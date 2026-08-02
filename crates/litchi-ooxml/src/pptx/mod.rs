@@ -238,8 +238,7 @@ pub use presentation_structure::{
     synchronize_presentation_structure_after_slide_mutation, update_custom_show, update_section,
 };
 pub use protection::{
-    CryptoAlgorithm, OpenPasswordEncryption, PresentationProtection, ProtectionType,
-    SlideProtection,
+    CryptoAlgorithm, ModifyVerifier, PresentationProtection, ProtectionType, SlideProtection,
 };
 pub use revision_information::{
     ClientRevision, REVISION_INFORMATION_CONTENT_TYPE, REVISION_INFORMATION_RELATIONSHIP_TYPE,

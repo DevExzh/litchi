@@ -48,7 +48,7 @@ conversion, fonts, and image conversion are optional.
 | OOXML OPC package editing | ✅ | ✅ | ✅ | Parts, relationships, content types, strict/transitional XML, and transactional graph updates |
 | OLE/CFB package editing | ✅ | ✅ | ✅ | Streams, storages, property sets, and package-preserving editors; reading follows MS-CFB's guidance for real-world files by ignoring the uninitialized high stream-size word in version 3 directory entries and accepting a file truncated mid-sector, while sectors starting at or past the end of the file remain errors |
 | ODF package editing | ✅ | ✅ | ✅ | ZIP package, manifest, metadata, styles, settings, resources, and MIME validation |
-| OOXML encryption | ✅ | ✅ | ✅ | Standard 2007 and Agile encryption; requires `ooxml_encryption` |
+| OOXML encryption | ✅ | ✅ | ✅ | Canonical runtime-neutral `litchi-crypto::ooxml`, exposed contextually as `litchi_ooxml::encryption`, owns password-free `Kind` inspection, move-consuming open/encrypt/password-change operations, and the validated StrongEncryptionDataSpace envelope. The implemented Standard and Agile compatibility profiles are AES-128/SHA-1; AES-192/256 and SHA-2 Agile profiles remain typed `Unsupported` rather than being misread. Explicit `Limits`, bounded XML/spin count/stream sizes, checked lengths, typed password/policy/integrity failures, zeroizing secrets, move-owned CFB output, and atomic DOCX/PPTX/XLSX path saves apply under `ooxml_encryption`; encrypted sources refuse an implicit plaintext save |
 | Legacy Office encryption | ✅ | ✅ | ✅ | Format-specific DOC, XLS, and PPT password profiles |
 | ODF encryption | ✅ | ✅ | ✅ | Package authoring/opening with supported AES/Blowfish, PBKDF2, and Argon2 profiles |
 | OOXML digital signatures | ✅ | ✅ | ✅ | Neutral `litchi-sign` XMLDSig engine plus an atomic `litchi-opc` graph adapter; strict verification is the safe default, while explicit compatibility verification reports producer subset signatures as partial coverage; verify, add, re-sign, and clear RSA-SHA256/ECDSA signatures |
@@ -137,7 +137,7 @@ conversion, fonts, and image conversion are optional.
 | Ribbon customization | 🟡 | ✅ | ✅ | `litchi-ooxml-common::ribbon` provides borrowed, bounded package reads plus consuming `put` and family-level `remove`; DOCX, PPTX, XLSX, and XLSB expose concise safe-default facades, and PowerPoint also exposes read-only presentation access. The graph validator enforces package-level cardinality, relationship/root namespaces, internal targets, content types, and image-only outbound relationships without executing callbacks, macros, commands, or linked content |
 | VBA projects/DOCM macros | 🟡 | 🟡 | 🟡 | DOCM/DOTM relationship graphs plus bounded `vbaProject.bin` CFB/MS-OVBA parsing, deterministic cache-free project/module payload authoring, typed project/module metadata, and codepage-aware inert source extraction; package mutation validates or authors the project payload, writes typed document-event/macro supplemental data, changes DOCX/DOTX content types, preserves the graph across document materialization, and supports complete removal; VBA is never executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
-| Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
+| Password encryption | ✅ | ✅ | ✅ | Supported-profile encrypted open/save/password change with retained mode; ordinary save refuses implicit plaintext downgrade and explicit `save_plain` remains available |
 
 ## Excel workbooks (XLSX)
 
@@ -200,7 +200,7 @@ conversion, fonts, and image conversion are optional.
 | Sheet protection/protected ranges | ✅ | ✅ | ✅ | Legacy and strong hashes plus protected-range metadata |
 | Workbook protection | ✅ | ✅ | ✅ | Typed structure/window/revision locks and legacy/strong verifier metadata round-trip through complete `workbookProtection` parsing and authoring; password verifiers remain advisory and the library does not enforce editing policy |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
-| Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
+| Password encryption | ✅ | ✅ | ✅ | Supported-profile encrypted open/save/password change with retained mode; ordinary save refuses implicit plaintext downgrade and explicit `save_plain` remains available |
 | VBA projects/XLSM macros | 🟡 | 🟡 | 🟡 | The MS-OFFMACRO2 relationship graph and bounded `vbaProject.bin` CFB/MS-OVBA project/module source are parsed inertly with the declared code page; package mutation attaches either validated existing payloads or deterministic cache-free authored projects, transitions XLSX/XLTX content types, preserves the graph across workbook materialization, and supports complete removal; VBA is never executed |
 
 ## PowerPoint presentations (PPTX)
@@ -228,7 +228,7 @@ conversion, fonts, and image conversion are optional.
 | Themes | ✅ | ✅ | ✅ | Master-, layout-, and slide-scoped validated theme resolution, typed color maps/overrides, and presentation inventory; theme authoring with typed 12-slot color schemes and major/minor font schemes, master attachment with graph validation, scheme replacement on existing theme parts, and theme override model + authoring on slides and layouts (parse/store/replace/remove with orphaned-part cleanup); fmtScheme authoring is not covered |
 | Sections | ✅ | ✅ | ✅ | Typed section readers with stable IDs and resolved slide-index membership, plus graph-safe CRUD |
 | Custom slide shows | ✅ | ✅ | ✅ | High-level typed inventory of named subsets, plus graph-safe ordered CRUD |
-| Presentation/slide protection | ✅ | ✅ | ✅ | Protection and password metadata, including root modification-verifier inspection; policy is not enforced by the library |
+| Presentation/slide protection | ✅ | ✅ | ✅ | Protection metadata with a private validated `ModifyVerifier` aggregate, strict algorithm/SID/Base64/spin parsing, Office-compatible password-then-salt hashing, and read-only verifier inspection; modification policy is advisory and outer file-open encryption is a separate package-save concern |
 | Embedded fonts | ✅ | ✅ | ✅ | High-level typed inventory, payloads, obfuscation, licensing checks, and ordered CRUD |
 | Embedded OLE/package objects | ✅ | ✅ | ✅ | Typed per-slide inert OLE inventory plus the shared bounded, zero-copy relationship inventory; inert OLE authoring uses validated ProgIDs, `/ppt/embeddings` parts, `p:oleObj` frames, and byte-identical payload round-trips; payloads are never activated |
 | View and presentation properties, and guides | 🟡 | ✅ | ✅ | Typed root/package presentation settings, high-level extended-guide inventory, slide/notes surface dimensions and size type, including PowerPoint 2010 browse-mode metadata, with bounded serialization |
@@ -239,7 +239,7 @@ conversion, fonts, and image conversion are optional.
 | Slide-show event records | ✅ | ✅ | ✅ | Bounded inert PowerPoint 2010 trigger/media event inventory with slide, event, target object, and stored timeline metadata, plus validated inert event storage (`p14:showEvtLst` via the shared extension patcher); events are never replayed or executed |
 | VBA projects/PPTM macros | 🟡 | 🟡 | 🟡 | PPTM/PPSM/POTM relationship metadata plus bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing and deterministic cache-free project/module payload authoring; package mutation attaches validated or authored payloads, preserves presentation/slideshow/template kind and macro graphs across materialization, and supports complete removal; source is codepage-aware and inert, and VBA is never executed |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
-| Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
+| Password encryption | ✅ | ✅ | ✅ | Supported-profile encrypted open/save/password change with retained mode; ordinary save refuses implicit plaintext downgrade and explicit `save_plain` remains available |
 
 ## Word binary documents (DOC)
 
@@ -375,7 +375,7 @@ host and `ole` feature/module are removed rather than retained as aliases.
 | Web extensions/Office Add-ins | 🟡 | ✅ | ✅ | `XlsbWorkbook::{task_panes, put_task_panes, remove_task_panes}` now exposes canonical `litchi-ooxml-common::web` CRUD. Candidate task panes must satisfy every binary worksheet `BrtWebExtension.appRef`, and removal refuses dangling binary bindings. Bounded `WEBEXTENSIONS` codecs still preserve exact FRT formula bytes, enforce one REFERENCE-class 3D cell/area range, validate workbook-resolved internal-sheet XTI indices and exact UTF-16 references, and remain inert |
 | VBA project/code modules | 🟡 | 🟡 | ✅ | Inert MS-XLSB topology, bounded `vbaProject.bin` CFB/MS-OVBA project/module source parsing, deterministic cache-free project/module payload authoring, and declared legacy/Agile signature-part metadata; parsed workbooks and the new-workbook writer attach validated or authored projects, preserve them across binary-part edits, and remove complete project/signature graphs; replacement drops stale project signatures, source is never executed, and signature payloads remain opaque/unverified |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC verification and signing |
-| Password encryption | ✅ | ✅ | ✅ | Standard/Agile encrypted OOXML wrapper |
+| Password encryption | ✅ | ✅ | ✅ | Canonical supported-profile package encryption/decryption is available; migration of a dedicated safe-save facade from the XLSB host remains open |
 
 ## PowerPoint binary presentations (PPT)
 

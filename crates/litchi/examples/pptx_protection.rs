@@ -45,12 +45,13 @@ fn main() {
     }
 
     println!("\nPassword Protected:");
-    println!(
-        "  Modify protected: {}",
-        password_protected.modify_password_protected
-    );
-    println!("  Algorithm: {:?}", password_protected.modify_algorithm);
-    println!("  Spin count: {}", password_protected.modify_spin_count);
+    let Some(verifier) = password_protected.modify() else {
+        println!("  Internal error: modify verifier was not retained");
+        return;
+    };
+    println!("  Modify protected: true");
+    println!("  Algorithm: {:?}", verifier.algorithm());
+    println!("  Spin count: {}", verifier.spins());
     println!(
         "  Protection type: {:?}",
         password_protected.protection_type()
@@ -65,7 +66,7 @@ fn main() {
     println!("\nAfter clearing password:");
     println!(
         "  Modify protected: {}",
-        password_protected.modify_password_protected
+        password_protected.modify().is_some()
     );
 
     // Test crypto algorithms
@@ -79,7 +80,10 @@ fn main() {
 
     for algo in algorithms {
         let uri = algo.uri();
-        let parsed = CryptoAlgorithm::from_uri(uri);
+        let Ok(parsed) = CryptoAlgorithm::from_uri(uri) else {
+            println!("  Unexpected unsupported algorithm URI: {uri}");
+            return;
+        };
         println!("  {:?} -> {}", algo, uri);
         assert_eq!(algo, parsed);
     }
@@ -109,18 +113,17 @@ fn main() {
     println!("  No resize: {}", partial.no_resize);
     println!("  No move: {}", partial.no_move);
 
-    let mut open_protected = PresentationProtection::new();
-    match open_protected.set_open_password("secret123") {
-        Ok(()) => println!("\nOpen password was set successfully (encryption supported)."),
-        Err(e) => println!("\nOpen password not yet supported: {e}"),
-    }
+    println!(
+        "\nOpen-password encryption is selected explicitly on Package::save_encrypted, \
+         independently of presentation modification protection."
+    );
 
     // Generate XML
     let mut with_password = PresentationProtection::new();
-    with_password.modify_password_protected = true;
-    with_password.modify_password_hash = Some("base64hash==".to_string());
-    with_password.modify_password_salt = Some("base64salt==".to_string());
-    with_password.modify_spin_count = 100000;
+    if let Err(error) = with_password.set_modify_password("secret123") {
+        println!("\nError setting XML example password: {error}");
+        return;
+    }
 
     let xml = with_password.to_xml();
     println!("\nGenerated protection XML:");

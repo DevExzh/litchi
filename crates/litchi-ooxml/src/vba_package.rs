@@ -1,12 +1,10 @@
 //! Shared, inert MS-OFFMACRO2 package-graph mutation.
 
 use crate::error::{OoxmlError, Result};
-use litchi_cfb::OleFile;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_vba::{Limits, project::Project};
-use std::io::Cursor;
 use std::sync::Arc;
 
 const WORD_PROJECT_PART: &str = "/word/vbaProject.bin";
@@ -104,17 +102,7 @@ pub(crate) fn read_project_part(
     limits: &Limits,
 ) -> Result<Project> {
     let part = package.get_part(part_name)?;
-    let bytes = part.blob();
-    if bytes.len() > limits.max_cfb_bytes {
-        return Err(litchi_vba::Error::LimitExceeded {
-            limit: "standalone VBA CFB bytes",
-            actual: bytes.len(),
-            maximum: limits.max_cfb_bytes,
-        }
-        .into());
-    }
-    let mut compound = OleFile::open(Cursor::new(bytes)).map_err(litchi_vba::Error::from)?;
-    Project::open(&mut compound, &[], limits).map_err(Into::into)
+    Project::read_with(part.blob(), limits).map_err(Into::into)
 }
 
 /// Replace or attach the one VBA graph allowed for an OOXML main part.
@@ -476,6 +464,32 @@ mod tests {
         fn rels_mut(&mut self) -> &mut litchi_opc::rel::Relationships {
             self.inner.rels_mut()
         }
+    }
+
+    #[test]
+    fn project_part_reads_through_the_bounded_vba_owner() {
+        let part_name = PackURI::new("/xl/vbaProject.bin").expect("project URI");
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                part_name.clone(),
+                ct::OFC_VBA_PROJECT.to_owned(),
+                vec![0; 4],
+            )))
+            .expect("project part");
+        let limits = Limits {
+            max_cfb_bytes: 3,
+            ..Limits::default()
+        };
+
+        assert!(matches!(
+            read_project_part(&package, &part_name, &limits),
+            Err(OoxmlError::Vba(litchi_vba::Error::LimitExceeded {
+                limit: "standalone VBA CFB bytes",
+                actual: 4,
+                maximum: 3,
+            }))
+        ));
     }
 
     #[test]

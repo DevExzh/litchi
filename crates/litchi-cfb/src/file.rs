@@ -164,6 +164,11 @@ pub struct DirectoryEntry {
 #[derive(Debug)]
 pub enum OleError {
     Io(io::Error),
+    /// A bounded writer could not reserve the memory required for `resource`.
+    Allocation {
+        resource: &'static str,
+        source: std::collections::TryReserveError,
+    },
     InvalidFormat(String),
     InvalidData(String),
     NotOleFile,
@@ -177,6 +182,15 @@ impl From<io::Error> for OleError {
     }
 }
 
+impl OleError {
+    pub(crate) fn allocation(
+        resource: &'static str,
+        source: std::collections::TryReserveError,
+    ) -> Self {
+        Self::Allocation { resource, source }
+    }
+}
+
 impl From<litchi_core::binary::BinaryError> for OleError {
     fn from(err: litchi_core::binary::BinaryError) -> Self {
         OleError::InvalidData(err.to_string())
@@ -187,6 +201,9 @@ impl std::fmt::Display for OleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OleError::Io(e) => write!(f, "IO error: {}", e),
+            OleError::Allocation { resource, source } => {
+                write!(f, "could not reserve memory for CFB {resource}: {source}")
+            },
             OleError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
             OleError::InvalidData(s) => write!(f, "Invalid data: {}", s),
             OleError::NotOleFile => write!(f, "Not an OLE file"),
@@ -196,7 +213,15 @@ impl std::fmt::Display for OleError {
     }
 }
 
-impl std::error::Error for OleError {}
+impl std::error::Error for OleError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(source) => Some(source),
+            Self::Allocation { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
 
 // Convert CFB-substrate errors into the unified `litchi_core::Error`.
 //
@@ -208,6 +233,9 @@ impl From<OleError> for litchi_core::Error {
     fn from(err: OleError) -> Self {
         match err {
             OleError::Io(e) => litchi_core::Error::Io(e),
+            OleError::Allocation { resource, source } => litchi_core::Error::Other(format!(
+                "could not reserve memory for CFB {resource}: {source}"
+            )),
             OleError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             OleError::InvalidData(s) => litchi_core::Error::InvalidFormat(s),
             OleError::NotOleFile => litchi_core::Error::NotOfficeFile,

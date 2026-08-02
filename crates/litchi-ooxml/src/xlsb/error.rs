@@ -48,12 +48,17 @@ pub enum XlsbError {
     UnsupportedFeature(String),
     /// Encoding error
     Encoding(String),
+    /// A bounded host-side operation could not reserve required memory.
+    Allocation(&'static str),
     /// Shared DrawingML parsing error.
     Drawing(litchi_drawingml::Error),
     /// Shared host-neutral OOXML package-service error.
     Common(litchi_ooxml_common::Error),
     /// Bounded, inert VBA parsing or authoring error.
     Vba(litchi_vba::Error),
+    /// Canonical bounded Office encrypted-package failure.
+    #[cfg(feature = "encryption")]
+    Crypto(litchi_crypto::ooxml::Error),
     /// Wide string length error
     WideStringLength {
         /// Expected length
@@ -112,9 +117,14 @@ impl fmt::Display for XlsbError {
             XlsbError::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
             },
+            XlsbError::Allocation(resource) => {
+                write!(f, "allocation failed for {resource}")
+            },
             XlsbError::Drawing(error) => write!(f, "DrawingML error: {error}"),
             XlsbError::Common(error) => write!(f, "shared OOXML error: {error}"),
             XlsbError::Vba(error) => write!(f, "VBA error: {error}"),
+            #[cfg(feature = "encryption")]
+            XlsbError::Crypto(error) => write!(f, "Office cryptography error: {error}"),
             XlsbError::WideStringLength { expected, actual } => {
                 write!(
                     f,
@@ -142,6 +152,8 @@ impl std::error::Error for XlsbError {
             XlsbError::Drawing(e) => Some(e),
             XlsbError::Common(e) => Some(e),
             XlsbError::Vba(e) => Some(e),
+            #[cfg(feature = "encryption")]
+            XlsbError::Crypto(e) => Some(e),
             _ => None,
         }
     }
@@ -202,24 +214,9 @@ impl From<litchi_vba::Error> for XlsbError {
 }
 
 #[cfg(feature = "encryption")]
-impl From<litchi_cfb::OleError> for XlsbError {
-    fn from(err: litchi_cfb::OleError) -> Self {
-        match err {
-            litchi_cfb::OleError::Io(e) => XlsbError::Io(e),
-            litchi_cfb::OleError::InvalidFormat(msg) => {
-                XlsbError::Encoding(format!("Invalid format: {}", msg))
-            },
-            litchi_cfb::OleError::InvalidData(msg) => {
-                XlsbError::Encoding(format!("Invalid data: {}", msg))
-            },
-            litchi_cfb::OleError::NotOleFile => XlsbError::Encoding("Not an OLE file".to_string()),
-            litchi_cfb::OleError::CorruptedFile(msg) => {
-                XlsbError::Encoding(format!("Corrupted file: {}", msg))
-            },
-            litchi_cfb::OleError::StreamNotFound => {
-                XlsbError::FileNotFound("Stream not found".to_string())
-            },
-        }
+impl From<litchi_crypto::ooxml::Error> for XlsbError {
+    fn from(error: litchi_crypto::ooxml::Error) -> Self {
+        Self::Crypto(error)
     }
 }
 
@@ -251,9 +248,12 @@ impl From<crate::error::OoxmlError> for XlsbError {
             crate::error::OoxmlError::Docx(err) => XlsbError::Encoding(err.to_string()),
             crate::error::OoxmlError::Pptx(err) => XlsbError::Encoding(err.to_string()),
             crate::error::OoxmlError::Xlsb(err) => XlsbError::Wire(err),
+            #[cfg(feature = "encryption")]
+            crate::error::OoxmlError::Crypto(err) => XlsbError::Crypto(err),
             crate::error::OoxmlError::Io(e) => XlsbError::Io(e),
             crate::error::OoxmlError::Common(err) => XlsbError::Common(err),
             crate::error::OoxmlError::Vba(err) => XlsbError::Vba(err),
+            crate::error::OoxmlError::Allocation(resource) => XlsbError::Allocation(resource),
             crate::error::OoxmlError::UnsafeEdit {
                 format,
                 operation,

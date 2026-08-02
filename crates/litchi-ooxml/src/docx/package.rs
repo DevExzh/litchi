@@ -24,6 +24,8 @@ use crate::docx::vba_project::{
 };
 use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
+#[cfg(feature = "encryption")]
+use crate::encryption::{Limits, Mode};
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
 use litchi_docx::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_relationship};
@@ -123,6 +125,10 @@ pub struct Package {
     properties: DocumentProperties,
     /// Custom document properties
     custom_props: CustomProps,
+    /// Encryption profile of the opened outer package, retained to prevent an
+    /// accidental plaintext downgrade on save.
+    #[cfg(feature = "encryption")]
+    source_encryption: Option<Mode>,
 }
 
 struct StoredRelationship {
@@ -453,6 +459,8 @@ impl Package {
             web_settings_dirty: false,
             properties,
             custom_props,
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
     }
 
@@ -489,15 +497,27 @@ impl Package {
             web_settings_dirty: false,
             properties: DocumentProperties::new(),
             custom_props,
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
     }
 
     #[cfg(feature = "encryption")]
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
-        let data = std::fs::read(path.as_ref()).map_err(OoxmlError::Io)?;
-        let decrypted = crate::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
-        let opc = OpcPackage::from_bytes(&decrypted.package_bytes)?;
-        Self::from_opc_package(opc)
+        let file = std::fs::File::open(path.as_ref()).map_err(OoxmlError::Io)?;
+        let opened = crate::encryption::load(file, password)?;
+        Self::from_opened(opened)
+    }
+
+    /// Open with explicit outer-encryption limits.
+    ///
+    /// The decrypted OPC archive is parsed under its independently bounded
+    /// default policy; a composite host policy remains migration work.
+    #[cfg(feature = "encryption")]
+    pub fn open_with<P: AsRef<Path>>(path: P, password: &str, limits: &Limits) -> Result<Self> {
+        let file = std::fs::File::open(path.as_ref()).map_err(OoxmlError::Io)?;
+        let opened = crate::encryption::load_with(file, password, limits)?;
+        Self::from_opened(opened)
     }
 
     /// Create a Package from an already-parsed OPC package.
@@ -537,6 +557,8 @@ impl Package {
             web_settings_dirty: false,
             properties: DocumentProperties::new(),
             custom_props,
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
     }
 
@@ -576,19 +598,33 @@ impl Package {
             web_settings_dirty: false,
             properties: DocumentProperties::new(),
             custom_props,
+            #[cfg(feature = "encryption")]
+            source_encryption: None,
         })
     }
 
     #[cfg(feature = "encryption")]
-    pub fn from_reader_with_password<R: Read + Seek>(
-        mut reader: R,
-        password: &str,
-    ) -> Result<Self> {
-        let mut data = Vec::new();
-        reader.read_to_end(&mut data).map_err(OoxmlError::Io)?;
-        let decrypted = crate::crypto::decrypt_ooxml_if_encrypted(&data, password)?;
-        let opc = OpcPackage::from_bytes(&decrypted.package_bytes)?;
-        Self::from_opc_package(opc)
+    pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
+        let opened = crate::encryption::load(reader, password)?;
+        Self::from_opened(opened)
+    }
+
+    /// Open a reader with explicit outer-encryption limits.
+    ///
+    /// The decrypted OPC archive uses its independently bounded defaults.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Self> {
+        let opened = crate::encryption::load_with(reader, password, limits)?;
+        Self::from_opened(opened)
+    }
+
+    #[cfg(feature = "encryption")]
+    fn from_opened(opened: crate::encryption::Opened) -> Result<Self> {
+        let source_encryption = opened.mode();
+        let opc = OpcPackage::from_vec(opened.into_bytes())?;
+        let mut package = Self::from_opc_package(opc)?;
+        package.source_encryption = source_encryption;
+        Ok(package)
     }
 
     /// Get the main document for reading.
@@ -2290,12 +2326,19 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)?;
-        self.to_stream(&mut file)
+        self.ensure_plain_output("save")?;
+        self.save_plain_impl(path)
+    }
+
+    /// Explicitly save a plaintext package, even when the source was encrypted.
+    pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.save_plain_impl(path)
+    }
+
+    fn save_plain_impl<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        litchi_opc::atomic::replace_with::<OoxmlError>(path.as_ref(), |temporary| {
+            self.write_plain(temporary)
+        })
     }
 
     /// Save the package to a stream.
@@ -2319,6 +2362,82 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn to_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+        self.ensure_plain_output("to_stream")?;
+        self.write_plain(writer)
+    }
+
+    /// Explicitly write a plaintext package to a stream.
+    pub fn to_plain_stream<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+        self.write_plain(writer)
+    }
+
+    /// Serialize and encrypt this package entirely in memory.
+    #[cfg(feature = "encryption")]
+    pub fn to_encrypted(&mut self, password: &str, mode: Mode) -> Result<Vec<u8>> {
+        let mut output = std::io::Cursor::new(Vec::new());
+        self.write_plain(&mut output)?;
+        crate::encryption::encrypt(output.into_inner(), password, mode).map_err(Into::into)
+    }
+
+    /// Serialize and encrypt using the source package's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn to_reencrypted(&mut self, password: &str) -> Result<Vec<u8>> {
+        let mode = self.preserved_mode("to_reencrypted")?;
+        self.to_encrypted(password, mode)
+    }
+
+    /// Save with an explicit encryption profile and a borrowed password.
+    #[cfg(feature = "encryption")]
+    pub fn save_encrypted<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        password: &str,
+        mode: Mode,
+    ) -> Result<()> {
+        let output = self.to_encrypted(password, mode)?;
+        litchi_opc::atomic::replace(path.as_ref(), |temporary| {
+            temporary.write_all(&output)?;
+            Ok(())
+        })?;
+        self.source_encryption = Some(mode);
+        Ok(())
+    }
+
+    /// Save using the encrypted source's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn save_reencrypted<P: AsRef<Path>>(&mut self, path: P, password: &str) -> Result<()> {
+        let mode = self.preserved_mode("save_reencrypted")?;
+        self.save_encrypted(path, password, mode)
+    }
+
+    /// Encryption profile of the opened or most recently encrypted package.
+    #[cfg(feature = "encryption")]
+    pub const fn encryption(&self) -> Option<Mode> {
+        self.source_encryption
+    }
+
+    fn ensure_plain_output(&self, _operation: &'static str) -> Result<()> {
+        #[cfg(feature = "encryption")]
+        if self.source_encryption.is_some() {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "DOCX",
+                operation: _operation,
+                reason: "the source package was encrypted; use save_reencrypted or save_plain",
+            });
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "encryption")]
+    fn preserved_mode(&self, operation: &'static str) -> Result<Mode> {
+        self.source_encryption.ok_or(OoxmlError::UnsafeEdit {
+            format: "DOCX",
+            operation,
+            reason: "the source package has no encryption profile; supply an explicit Mode",
+        })
+    }
+
+    fn write_plain<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         use crate::docx::writer::relmap::RelationshipMapper;
         use litchi_opc::constants::relationship_type as rt;
 

@@ -13,6 +13,7 @@
 //! - Free sectors are marked with FREESECT (0xFFFFFFFF)
 
 use super::super::consts::*;
+use super::super::file::OleError;
 
 /// FAT builder for sector allocation
 ///
@@ -30,8 +31,6 @@ pub struct FatBuilder {
     fat: Vec<u32>,
     /// Next available sector
     next_sector: u32,
-    /// Total number of sectors allocated (including FAT sectors)
-    total_allocated: u32,
     /// Sector size for this FAT
     sector_size: usize,
 }
@@ -43,23 +42,26 @@ impl FatBuilder {
     /// # Arguments
     ///
     /// * `sector_size` - Size of each sector in bytes (512 or 4096)
-    pub fn new_with_size(sector_size: usize) -> Self {
-        assert!(
-            sector_size == 512 || sector_size == 4096,
-            "Sector size must be 512 or 4096"
-        );
+    pub fn new_with_size(sector_size: usize) -> Result<Self, OleError> {
+        if !matches!(sector_size, 512 | 4096) {
+            return Err(OleError::InvalidData(format!(
+                "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
+            )));
+        }
+        Ok(Self::with_valid_sector_size(sector_size))
+    }
 
+    fn with_valid_sector_size(sector_size: usize) -> Self {
         Self {
             fat: Vec::new(),
             next_sector: 0,
-            total_allocated: 0,
             sector_size,
         }
     }
 
     /// Create a new FAT builder with default 512-byte sectors
     pub fn new() -> Self {
-        Self::new_with_size(512)
+        Self::with_valid_sector_size(512)
     }
 
     /// Allocate a chain of sectors for a stream
@@ -76,38 +78,38 @@ impl FatBuilder {
     ///
     /// This method pre-allocates all FAT entries needed for the chain,
     /// avoiding repeated vector resizing.
-    pub fn allocate_chain(&mut self, size: usize) -> u32 {
+    pub fn allocate_chain(&mut self, size: usize) -> Result<u32, OleError> {
         if size == 0 {
-            return ENDOFCHAIN;
+            return Ok(ENDOFCHAIN);
         }
 
         let num_sectors = size.div_ceil(self.sector_size);
+        let sector_count = u32::try_from(num_sectors).map_err(|_| {
+            OleError::InvalidData("CFB sector count exceeds MAXREGSECT".to_string())
+        })?;
         let start_sector = self.next_sector;
+        let end_sector = checked_sector_end(start_sector, sector_count)?;
+        let new_len = usize::try_from(end_sector)
+            .map_err(|_| OleError::InvalidData("CFB FAT length does not fit usize".to_string()))?;
 
-        // Pre-allocate FAT entries to avoid resizing (optimization)
-        let new_size = (self.next_sector as usize + num_sectors).max(self.fat.len());
-        if new_size > self.fat.len() {
-            self.fat.resize(new_size, FREESECT);
+        if new_len > self.fat.len() {
+            self.fat
+                .try_reserve_exact(new_len - self.fat.len())
+                .map_err(|source| OleError::allocation("FAT entries", source))?;
+            self.fat.resize(new_len, FREESECT);
         }
 
-        // Allocate sectors and link them in a single pass
-        for i in 0..num_sectors {
-            let current_sector = self.next_sector;
-            self.next_sector += 1;
-            self.total_allocated += 1;
-
-            // Set FAT entry
-            // If not last sector: current_sector + 1, else ENDOFCHAIN
-            let next_value = if i < num_sectors - 1 {
+        for current_sector in start_sector..end_sector {
+            let next_value = if current_sector + 1 < end_sector {
                 current_sector + 1
             } else {
                 ENDOFCHAIN
             };
-
             self.fat[current_sector as usize] = next_value;
         }
+        self.next_sector = end_sector;
 
-        start_sector
+        Ok(start_sector)
     }
 
     /// Allocate a single sector
@@ -115,12 +117,8 @@ impl FatBuilder {
     /// # Returns
     ///
     /// * `u32` - The allocated sector ID
-    pub fn allocate_sector(&mut self) -> u32 {
-        let sector = self.next_sector;
-        self.next_sector += 1;
-        self.total_allocated += 1;
-        self.set_fat_entry(sector, ENDOFCHAIN);
-        sector
+    pub fn allocate_sector(&mut self) -> Result<u32, OleError> {
+        self.allocate_chain(self.sector_size)
     }
 
     /// Allocate a contiguous range of sectors and mark them with a special value
@@ -132,17 +130,25 @@ impl FatBuilder {
     ///
     /// * `count` - Number of sectors to reserve
     /// * `marker` - The FAT marker to use for these sectors (e.g. `FATSECT`, `DIFSECT`)
-    pub fn allocate_special(&mut self, count: u32, marker: u32) -> u32 {
+    pub fn allocate_special(&mut self, count: u32, marker: u32) -> Result<u32, OleError> {
         if count == 0 {
-            return ENDOFCHAIN;
+            return Ok(ENDOFCHAIN);
+        }
+        if !matches!(marker, FATSECT | DIFSECT) {
+            return Err(OleError::InvalidData(
+                "CFB special allocation requires FATSECT or DIFSECT".to_string(),
+            ));
         }
 
         let start = self.next_sector;
-        let end = start + count; // exclusive
+        let end = checked_sector_end(start, count)?;
 
-        // Ensure FAT has capacity for all sectors we will mark
-        let needed_len = end as usize;
+        let needed_len = usize::try_from(end)
+            .map_err(|_| OleError::InvalidData("CFB FAT length does not fit usize".to_string()))?;
         if self.fat.len() < needed_len {
+            self.fat
+                .try_reserve_exact(needed_len - self.fat.len())
+                .map_err(|source| OleError::allocation("FAT entries", source))?;
             self.fat.resize(needed_len, FREESECT);
         }
 
@@ -151,34 +157,20 @@ impl FatBuilder {
         }
 
         self.next_sector = end;
-        self.total_allocated += count;
-        start
-    }
-
-    /// Set a FAT entry
-    ///
-    /// # Arguments
-    ///
-    /// * `sector` - Sector ID
-    /// * `value` - Value to set (next sector or ENDOFCHAIN)
-    fn set_fat_entry(&mut self, sector: u32, value: u32) {
-        let sector_idx = sector as usize;
-
-        // Expand FAT if necessary
-        if sector_idx >= self.fat.len() {
-            self.fat.resize(sector_idx + 1, FREESECT);
-        }
-
-        self.fat[sector_idx] = value;
+        Ok(start)
     }
 
     /// Mark a range of sectors as FAT sectors
     ///
     /// FAT sectors are marked with special value FATSECT in the FAT itself.
-    pub fn mark_fat_sectors(&mut self, start: u32, count: u32) {
-        for i in 0..count {
-            self.set_fat_entry(start + i, FATSECT);
+    pub fn mark_fat_sectors(&mut self, start: u32, count: u32) -> Result<(), OleError> {
+        if start != self.next_sector {
+            return Err(OleError::InvalidData(
+                "CFB FAT sectors must begin at the next free sector".to_string(),
+            ));
         }
+        self.allocate_special(count, FATSECT)?;
+        Ok(())
     }
 
     /// Get the FAT table
@@ -200,20 +192,19 @@ impl FatBuilder {
     /// # Performance
     ///
     /// Uses pre-allocated buffers and efficient byte copying to minimize allocations.
-    pub fn generate_fat_sectors(&self) -> Vec<Vec<u8>> {
+    pub fn generate_fat_sectors(&self) -> Result<Vec<Vec<u8>>, OleError> {
         let entries_per_sector = self.sector_size / 4;
         let num_fat_sectors = self.fat.len().div_ceil(entries_per_sector);
 
-        let mut fat_sectors = Vec::with_capacity(num_fat_sectors);
+        let mut fat_sectors = Vec::new();
+        fat_sectors
+            .try_reserve_exact(num_fat_sectors)
+            .map_err(|source| OleError::allocation("serialized FAT sectors", source))?;
 
-        for sector_idx in 0..num_fat_sectors {
-            // Initialize with FREESECT (0xFFFFFFFF)
-            let mut sector_data = vec![0xFFu8; self.sector_size];
-            let start_entry = sector_idx * entries_per_sector;
-            let end_entry = (start_entry + entries_per_sector).min(self.fat.len());
+        for entries in self.fat.chunks(entries_per_sector) {
+            let mut sector_data = filled_sector(self.sector_size, "serialized FAT sector")?;
 
-            // Copy FAT entries as little-endian u32 values
-            for (i, &fat_value) in self.fat[start_entry..end_entry].iter().enumerate() {
+            for (i, &fat_value) in entries.iter().enumerate() {
                 let offset = i * 4;
                 sector_data[offset..offset + 4].copy_from_slice(&fat_value.to_le_bytes());
             }
@@ -221,7 +212,7 @@ impl FatBuilder {
             fat_sectors.push(sector_data);
         }
 
-        fat_sectors
+        Ok(fat_sectors)
     }
 
     /// Calculate the number of FAT sectors needed for the current allocation
@@ -238,54 +229,36 @@ impl FatBuilder {
 
     /// Validate the FAT for consistency
     ///
-    /// Checks for:
-    /// - Circular references (loops in chains)
-    /// - Invalid sector references
-    /// - Orphaned sectors
+    /// Checks for invalid sector references and backward links, which would
+    /// permit a cycle in a writer-produced chain.
     ///
     /// # Returns
     ///
-    /// * `Result<(), String>` - Ok if valid, Err with description if invalid
-    pub fn validate(&self) -> Result<(), String> {
-        use std::collections::HashSet;
-
-        // Track visited sectors to detect loops
-        let mut visited = HashSet::new();
-
-        // Check each chain for cycles
-        for start_sector in 0..self.fat.len() as u32 {
-            if self.fat.get(start_sector as usize) == Some(&ENDOFCHAIN) {
-                visited.clear();
-                let mut current = start_sector;
-
-                // Follow chain
-                while current != ENDOFCHAIN {
-                    if current >= self.fat.len() as u32 {
-                        return Err(format!("Invalid sector reference: {}", current));
+    /// * `Result<(), OleError>` - Ok if valid, Err with description if invalid
+    pub fn validate(&self) -> Result<(), OleError> {
+        for (current, &next) in self.fat.iter().enumerate() {
+            match next {
+                ENDOFCHAIN | FREESECT | FATSECT | DIFSECT => {},
+                0..MAXREGSECT => {
+                    let next = usize::try_from(next).map_err(|_| {
+                        OleError::InvalidData("CFB FAT reference does not fit usize".to_string())
+                    })?;
+                    if next >= self.fat.len() {
+                        return Err(OleError::InvalidData(format!(
+                            "invalid next FAT sector {next} at sector {current}"
+                        )));
                     }
-
-                    if !visited.insert(current) {
-                        return Err(format!("Circular reference detected at sector {}", current));
+                    if next <= current {
+                        return Err(OleError::InvalidData(format!(
+                            "backward FAT reference from sector {current} to {next}"
+                        )));
                     }
-
-                    let next = self.fat[current as usize];
-
-                    // Validate special values
-                    match next {
-                        ENDOFCHAIN | FREESECT => break,
-                        FATSECT | DIFSECT => break, // Valid special markers
-                        _ => {
-                            if next >= self.fat.len() as u32 && next != ENDOFCHAIN {
-                                return Err(format!(
-                                    "Invalid next sector {} at sector {}",
-                                    next, current
-                                ));
-                            }
-                        },
-                    }
-
-                    current = next;
-                }
+                },
+                _ => {
+                    return Err(OleError::InvalidData(format!(
+                        "invalid FAT marker 0x{next:08X} at sector {current}"
+                    )));
+                },
             }
         }
 
@@ -296,6 +269,27 @@ impl FatBuilder {
     pub fn sector_size(&self) -> usize {
         self.sector_size
     }
+}
+
+fn checked_sector_end(start: u32, count: u32) -> Result<u32, OleError> {
+    let end = start
+        .checked_add(count)
+        .ok_or_else(|| OleError::InvalidData("CFB sector count overflows u32".to_string()))?;
+    if end > MAXREGSECT {
+        return Err(OleError::InvalidData(
+            "CFB sector count exceeds MAXREGSECT".to_string(),
+        ));
+    }
+    Ok(end)
+}
+
+fn filled_sector(size: usize, resource: &'static str) -> Result<Vec<u8>, OleError> {
+    let mut sector = Vec::new();
+    sector
+        .try_reserve_exact(size)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    sector.resize(size, 0xff);
+    Ok(sector)
 }
 
 impl Default for FatBuilder {
@@ -313,7 +307,7 @@ mod tests {
         let mut fat = FatBuilder::new();
 
         // Allocate 1024 bytes with 512-byte sectors (2 sectors)
-        let start = fat.allocate_chain(1024);
+        let start = fat.allocate_chain(1024).unwrap();
         assert_eq!(start, 0);
         assert_eq!(fat.total_sectors(), 2);
 
@@ -325,7 +319,7 @@ mod tests {
     #[test]
     fn test_empty_chain() {
         let mut fat = FatBuilder::new();
-        let start = fat.allocate_chain(0);
+        let start = fat.allocate_chain(0).unwrap();
         assert_eq!(start, ENDOFCHAIN);
         assert_eq!(fat.total_sectors(), 0);
     }
@@ -333,8 +327,8 @@ mod tests {
     #[test]
     fn test_mark_fat_sectors() {
         let mut fat = FatBuilder::new();
-        fat.allocate_chain(512); // Allocate one sector
-        fat.mark_fat_sectors(1, 2); // Mark sectors 1-2 as FAT
+        fat.allocate_chain(512).unwrap(); // Allocate one sector
+        fat.mark_fat_sectors(1, 2).unwrap(); // Mark sectors 1-2 as FAT
 
         assert_eq!(fat.fat()[1], FATSECT);
         assert_eq!(fat.fat()[2], FATSECT);
@@ -343,7 +337,7 @@ mod tests {
     #[test]
     fn test_validate_good_fat() {
         let mut fat = FatBuilder::new();
-        fat.allocate_chain(1024);
+        fat.allocate_chain(1024).unwrap();
         assert!(fat.validate().is_ok());
     }
 
@@ -352,7 +346,22 @@ mod tests {
         let fat_512 = FatBuilder::new();
         assert_eq!(fat_512.sector_size(), 512);
 
-        let fat_4096 = FatBuilder::new_with_size(4096);
+        let fat_4096 = FatBuilder::new_with_size(4096).unwrap();
         assert_eq!(fat_4096.sector_size(), 4096);
+    }
+
+    #[test]
+    fn sector_limit_uses_maxregsect_as_an_exclusive_count() {
+        assert_eq!(checked_sector_end(MAXREGSECT - 1, 1).unwrap(), MAXREGSECT);
+        assert!(checked_sector_end(MAXREGSECT, 1).is_err());
+        assert!(checked_sector_end(u32::MAX, 1).is_err());
+    }
+
+    #[test]
+    fn invalid_sector_geometry_is_typed() {
+        assert!(matches!(
+            FatBuilder::new_with_size(1024),
+            Err(OleError::InvalidData(_))
+        ));
     }
 }
