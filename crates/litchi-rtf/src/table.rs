@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::indexing_slicing))]
+
 //! RTF table support.
 //!
 //! This module provides basic table parsing for RTF documents.
@@ -5,7 +7,7 @@
 
 use crate::TextDirection;
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 pub const MAX_TABLE_DISTANCE_TWIPS: i32 = 31_680;
 pub const MAX_TABLE_GEOMETRY_TWIPS: i32 = 31_680;
@@ -1208,25 +1210,25 @@ impl<'a> Cell<'a> {
         text_offset: usize,
         table: Table<'a>,
     ) -> crate::RtfResult<()> {
+        let last_story_position = self.last_story_position()?;
         if text_offset > self.text.len()
             || !self.text.is_char_boundary(text_offset)
             || self
                 .nested_tables
                 .last()
                 .is_some_and(|entry| entry.text_offset > text_offset)
-            || self
-                .story_events
-                .last()
-                .is_some_and(|event| self.event_position(*event) > text_offset)
+            || last_story_position.is_some_and(|position| position > text_offset)
         {
             return Err(crate::RtfError::MalformedDocument(
                 "invalid nested-table text insertion offset".to_string(),
             ));
         }
-        self.story_events
-            .push(CellStoryEvent::NestedTable(self.nested_tables.len()));
+        crate::error::try_reserve_one(&mut self.nested_tables, "table-cell nested tables")?;
+        crate::error::try_reserve_one(&mut self.story_events, "table-cell story events")?;
+        let index = self.nested_tables.len();
         self.nested_tables
             .push(CellNestedTable { text_offset, table });
+        self.story_events.push(CellStoryEvent::NestedTable(index));
         Ok(())
     }
     pub fn nested_tables_mut(&mut self) -> &mut Vec<CellNestedTable<'a>> {
@@ -1244,103 +1246,133 @@ impl<'a> Cell<'a> {
     pub fn story_events(&self) -> &[CellStoryEvent] {
         &self.story_events
     }
-    fn event_position(&self, event: CellStoryEvent) -> usize {
+    fn event_position(&self, event: CellStoryEvent) -> crate::RtfResult<usize> {
+        Self::event_position_in(&self.nested_tables, &self.shapes, &self.shape_groups, event)
+    }
+
+    fn event_position_in(
+        nested_tables: &[CellNestedTable<'_>],
+        shapes: &[crate::Shape<'_>],
+        shape_groups: &[crate::ShapeGroup<'_>],
+        event: CellStoryEvent,
+    ) -> crate::RtfResult<usize> {
         match event {
-            CellStoryEvent::NestedTable(index) => self.nested_tables[index].text_offset,
+            CellStoryEvent::NestedTable(index) => {
+                nested_tables.get(index).map(|nested| nested.text_offset)
+            },
             CellStoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
-                self.shapes[index].position
+                shapes.get(index).map(|shape| shape.position)
             },
             CellStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
-                self.shape_groups[index].position
+                shape_groups.get(index).map(|group| group.position)
             },
-            CellStoryEvent::Field(field) => field.position,
-            CellStoryEvent::PageBreak(page_break) => page_break.position,
-            CellStoryEvent::ColumnBreak(column_break) => column_break.position,
+            CellStoryEvent::Field(field) => Some(field.position),
+            CellStoryEvent::PageBreak(page_break) => Some(page_break.position),
+            CellStoryEvent::ColumnBreak(column_break) => Some(column_break.position),
             CellStoryEvent::NavigationEntry(reference)
             | CellStoryEvent::RevisionStart(reference)
             | CellStoryEvent::RevisionEnd(reference)
-            | CellStoryEvent::RevisionDeletion(reference) => reference.position,
+            | CellStoryEvent::RevisionDeletion(reference) => Some(reference.position),
         }
+        .ok_or_else(|| {
+            crate::RtfError::MalformedDocument(
+                "RTF table-cell story event references missing metadata".to_string(),
+            )
+        })
     }
-    pub fn validate_drawings(&self) -> crate::RtfResult<()> {
+
+    fn last_story_position(&self) -> crate::RtfResult<Option<usize>> {
+        self.story_events
+            .last()
+            .copied()
+            .map(|event| self.event_position(event))
+            .transpose()
+    }
+
+    fn validate_story_content(
+        text: &str,
+        nested_tables: &[CellNestedTable<'_>],
+        shapes: &[crate::Shape<'_>],
+        shape_groups: &[crate::ShapeGroup<'_>],
+        drawing_order: &[crate::StoryDrawing],
+        story_events: &[CellStoryEvent],
+    ) -> crate::RtfResult<()> {
         crate::shape::validate_story_drawings(
-            self.text.as_ref(),
-            &self.shapes,
-            &self.shape_groups,
-            &self.drawing_order,
+            text,
+            shapes,
+            shape_groups,
+            drawing_order,
             "table cell",
         )?;
-        let mut saw_nested = vec![false; self.nested_tables.len()];
-        let mut saw_fields = std::collections::BTreeSet::new();
-        let mut drawings = Vec::with_capacity(self.drawing_order.len());
+
+        let mut saw_nested = Vec::new();
+        crate::error::try_reserve_additional(
+            &mut saw_nested,
+            nested_tables.len(),
+            "table-cell nested-table references",
+        )?;
+        saw_nested.resize(nested_tables.len(), false);
+
+        let field_count = story_events
+            .iter()
+            .filter(|event| matches!(event, CellStoryEvent::Field(_)))
+            .count();
+        let mut saw_fields = HashSet::new();
+        saw_fields
+            .try_reserve(field_count)
+            .map_err(|_| crate::RtfError::AllocationFailed {
+                resource: "table-cell field references",
+                requested: field_count.saturating_mul(std::mem::size_of::<usize>()),
+            })?;
+
+        let mut drawings = drawing_order.iter().copied();
         let mut previous = None;
-        for event in &self.story_events {
+        for event in story_events {
             let position = match *event {
-                CellStoryEvent::NestedTable(index)
-                    if index < self.nested_tables.len() && !saw_nested[index] =>
-                {
-                    saw_nested[index] = true;
-                    self.nested_tables[index].text_offset
+                CellStoryEvent::NestedTable(index) => {
+                    let seen = saw_nested.get_mut(index).ok_or_else(|| {
+                        crate::RtfError::MalformedDocument(
+                            "RTF table-cell story order has an invalid nested-table reference"
+                                .to_string(),
+                        )
+                    })?;
+                    if std::mem::replace(seen, true) {
+                        return Err(crate::RtfError::MalformedDocument(
+                            "RTF table-cell story order has a duplicate nested-table reference"
+                                .to_string(),
+                        ));
+                    }
+                    Self::event_position_in(nested_tables, shapes, shape_groups, *event)?
                 },
                 CellStoryEvent::Drawing(drawing) => {
-                    drawings.push(drawing);
-                    match drawing {
-                        crate::StoryDrawing::Shape(index) if index < self.shapes.len() => {
-                            self.shapes[index].position
-                        },
-                        crate::StoryDrawing::ShapeGroup(index)
-                            if index < self.shape_groups.len() =>
-                        {
-                            self.shape_groups[index].position
-                        },
-                        _ => {
-                            return Err(crate::RtfError::MalformedDocument(
-                                "RTF table-cell story order has an invalid drawing reference"
-                                    .to_string(),
-                            ));
-                        },
+                    if drawings.next() != Some(drawing) {
+                        return Err(crate::RtfError::MalformedDocument(
+                            "RTF table-cell story order changes drawing order".to_string(),
+                        ));
                     }
+                    Self::event_position_in(nested_tables, shapes, shape_groups, *event)?
                 },
-                CellStoryEvent::Field(field)
-                    if saw_fields.insert(field.field_index)
-                        && self.text.get(field.position..field.position).is_some() =>
-                {
+                CellStoryEvent::Field(field) => {
+                    if !saw_fields.insert(field.field_index) {
+                        return Err(crate::RtfError::MalformedDocument(
+                            "RTF table-cell story order has a duplicate field reference"
+                                .to_string(),
+                        ));
+                    }
                     field.position
                 },
-                CellStoryEvent::PageBreak(page_break)
-                    if self
-                        .text
-                        .get(page_break.position..page_break.position)
-                        .is_some() =>
-                {
-                    page_break.position
-                },
-                CellStoryEvent::ColumnBreak(column_break)
-                    if self
-                        .text
-                        .get(column_break.position..column_break.position)
-                        .is_some() =>
-                {
-                    column_break.position
-                },
+                CellStoryEvent::PageBreak(page_break) => page_break.position,
+                CellStoryEvent::ColumnBreak(column_break) => column_break.position,
                 CellStoryEvent::NavigationEntry(reference)
                 | CellStoryEvent::RevisionStart(reference)
                 | CellStoryEvent::RevisionEnd(reference)
-                | CellStoryEvent::RevisionDeletion(reference)
-                    if self
-                        .text
-                        .get(reference.position..reference.position)
-                        .is_some() =>
-                {
-                    reference.position
-                },
-                _ => {
-                    return Err(crate::RtfError::MalformedDocument(
-                        "RTF table-cell story order has an invalid or duplicate reference"
-                            .to_string(),
-                    ));
-                },
+                | CellStoryEvent::RevisionDeletion(reference) => reference.position,
             };
+            if text.get(position..position).is_none() {
+                return Err(crate::RtfError::MalformedDocument(
+                    "RTF table-cell story event is outside a UTF-8 boundary".to_string(),
+                ));
+            }
             if previous.is_some_and(|value| value > position) {
                 return Err(crate::RtfError::MalformedDocument(
                     "RTF table-cell story order moves backwards".to_string(),
@@ -1348,66 +1380,108 @@ impl<'a> Cell<'a> {
             }
             previous = Some(position);
         }
-        if saw_nested.iter().any(|seen| !*seen) || drawings != self.drawing_order {
+        if saw_nested.iter().any(|seen| !*seen) || drawings.next().is_some() {
             return Err(crate::RtfError::MalformedDocument(
                 "RTF table-cell story order is incomplete or changes drawing order".to_string(),
             ));
         }
         Ok(())
     }
+
+    pub fn validate_drawings(&self) -> crate::RtfResult<()> {
+        Self::validate_story_content(
+            self.text.as_ref(),
+            &self.nested_tables,
+            &self.shapes,
+            &self.shape_groups,
+            &self.drawing_order,
+            &self.story_events,
+        )
+    }
     pub fn push_shape(&mut self, shape: crate::Shape<'a>) -> crate::RtfResult<()> {
         let position = shape.position;
-        let drawing = crate::StoryDrawing::Shape(self.shapes.len());
-        let mut shapes = self.shapes.clone();
-        let mut order = self.drawing_order.clone();
-        order.push(drawing);
-        shapes.push(shape);
-        crate::shape::validate_story_drawings(
-            self.text.as_ref(),
-            &shapes,
-            &self.shape_groups,
-            &order,
-            "table cell",
-        )?;
-        if self
-            .story_events
-            .last()
-            .is_some_and(|event| self.event_position(*event) > position)
-        {
+        if self.shapes.len() >= crate::shape::MAX_SHAPES_PER_GROUP {
             return Err(crate::RtfError::MalformedDocument(
-                "RTF table-cell story order moves backwards".to_string(),
+                "RTF table-cell shape count exceeds the safety limit".to_string(),
             ));
         }
-        self.shapes = shapes;
-        self.drawing_order = order;
+        crate::shape::validate_story_drawings(
+            self.text.as_ref(),
+            &self.shapes,
+            &self.shape_groups,
+            &self.drawing_order,
+            "table cell",
+        )?;
+        shape.validate()?;
+        let last_drawing_position = self
+            .drawing_order
+            .last()
+            .copied()
+            .map(|drawing| self.event_position(CellStoryEvent::Drawing(drawing)))
+            .transpose()?;
+        let last_story_position = self.last_story_position()?;
+        if shape.is_background
+            || self.text.get(position..position).is_none()
+            || self
+                .shapes
+                .last()
+                .is_some_and(|previous| previous.position > position)
+            || last_drawing_position.is_some_and(|previous| previous > position)
+            || last_story_position.is_some_and(|previous| previous > position)
+        {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF table-cell shape is outside or out of story order".to_string(),
+            ));
+        }
+        let drawing = crate::StoryDrawing::Shape(self.shapes.len());
+        crate::error::try_reserve_one(&mut self.shapes, "table-cell shapes")?;
+        crate::error::try_reserve_one(&mut self.drawing_order, "table-cell drawing order")?;
+        crate::error::try_reserve_one(&mut self.story_events, "table-cell story events")?;
+        self.shapes.push(shape);
+        self.drawing_order.push(drawing);
         self.story_events.push(CellStoryEvent::Drawing(drawing));
         Ok(())
     }
     pub fn push_shape_group(&mut self, group: crate::ShapeGroup<'a>) -> crate::RtfResult<()> {
         let position = group.position;
-        let drawing = crate::StoryDrawing::ShapeGroup(self.shape_groups.len());
-        let mut groups = self.shape_groups.clone();
-        let mut order = self.drawing_order.clone();
-        order.push(drawing);
-        groups.push(group);
+        if self.shape_groups.len() >= crate::shape::MAX_GROUPS_PER_GROUP {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF table-cell shape-group count exceeds the safety limit".to_string(),
+            ));
+        }
         crate::shape::validate_story_drawings(
             self.text.as_ref(),
             &self.shapes,
-            &groups,
-            &order,
+            &self.shape_groups,
+            &self.drawing_order,
             "table cell",
         )?;
-        if self
-            .story_events
+        group.validate()?;
+        let last_drawing_position = self
+            .drawing_order
             .last()
-            .is_some_and(|event| self.event_position(*event) > position)
+            .copied()
+            .map(|drawing| self.event_position(CellStoryEvent::Drawing(drawing)))
+            .transpose()?;
+        let last_story_position = self.last_story_position()?;
+        if self.text.get(position..position).is_none()
+            || self
+                .shape_groups
+                .last()
+                .is_some_and(|previous| previous.position > position)
+            || last_drawing_position.is_some_and(|previous| previous > position)
+            || last_story_position.is_some_and(|previous| previous > position)
         {
             return Err(crate::RtfError::MalformedDocument(
-                "RTF table-cell story order moves backwards".to_string(),
+                "RTF table-cell shape group is outside or out of story order".to_string(),
             ));
         }
-        self.shape_groups = groups;
-        self.drawing_order = order;
+        let drawing = crate::StoryDrawing::ShapeGroup(self.shape_groups.len());
+        crate::error::try_reserve_one(&mut self.shape_groups, "table-cell shape groups")?;
+        crate::error::try_reserve_one(&mut self.drawing_order, "table-cell drawing order")?;
+        crate::error::try_reserve_one(&mut self.story_events, "table-cell story events")?;
+        self.shape_groups.push(group);
+        self.drawing_order.push(drawing);
         self.story_events.push(CellStoryEvent::Drawing(drawing));
         Ok(())
     }
@@ -1425,19 +1499,10 @@ impl<'a> Cell<'a> {
         })
     }
     pub fn push_page_break(&mut self, position: usize) -> crate::RtfResult<()> {
-        if self.text.get(position..position).is_none()
-            || self
-                .story_events
-                .last()
-                .is_some_and(|event| self.event_position(*event) > position)
-        {
-            return Err(crate::RtfError::MalformedDocument(
-                "invalid table-cell page-break insertion offset".to_string(),
-            ));
-        }
-        self.story_events
-            .push(CellStoryEvent::PageBreak(crate::PageBreak::new(position)));
-        Ok(())
+        self.push_ordered_story_events(
+            [CellStoryEvent::PageBreak(crate::PageBreak::new(position))],
+            "invalid table-cell page-break insertion offset",
+        )
     }
     pub fn clear_page_breaks(&mut self) {
         self.story_events
@@ -1450,21 +1515,12 @@ impl<'a> Cell<'a> {
         })
     }
     pub fn push_column_break(&mut self, position: usize) -> crate::RtfResult<()> {
-        if self.text.get(position..position).is_none()
-            || self
-                .story_events
-                .last()
-                .is_some_and(|event| self.event_position(*event) > position)
-        {
-            return Err(crate::RtfError::MalformedDocument(
-                "invalid table-cell column-break insertion offset".to_string(),
-            ));
-        }
-        self.story_events
-            .push(CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
+        self.push_ordered_story_events(
+            [CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
                 position,
-            )));
-        Ok(())
+            ))],
+            "invalid table-cell column-break insertion offset",
+        )
     }
     pub fn clear_column_breaks(&mut self) {
         self.story_events
@@ -1507,14 +1563,16 @@ impl<'a> Cell<'a> {
                 "invalid table-cell insertion revision range".to_string(),
             ));
         }
-        self.push_positional_event(CellStoryEvent::RevisionStart(CellStoryReference {
-            index,
-            position,
-        }))?;
-        self.push_positional_event(CellStoryEvent::RevisionEnd(CellStoryReference {
-            index,
-            position: range_end,
-        }))
+        self.push_ordered_story_events(
+            [
+                CellStoryEvent::RevisionStart(CellStoryReference { index, position }),
+                CellStoryEvent::RevisionEnd(CellStoryReference {
+                    index,
+                    position: range_end,
+                }),
+            ],
+            "invalid or out-of-order table-cell insertion revision",
+        )
     }
     pub fn push_deletion_revision_reference(
         &mut self,
@@ -1527,26 +1585,39 @@ impl<'a> Cell<'a> {
         }))
     }
     fn push_positional_event(&mut self, event: CellStoryEvent) -> crate::RtfResult<()> {
-        let position = self.event_position(event);
-        if self.text.get(position..position).is_none()
-            || self
-                .story_events
-                .last()
-                .is_some_and(|previous| self.event_position(*previous) > position)
-        {
-            return Err(crate::RtfError::MalformedDocument(
-                "invalid or out-of-order table-cell story event".to_string(),
-            ));
+        self.push_ordered_story_events([event], "invalid or out-of-order table-cell story event")
+    }
+    fn push_ordered_story_events<const N: usize>(
+        &mut self,
+        events: [CellStoryEvent; N],
+        error_message: &'static str,
+    ) -> crate::RtfResult<()> {
+        let mut previous_position = self.last_story_position()?;
+        for event in &events {
+            let position = self.event_position(*event)?;
+            if self.text.get(position..position).is_none()
+                || previous_position.is_some_and(|previous| previous > position)
+            {
+                return Err(crate::RtfError::MalformedDocument(
+                    error_message.to_string(),
+                ));
+            }
+            previous_position = Some(position);
         }
-        self.story_events.push(event);
+        crate::error::try_reserve_additional(&mut self.story_events, N, "table-cell story events")?;
+        self.story_events.extend(events);
         Ok(())
     }
     pub fn set_text(&mut self, text: Cow<'a, str>) -> crate::RtfResult<()> {
-        let previous = std::mem::replace(&mut self.text, text);
-        if let Err(error) = self.validate_drawings() {
-            self.text = previous;
-            return Err(error);
-        }
+        Self::validate_story_content(
+            text.as_ref(),
+            &self.nested_tables,
+            &self.shapes,
+            &self.shape_groups,
+            &self.drawing_order,
+            &self.story_events,
+        )?;
+        self.text = text;
         Ok(())
     }
     pub fn clear_navigation_entry_references(&mut self) {
@@ -1576,22 +1647,18 @@ impl<'a> Cell<'a> {
         drawing_order: Vec<crate::StoryDrawing>,
         story_events: Vec<CellStoryEvent>,
     ) -> crate::RtfResult<()> {
+        Self::validate_story_content(
+            self.text.as_ref(),
+            &self.nested_tables,
+            &shapes,
+            &shape_groups,
+            &drawing_order,
+            &story_events,
+        )?;
         self.shapes = shapes;
         self.shape_groups = shape_groups;
         self.drawing_order = drawing_order;
         self.story_events = story_events;
-        if let Err(error) = self.validate_drawings() {
-            self.shapes = Vec::new();
-            self.shape_groups = Vec::new();
-            self.drawing_order = Vec::new();
-            self.story_events = self
-                .nested_tables
-                .iter()
-                .enumerate()
-                .map(|(index, _)| CellStoryEvent::NestedTable(index))
-                .collect();
-            return Err(error);
-        }
         Ok(())
     }
 }
@@ -1751,5 +1818,109 @@ impl Table<'_> {
             active_vertical = next_vertical;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_story_references_fail_without_mutating_the_cell() {
+        let mut cell = Cell::new(Cow::Borrowed("abc"));
+        cell.add_nested_table(1, Table::new()).unwrap();
+        cell.nested_tables_mut().clear();
+        let events_before = cell.story_events().to_vec();
+
+        assert!(cell.validate_drawings().is_err());
+        assert!(cell.push_page_break(1).is_err());
+        assert!(cell.add_nested_table(2, Table::new()).is_err());
+        assert_eq!(cell.story_events(), events_before);
+        assert!(cell.nested_tables().is_empty());
+
+        let text_before = cell.text().to_string();
+        assert!(cell.set_text(Cow::Borrowed("replacement")).is_err());
+        assert_eq!(cell.text(), text_before);
+
+        let mut cell = Cell::new(Cow::Borrowed("abc"));
+        let mut shape = crate::Shape::new(crate::ShapeType::Rectangle);
+        shape.position = 1;
+        cell.shapes.push(shape);
+        cell.drawing_order.push(crate::StoryDrawing::Shape(0));
+        cell.story_events
+            .push(CellStoryEvent::Drawing(crate::StoryDrawing::Shape(
+                usize::MAX,
+            )));
+        let events_before = cell.story_events.clone();
+        assert!(cell.validate_drawings().is_err());
+        assert!(cell.push_column_break(1).is_err());
+        assert_eq!(cell.story_events, events_before);
+
+        let mut cell = Cell::new(Cow::Borrowed("abc"));
+        let mut group = crate::ShapeGroup::new();
+        group.position = 1;
+        cell.shape_groups.push(group);
+        cell.drawing_order.push(crate::StoryDrawing::ShapeGroup(0));
+        cell.story_events
+            .push(CellStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(
+                usize::MAX,
+            )));
+        let events_before = cell.story_events.clone();
+        assert!(cell.validate_drawings().is_err());
+        assert!(cell.push_navigation_entry_reference(0, 1).is_err());
+        assert_eq!(cell.story_events, events_before);
+    }
+
+    #[test]
+    fn story_content_replacement_and_text_edits_are_atomic() {
+        let mut cell = Cell::new(Cow::Borrowed("ab"));
+        let mut shape = crate::Shape::new(crate::ShapeType::Rectangle);
+        shape.position = 1;
+        cell.push_shape(shape).unwrap();
+        let shapes_before = cell.shapes.clone();
+        let order_before = cell.drawing_order.clone();
+        let events_before = cell.story_events.clone();
+
+        assert!(
+            cell.set_story_content(
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                vec![CellStoryEvent::Drawing(crate::StoryDrawing::Shape(
+                    usize::MAX,
+                ))],
+            )
+            .is_err()
+        );
+        assert_eq!(cell.shapes, shapes_before);
+        assert_eq!(cell.drawing_order, order_before);
+        assert_eq!(cell.story_events, events_before);
+
+        let mut cell = Cell::new(Cow::Borrowed("ab"));
+        cell.add_nested_table(1, Table::new()).unwrap();
+        assert!(cell.set_text(Cow::Borrowed("你")).is_err());
+        assert_eq!(cell.text(), "ab");
+        cell.validate_drawings().unwrap();
+    }
+
+    #[test]
+    fn drawing_append_preserves_existing_owned_payload_allocations() {
+        let mut cell = Cell::new(Cow::Borrowed("abc"));
+        let mut first = crate::Shape::new(crate::ShapeType::Rectangle);
+        first.position = 1;
+        first.name = Cow::Owned("first shape".repeat(1_024));
+        cell.push_shape(first).unwrap();
+        let name_pointer = cell.shapes().first().unwrap().name.as_ptr();
+
+        let mut second = crate::Shape::new(crate::ShapeType::Ellipse);
+        second.position = 1;
+        cell.push_shape(second).unwrap();
+
+        assert_eq!(cell.shapes().first().unwrap().name.as_ptr(), name_pointer);
+        assert_eq!(
+            cell.drawing_order(),
+            &[crate::StoryDrawing::Shape(0), crate::StoryDrawing::Shape(1)]
+        );
+        cell.validate_drawings().unwrap();
     }
 }

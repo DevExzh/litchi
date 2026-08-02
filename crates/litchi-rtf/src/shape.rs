@@ -9,8 +9,8 @@ use super::border::Border;
 use super::types::Formatting;
 use std::borrow::Cow;
 
-const MAX_SHAPES_PER_GROUP: usize = 65_536;
-const MAX_GROUPS_PER_GROUP: usize = 16_384;
+pub(crate) const MAX_SHAPES_PER_GROUP: usize = 65_536;
+pub(crate) const MAX_GROUPS_PER_GROUP: usize = 16_384;
 const MAX_SHAPE_GROUP_CHILDREN: usize = 65_536;
 const MAX_SHAPE_NESTING_DEPTH: usize = 64;
 
