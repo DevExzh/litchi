@@ -68,8 +68,8 @@ impl KeynoteDocument {
 
     /// Create a Keynote document from raw bytes (ZIP archive data).
     ///
-    /// This is used for single-pass parsing where the ZIP archive has already
-    /// been validated during format detection. It avoids double-parsing.
+    /// This convenience entry point currently performs the same parsing as
+    /// [`Self::from_bytes`]; it does not accept a previously parsed archive.
     pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes)
     }

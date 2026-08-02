@@ -1,13 +1,13 @@
 //! Core file format detection functions.
 //!
-//! Uses SIMD-accelerated signature matching for high-performance format detection,
-//! including parallel signature checking for maximum throughput.
+//! Uses a combined fixed-signature check before invoking format-specific
+//! detectors owned by their leaf crates.
 
 use std::fs::File;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use super::{iwork, ole2, ooxml};
+use super::{ole2, ooxml};
 use litchi_core::detection::FileFormat;
 use litchi_core::detection::simd_utils::{check_office_signatures, signature_matches};
 use litchi_core::detection::{rtf, utils};
@@ -17,8 +17,8 @@ use litchi_odf::detect as odf;
 
 /// Detect file format from a file path.
 ///
-/// This function opens the file and reads only the necessary bytes
-/// to determine the format, making it very efficient.
+/// This function opens the file and delegates to the enabled format owners.
+/// Container formats may require a complete package scan.
 ///
 /// # Arguments
 ///
@@ -51,9 +51,6 @@ pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
 /// requiring file I/O, making it ideal for network data or
 /// in-memory processing.
 ///
-/// Uses SIMD-accelerated parallel signature checking for maximum performance
-/// when processing multiple files or large batches.
-///
 /// # Arguments
 ///
 /// * `bytes` - The file data as bytes
@@ -62,13 +59,6 @@ pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
 ///
 /// * `Some(FileFormat)` if a supported format is detected
 /// * `None` if the format is not recognized
-///
-/// # Performance
-///
-/// Optimized using SIMD operations for fast signature matching:
-/// - Checks OLE2, ZIP, and RTF signatures **in parallel** (3-6x faster)
-/// - Provides up to 6-32x speedup per signature depending on CPU capabilities
-/// - Overall detection is 3-10x faster than sequential checking
 ///
 /// # Examples
 ///
@@ -93,8 +83,7 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         return Some(result);
     }
 
-    // Use parallel signature checking to test OLE2, ZIP, and RTF simultaneously
-    // This is 3-6x faster than checking each signature individually
+    // Classify the fixed signatures together before invoking format parsers.
     let mask = check_office_signatures(bytes);
 
     // Check OLE2 first (if matched)
@@ -118,7 +107,8 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         }
 
         // Finally try iWork detection
-        if let Some(result) = iwork::detect_iwork_format_from_bytes(bytes) {
+        #[cfg(feature = "iwa")]
+        if let Some(result) = litchi_iwa::detect::bytes(bytes).map(iwork_format) {
             return Some(result);
         }
 
@@ -132,20 +122,14 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         return Some(result);
     }
 
-    // Check for iWork bundle formats (non-ZIP based)
-    if let Some(result) = iwork::detect_iwork_format_from_bytes(bytes) {
-        return Some(result);
-    }
-
     None
 }
 
 /// Detect file format from any reader that implements Read + Seek.
 ///
-/// This is the core detection function used by both file path and
-/// byte slice detection methods.
-///
-/// Uses SIMD-accelerated signature matching for improved performance.
+/// Detection always starts at the beginning of the stream. The caller's
+/// original cursor position is restored before returning. A failed restore is
+/// reported as `None` because the cursor contract could not be upheld.
 ///
 /// # Arguments
 ///
@@ -156,98 +140,81 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 /// * `Some(FileFormat)` if a supported format is detected
 /// * `None` if the format is not recognized
 ///
-/// # Performance
-///
-/// Optimized using SIMD operations for fast signature matching,
-/// especially beneficial when processing multiple files.
 pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
-    // Read the first 8 bytes for signature detection
-    let mut header = [0u8; 8];
-    if reader.read_exact(&mut header).is_err() {
-        return None;
-    }
+    let original = reader.stream_position().ok()?;
+    let detected = (|| {
+        reader.seek(SeekFrom::Start(0)).ok()?;
+        let mut header = [0u8; 8];
+        reader.read_exact(&mut header).ok()?;
 
-    // Reset to beginning
-    let _ = reader.seek(std::io::SeekFrom::Start(0));
+        if signature_matches(&header, utils::OLE2_SIGNATURE) {
+            reader.seek(SeekFrom::Start(0)).ok()?;
+            return ole2::detect_ole2_format_from_reader(reader);
+        }
 
-    // Check for OLE2 signature (legacy Office formats) using SIMD
-    if signature_matches(&header[0..8], utils::OLE2_SIGNATURE) {
-        return ole2::detect_ole2_format_from_reader(reader);
-    }
-
-    // Check for ZIP signature (OOXML, ODF, and iWork formats) using SIMD
-    #[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
-    if signature_matches(&header[0..4], utils::ZIP_SIGNATURE) {
-        // For ZIP files, first check if it contains IWA files (iWork indicator)
-        #[cfg(feature = "iwa")]
-        {
-            let _ = reader.seek(std::io::SeekFrom::Start(0));
-            // Read all data for ArchiveReader
-            let mut data = Vec::new();
-            if reader.read_to_end(&mut data).is_ok()
-                && let Ok(archive) = soapberry_zip::office::ArchiveReader::new(&data)
+        #[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
+        if signature_matches(&header[..4], utils::ZIP_SIGNATURE) {
+            #[cfg(feature = "ooxml")]
             {
-                let has_iwa_files = archive.file_names().any(|name| name.ends_with(".iwa"));
-
-                if has_iwa_files {
-                    // This is an iWork file, detect the specific type
-                    if let Ok(result) = iwork::detect_iwork_format(&archive) {
-                        return Some(result);
-                    }
-                    return None;
+                reader.seek(SeekFrom::Start(0)).ok()?;
+                if let Some(format) = ooxml::detect_zip_format_from_reader(reader) {
+                    return Some(format);
                 }
+            }
+
+            #[cfg(feature = "odf")]
+            {
+                reader.seek(SeekFrom::Start(0)).ok()?;
+                if let Some(format) = odf::reader(reader) {
+                    return Some(format);
+                }
+            }
+
+            #[cfg(feature = "iwa")]
+            {
+                reader.seek(SeekFrom::Start(0)).ok()?;
+                if let Some(format) = litchi_iwa::detect::reader(reader).map(iwork_format) {
+                    return Some(format);
+                }
+            }
+
+            return None;
+        }
+
+        #[cfg(feature = "odf")]
+        if header
+            .iter()
+            .copied()
+            .find(|byte| !byte.is_ascii_whitespace())
+            == Some(b'<')
+            || header.starts_with(&[0xef, 0xbb, 0xbf])
+        {
+            reader.seek(SeekFrom::Start(0)).ok()?;
+            if let Some(format) = odf::reader(reader) {
+                return Some(format);
             }
         }
 
-        // Reset to beginning for OOXML detection
-        let _ = reader.seek(std::io::SeekFrom::Start(0));
-
-        // Try OOXML
-        #[cfg(feature = "ooxml")]
-        if let Some(result) = ooxml::detect_zip_format_from_reader(reader) {
-            return Some(result);
-        }
-
-        // Reset to beginning for ODF detection
-        let _ = reader.seek(std::io::SeekFrom::Start(0));
-
-        // Try ODF
-        #[cfg(feature = "odf")]
-        if let Some(result) = odf::reader(reader) {
-            return Some(result);
-        }
-
-        return None;
-    }
-
-    #[cfg(feature = "odf")]
-    if header
-        .iter()
-        .copied()
-        .find(|byte| !byte.is_ascii_whitespace())
-        == Some(b'<')
-        || header.starts_with(&[0xef, 0xbb, 0xbf])
-    {
-        let _ = reader.seek(std::io::SeekFrom::Start(0));
-        if let Some(result) = odf::reader(reader) {
-            return Some(result);
-        }
-    }
-
-    // Check for RTF format (plain text with {\rtf signature)
-    if let Some(result) = rtf::detect_rtf_format_from_reader(reader) {
-        return Some(result);
-    }
-
-    // Note: iWork format detection from reader is handled via byte-based detection
-    // Use detect_iwork_format_from_bytes() for iWork detection
-
-    None
+        reader.seek(SeekFrom::Start(0)).ok()?;
+        rtf::detect_rtf_format_from_reader(reader)
+    })();
+    reader.seek(SeekFrom::Start(original)).ok()?;
+    detected
 }
 
 /// Detect iWork format from file path.
+#[cfg(feature = "iwa")]
 pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
-    iwork::detect_iwork_format_from_path(path)
+    litchi_iwa::detect::path(path.as_ref()).map(iwork_format)
+}
+
+#[cfg(feature = "iwa")]
+fn iwork_format(format: litchi_iwa::detect::Format) -> FileFormat {
+    match format {
+        litchi_iwa::detect::Format::Pages => FileFormat::Pages,
+        litchi_iwa::detect::Format::Keynote => FileFormat::Keynote,
+        litchi_iwa::detect::Format::Numbers => FileFormat::Numbers,
+    }
 }
 
 #[cfg(test)]
@@ -260,10 +227,12 @@ mod tests {
         let xml = br#"<?xml version="1.0"?><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.chart"><o:body><o:chart/></o:body></o:document>"#;
         assert_eq!(detect_file_format_from_bytes(xml), Some(FileFormat::Odc));
         let mut reader = std::io::Cursor::new(xml);
+        reader.set_position(7);
         assert_eq!(
             detect_format_from_reader(&mut reader),
             Some(FileFormat::Odc)
         );
+        assert_eq!(reader.position(), 7);
     }
 
     #[test]
@@ -329,6 +298,99 @@ mod tests {
         assert!(format.is_none());
     }
 
+    #[test]
+    #[cfg(feature = "iwa")]
+    fn iwork_leaf_detection_maps_bytes_reader_smart_and_path() {
+        let bytes = iwork_package(None);
+        assert_eq!(
+            detect_file_format_from_bytes(&bytes),
+            Some(FileFormat::Numbers)
+        );
+
+        let mut reader = std::io::Cursor::new(&bytes);
+        reader.set_position(6);
+        assert_eq!(
+            detect_format_from_reader(&mut reader),
+            Some(FileFormat::Numbers)
+        );
+        assert_eq!(reader.position(), 6);
+
+        assert!(matches!(
+            crate::detection_smart::detect_format_smart(bytes.clone()),
+            Some(crate::detection_smart::DetectedFormat::Numbers(retained)) if retained == bytes
+        ));
+
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), &bytes).unwrap();
+        assert_eq!(
+            detect_iwork_format_from_path(file.path()),
+            Some(FileFormat::Numbers)
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "iwa", feature = "odf"))]
+    fn odf_precedes_iwork_consistently_for_mixed_packages() {
+        let bytes = iwork_package(Some("application/vnd.oasis.opendocument.spreadsheet"));
+        assert_eq!(detect_file_format_from_bytes(&bytes), Some(FileFormat::Ods));
+
+        let mut reader = std::io::Cursor::new(&bytes);
+        reader.set_position(4);
+        assert_eq!(
+            detect_format_from_reader(&mut reader),
+            Some(FileFormat::Ods)
+        );
+        assert_eq!(reader.position(), 4);
+
+        assert!(matches!(
+            crate::detection_smart::detect_format_smart(bytes),
+            Some(crate::detection_smart::DetectedFormat::Ods(_))
+        ));
+    }
+
+    #[cfg(feature = "iwa")]
+    fn iwork_package(mimetype: Option<&str>) -> Vec<u8> {
+        use litchi_iwa::archive::{Archive, ArchiveObject, RawMessage};
+        use std::io::{Cursor, Write};
+
+        let document = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 6,
+                        // TN.DocumentArchive required references plus its shared root.
+                        data: vec![
+                            0x22, 0x02, 0x08, 0x01, 0x2a, 0x02, 0x08, 0x02, 0x32, 0x02, 0x08, 0x03,
+                            0x42, 0x02, 0x0a, 0x00,
+                        ],
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        let document = litchi_iwa::SnappyStream::compress(&document.to_bytes().unwrap()).unwrap();
+
+        let mut bytes = Vec::new();
+        {
+            let mut writer = zip::ZipWriter::new(Cursor::new(&mut bytes));
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            if let Some(mimetype) = mimetype {
+                writer.start_file("mimetype", options).unwrap();
+                writer.write_all(mimetype.as_bytes()).unwrap();
+            }
+            writer.start_file("Index/Document.iwa", options).unwrap();
+            writer.write_all(&document).unwrap();
+            writer
+                .start_file("Index/CalculationEngine-174.iwa", options)
+                .unwrap();
+            writer.write_all(b"iwa").unwrap();
+            writer.finish().unwrap();
+        }
+        bytes
+    }
+
     // Helper function to create a minimal DOCX-like ZIP for testing
     #[cfg(feature = "ooxml")]
     fn create_minimal_docx_zip() -> Vec<u8> {
@@ -340,27 +402,38 @@ mod tests {
 
     #[cfg(feature = "ooxml")]
     fn create_minimal_ooxml_zip(part_name: &str, content_type: &str) -> Vec<u8> {
-        use soapberry_zip::office::StreamingArchiveWriter;
+        use crate::ooxml::opc::PackURI;
+        use crate::ooxml::opc::phys_pkg::PhysPkgWriter;
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer = PhysPkgWriter::new();
         let content_types = format!(
             r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/octet-stream"/><Override PartName="/{part_name}" ContentType="{content_type}"/></Types>"#
         );
 
-        // Add [Content_Types].xml
         writer
-            .write_deflated("[Content_Types].xml", content_types.as_bytes())
+            .write(
+                &PackURI::new("/[Content_Types].xml").unwrap(),
+                content_types.as_bytes(),
+            )
             .unwrap();
 
         let relationships = format!(
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{part_name}"/></Relationships>"#
         );
         writer
-            .write_deflated("_rels/.rels", relationships.as_bytes())
+            .write(
+                &PackURI::new("/_rels/.rels").unwrap(),
+                relationships.as_bytes(),
+            )
             .unwrap();
 
-        writer.write_deflated(part_name, b"office data").unwrap();
+        writer
+            .write(
+                &PackURI::new(format!("/{part_name}")).unwrap(),
+                b"office data",
+            )
+            .unwrap();
 
-        writer.finish_to_bytes().unwrap()
+        writer.finish().unwrap()
     }
 }

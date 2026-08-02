@@ -62,8 +62,8 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        // Read file into memory and use smart detection for single-pass parsing
-        // This is faster than the old approach of detecting first then parsing again
+        // Read once into owned memory; detection transfers that ownership into
+        // the selected format path.
         let bytes = std::fs::read(path.as_ref())
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
         Self::from_bytes(bytes)
@@ -86,11 +86,13 @@ impl Workbook {
     ///
     /// # Performance Notes
     ///
-    /// - **Single-pass parsing**: Format detection reuses the parsed structure (40-60% faster)
+    /// - OLE2 and OOXML detection return parsed owners that their loaders reuse
+    /// - Other detection results retain the moved buffer for loaders that may parse it afterward
     /// - No temporary files created
     /// - Ideal for network data, streams, or in-memory content
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        // Use smart detection to parse only once
+        // Detection consumes the input and returns either a parsed owner or the
+        // moved source bytes, depending on the format.
         use crate::detection_smart::{DetectedFormat, detect_format_smart};
 
         let detected = detect_format_smart(bytes).ok_or_else(|| {

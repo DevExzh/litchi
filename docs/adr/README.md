@@ -22,6 +22,7 @@ Office round trips.
 | [0007](0007-office-object-models.md) | Word, spreadsheet, presentation, and drawing models |
 | [0008](0008-migration-and-verification.md) | Buildable migration phases and evidence gates |
 | [0009](0009-odf-detection-ownership.md) | ODF detection ownership and fuzz boundary |
+| [0010](0010-facade-archive-ownership.md) | Archive ownership below the facade |
 
 ## Decision hierarchy
 

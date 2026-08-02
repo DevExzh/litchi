@@ -268,13 +268,6 @@
       "dependency": "litchi-ooxml",
       "reason": "The facade still exposes the OOXML migration host.",
       "exit": "Re-export the concrete DOCX/PPTX/XLSB/XLSX crates and remove the host dependency."
-    },
-    {
-      "order": 48,
-      "dependent": "litchi",
-      "dependency": "soapberry-zip",
-      "reason": "The facade still owns format implementation dependencies.",
-      "exit": "Move archive use behind concrete crates so the facade only re-exports canonical APIs."
     }
   ],
   "runtime_neutral": [

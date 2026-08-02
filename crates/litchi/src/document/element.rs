@@ -1,11 +1,14 @@
 //! Document element types for representing ordered content.
 
-use super::{Paragraph, Table};
+use super::Paragraph;
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+use super::Table;
 
-/// A document element that can be either a paragraph or a table.
+/// An element in a document's natural content order.
 ///
 /// This enum represents the natural order of elements as they appear in a document,
 /// which is essential for proper Markdown conversion and other sequential operations.
+/// Table elements are available when a table-capable document feature is enabled.
 ///
 /// # Examples
 ///
@@ -16,13 +19,8 @@ use super::{Paragraph, Table};
 ///
 /// // Process elements in document order
 /// for element in doc.elements()? {
-///     match element {
-///         litchi::DocumentElement::Paragraph(para) => {
-///             println!("Paragraph: {}", para.text()?);
-///         }
-///         litchi::DocumentElement::Table(table) => {
-///             println!("Table with {} rows", table.row_count()?);
-///         }
+///     if let Some(para) = element.as_paragraph() {
+///         println!("Paragraph: {}", para.text()?);
 ///     }
 /// }
 /// # Ok::<(), litchi::common::Error>(())
@@ -32,6 +30,7 @@ pub enum DocumentElement {
     /// A paragraph element (boxed to reduce enum size)
     Paragraph(Box<Paragraph>),
     /// A table element (boxed to reduce enum size from 12KB to ~224 bytes)
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
     Table(Box<Table>),
 }
 
@@ -39,13 +38,21 @@ impl DocumentElement {
     /// Check if this element is a paragraph.
     #[inline]
     pub fn is_paragraph(&self) -> bool {
-        matches!(self, DocumentElement::Paragraph(_))
+        match self {
+            DocumentElement::Paragraph(_) => true,
+            #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+            DocumentElement::Table(_) => false,
+        }
     }
 
     /// Check if this element is a table.
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
     #[inline]
     pub fn is_table(&self) -> bool {
-        matches!(self, DocumentElement::Table(_))
+        match self {
+            DocumentElement::Paragraph(_) => false,
+            DocumentElement::Table(_) => true,
+        }
     }
 
     /// Get a reference to the paragraph, if this is a paragraph element.
@@ -55,13 +62,15 @@ impl DocumentElement {
     pub fn as_paragraph(&self) -> Option<&Paragraph> {
         match self {
             DocumentElement::Paragraph(p) => Some(p),
-            _ => None,
+            #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+            DocumentElement::Table(_) => None,
         }
     }
 
     /// Get a reference to the table, if this is a table element.
     ///
     /// Returns `None` if this is a paragraph element.
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
     #[inline]
     pub fn as_table(&self) -> Option<&Table> {
         match self {
@@ -77,13 +86,15 @@ impl DocumentElement {
     pub fn into_paragraph(self) -> Option<Paragraph> {
         match self {
             DocumentElement::Paragraph(p) => Some(*p),
-            _ => None,
+            #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+            DocumentElement::Table(_) => None,
         }
     }
 
     /// Consume this element and return the table, if this is a table element.
     ///
     /// Returns `None` if this is a paragraph element.
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
     #[inline]
     pub fn into_table(self) -> Option<Table> {
         match self {

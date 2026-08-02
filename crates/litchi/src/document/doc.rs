@@ -1,7 +1,9 @@
 //! Word document implementation.
 
+use super::Paragraph;
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+use super::Table;
 use super::types::DocumentImpl;
-use super::{Paragraph, Table};
 use litchi_core::{Error, Result};
 
 #[cfg(feature = "doc")]
@@ -126,8 +128,8 @@ impl Document {
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        // Read file into memory and use smart detection for single-pass parsing
-        // This is faster than the old approach of detecting first then parsing again
+        // Read once into owned memory; detection transfers that ownership into
+        // the selected format path.
         let bytes = std::fs::read(path.as_ref())?;
         Self::from_bytes(bytes)
     }
@@ -157,13 +159,13 @@ impl Document {
     ///
     /// # Performance Notes
     ///
-    /// - For .doc files (OLE2): Parses directly from the buffer with minimal copying
-    /// - For .docx files (ZIP): Efficient decompression without file I/O overhead
+    /// - OLE2 and OOXML detection return parsed owners that their loaders reuse
+    /// - Other detection results retain the moved buffer for loaders that may parse it afterward
     /// - Ideal for network data, streams, or in-memory content
     /// - No temporary files created
-    /// - **Single-pass parsing**: Format detection reuses the parsed structure (40-60% faster)
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        // Use smart detection to parse only once
+        // Detection consumes the input and returns either a parsed owner or the
+        // moved source bytes, depending on the format.
         use crate::detection_smart::{DetectedFormat, detect_format_smart};
 
         let detected = detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
@@ -410,6 +412,7 @@ impl Document {
     /// }
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
     pub fn tables(&self) -> Result<Vec<Table>> {
         match &self.inner {
             #[cfg(feature = "doc")]
@@ -461,39 +464,27 @@ impl Document {
         }
     }
 
-    /// Get all document elements (paragraphs and tables) in document order.
+    /// Get all supported document elements in document order.
     ///
-    /// This method is optimized to extract paragraphs and tables in a single pass,
-    /// which is more efficient than calling `paragraphs()` and `tables()` separately.
-    /// More importantly, it preserves the document order of elements, which is essential
-    /// for proper sequential processing (e.g., Markdown conversion).
+    /// Table elements are included for table-capable formats. Pages currently exposes
+    /// paragraph elements only. The method preserves document order for sequential
+    /// processing such as Markdown conversion.
     ///
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::{Document, DocumentElement};
+    /// use litchi::Document;
     ///
     /// let doc = Document::open("document.doc")?;
     ///
     /// // Process elements in document order
     /// for element in doc.elements()? {
-    ///     match element {
-    ///         DocumentElement::Paragraph(para) => {
-    ///             println!("Paragraph: {}", para.text()?);
-    ///         }
-    ///         DocumentElement::Table(table) => {
-    ///             println!("Table with {} rows", table.row_count()?);
-    ///         }
+    ///     if let Some(para) = element.as_paragraph() {
+    ///         println!("Paragraph: {}", para.text()?);
     ///     }
     /// }
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
-    ///
-    /// # Performance
-    ///
-    /// - For `.doc` files: Extracts paragraphs once and identifies tables from them
-    /// - For `.docx` files: Parses XML once to extract both paragraphs and tables
-    /// - This is 2x faster than calling `paragraphs()` and `tables()` separately
     pub fn elements(&self) -> Result<Vec<super::DocumentElement>> {
         match &self.inner {
             #[cfg(feature = "doc")]

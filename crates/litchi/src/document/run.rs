@@ -97,9 +97,10 @@ impl Run {
     ///
     /// Returns the vertical positioning if specified, None if normal.
     ///
-    /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
+    /// Pages currently reports no run-level vertical positioning.
     #[cfg(any(feature = "doc", feature = "ooxml", feature = "iwa"))]
     pub fn vertical_position(&self) -> Result<Option<litchi_core::VerticalPosition>> {
+        #[cfg(any(feature = "doc", feature = "ooxml"))]
         use litchi_core::VerticalPosition;
 
         match self {

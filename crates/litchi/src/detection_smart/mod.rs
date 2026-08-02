@@ -8,12 +8,10 @@ pub mod detected;
 pub mod functions;
 
 // Format-family probes used by `functions`.
-pub(crate) mod iwork;
 pub(crate) mod ole2;
 pub(crate) mod ooxml;
 
 pub use detected::{DetectedFormat, detect_format_smart};
-pub use functions::{
-    detect_file_format, detect_file_format_from_bytes, detect_format_from_reader,
-    detect_iwork_format_from_path,
-};
+#[cfg(feature = "iwa")]
+pub use functions::detect_iwork_format_from_path;
+pub use functions::{detect_file_format, detect_file_format_from_bytes, detect_format_from_reader};

@@ -112,13 +112,11 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! ## Performance
+//! ## Resource behavior
 //!
-//! The implementation is optimized for:
-//! - Fast decompression (50-100 MB/s per core)
-//! - Efficient parsing (100-200 MB/s per core)
-//! - Low memory overhead (~2-3x document size)
-//! - O(1) message type lookups (perfect hash maps)
+//! Parsers and editors document their own size limits and ownership behavior.
+//! Throughput, allocation, and memory-use claims require reproducible benchmarks
+//! for the concrete workload and are not inferred from the data structures used.
 //!
 //! ## Reference
 //!
@@ -171,6 +169,8 @@ pub mod zip_utils;
 pub mod text;
 
 mod data_reference_registry;
+/// Safe, typed detection for packaged and legacy iWork documents.
+pub mod detect;
 /// High-level iWork document types
 pub mod document;
 

@@ -10,7 +10,7 @@
 //! - `Document`: The main document API (auto-detects format)
 //! - `Paragraph`: Paragraph with text runs
 //! - `Run`: Text run with formatting
-//! - `Table`: Table with rows and cells
+//! - `Table`: Table with rows and cells (for table-capable document formats)
 //!
 //! # Example
 //!
@@ -34,30 +34,26 @@
 //!     }
 //! }
 //!
-//! // Access tables
-//! for table in doc.tables()? {
-//!     for row in table.rows()? {
-//!         for cell in row.cells()? {
-//!             println!("Cell: {}", cell.text()?);
-//!         }
-//!     }
-//! }
 //! # Ok::<(), litchi::common::Error>(())
 //! ```
 
 // Submodule declarations
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 mod cell_merge;
 mod doc;
 mod element;
 mod paragraph;
 mod run;
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 mod table;
 mod types;
 
 // Re-exports
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 pub use cell_merge::CellMerge;
 pub use doc::Document;
 pub use element::DocumentElement;
 pub use paragraph::Paragraph;
 pub use run::Run;
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 pub use table::{Cell, Row, Table};

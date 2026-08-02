@@ -60,8 +60,8 @@ full = [
     "sign",
 ]
 # Format support features
-iwa = ["dep:litchi-iwa", "dep:soapberry-zip"]
-odf = ["dep:litchi-odf", "dep:soapberry-zip"]
+iwa = ["dep:litchi-iwa"]
+odf = ["dep:litchi-odf"]
 doc = ["dep:litchi-cfb", "dep:litchi-doc", "sign"]
 ppt = ["dep:litchi-cfb", "dep:litchi-ppt", "sign"]
 xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]
@@ -71,7 +71,6 @@ ooxml = [
     "dep:litchi-ooxml-common",
     "dep:litchi-pptx",
     "dep:litchi-xlsb",
-    "dep:soapberry-zip",
     "sign",
 ]
 ooxml_encryption = ["ooxml", "dep:litchi-crypto", "litchi-ooxml/encryption"]
@@ -130,7 +129,6 @@ serde = { version = "1", features = ["derive"] } # Serialization/deserialization
 serde-saphyr = "0" # YAML serialization support
 sha2 = "0.11" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
-soapberry-zip = { workspace = true, optional = true } # High-performance ZIP archive handling for modern Office formats (gated by ooxml/iwa/odf features)
 thiserror = "2.0" # Convenient derive macros for error types
 zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
 zerocopy-derive = "0.8" # Derive macros for zerocopy traits

@@ -10,14 +10,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-ooxml = [
-    "dep:aes",
-    "dep:base64",
-    "dep:cbc",
-    "dep:hmac",
-    "dep:rand",
-    "dep:thiserror",
-]
+ooxml = ["dep:aes", "dep:base64", "dep:cbc", "dep:hmac", "dep:rand", "dep:thiserror"]
 
 [dependencies]
 aes = { workspace = true, optional = true, features = ["zeroize"] }

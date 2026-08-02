@@ -169,14 +169,14 @@ impl Row {
             #[cfg(feature = "rtf")]
             Row::Rtf(r) => {
                 let cells = r.cells();
-                Ok(cells.iter().cloned().map(Cell::Rtf).collect())
+                Ok(cells.iter().cloned().map(Box::new).map(Cell::Rtf).collect())
             },
             #[cfg(feature = "odf")]
             Row::Odt(r) => {
                 let cells = r
                     .cells()
                     .map_err(|e| Error::ParseError(format!("Failed to get cells: {}", e)))?;
-                Ok(cells.into_iter().map(Cell::Odt).collect())
+                Ok(cells.into_iter().map(Box::new).map(Cell::Odt).collect())
             },
         }
     }
@@ -202,14 +202,14 @@ impl Row {
             #[cfg(feature = "rtf")]
             Row::Rtf(r) => {
                 let cells = r.cells();
-                Ok(cells.get(index).cloned().map(Cell::Rtf))
+                Ok(cells.get(index).cloned().map(Box::new).map(Cell::Rtf))
             },
             #[cfg(feature = "odf")]
             Row::Odt(r) => {
                 let cells = r
                     .cells()
                     .map_err(|e| Error::ParseError(format!("Failed to get cells: {}", e)))?;
-                Ok(cells.get(index).cloned().map(Cell::Odt))
+                Ok(cells.get(index).cloned().map(Box::new).map(Cell::Odt))
             },
         }
     }
@@ -261,9 +261,9 @@ pub enum Cell {
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Cell),
     #[cfg(feature = "rtf")]
-    Rtf(litchi_rtf::Cell<'static>),
+    Rtf(Box<litchi_rtf::Cell<'static>>),
     #[cfg(feature = "odf")]
-    Odt(litchi_odf::Cell),
+    Odt(Box<litchi_odf::Cell>),
 }
 
 impl Cell {

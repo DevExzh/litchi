@@ -265,54 +265,99 @@ pub fn detect_application(message_type_ids: &[u32]) -> Option<Application> {
 ///
 /// Message type identifiers overlap between Pages, Numbers, and Keynote, so they
 /// cannot reliably identify an application. The root protobuf schemas have
-/// stable, application-specific required fields: Pages uses field 15, Numbers
-/// uses fields 4/5/6/8, and Keynote uses fields 2/3.
+/// stable, application-specific required message shapes: Pages uses its shared
+/// document at field 15, Numbers uses references at fields 4/5/6 plus its shared
+/// document at field 8, and Keynote uses a reference at field 2 plus its shared
+/// document at field 3. Malformed or multiply matching payloads fail closed.
 pub fn detect_application_from_document(payload: &[u8]) -> Option<Application> {
-    let fields = top_level_field_numbers(payload)?;
+    let fields = wire_fields(payload)?;
+    let pages = unique_field(&fields, 15, 2).is_some_and(valid_shared_document);
+    let numbers = [4, 5, 6]
+        .into_iter()
+        .all(|field| unique_field(&fields, field, 2).is_some_and(valid_reference))
+        && unique_field(&fields, 8, 2).is_some_and(valid_shared_document);
+    let keynote = unique_field(&fields, 2, 2).is_some_and(valid_reference)
+        && unique_field(&fields, 3, 2).is_some_and(valid_shared_document);
 
-    if fields.contains(&15) {
-        Some(Application::Pages)
-    } else if [4, 5, 6, 8].iter().all(|field| fields.contains(field)) {
-        Some(Application::Numbers)
-    } else if fields.contains(&2) && fields.contains(&3) {
-        Some(Application::Keynote)
-    } else {
-        None
+    match (pages, numbers, keynote) {
+        (true, false, false) => Some(Application::Pages),
+        (false, true, false) => Some(Application::Numbers),
+        (false, false, true) => Some(Application::Keynote),
+        _ => None,
     }
 }
 
-fn top_level_field_numbers(payload: &[u8]) -> Option<std::collections::HashSet<u32>> {
-    let mut fields = std::collections::HashSet::new();
+#[derive(Debug, Clone, Copy)]
+struct WireField<'a> {
+    number: u32,
+    wire_type: u8,
+    value: &'a [u8],
+}
+
+fn wire_fields(payload: &[u8]) -> Option<Vec<WireField<'_>>> {
+    let mut fields = Vec::new();
     let mut position = 0;
 
     while position < payload.len() {
         let tag = read_varint(payload, &mut position)?;
-        let field = u32::try_from(tag >> 3).ok()?;
+        let number = u32::try_from(tag >> 3).ok()?;
         let wire_type = (tag & 0x07) as u8;
-        if field == 0 {
+        if number == 0 {
             return None;
         }
-        fields.insert(field);
 
-        match wire_type {
+        let value = match wire_type {
             0 => {
+                let start = position;
                 read_varint(payload, &mut position)?;
+                payload.get(start..position)?
             },
-            1 => position = position.checked_add(8)?,
+            1 => take(payload, &mut position, 8)?,
             2 => {
                 let length = usize::try_from(read_varint(payload, &mut position)?).ok()?;
-                position = position.checked_add(length)?;
+                take(payload, &mut position, length)?
             },
-            5 => position = position.checked_add(4)?,
+            5 => take(payload, &mut position, 4)?,
             _ => return None,
-        }
+        };
 
-        if position > payload.len() {
-            return None;
-        }
+        fields.push(WireField {
+            number,
+            wire_type,
+            value,
+        });
     }
 
     Some(fields)
+}
+
+fn take<'a>(payload: &'a [u8], position: &mut usize, length: usize) -> Option<&'a [u8]> {
+    let end = position.checked_add(length)?;
+    let value = payload.get(*position..end)?;
+    *position = end;
+    Some(value)
+}
+
+fn unique_field<'a>(fields: &[WireField<'a>], number: u32, wire_type: u8) -> Option<&'a [u8]> {
+    let mut matches = fields.iter().filter(|field| field.number == number);
+    let field = matches.next()?;
+    if matches.next().is_some() || field.wire_type != wire_type {
+        return None;
+    }
+    Some(field.value)
+}
+
+fn valid_reference(payload: &[u8]) -> bool {
+    wire_fields(payload)
+        .and_then(|fields| unique_field(&fields, 1, 0))
+        .is_some()
+}
+
+fn valid_shared_document(payload: &[u8]) -> bool {
+    wire_fields(payload)
+        .and_then(|fields| unique_field(&fields, 1, 2))
+        .and_then(wire_fields)
+        .is_some()
 }
 
 fn read_varint(payload: &[u8], position: &mut usize) -> Option<u64> {
@@ -334,6 +379,47 @@ fn read_varint(payload: &[u8], position: &mut usize) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protobuf::{kn, tn, tp, tsa, tsk, tsp};
+    use prost::Message;
+
+    fn shared_document() -> tsa::DocumentArchive {
+        tsa::DocumentArchive {
+            super_: tsk::DocumentArchive::default(),
+            ..Default::default()
+        }
+    }
+
+    fn reference(identifier: u64) -> tsp::Reference {
+        tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn document_payload(application: Application) -> Vec<u8> {
+        match application {
+            Application::Pages => tp::DocumentArchive {
+                super_: shared_document(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            Application::Numbers => tn::DocumentArchive {
+                super_: shared_document(),
+                stylesheet: reference(1),
+                sidebar_order: reference(2),
+                theme: reference(3),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            Application::Keynote => kn::DocumentArchive {
+                super_: shared_document(),
+                show: reference(1),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+            Application::Common => Vec::new(),
+        }
+    }
 
     #[test]
     fn test_message_type_lookup() {
@@ -368,20 +454,41 @@ mod tests {
 
     #[test]
     fn test_document_payload_detection() {
-        // Length-delimited fields with empty payloads are sufficient because
-        // detection only inspects top-level field numbers.
         assert_eq!(
-            detect_application_from_document(&[0x7a, 0x00]),
+            detect_application_from_document(&document_payload(Application::Pages)),
             Some(Application::Pages)
         );
         assert_eq!(
-            detect_application_from_document(&[0x22, 0x00, 0x2a, 0x00, 0x32, 0x00, 0x42, 0x00,]),
+            detect_application_from_document(&document_payload(Application::Numbers)),
             Some(Application::Numbers)
         );
         assert_eq!(
-            detect_application_from_document(&[0x12, 0x00, 0x1a, 0x00]),
+            detect_application_from_document(&document_payload(Application::Keynote)),
             Some(Application::Keynote)
         );
+
+        let pages_with_references = tp::DocumentArchive {
+            super_: shared_document(),
+            stylesheet: Some(reference(1)),
+            floating_drawables: Some(reference(2)),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert_eq!(
+            detect_application_from_document(&pages_with_references),
+            Some(Application::Pages)
+        );
+
+        let mut conflicting = document_payload(Application::Pages);
+        conflicting.extend(document_payload(Application::Numbers));
+        assert_eq!(detect_application_from_document(&conflicting), None);
+
+        let mut conflicting = document_payload(Application::Pages);
+        conflicting.extend(document_payload(Application::Keynote));
+        assert_eq!(detect_application_from_document(&conflicting), None);
+
+        assert_eq!(detect_application_from_document(&[0x78, 0x00]), None);
+        assert_eq!(detect_application_from_document(&[0x7a, 0x00]), None);
         assert_eq!(detect_application_from_document(&[0x80]), None);
     }
 

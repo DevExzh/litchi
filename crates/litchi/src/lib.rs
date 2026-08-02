@@ -192,6 +192,8 @@ pub mod common {
     /// Detection re-exports — merges `litchi-core`'s signature detection with
     /// the umbrella's smart-detection entry points.
     pub mod detection {
+        #[cfg(feature = "iwa")]
+        pub use crate::detection_smart::detect_iwork_format_from_path;
         #[cfg(any(
             feature = "doc",
             feature = "ppt",
@@ -203,7 +205,7 @@ pub mod common {
         ))]
         pub use crate::detection_smart::{
             DetectedFormat, detect_file_format, detect_file_format_from_bytes,
-            detect_format_from_reader, detect_format_smart, detect_iwork_format_from_path,
+            detect_format_from_reader, detect_format_smart,
         };
         pub use litchi_core::detection::*;
     }

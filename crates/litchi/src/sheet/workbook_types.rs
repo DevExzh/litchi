@@ -1,11 +1,9 @@
 //! Unified workbook types and format detection.
 
 use litchi_core::Error;
+#[cfg(any(feature = "odf", feature = "ooxml"))]
+use litchi_core::FileFormat;
 use std::io::{Read, Seek, SeekFrom};
-
-// soapberry-zip is used for refining detection of OOXML, iWork and ODF containers
-#[cfg(any(feature = "iwa", feature = "ooxml", feature = "odf"))]
-use soapberry_zip::office::ArchiveReader;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -94,57 +92,31 @@ pub fn refine_workbook_format<R: Read + Seek>(
         return Ok(initial_format);
     }
 
-    reader.seek(SeekFrom::Start(0))?;
+    let original = reader.stream_position()?;
+    let refined = (|| {
+        reader.seek(SeekFrom::Start(0))?;
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data)?;
 
-    // Read all data from the reader
-    let mut data = Vec::new();
-    reader.read_to_end(&mut data)?;
-
-    // Open ZIP archive once
-    let archive = match ArchiveReader::new(&data) {
-        Ok(archive) => archive,
-        Err(_) => return Ok(initial_format),
-    };
-
-    // Check for ODF by inspecting the mimetype file
-    #[cfg(feature = "odf")]
-    {
-        if let Ok(mime) = archive.read_string("mimetype") {
-            let mime_trimmed = mime.trim();
-            if mime_trimmed == "application/vnd.oasis.opendocument.spreadsheet"
-                || mime_trimmed == "application/vnd.oasis.opendocument.spreadsheet-template"
-            {
-                return Ok(WorkbookFormat::Ods);
-            }
+        #[cfg(feature = "ooxml")]
+        if crate::detection_smart::ooxml::detect_zip_format(&data) == Some(FileFormat::Xlsb) {
+            return Ok(WorkbookFormat::Xlsb);
         }
-    }
 
-    // Check for iWork Numbers format (Index/*.iwa files)
-    #[cfg(feature = "iwa")]
-    {
-        // Check for Index.zip (older iWork format)
-        if archive.contains("Index.zip") {
+        #[cfg(feature = "odf")]
+        if litchi_odf::detect::bytes(&data) == Some(FileFormat::Ods) {
+            return Ok(WorkbookFormat::Ods);
+        }
+
+        #[cfg(feature = "iwa")]
+        if litchi_iwa::detect::bytes(&data) == Some(litchi_iwa::detect::Format::Numbers) {
             return Ok(WorkbookFormat::Numbers);
         }
 
-        // Check for Index/ directory with .iwa files (newer iWork format)
-        for name in archive.file_names() {
-            if name.starts_with("Index/") && name.ends_with(".iwa") {
-                return Ok(WorkbookFormat::Numbers);
-            }
-        }
-    }
-
-    // Check for XLSB by looking at the workbook part
-    #[cfg(feature = "ooxml")]
-    {
-        // XLSB uses .bin extension for parts
-        if archive.contains("xl/workbook.bin") {
-            return Ok(WorkbookFormat::Xlsb);
-        }
-    }
-
-    Ok(WorkbookFormat::Xlsx)
+        Ok(initial_format)
+    })();
+    reader.seek(SeekFrom::Start(original))?;
+    refined
 }
 
 #[cfg(test)]
@@ -226,5 +198,17 @@ mod tests {
         let format = WorkbookFormat::Ods;
         let copied = format;
         assert_eq!(format, copied);
+    }
+
+    #[test]
+    #[cfg(any(feature = "iwa", feature = "ooxml", feature = "odf"))]
+    fn refinement_restores_a_nonzero_cursor() {
+        let mut reader = Cursor::new(b"PK\x03\x04not-a-valid-package".as_slice());
+        reader.set_position(5);
+        assert_eq!(
+            refine_workbook_format(&mut reader, WorkbookFormat::Xlsx).unwrap(),
+            WorkbookFormat::Xlsx
+        );
+        assert_eq!(reader.position(), 5);
     }
 }

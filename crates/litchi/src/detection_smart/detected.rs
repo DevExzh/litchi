@@ -1,28 +1,21 @@
-//! Smart single-pass format detection with pre-parsed structures.
+//! Smart format detection with reusable owned results.
 //!
 //! This module provides the `DetectedFormat` enum and the `detect_format_smart`
-//! function that detects the file format while parsing it only once, eliminating
-//! the double-parsing problem that existed before.
-//!
-//! Uses SIMD-accelerated signature matching for high-performance detection.
+//! function. OOXML and OLE results retain their parsed owners; iWork, ODF, and
+//! RTF results retain the caller's moved byte buffer for subsequent parsing.
 
-/// Detected format with pre-parsed data structures for all formats.
+/// Detected format with reusable parsed owners or moved source bytes.
 ///
 /// This enum represents the result of format detection, where each format
-/// includes its already-parsed data structure to avoid double parsing:
+/// includes the most reusable representation available at this layer:
 /// - OOXML formats (DOCX, PPTX, XLSX, XLSB): include parsed OPC package
 /// - OLE2 formats (DOC, PPT, XLS): include parsed OleFile
-/// - iWork formats (Pages, Keynote, Numbers): include raw bytes (lazy parsing)
-/// - ODF formats: include raw bytes (lazy parsing)
-/// - RTF: just bytes (no parsing needed)
+/// - iWork and ODF formats: include owned bytes after leaf detection
+/// - RTF: includes owned bytes
 ///
-/// # Performance
-///
-/// Using this enum eliminates the double-parsing problem for ALL formats:
-/// - Old way: detect format (parse) → parse again to load document
-/// - New way: detect format (parse once) → reuse parsed structure
-///
-/// This provides 40-60% performance improvement across all formats.
+/// iWork and ODF leaf detectors may scan a container before a later document
+/// parser reads the retained bytes again. No parsing-once guarantee is made for
+/// those formats.
 #[derive(Debug)]
 pub enum DetectedFormat {
     // OOXML formats with parsed OPC package
@@ -81,24 +74,12 @@ pub enum DetectedFormat {
     Rtf(Vec<u8>),
 }
 
-/// Smart single-pass format detection with pre-parsed data structures.
+/// Detect a format while moving the source into a reusable result.
 ///
-/// This function detects the format in a single pass and returns the already-parsed
-/// data structure (OPC package, OLE file, ZIP archive) for immediate reuse:
+/// The result retains a reusable representation for immediate follow-up work:
 /// - OOXML files: parse OPC package once and return it
 /// - OLE2 files: parse OLE file once and return it
-/// - iWork files: parse ZIP archive once and return it
-/// - ODF files: parse ZIP archive once and return it
-/// - RTF files: return bytes (no parsing needed)
-///
-/// # Performance
-///
-/// This eliminates double-parsing for ALL formats:
-/// - Parses each file structure only once
-/// - No re-parsing needed when loading the document
-/// - 40-60% performance improvement across all formats
-/// - Uses **parallel** SIMD-accelerated signature matching (3-6x faster)
-/// - Zero heap allocations for signature checking (uses SmallVec)
+/// - iWork, ODF, and RTF files: return the moved bytes after detection
 ///
 /// # Arguments
 ///
@@ -106,10 +87,10 @@ pub enum DetectedFormat {
 ///
 /// # Returns
 ///
-/// * `Some(DetectedFormat)` - Format detected with pre-parsed structure
+/// * `Some(DetectedFormat)` - Format detected with a reusable owner or byte buffer
 /// * `None` - Format not recognized
 pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
-    #[cfg(any(feature = "ooxml", feature = "iwa", feature = "odf"))]
+    #[cfg(any(feature = "ooxml", feature = "odf"))]
     use litchi_core::detection::FileFormat;
     use litchi_core::detection::simd_utils::check_office_signatures;
 
@@ -123,8 +104,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
 
-    // Use parallel signature checking to test OLE2, ZIP, and RTF simultaneously
-    // This is 3-6x faster than checking each signature individually
+    // Classify the fixed signatures together before invoking format parsers.
     let mask = check_office_signatures(&bytes);
 
     // Check RTF first (simplest check, no parsing needed)
@@ -155,9 +135,9 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         return None;
     }
 
-    // Check ZIP signature (OOXML, iWork, ODF) - parse once and determine type
+    // Check ZIP candidates in the same order as the ordinary detector.
     if mask.is_zip() {
-        // Try to parse as OPC package (OOXML) first - single parse!
+        // A successful OOXML probe returns the parsed OPC owner directly.
         #[cfg(feature = "ooxml")]
         {
             if let Ok(package) = crate::ooxml::OpcPackage::from_bytes(&bytes) {
@@ -176,50 +156,30 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
             }
         }
 
-        // Not OOXML, try as regular ZIP - parse once for iWork/ODF
-        #[cfg(any(feature = "iwa", feature = "odf"))]
-        {
-            use soapberry_zip::office::ArchiveReader;
+        #[cfg(feature = "odf")]
+        if let Some(format) = litchi_odf::detect::bytes(&bytes) {
+            return match format {
+                FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
+                FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
+                FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
+                FileFormat::Odg => Some(DetectedFormat::Odg(bytes)),
+                FileFormat::Odc => Some(DetectedFormat::Odc(bytes)),
+                FileFormat::Odf => Some(DetectedFormat::Odf(bytes)),
+                FileFormat::Odi => Some(DetectedFormat::Odi(bytes)),
+                FileFormat::Odm => Some(DetectedFormat::Odm(bytes)),
+                FileFormat::Oth => Some(DetectedFormat::Oth(bytes)),
+                FileFormat::Odb => Some(DetectedFormat::Odb(bytes)),
+                _ => None,
+            };
+        }
 
-            if let Ok(archive) = ArchiveReader::new(&bytes) {
-                // Check iWork formats using existing detection logic
-                #[cfg(feature = "iwa")]
-                {
-                    if let Ok(format) = crate::detection_smart::iwork::detect_iwork_format(&archive)
-                    {
-                        return match format {
-                            FileFormat::Keynote => Some(DetectedFormat::Keynote(bytes)),
-                            FileFormat::Pages => Some(DetectedFormat::Pages(bytes)),
-                            FileFormat::Numbers => Some(DetectedFormat::Numbers(bytes)),
-                            _ => None,
-                        };
-                    }
-                }
-
-                // Check ODF formats using existing detection logic
-                #[cfg(feature = "odf")]
-                {
-                    // Read mimetype file to determine ODF format
-                    if let Ok(mimetype) = archive.read_string("mimetype") {
-                        // Use existing ODF detection logic
-                        if let Some(format) = litchi_odf::detect::mime(mimetype.as_bytes()) {
-                            return match format {
-                                FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
-                                FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
-                                FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
-                                FileFormat::Odg => Some(DetectedFormat::Odg(bytes)),
-                                FileFormat::Odc => Some(DetectedFormat::Odc(bytes)),
-                                FileFormat::Odf => Some(DetectedFormat::Odf(bytes)),
-                                FileFormat::Odi => Some(DetectedFormat::Odi(bytes)),
-                                FileFormat::Odm => Some(DetectedFormat::Odm(bytes)),
-                                FileFormat::Oth => Some(DetectedFormat::Oth(bytes)),
-                                FileFormat::Odb => Some(DetectedFormat::Odb(bytes)),
-                                _ => None,
-                            };
-                        }
-                    }
-                }
-            }
+        #[cfg(feature = "iwa")]
+        if let Some(format) = litchi_iwa::detect::bytes(&bytes) {
+            return Some(match format {
+                litchi_iwa::detect::Format::Pages => DetectedFormat::Pages(bytes),
+                litchi_iwa::detect::Format::Keynote => DetectedFormat::Keynote(bytes),
+                litchi_iwa::detect::Format::Numbers => DetectedFormat::Numbers(bytes),
+            });
         }
     }
 

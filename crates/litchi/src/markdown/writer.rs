@@ -1,5 +1,7 @@
 use crate::MetadataYaml;
-use crate::document::{Cell, Paragraph, Run, Table};
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+use crate::document::{Cell, Table};
+use crate::document::{Paragraph, Run};
 /// Low-level writer for Markdown generation.
 ///
 /// This module provides the `MarkdownWriter` struct which handles the actual
@@ -7,13 +9,18 @@ use crate::document::{Cell, Paragraph, Run, Table};
 ///
 /// **Note**: Some functionality requires the `doc` or `ooxml` feature to be enabled.
 use litchi_core::{Error, Metadata, Result};
-use litchi_markdown::{MarkdownOptions, TableStyle};
+use litchi_markdown::MarkdownOptions;
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+use litchi_markdown::TableStyle;
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 use memchr::memchr;
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::fmt::Write as FmtWrite;
 
 /// Minimum number of table rows to justify parallel processing overhead.
 /// Tables are typically smaller than documents, so we use a lower threshold.
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 const TABLE_PARALLEL_THRESHOLD: usize = 20;
 
 /// Information about a detected list item.
@@ -39,6 +46,7 @@ enum ListType {
 }
 
 /// Information about cell span (colspan and rowspan) for HTML rendering.
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CellSpan {
     /// Number of columns this cell spans (horizontal merge)
@@ -49,6 +57,7 @@ struct CellSpan {
     skip: bool,
 }
 
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 impl CellSpan {
     /// Create a new cell span with default values (no merge).
     fn new() -> Self {
@@ -88,6 +97,7 @@ pub(crate) struct MarkdownWriter {
 ///
 /// This struct caches cell span data to avoid repeated parsing during span analysis.
 /// Text content is extracted separately for better performance.
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
 #[derive(Debug, Clone)]
 struct CellData {
     /// Horizontal span (gridSpan/colspan)
@@ -108,13 +118,7 @@ struct CellData {
 ///
 /// **Performance**: Optimized to extract all cell data in a single pass, avoiding repeated
 /// parsing. For large tables, uses parallel processing to extract cell data concurrently.
-#[cfg(any(
-    feature = "doc",
-    feature = "ooxml",
-    feature = "odf",
-    feature = "rtf",
-    feature = "iwa"
-))]
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
 fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<CellSpan>>> {
     let rows = table.rows()?;
     if rows.is_empty() {
@@ -252,13 +256,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
 ///
 /// **Performance**: For large tables, uses parallel processing to extract cell data concurrently.
 /// This avoids repeated XML parsing during table rendering.
-#[cfg(any(
-    feature = "doc",
-    feature = "ooxml",
-    feature = "odf",
-    feature = "rtf",
-    feature = "iwa"
-))]
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
 fn extract_table_cell_data(table: &Table, use_parallel: bool) -> Result<Vec<Vec<String>>> {
     let rows = table.rows()?;
     if rows.is_empty() {
@@ -788,13 +786,7 @@ impl MarkdownWriter {
     /// Write a table to the buffer.
     ///
     /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
-    #[cfg(any(
-        feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
-        feature = "rtf",
-        feature = "iwa"
-    ))]
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
     pub fn write_table(&mut self, table: &Table) -> Result<()> {
         // Check if table has merged cells
         let has_merged_cells = self.table_has_merged_cells(table)?;
@@ -823,13 +815,7 @@ impl MarkdownWriter {
     /// - Vertical merges (vMerge/rowspan > 1)
     ///
     /// **Performance**: Efficient analysis that reuses existing span computation.
-    #[cfg(any(
-        feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
-        feature = "rtf",
-        feature = "iwa"
-    ))]
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
     fn table_has_merged_cells(&self, table: &Table) -> Result<bool> {
         let rows = table.rows()?;
         if rows.is_empty() {
@@ -863,13 +849,7 @@ impl MarkdownWriter {
     /// **Performance**: Uses efficient single-pass escaping and minimizes allocations.
     /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
     /// Pre-extracts all cell data in a single optimized pass to avoid repeated parsing.
-    #[cfg(any(
-        feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
-        feature = "rtf",
-        feature = "iwa"
-    ))]
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
     fn write_markdown_table(&mut self, table: &Table) -> Result<()> {
         // OPTIMIZATION: Extract all cell data in a single pass (with parallelization for large tables)
         let cell_data = extract_table_cell_data(table, self.options.use_parallel)?;
@@ -945,13 +925,7 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(
-        feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
-        feature = "rtf",
-        feature = "iwa"
-    ))]
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
     fn write_markdown_escaped(&mut self, text: &str) {
         Self::escape_markdown_to_buffer(&mut self.buffer, text);
     }
@@ -962,13 +936,7 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(
-        feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
-        feature = "rtf",
-        feature = "iwa"
-    ))]
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
     fn escape_markdown_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;
@@ -1021,13 +989,7 @@ impl MarkdownWriter {
     /// **Styling**:
     /// - Styled tables (`styled = true`): Include indentation, line feeds, and CSS class
     /// - Minimal tables (`styled = false`): No indentation, no line feeds for compact output
-    #[cfg(any(
-        feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
-        feature = "rtf",
-        feature = "iwa"
-    ))]
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
         // OPTIMIZATION: Extract all cell data in a single pass (with parallelization for large tables)
         let cell_data = extract_table_cell_data(table, self.options.use_parallel)?;
@@ -1238,13 +1200,7 @@ impl MarkdownWriter {
     /// **Performance**: Single-pass escaping that writes directly to the buffer,
     /// avoiding the 4 intermediate string allocations from chained `replace()` calls.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(
-        feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
-        feature = "rtf",
-        feature = "iwa"
-    ))]
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
     fn escape_html_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;

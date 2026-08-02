@@ -92,8 +92,8 @@ impl Bundle {
 
     /// Create a Bundle from raw bytes (ZIP archive).
     ///
-    /// This is used for single-pass parsing where the ZIP archive has already
-    /// been parsed during format detection. It avoids double-parsing.
+    /// This method parses the archive and its IWA members from the supplied
+    /// bytes; it does not accept or reuse a previously parsed archive owner.
     pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
         // Parse IWA files from the ZIP archive
         let archive = ArchiveReader::new(bytes)
