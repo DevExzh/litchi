@@ -12,9 +12,11 @@ pub mod parser;
 use self::engine::{ReferenceResolver, ResolvedName};
 use self::parser::{RangeRef, parse_range_reference, parse_single_cell_reference};
 use litchi_core::sheet::{CellValue, Result, WorkbookTrait};
+use parking_lot::{Mutex, RwLock};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use tokio::sync::RwLock;
+#[cfg(feature = "web_functions")]
+use std::error::Error;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 struct CellRef {
@@ -25,13 +27,90 @@ struct CellRef {
 
 struct EvalState {
     cache: HashMap<CellRef, CellValue>,
-    visiting: HashSet<CellRef>,
+}
+
+#[derive(Default)]
+struct EvalSession {
+    visiting: Mutex<HashSet<CellRef>>,
+}
+
+struct Visit<'a> {
+    session: &'a Mutex<HashSet<CellRef>>,
+    key: CellRef,
+}
+
+impl EvalSession {
+    fn enter(&self, key: CellRef) -> Option<Visit<'_>> {
+        let inserted = {
+            let mut visiting = self.visiting.lock();
+            visiting.insert(key)
+        };
+
+        inserted.then(|| Visit {
+            session: &self.visiting,
+            key,
+        })
+    }
+}
+
+impl Drop for Visit<'_> {
+    fn drop(&mut self) {
+        self.session.lock().remove(&self.key);
+    }
+}
+
+#[cfg(test)]
+mod session_tests {
+    use super::*;
+
+    #[test]
+    fn cycle_tracking_is_local_and_clears_on_drop() {
+        let key = CellRef {
+            sheet_idx: 0,
+            row: 1,
+            col: 1,
+        };
+        let first = EvalSession::default();
+        let second = EvalSession::default();
+
+        let visit = first.enter(key).unwrap();
+        assert!(first.enter(key).is_none());
+        let independent = second.enter(key).unwrap();
+
+        drop(visit);
+        assert!(first.enter(key).is_some());
+        drop(independent);
+    }
 }
 
 use std::future::Future;
 use std::pin::Pin;
 
 pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// Error returned by a caller-provided [`Fetch`] implementation.
+#[cfg(feature = "web_functions")]
+pub type FetchError = Box<dyn Error + Send + Sync + 'static>;
+
+/// Result returned by a caller-provided [`Fetch`] implementation.
+#[cfg(feature = "web_functions")]
+pub type FetchResult = std::result::Result<Vec<u8>, FetchError>;
+
+/// Runtime-neutral future returned by [`Fetch::get`].
+#[cfg(feature = "web_functions")]
+pub type FetchFuture<'a> = Pin<Box<dyn Future<Output = FetchResult> + Send + 'a>>;
+
+/// Caller-owned transport for formula functions that retrieve external data.
+///
+/// Litchi does not select an async runtime, perform implicit network I/O, or
+/// define network policy. Implementations may use any runtime and should stop
+/// reading once `max` bytes have been received. The evaluator independently
+/// checks that limit before accepting the response.
+#[cfg(feature = "web_functions")]
+pub trait Fetch: Send + Sync {
+    /// Retrieve `url`, returning at most `max` response bytes.
+    fn get<'a>(&'a self, url: &'a str, max: usize) -> FetchFuture<'a>;
+}
 
 /// Evaluation context used by the engine runtime.
 pub(crate) trait EngineCtx: Send + Sync {
@@ -61,9 +140,9 @@ pub(crate) trait EngineCtx: Send + Sync {
     /// Returns true if the workbook backing this context uses the 1904 date system.
     fn is_1904_date_system(&self) -> bool;
 
-    /// Returns a shared HTTP client for web functions.
+    /// Returns the caller-provided external-data transport, when configured.
     #[cfg(feature = "web_functions")]
-    fn http_client(&self) -> &reqwest::Client;
+    fn fetch(&self) -> Option<&dyn Fetch>;
 
     /// Returns the index of the given sheet (0-based).
     fn get_sheet_index(&self, name: &str) -> Option<usize>;
@@ -85,9 +164,15 @@ pub struct FormulaEvaluator<'a, W: WorkbookTrait + ?Sized> {
     names: HashMap<String, String>,
     local_names: HashMap<(String, String), String>,
     tables: HashMap<String, NamedTable>,
-    position_stack: RwLock<Vec<(String, u32, u32)>>,
     #[cfg(feature = "web_functions")]
-    http_client: reqwest::Client,
+    fetch: Option<&'a dyn Fetch>,
+}
+
+/// Per-evaluation position, borrowed instead of stored in shared mutable state.
+struct At<'e, 'w, W: WorkbookTrait + ?Sized> {
+    evaluator: &'e FormulaEvaluator<'w, W>,
+    session: &'e EvalSession,
+    position: (String, u32, u32),
 }
 
 #[derive(Clone)]
@@ -100,98 +185,55 @@ struct NamedTable {
     headers: HashMap<String, u32>,
 }
 
-impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for FormulaEvaluator<'a, W> {
-    fn get_cell_value<'b>(
-        &'b self,
-        sheet_name: &'b str,
+impl<'e, 'w, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for At<'e, 'w, W> {
+    fn get_cell_value<'a>(
+        &'a self,
+        sheet_name: &'a str,
         row: u32,
         col: u32,
-    ) -> BoxFuture<'b, Result<CellValue>> {
-        Box::pin(async move {
-            let sheet_idx = *self
-                .sheet_index
-                .get(sheet_name)
-                .expect("Sheet name not found in index");
-            let key = CellRef {
-                sheet_idx,
-                row,
-                col,
-            };
-
-            // Fast path: cached value
-            {
-                let state = self.eval_state.read().await;
-                if let Some(v) = state.cache.get(&key) {
-                    return Ok(v.clone());
-                }
-
-                if state.visiting.contains(&key) {
-                    // Circular reference detected.
-                    return Ok(CellValue::Error("Circular reference detected".to_string()));
-                }
-            }
-
-            // Mark as visiting
-            {
-                let mut state = self.eval_state.write().await;
-                state.visiting.insert(key);
-            }
-
-            // Load raw value from workbook
-            let sheet = self.workbook.worksheet_by_name(sheet_name)?;
-            let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
-            let raw = value.into_owned();
-
-            // Evaluate value (handles formulas and cached results)
-            let result = self.evaluate_value(sheet_name, row, col, raw).await?;
-
-            // Store in cache and clear visiting
-            {
-                let mut state = self.eval_state.write().await;
-                state.visiting.remove(&key);
-                state.cache.insert(key, result.clone());
-            }
-
-            Ok(result)
-        })
+    ) -> BoxFuture<'a, Result<CellValue>> {
+        self.evaluator
+            .get_cell_value_in(self.session, sheet_name, row, col)
     }
 
     fn current_position(&self) -> Option<(String, u32, u32)> {
-        // NOTE: This now returns a default or requires a sync way to access.
-        // For simplicity in this migration, we might need a sync guard or just accept that
-        // functions needing position might need to be async or we use a different mechanism.
-        // For now, use blocking read as it's just a stack of strings/u32.
-        self.position_stack.blocking_read().last().cloned()
+        Some(self.position.clone())
     }
 
-    fn raw_cell_value<'b>(
-        &'b self,
-        sheet_name: &'b str,
+    fn raw_cell_value<'a>(
+        &'a self,
+        sheet_name: &'a str,
         row: u32,
         col: u32,
-    ) -> BoxFuture<'b, Result<CellValue>> {
+    ) -> BoxFuture<'a, Result<CellValue>> {
         Box::pin(async move {
-            let sheet = self.workbook.worksheet_by_name(sheet_name)?;
+            let sheet = self.evaluator.workbook.worksheet_by_name(sheet_name)?;
             let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
             Ok(value.into_owned())
         })
     }
 
     fn is_1904_date_system(&self) -> bool {
-        self.workbook.is_1904_date_system()
+        self.evaluator.workbook.is_1904_date_system()
     }
 
     #[cfg(feature = "web_functions")]
-    fn http_client(&self) -> &reqwest::Client {
-        &self.http_client
+    fn fetch(&self) -> Option<&dyn Fetch> {
+        self.evaluator.fetch
     }
 
     fn get_sheet_index(&self, name: &str) -> Option<usize> {
-        self.sheet_index.get(name).copied()
+        self.evaluator.sheet_index.get(name).copied()
     }
 
     fn get_sheet_count(&self) -> usize {
-        self.workbook.worksheet_names().len()
+        self.evaluator.workbook.worksheet_names().len()
+    }
+}
+
+impl<W: WorkbookTrait + ?Sized> ReferenceResolver for At<'_, '_, W> {
+    fn resolve_name(&self, current_sheet: &str, name: &str) -> Result<Option<ResolvedName>> {
+        self.evaluator.resolve_name(current_sheet, name)
     }
 }
 
@@ -244,15 +286,66 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
             sheet_index,
             eval_state: RwLock::new(EvalState {
                 cache: HashMap::new(),
-                visiting: HashSet::new(),
             }),
             names: HashMap::new(),
             local_names: HashMap::new(),
             tables: HashMap::new(),
-            position_stack: RwLock::new(Vec::new()),
             #[cfg(feature = "web_functions")]
-            http_client: reqwest::Client::new(),
+            fetch: None,
         }
+    }
+
+    /// Attach the transport used by functions such as `WEBSERVICE`.
+    ///
+    /// Evaluation is network-inert until a transport is explicitly supplied.
+    #[cfg(feature = "web_functions")]
+    #[must_use]
+    pub fn with_fetch(mut self, fetch: &'a dyn Fetch) -> Self {
+        self.fetch = Some(fetch);
+        self
+    }
+
+    fn get_cell_value_in<'b>(
+        &'b self,
+        session: &'b EvalSession,
+        sheet_name: &'b str,
+        row: u32,
+        col: u32,
+    ) -> BoxFuture<'b, Result<CellValue>> {
+        Box::pin(async move {
+            let sheet_idx = self.sheet_index.get(sheet_name).copied().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("worksheet '{sheet_name}' is not indexed"),
+                )
+            })?;
+            let key = CellRef {
+                sheet_idx,
+                row,
+                col,
+            };
+
+            if let Some(value) = self.eval_state.read().cache.get(&key) {
+                return Ok(value.clone());
+            }
+
+            let Some(_visit) = session.enter(key) else {
+                return Ok(CellValue::Error("Circular reference detected".to_string()));
+            };
+
+            let result = async {
+                let sheet = self.workbook.worksheet_by_name(sheet_name)?;
+                let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
+                self.evaluate_value(session, sheet_name, row, col, value.into_owned())
+                    .await
+            }
+            .await;
+
+            if let Ok(value) = &result {
+                self.eval_state.write().cache.insert(key, value.clone());
+            }
+            result
+        })
     }
 
     pub fn define_name(&mut self, name: &str, reference: &str) {
@@ -467,7 +560,8 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
     ///
     /// Row and column are 1-based, consistent with the `Worksheet` trait.
     pub async fn evaluate_cell(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
-        self.get_cell_value(sheet_name, row, col).await
+        let session = EvalSession::default();
+        self.get_cell_value_in(&session, sheet_name, row, col).await
     }
 
     /// Evaluate all cells in a worksheet and return a dense 2D grid
@@ -481,11 +575,15 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
 
         let (min_row, min_col, max_row, max_col) = dims;
         let mut rows = Vec::new();
+        let session = EvalSession::default();
 
         for row in min_row..=max_row {
             let mut out_row = Vec::new();
             for col in min_col..=max_col {
-                out_row.push(self.get_cell_value(sheet_name, row, col).await?);
+                out_row.push(
+                    self.get_cell_value_in(&session, sheet_name, row, col)
+                        .await?,
+                );
             }
             rows.push(out_row);
         }
@@ -503,6 +601,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
     /// - Single-cell references (same-sheet or qualified with a sheet name)
     async fn evaluate_value(
         &self,
+        session: &EvalSession,
         sheet_name: &str,
         row: u32,
         col: u32,
@@ -521,7 +620,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     // No cached value – perform a minimal evaluation of the
                     // formula text. Any parsing/semantic issues are reported as
                     // CellValue::Error rather than hard failures.
-                    self.evaluate_formula(sheet_name, row, col, &formula)
+                    self.evaluate_formula(session, sheet_name, row, col, &formula)
                         .await?
                 }
             },
@@ -533,9 +632,10 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
 
     async fn evaluate_formula(
         &self,
+        session: &EvalSession,
         sheet_name: &str,
-        _row: u32,
-        _col: u32,
+        row: u32,
+        col: u32,
         expr: &str,
     ) -> Result<CellValue> {
         let s = expr.trim();
@@ -548,39 +648,17 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
             return Ok(CellValue::Error("Empty formula".to_string()));
         }
 
-        struct PositionGuard<'a> {
-            stack: &'a RwLock<Vec<(String, u32, u32)>>,
-        }
-
-        impl<'a> PositionGuard<'a> {
-            async fn new(
-                stack: &'a RwLock<Vec<(String, u32, u32)>>,
-                sheet: &str,
-                row: u32,
-                col: u32,
-            ) -> Self {
-                stack.write().await.push((sheet.to_string(), row, col));
-                PositionGuard { stack }
-            }
-        }
-
-        impl<'a> Drop for PositionGuard<'a> {
-            fn drop(&mut self) {
-                if let Ok(mut guard) = self.stack.try_write() {
-                    guard.pop();
-                }
-            }
-        }
-
-        let _position_guard =
-            PositionGuard::new(&self.position_stack, sheet_name, _row, _col).await;
-
         // General expression (e.g., A1+2, 1+2*3, CONCAT("a","b"),
         // TEXTJOIN("-",TRUE,A1:A3)). This uses the small expression parser
         // and runtime engine. If parsing fails, fall back to returning an
         // Error cell rather than panicking.
         if let Some(expr) = parser::parse_expression(sheet_name, body) {
-            return engine::evaluate_expression(self, sheet_name, &expr).await;
+            let at = At {
+                evaluator: self,
+                session,
+                position: (sheet_name.to_owned(), row, col),
+            };
+            return engine::evaluate_expression(&at, sheet_name, &expr).await;
         }
 
         // Unsupported or unrecognized formula in this MVP implementation.

@@ -10,21 +10,21 @@ rust-version.workspace = true
 
 [features]
 default = []
-web_functions = ["dep:urlencoding", "dep:reqwest", "dep:sxd-document", "dep:sxd-xpath"]
+web_functions = ["dep:urlencoding", "dep:sxd-document", "dep:sxd-xpath"]
 
 [dependencies]
 chrono       = { workspace = true }
 litchi-core  = { workspace = true }
 num-complex  = { workspace = true }
 once_cell    = { workspace = true }
+parking_lot  = { workspace = true }
 phf          = { workspace = true }
 rand         = { workspace = true }
-reqwest      = { workspace = true, optional = true }
 statrs       = { workspace = true }
 sxd-document = { workspace = true, optional = true }
 sxd-xpath    = { workspace = true, optional = true }
-tokio        = { workspace = true }
 urlencoding  = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+tokio    = { workspace = true }

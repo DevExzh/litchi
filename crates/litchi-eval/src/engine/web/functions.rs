@@ -4,6 +4,11 @@ use crate::engine::{evaluate_expression, to_text};
 use crate::parser::Expr;
 use litchi_core::sheet::{CellValue, Result};
 
+#[cfg(feature = "web_functions")]
+const MAX_RESPONSE_BYTES: usize = 131_068;
+#[cfg(feature = "web_functions")]
+const MAX_CELL_UNITS: usize = 32_767;
+
 pub(crate) async fn eval_encodeurl(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
@@ -49,20 +54,18 @@ pub(crate) async fn eval_webservice(
             return Ok(CellValue::Error("#VALUE!".to_string()));
         }
 
-        let client = ctx.http_client();
-        match client.get(&url_str).send().await {
-            Ok(response) => match response.text().await {
-                Ok(body) => {
-                    if body.len() > 32767 {
-                        Ok(CellValue::Error("#VALUE!".to_string()))
-                    } else {
-                        Ok(CellValue::String(body))
-                    }
-                },
-                Err(_) => Ok(CellValue::Error("#VALUE!".to_string())),
-            },
-            Err(_) => Ok(CellValue::Error("#VALUE!".to_string())),
-        }
+        let Some(fetch) = ctx.fetch() else {
+            return Ok(CellValue::Error("#CONNECT!".to_string()));
+        };
+        let bytes = match fetch.get(&url_str, MAX_RESPONSE_BYTES).await {
+            Ok(bytes) if bytes.len() <= MAX_RESPONSE_BYTES => bytes,
+            _ => return Ok(CellValue::Error("#VALUE!".to_string())),
+        };
+        let body = match String::from_utf8(bytes) {
+            Ok(body) if body.encode_utf16().count() <= MAX_CELL_UNITS => body,
+            _ => return Ok(CellValue::Error("#VALUE!".to_string())),
+        };
+        Ok(CellValue::String(body))
     }
     #[cfg(not(feature = "web_functions"))]
     {
@@ -171,6 +174,16 @@ mod tests {
     #[cfg(feature = "web_functions")]
     mod feature_tests {
         use super::*;
+        use crate::{Fetch, FetchFuture};
+        use std::sync::Arc;
+
+        struct Stub(Vec<u8>);
+
+        impl Fetch for Stub {
+            fn get<'a>(&'a self, _url: &'a str, _max: usize) -> FetchFuture<'a> {
+                Box::pin(async move { Ok(self.0.clone()) })
+            }
+        }
 
         #[tokio::test]
         async fn test_encodeurl_simple() {
@@ -313,6 +326,49 @@ mod tests {
             let args = vec![str_expr(&long_url)];
             let result = eval_webservice(ctx, "Sheet1", &args).await.unwrap();
             assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_webservice_requires_explicit_transport() {
+            let engine = TestEngine::new();
+            let args = vec![str_expr("https://example.com")];
+            let result = eval_webservice(engine.ctx(), "Sheet1", &args)
+                .await
+                .unwrap();
+            assert_eq!(result, CellValue::Error("#CONNECT!".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_webservice_uses_runtime_neutral_transport() {
+            let engine = TestEngine::new().with_fetch(Arc::new(Stub(b"hello".to_vec())));
+            let args = vec![str_expr("https://example.com")];
+            let result = eval_webservice(engine.ctx(), "Sheet1", &args)
+                .await
+                .unwrap();
+            assert_eq!(result, CellValue::String("hello".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_webservice_rechecks_transport_byte_limit() {
+            let engine =
+                TestEngine::new().with_fetch(Arc::new(Stub(vec![b'a'; MAX_RESPONSE_BYTES + 1])));
+            let args = vec![str_expr("https://example.com")];
+            let result = eval_webservice(engine.ctx(), "Sheet1", &args)
+                .await
+                .unwrap();
+            assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+        }
+
+        #[tokio::test]
+        async fn test_webservice_rejects_invalid_utf8_and_oversized_cell_text() {
+            for body in [vec![0xff], vec![b'a'; MAX_CELL_UNITS + 1]] {
+                let engine = TestEngine::new().with_fetch(Arc::new(Stub(body)));
+                let args = vec![str_expr("https://example.com")];
+                let result = eval_webservice(engine.ctx(), "Sheet1", &args)
+                    .await
+                    .unwrap();
+                assert_eq!(result, CellValue::Error("#VALUE!".to_string()));
+            }
         }
     }
 }

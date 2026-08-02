@@ -111,7 +111,8 @@
       "litchi-vba"
     ],
     "litchi-pptx": [
-      "litchi-ooxml-common"
+      "litchi-ooxml-common",
+      "litchi-opc"
     ],
     "litchi-py": [
       "litchi"
@@ -302,6 +303,7 @@
     "litchi-crypto",
     "litchi-docx",
     "litchi-drawingml",
+    "litchi-eval",
     "litchi-odraw",
     "litchi-ograph",
     "litchi-ole-common",

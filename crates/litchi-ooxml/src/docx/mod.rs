@@ -49,7 +49,6 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub mod alt_chunk;
 pub mod bibliography;
 pub mod bibliography_writer;
 pub mod bookmark;
@@ -92,10 +91,6 @@ pub mod vba_project;
 pub mod web_settings;
 pub mod writer;
 
-pub use alt_chunk::{
-    AltChunk, AltChunkNamespace, AlternativeFormatData, AlternativeFormatImport,
-    AlternativeFormatKind, AlternativeFormatPart, AlternativeFormatTarget,
-};
 pub use bibliography::{
     BibliographySource, BibliographySourceStore, BibliographySourceValue,
     LEGACY_WORD_BIBLIOGRAPHY_NAMESPACE, OOXML_BIBLIOGRAPHY_NAMESPACE,
@@ -177,6 +172,7 @@ pub use settings::{
 pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use smartart::{DocxDiagramConformance, DocxSmartArt, load_smart_arts};
 // Re-export the shared semantic SmartArt model for authoring.
+use litchi_docx::alt::Chunk;
 pub use litchi_drawingml::diagram::{DiagramNode, DiagramType, SmartArt, SmartArtBuilder};
 pub use statistics::DocumentStatistics;
 pub use styles::{Style, Styles};
@@ -239,5 +235,5 @@ pub enum DocxElement {
 pub enum DocumentBlock {
     Paragraph(Box<Paragraph>),
     Table(Box<Table>),
-    AltChunk(Box<AltChunk>),
+    Alt(Box<Chunk>),
 }

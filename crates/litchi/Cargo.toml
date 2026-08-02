@@ -82,6 +82,7 @@ imgconv = ["dep:litchi-imgconv", "dep:litchi-odraw"]
 fonts = ["dep:allsorts", "dep:litchi-fonts"]
 sign = ["dep:litchi-sign"]
 eval_engine = ["dep:litchi-eval"]
+# Formula I/O is caller-injected through litchi-eval::Fetch; no runtime is selected here.
 eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
 
 [dependencies]
@@ -111,11 +112,11 @@ litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt im
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
 litchi-ooxml-common = { workspace = true, optional = true } # Host-neutral OOXML package grammar exposed directly by the OOXML facade
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary parser/writer (.ppt), independently gated by `ppt`
-litchi-pptx = { workspace = true, optional = true } # Canonical PresentationML transition capability, gated by `ooxml`
+litchi-pptx = { workspace = true, optional = true } # Canonical PresentationML capabilities, gated by `ooxml`
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
 litchi-sign = { workspace = true, optional = true } # Trust-neutral Office signature authoring and verification
 litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF parser/writer, independently gated by `xls`
-litchi-xlsb = { workspace = true, optional = true } # Canonical BIFF12 wire capability, gated by `ooxml`
+litchi-xlsb = { workspace = true, optional = true } # Canonical BIFF12 record capabilities, gated by `ooxml`
 memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
 once_cell = "1" # Lazy statics and one-time initialization for global state
 parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
@@ -130,7 +131,6 @@ sha2 = "0.11" # SHA-512 hashing for OOXML password protection
 smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
 soapberry-zip = { workspace = true, optional = true } # High-performance ZIP archive handling for modern Office formats (gated by ooxml/iwa/odf features)
 thiserror = "2.0" # Convenient derive macros for error types
-tokio = { version = "1", features = ["full"] }
 xml-minifier = { workspace = true }
 zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
 zerocopy-derive = "0.8" # Derive macros for zerocopy traits
@@ -142,6 +142,7 @@ zerocopy-derive = "0.8" # Derive macros for zerocopy traits
 clap = { version = "4", features = ["derive"] }
 proptest = "1.5"
 tempfile = "3"
+tokio = { workspace = true }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [[example]]

@@ -19,6 +19,22 @@ const STRICT_SLIDE_MASTER_RELATIONSHIP_TYPE: &str =
 const STRICT_THEME_RELATIONSHIP_TYPE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
 
+fn tag_error(error: litchi_pptx::Error) -> OoxmlError {
+    match error {
+        litchi_pptx::Error::Opc(error) => OoxmlError::Opc(error),
+        litchi_pptx::Error::Xml(message) => OoxmlError::Xml(message),
+        litchi_pptx::Error::Invalid(message) => OoxmlError::InvalidFormat(message),
+        litchi_pptx::Error::ContentType { expected, actual } => OoxmlError::InvalidContentType {
+            expected,
+            got: actual,
+        },
+        litchi_pptx::Error::MarkupCompatibility(error) => error.into(),
+        litchi_pptx::Error::Decode(error) => error.into(),
+        error @ litchi_pptx::Error::Limit { .. } => OoxmlError::Pptx(error),
+        other => OoxmlError::InvalidFormat(other.to_string()),
+    }
+}
+
 fn resolve_picture_background(
     source_part: &dyn Part,
     package: &OpcPackage,
@@ -227,14 +243,15 @@ impl<'a> Slide<'a> {
         &self.part
     }
 
-    /// Load all programmable tag-list parts related to this slide.
-    pub fn tag_lists(&self) -> Result<Vec<crate::pptx::tags::SlideTagList>> {
+    /// Load all programmable tag-list parts related to this slide in stable
+    /// ascending relationship-ID order.
+    pub fn tag_lists(&self) -> Result<Vec<litchi_pptx::tag::Source>> {
         let package = self.package.ok_or_else(|| {
             crate::error::OoxmlError::InvalidFormat(
                 "slide tag lists require package-backed slide access".into(),
             )
         })?;
-        crate::pptx::tags::load_slide_tag_lists(self.part.part(), package)
+        litchi_pptx::tag::discover(self.part.part(), package).map_err(tag_error)
     }
 
     /// Load typed audio and video pictures with their inert internal resources.
@@ -1234,5 +1251,20 @@ impl<'a> SlideMaster<'a> {
 
 #[cfg(test)]
 mod tests {
-    // Tests will be added as implementation progresses
+    use super::*;
+
+    #[test]
+    fn tag_resource_limits_remain_typed_across_the_host_seam() {
+        let mapped = tag_error(litchi_pptx::Error::Limit {
+            resource: "tag count",
+            limit: 7,
+        });
+        assert!(matches!(
+            mapped,
+            OoxmlError::Pptx(litchi_pptx::Error::Limit {
+                resource: "tag count",
+                limit: 7
+            })
+        ));
+    }
 }

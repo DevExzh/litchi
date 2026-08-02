@@ -28,14 +28,8 @@ fn package_inventory_reports_local_tag_lists() {
     assert_eq!(primary.tag_list().tags()[0].name(), "OWNER");
     assert_eq!(primary.tag_list().tags()[0].value(), "Alice");
     assert_eq!(primary.tag_list().tags()[1].value(), "<not-a-command/>");
-    assert_eq!(
-        primary.tag_list().extension_attributes()[0].qualified_name(),
-        "ext:origin"
-    );
-    assert_eq!(
-        primary.tag_list().extension_attributes()[0].value(),
-        "local"
-    );
+    assert_eq!(primary.tag_list().attrs()[0].qualified_name(), "ext:origin");
+    assert_eq!(primary.tag_list().attrs()[0].value(), "local");
 
     let secondary = &tag_lists[1];
     assert_eq!(secondary.slide_index(), 1);
@@ -86,6 +80,25 @@ fn package_inventory_rejects_wrong_tag_content_type() {
         Err(OoxmlError::InvalidContentType { expected, got })
             if expected == TAG_CONTENT_TYPE && got == "application/xml"
     ));
+}
+
+#[test]
+fn real_libreoffice_slide_tags_remain_discoverable() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let package =
+        Package::open(root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx"))
+            .unwrap();
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let lists = slides[0].tag_lists().unwrap();
+
+    assert_eq!(lists.len(), 7);
+    assert!(lists.iter().all(|source| !source.list().is_empty()));
+    assert!(
+        lists
+            .iter()
+            .all(|source| source.part().as_str().starts_with("/ppt/tags/"))
+    );
 }
 
 fn package_with_local_tag_lists() -> Package {

@@ -1,7 +1,3 @@
-use crate::docx::alt_chunk::{
-    AltChunk, AltChunkNamespace, AlternativeFormatImport, STRICT_ALTERNATIVE_FORMAT_IMPORT,
-    is_alternative_format_relationship,
-};
 use crate::docx::bibliography::{
     BibliographySource, BibliographySourceStore, discover_bibliography_source_stores,
 };
@@ -30,6 +26,7 @@ use crate::docx::web_settings::{WebSettings, is_web_settings_relationship};
 use crate::docx::writer::MutableDocument;
 /// Package implementation for Word documents.
 use crate::error::{OoxmlError, Result};
+use litchi_docx::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_relationship};
 use litchi_docx::font;
 use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
@@ -51,7 +48,6 @@ use litchi_opc::rel::TargetMode;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 
-const MAX_ALT_CHUNKS: usize = 4096;
 const MAX_MAIL_MERGE_RELATIONSHIPS: usize = 65_536;
 
 fn validate_document_main_content_type(content_type: &str) -> Result<()> {
@@ -892,28 +888,29 @@ impl Package {
     }
 
     /// Append a package-backed alternative-format import to the document body.
-    pub fn add_alt_chunk(
-        &mut self,
-        import: AlternativeFormatImport,
-        match_source: Option<bool>,
-    ) -> Result<AltChunk> {
-        let index = self.document_mut()?.alt_chunks().len();
-        self.insert_alt_chunk(index, import, match_source)
+    pub fn add_alt(&mut self, import: Import, match_source: Option<bool>) -> Result<Chunk> {
+        let index = self.document_mut()?.alts().len();
+        self.insert_alt(index, import, match_source)
     }
 
     /// Insert a package-backed alternative-format import by anchor-relative index.
     ///
     /// Part, relationship, and body mutations are rolled back together on error.
-    pub fn insert_alt_chunk(
+    pub fn insert_alt(
         &mut self,
         index: usize,
-        import: AlternativeFormatImport,
+        import: Import,
         match_source: Option<bool>,
-    ) -> Result<AltChunk> {
-        let count = self.document_mut()?.alt_chunks().len();
+    ) -> Result<Chunk> {
+        let count = self.document_mut()?.alts().len();
         if index > count {
             return Err(OoxmlError::InvalidFormat(format!(
                 "altChunk index {index} is out of range"
+            )));
+        }
+        if count >= MAX_CHUNKS {
+            return Err(OoxmlError::InvalidFormat(format!(
+                "alternative-format anchor limit of {MAX_CHUNKS} is exhausted"
             )));
         }
         let namespace = self.alt_chunk_namespace()?;
@@ -921,24 +918,24 @@ impl Package {
             self.install_alt_chunk_target(import, match_source, namespace)?;
         if let Err(error) = self
             .document_mut()?
-            .insert_alt_chunk(index, chunk.clone(), namespace)
+            .insert_alt(index, chunk.clone(), namespace)
         {
-            self.rollback_alt_chunk_target(chunk.relationship_id(), installed_part.as_ref())?;
+            self.rollback_alt_chunk_target(chunk.relationship().as_str(), installed_part.as_ref())?;
             return Err(error);
         }
         Ok(chunk)
     }
 
     /// Replace an anchor and its relationship as one package mutation.
-    pub fn replace_alt_chunk(
+    pub fn replace_alt(
         &mut self,
         index: usize,
-        import: AlternativeFormatImport,
+        import: Import,
         match_source: Option<bool>,
-    ) -> Result<AltChunk> {
+    ) -> Result<Chunk> {
         let old = self
             .document_mut()?
-            .alt_chunks()
+            .alts()
             .get(index)
             .cloned()
             .ok_or_else(|| {
@@ -950,37 +947,37 @@ impl Package {
             self.install_alt_chunk_target(import, match_source, namespace)?;
         if let Err(error) = self
             .document_mut()?
-            .replace_alt_chunk(index, new.clone(), namespace)
+            .replace_alt(index, new.clone(), namespace)
         {
-            self.rollback_alt_chunk_target(new.relationship_id(), installed_part.as_ref())?;
+            self.rollback_alt_chunk_target(new.relationship().as_str(), installed_part.as_ref())?;
             return Err(error);
         }
-        self.remove_alt_chunk_relationship(&old, old_target.as_ref())?;
+        self.remove_alt_relationship(&old, old_target.as_ref())?;
         Ok(old)
     }
 
     /// Remove an anchor, its relationship, and an unreachable internal payload.
-    pub fn remove_alt_chunk(&mut self, index: usize) -> Result<AltChunk> {
+    pub fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
         let old = self
             .document_mut()?
-            .alt_chunks()
+            .alts()
             .get(index)
             .cloned()
             .ok_or_else(|| {
                 OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
             })?;
         let old_target = self.validate_alt_chunk_relationship(&old)?;
-        self.document_mut()?.remove_alt_chunk(index)?;
-        self.remove_alt_chunk_relationship(&old, old_target.as_ref())?;
+        self.document_mut()?.remove_alt(index)?;
+        self.remove_alt_relationship(&old, old_target.as_ref())?;
         Ok(old)
     }
 
     /// Reorder body anchors without changing their package relationships.
-    pub fn move_alt_chunk(&mut self, from: usize, to: usize) -> Result<()> {
-        self.document_mut()?.move_alt_chunk(from, to)
+    pub fn move_alt(&mut self, from: usize, to: usize) -> Result<()> {
+        self.document_mut()?.move_alt(from, to)
     }
 
-    fn alt_chunk_namespace(&self) -> Result<AltChunkNamespace> {
+    fn alt_chunk_namespace(&self) -> Result<Conformance> {
         let document_uri = PackURI::new("/word/document.xml")
             .map_err(|error| OoxmlError::InvalidUri(format!("document URI: {error}")))?;
         let strict = self
@@ -993,49 +990,35 @@ impl Package {
             })
             .unwrap_or(false);
         Ok(if strict {
-            AltChunkNamespace::Strict
+            Conformance::Strict
         } else {
-            AltChunkNamespace::Transitional
+            Conformance::Transitional
         })
     }
 
     fn install_alt_chunk_target(
         &mut self,
-        import: AlternativeFormatImport,
+        import: Import,
         match_source: Option<bool>,
-        namespace: AltChunkNamespace,
-    ) -> Result<(AltChunk, Option<PackURI>)> {
+        namespace: Conformance,
+    ) -> Result<(Chunk, Option<PackURI>)> {
         let document_uri = PackURI::new("/word/document.xml")
             .map_err(|error| OoxmlError::InvalidUri(format!("document URI: {error}")))?;
         let document = self.opc.get_part(&document_uri)?;
-        let relationship_id = (1usize..=MAX_ALT_CHUNKS)
+        let relationship_id = (1usize..=MAX_CHUNKS)
             .map(|number| format!("rIdAltChunk{number}"))
             .find(|id| document.rels().get(id).is_none())
             .ok_or_else(|| {
                 OoxmlError::InvalidFormat("altChunk relationship ID space is exhausted".into())
             })?;
-        let relationship_type = match namespace {
-            AltChunkNamespace::Transitional => {
-                litchi_opc::constants::relationship_type::MS_ALTERNATIVE_FORMAT_IMPORT
-            },
-            AltChunkNamespace::Strict => STRICT_ALTERNATIVE_FORMAT_IMPORT,
-        };
+        let relationship = Rel::new(relationship_id.clone())?;
+        let relationship_type = namespace.relationship();
         let (target_ref, target_mode, installed_part) = match import {
-            AlternativeFormatImport::External(uri) => {
-                if uri.is_empty() || uri.len() > 32_768 || uri.chars().any(char::is_control) {
-                    return Err(OoxmlError::InvalidFormat(
-                        "external altChunk target is empty or unsafe".to_string(),
-                    ));
-                }
-                (uri, TargetMode::External, None)
-            },
-            AlternativeFormatImport::Internal(data) => {
-                if data.bytes().len() > 128 * 1024 * 1024 {
-                    return Err(OoxmlError::InvalidFormat(
-                        "alternative-format part exceeds the 128 MiB authoring limit".to_string(),
-                    ));
-                }
-                let (uri, target_ref) = (1usize..=MAX_ALT_CHUNKS)
+            Import::Link(uri) => (uri.into_string(), TargetMode::External, None),
+            Import::Data(data) => {
+                data.validate()?;
+                let media_type = data.media_type();
+                let (uri, target_ref) = (1usize..=MAX_CHUNKS)
                     .find_map(|number| {
                         let target_ref = format!("afchunk{number}.{}", data.extension());
                         let uri = PackURI::new(format!("/word/{target_ref}")).ok()?;
@@ -1051,8 +1034,8 @@ impl Package {
                     })?;
                 self.opc.try_add_part(Box::new(BlobPart::new(
                     uri.clone(),
-                    data.content_type().to_string(),
-                    data.bytes().to_vec(),
+                    media_type.to_string(),
+                    data.into_bytes(),
                 )))?;
                 (target_ref, TargetMode::Internal, Some(uri))
             },
@@ -1073,30 +1056,27 @@ impl Package {
             }
             return Err(error.into());
         }
-        Ok((
-            AltChunk::new(relationship_id, match_source)?,
-            installed_part,
-        ))
+        Ok((Chunk::new(relationship, match_source), installed_part))
     }
 
-    fn validate_alt_chunk_relationship(&self, chunk: &AltChunk) -> Result<Option<PackURI>> {
+    fn validate_alt_chunk_relationship(&self, chunk: &Chunk) -> Result<Option<PackURI>> {
         let document_uri = PackURI::new("/word/document.xml")
             .map_err(|error| OoxmlError::InvalidUri(format!("document URI: {error}")))?;
         let relationship = self
             .opc
             .get_part(&document_uri)?
             .rels()
-            .get(chunk.relationship_id())
+            .get(chunk.relationship().as_str())
             .ok_or_else(|| {
                 OoxmlError::InvalidFormat(format!(
                     "altChunk relationship {:?} is missing",
-                    chunk.relationship_id()
+                    chunk.relationship().as_str()
                 ))
             })?;
-        if !is_alternative_format_relationship(relationship.reltype()) {
+        if !is_relationship(relationship.reltype()) {
             return Err(OoxmlError::InvalidFormat(format!(
                 "relationship {:?} is not an alternative-format import",
-                chunk.relationship_id()
+                chunk.relationship().as_str()
             )));
         }
         if relationship.is_external() {
@@ -1105,13 +1085,13 @@ impl Package {
         let target = relationship.target_partname().map_err(|error| {
             OoxmlError::InvalidFormat(format!(
                 "invalid altChunk relationship {:?}: {error}",
-                chunk.relationship_id()
+                chunk.relationship().as_str()
             ))
         })?;
         self.opc.get_part(&target).map_err(|_| {
             OoxmlError::InvalidFormat(format!(
                 "altChunk relationship {:?} targets a missing part",
-                chunk.relationship_id()
+                chunk.relationship().as_str()
             ))
         })?;
         Ok(Some(target))
@@ -1127,16 +1107,12 @@ impl Package {
         Ok(())
     }
 
-    fn remove_alt_chunk_relationship(
-        &mut self,
-        chunk: &AltChunk,
-        target: Option<&PackURI>,
-    ) -> Result<()> {
+    fn remove_alt_relationship(&mut self, chunk: &Chunk, target: Option<&PackURI>) -> Result<()> {
         if self.mutable_doc.as_ref().is_some_and(|document| {
             document
-                .alt_chunks()
+                .alts()
                 .iter()
-                .any(|remaining| remaining.relationship_id() == chunk.relationship_id())
+                .any(|remaining| remaining.relationship() == chunk.relationship())
         }) {
             return Ok(());
         }
@@ -1145,7 +1121,7 @@ impl Package {
         self.opc
             .get_part_mut(&document_uri)?
             .rels_mut()
-            .remove(chunk.relationship_id());
+            .remove(chunk.relationship().as_str());
         let Some(target) = target else {
             return Ok(());
         };

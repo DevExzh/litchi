@@ -9,6 +9,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// The underlying OPC graph is malformed or could not be read safely.
+    #[error("PPTX OPC error: {0}")]
+    Opc(#[from] litchi_opc::OpcError),
+
     /// The XML stream is not well formed or cannot be decoded safely.
     #[error("invalid PresentationML XML: {0}")]
     Xml(String),
@@ -24,6 +28,62 @@ pub enum Error {
         resource: &'static str,
         /// Active upper bound.
         limit: usize,
+    },
+
+    /// A related part has a content type forbidden by PresentationML.
+    #[error("invalid PPTX content type: expected {expected}, got {actual}")]
+    ContentType {
+        /// Required content type.
+        expected: String,
+        /// Content type found in the package.
+        actual: String,
+    },
+
+    /// No tag has the requested semantic name.
+    #[error("tag name '{0}' was not found")]
+    NameNotFound(String),
+
+    /// A numeric tag selector is outside the checked list bounds.
+    #[error("tag index {index} is outside a list of length {len}")]
+    IndexOutOfBounds {
+        /// Requested zero-based index.
+        index: usize,
+        /// Current list length.
+        len: usize,
+    },
+
+    /// Malformed producer input contains multiple caseless-equivalent names.
+    #[error("tag name '{name}' is ambiguous ({matches} matches)")]
+    AmbiguousName {
+        /// Selector spelling supplied by the caller.
+        name: String,
+        /// Number of matching tags.
+        matches: usize,
+    },
+
+    /// A mutation would create a caseless-equivalent duplicate name.
+    #[error("tag name '{name}' conflicts with {matches} existing tag(s)")]
+    DuplicateName {
+        /// Spelling supplied by the caller.
+        name: String,
+        /// Number of conflicting tags.
+        matches: usize,
+    },
+
+    /// A requested reorder is not a complete list permutation.
+    #[error("tag reorder has {actual} selectors; expected {expected}")]
+    OrderLength {
+        /// Required selector count.
+        expected: usize,
+        /// Supplied selector count.
+        actual: usize,
+    },
+
+    /// A requested reorder selects the same physical tag more than once.
+    #[error("tag reorder selects index {index} more than once")]
+    DuplicateSelection {
+        /// Repeated physical index.
+        index: usize,
     },
 
     /// Markup-compatibility processing failed.

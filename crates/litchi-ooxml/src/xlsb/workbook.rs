@@ -1,7 +1,6 @@
 //! Workbook implementation for XLSB files
 
 use crate::xlsb::XlsbCell;
-use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::XlsbResult;
 use crate::xlsb::external_link::{
     DATA_ITEM_REQUIRED_TRAILING_FLAG, DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE,
@@ -34,6 +33,7 @@ use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
+use litchi_xlsb::calc::{self, Props};
 use litchi_xlsb::raw::{Records, kind};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
@@ -56,7 +56,7 @@ pub struct XlsbWorkbook {
     formula_context: FormulaResolutionContext,
     shared_strings: Vec<SharedString>,
     styles: StylesTable,
-    calculation_properties: CalculationProperties,
+    calc: Props,
     is_1904: bool,
     pivot_cache_definitions: Vec<(u32, crate::xlsb::pivot::PivotCacheDefinition)>,
     structured_tables: Vec<(usize, crate::xlsb::table::XlsbTable)>,
@@ -81,7 +81,7 @@ struct ParsedWorkbookInfo {
     external_link_rel_ids: Vec<String>,
     defined_names: Vec<String>,
     is_1904: bool,
-    calculation_properties: Option<CalculationProperties>,
+    calc: Option<Props>,
 }
 
 #[derive(Debug)]
@@ -98,7 +98,7 @@ impl std::fmt::Debug for XlsbWorkbook {
             .field("worksheet_rel_ids", &self.worksheet_rel_ids)
             .field("shared_strings_count", &self.shared_strings.len())
             .field("cell_xfs_count", &self.styles.cell_xfs.len())
-            .field("calculation_properties", &self.calculation_properties)
+            .field("calc", &self.calc)
             .field("is_1904", &self.is_1904)
             .finish()
     }
@@ -627,9 +627,9 @@ impl XlsbWorkbook {
         self.styles.get_cell_format(cell.style_id() as usize)
     }
 
-    /// Workbook formula calculation policy.
-    pub fn calculation_properties(&self) -> &CalculationProperties {
-        &self.calculation_properties
+    /// Validated workbook formula calculation policy.
+    pub fn calc(&self) -> &Props {
+        &self.calc
     }
 
     /// Save this parsed workbook, including atomic worksheet-stream mutations.
@@ -758,7 +758,7 @@ impl XlsbWorkbook {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
-            calculation_properties: CalculationProperties::default(),
+            calc: Props::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
@@ -790,7 +790,7 @@ impl XlsbWorkbook {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
-            calculation_properties: CalculationProperties::default(),
+            calc: Props::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
@@ -1346,7 +1346,7 @@ impl XlsbWorkbook {
         };
         self.worksheet_rel_ids = info.worksheet_rel_ids;
         self.is_1904 = info.is_1904;
-        self.calculation_properties = info.calculation_properties.unwrap_or_default();
+        self.calc = info.calc.unwrap_or_default();
         self.pivot_cache_definitions = pivot_cache_definitions;
         self.connections = connections;
         self.structured_tables = structured_tables;
@@ -1575,14 +1575,13 @@ impl XlsbWorkbook {
                     }
                 },
                 kind::CALC_PROP => {
-                    if info.calculation_properties.is_some() {
+                    if info.calc.is_some() {
                         return Err(crate::xlsb::error::XlsbError::Unrecognized {
                             typ: "BrtCalcProp".to_string(),
                             val: "duplicate record".to_string(),
                         });
                     }
-                    info.calculation_properties =
-                        Some(CalculationProperties::parse(record.payload())?);
+                    info.calc = Some(calc::read(record.payload())?);
                 },
                 kind::BUNDLE_SH => {
                     let bundle_sh =
@@ -2700,7 +2699,7 @@ mod tests {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
-            calculation_properties: CalculationProperties::default(),
+            calc: Props::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
@@ -2764,7 +2763,7 @@ mod tests {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
-            calculation_properties: CalculationProperties::default(),
+            calc: Props::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),
@@ -3147,7 +3146,7 @@ mod tests {
             formula_context: FormulaResolutionContext::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
-            calculation_properties: CalculationProperties::default(),
+            calc: Props::default(),
             is_1904: false,
             pivot_cache_definitions: Vec::new(),
             structured_tables: Vec::new(),

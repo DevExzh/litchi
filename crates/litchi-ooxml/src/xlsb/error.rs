@@ -16,6 +16,8 @@ pub enum XlsbError {
     Xml(quick_xml::Error),
     /// Validated BIFF12 wire-kernel error.
     Wire(litchi_xlsb::Error),
+    /// Typed workbook calculation-property error.
+    Calc(litchi_xlsb::calc::Error),
     /// Invalid record type
     InvalidRecordType(u16),
     /// Unexpected record
@@ -77,6 +79,7 @@ impl fmt::Display for XlsbError {
             XlsbError::Zip(e) => write!(f, "ZIP error: {}", e),
             XlsbError::Xml(e) => write!(f, "XML error: {}", e),
             XlsbError::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
+            XlsbError::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
             XlsbError::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
             XlsbError::UnexpectedRecord { expected, found } => {
                 write!(
@@ -135,6 +138,7 @@ impl std::error::Error for XlsbError {
             XlsbError::Io(e) => Some(e),
             XlsbError::Xml(e) => Some(e),
             XlsbError::Wire(e) => Some(e),
+            XlsbError::Calc(e) => Some(e),
             XlsbError::Drawing(e) => Some(e),
             XlsbError::Common(e) => Some(e),
             XlsbError::Vba(e) => Some(e),
@@ -164,6 +168,12 @@ impl From<quick_xml::Error> for XlsbError {
 impl From<litchi_xlsb::Error> for XlsbError {
     fn from(error: litchi_xlsb::Error) -> Self {
         Self::Wire(error)
+    }
+}
+
+impl From<litchi_xlsb::calc::Error> for XlsbError {
+    fn from(error: litchi_xlsb::calc::Error) -> Self {
+        Self::Calc(error)
     }
 }
 

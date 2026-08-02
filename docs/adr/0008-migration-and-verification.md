@@ -2465,6 +2465,124 @@ declarations with 21 explicitly ordered debt items, and all 10 boundary-policy
 regression tests pass. These are the intentionally focused gates described
 above, not a repeated full-workspace or native-Office certification run.
 
+The subsequent dependency-decoupling slice gives DOCX alternative-format
+imports, PPTX programmable tags, and XLSB workbook calculation properties their
+canonical concrete owners, and removes the formula evaluator's production
+runtime anchor. The migration host consumes these owners directly; the former
+host alternative-format, tag, and calculation modules and their flattened long
+names are deleted without compatibility aliases.
+
+`litchi-docx::alt` owns typed alternative-format anchors and opaque package
+payloads. `Chunk`, `Conformance`, `Data`, `Import`, `Kind`, `Part`, and `Target`
+form the ordinary API; checked `Rel` and `Uri` values remain the low-level
+metadata layer. `Data` and `Import` cannot be cloned, and internal insertion
+moves the original byte allocation directly into the OPC part. Word's ten
+document, template, MIME, HTML/XHTML, RTF, text, and XML media families come
+from checked-in `[MS-OI29500]` section 2.1.527 and `[MS-OE376]` section 2.1.558,
+including Word's case-sensitive Transitional `aFChunk` spelling. Reads lend
+unknown or recognized payload bytes without opening nested packages; external
+targets are returned as inert text and never contacted. The host exposes
+ordered `add_alt`, `insert_alt`, `replace_alt`, `remove_alt`, and `move_alt`
+package operations while keeping raw-ID writer mutation private. Parser and
+authoring defaults cap payloads at 128 MiB, source XML at 32 MiB, nesting at 256
+levels, and anchors at 4,096; unknown nested extension XML remains preserved.
+Bounded markup-compatibility processing acts only as a visibility oracle: read
+and mutable selectors retain original source coordinates, agree on the active
+Choice/Fallback branch, and preserve inherited Strict or Transitional namespace
+aliases plus inactive branch bytes.
+
+`litchi-pptx::tag` owns bounded Strict/Transitional `tagLst` parsing, writing,
+and slide relationship discovery. Its short `List`, `Tag`, `Key`, `Source`,
+`Conformance`, and `raw::Attr` vocabulary keeps semantic name selection as the
+ordinary path and checked zero-based positions as the repair path. `List`
+supports detached add, insert, replace, value set, remove, and complete reorder
+operations; inserted and replacement values move into place, and removal moves
+the old value back to the caller. Lookup and every mutation use one
+NFD/default-case-fold/NFD identity chosen by Litchi as a deterministic
+implementation of the case-insensitive uniqueness requirement in checked-in
+`[MS-OE376]` section 2.1.1170(c); the specification does not prescribe that
+normalization algorithm. A malformed producer list with equivalent names is
+retained for numeric inspection, while semantic lookup returns typed ambiguity
+and new mutations cannot create another equivalent name. Tag values and bounded
+extension attributes remain inert. Cached exact escaped-wire sizes preflight
+the aggregate 8 MiB writer ceiling before every successful mutation and keep
+replacement/value-set failure atomic without rescanning existing strings.
+Discovery refuses external tag targets, wrong content types, duplicate targets,
+and unexpected relationships on a tag part. Tag package relationship mutation
+is not yet wired, so detached CRUD is not presented as package-level tag
+replacement or deletion; the separate
+revision/change package stores remain add-only.
+
+`litchi-xlsb::calc` owns `BrtCalcProp` independently of the OOXML migration
+host. `Props` keeps all fields private and combines short checked setters with
+consuming `with_*` builders. `Mode` closes the wire enumeration, `Opts` packs
+the nine switches into a `u16` and rejects reserved bits, `Threads` enforces the
+`1..=1024` domain, and `Delta` excludes NaN, infinity, subnormal values, and
+negative zero. These are the checked-in `[MS-XLSB]` section 2.4.318 record rules
+and section 2.5.172 `Xnum` rules, not guessed ergonomic restrictions. `read`
+requires one exact 26-byte payload, while `write` streams those fields through
+the canonical raw writer without allocating an intermediate record buffer.
+The parsed workbook exposes `calc`; the authoring host uses `calc`, `calc_mut`,
+and move-accepting `put_calc`.
+
+The `litchi-eval` production graph no longer contains Tokio or Reqwest.
+Feature-gated web functions accept an explicit borrowed `Fetch` capability via
+`FormulaEvaluator::with_fetch`; the trait returns a runtime-neutral future, so
+the caller chooses the executor, transport, and network policy. Without that
+capability, `WEBSERVICE` is network-inert and returns a connection cell error.
+With one, URL shape, response bytes, UTF-8, and the 32,767-UTF-16-unit cell limit
+are checked before a value is accepted. The evaluator also replaces shared
+position and circular-visit state with a method-scoped `At` view over a borrowed
+evaluation session. Concurrent top-level calls therefore cannot report one
+another as a cycle, and a scoped visit guard removes its marker on success or
+error. Private synchronous cache locks are held only for short cache operations
+and never cross an await; no lock type enters the public facade.
+
+The dependency policy now distinguishes production runtime coupling from test
+execution: runtime-neutral crates are checked against normal Cargo edges,
+including optional normal dependencies, while development-only runtimes remain
+available to tests. `litchi-eval` is in that enforced set. This does not relax
+the separate inventory of internal normal, optional, development, renamed, and
+target-specific edges.
+
+Focused evidence is green. The DOCX owner passes 20 unit tests, two downstream
+API tests, and one doctest; 11 migration-host alternative-format tests pass.
+Its canonical all-target and focused-host warning-denied Clippy, warning-denied
+rustdoc, formatting, and diff gates pass. The PPTX owner passes 24 unit tests
+and three documentation cases; four migration-host integration tests pass,
+including discovery of seven real LibreOffice tag parts. Its all-target
+warning-denied Clippy and warning-denied rustdoc gates pass. The XLSB owner
+passes two unit tests, seven calculation integration tests, 17 existing
+raw-wire tests, one passing doctest, and two compile-fail doctests, plus
+all-target warning-denied Clippy. The evaluator passes 1,147 default-feature
+and 1,161 all-feature unit tests, including all 17 focused web-function tests,
+plus all-feature all-target warning-denied Clippy, warning-denied rustdoc, and
+the umbrella's isolated
+`eval_engine_web_functions` check. Normal dependency-tree checks find neither
+Tokio nor Reqwest. The executable boundary checker accepts 35 workspace
+packages and 111 internal dependency declarations with 21 ordered debt items;
+all 13 policy regressions, Python bytecode
+compilation, and diff validation pass.
+
+This slice changes one authored Office artifact path: the new focused example
+writes a valid HTML alternative-format import between ordinary Word paragraphs.
+Computer Use verification on macOS Word opened that generated DOCX without a
+repair dialog and displayed the imported heading and paragraph in the expected
+body order. Word accepted a new trailing paragraph and saved a second DOCX;
+the resaved ZIP passed integrity checks, and Litchi reverse-read five expected
+paragraphs including both imported HTML strings and the Office edit. Word
+removed the alternative-format part and anchor during resave, which is the
+expected producer normalization after importing the foreign content. This gate
+does not certify the other nine media families, Windows or web Word, older
+Office versions, or pixel-identical layout.
+
+Per explicit user direction, the previously green full-workspace gate was not
+repeated. The compact options layout, streamed record write, borrowed contexts,
+move-owned payload identity, and absence of production runtime edges are
+structural facts, not latency, allocation, CPU, cache, affinity, contention, or
+scaling measurements. No performance claim follows without the ADR 0005
+benchmark and flame-graph work.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

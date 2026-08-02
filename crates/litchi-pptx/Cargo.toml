@@ -9,6 +9,9 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+caseless = { workspace = true }
 litchi-ooxml-common = { workspace = true }
+litchi-opc = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
+unicode-normalization = { workspace = true }

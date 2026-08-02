@@ -230,6 +230,22 @@ operation, so spelling normalization cannot make selectors disagree. The
 package host exposes symmetric `fonts`, `put_fonts`, and `remove_fonts` entry
 points, but never discovers, loads, renders, or executes a font program.
 
+`litchi-docx::alt` owns WordprocessingML alternative-format anchors and opaque
+payload typing. Its short vocabulary is `Chunk`, `Conformance`, `Data`,
+`Import`, `Kind`, `Part`, and `Target`; cheap low-level identifiers are checked
+`Rel` and `Uri` values. `Data` and `Import` are deliberately move-only, package
+insertion transfers their payload allocation into OPC storage, and borrowed
+`Part` access never parses or copies foreign bytes. Checked-in `[MS-OI29500]`
+section 2.1.527 and `[MS-OE376]` section 2.1.558 define the ten supported Word
+media families and case-sensitive Transitional `aFChunk` relationship. The
+host exposes ordered `add_alt`, `insert_alt`, `replace_alt`, `remove_alt`, and
+`move_alt`; public writer CRUD does not accept raw relationship IDs. External
+targets remain inert. Markup-compatibility selection retains original source
+coordinates, so read and mutable selectors agree on the active Choice/Fallback
+branch; full-document parsing also preserves inherited Strict and Transitional
+namespace aliases. Payload, XML, nesting, and anchor limits are enforced before
+unbounded package or parser work.
+
 `litchi-pptx::transition` owns the PresentationML transition model and bounded
 XML codec. Each `Kind` variant carries only the direction/orientation value
 valid for that effect, so invalid effect-option pairs are not representable.
@@ -238,6 +254,23 @@ serialization. Unknown source effects and extension children are retained as
 bounded inert markup. A semantic sound or effect variant is exposed only when
 both read and write preserve it; the API does not keep constructor-only or
 writer-rejected compatibility variants.
+
+`litchi-pptx::tag` owns the bounded PresentationML programmable-tag grammar and
+slide relationship discovery. Its contextual vocabulary is `List`, `Tag`,
+`Key`, `Source`, `Conformance`, and `tag::raw::Attr`. Semantic name lookup is
+the primary selector, while `Key::Index` supports checked source-order repair
+without exposing a relationship identifier as the ordinary API. Litchi chooses
+one deterministic NFD/default-case-fold/NFD identity for lookup and every
+detached add, insert, replace, set, remove, and reorder operation. Checked-in
+`[MS-OE376]` section 2.1.1170(c) requires case-insensitive uniqueness but does
+not prescribe this normalization algorithm.
+Malformed producer duplicates remain inspectable by numeric position and make
+semantic selection explicitly ambiguous. Values and retained extension markup
+stay inert. Private escaped-wire counters make aggregate size preflight O(1)
+after scanning only the incoming value, so every successful checked mutation
+remains serializable under the 8 MiB part ceiling. Strict and Transitional
+relationship discovery rejects external, wrong-content-type, duplicate-target,
+and relationship-bearing tag parts.
 
 `litchi-xlsb::raw` owns the BIFF12 record wire kernel: `Kind`, `Header`,
 borrowed `Record`/`Records`, bounded `Cursor`, and `Writer`, with constants
@@ -252,6 +285,31 @@ flags; RK writes refuse values that cannot be represented bit-exactly instead
 of silently rounding them. The kernel has no OPC, DrawingML, XLSX, runtime, or
 concrete peer dependency; XLSB semantic records remain in the concrete owner
 and migrate onto this substrate incrementally.
+
+`litchi-xlsb::calc` owns the exact 26-byte `BrtCalcProp` semantic record and
+streams it through the canonical raw `Cursor` and `Writer`. Its short public
+vocabulary is `Props`, `Mode`, `Opts`, `Delta`, and `Threads`. Private fields,
+checked setters, and consuming `with_*` builders make every `Props` value
+directly writable. `Opts` packs the nine switches into one `u16`; unknown bits
+are rejected. Checked-in `[MS-XLSB]` section 2.4.318 fixes the mode enumeration,
+reserved bits, and `1..=1024` thread-count domain, while section 2.5.172 makes
+NaN, infinity, subnormal values, and negative zero invalid `Delta` states. The
+migration host exposes concise `calc`, `calc_mut`, and move-accepting
+`put_calc` entry points instead of retaining the former long compatibility
+types.
+
+`litchi-eval` remains runtime-neutral when `web_functions` is enabled. External
+retrieval is an explicit caller capability: `FormulaEvaluator::with_fetch`
+borrows an implementation of `Fetch`, whose boxed future can be driven by any
+executor. With no provider, evaluation performs no network I/O and
+`WEBSERVICE` returns a connection cell error; supplied responses are bounded,
+strictly decoded as UTF-8, and checked against the cell text limit. The
+evaluator's method-scoped `At` context carries the current cell while borrowing
+both the evaluator and a private circular-reference session. Concurrent
+top-level calls therefore cannot mistake one another for a cycle, and RAII
+removes a visit marker on every exit. No runtime lock wrapper enters the public
+API. Tokio remains test-only, and neither Tokio nor Reqwest is a normal
+dependency of the crate.
 
 The `litchi-ole` monolith is removed after DOC, PPT, and XLS migrate into their
 concrete crates. It does not remain as a compatibility crate, feature, or
@@ -273,6 +331,9 @@ prefixes. Legacy Word, PowerPoint, and Excel are independently gated as `doc`,
 - `litchi-core` owns only format-neutral sources, blobs, budgets, execution,
   scalars, selectors, diagnostics, patch envelopes, and content events. It owns
   no ZIP, XML, CFB, format feature, Tokio, Reqwest, or Rayon dependency.
+- Runtime-neutral policy evaluates normal Cargo dependency edges, including
+  optional normal edges. Development-only runtimes may support tests without
+  weakening or masking the production dependency check.
 - Container/common crates do not depend on concrete formats.
 - Default `litchi` enables DOCX, PPTX, and XLSX. XLSB, legacy formats, crypto,
   signing, VBA parsing, calculation, rendering, and runtime adapters are opt-in.

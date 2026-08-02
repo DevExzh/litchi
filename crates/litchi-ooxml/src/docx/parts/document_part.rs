@@ -1,12 +1,13 @@
 //! DocumentPart - the main document.xml part of a Word document.
 
-use crate::docx::alt_chunk::{AltChunk, scan_alt_chunks};
 use crate::docx::namespace::scan_word_element_ranges;
 use crate::docx::paragraph::{Paragraph, extract_word_text};
 use crate::docx::table::Table;
 use crate::error::Result;
+use litchi_docx::alt::{Chunk, active, scan};
 use litchi_opc::part::Part;
 use smallvec::SmallVec;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 /// The main document part of a Word document.
@@ -17,7 +18,31 @@ use std::sync::Arc;
 pub struct DocumentPart<'a> {
     /// Reference to the underlying part
     part: &'a dyn Part,
+    raw: Arc<Vec<u8>>,
     xml: Arc<Vec<u8>>,
+}
+
+/// Select document-level Word blocks in original source order and coordinates.
+///
+/// Markup-compatibility preprocessing is used only as a visibility oracle; the
+/// ranges continue to address the untouched package part.
+pub(crate) fn active_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
+    let mut ranges = Vec::new();
+    scan_word_element_ranges(
+        xml,
+        &[b"p".as_slice(), b"tbl".as_slice(), b"altChunk".as_slice()],
+        |target, start, length| {
+            ranges.push((target, start, length));
+            Ok(())
+        },
+    )?;
+    let starts = ranges
+        .iter()
+        .map(|&(_, start, _)| start)
+        .collect::<Vec<_>>();
+    let selected = active(xml, &starts)?.into_iter().collect::<BTreeSet<_>>();
+    ranges.retain(|&(_, start, _)| selected.contains(&start));
+    Ok(ranges)
 }
 
 impl<'a> DocumentPart<'a> {
@@ -32,17 +57,24 @@ impl<'a> DocumentPart<'a> {
     ///
     /// * `part` - The part containing the document.xml content
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
-        let xml = match litchi_ooxml_common::mce::process_ooxml(part.blob())? {
-            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+        let raw = part.blob_arc();
+        let xml = match litchi_ooxml_common::mce::process_ooxml(raw.as_slice())? {
+            std::borrow::Cow::Borrowed(_) => Arc::clone(&raw),
             std::borrow::Cow::Owned(v) => Arc::new(v),
         };
-        Ok(Self { part, xml })
+        Ok(Self { part, raw, xml })
     }
 
     /// Get the shared Arc of XML bytes (zero-copy from Part).
     #[inline]
     fn get_xml_arc(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.xml)
+    }
+
+    /// Get the original XML backing semantic source ranges.
+    #[inline]
+    fn get_raw_arc(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.raw)
     }
 
     /// Get the XML bytes of the document.
@@ -156,7 +188,7 @@ impl<'a> DocumentPart<'a> {
                     Some(DocxElement::Paragraph(paragraph))
                 },
                 crate::docx::DocumentBlock::Table(table) => Some(DocxElement::Table(table)),
-                crate::docx::DocumentBlock::AltChunk(_) => None,
+                crate::docx::DocumentBlock::Alt(_) => None,
             })
             .collect())
     }
@@ -165,37 +197,43 @@ impl<'a> DocumentPart<'a> {
     pub fn blocks(&self) -> Result<Vec<crate::docx::DocumentBlock>> {
         use crate::docx::DocumentBlock;
 
-        let source = self.get_xml_arc();
-        let mut alt_chunks = scan_alt_chunks(source.as_slice())?;
+        let source = self.get_raw_arc();
+        let mut alts = scan(source.as_slice())?;
         let mut elements = Vec::new();
-        scan_word_element_ranges(
-            source.as_slice(),
-            &[b"p".as_slice(), b"tbl".as_slice(), b"altChunk".as_slice()],
-            |target, start, length| {
-                let source = Arc::clone(&source);
-                elements.push(if target == 0 {
-                    DocumentBlock::Paragraph(Box::new(Paragraph::from_arc_range(
-                        source, start, length,
-                    )))
-                } else if target == 1 {
-                    DocumentBlock::Table(Box::new(Table::from_arc_range(source, start, length)))
-                } else {
-                    let chunk = alt_chunks.remove(&start).ok_or_else(|| {
-                        crate::error::OoxmlError::InvalidFormat(
-                            "ordered altChunk lacks parsed anchor metadata".into(),
-                        )
-                    })?;
-                    DocumentBlock::AltChunk(Box::new(chunk))
-                });
-                Ok(())
-            },
-        )?;
+        for (target, start, length) in active_block_ranges(source.as_slice())? {
+            let block_source = Arc::clone(&source);
+            elements.push(if target == 0 {
+                DocumentBlock::Paragraph(Box::new(Paragraph::from_arc_range(
+                    block_source,
+                    start,
+                    length,
+                )))
+            } else if target == 1 {
+                DocumentBlock::Table(Box::new(Table::from_arc_range(block_source, start, length)))
+            } else {
+                let chunk = alts.remove(&start).ok_or_else(|| {
+                    crate::error::OoxmlError::InvalidFormat(
+                        "ordered altChunk lacks parsed anchor metadata".into(),
+                    )
+                })?;
+                DocumentBlock::Alt(Box::new(chunk))
+            });
+        }
         Ok(elements)
     }
 
     /// Return all alternative-format anchors in XML order.
-    pub fn alt_chunks(&self) -> Result<Vec<AltChunk>> {
-        Ok(scan_alt_chunks(self.xml_bytes())?.into_values().collect())
+    pub fn alts(&self) -> Result<Vec<Chunk>> {
+        Ok(self
+            .blocks()?
+            .into_iter()
+            .filter_map(|block| match block {
+                crate::docx::DocumentBlock::Alt(chunk) => Some(*chunk),
+                crate::docx::DocumentBlock::Paragraph(_) | crate::docx::DocumentBlock::Table(_) => {
+                    None
+                },
+            })
+            .collect())
     }
 }
 

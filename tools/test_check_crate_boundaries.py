@@ -14,13 +14,17 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     for edge in edges:
         dependencies[edge.dependent].add(edge.dependency)
     dependencies["litchi-core"].update(item.name for item in policy.core_dependency_debt)
+    frozen_dependencies = {
+        name: frozenset(items) for name, items in dependencies.items()
+    }
     features = {name: frozenset() for name in policy.packages}
     features["litchi-core"] = frozenset(item.name for item in policy.core_feature_debt)
     return boundaries.Snapshot(
         packages=policy.packages,
         manifests=frozenset(),
         edges={edge: ("kind=normal, optional=false, target=*, rename=-",) for edge in edges},
-        dependencies={name: frozenset(items) for name, items in dependencies.items()},
+        dependencies=frozen_dependencies,
+        normal_dependencies=frozen_dependencies,
         features=features,
     )
 
@@ -49,6 +53,66 @@ class BoundaryPolicyTests(unittest.TestCase):
             "unclassified internal edge litchi-xlsx -> litchi-doc "
             "(kind=dev, optional=true, target=cfg(unix), rename=legacy)",
             violations,
+        )
+
+    def test_eval_rejects_each_normal_runtime_dependency(self) -> None:
+        for runtime in sorted(self.policy.runtime_packages):
+            with self.subTest(runtime=runtime):
+                snapshot = valid_snapshot(self.policy)
+                dependencies = dict(snapshot.dependencies)
+                dependencies["litchi-eval"] |= frozenset({runtime})
+                normal_dependencies = dict(snapshot.normal_dependencies)
+                normal_dependencies["litchi-eval"] |= frozenset({runtime})
+                snapshot = replace(
+                    snapshot,
+                    dependencies=dependencies,
+                    normal_dependencies=normal_dependencies,
+                )
+
+                violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+                self.assertIn(
+                    f"runtime-neutral crate litchi-eval depends on: {runtime}",
+                    violations,
+                )
+
+    def test_eval_allows_dev_only_runtime_dependency(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        dependencies = dict(snapshot.dependencies)
+        dependencies["litchi-eval"] |= frozenset({"tokio"})
+        snapshot = replace(snapshot, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertEqual(violations, [])
+
+    def test_metadata_classifies_only_normal_dependencies_as_runtime_edges(self) -> None:
+        snapshot = boundaries.snapshot_from_metadata(
+            {
+                "workspace_members": ["litchi-eval-id"],
+                "packages": [
+                    {
+                        "id": "litchi-eval-id",
+                        "name": "litchi-eval",
+                        "manifest_path": "/workspace/crates/litchi-eval/Cargo.toml",
+                        "features": {},
+                        "dependencies": [
+                            {"name": "tokio", "kind": "dev"},
+                            {"name": "rayon", "kind": "build"},
+                            {"name": "reqwest", "kind": None},
+                        ],
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            snapshot.dependencies["litchi-eval"],
+            frozenset({"rayon", "reqwest", "tokio"}),
+        )
+        self.assertEqual(
+            snapshot.normal_dependencies["litchi-eval"],
+            frozenset({"reqwest"}),
         )
 
     def test_xlsb_cannot_depend_on_concrete_xlsx(self) -> None:

@@ -2,7 +2,6 @@
 //!
 //! This module provides functionality to create complete XLSB files with multiple worksheets,
 //! shared strings, styles, and advanced features.
-use crate::xlsb::calculation::CalculationProperties;
 use crate::xlsb::error::{XlsbError, XlsbResult};
 use crate::xlsb::formula::{
     CellParsedFormula, FormulaCompilationContext, FormulaDefinedName, excel_name_eq,
@@ -15,6 +14,7 @@ use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_xlsb::calc::{self, Props};
 use litchi_xlsb::raw::{Writer, kind};
 use std::io::{Seek, Write};
 use std::sync::Arc;
@@ -54,7 +54,7 @@ pub struct XlsbWorkbookWriter {
     named_ranges: Vec<NamedRange>,
     shared_strings: MutableSharedStringsWriter,
     styles: StylesWriter,
-    calculation_properties: CalculationProperties,
+    calc: Props,
     is_1904: bool,
     connections: Option<crate::xlsb::connections::XlsbConnections>,
     external_links: Vec<crate::xlsb::formula::XlsbExternalLink>,
@@ -101,7 +101,7 @@ impl XlsbWorkbookWriter {
             named_ranges: Vec::new(),
             shared_strings: MutableSharedStringsWriter::new(),
             styles: StylesWriter::new(),
-            calculation_properties: CalculationProperties::default(),
+            calc: Props::default(),
             is_1904: false,
             connections: None,
             external_links: Vec::new(),
@@ -119,14 +119,20 @@ impl XlsbWorkbookWriter {
         self.is_1904 = is_1904;
     }
 
-    /// Workbook formula calculation policy written to `BrtCalcProp`.
-    pub fn calculation_properties(&self) -> &CalculationProperties {
-        &self.calculation_properties
+    /// Validated workbook formula calculation policy written to `BrtCalcProp`.
+    pub fn calc(&self) -> &Props {
+        &self.calc
     }
 
-    /// Mutably configure workbook formula calculation policy.
-    pub fn calculation_properties_mut(&mut self) -> &mut CalculationProperties {
-        &mut self.calculation_properties
+    /// Mutably configure the policy through its safe setters.
+    pub fn calc_mut(&mut self) -> &mut Props {
+        &mut self.calc
+    }
+
+    /// Replace the policy by moving in an already validated value.
+    pub fn put_calc(&mut self, props: Props) -> &mut Self {
+        self.calc = props;
+        self
     }
 
     /// Attach a cache-free, inert MS-OVBA project to generated workbooks.
@@ -852,7 +858,7 @@ impl XlsbWorkbookWriter {
         // Basic calculation properties describing recalc behavior and
         // numerical tolerance. This is tiny and follows the spec example
         // values, so we emit it unconditionally.
-        self.write_calc_properties(writer)?;
+        self.write_calc(writer)?;
 
         // BrtEndBook
         writer.write_record(kind::END_BOOK, &[])?;
@@ -1004,19 +1010,9 @@ impl XlsbWorkbookWriter {
     /// Write calculation properties (CALC_PROP, 0x009D)
     ///
     /// Spec example fields and order
-    fn write_calc_properties<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
-        self.calculation_properties.validate()?;
-        let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
-
-        temp_writer.write_u32(self.calculation_properties.recalculation_id)?;
-        temp_writer.write_u32(self.calculation_properties.mode as u32)?;
-        temp_writer.write_u32(self.calculation_properties.iteration_count)?;
-        temp_writer.write_f64(self.calculation_properties.iteration_delta)?;
-        temp_writer.write_u32(self.calculation_properties.user_thread_count as u32)?;
-        temp_writer.write_u16(self.calculation_properties.flags())?;
-
-        writer.write_record(kind::CALC_PROP, &data)?;
+    fn write_calc<W: Write>(&self, writer: &mut Writer<W>) -> XlsbResult<()> {
+        writer.write_header(kind::CALC_PROP, calc::LEN)?;
+        calc::write(&self.calc, writer)?;
         Ok(())
     }
 
@@ -1578,8 +1574,9 @@ mod tests {
     use crate::xlsb::data_validation::{
         DataValidation, DataValidationRecordKind, DataValidationSettings,
     };
-    use crate::xlsb::{CalculationMode, SharedStringRun, SheetProtection};
+    use crate::xlsb::{SharedStringRun, SheetProtection};
     use litchi_core::sheet::{CellValue, WorkbookTrait};
+    use litchi_xlsb::calc::{Delta, Mode, Opts, Threads};
     use std::io::Cursor;
 
     #[test]
@@ -2046,23 +2043,27 @@ mod tests {
     }
 
     #[test]
-    fn calculation_properties_survive_package_roundtrip() {
+    fn calc_survives_package_roundtrip() {
         let mut workbook = XlsbWorkbookWriter::new();
-        let properties = workbook.calculation_properties_mut();
-        properties.mode = CalculationMode::Manual;
-        properties.iterative_calculation = true;
-        properties.iteration_count = 25;
-        properties.iteration_delta = 0.000_01;
-        properties.user_set_thread_count = true;
-        properties.user_thread_count = 4;
-        properties.full_calculation_on_load = true;
+        let properties = workbook.calc_mut();
+        properties
+            .set_mode(Mode::Manual)
+            .set_iters(25)
+            .set_delta(Delta::new(0.000_01).unwrap())
+            .set_threads(Threads::new(4).unwrap());
+        properties
+            .set_opt(
+                Opts::ITERATE | Opts::USER_THREADS | Opts::FULL_ON_LOAD,
+                true,
+            )
+            .unwrap();
         workbook.add_worksheet(MutableXlsbWorksheet::new("Sheet1"));
 
-        let expected = workbook.calculation_properties().clone();
+        let expected = workbook.calc().clone();
         let mut output = Cursor::new(Vec::new());
         workbook.save(&mut output).unwrap();
         let reader = crate::xlsb::XlsbWorkbook::new(Cursor::new(output.into_inner())).unwrap();
-        assert_eq!(reader.calculation_properties(), &expected);
+        assert_eq!(reader.calc(), &expected);
     }
 
     #[test]

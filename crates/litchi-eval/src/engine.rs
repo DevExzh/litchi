@@ -47,6 +47,8 @@ mod web;
 pub(crate) mod test_helpers {
     use super::*;
     use crate::BoxFuture;
+    #[cfg(feature = "web_functions")]
+    use crate::Fetch;
     use litchi_core::sheet::Result;
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
@@ -58,6 +60,8 @@ pub(crate) mod test_helpers {
         cells: Arc<RwLock<TestCellMap>>,
         current_pos: Arc<RwLock<Option<(String, u32, u32)>>>,
         sheet_count: usize,
+        #[cfg(feature = "web_functions")]
+        fetch: Option<Arc<dyn Fetch>>,
     }
 
     impl TestEngine {
@@ -66,7 +70,15 @@ pub(crate) mod test_helpers {
                 cells: Arc::new(RwLock::new(HashMap::new())),
                 current_pos: Arc::new(RwLock::new(None)),
                 sheet_count: 1,
+                #[cfg(feature = "web_functions")]
+                fetch: None,
             }
+        }
+
+        #[cfg(feature = "web_functions")]
+        pub(crate) fn with_fetch(mut self, fetch: Arc<dyn Fetch>) -> Self {
+            self.fetch = Some(fetch);
+            self
         }
 
         /// Returns a reference to self as an EvalCtx
@@ -150,8 +162,8 @@ pub(crate) mod test_helpers {
         }
 
         #[cfg(feature = "web_functions")]
-        fn http_client(&self) -> &reqwest::Client {
-            panic!("TestEngine does not support HTTP client")
+        fn fetch(&self) -> Option<&dyn Fetch> {
+            self.fetch.as_deref()
         }
 
         fn get_sheet_index(&self, _name: &str) -> Option<usize> {

@@ -82,6 +82,7 @@ class Snapshot:
     manifests: frozenset[Path]
     edges: dict[Edge, tuple[str, ...]]
     dependencies: dict[str, frozenset[str]]
+    normal_dependencies: dict[str, frozenset[str]]
     features: dict[str, frozenset[str]]
 
 
@@ -334,6 +335,7 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
 
     evidence: dict[Edge, set[str]] = {}
     dependencies: dict[str, frozenset[str]] = {}
+    normal_dependencies: dict[str, frozenset[str]] = {}
     features: dict[str, frozenset[str]] = {}
     manifests: set[Path] = set()
     for package in packages:
@@ -341,6 +343,11 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
         manifests.add(Path(package["manifest_path"]).resolve())
         package_dependencies = frozenset(item["name"] for item in package["dependencies"])
         dependencies[name] = package_dependencies
+        normal_dependencies[name] = frozenset(
+            item["name"]
+            for item in package["dependencies"]
+            if (item.get("kind") or "normal") == "normal"
+        )
         features[name] = frozenset(package["features"])
         for dependency in package["dependencies"]:
             if dependency["name"] not in names:
@@ -359,6 +366,7 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
         manifests=frozenset(manifests),
         edges={edge: tuple(sorted(items)) for edge, items in evidence.items()},
         dependencies=dependencies,
+        normal_dependencies=normal_dependencies,
         features=features,
     )
 
@@ -457,7 +465,10 @@ def audit_snapshot(snapshot: Snapshot, policy: Policy) -> list[str]:
             )
 
     for name in sorted(policy.runtime_neutral & snapshot.packages):
-        runtimes = snapshot.dependencies.get(name, frozenset()) & policy.runtime_packages
+        runtimes = (
+            snapshot.normal_dependencies.get(name, frozenset())
+            & policy.runtime_packages
+        )
         if runtimes:
             violations.append(
                 f"runtime-neutral crate {name} depends on: " + ", ".join(sorted(runtimes))

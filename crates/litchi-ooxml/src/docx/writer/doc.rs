@@ -1,7 +1,8 @@
 use crate::docx::OfficeMath;
+use crate::docx::parts::document_part::active_block_ranges;
 /// Document writer implementation for DOCX.
-use crate::docx::alt_chunk::{AltChunk, AltChunkNamespace, scan_alt_chunks};
 use crate::error::{OoxmlError, Result};
+use litchi_docx::alt::{Chunk, Conformance, scan};
 use std::fmt::Write as FmtWrite;
 
 // Import shared format types
@@ -112,7 +113,7 @@ impl CollectGlyphs for MutableDocument {
                 BodyElement::PreservedParagraph(_)
                 | BodyElement::PreservedTable(_)
                 | BodyElement::PreservedSectionProperties(_)
-                | BodyElement::PreservedAltChunk(_, _)
+                | BodyElement::PreservedAlt(_, _)
                 | BodyElement::PreservedOther(_) => continue,
             };
             for (font, bitmap) in element_glyphs {
@@ -484,7 +485,7 @@ impl MutableDocument {
             | BodyElement::PreservedTable(raw)
             | BodyElement::PreservedSectionProperties(raw)
             | BodyElement::PreservedOther(raw) => raw.contains(shape_id),
-            BodyElement::PreservedAltChunk(raw, _) => raw.contains(shape_id),
+            BodyElement::PreservedAlt(raw, _) => raw.contains(shape_id),
             _ => false,
         })
     }
@@ -1435,44 +1436,44 @@ impl MutableDocument {
     }
 
     /// Return the direct alternative-format anchors in body order.
-    pub fn alt_chunks(&self) -> Vec<AltChunk> {
-        self.body.alt_chunks()
+    pub fn alts(&self) -> Vec<Chunk> {
+        self.body.alts()
     }
 
     /// Insert an alternative-format anchor at an anchor-relative index.
-    pub fn insert_alt_chunk(
+    pub(crate) fn insert_alt(
         &mut self,
         index: usize,
-        chunk: AltChunk,
-        namespace: AltChunkNamespace,
+        chunk: Chunk,
+        namespace: Conformance,
     ) -> Result<()> {
-        self.body.insert_alt_chunk(index, chunk, namespace)?;
+        self.body.insert_alt(index, chunk, namespace)?;
         self.modified = true;
         Ok(())
     }
 
     /// Replace an alternative-format anchor without disturbing adjacent XML.
-    pub fn replace_alt_chunk(
+    pub(crate) fn replace_alt(
         &mut self,
         index: usize,
-        chunk: AltChunk,
-        namespace: AltChunkNamespace,
-    ) -> Result<AltChunk> {
-        let old = self.body.replace_alt_chunk(index, chunk, namespace)?;
+        chunk: Chunk,
+        namespace: Conformance,
+    ) -> Result<Chunk> {
+        let old = self.body.replace_alt(index, chunk, namespace)?;
         self.modified = true;
         Ok(old)
     }
 
     /// Remove an alternative-format anchor.
-    pub fn remove_alt_chunk(&mut self, index: usize) -> Result<AltChunk> {
-        let old = self.body.remove_alt_chunk(index)?;
+    pub(crate) fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
+        let old = self.body.remove_alt(index)?;
         self.modified = true;
         Ok(old)
     }
 
     /// Move an alternative-format anchor to another anchor-relative index.
-    pub fn move_alt_chunk(&mut self, from: usize, to: usize) -> Result<()> {
-        self.body.move_alt_chunk(from, to)?;
+    pub(crate) fn move_alt(&mut self, from: usize, to: usize) -> Result<()> {
+        self.body.move_alt(from, to)?;
         self.modified = true;
         Ok(())
     }
@@ -1867,8 +1868,14 @@ enum PreservedBodyKind {
     Paragraph,
     Table,
     SectionProperties,
-    AltChunk,
+    Alt,
     Other,
+}
+
+struct PreservedAltRange {
+    start: usize,
+    end: usize,
+    chunk: Chunk,
 }
 
 impl DocumentBody {
@@ -1897,6 +1904,33 @@ impl DocumentBody {
         }
 
         let bytes = xml.as_bytes();
+        let mut chunks = scan(bytes)?;
+        let mut active_alts = Vec::new();
+        for (target, start, length) in active_block_ranges(bytes)? {
+            if target != 2 {
+                continue;
+            }
+            let start_usize = usize::try_from(start).map_err(|_| {
+                OoxmlError::InvalidFormat("altChunk offset does not fit usize".to_string())
+            })?;
+            let end = start_usize
+                .checked_add(usize::try_from(length).map_err(|_| {
+                    OoxmlError::InvalidFormat("altChunk length does not fit usize".to_string())
+                })?)
+                .ok_or_else(|| {
+                    OoxmlError::InvalidFormat("altChunk range overflowed".to_string())
+                })?;
+            let chunk = chunks.remove(&start).ok_or_else(|| {
+                OoxmlError::InvalidFormat(
+                    "active altChunk range lacks parsed anchor metadata".to_string(),
+                )
+            })?;
+            active_alts.push(PreservedAltRange {
+                start: start_usize,
+                end,
+                chunk,
+            });
+        }
         let mut reader = NsReader::from_reader(bytes);
         let mut body = Self::new();
         let mut depth = 0usize;
@@ -1990,6 +2024,7 @@ impl DocumentBody {
                         kind,
                         event_start,
                         event_end,
+                        &active_alts,
                     )?;
                 },
                 ScanEvent::EndCaptured => {
@@ -2017,6 +2052,7 @@ impl DocumentBody {
                             kind,
                             start,
                             event_end,
+                            &active_alts,
                         )?;
                     }
                 },
@@ -2028,6 +2064,7 @@ impl DocumentBody {
                             xml,
                             last_content_end,
                             event_start,
+                            &active_alts,
                         )?;
                     }
                     suffix_start = Some(event_start);
@@ -2203,87 +2240,85 @@ impl DocumentBody {
         Ok(position)
     }
 
-    fn alt_chunk_positions(&self) -> Vec<usize> {
+    fn alt_positions(&self) -> Vec<usize> {
         self.elements
             .iter()
             .enumerate()
             .filter_map(|(index, element)| {
-                matches!(element, BodyElement::PreservedAltChunk(_, _)).then_some(index)
+                matches!(element, BodyElement::PreservedAlt(_, _)).then_some(index)
             })
             .collect()
     }
 
-    fn alt_chunks(&self) -> Vec<AltChunk> {
+    fn alts(&self) -> Vec<Chunk> {
         self.elements
             .iter()
             .filter_map(|element| match element {
-                BodyElement::PreservedAltChunk(_, chunk) => Some(chunk.clone()),
+                BodyElement::PreservedAlt(_, chunk) => Some(chunk.clone()),
                 _ => None,
             })
             .collect()
     }
 
-    fn insert_alt_chunk(
-        &mut self,
-        index: usize,
-        chunk: AltChunk,
-        namespace: AltChunkNamespace,
-    ) -> Result<()> {
-        let positions = self.alt_chunk_positions();
+    fn insert_alt(&mut self, index: usize, chunk: Chunk, namespace: Conformance) -> Result<()> {
+        let positions = self.alt_positions();
         if index > positions.len() {
             return Err(OoxmlError::InvalidFormat(format!(
                 "altChunk index {index} is out of range"
             )));
         }
-        let position = positions
-            .get(index)
-            .copied()
-            .unwrap_or_else(|| self.content_insertion_index());
-        let xml = chunk.to_xml(namespace);
+        let position = match positions.get(index).copied() {
+            Some(position) => position,
+            None => self.content_insertion_index(),
+        };
+        let xml = chunk.xml(namespace);
         self.elements
-            .insert(position, BodyElement::PreservedAltChunk(xml, chunk));
+            .insert(position, BodyElement::PreservedAlt(xml, chunk));
         Ok(())
     }
 
-    fn replace_alt_chunk(
-        &mut self,
-        index: usize,
-        chunk: AltChunk,
-        namespace: AltChunkNamespace,
-    ) -> Result<AltChunk> {
-        let position = self
-            .alt_chunk_positions()
-            .get(index)
-            .copied()
-            .ok_or_else(|| {
-                OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
-            })?;
-        let xml = chunk.to_xml(namespace);
-        match std::mem::replace(
-            &mut self.elements[position],
-            BodyElement::PreservedAltChunk(xml, chunk),
-        ) {
-            BodyElement::PreservedAltChunk(_, old) => Ok(old),
-            _ => unreachable!(),
+    fn replace_alt(&mut self, index: usize, chunk: Chunk, namespace: Conformance) -> Result<Chunk> {
+        let position = self.alt_positions().get(index).copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
+        })?;
+        let xml = chunk.xml(namespace);
+        let slot = self.elements.get_mut(position).ok_or_else(|| {
+            OoxmlError::InvalidFormat("alternative-format position became invalid".into())
+        })?;
+        match std::mem::replace(slot, BodyElement::PreservedAlt(xml, chunk)) {
+            BodyElement::PreservedAlt(_, old) => Ok(old),
+            other => {
+                *slot = other;
+                Err(OoxmlError::InvalidFormat(
+                    "alternative-format position does not contain an anchor".into(),
+                ))
+            },
         }
     }
 
-    fn remove_alt_chunk(&mut self, index: usize) -> Result<AltChunk> {
-        let position = self
-            .alt_chunk_positions()
-            .get(index)
-            .copied()
-            .ok_or_else(|| {
-                OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
-            })?;
+    fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
+        let position = self.alt_positions().get(index).copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat(format!("altChunk index {index} is out of range"))
+        })?;
+        if position >= self.elements.len() {
+            return Err(OoxmlError::InvalidFormat(
+                "alternative-format position became invalid".into(),
+            ));
+        }
         match self.elements.remove(position) {
-            BodyElement::PreservedAltChunk(_, chunk) => Ok(chunk),
-            _ => unreachable!(),
+            BodyElement::PreservedAlt(_, chunk) => Ok(chunk),
+            other => {
+                self.elements.insert(position, other);
+                Err(OoxmlError::InvalidFormat(
+                    "alternative-format position does not contain an anchor".into(),
+                ))
+            },
         }
     }
 
-    fn move_alt_chunk(&mut self, from: usize, to: usize) -> Result<()> {
-        let count = self.alt_chunk_positions().len();
+    fn move_alt(&mut self, from: usize, to: usize) -> Result<()> {
+        let positions = self.alt_positions();
+        let count = positions.len();
         if from >= count || to >= count {
             return Err(OoxmlError::InvalidFormat(format!(
                 "altChunk move {from} -> {to} is out of range"
@@ -2292,13 +2327,26 @@ impl DocumentBody {
         if from == to {
             return Ok(());
         }
-        let source = self.alt_chunk_positions()[from];
+        let source = positions.get(from).copied().ok_or_else(|| {
+            OoxmlError::InvalidFormat("alternative-format source position is missing".into())
+        })?;
+        if source >= self.elements.len() {
+            return Err(OoxmlError::InvalidFormat(
+                "alternative-format source position became invalid".into(),
+            ));
+        }
         let element = self.elements.remove(source);
-        let remaining = self.alt_chunk_positions();
-        let destination = remaining
-            .get(to)
-            .copied()
-            .unwrap_or_else(|| self.content_insertion_index());
+        if !matches!(&element, BodyElement::PreservedAlt(_, _)) {
+            self.elements.insert(source, element);
+            return Err(OoxmlError::InvalidFormat(
+                "alternative-format source does not contain an anchor".into(),
+            ));
+        }
+        let remaining = self.alt_positions();
+        let destination = match remaining.get(to).copied() {
+            Some(position) => position,
+            None => self.content_insertion_index(),
+        };
         self.elements.insert(destination, element);
         Ok(())
     }
@@ -2379,7 +2427,7 @@ impl DocumentBody {
                 BodyElement::PreservedParagraph(raw)
                 | BodyElement::PreservedTable(raw)
                 | BodyElement::PreservedOther(raw)
-                | BodyElement::PreservedAltChunk(raw, _) => xml.push_str(raw),
+                | BodyElement::PreservedAlt(raw, _) => xml.push_str(raw),
                 BodyElement::PreservedSectionProperties(raw) if preserve_section => {
                     xml.push_str(raw);
                 },
@@ -2674,7 +2722,7 @@ impl DocumentBody {
                 BodyElement::PreservedParagraph(raw)
                 | BodyElement::PreservedTable(raw)
                 | BodyElement::PreservedOther(raw)
-                | BodyElement::PreservedAltChunk(raw, _) => xml.push_str(raw),
+                | BodyElement::PreservedAlt(raw, _) => xml.push_str(raw),
                 BodyElement::PreservedSectionProperties(raw) if preserve_section => {
                     xml.push_str(raw);
                 },
@@ -2825,7 +2873,7 @@ fn preserved_body_kind(
             b"p" => PreservedBodyKind::Paragraph,
             b"tbl" => PreservedBodyKind::Table,
             b"sectPr" => PreservedBodyKind::SectionProperties,
-            b"altChunk" => PreservedBodyKind::AltChunk,
+            b"altChunk" => PreservedBodyKind::Alt,
             _ => PreservedBodyKind::Other,
         };
     }
@@ -2892,6 +2940,7 @@ fn push_preserved_body_range(
     kind: PreservedBodyKind,
     start: usize,
     end: usize,
+    active_alts: &[PreservedAltRange],
 ) -> Result<()> {
     if start > *last_content_end {
         push_raw_body_xml(
@@ -2900,9 +2949,10 @@ fn push_preserved_body_range(
             xml,
             *last_content_end,
             start,
+            active_alts,
         )?;
     }
-    push_raw_body_xml(body, kind, xml, start, end)?;
+    push_raw_body_xml(body, kind, xml, start, end, active_alts)?;
     *last_content_end = end;
     Ok(())
 }
@@ -2913,46 +2963,66 @@ fn push_raw_body_xml(
     xml: &str,
     start: usize,
     end: usize,
+    active_alts: &[PreservedAltRange],
 ) -> Result<()> {
-    let raw_xml = xml
+    let source = xml
         .get(start..end)
-        .ok_or_else(|| OoxmlError::InvalidFormat("invalid Word body element range".to_string()))?
-        .to_string();
-    body.elements.push(match kind {
-        PreservedBodyKind::Paragraph => BodyElement::PreservedParagraph(raw_xml),
-        PreservedBodyKind::Table => BodyElement::PreservedTable(raw_xml),
-        PreservedBodyKind::SectionProperties => BodyElement::PreservedSectionProperties(raw_xml),
-        PreservedBodyKind::AltChunk => {
-            let namespace_pairs = [
-                (
-                    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
-                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-                ),
-                (
-                    "http://purl.oclc.org/ooxml/wordprocessingml/main",
-                    "http://purl.oclc.org/ooxml/officeDocument/relationships",
-                ),
-            ];
-            let parsed = namespace_pairs
-                .into_iter()
-                .find_map(|(word, relationship)| {
-                    let wrapped = format!(
-                        r#"<root xmlns:w="{word}" xmlns:r="{relationship}">{raw_xml}</root>"#
-                    );
-                    let mut chunks = scan_alt_chunks(wrapped.as_bytes()).ok()?;
-                    (chunks.len() == 1).then(|| chunks.pop_first().expect("length checked").1)
-                });
-            BodyElement::PreservedAltChunk(
-                raw_xml,
-                parsed.ok_or_else(|| {
+        .ok_or_else(|| OoxmlError::InvalidFormat("invalid Word body element range".to_string()))?;
+    match kind {
+        PreservedBodyKind::Paragraph => body
+            .elements
+            .push(BodyElement::PreservedParagraph(source.to_string())),
+        PreservedBodyKind::Table => body
+            .elements
+            .push(BodyElement::PreservedTable(source.to_string())),
+        PreservedBodyKind::SectionProperties => body
+            .elements
+            .push(BodyElement::PreservedSectionProperties(source.to_string())),
+        PreservedBodyKind::Alt => {
+            let anchor = active_alts
+                .iter()
+                .find(|anchor| anchor.start == start && anchor.end == end)
+                .ok_or_else(|| {
                     OoxmlError::InvalidFormat(
-                        "direct altChunk body child did not parse as one anchor".to_string(),
+                        "direct altChunk body child is not MCE-active".to_string(),
                     )
-                })?,
-            )
+                })?;
+            body.elements.push(BodyElement::PreservedAlt(
+                source.to_string(),
+                anchor.chunk.clone(),
+            ));
         },
-        PreservedBodyKind::Other => BodyElement::PreservedOther(raw_xml),
-    });
+        PreservedBodyKind::Other => {
+            let mut cursor = start;
+            for anchor in active_alts
+                .iter()
+                .filter(|anchor| anchor.start >= start && anchor.end <= end)
+            {
+                let prefix = xml.get(cursor..anchor.start).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("active altChunk prefix range is invalid".to_string())
+                })?;
+                if !prefix.is_empty() {
+                    body.elements
+                        .push(BodyElement::PreservedOther(prefix.to_string()));
+                }
+                let raw = xml.get(anchor.start..anchor.end).ok_or_else(|| {
+                    OoxmlError::InvalidFormat("active altChunk range is invalid".to_string())
+                })?;
+                body.elements.push(BodyElement::PreservedAlt(
+                    raw.to_string(),
+                    anchor.chunk.clone(),
+                ));
+                cursor = anchor.end;
+            }
+            let suffix = xml.get(cursor..end).ok_or_else(|| {
+                OoxmlError::InvalidFormat("active altChunk suffix range is invalid".to_string())
+            })?;
+            if !suffix.is_empty() {
+                body.elements
+                    .push(BodyElement::PreservedOther(suffix.to_string()));
+            }
+        },
+    }
     Ok(())
 }
 
@@ -2965,7 +3035,7 @@ pub(crate) enum BodyElement {
     PreservedParagraph(String),
     PreservedTable(String),
     PreservedSectionProperties(String),
-    PreservedAltChunk(String, AltChunk),
+    PreservedAlt(String, Chunk),
     PreservedOther(String),
 }
 

@@ -30,7 +30,9 @@ async fn sum_a1(workbook: &impl WorkbookTrait) -> litchi_core::sheet::Result<()>
 - `FormulaEvaluator::evaluate_cell` and `evaluate_sheet` for per-cell or whole-sheet evaluation.
 - Defined names and Excel-style structured table references via `define_name`, `define_name_local`, `define_table`.
 - Circular-reference detection and result caching.
-- Optional `web_functions` feature gates network-bound functions (uses `reqwest`).
+- Optional `web_functions` support remains network-inert until the caller attaches
+  a runtime-neutral `Fetch` implementation with `FormulaEvaluator::with_fetch`.
+  The caller chooses the executor, HTTP stack, response limits, and network policy.
 
 ## License
 

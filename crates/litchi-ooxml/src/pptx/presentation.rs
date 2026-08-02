@@ -13,8 +13,6 @@ use crate::pptx::parts::{
 };
 use crate::pptx::show_events::{PptxSlideShowEvent, ShowEventLoadLimits, load_slide_show_events};
 use crate::pptx::slide::{Slide, SlideMaster};
-use crate::pptx::tags::{SlideTagList, TagList};
-/// Main presentation object - the high-level API for working with presentations.
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
@@ -22,6 +20,8 @@ use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::packuri::PackURI;
 use litchi_opc::part::Part;
+/// Main presentation object - the high-level API for working with presentations.
+use litchi_pptx::tag::{List as TagList, Source as TagSource};
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -154,7 +154,7 @@ impl PptxChart {
 pub struct PptxTagList {
     slide_index: usize,
     tag_list_index: usize,
-    value: SlideTagList,
+    value: TagSource,
 }
 
 impl PptxTagList {
@@ -164,7 +164,9 @@ impl PptxTagList {
         self.slide_index
     }
 
-    /// Return the zero-based source-order index of this tag-list on its slide.
+    /// Return the zero-based stable relationship-ID-order index on its slide.
+    ///
+    /// OPC relationship storage does not retain XML source order.
     #[inline]
     pub fn tag_list_index(&self) -> usize {
         self.tag_list_index
@@ -173,24 +175,24 @@ impl PptxTagList {
     /// Return the relationship ID from the owning slide to this tag-list part.
     #[inline]
     pub fn relationship_id(&self) -> &str {
-        self.value.relationship_id()
+        self.value.rel()
     }
 
     /// Return the absolute OPC part name of this tag-list part.
     #[inline]
     pub fn part_name(&self) -> &str {
-        self.value.part_name()
+        self.value.part().as_str()
     }
 
     /// Return the parsed inert programmable tags.
     #[inline]
     pub fn tag_list(&self) -> &TagList {
-        self.value.tag_list()
+        self.value.list()
     }
 
-    /// Return the underlying slide-scoped tag-list value.
+    /// Return the underlying slide-scoped source descriptor.
     #[inline]
-    pub fn as_slide_tag_list(&self) -> &SlideTagList {
+    pub fn source(&self) -> &TagSource {
         &self.value
     }
 }
@@ -1105,6 +1107,10 @@ impl<'a> Presentation<'a> {
     }
 
     /// Discover programmable tag-list parts reachable from presentation slides.
+    ///
+    /// Slides retain presentation order; lists within each slide use stable
+    /// ascending relationship-ID order because OPC storage does not retain the
+    /// source `.rels` element order.
     ///
     /// Tag names and values remain inert document strings. This never follows
     /// values as paths or relationships, evaluates markup, or executes commands.

@@ -7,6 +7,7 @@
 
 mod error;
 
+pub mod alt;
 pub mod font;
 
 pub use error::{Error, Result};

@@ -120,7 +120,6 @@ mod workbook;
 /// Worksheet parsing implementation
 mod worksheet;
 
-mod calculation;
 /// Cell value parsing and representation
 mod cell;
 
@@ -190,7 +189,6 @@ pub(crate) mod drawing_write;
 pub mod formula;
 pub mod web_extension_bindings;
 
-pub use calculation::{CalculationMode, CalculationProperties};
 pub use cell::XlsbCell;
 pub use chartsheet::{
     XlsbChartSheet, XlsbChartSheetColor, XlsbChartSheetColorType, XlsbChartSheetPageSetup,
