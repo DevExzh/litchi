@@ -349,6 +349,30 @@ pub struct Slot {
     dirty: bool,
 }
 
+/// A package-staged properties edit tied to its originating slot.
+///
+/// Dropping this guard keeps the slot dirty. Consuming it through
+/// [`Stage::commit`] is the only way to clear the edit intent.
+#[doc(hidden)]
+#[must_use = "commit only after the staged package has been published, or drop to retry"]
+pub struct Stage<'a> {
+    slot: &'a mut Slot,
+    changed: bool,
+}
+
+impl Stage<'_> {
+    /// Reports whether staging changed package bytes or graph state.
+    #[must_use]
+    pub fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// Marks the originating slot clean after successful publication.
+    pub fn commit(self) {
+        self.slot.dirty = false;
+    }
+}
+
 impl Slot {
     /// Reads and validates the package graph while retaining absence exactly.
     pub fn load(package: &OpcPackage) -> Result<Self> {
@@ -389,19 +413,38 @@ impl Slot {
     /// A failed flush leaves the slot dirty so the caller can repair the value
     /// and retry. A byte-identical write is a true no-op.
     pub fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
+        let staged = self.stage(package)?;
+        let changed = staged.changed();
+        staged.commit();
+        Ok(changed)
+    }
+
+    /// Applies this slot to a staging package without clearing edit intent.
+    ///
+    /// Hosts use this before a fallible publication step and call
+    /// [`Stage::commit`] only after publication succeeds. The returned guard
+    /// is tied to this exact slot, so another slot cannot be committed by
+    /// mistake.
+    pub fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
         if !self.dirty {
-            return Ok(false);
+            return Ok(Stage {
+                slot: self,
+                changed: false,
+            });
         }
         let changed = match self.props.as_ref() {
             Some(props) => write::sync(package, props)?,
             None => clear(package)?,
         };
-        self.dirty = false;
-        Ok(changed)
+        Ok(Stage {
+            slot: self,
+            changed,
+        })
     }
 
-    #[cfg(test)]
-    fn is_dirty(&self) -> bool {
+    /// Returns whether the host must flush this slot before publication.
+    #[must_use]
+    pub fn is_dirty(&self) -> bool {
         self.dirty
     }
 }
@@ -450,5 +493,13 @@ mod tests {
         slot.put(Props::new());
         assert!(slot.is_dirty());
         assert!(slot.get_mut().is_some());
+
+        let mut staged = OpcPackage::new();
+        let pending = slot.stage(&mut staged).expect("stage");
+        assert!(pending.changed());
+        drop(pending);
+        assert!(slot.is_dirty());
+        slot.stage(&mut staged).expect("restage").commit();
+        assert!(!slot.is_dirty());
     }
 }

@@ -2568,15 +2568,11 @@ impl Workbook {
             }
         }
 
-        // Flush only an explicitly edited core-properties slot.
-        self.properties
-            .flush(&mut self.package)
-            .map_err(crate::error::OoxmlError::from)?;
-
-        // Update app properties (extended properties)
-        self.update_app_properties()?;
-
         let staged = self.stage_worksheet_mutations()?;
+        if !should_update && !self.properties.is_dirty() && staged.is_empty() {
+            return write(&self.package);
+        }
+
         let mut originals = Vec::new();
         originals
             .try_reserve_exact(staged.len())
@@ -2584,23 +2580,47 @@ impl Workbook {
                 resource: "worksheet restoration plan",
                 source,
             })?;
-        for (uri, original, replacement) in staged {
-            self.package.get_part_mut(&uri)?.set_blob(replacement);
-            originals.push((uri, original));
-        }
-        let save_result = write(&self.package);
-        let mut restore_error = None;
-        for (uri, original) in originals {
-            match self.package.get_part_mut(&uri) {
-                Ok(part) => part.set_blob_shared(original),
-                Err(error) if restore_error.is_none() => restore_error = Some(error),
-                Err(_) => {},
+
+        // The late save phase is transactional. Cloning the OPC graph shares
+        // built-in immutable part payloads through `Arc`; custom `Part`
+        // implementations retain their own clone policy. A failed sink leaves
+        // both the package and the dirty properties slot ready for a retry.
+        let package_before = self.package.clone();
+        let result = (|| {
+            // Extended properties describe the materialized writer model.
+            // Metadata-only and worksheet-overlay saves must retain an
+            // opened producer's app-properties bytes exactly.
+            if should_update {
+                self.update_app_properties()?;
             }
+
+            // Stage only an explicitly edited core-properties slot. The
+            // guard keeps edit intent dirty until publication succeeds.
+            let staged_properties = self
+                .properties
+                .stage(&mut self.package)
+                .map_err(crate::error::OoxmlError::from)?;
+
+            for (uri, original, replacement) in staged {
+                self.package.get_part_mut(&uri)?.set_blob(replacement);
+                originals.push((uri, original));
+            }
+
+            let value = write(&self.package)?;
+            for (uri, original) in originals {
+                self.package.get_part_mut(&uri)?.set_blob_shared(original);
+            }
+            staged_properties.commit();
+            Ok(value)
+        })();
+
+        match result {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                self.package = package_before;
+                Err(error)
+            },
         }
-        if let Some(error) = restore_error {
-            return Err(error.into());
-        }
-        save_result
     }
 
     #[allow(clippy::type_complexity)]
@@ -4477,7 +4497,7 @@ mod tests {
     use litchi_ooxml_common::embedded::{Kind, Target};
     use litchi_ooxml_common::web;
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-    use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+    use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part};
     use litchi_xlsx::web::{Binding as SheetBinding, Bindings};
 
     use crate::xlsx::{
@@ -4496,6 +4516,100 @@ mod tests {
     <definedName name="_xlnm.Print_Titles" localSheetId="0">Sales!$1:$2,Sales!$A:$B</definedName>
   </definedNames>
 </workbook>"#;
+
+    #[test]
+    fn unchanged_late_save_does_not_clone_part_payloads() {
+        let mut created = Workbook::create().unwrap();
+        let initial = created
+            .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
+            .unwrap();
+        let mut workbook = Workbook::new(OpcPackage::from_bytes(&initial).unwrap()).unwrap();
+        let core = PackURI::new("/docProps/core.xml").unwrap();
+        let payload = workbook.package.get_part(&core).unwrap().blob_arc();
+        let owners_before = std::sync::Arc::strong_count(&payload);
+
+        workbook
+            .write_with(|package| {
+                let observed = package.get_part(&core)?.blob_arc();
+                assert_eq!(std::sync::Arc::strong_count(&payload), owners_before + 1);
+                drop(observed);
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn late_save_failure_restores_package_and_keeps_properties_retryable() {
+        let mut created = Workbook::create().unwrap();
+        let initial = created
+            .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
+            .unwrap();
+        let mut workbook = Workbook::new(OpcPackage::from_bytes(&initial).unwrap()).unwrap();
+
+        let core = PackURI::new("/docProps/core.xml").unwrap();
+        let app = PackURI::new("/docProps/app.xml").unwrap();
+        let core_before = workbook.package.get_part(&core).unwrap().blob_arc();
+        let app_before = workbook.package.get_part(&app).unwrap().blob_arc();
+        workbook.put_props(
+            litchi_ooxml_common::properties::Props::new().title("Retry after sink failure"),
+        );
+
+        let error = workbook
+            .write_with::<()>(|_| Err("injected late-save failure".into()))
+            .unwrap_err();
+        assert!(error.to_string().contains("injected late-save failure"));
+        assert!(std::sync::Arc::ptr_eq(
+            &core_before,
+            &workbook.package.get_part(&core).unwrap().blob_arc()
+        ));
+        assert!(std::sync::Arc::ptr_eq(
+            &app_before,
+            &workbook.package.get_part(&app).unwrap().blob_arc()
+        ));
+        assert_eq!(
+            workbook.props().and_then(|props| props.title.as_deref()),
+            Some("Retry after sink failure")
+        );
+
+        let output = workbook
+            .write_with(|package| Ok(PackageWriter::to_bytes(package)?))
+            .unwrap();
+        let reopened = Workbook::new(OpcPackage::from_bytes(&output).unwrap()).unwrap();
+        assert_eq!(
+            reopened.props().and_then(|props| props.title.as_deref()),
+            Some("Retry after sink failure")
+        );
+        assert!(std::sync::Arc::ptr_eq(
+            &app_before,
+            &workbook.package.get_part(&app).unwrap().blob_arc()
+        ));
+    }
+
+    #[test]
+    fn invalid_late_save_is_failure_atomic_and_does_not_call_sink() {
+        let mut workbook = Workbook::create().unwrap();
+        workbook.props_mut().unwrap().title = Some("forbidden\0text".to_owned());
+        let core = PackURI::new("/docProps/core.xml").unwrap();
+        let core_before = workbook.package.get_part(&core).unwrap().blob_arc();
+        let sink_called = std::cell::Cell::new(false);
+
+        assert!(
+            workbook
+                .write_with(|_| {
+                    sink_called.set(true);
+                    Ok(())
+                })
+                .is_err()
+        );
+        assert!(!sink_called.get());
+        assert!(std::sync::Arc::ptr_eq(
+            &core_before,
+            &workbook.package.get_part(&core).unwrap().blob_arc()
+        ));
+
+        workbook.props_mut().unwrap().title = Some("repaired".to_owned());
+        assert!(workbook.write_with(|_| Ok(())).is_ok());
+    }
 
     #[test]
     fn embedded_facade_inventories_real_workbook_relationships() {
