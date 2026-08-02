@@ -132,7 +132,7 @@ impl Workbook {
             DetectedFormat::Xlsx(opc_package) => {
                 // OPC package already parsed - reuse it!
                 let metadata =
-                    crate::ooxml::metadata::extract_metadata(&opc_package).unwrap_or_default();
+                    litchi_ooxml_common::properties::read(&opc_package).unwrap_or_default();
 
                 let xlsx = crate::ooxml::xlsx::Workbook::new(opc_package)?;
                 (WorkbookImpl::Xlsx(xlsx), metadata)
@@ -142,7 +142,7 @@ impl Workbook {
             DetectedFormat::Xlsb(opc_package) => {
                 // OPC package already parsed - reuse it!
                 let metadata =
-                    crate::ooxml::metadata::extract_metadata(&opc_package).unwrap_or_default();
+                    litchi_ooxml_common::properties::read(&opc_package).unwrap_or_default();
 
                 // Create XLSB workbook directly from the parsed OPC package
                 let xlsb = crate::ooxml::xlsb::XlsbWorkbook::from_opc_package(opc_package)

@@ -212,7 +212,7 @@ impl Document {
                 package.document().map_err(Error::from)?;
 
                 // Extract metadata from OOXML core properties
-                let metadata = crate::ooxml::metadata::extract_metadata(package.opc_package())
+                let metadata = litchi_ooxml_common::properties::read(package.opc_package())
                     .unwrap_or_else(|_| litchi_core::Metadata::default());
 
                 Ok(Self {

@@ -1,11 +1,12 @@
 //! Strict OPC core-properties metadata extraction.
 
-use crate::error::{OoxmlError, Result};
+use crate::{Error, Result};
 use chrono::{DateTime, Utc};
 use litchi_core::Metadata;
-use litchi_ooxml_common::xml::decode_xml_reference;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+
+use crate::xml::decode_xml_reference;
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -63,12 +64,12 @@ impl CoreProperty {
 ///
 /// Absence is valid and returns empty metadata. A present relationship or part
 /// that violates OPC M4.1-M4.5 fails closed.
-pub fn extract_metadata(package: &OpcPackage) -> Result<Metadata> {
+pub fn read(package: &OpcPackage) -> Result<Metadata> {
     let Some(core_part) = find_core_properties_part(package)? else {
         return Ok(Metadata::default());
     };
     let xml = std::str::from_utf8(core_part.blob())
-        .map_err(|error| OoxmlError::Xml(format!("invalid UTF-8 in core properties: {error}")))?;
+        .map_err(|error| Error::Xml(format!("invalid UTF-8 in core properties: {error}")))?;
     parse_core_properties_xml(xml)
 }
 
@@ -83,26 +84,26 @@ fn find_core_properties_part(package: &OpcPackage) -> Result<Option<&dyn litchi_
         return Ok(None);
     };
     if relationships.next().is_some() {
-        return Err(OoxmlError::InvalidRelationship(
+        return Err(Error::Relationship(
             "OPC M4.1 permits at most one core-properties relationship".to_string(),
         ));
     }
     if relationship.is_external() {
-        return Err(OoxmlError::InvalidRelationship(
+        return Err(Error::Relationship(
             "core-properties relationship has an external target".to_string(),
         ));
     }
-    let target = relationship.target_partname().map_err(OoxmlError::Opc)?;
+    let target = relationship.target_partname().map_err(Error::Opc)?;
     let part = package.get_part(&target).map_err(|_| {
-        OoxmlError::PartNotFound(format!(
+        Error::Missing(format!(
             "core-properties relationship target '{}' does not exist",
             target.as_str()
         ))
     })?;
     if part.content_type() != ct::OPC_CORE_PROPERTIES {
-        return Err(OoxmlError::InvalidContentType {
+        return Err(Error::ContentType {
             expected: ct::OPC_CORE_PROPERTIES.to_string(),
-            got: part.content_type().to_string(),
+            actual: part.content_type().to_string(),
         });
     }
     Ok(Some(part))
@@ -120,7 +121,7 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| OoxmlError::Xml(format!("core properties XML error: {error}")))?;
+            .map_err(|error| Error::Xml(format!("core properties XML error: {error}")))?;
         let namespace = bound_namespace(&namespace).map(<[u8]>::to_vec);
         let namespace = namespace.as_deref();
         let event = event.into_owned();
@@ -129,11 +130,19 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
         match event {
             Event::Start(element) if root_namespace.is_none() => {
                 validate_root(namespace, &element, &reader)?;
-                root_namespace = Some(namespace.expect("validated root namespace").to_vec());
+                root_namespace = Some(
+                    namespace
+                        .ok_or_else(|| Error::Invalid("coreProperties has no namespace".into()))?
+                        .to_vec(),
+                );
             },
             Event::Empty(element) if root_namespace.is_none() => {
                 validate_root(namespace, &element, &reader)?;
-                root_namespace = Some(namespace.expect("validated root namespace").to_vec());
+                root_namespace = Some(
+                    namespace
+                        .ok_or_else(|| Error::Invalid("coreProperties has no namespace".into()))?
+                        .to_vec(),
+                );
                 root_closed = true;
             },
             Event::Start(element) if !root_closed && active.is_none() => {
@@ -149,37 +158,41 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
                 apply_property(&mut metadata, property, String::new())?;
             },
             Event::Start(_) | Event::Empty(_) if active.is_some() => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "core property values must not contain child elements".to_string(),
                 ));
             },
             Event::Start(_) | Event::Empty(_) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "coreProperties must be the only document element".to_string(),
                 ));
             },
             Event::Text(value) => {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    .map_err(|error| Error::Xml(error.to_string()))?;
                 let decoded = quick_xml::escape::unescape(&decoded)
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    .map_err(|error| Error::Xml(error.to_string()))?;
                 push_property_text(&mut active, &decoded)?;
             },
             Event::CData(value) => {
                 let decoded = value
                     .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+                    .map_err(|error| Error::Xml(error.to_string()))?;
                 push_property_text(&mut active, &decoded)?;
             },
             Event::GeneralRef(reference) => {
                 push_property_text(&mut active, &decode_xml_reference(&reference)?)?;
             },
             Event::End(element) if active.is_some() => {
-                let (property, value) = active.take().expect("checked active property");
+                let Some((property, value)) = active.take() else {
+                    return Err(Error::Invalid(
+                        "core property closing element has no active property".into(),
+                    ));
+                };
                 let expected = property_name(property);
                 if element.local_name().as_ref() != expected {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "malformed core property element nesting".to_string(),
                     ));
                 }
@@ -189,19 +202,19 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
                 if element.local_name().as_ref() != b"coreProperties"
                     || namespace != root_namespace.as_deref()
                 {
-                    return Err(OoxmlError::InvalidFormat(
+                    return Err(Error::Invalid(
                         "malformed coreProperties root element".to_string(),
                     ));
                 }
                 root_closed = true;
             },
             Event::End(_) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "unexpected element after coreProperties".to_string(),
                 ));
             },
             Event::DocType(_) => {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "DTD is not allowed in core properties".to_string(),
                 ));
             },
@@ -211,7 +224,7 @@ fn parse_core_properties_xml(xml: &str) -> Result<Metadata> {
         buffer.clear();
     }
     if root_namespace.is_none() || !root_closed || active.is_some() {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "unterminated or missing coreProperties root element".to_string(),
         ));
     }
@@ -229,7 +242,7 @@ fn validate_root(
             Some(CORE_PROPERTIES_NAMESPACE | STRICT_CORE_PROPERTIES_NAMESPACE)
         )
     {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "expected coreProperties in the OPC core-properties namespace".to_string(),
         ));
     }
@@ -271,12 +284,12 @@ fn parse_property(namespace: Option<&[u8]>, local: &[u8]) -> Result<CoreProperty
             CoreProperty::LastPrinted
         },
         (Some(DUBLIN_CORE_TERMS_NAMESPACE), _) => {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "OPC M4.3 permits only dcterms:created and dcterms:modified".to_string(),
             ));
         },
         _ => {
-            return Err(OoxmlError::InvalidFormat(format!(
+            return Err(Error::Invalid(format!(
                 "unexpected core property element '{}'",
                 String::from_utf8_lossy(local)
             )));
@@ -300,16 +313,15 @@ fn validate_attributes(
 ) -> Result<()> {
     let mut has_w3cdtf = false;
     for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| {
-            OoxmlError::Xml(format!("invalid core property attribute: {error}"))
-        })?;
+        let attribute = attribute
+            .map_err(|error| Error::Xml(format!("invalid core property attribute: {error}")))?;
         let raw_key = attribute.key.as_ref();
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| OoxmlError::Xml(error.to_string()))?;
+            .map_err(|error| Error::Xml(error.to_string()))?;
         if matches!(raw_key, b"xmlns") || raw_key.starts_with(b"xmlns:") {
             if value.as_bytes() == MARKUP_COMPATIBILITY_NAMESPACE {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "OPC M4.2 forbids the Markup Compatibility namespace".to_string(),
                 ));
             }
@@ -319,18 +331,18 @@ fn validate_attributes(
         let namespace = bound_namespace(&namespace);
         reject_markup_compatibility(namespace)?;
         if namespace == Some(XML_NAMESPACE) && local.as_ref() == b"lang" {
-            return Err(OoxmlError::InvalidFormat(
+            return Err(Error::Invalid(
                 "OPC M4.4 forbids xml:lang in core properties".to_string(),
             ));
         }
         if namespace == Some(XSI_NAMESPACE) && local.as_ref() == b"type" {
             let Some(property) = property else {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "OPC M4.5 forbids xsi:type on coreProperties".to_string(),
                 ));
             };
             if !property.requires_w3cdtf() || has_w3cdtf {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "OPC M4.5 permits one xsi:type only on created or modified".to_string(),
                 ));
             }
@@ -339,20 +351,20 @@ fn validate_attributes(
             if bound_namespace(&value_namespace) != Some(DUBLIN_CORE_TERMS_NAMESPACE)
                 || value_local.as_ref() != b"W3CDTF"
             {
-                return Err(OoxmlError::InvalidFormat(
+                return Err(Error::Invalid(
                     "OPC M4.5 requires xsi:type=\"dcterms:W3CDTF\"".to_string(),
                 ));
             }
             has_w3cdtf = true;
             continue;
         }
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "attribute '{}' is not allowed on core properties",
             String::from_utf8_lossy(raw_key)
         )));
     }
     if property.is_some_and(CoreProperty::requires_w3cdtf) && !has_w3cdtf {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "OPC M4.5 requires xsi:type on created and modified".to_string(),
         ));
     }
@@ -361,7 +373,7 @@ fn validate_attributes(
 
 fn reject_markup_compatibility(namespace: Option<&[u8]>) -> Result<()> {
     if namespace == Some(MARKUP_COMPATIBILITY_NAMESPACE) {
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "OPC M4.2 forbids the Markup Compatibility namespace".to_string(),
         ));
     }
@@ -370,7 +382,7 @@ fn reject_markup_compatibility(namespace: Option<&[u8]>) -> Result<()> {
 
 fn mark_seen(seen: &mut [bool; CoreProperty::COUNT], property: CoreProperty) -> Result<()> {
     if std::mem::replace(&mut seen[property.index()], true) {
-        return Err(OoxmlError::InvalidFormat(format!(
+        return Err(Error::Invalid(format!(
             "duplicate core property '{}'",
             String::from_utf8_lossy(property_name(property))
         )));
@@ -383,18 +395,21 @@ fn push_property_text(active: &mut Option<(CoreProperty, String)>, value: &str) 
         if value.trim().is_empty() {
             return Ok(());
         }
-        return Err(OoxmlError::InvalidFormat(
+        return Err(Error::Invalid(
             "non-whitespace text outside a core property".to_string(),
         ));
     };
-    let length = text
-        .len()
-        .checked_add(value.len())
-        .ok_or_else(|| OoxmlError::InvalidFormat("core property is too large".to_string()))?;
+    let length = text.len().checked_add(value.len()).ok_or(Error::Limit {
+        resource: "core property text bytes",
+        max: MAX_PROPERTY_TEXT,
+        actual: usize::MAX,
+    })?;
     if length > MAX_PROPERTY_TEXT {
-        return Err(OoxmlError::InvalidFormat(
-            "core property exceeds the text safety limit".to_string(),
-        ));
+        return Err(Error::Limit {
+            resource: "core property text bytes",
+            max: MAX_PROPERTY_TEXT,
+            actual: length,
+        });
     }
     text.push_str(value);
     Ok(())
@@ -411,9 +426,10 @@ fn apply_property(metadata: &mut Metadata, property: CoreProperty, value: String
         CoreProperty::Language => metadata.language = Some(value),
         CoreProperty::LastModifiedBy => metadata.last_modified_by = Some(value),
         CoreProperty::Revision => {
-            value.trim().parse::<u32>().map_err(|_| {
-                OoxmlError::InvalidFormat(format!("invalid core revision '{value}'"))
-            })?;
+            value
+                .trim()
+                .parse::<u32>()
+                .map_err(|_| Error::Invalid(format!("invalid core revision '{value}'")))?;
             metadata.revision = Some(value);
         },
         CoreProperty::Category => metadata.category = Some(value),
@@ -464,7 +480,7 @@ fn parse_datetime(value: &str) -> Result<DateTime<Utc>> {
     if let Ok(datetime) = chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f") {
         return Ok(DateTime::from_naive_utc_and_offset(datetime, Utc));
     }
-    Err(OoxmlError::InvalidFormat(format!(
+    Err(Error::Invalid(format!(
         "invalid core property datetime '{value}'"
     )))
 }
@@ -472,8 +488,8 @@ fn parse_datetime(value: &str) -> Result<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::DocumentProperties;
     use chrono::{Datelike, Timelike};
-    use litchi_ooxml_common::DocumentProperties;
     use litchi_opc::{PackURI, part::BlobPart};
 
     fn package_with_core(path: &str, content_type: &str, xml: &[u8]) -> OpcPackage {
@@ -504,29 +520,26 @@ mod tests {
             ct::OPC_CORE_PROPERTIES.to_string(),
             decoy.to_vec(),
         )));
-        assert_eq!(
-            extract_metadata(&package).unwrap().title.as_deref(),
-            Some("Target")
-        );
-        assert!(!extract_metadata(&OpcPackage::new()).unwrap().has_data());
+        assert_eq!(read(&package).unwrap().title.as_deref(), Some("Target"));
+        assert!(!read(&OpcPackage::new()).unwrap().has_data());
     }
 
     #[test]
     fn rejects_external_dangling_and_wrong_content_type_relationships() {
         let mut external = OpcPackage::new();
         external.relate_to_external("https://example.test/core.xml", rt::CORE_PROPERTIES);
-        assert!(extract_metadata(&external).is_err());
+        assert!(matches!(read(&external), Err(Error::Relationship(_))));
 
         let mut dangling = OpcPackage::new();
         dangling.relate_to("missing.xml", rt::CORE_PROPERTIES);
-        assert!(extract_metadata(&dangling).is_err());
+        assert!(matches!(read(&dangling), Err(Error::Missing(_))));
 
         let wrong = package_with_core(
             "/core.xml",
             ct::WML_DOCUMENT,
             br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
         );
-        assert!(extract_metadata(&wrong).is_err());
+        assert!(matches!(read(&wrong), Err(Error::ContentType { .. })));
     }
 
     #[test]
@@ -581,17 +594,32 @@ mod tests {
         assert!(parse_core_properties_xml(bad_revision).is_err());
         assert!(parse_core_properties_xml("<!DOCTYPE x><x/>").is_err());
         let package = poi_package("CorePropertiesHasEntities.ooxml");
-        assert!(extract_metadata(&package).is_err());
+        assert!(read(&package).is_err());
+    }
+
+    #[test]
+    fn rejects_property_text_beyond_the_declared_budget() {
+        let value = "x".repeat(MAX_PROPERTY_TEXT + 1);
+        let xml = format!(
+            r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>{value}</dc:title></cp:coreProperties>"#
+        );
+        assert!(matches!(
+            parse_core_properties_xml(&xml),
+            Err(Error::Limit {
+                resource: "core property text bytes",
+                max: MAX_PROPERTY_TEXT,
+                actual,
+            }) if actual == MAX_PROPERTY_TEXT + 1
+        ));
     }
 
     #[test]
     fn matches_poi_success_timezone_and_m4_conformance_fixtures() {
-        let success =
-            extract_metadata(&poi_package("OPCCompliance_CoreProperties_SUCCESS.docx")).unwrap();
+        let success = read(&poi_package("OPCCompliance_CoreProperties_SUCCESS.docx")).unwrap();
         assert_eq!(success.title.as_deref(), Some("MyTitle"));
         assert_eq!(success.revision.as_deref(), Some("2"));
 
-        let timezone = extract_metadata(&poi_package(
+        let timezone = read(&poi_package(
             "OPCCompliance_CoreProperties_AlternateTimezones.docx",
         ))
         .unwrap();
@@ -605,16 +633,13 @@ mod tests {
             "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx",
             "OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx",
         ] {
-            assert!(
-                extract_metadata(&poi_package(name)).is_err(),
-                "accepted {name}"
-            );
+            assert!(read(&poi_package(name)).is_err(), "accepted {name}");
         }
     }
 
     #[test]
     fn poi_no_core_is_empty_and_multiple_relationships_fail_during_package_load() {
-        let empty = extract_metadata(&poi_package("OPCCompliance_NoCoreProperties.xlsx")).unwrap();
+        let empty = read(&poi_package("OPCCompliance_NoCoreProperties.xlsx")).unwrap();
         assert!(!empty.has_data());
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
             "../../test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",

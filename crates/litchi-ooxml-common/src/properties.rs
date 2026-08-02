@@ -3,6 +3,10 @@
 //! This module provides document metadata properties that are shared across
 //! DOCX, XLSX, and PPTX formats.
 
+mod read;
+
+pub use read::read;
+
 use chrono::{DateTime, Utc};
 use litchi_core::xml::escape_xml;
 

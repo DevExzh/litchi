@@ -150,10 +150,9 @@ impl Presentation {
                 );
 
                 // Extract metadata from OOXML package before transferring ownership
-                let cached_metadata =
-                    crate::ooxml::metadata::extract_metadata(package.opc_package())
-                        .ok()
-                        .filter(|metadata| metadata.has_data());
+                let cached_metadata = litchi_ooxml_common::properties::read(package.opc_package())
+                    .ok()
+                    .filter(|metadata| metadata.has_data());
                 Ok(Self {
                     inner: PresentationImpl::Pptx(package),
                     cached_metadata,

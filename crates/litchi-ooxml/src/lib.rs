@@ -37,7 +37,6 @@
 pub mod api;
 pub mod docx;
 pub mod error;
-pub mod metadata;
 // OPC implementation lives in the focused litchi-opc crate.
 pub mod opc {
     pub use litchi_opc::*;
