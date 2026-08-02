@@ -41,7 +41,7 @@ fn typed_body_group_round_trips_at_unicode_boundary() {
         Cow::Borrowed("wzName"),
         Cow::Borrowed("body group"),
     ));
-    group.add_shape(Shape::new(ShapeType::Rectangle));
+    group.add_shape(Shape::new(ShapeType::Rectangle)).unwrap();
     document.push_shape_group(group).unwrap();
     let reparsed = RtfDocument::parse(&write_document(&document)).unwrap();
     assert_eq!(reparsed.text(), "A你B");
@@ -83,7 +83,8 @@ fn header_footer_api_validates_utf8_positions_and_nested_position_abuse() {
     let mut nested = ShapeGroup::new();
     nested.position = 1;
     let mut root = ShapeGroup::new();
-    root.add_group(nested);
+    root.groups.push(nested);
+    root.child_order.push(litchi_rtf::ShapeGroupChild::Group(0));
     assert!(header.push_shape_group(root).is_err());
 
     let mut valid = ShapeGroup::new();

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use litchi_rtf::{
-    RtfDocument, RtfWriter, Shape, ShapeGeometry, ShapeGroup, ShapeGroupInfo,
+    RtfDocument, RtfWriter, Shape, ShapeGeometry, ShapeGroup, ShapeGroupChild, ShapeGroupInfo,
     ShapeHorizontalAnchor, ShapeProperty, ShapeRotationDegrees, ShapeTwips, ShapeType,
     ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing,
 };
@@ -23,6 +23,13 @@ fn named(name: &'static str, id: i32) -> Shape<'static> {
         Cow::Borrowed(name),
     ));
     shape
+}
+
+fn named_group(name: &'static str, id: i32) -> ShapeGroup<'static> {
+    let mut group = ShapeGroup::new();
+    group.name = Cow::Borrowed(name);
+    group.add_shape(named(name, id)).unwrap();
+    group
 }
 
 #[test]
@@ -93,8 +100,8 @@ fn typed_units_anchors_and_nested_group_mutation_round_trip() {
         ShapeGroupInfo::wrap(ShapeWrapStyle::Tight),
         ShapeGroupInfo::wrap_side(ShapeWrapSide::Right),
     ]);
-    root.add_shape(named("one", 1));
-    root.add_shape(named("two", 2));
+    assert_eq!(root.add_shape(named("one", 1)).unwrap(), 0);
+    assert_eq!(root.add_shape(named("two", 2)).unwrap(), 1);
     root.move_child(1, 0).unwrap();
     root.replace_shape(0, named("replacement", 3)).unwrap();
     root.remove_shape(1).unwrap();
@@ -164,9 +171,79 @@ fn reorder_across_body_anchors_and_invalid_group_indices_roll_back() {
     assert_eq!(document.drawing_order(), before);
 
     let mut group = ShapeGroup::new();
-    group.add_shape(named("only", 7));
+    group.add_shape(named("only", 7)).unwrap();
     let before = group.clone();
     assert!(group.remove_shape(9).is_err());
     assert!(group.move_child(0, 9).is_err());
     assert_eq!(group, before);
+}
+
+#[test]
+fn group_additions_reject_invalid_children_without_mutation() {
+    let mut root = ShapeGroup::new();
+    assert_eq!(root.add_shape(named("valid", 1)).unwrap(), 0);
+    let before = root.clone();
+
+    let mut relocated_shape = named("relocated", 2);
+    relocated_shape.position = 1;
+    assert!(root.add_shape(relocated_shape).is_err());
+    assert_eq!(root, before);
+
+    let mut relocated_group = named_group("nested", 3);
+    relocated_group.position = 1;
+    assert!(root.add_group(relocated_group).is_err());
+    assert_eq!(root, before);
+}
+
+#[test]
+fn nested_group_replace_remove_and_index_repair_are_atomic() {
+    let mut root = ShapeGroup::new();
+    assert_eq!(root.add_group(named_group("first", 1)).unwrap(), 0);
+    assert_eq!(root.add_shape(named("standalone", 2)).unwrap(), 0);
+    assert_eq!(root.add_group(named_group("second", 3)).unwrap(), 1);
+    assert_eq!(
+        root.child_order(),
+        &[
+            ShapeGroupChild::Group(0),
+            ShapeGroupChild::Shape(0),
+            ShapeGroupChild::Group(1),
+        ]
+    );
+
+    let before = root.clone();
+    let mut invalid = named_group("invalid", 4);
+    invalid.position = 1;
+    assert!(root.replace_group(0, invalid).is_err());
+    assert_eq!(root, before);
+
+    let replaced = root
+        .replace_group(0, named_group("replacement", 4))
+        .unwrap();
+    assert_eq!(replaced.name, "first");
+    let removed = root.remove_group(0).unwrap();
+    assert_eq!(removed.name, "replacement");
+    assert_eq!(
+        root.child_order(),
+        &[ShapeGroupChild::Shape(0), ShapeGroupChild::Group(0)]
+    );
+    assert_eq!(root.groups()[0].name, "second");
+    root.validate().unwrap();
+}
+
+#[test]
+fn malformed_child_and_story_indices_return_errors() {
+    let mut group = ShapeGroup::new();
+    group.shapes.push(named("orphan", 1));
+    group.child_order.push(ShapeGroupChild::Shape(usize::MAX));
+    assert!(group.validate().is_err());
+    let before = group.clone();
+    assert!(group.remove_shape(0).is_err());
+    assert_eq!(group, before);
+
+    let mut text_box = Shape::text_box(Cow::Borrowed(""));
+    text_box.text_shapes.push(named("story", 2));
+    text_box
+        .text_drawing_order
+        .push(StoryDrawing::Shape(usize::MAX));
+    assert!(text_box.validate().is_err());
 }

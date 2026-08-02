@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::indexing_slicing))]
+
 //! RTF shape and drawing object support.
 //!
 //! This module provides support for shapes, text boxes, and drawing objects
@@ -6,6 +8,11 @@
 use super::border::Border;
 use super::types::Formatting;
 use std::borrow::Cow;
+
+const MAX_SHAPES_PER_GROUP: usize = 65_536;
+const MAX_GROUPS_PER_GROUP: usize = 16_384;
+const MAX_SHAPE_GROUP_CHILDREN: usize = 65_536;
+const MAX_SHAPE_NESTING_DEPTH: usize = 64;
 
 /// Raw 32-bit OfficeArt color value used by RTF shape properties.
 ///
@@ -976,10 +983,12 @@ impl<'a> Shape<'a> {
             .iter()
             .rposition(|current| current.name == property.name)
         {
-            return Ok(Some(std::mem::replace(
-                &mut self.properties[index],
-                property,
-            )));
+            let current = self.properties.get_mut(index).ok_or_else(|| {
+                crate::RtfError::MalformedDocument(
+                    "RTF shape property index is out of bounds".to_string(),
+                )
+            })?;
+            return Ok(Some(std::mem::replace(current, property)));
         }
         if self.properties.len() >= 65_536 {
             return Err(crate::RtfError::MalformedDocument(
@@ -1005,7 +1014,7 @@ impl<'a> Shape<'a> {
     }
 
     pub(crate) fn validate_at_depth(&self, depth: usize) -> crate::RtfResult<()> {
-        if depth >= 64 {
+        if depth >= MAX_SHAPE_NESTING_DEPTH {
             return Err(crate::RtfError::MalformedDocument(
                 "RTF shape story nesting exceeds the safety limit".to_string(),
             ));
@@ -1266,20 +1275,42 @@ impl<'a> ShapeGroup<'a> {
         }
     }
 
-    /// Add a shape to the group
-    #[inline]
-    pub fn add_shape(&mut self, shape: Shape<'a>) {
-        self.child_order
-            .push(ShapeGroupChild::Shape(self.shapes.len()));
+    /// Append a validated shape and return its index in [`Self::shapes`].
+    pub fn add_shape(&mut self, shape: Shape<'a>) -> crate::RtfResult<usize> {
+        if self.shapes.len() >= MAX_SHAPES_PER_GROUP
+            || self.child_order.len() >= MAX_SHAPE_GROUP_CHILDREN
+        {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF shape group child count exceeds the safety limit".to_string(),
+            ));
+        }
+        validate_grouped_shape_at_depth(&shape, 1)?;
+        reserve_one(&mut self.shapes, "shape-group shapes")?;
+        reserve_one(&mut self.child_order, "shape-group child order")?;
+
+        let index = self.shapes.len();
         self.shapes.push(shape);
+        self.child_order.push(ShapeGroupChild::Shape(index));
+        Ok(index)
     }
 
-    /// Add a nested shape group.
-    #[inline]
-    pub fn add_group(&mut self, group: ShapeGroup<'a>) {
-        self.child_order
-            .push(ShapeGroupChild::Group(self.groups.len()));
+    /// Append a validated nested group and return its index in [`Self::groups`].
+    pub fn add_group(&mut self, group: ShapeGroup<'a>) -> crate::RtfResult<usize> {
+        if self.groups.len() >= MAX_GROUPS_PER_GROUP
+            || self.child_order.len() >= MAX_SHAPE_GROUP_CHILDREN
+        {
+            return Err(crate::RtfError::MalformedDocument(
+                "RTF shape group child count exceeds the safety limit".to_string(),
+            ));
+        }
+        validate_nested_group_at_depth(&group, 1)?;
+        reserve_one(&mut self.groups, "shape-group nested groups")?;
+        reserve_one(&mut self.child_order, "shape-group child order")?;
+
+        let index = self.groups.len();
         self.groups.push(group);
+        self.child_order.push(ShapeGroupChild::Group(index));
+        Ok(index)
     }
 
     /// Get all shapes in the group
@@ -1340,39 +1371,71 @@ impl<'a> ShapeGroup<'a> {
         index: usize,
         replacement: Shape<'a>,
     ) -> crate::RtfResult<Shape<'a>> {
-        if index >= self.shapes.len() {
-            return Err(crate::RtfError::MalformedDocument(format!(
-                "RTF grouped shape index {index} is out of bounds"
-            )));
+        if self.shapes.get(index).is_none() {
+            return Err(grouped_shape_index_error(index));
         }
-        let mut staged = self.clone();
-        let old = std::mem::replace(&mut staged.shapes[index], replacement);
-        staged.validate_at_depth(0, true)?;
-        *self = staged;
-        Ok(old)
+        self.validate()?;
+        validate_grouped_shape_at_depth(&replacement, 1)?;
+        let current = self
+            .shapes
+            .get_mut(index)
+            .ok_or_else(|| grouped_shape_index_error(index))?;
+        Ok(std::mem::replace(current, replacement))
     }
 
     /// Atomically remove a directly contained shape and repair child indices.
     pub fn remove_shape(&mut self, index: usize) -> crate::RtfResult<Shape<'a>> {
-        if index >= self.shapes.len() {
-            return Err(crate::RtfError::MalformedDocument(format!(
-                "RTF grouped shape index {index} is out of bounds"
-            )));
+        if self.shapes.get(index).is_none() {
+            return Err(grouped_shape_index_error(index));
         }
-        let mut staged = self.clone();
-        let old = staged.shapes.remove(index);
-        staged
-            .child_order
+        self.validate()?;
+        let old = self.shapes.remove(index);
+        self.child_order
             .retain(|child| !matches!(child, ShapeGroupChild::Shape(value) if *value == index));
-        for child in &mut staged.child_order {
+        for child in &mut self.child_order {
             if let ShapeGroupChild::Shape(value) = child
                 && *value > index
             {
                 *value -= 1;
             }
         }
-        staged.validate_at_depth(0, true)?;
-        *self = staged;
+        Ok(old)
+    }
+
+    /// Atomically replace a directly nested group.
+    pub fn replace_group(
+        &mut self,
+        index: usize,
+        replacement: ShapeGroup<'a>,
+    ) -> crate::RtfResult<ShapeGroup<'a>> {
+        if self.groups.get(index).is_none() {
+            return Err(nested_group_index_error(index));
+        }
+        self.validate()?;
+        validate_nested_group_at_depth(&replacement, 1)?;
+        let current = self
+            .groups
+            .get_mut(index)
+            .ok_or_else(|| nested_group_index_error(index))?;
+        Ok(std::mem::replace(current, replacement))
+    }
+
+    /// Atomically remove a directly nested group and repair child indices.
+    pub fn remove_group(&mut self, index: usize) -> crate::RtfResult<ShapeGroup<'a>> {
+        if self.groups.get(index).is_none() {
+            return Err(nested_group_index_error(index));
+        }
+        self.validate()?;
+        let old = self.groups.remove(index);
+        self.child_order
+            .retain(|child| !matches!(child, ShapeGroupChild::Group(value) if *value == index));
+        for child in &mut self.child_order {
+            if let ShapeGroupChild::Group(value) = child
+                && *value > index
+            {
+                *value -= 1;
+            }
+        }
         Ok(old)
     }
 
@@ -1386,11 +1449,9 @@ impl<'a> ShapeGroup<'a> {
         if from == to {
             return Ok(());
         }
-        let mut staged = self.clone();
-        let child = staged.child_order.remove(from);
-        staged.child_order.insert(to, child);
-        staged.validate_at_depth(0, true)?;
-        *self = staged;
+        self.validate()?;
+        let child = self.child_order.remove(from);
+        self.child_order.insert(to, child);
         Ok(())
     }
 
@@ -1431,14 +1492,14 @@ impl<'a> ShapeGroup<'a> {
     }
 
     pub(crate) fn validate_at_depth(&self, depth: usize, root: bool) -> crate::RtfResult<()> {
-        if depth >= 64 {
+        if depth >= MAX_SHAPE_NESTING_DEPTH {
             return Err(crate::RtfError::MalformedDocument(
                 "RTF shape group nesting exceeds the safety limit".to_string(),
             ));
         }
-        if self.shapes.len() > 65_536
-            || self.groups.len() > 16_384
-            || self.child_order.len() > 65_536
+        if self.shapes.len() > MAX_SHAPES_PER_GROUP
+            || self.groups.len() > MAX_GROUPS_PER_GROUP
+            || self.child_order.len() > MAX_SHAPE_GROUP_CHILDREN
             || self.info.len() > 32
             || self.properties.len() > 65_536
         {
@@ -1481,18 +1542,18 @@ impl<'a> ShapeGroup<'a> {
         let mut saw_shapes = vec![false; self.shapes.len()];
         let mut saw_groups = vec![false; self.groups.len()];
         for child in &self.child_order {
-            match *child {
-                ShapeGroupChild::Shape(index) if index < saw_shapes.len() && !saw_shapes[index] => {
-                    saw_shapes[index] = true;
+            let valid = match *child {
+                ShapeGroupChild::Shape(index) => {
+                    claim_ordered_item(&self.shapes, &mut saw_shapes, index).is_some()
                 },
-                ShapeGroupChild::Group(index) if index < saw_groups.len() && !saw_groups[index] => {
-                    saw_groups[index] = true;
+                ShapeGroupChild::Group(index) => {
+                    claim_ordered_item(&self.groups, &mut saw_groups, index).is_some()
                 },
-                _ => {
-                    return Err(crate::RtfError::MalformedDocument(
-                        "RTF shape group child order is invalid".to_string(),
-                    ));
-                },
+            };
+            if !valid {
+                return Err(crate::RtfError::MalformedDocument(
+                    "RTF shape group child order is invalid".to_string(),
+                ));
             }
         }
         if saw_shapes.iter().any(|seen| !seen) || saw_groups.iter().any(|seen| !seen) {
@@ -1500,46 +1561,79 @@ impl<'a> ShapeGroup<'a> {
                 "RTF shape group child order is incomplete".to_string(),
             ));
         }
+        let child_depth = depth.checked_add(1).ok_or_else(|| {
+            crate::RtfError::MalformedDocument(
+                "RTF shape group nesting exceeds the safety limit".to_string(),
+            )
+        })?;
         for shape in &self.shapes {
-            if shape.position != 0 {
-                return Err(crate::RtfError::MalformedDocument(
-                    "RTF grouped shape position must be zero".to_string(),
-                ));
-            }
-            if !shape.instruction_present {
-                return Err(crate::RtfError::MalformedDocument(
-                    "RTF grouped shape must contain shpinst".to_string(),
-                ));
-            }
-            if shape.result.is_some() {
-                return Err(crate::RtfError::MalformedDocument(
-                    "RTF grouped shape cannot contain shprslt".to_string(),
-                ));
-            }
-            if shape.properties.len() > 65_536 || shape.text.len() > 16 * 1_048_576 {
-                return Err(crate::RtfError::MalformedDocument(
-                    "RTF grouped shape exceeds the safety limit".to_string(),
-                ));
-            }
-            for property in &shape.properties {
-                property.validate()?;
-                if property.name.len().saturating_add(property.value.len()) > 1_048_576 {
-                    return Err(crate::RtfError::MalformedDocument(
-                        "RTF grouped shape property exceeds the safety limit".to_string(),
-                    ));
-                }
-            }
-            shape.validate_at_depth(depth + 1)?;
+            validate_grouped_shape_at_depth(shape, child_depth)?;
         }
         for group in &self.groups {
-            if group.position != 0 {
-                return Err(crate::RtfError::MalformedDocument(
-                    "RTF nested shape-group position must be zero".to_string(),
-                ));
-            }
-            group.validate_at_depth(depth + 1, false)?;
+            validate_nested_group_at_depth(group, child_depth)?;
         }
         Ok(())
+    }
+}
+
+fn grouped_shape_index_error(index: usize) -> crate::RtfError {
+    crate::RtfError::MalformedDocument(format!("RTF grouped shape index {index} is out of bounds"))
+}
+
+fn nested_group_index_error(index: usize) -> crate::RtfError {
+    crate::RtfError::MalformedDocument(format!(
+        "RTF nested shape-group index {index} is out of bounds"
+    ))
+}
+
+fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> crate::RtfResult<()> {
+    let requested = values
+        .len()
+        .saturating_add(1)
+        .saturating_mul(std::mem::size_of::<T>());
+    values
+        .try_reserve(1)
+        .map_err(|_| crate::RtfError::AllocationFailed {
+            resource,
+            requested,
+        })
+}
+
+fn validate_grouped_shape_at_depth(shape: &Shape<'_>, depth: usize) -> crate::RtfResult<()> {
+    if shape.position != 0 {
+        return Err(crate::RtfError::MalformedDocument(
+            "RTF grouped shape position must be zero".to_string(),
+        ));
+    }
+    if !shape.instruction_present {
+        return Err(crate::RtfError::MalformedDocument(
+            "RTF grouped shape must contain shpinst".to_string(),
+        ));
+    }
+    if shape.result.is_some() {
+        return Err(crate::RtfError::MalformedDocument(
+            "RTF grouped shape cannot contain shprslt".to_string(),
+        ));
+    }
+    shape.validate_at_depth(depth)
+}
+
+fn validate_nested_group_at_depth(group: &ShapeGroup<'_>, depth: usize) -> crate::RtfResult<()> {
+    if group.position != 0 {
+        return Err(crate::RtfError::MalformedDocument(
+            "RTF nested shape-group position must be zero".to_string(),
+        ));
+    }
+    group.validate_at_depth(depth, false)
+}
+
+fn claim_ordered_item<'a, T>(items: &'a [T], seen: &mut [bool], index: usize) -> Option<&'a T> {
+    let item = items.get(index)?;
+    let seen = seen.get_mut(index)?;
+    if std::mem::replace(seen, true) {
+        None
+    } else {
+        Some(item)
     }
 }
 
@@ -1561,9 +1655,9 @@ fn validate_story_drawings_at_depth(
     story: &str,
     depth: usize,
 ) -> crate::RtfResult<()> {
-    if depth >= 64
-        || shapes.len() > 65_536
-        || groups.len() > 16_384
+    if depth >= MAX_SHAPE_NESTING_DEPTH
+        || shapes.len() > MAX_SHAPES_PER_GROUP
+        || groups.len() > MAX_GROUPS_PER_GROUP
         || order.len() != shapes.len().saturating_add(groups.len())
     {
         return Err(crate::RtfError::MalformedDocument(format!(
@@ -1587,20 +1681,16 @@ fn validate_story_drawings_at_depth(
     let mut previous_position = None;
     for drawing in order {
         let position = match *drawing {
-            StoryDrawing::Shape(index) if index < shapes.len() && !saw_shapes[index] => {
-                saw_shapes[index] = true;
-                shapes[index].position
+            StoryDrawing::Shape(index) => {
+                claim_ordered_item(shapes, &mut saw_shapes, index).map(|shape| shape.position)
             },
-            StoryDrawing::ShapeGroup(index) if index < groups.len() && !saw_groups[index] => {
-                saw_groups[index] = true;
-                groups[index].position
+            StoryDrawing::ShapeGroup(index) => {
+                claim_ordered_item(groups, &mut saw_groups, index).map(|group| group.position)
             },
-            _ => {
-                return Err(crate::RtfError::MalformedDocument(format!(
-                    "RTF {story} drawing order is invalid"
-                )));
-            },
-        };
+        }
+        .ok_or_else(|| {
+            crate::RtfError::MalformedDocument(format!("RTF {story} drawing order is invalid"))
+        })?;
         if previous_position.is_some_and(|previous| previous > position) {
             return Err(crate::RtfError::MalformedDocument(format!(
                 "RTF {story} drawing order moves backwards"

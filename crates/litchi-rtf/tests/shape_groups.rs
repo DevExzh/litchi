@@ -47,14 +47,14 @@ fn typed_group_writes_nested_children() {
         Cow::Borrowed("wzName"),
         Cow::Borrowed("root"),
     ));
-    root.add_shape(Shape::new(ShapeType::Rectangle));
+    root.add_shape(Shape::new(ShapeType::Rectangle)).unwrap();
     let mut nested = ShapeGroup::new();
     nested.properties.push(ShapeProperty::new(
         Cow::Borrowed("wzName"),
         Cow::Borrowed("nested"),
     ));
-    nested.add_shape(Shape::new(ShapeType::Ellipse));
-    root.add_group(nested);
+    nested.add_shape(Shape::new(ShapeType::Ellipse)).unwrap();
+    root.add_group(nested).unwrap();
     assert_eq!(
         root.child_order(),
         &[ShapeGroupChild::Shape(0), ShapeGroupChild::Group(0)]
@@ -89,7 +89,7 @@ fn rejects_hostile_group_grammar_and_typed_order_abuse() {
     }
 
     let mut group = ShapeGroup::new();
-    group.add_shape(Shape::new(ShapeType::Rectangle));
+    group.add_shape(Shape::new(ShapeType::Rectangle)).unwrap();
     group.child_order.push(ShapeGroupChild::Shape(0));
     let mut document = RtfDocument::parse(r#"{\rtf1}"#).unwrap();
     assert!(document.push_shape_group(group).is_err());

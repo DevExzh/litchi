@@ -21689,7 +21689,7 @@ impl<'a> Parser<'a> {
                     }
                     saw_child = true;
                     self.pos += 1;
-                    group.add_shape(self.parse_shape_destination(false)?);
+                    group.add_shape(self.parse_shape_destination(false)?)?;
                 },
                 Token::OpenBrace
                     if matches!(
@@ -21712,7 +21712,7 @@ impl<'a> Parser<'a> {
                         nesting_depth.saturating_add(1),
                         false,
                     )?;
-                    group.add_group(nested);
+                    group.add_group(nested)?;
                 },
                 Token::OpenBrace
                     if self
