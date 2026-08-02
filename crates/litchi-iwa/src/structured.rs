@@ -77,10 +77,14 @@ pub enum CellValue {
     Number(f64),
     /// Boolean value
     Boolean(bool),
-    /// Date value (as string)
-    Date(String),
+    /// Seconds since Numbers' 2001-01-01 UTC epoch.
+    Date(f64),
+    /// Duration in seconds.
+    Duration(f64),
     /// Formula (stored as string)
     Formula(String),
+    /// Spreadsheet error value.
+    Error(String),
     /// Empty cell
     Empty,
 }
@@ -99,7 +103,9 @@ impl std::fmt::Display for CellValue {
             CellValue::Number(n) => write!(f, "{}", n),
             CellValue::Boolean(b) => write!(f, "{}", b),
             CellValue::Date(d) => write!(f, "{}", d),
+            CellValue::Duration(d) => write!(f, "{}", d),
             CellValue::Formula(formula) => write!(f, "{}", formula),
+            CellValue::Error(error) => write!(f, "ERROR: {}", error),
             CellValue::Empty => Ok(()),
         }
     }
@@ -214,138 +220,219 @@ fn convert_numbers_cell_to_structured(cell: crate::numbers::CellValue) -> CellVa
         NC::Number(n) => CellValue::Number(n),
         NC::Boolean(b) => CellValue::Boolean(b),
         NC::Date(d) => CellValue::Date(d),
-        NC::Duration(_) => CellValue::Empty, // Duration not supported in structured format
+        NC::Duration(value) => CellValue::Duration(value),
         NC::Formula(f) => CellValue::Formula(f),
-        NC::Error(e) => CellValue::Text(format!("ERROR: {}", e)),
+        NC::Error(e) => CellValue::Error(e),
     }
 }
 
 /// Extract slides from a Keynote presentation
-pub fn extract_slides(bundle: &Bundle, _object_index: &ObjectIndex) -> Result<Vec<Slide>> {
+pub fn extract_slides(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<Slide>> {
+    use prost::Message;
+
     let mut slides = Vec::new();
+    let Some(document_object) = bundle_object(bundle, 1) else {
+        return Ok(slides);
+    };
+    let Some(document) = document_object.messages.iter().find_map(|message| {
+        crate::protobuf::kn::DocumentArchive::decode(message.data.as_slice()).ok()
+    }) else {
+        return Ok(slides);
+    };
+    let Some(show_object) = bundle_object(bundle, document.show.identifier) else {
+        return Ok(slides);
+    };
+    let Some(show) = show_object
+        .messages
+        .iter()
+        .find_map(|message| crate::protobuf::kn::ShowArchive::decode(message.data.as_slice()).ok())
+    else {
+        return Ok(slides);
+    };
 
-    // Find all slide objects (message type 1102 based on our decoder map)
-    let slide_objects = bundle.find_objects_by_type(1102);
+    for node_reference in show.slide_tree.slides {
+        let Some(node_object) = bundle_object(bundle, node_reference.identifier) else {
+            continue;
+        };
+        let Some(node) = node_object.messages.iter().find_map(|message| {
+            crate::protobuf::kn::SlideNodeArchive::decode(message.data.as_slice()).ok()
+        }) else {
+            continue;
+        };
+        let Some(slide_reference) = node.slide else {
+            continue;
+        };
+        let Some(slide_object) = bundle_object(bundle, slide_reference.identifier) else {
+            continue;
+        };
+        let Some(archive) = slide_object.messages.iter().find_map(|message| {
+            crate::protobuf::kn::SlideArchive::decode(message.data.as_slice()).ok()
+        }) else {
+            continue;
+        };
 
-    for (index, (_archive_name, object)) in slide_objects.iter().enumerate() {
+        let index = slides.len();
         let mut slide = Slide::new(index);
+        slide.title = archive.name.filter(|name| !name.is_empty());
+        let title_placeholder = archive
+            .title_placeholder
+            .as_ref()
+            .map(|reference| reference.identifier);
+        let body_placeholder = archive
+            .body_placeholder
+            .as_ref()
+            .map(|reference| reference.identifier);
 
-        // Extract text content from the slide
-        let text_parts = object.extract_text();
-        if !text_parts.is_empty() {
-            slide.title = text_parts.first().cloned();
-            slide.text_content = text_parts.into_iter().skip(1).collect();
+        if let Some(identifier) = title_placeholder
+            && let Some(text) = drawable_text(bundle, object_index, identifier)?
+        {
+            slide.title = Some(text);
         }
-
+        if let Some(identifier) = body_placeholder
+            && let Some(text) = drawable_text(bundle, object_index, identifier)?
+        {
+            slide.text_content.push(text);
+        }
+        for drawable in archive.owned_drawables {
+            if Some(drawable.identifier) == title_placeholder
+                || Some(drawable.identifier) == body_placeholder
+            {
+                continue;
+            }
+            if let Some(text) = drawable_text(bundle, object_index, drawable.identifier)? {
+                slide.text_content.push(text);
+            }
+        }
+        if let Some(note) = archive.note
+            && let Some(note_object) = object_index.resolve_object(bundle, note.identifier)?
+        {
+            for message in note_object.messages {
+                let Ok(note) = crate::protobuf::kn::NoteArchive::decode(message.data.as_slice())
+                else {
+                    continue;
+                };
+                if let Some(storage) = object_index
+                    .resolve_object(bundle, note.contained_storage.identifier)?
+                    .and_then(|object| {
+                        object.messages.into_iter().find_map(|message| {
+                            crate::protobuf::tswp::StorageArchive::decode(message.data.as_slice())
+                                .ok()
+                        })
+                    })
+                {
+                    let text = storage.text.concat();
+                    if !text.is_empty() {
+                        slide.notes = Some(text);
+                    }
+                }
+                break;
+            }
+        }
         slides.push(slide);
     }
 
     Ok(slides)
 }
 
-/// Extract sections from a Pages document
+fn bundle_object(bundle: &Bundle, identifier: u64) -> Option<&crate::archive::ArchiveObject> {
+    bundle
+        .archives()
+        .values()
+        .find_map(|archive| archive.object(identifier))
+}
+
+fn drawable_text(
+    bundle: &Bundle,
+    object_index: &ObjectIndex,
+    identifier: u64,
+) -> Result<Option<String>> {
+    use prost::Message;
+
+    let Some(drawable) = object_index.resolve_object(bundle, identifier)? else {
+        return Ok(None);
+    };
+    let storage_id = drawable.messages.iter().find_map(|message| {
+        crate::protobuf::kn::PlaceholderArchive::decode(message.data.as_slice())
+            .ok()
+            .and_then(|placeholder| placeholder.super_.owned_storage)
+            .or_else(|| {
+                crate::protobuf::tswp::ShapeInfoArchive::decode(message.data.as_slice())
+                    .ok()
+                    .and_then(|shape| shape.owned_storage)
+            })
+            .map(|reference| reference.identifier)
+    });
+    let Some(storage_id) = storage_id else {
+        return Ok(None);
+    };
+    let Some(storage_object) = object_index.resolve_object(bundle, storage_id)? else {
+        return Ok(None);
+    };
+    for message in storage_object.messages {
+        if let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(message.data.as_slice())
+        {
+            let text = storage.text.concat();
+            return Ok((!text.is_empty()).then_some(text));
+        }
+    }
+    Ok(None)
+}
+
+/// Extract the main body section from a Pages document.
 ///
-/// # Implementation Status
-///
-/// ✓ COMPLETED: Proper section boundary identification (2025-11-04)
-///   - Uses message type 10011 (TP.SectionArchive) to identify actual sections
-///   - Falls back to text storage objects if no sections found
-///   - Based on Apple's Pages protobuf structure and pyiwa reference
-///   
-/// Pages documents use message type 10011 (TP.SectionArchive) to mark section
-/// boundaries. Each section can contain multiple text storage objects (type 2001/2022).
-/// This implementation properly identifies sections and groups their content.
+/// Current Pages packages store the main text reference directly in
+/// `TP.DocumentArchive.body_storage`. `TP.SectionArchive` describes page and
+/// header/footer properties; it is not a container for the document body.
 pub fn extract_sections(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec<Section>> {
-    let mut sections = Vec::new();
+    use prost::Message;
 
-    // Method 1: Look for actual SectionArchive objects (message type 10011)
-    // This is the proper way to identify sections in Pages documents
-    let section_objects = bundle.find_objects_by_type(10011);
+    let Some(document_object) = bundle
+        .get_archive("Index/Document.iwa")
+        .and_then(|archive| archive.object(1))
+    else {
+        return Ok(Vec::new());
+    };
+    let Some(document) = document_object
+        .messages
+        .iter()
+        .find(|message| message.type_ == 10000)
+        .and_then(|message| {
+            crate::protobuf::tp::DocumentArchive::decode(message.data.as_slice()).ok()
+        })
+    else {
+        return Ok(Vec::new());
+    };
 
-    if !section_objects.is_empty() {
-        // We found actual section markers - use them to properly extract sections
-        for (index, (_archive_name, section_obj)) in section_objects.iter().enumerate() {
-            let mut section = Section::new(index);
-
-            // Try to extract section metadata and content
-            // SectionArchive contains references to text storage objects
-            // We need to traverse the object graph to get the actual content
-
-            // Get the section's object ID
-            if let Some(section_id) = section_obj.archive_info.identifier {
-                // Find objects that reference this section (its content)
-                if let Some(referenced_ids) = object_index.get_dependencies(section_id) {
-                    // Collect text from all referenced storage objects
-                    for &ref_id in referenced_ids {
-                        if let Ok(Some(ref_obj)) = object_index.resolve_object(bundle, ref_id) {
-                            let text_parts = ref_obj
-                                .messages
-                                .iter()
-                                .filter(|msg| msg.type_ == 2001 || msg.type_ == 2022)
-                                .flat_map(|msg| {
-                                    use prost::Message;
-                                    if let Ok(storage) =
-                                        crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
-                                    {
-                                        storage.text.clone()
-                                    } else {
-                                        Vec::new()
-                                    }
-                                })
-                                .collect::<Vec<_>>();
-
-                            if !text_parts.is_empty() {
-                                if section.heading.is_none() {
-                                    section.heading = text_parts.first().cloned();
-                                    section.paragraphs.extend(text_parts.into_iter().skip(1));
-                                } else {
-                                    section.paragraphs.extend(text_parts);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Also extract text directly from the section object itself
-            let text_parts = section_obj.extract_text();
-            if !text_parts.is_empty() {
-                if section.heading.is_none() {
-                    section.heading = text_parts.first().cloned();
-                    section.paragraphs.extend(text_parts.into_iter().skip(1));
-                } else {
-                    section.paragraphs.extend(text_parts);
-                }
-            }
-
-            if section.heading.is_some() || !section.paragraphs.is_empty() {
-                sections.push(section);
-            }
+    let mut section = Section::new(0);
+    if let Some(reference) = document.body_storage {
+        let object = object_index
+            .resolve_object(bundle, reference.identifier)?
+            .ok_or_else(|| {
+                crate::Error::InvalidFormat(format!(
+                    "Pages body storage object {} is missing",
+                    reference.identifier
+                ))
+            })?;
+        let storage = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == 2001 || message.type_ == 2022)
+            .find_map(|message| {
+                crate::protobuf::tswp::StorageArchive::decode(message.data.as_slice()).ok()
+            })
+            .ok_or_else(|| {
+                crate::Error::InvalidFormat(format!(
+                    "Pages body object {} has no text storage payload",
+                    reference.identifier
+                ))
+            })?;
+        let text = storage.text.concat();
+        if !text.is_empty() {
+            section.paragraphs.push(text);
         }
     }
 
-    // Method 2: Fallback - if no section markers found, treat text storage objects as sections
-    // This handles older Pages formats or documents without explicit section markers
-    if sections.is_empty() {
-        let text_objects = bundle.find_objects_by_type(2022); // TSWP.ParagraphStyleArchive
-
-        for (index, (_archive_name, object)) in text_objects.iter().enumerate() {
-            let mut section = Section::new(index);
-
-            // Extract text content
-            let text_parts = object.extract_text();
-            if !text_parts.is_empty() {
-                section.heading = text_parts.first().cloned();
-                section.paragraphs = text_parts.into_iter().skip(1).collect();
-            }
-
-            if section.heading.is_some() || !section.paragraphs.is_empty() {
-                sections.push(section);
-            }
-        }
-    }
-
-    Ok(sections)
+    Ok(vec![section])
 }
 
 /// Extract all structured data from a document based on its type

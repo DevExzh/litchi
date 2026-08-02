@@ -1,0 +1,569 @@
+//! Conversion between public table-cell formats and native format archives.
+
+use crate::protobuf::tsk::FormatStructArchive;
+use crate::table_cell_data_format::{
+    TableCellCheckboxFormat, TableCellCurrencyCode, TableCellCurrencyFormat,
+    TableCellCurrencyStyle, TableCellDataFormat, TableCellDateTimeFormat, TableCellDecimalPlaces,
+    TableCellDurationFormat, TableCellDurationStyle, TableCellDurationUnit,
+    TableCellDurationUnitRange, TableCellDurationUnits, TableCellFixedDecimalPlaces,
+    TableCellFractionAccuracy, TableCellFractionFormat, TableCellNegativeNumberStyle,
+    TableCellNumberFormat, TableCellNumeralSystemBase, TableCellNumeralSystemFormat,
+    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
+    TableCellNumericControlDisplayFormat, TableCellPercentageFormat, TableCellScientificFormat,
+    TableCellStarRatingFormat, TableCellTextFormat, TableCellThousandsSeparator,
+};
+use crate::{Error, Result};
+
+pub(super) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
+pub(super) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
+pub(super) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
+pub(super) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+pub(super) const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;
+pub(super) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
+pub(super) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+pub(super) const NATIVE_CHECKBOX_FORMAT_TYPE: u32 = 263;
+pub(super) const NATIVE_STAR_RATING_FORMAT_TYPE: u32 = 267;
+pub(super) const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;
+pub(super) const NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE: u32 = 269;
+pub(super) const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
+const NATIVE_FRACTION_UP_TO_ONE_DIGIT: i32 = -1;
+const NATIVE_FRACTION_UP_TO_TWO_DIGITS: i32 = -2;
+const NATIVE_FRACTION_UP_TO_THREE_DIGITS: i32 = -3;
+const NATIVE_FRACTION_HALVES: i32 = 2;
+const NATIVE_FRACTION_QUARTERS: i32 = 4;
+const NATIVE_FRACTION_EIGHTHS: i32 = 8;
+const NATIVE_FRACTION_SIXTEENTHS: i32 = 16;
+const NATIVE_FRACTION_TENTHS: i32 = 10;
+const NATIVE_FRACTION_HUNDREDTHS: i32 = 100;
+
+pub(super) fn data_format_to_native(format: &TableCellDataFormat) -> Result<FormatStructArchive> {
+    if matches!(
+        format,
+        TableCellDataFormat::Text(_) | TableCellDataFormat::PopUpMenu(_)
+    ) {
+        return Ok(text_format_to_native());
+    }
+    if let TableCellDataFormat::Slider(format) = format {
+        return numeric_control_display_to_native(format.display_format());
+    }
+    if let TableCellDataFormat::Stepper(format) = format {
+        return numeric_control_display_to_native(format.display_format());
+    }
+    if matches!(format, TableCellDataFormat::Checkbox(_)) {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_CHECKBOX_FORMAT_TYPE),
+            ..Default::default()
+        });
+    }
+    if matches!(format, TableCellDataFormat::StarRating(_)) {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_STAR_RATING_FORMAT_TYPE),
+            ..Default::default()
+        });
+    }
+    if let TableCellDataFormat::Duration(format) = format {
+        let range = format.units().range();
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_DURATION_FORMAT_TYPE),
+            duration_style: Some(duration_style_to_native(format.style())),
+            duration_unit_largest: Some(range.largest().native_value()),
+            duration_unit_smallest: Some(range.smallest().native_value()),
+            use_automatic_duration_units: Some(format.units().uses_automatic_units()),
+            ..Default::default()
+        });
+    }
+    if let TableCellDataFormat::DateTime(format) = format {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_DATE_TIME_FORMAT_TYPE),
+            date_time_format: Some(format.pattern().to_owned()),
+            ..Default::default()
+        });
+    }
+    if let TableCellDataFormat::NumeralSystem(format) = format {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE),
+            base: Some(u32::from(format.base().value())),
+            base_places: Some(match format.places() {
+                TableCellNumeralSystemPlaces::Minimum => 0,
+                TableCellNumeralSystemPlaces::Fixed(places) => u32::from(places.value()),
+            }),
+            base_use_minus_sign: Some(matches!(
+                format.negative_style(),
+                TableCellNumeralSystemNegativeStyle::MinusSign
+            )),
+            ..Default::default()
+        });
+    }
+    if let TableCellDataFormat::Fraction(format) = format {
+        return Ok(FormatStructArchive {
+            format_type: Some(NATIVE_FRACTION_FORMAT_TYPE),
+            fraction_accuracy: Some(fraction_accuracy_to_native(format.accuracy())),
+            ..Default::default()
+        });
+    }
+    let (
+        format_type,
+        decimal_places,
+        negative_style,
+        thousands_separator,
+        currency_code,
+        accounting_style,
+    ) = match format {
+        TableCellDataFormat::Automatic => {
+            return Err(Error::InvalidFormat(
+                "Automatic table-cell data format has no explicit payload".to_owned(),
+            ));
+        },
+        TableCellDataFormat::Number(format) => (
+            NATIVE_NUMBER_FORMAT_TYPE,
+            format.decimal_places(),
+            format.negative_style(),
+            format.thousands_separator(),
+            None,
+            None,
+        ),
+        TableCellDataFormat::Currency(format) => (
+            NATIVE_CURRENCY_FORMAT_TYPE,
+            format.decimal_places(),
+            format.negative_style(),
+            format.thousands_separator(),
+            Some(format.currency_code().as_str().to_owned()),
+            Some(matches!(format.style(), TableCellCurrencyStyle::Accounting)),
+        ),
+        TableCellDataFormat::Percentage(format) => (
+            NATIVE_PERCENTAGE_FORMAT_TYPE,
+            format.decimal_places(),
+            format.negative_style(),
+            format.thousands_separator(),
+            None,
+            None,
+        ),
+        TableCellDataFormat::Scientific(format) => (
+            NATIVE_SCIENTIFIC_FORMAT_TYPE,
+            TableCellDecimalPlaces::Fixed(format.decimal_places()),
+            TableCellNegativeNumberStyle::MinusSign,
+            TableCellThousandsSeparator::Hidden,
+            None,
+            None,
+        ),
+        TableCellDataFormat::Fraction(_) => unreachable!("handled above"),
+        TableCellDataFormat::NumeralSystem(_) => unreachable!("handled above"),
+        TableCellDataFormat::DateTime(_) => unreachable!("handled above"),
+        TableCellDataFormat::Duration(_) => unreachable!("handled above"),
+        TableCellDataFormat::Checkbox(_) => unreachable!("handled above"),
+        TableCellDataFormat::StarRating(_) => unreachable!("handled above"),
+        TableCellDataFormat::Slider(_) => unreachable!("handled above"),
+        TableCellDataFormat::Stepper(_) => unreachable!("handled above"),
+        TableCellDataFormat::PopUpMenu(_) => unreachable!("handled above"),
+        TableCellDataFormat::Text(_) => unreachable!("handled above"),
+        TableCellDataFormat::Custom(_) => unreachable!("handled by custom-format registry"),
+    };
+    Ok(FormatStructArchive {
+        format_type: Some(format_type),
+        decimal_places: Some(match decimal_places {
+            TableCellDecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
+            TableCellDecimalPlaces::Fixed(places) => u32::from(places.value()),
+        }),
+        negative_style: Some(match negative_style {
+            TableCellNegativeNumberStyle::MinusSign => 0,
+            TableCellNegativeNumberStyle::Red => 1,
+            TableCellNegativeNumberStyle::Parentheses => 2,
+            TableCellNegativeNumberStyle::RedParentheses => 3,
+        }),
+        show_thousands_separator: Some(matches!(
+            thousands_separator,
+            TableCellThousandsSeparator::Shown
+        )),
+        currency_code,
+        use_accounting_style: accounting_style,
+        ..Default::default()
+    })
+}
+
+pub(super) fn text_format_to_native() -> FormatStructArchive {
+    FormatStructArchive {
+        format_type: Some(NATIVE_TEXT_FORMAT_TYPE),
+        ..Default::default()
+    }
+}
+
+pub(super) fn validate_text_format(native: &FormatStructArchive) -> Result<()> {
+    if native != &text_format_to_native() {
+        return Err(Error::InvalidFormat(
+            "Pop-Up Menu references a non-canonical Text format".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn numeric_control_display_to_native(
+    display: &TableCellNumericControlDisplayFormat,
+) -> Result<FormatStructArchive> {
+    let format = match display {
+        TableCellNumericControlDisplayFormat::Number(format) => {
+            TableCellDataFormat::Number(*format)
+        },
+        TableCellNumericControlDisplayFormat::Currency(format) => {
+            TableCellDataFormat::Currency(*format)
+        },
+        TableCellNumericControlDisplayFormat::Percentage(format) => {
+            TableCellDataFormat::Percentage(*format)
+        },
+        TableCellNumericControlDisplayFormat::Fraction(format) => {
+            TableCellDataFormat::Fraction(*format)
+        },
+        TableCellNumericControlDisplayFormat::Scientific(format) => {
+            TableCellDataFormat::Scientific(*format)
+        },
+        TableCellNumericControlDisplayFormat::NumeralSystem(format) => {
+            TableCellDataFormat::NumeralSystem(*format)
+        },
+    };
+    data_format_to_native(&format)
+}
+
+pub(super) fn numeric_control_display_from_native(
+    native: &FormatStructArchive,
+) -> Result<TableCellNumericControlDisplayFormat> {
+    match data_format_from_native(native)? {
+        TableCellDataFormat::Number(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Number(format))
+        },
+        TableCellDataFormat::Currency(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Currency(format))
+        },
+        TableCellDataFormat::Percentage(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Percentage(format))
+        },
+        TableCellDataFormat::Fraction(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Fraction(format))
+        },
+        TableCellDataFormat::Scientific(format) => {
+            Ok(TableCellNumericControlDisplayFormat::Scientific(format))
+        },
+        TableCellDataFormat::NumeralSystem(format) => {
+            Ok(TableCellNumericControlDisplayFormat::NumeralSystem(format))
+        },
+        _ => Err(Error::InvalidFormat(
+            "Interactive numeric control uses a non-numeric display format".to_owned(),
+        )),
+    }
+}
+
+pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<TableCellDataFormat> {
+    let format_type = native.format_type.ok_or_else(|| {
+        Error::InvalidFormat("Table cell has no native data-format type".to_owned())
+    })?;
+    if format_type == NATIVE_TEXT_FORMAT_TYPE {
+        validate_text_format(native)?;
+        return Ok(TableCellDataFormat::Text(TableCellTextFormat));
+    }
+    if format_type == NATIVE_CHECKBOX_FORMAT_TYPE {
+        let canonical =
+            data_format_to_native(&TableCellDataFormat::Checkbox(TableCellCheckboxFormat))?;
+        if native != &canonical {
+            return Err(Error::InvalidFormat(
+                "Checkbox cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::Checkbox(TableCellCheckboxFormat));
+    }
+    if format_type == NATIVE_STAR_RATING_FORMAT_TYPE {
+        let canonical =
+            data_format_to_native(&TableCellDataFormat::StarRating(TableCellStarRatingFormat))?;
+        if native != &canonical {
+            return Err(Error::InvalidFormat(
+                "Star Rating cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::StarRating(TableCellStarRatingFormat));
+    }
+    if format_type == NATIVE_DURATION_FORMAT_TYPE {
+        let style = duration_style_from_native(native.duration_style.ok_or_else(|| {
+            Error::InvalidFormat("Duration cell format has no presentation style".to_owned())
+        })?)?;
+        let range = TableCellDurationUnitRange::new(
+            TableCellDurationUnit::from_native(native.duration_unit_largest.ok_or_else(|| {
+                Error::InvalidFormat("Duration cell format has no largest unit".to_owned())
+            })?)?,
+            TableCellDurationUnit::from_native(native.duration_unit_smallest.ok_or_else(
+                || Error::InvalidFormat("Duration cell format has no smallest unit".to_owned()),
+            )?)?,
+        )?;
+        let units = if native.use_automatic_duration_units.ok_or_else(|| {
+            Error::InvalidFormat("Duration cell format has no unit-selection mode".to_owned())
+        })? {
+            TableCellDurationUnits::Automatic(range)
+        } else {
+            TableCellDurationUnits::Custom(range)
+        };
+        let format = TableCellDurationFormat::new(style, units);
+        let canonical = data_format_to_native(&TableCellDataFormat::Duration(format))?;
+        if native != &canonical {
+            return Err(Error::InvalidFormat(
+                "Duration cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::Duration(format));
+    }
+    if format_type == NATIVE_DATE_TIME_FORMAT_TYPE {
+        if native.decimal_places.is_some()
+            || native.negative_style.is_some()
+            || native.show_thousands_separator.is_some()
+            || native.currency_code.is_some()
+            || native.use_accounting_style.is_some()
+            || native.fraction_accuracy.is_some()
+            || native.base.is_some()
+            || native.base_places.is_some()
+            || native.base_use_minus_sign.is_some()
+            || native.suppress_date_format.is_some()
+            || native.suppress_time_format.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Date & Time cell format contains non-canonical options".to_owned(),
+            ));
+        }
+        let pattern = native.date_time_format.as_deref().ok_or_else(|| {
+            Error::InvalidFormat("Date & Time cell format has no ICU pattern".to_owned())
+        })?;
+        return TableCellDateTimeFormat::new(pattern).map(TableCellDataFormat::DateTime);
+    }
+    if format_type == NATIVE_NUMERAL_SYSTEM_FORMAT_TYPE {
+        if native.decimal_places.is_some()
+            || native.negative_style.is_some()
+            || native.show_thousands_separator.is_some()
+            || native.currency_code.is_some()
+            || native.use_accounting_style.is_some()
+            || native.fraction_accuracy.is_some()
+            || native.date_time_format.is_some()
+            || native.suppress_date_format.is_some()
+            || native.suppress_time_format.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Numeral System cell format contains non-canonical numeric options".to_owned(),
+            ));
+        }
+        let base = native.base.ok_or_else(|| {
+            Error::InvalidFormat("Numeral System cell format has no base".to_owned())
+        })?;
+        let base = u8::try_from(base).map_err(|_| {
+            Error::InvalidFormat(format!(
+                "Numeral System cell format has invalid base {base}"
+            ))
+        })?;
+        let base = TableCellNumeralSystemBase::new(base)?;
+        let places = native.base_places.ok_or_else(|| {
+            Error::InvalidFormat("Numeral System cell format has no places setting".to_owned())
+        })?;
+        let places = match places {
+            0 => TableCellNumeralSystemPlaces::Minimum,
+            value => {
+                let value = u8::try_from(value).map_err(|_| {
+                    Error::InvalidFormat(format!(
+                        "Numeral System cell format has invalid places setting {value}"
+                    ))
+                })?;
+                TableCellNumeralSystemPlaces::fixed(value)?
+            },
+        };
+        let negative_style = match native.base_use_minus_sign {
+            Some(true) => TableCellNumeralSystemNegativeStyle::MinusSign,
+            Some(false) => TableCellNumeralSystemNegativeStyle::TwosComplement,
+            None => {
+                return Err(Error::InvalidFormat(
+                    "Numeral System cell format has no negative-style setting".to_owned(),
+                ));
+            },
+        };
+        return TableCellNumeralSystemFormat::new(base, places, negative_style)
+            .map(TableCellDataFormat::NumeralSystem);
+    }
+    if format_type == NATIVE_FRACTION_FORMAT_TYPE {
+        let accuracy = native.fraction_accuracy.ok_or_else(|| {
+            Error::InvalidFormat("Fraction cell format has no accuracy setting".to_owned())
+        })?;
+        if native.decimal_places.is_some()
+            || native.negative_style.is_some()
+            || native.show_thousands_separator.is_some()
+            || native.currency_code.is_some()
+            || native.use_accounting_style.is_some()
+            || native.base.is_some()
+            || native.base_places.is_some()
+            || native.base_use_minus_sign.is_some()
+            || native.date_time_format.is_some()
+            || native.suppress_date_format.is_some()
+            || native.suppress_time_format.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Fraction cell format contains non-canonical decimal options".to_owned(),
+            ));
+        }
+        return Ok(TableCellDataFormat::Fraction(TableCellFractionFormat::new(
+            fraction_accuracy_from_native(accuracy)?,
+        )));
+    }
+    if !matches!(
+        format_type,
+        NATIVE_NUMBER_FORMAT_TYPE
+            | NATIVE_CURRENCY_FORMAT_TYPE
+            | NATIVE_PERCENTAGE_FORMAT_TYPE
+            | NATIVE_SCIENTIFIC_FORMAT_TYPE
+    ) {
+        return Err(Error::InvalidFormat(format!(
+            "Table cell uses unsupported native data-format type {format_type}"
+        )));
+    }
+    if native.fraction_accuracy.is_some() {
+        return Err(Error::InvalidFormat(
+            "Non-Fraction cell format contains a fraction-accuracy setting".to_owned(),
+        ));
+    }
+    if native.base.is_some() || native.base_places.is_some() || native.base_use_minus_sign.is_some()
+    {
+        return Err(Error::InvalidFormat(
+            "Non-Numeral-System cell format contains numeral-system options".to_owned(),
+        ));
+    }
+    if native.date_time_format.is_some()
+        || native.suppress_date_format.is_some()
+        || native.suppress_time_format.is_some()
+    {
+        return Err(Error::InvalidFormat(
+            "Non-Date-Time cell format contains Date & Time options".to_owned(),
+        ));
+    }
+    let decimal_places = match native.decimal_places {
+        Some(NATIVE_AUTOMATIC_DECIMAL_PLACES) => TableCellDecimalPlaces::Automatic,
+        Some(value) => {
+            let value = u8::try_from(value).map_err(|_| {
+                Error::InvalidFormat(format!(
+                    "Table cell has invalid decimal-place count {value}"
+                ))
+            })?;
+            TableCellDecimalPlaces::Fixed(TableCellFixedDecimalPlaces::new(value)?)
+        },
+        None => {
+            return Err(Error::InvalidFormat(
+                "Table-cell data format has no decimal-place setting".to_owned(),
+            ));
+        },
+    };
+    let negative_style = match native.negative_style {
+        Some(0) => TableCellNegativeNumberStyle::MinusSign,
+        Some(1) => TableCellNegativeNumberStyle::Red,
+        Some(2) => TableCellNegativeNumberStyle::Parentheses,
+        Some(3) => TableCellNegativeNumberStyle::RedParentheses,
+        value => {
+            return Err(Error::InvalidFormat(format!(
+                "Table cell has invalid negative-number style {value:?}"
+            )));
+        },
+    };
+    let thousands_separator = match native.show_thousands_separator {
+        Some(false) => TableCellThousandsSeparator::Hidden,
+        Some(true) => TableCellThousandsSeparator::Shown,
+        None => {
+            return Err(Error::InvalidFormat(
+                "Table-cell data format has no thousands-separator setting".to_owned(),
+            ));
+        },
+    };
+    Ok(match format_type {
+        NATIVE_NUMBER_FORMAT_TYPE => TableCellDataFormat::Number(TableCellNumberFormat::new(
+            decimal_places,
+            negative_style,
+            thousands_separator,
+        )),
+        NATIVE_CURRENCY_FORMAT_TYPE => {
+            let code = native.currency_code.as_deref().ok_or_else(|| {
+                Error::InvalidFormat("Currency cell format has no currency code".to_owned())
+            })?;
+            let currency_code = TableCellCurrencyCode::new(code)?;
+            let style = match native.use_accounting_style {
+                Some(false) => TableCellCurrencyStyle::Standard,
+                Some(true) => TableCellCurrencyStyle::Accounting,
+                None => {
+                    return Err(Error::InvalidFormat(
+                        "Currency cell format has no accounting-style setting".to_owned(),
+                    ));
+                },
+            };
+            TableCellDataFormat::Currency(TableCellCurrencyFormat::new(
+                currency_code,
+                decimal_places,
+                negative_style,
+                thousands_separator,
+                style,
+            ))
+        },
+        NATIVE_PERCENTAGE_FORMAT_TYPE => TableCellDataFormat::Percentage(
+            TableCellPercentageFormat::new(decimal_places, negative_style, thousands_separator),
+        ),
+        NATIVE_SCIENTIFIC_FORMAT_TYPE => {
+            if negative_style != TableCellNegativeNumberStyle::MinusSign
+                || thousands_separator != TableCellThousandsSeparator::Hidden
+            {
+                return Err(Error::InvalidFormat(
+                    "Scientific cell format contains non-canonical decimal options".to_owned(),
+                ));
+            }
+            let TableCellDecimalPlaces::Fixed(decimal_places) = decimal_places else {
+                return Err(Error::InvalidFormat(
+                    "Scientific cell format cannot use automatic decimal places".to_owned(),
+                ));
+            };
+            TableCellDataFormat::Scientific(TableCellScientificFormat::new(decimal_places))
+        },
+        _ => unreachable!("validated native data-format type"),
+    })
+}
+
+const fn duration_style_to_native(style: TableCellDurationStyle) -> u32 {
+    match style {
+        TableCellDurationStyle::Colon => 0,
+        TableCellDurationStyle::Abbreviated => 1,
+        TableCellDurationStyle::FullNames => 2,
+    }
+}
+
+fn duration_style_from_native(value: u32) -> Result<TableCellDurationStyle> {
+    match value {
+        0 => Ok(TableCellDurationStyle::Colon),
+        1 => Ok(TableCellDurationStyle::Abbreviated),
+        2 => Ok(TableCellDurationStyle::FullNames),
+        _ => Err(Error::InvalidFormat(format!(
+            "Unsupported native Duration style {value}"
+        ))),
+    }
+}
+
+const fn fraction_accuracy_to_native(accuracy: TableCellFractionAccuracy) -> u32 {
+    match accuracy {
+        TableCellFractionAccuracy::UpToOneDigit => NATIVE_FRACTION_UP_TO_ONE_DIGIT as u32,
+        TableCellFractionAccuracy::UpToTwoDigits => NATIVE_FRACTION_UP_TO_TWO_DIGITS as u32,
+        TableCellFractionAccuracy::UpToThreeDigits => NATIVE_FRACTION_UP_TO_THREE_DIGITS as u32,
+        TableCellFractionAccuracy::Halves => NATIVE_FRACTION_HALVES as u32,
+        TableCellFractionAccuracy::Quarters => NATIVE_FRACTION_QUARTERS as u32,
+        TableCellFractionAccuracy::Eighths => NATIVE_FRACTION_EIGHTHS as u32,
+        TableCellFractionAccuracy::Sixteenths => NATIVE_FRACTION_SIXTEENTHS as u32,
+        TableCellFractionAccuracy::Tenths => NATIVE_FRACTION_TENTHS as u32,
+        TableCellFractionAccuracy::Hundredths => NATIVE_FRACTION_HUNDREDTHS as u32,
+    }
+}
+
+fn fraction_accuracy_from_native(value: u32) -> Result<TableCellFractionAccuracy> {
+    match value as i32 {
+        NATIVE_FRACTION_UP_TO_ONE_DIGIT => Ok(TableCellFractionAccuracy::UpToOneDigit),
+        NATIVE_FRACTION_UP_TO_TWO_DIGITS => Ok(TableCellFractionAccuracy::UpToTwoDigits),
+        NATIVE_FRACTION_UP_TO_THREE_DIGITS => Ok(TableCellFractionAccuracy::UpToThreeDigits),
+        NATIVE_FRACTION_HALVES => Ok(TableCellFractionAccuracy::Halves),
+        NATIVE_FRACTION_QUARTERS => Ok(TableCellFractionAccuracy::Quarters),
+        NATIVE_FRACTION_EIGHTHS => Ok(TableCellFractionAccuracy::Eighths),
+        NATIVE_FRACTION_SIXTEENTHS => Ok(TableCellFractionAccuracy::Sixteenths),
+        NATIVE_FRACTION_TENTHS => Ok(TableCellFractionAccuracy::Tenths),
+        NATIVE_FRACTION_HUNDREDTHS => Ok(TableCellFractionAccuracy::Hundredths),
+        _ => Err(Error::InvalidFormat(format!(
+            "Fraction cell format has invalid accuracy {value}"
+        ))),
+    }
+}

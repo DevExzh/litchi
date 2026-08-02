@@ -6,11 +6,11 @@ use std::path::Path;
 
 use super::sheet::NumbersSheet;
 use super::table::NumbersTable;
-use crate::Result;
 use crate::bundle::Bundle;
 use crate::object_index::ObjectIndex;
-use crate::registry::Application;
+use crate::registry::{Application, detect_application_from_document};
 use crate::text::TextExtractor;
+use crate::{Error, Result};
 
 /// High-level interface for Numbers documents
 pub struct NumbersDocument {
@@ -34,6 +34,7 @@ impl NumbersDocument {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let bundle = Bundle::open(path)?;
+        Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         Ok(Self {
@@ -56,6 +57,7 @@ impl NumbersDocument {
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let bundle = Bundle::from_bytes(bytes)?;
+        Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
         Ok(Self {
@@ -70,6 +72,31 @@ impl NumbersDocument {
     /// been validated during format detection. It avoids double-parsing.
     pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes)
+    }
+
+    fn verify_application(bundle: &Bundle) -> Result<()> {
+        Self::root_document(bundle).map(|_| ())
+    }
+
+    fn root_document(bundle: &Bundle) -> Result<crate::protobuf::tn::DocumentArchive> {
+        use prost::Message;
+
+        let object = bundle
+            .get_archive("Index/Document.iwa")
+            .and_then(|archive| archive.object(1))
+            .ok_or_else(|| Error::InvalidFormat("Numbers root object 1 is missing".to_owned()))?;
+        object
+            .messages
+            .iter()
+            .find(|message| {
+                detect_application_from_document(&message.data) == Some(Application::Numbers)
+            })
+            .and_then(|message| {
+                crate::protobuf::tn::DocumentArchive::decode(message.data.as_slice()).ok()
+            })
+            .ok_or_else(|| {
+                Error::InvalidFormat("package does not contain a Numbers root document".to_owned())
+            })
     }
 
     /// Extract all text content from the document
@@ -113,42 +140,25 @@ impl NumbersDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn sheets(&self) -> Result<Vec<NumbersSheet>> {
-        let mut sheets = Vec::new();
+        use super::table_extractor::TableDataExtractor;
 
-        // Find sheet archives (message type 2 is TN.SheetArchive, type 1003 in our decoder)
-        let sheet_objects = self.bundle.find_objects_by_type(1003);
-
-        if sheet_objects.is_empty() {
-            // Try alternate sheet message type (TN.SheetArchive from JSON)
-            let alt_sheet_objects = self.bundle.find_objects_by_type(2);
-
-            for (index, (_archive_name, object)) in alt_sheet_objects.iter().enumerate() {
-                let sheet = self.parse_sheet(index, object)?;
-                if !sheet.is_empty() || !sheet.name.is_empty() {
-                    sheets.push(sheet);
-                }
-            }
-        } else {
-            for (index, (_archive_name, object)) in sheet_objects.iter().enumerate() {
-                let sheet = self.parse_sheet(index, object)?;
-                if !sheet.is_empty() || !sheet.name.is_empty() {
-                    sheets.push(sheet);
-                }
-            }
+        let document = Self::root_document(&self.bundle)?;
+        let extractor = TableDataExtractor::new(&self.bundle, &self.object_index);
+        let mut sheets = Vec::with_capacity(document.sheets.len());
+        for (index, reference) in document.sheets.into_iter().enumerate() {
+            let object = self
+                .bundle
+                .archives()
+                .values()
+                .find_map(|archive| archive.object(reference.identifier))
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers document references missing sheet object {}",
+                        reference.identifier
+                    ))
+                })?;
+            sheets.push(self.parse_sheet(index, object, &extractor)?);
         }
-
-        // If no sheets found, try to extract tables directly
-        if sheets.is_empty() {
-            let tables = self.extract_all_tables()?;
-            if !tables.is_empty() {
-                let mut default_sheet = NumbersSheet::new("Sheet 1".to_string(), 0);
-                for table in tables {
-                    default_sheet.add_table(table);
-                }
-                sheets.push(default_sheet);
-            }
-        }
-
         Ok(sheets)
     }
 
@@ -157,35 +167,33 @@ impl NumbersDocument {
         &self,
         index: usize,
         object: &crate::archive::ArchiveObject,
+        extractor: &super::table_extractor::TableDataExtractor<'_>,
     ) -> Result<NumbersSheet> {
         use prost::Message;
 
-        // Extract sheet name from decoded messages
-        let text_parts = object.extract_text();
-        let sheet_name = text_parts
-            .first()
-            .cloned()
-            .unwrap_or_else(|| format!("Sheet {}", index + 1));
-
-        let mut sheet = NumbersSheet::new(sheet_name, index);
-
-        // Parse the SheetArchive protobuf message to get table references
-        if let Some(raw_message) = object.messages.first()
-            && let Ok(sheet_archive) = crate::protobuf::tn::SheetArchive::decode(&*raw_message.data)
-        {
-            // Extract table references from drawable_infos
-            // Tables in Numbers are stored as drawables
-            for drawable_ref in &sheet_archive.drawable_infos {
-                if let Ok(table) = self.extract_table_from_drawable(drawable_ref.identifier) {
-                    sheet.add_table(table);
-                }
-            }
-        }
-
-        // Fallback: Extract all tables from the document if sheet has none
-        if sheet.table_count() == 0 {
-            let tables = self.extract_all_tables()?;
-            for table in tables {
+        let sheet_archive = object
+            .messages
+            .iter()
+            .find_map(|message| {
+                crate::protobuf::tn::SheetArchive::decode(message.data.as_slice())
+                    .ok()
+                    .or_else(|| {
+                        crate::protobuf::tn::FormBasedSheetArchive::decode(message.data.as_slice())
+                            .ok()
+                            .map(|form| form.super_)
+                    })
+            })
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers sheet object {:?} has no TN.SheetArchive payload",
+                    object.archive_info.identifier
+                ))
+            })?;
+        let mut sheet = NumbersSheet::new(sheet_archive.name, index);
+        for drawable_ref in &sheet_archive.drawable_infos {
+            if let Some(table) =
+                self.extract_table_from_drawable(drawable_ref.identifier, extractor)?
+            {
                 sheet.add_table(table);
             }
         }
@@ -193,43 +201,58 @@ impl NumbersDocument {
         Ok(sheet)
     }
 
-    /// Extract all tables from the document
-    fn extract_all_tables(&self) -> Result<Vec<NumbersTable>> {
-        use super::table_extractor::TableDataExtractor;
-
-        let extractor = TableDataExtractor::new(&self.bundle, &self.object_index);
-        extractor.extract_all_tables()
-    }
-
     /// Extract a table from a drawable reference
-    fn extract_table_from_drawable(&self, drawable_id: u64) -> Result<NumbersTable> {
+    fn extract_table_from_drawable(
+        &self,
+        drawable_id: u64,
+        extractor: &super::table_extractor::TableDataExtractor<'_>,
+    ) -> Result<Option<NumbersTable>> {
         use prost::Message;
 
-        if let Some(resolved) = self
+        let resolved = self
             .object_index
             .resolve_object(&self.bundle, drawable_id)?
-        {
-            // Look for TableInfoArchive which wraps the table model
-            for msg in &resolved.messages {
-                if let Ok(table_info) = crate::protobuf::tst::TableInfoArchive::decode(&*msg.data) {
-                    // The table_model field contains a reference to the TableModelArchive
-                    let table_model_id = table_info.table_model.identifier;
-                    return self.extract_table_from_model(table_model_id);
-                }
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers sheet references missing drawable object {drawable_id}"
+                ))
+            })?;
+        // Protobuf decoding is permissive, so accept a TableInfoArchive only
+        // when its model reference resolves to a typed TableModelArchive.
+        for message in &resolved.messages {
+            let Ok(table_info) =
+                crate::protobuf::tst::TableInfoArchive::decode(message.data.as_slice())
+            else {
+                continue;
+            };
+            let table_model_id = table_info.table_model.identifier;
+            let Some(model) = self
+                .object_index
+                .resolve_object(&self.bundle, table_model_id)?
+            else {
+                continue;
+            };
+            if !model.messages.iter().any(|message| {
+                (message.type_ == 6000 || message.type_ == 6001)
+                    && crate::protobuf::tst::TableModelArchive::decode(message.data.as_slice())
+                        .is_ok()
+            }) {
+                continue;
             }
+            return self
+                .extract_table_from_model(table_model_id, extractor)
+                .map(Some);
         }
 
-        Err(crate::Error::ParseError(
-            "Could not extract table from drawable".to_string(),
-        ))
+        Ok(None)
     }
 
     /// Extract a table from a TableModelArchive reference
-    fn extract_table_from_model(&self, table_model_id: u64) -> Result<NumbersTable> {
-        use super::table_extractor::TableDataExtractor;
-
-        let extractor = TableDataExtractor::new(&self.bundle, &self.object_index);
-
+    fn extract_table_from_model(
+        &self,
+        table_model_id: u64,
+        extractor: &super::table_extractor::TableDataExtractor<'_>,
+    ) -> Result<NumbersTable> {
         if let Some(resolved) = self
             .object_index
             .resolve_object(&self.bundle, table_model_id)?

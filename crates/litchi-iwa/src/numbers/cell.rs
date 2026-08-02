@@ -4,8 +4,11 @@
 
 use std::fmt;
 
+/// Seconds between the Unix epoch and Apple's 2001-01-01 UTC epoch.
+pub const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
+
 /// Represents a cell value in a Numbers table
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum CellValue {
     /// Empty cell
     #[default]
@@ -16,9 +19,9 @@ pub enum CellValue {
     Number(f64),
     /// Boolean value
     Boolean(bool),
-    /// Date value (stored as timestamp)
-    Date(String),
-    /// Duration/time value
+    /// Seconds since Numbers' 2001-01-01 UTC epoch.
+    Date(f64),
+    /// Duration in seconds.
     Duration(f64),
     /// Formula (stored as string representation)
     Formula(String),
@@ -26,7 +29,43 @@ pub enum CellValue {
     Error(String),
 }
 
+/// One typed mutation in a transactional table-cell batch.
+///
+/// Coordinates are zero-based. Batch APIs reject repeated `(row, column)`
+/// coordinates so every requested final value has exactly one source.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableCellUpdate {
+    pub row: usize,
+    pub column: usize,
+    pub value: CellValue,
+}
+
+impl TableCellUpdate {
+    #[must_use]
+    pub const fn new(row: usize, column: usize, value: CellValue) -> Self {
+        Self { row, column, value }
+    }
+
+    #[must_use]
+    pub const fn clear(row: usize, column: usize) -> Self {
+        Self::new(row, column, CellValue::Empty)
+    }
+}
+
 impl CellValue {
+    /// Construct a Numbers date from Unix epoch seconds.
+    pub fn date_from_unix_seconds(unix_seconds: f64) -> Self {
+        Self::Date(unix_seconds - APPLE_EPOCH_UNIX_OFFSET_SECONDS)
+    }
+
+    /// Convert a Numbers date to Unix epoch seconds.
+    pub fn date_as_unix_seconds(&self) -> Option<f64> {
+        match self {
+            Self::Date(seconds) => Some(seconds + APPLE_EPOCH_UNIX_OFFSET_SECONDS),
+            _ => None,
+        }
+    }
+
     /// Check if cell is empty
     pub fn is_empty(&self) -> bool {
         matches!(self, CellValue::Empty)
@@ -53,7 +92,7 @@ impl CellValue {
             CellValue::Text(s) => s.clone(),
             CellValue::Number(n) => format!("{}", n),
             CellValue::Boolean(b) => format!("{}", b),
-            CellValue::Date(d) => d.clone(),
+            CellValue::Date(d) => format!("{d}"),
             CellValue::Duration(d) => format!("{}", d),
             CellValue::Formula(f) => f.clone(),
             CellValue::Error(e) => format!("ERROR: {}", e),
@@ -64,6 +103,7 @@ impl CellValue {
     pub fn as_number(&self) -> Option<f64> {
         match self {
             CellValue::Number(n) => Some(*n),
+            CellValue::Date(d) => Some(*d),
             CellValue::Duration(d) => Some(*d),
             CellValue::Text(s) => s.parse::<f64>().ok(),
             CellValue::Boolean(b) => Some(if *b { 1.0 } else { 0.0 }),
@@ -149,6 +189,18 @@ mod tests {
         let boolean = CellValue::Boolean(true);
         assert_eq!(boolean.as_boolean(), Some(true));
         assert_eq!(boolean.as_number(), Some(1.0));
+
+        let date = CellValue::Date(123.5);
+        assert_eq!(date.as_number(), Some(123.5));
+        assert_eq!(date.as_text(), "123.5");
+        assert_eq!(
+            CellValue::date_from_unix_seconds(APPLE_EPOCH_UNIX_OFFSET_SECONDS + 123.5),
+            date
+        );
+        assert_eq!(
+            date.date_as_unix_seconds(),
+            Some(APPLE_EPOCH_UNIX_OFFSET_SECONDS + 123.5)
+        );
     }
 
     #[test]

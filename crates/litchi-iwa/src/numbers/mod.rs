@@ -30,13 +30,53 @@
 //! ```
 
 pub mod cell;
+pub mod creation;
 pub mod document;
+pub mod editor;
+pub mod formula;
 pub mod sheet;
 pub mod table;
 pub mod table_extractor;
 
-pub use cell::{CellType, CellValue};
+mod bnc;
+mod formula_owner;
+mod function_map;
+mod table_uid_map;
+
+pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue, TableCellUpdate};
+pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
+pub use editor::{
+    ChartSeriesDirection, IWorkTableCellRegion, NumbersCellCommentInfo,
+    NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
+    NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
+    NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
+    NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableCellParagraphIndents,
+    NumbersTableCellParagraphLineSpacing, NumbersTableCellParagraphList,
+    NumbersTableCellParagraphListBullet, NumbersTableCellParagraphListBulletGeometry,
+    NumbersTableCellParagraphListIndentation, NumbersTableCellParagraphListLabelColor,
+    NumbersTableCellParagraphListLevel, NumbersTableCellParagraphListLevelPlacement,
+    NumbersTableCellParagraphListNumberFormat, NumbersTableCellParagraphListNumberScale,
+    NumbersTableCellParagraphListNumberTiering, NumbersTableCellParagraphListNumbering,
+    NumbersTableCellParagraphListPlacement, NumbersTableCellParagraphSpacing,
+    NumbersTableCellParagraphTabStops, NumbersTableCellTextAlignment,
+    NumbersTableCellTextBackground, NumbersTableCellTextBaselineShift,
+    NumbersTableCellTextCapitalization, NumbersTableCellTextCharacterSpacing,
+    NumbersTableCellTextColor, NumbersTableCellTextDecorations, NumbersTableCellTextFont,
+    NumbersTableCellTextLigatures, NumbersTableCellTextOutline, NumbersTableCellTextScript,
+    NumbersTableCellTextShadow, NumbersTableCellTextStyle, NumbersTableDimension,
+    NumbersTableDimensionSize, NumbersTableHeaderCount, NumbersTableHeaderSettings,
+    NumbersTableInfo, NumbersTablePoints, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    NumbersTableSortOrder, NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,
+    NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
+    RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
+    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableCellConditionalHighlightInfo,
+    TableColumnDeletion, TableColumnInsertion, TableRowDeletion, TableRowInsertion,
+};
+pub use formula::{
+    FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
+    FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
+};
 pub use sheet::NumbersSheet;
-pub use table::NumbersTable;
+pub use table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
 pub use table_extractor::TableDataExtractor;

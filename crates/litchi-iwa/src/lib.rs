@@ -130,19 +130,47 @@
 // Core parsing modules
 pub mod archive;
 pub mod bundle;
+/// Typed native drawable stacking-order controls.
+pub mod drawable_order;
+pub mod identity;
+/// Typed native controls for basic image adjustments.
+pub mod image_adjustments;
+mod image_caption;
 pub mod media;
+/// Shared movie and audio playback settings.
+pub mod media_playback;
 pub mod object_index;
+pub mod package;
+mod package_metadata;
 pub mod protobuf;
 pub mod ref_graph;
 pub mod registry;
 pub mod snappy;
 pub mod structured;
+/// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
+pub mod table_appearance;
+/// Typed explicit cell-border controls shared by native iWork tables.
+pub mod table_cell_border;
+/// Typed conditional-highlight rules shared by native iWork table cells.
+pub mod table_cell_conditional_highlight;
+/// Typed cell data formats shared by native iWork tables.
+pub mod table_cell_data_format;
+/// Typed text-layout controls shared by native iWork table cells.
+pub mod table_cell_layout;
+pub mod table_cell_number_format;
+/// Typed hidden-row and hidden-column state shared by native iWork tables.
+pub mod table_hidden_axes;
+/// Typed native table lock controls shared by Pages, Numbers, and Keynote.
+pub mod table_lock;
+pub mod theme;
 pub mod varint;
+pub(crate) mod wire;
 pub mod zip_utils;
 
 /// Shared text extraction utilities
 pub mod text;
 
+mod data_reference_registry;
 /// High-level iWork document types
 pub mod document;
 
@@ -152,18 +180,37 @@ pub mod numbers;
 pub mod pages;
 
 pub mod charts;
+/// Cross-application direct drawable comments.
+pub mod comments;
 /// Cross-application content extractors
 pub mod shapes;
 
 /// Re-export commonly used types
 pub use archive::{ArchiveInfo, MessageInfo};
 pub use bundle::{Bundle, BundleMetadata, PropertyValue};
+pub use comments::{
+    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkComment, IWorkCommentUuid,
+    IWorkDrawableCommentEditor, IWorkDrawableInfo, IWorkTableCellCommentInfo,
+    IWorkTableCellCommentReplyInfo,
+};
 pub use document::Document;
-pub use media::{MediaAsset, MediaManager, MediaStats, MediaType};
+pub use drawable_order::DrawableLayerMove;
+pub use identity::IWorkDocumentIdentity;
+pub use image_adjustments::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+pub use media::{
+    EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats, MediaType,
+};
+pub use media_playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+pub use package::IWorkPackage;
 pub use ref_graph::ReferenceGraph;
+pub use shapes::DrawableTitleCaption;
 pub use snappy::SnappyStream;
 pub use structured::{CellValue, Section, Slide, StructuredData, Table};
-pub use text::{ParagraphStyle, TextExtractor, TextFragment, TextStorage, TextStyle};
+pub use text::{
+    ParagraphStyle, TextDecorations, TextExtractor, TextFragment, TextPointSize, TextStorage,
+    TextStrikethrough, TextStyle, TextUnderline,
+};
+pub use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 pub use zip_utils::{
     FileStructureInfo, analyze_file_structure, extract_message_types_from_archive,
     parse_iwa_files_from_archive,

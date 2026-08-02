@@ -1,0 +1,169 @@
+//! Native per-wedge position CRUD for Numbers pie and donut charts.
+
+use super::*;
+use crate::charts::pie_wedge_explosion::{
+    chart_pie_wedge_explosions as read_native_wedge_explosions,
+    set_chart_pie_wedge_explosions as set_native_wedge_explosions,
+};
+use crate::charts::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
+
+impl NumbersEditor {
+    /// Read every pie or donut wedge position in chart series order.
+    pub fn sheet_chart_pie_wedge_explosions(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ChartPieWedgeExplosion>> {
+        sheet_chart_pie_wedge_explosions(self, sheet_id, drawable_object_id)
+    }
+
+    /// Read one pie or donut wedge position by zero-based series index.
+    pub fn sheet_chart_pie_wedge_explosion(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        wedge: ChartPieWedgeIndex,
+    ) -> Result<ChartPieWedgeExplosion> {
+        let explosions = sheet_chart_pie_wedge_explosions(self, sheet_id, drawable_object_id)?;
+        explosions.get(wedge.zero_based()).copied().ok_or_else(|| {
+            wedge_index_error("Numbers", drawable_object_id, wedge, explosions.len())
+        })
+    }
+
+    /// Set every pie or donut wedge position in chart series order.
+    pub fn set_sheet_chart_pie_wedge_explosions(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        explosions: &[ChartPieWedgeExplosion],
+    ) -> Result<()> {
+        set_sheet_chart_pie_wedge_explosions(self, sheet_id, drawable_object_id, explosions)
+    }
+
+    /// Set one pie or donut wedge position by zero-based series index.
+    pub fn set_sheet_chart_pie_wedge_explosion(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        wedge: ChartPieWedgeIndex,
+        explosion: ChartPieWedgeExplosion,
+    ) -> Result<()> {
+        let mut explosions = sheet_chart_pie_wedge_explosions(self, sheet_id, drawable_object_id)?;
+        let explosion_count = explosions.len();
+        let target = explosions.get_mut(wedge.zero_based()).ok_or_else(|| {
+            wedge_index_error("Numbers", drawable_object_id, wedge, explosion_count)
+        })?;
+        if *target == explosion {
+            return Ok(());
+        }
+        *target = explosion;
+        set_sheet_chart_pie_wedge_explosions(self, sheet_id, drawable_object_id, &explosions)
+    }
+}
+
+fn sheet_chart_pie_wedge_explosions(
+    editor: &NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+) -> Result<Vec<ChartPieWedgeExplosion>> {
+    let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
+    require_pie_wedges(graph.info.kind, drawable_object_id)?;
+    let series_count = chart_series_count(
+        graph.info.direction,
+        &graph.info.data,
+        "Numbers",
+        drawable_object_id,
+    )?;
+    read_native_wedge_explosions(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Numbers",
+        series_count,
+    )
+}
+
+fn set_sheet_chart_pie_wedge_explosions(
+    editor: &mut NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+    explosions: &[ChartPieWedgeExplosion],
+) -> Result<()> {
+    let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
+    require_pie_wedges(graph.info.kind, drawable_object_id)?;
+    let series_count = chart_series_count(
+        graph.info.direction,
+        &graph.info.data,
+        "Numbers",
+        drawable_object_id,
+    )?;
+    if explosions.len() != series_count {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers chart {drawable_object_id} requires {series_count} wedge positions, got {}",
+            explosions.len()
+        )));
+    }
+    if read_native_wedge_explosions(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Numbers",
+        series_count,
+    )? == explosions
+    {
+        return Ok(());
+    }
+    let expected = explosions.to_vec();
+    let mut staged = editor.package().clone();
+    set_native_wedge_explosions(
+        &mut staged,
+        &graph.archive_name,
+        drawable_object_id,
+        "Numbers",
+        &expected,
+    )?;
+    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    if verified.sheet_chart_pie_wedge_explosions(sheet_id, drawable_object_id)? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers chart pie wedge-explosion update failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(())
+}
+
+fn require_pie_wedges(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+    if !kind.supports_pie_start_angle() {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers chart {drawable_object_id} kind {kind:?} has no pie wedges"
+        )));
+    }
+    Ok(())
+}
+
+fn chart_series_count(
+    direction: ChartSeriesDirection,
+    data: &ChartData,
+    drawable_label: &str,
+    drawable_object_id: u64,
+) -> Result<usize> {
+    match direction {
+        ChartSeriesDirection::Rows => Ok(data.row_names().len()),
+        ChartSeriesDirection::Columns => Ok(data.column_names().len()),
+        ChartSeriesDirection::Unsupported(value) => Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has unsupported series direction {value}"
+        ))),
+    }
+}
+
+fn wedge_index_error(
+    drawable_label: &str,
+    drawable_object_id: u64,
+    wedge: ChartPieWedgeIndex,
+    series_count: usize,
+) -> Error {
+    Error::InvalidFormat(format!(
+        "{drawable_label} chart {drawable_object_id} wedge index {} exceeds series count {series_count}",
+        wedge.zero_based()
+    ))
+}

@@ -1516,6 +1516,9 @@ impl<'a> Lexer<'a> {
     }
 
     /// Match control word string to enum variant.
+    // This is the RTF specification's flat control-word dispatch table. Keeping
+    // the entries together makes duplicate and missing mappings auditable.
+    #[allow(clippy::too_many_lines)]
     fn match_control_word(&self, word: &'a str, param: Option<i32>) -> RtfResult<ControlWord<'a>> {
         let param_value = param.unwrap_or(1);
         let param_bool = param.unwrap_or(1) != 0;

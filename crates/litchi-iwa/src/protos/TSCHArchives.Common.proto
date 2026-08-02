@@ -33,6 +33,9 @@ enum ChartType {
   bubbleChartType2D = 22;
   multiDataScatterChartType2D = 23;
   multiDataBubbleChartType2D = 24;
+  donutChartType2D = 25;
+  donutChartType3D = 26;
+  radarChartType2D = 27;
 }
 
 enum AxisType {
@@ -41,6 +44,8 @@ enum AxisType {
   axis_type_y = 2;
   axis_type_pie = 3;
   axis_type_size = 4;
+  axis_type_polar_radius = 5;
+  axis_type_polar_angle = 6;
 }
 
 enum ScatterFormat {
@@ -84,15 +89,6 @@ enum FractionAccuracy {
   fractionAccuracySixteenths = 16;
   fractionAccuracyTenths = 10;
   fractionAccuracyHundredths = 100;
-}
-
-message SparseReferenceArrayArchive {
-  message Entry {
-    required uint32 index = 1;
-    required .TSP.Reference value = 2;
-  }
-  required uint32 num_entries = 1;
-  repeated .TSCH.SparseReferenceArrayArchive.Entry entries = 2;
 }
 
 message RectArchive {
@@ -152,6 +148,27 @@ message ChartSeriesStyleArchive {
 }
 
 message ChartSeriesNonStyleArchive {
+  optional .TSS.StyleArchive super = 1;
+  extensions 10000 to 536870911;
+}
+
+message GridValue {
+  optional double numeric_value = 1;
+  optional double date_value_1_0 = 2;
+  optional double duration_value = 3;
+  optional double date_value = 4;
+}
+
+message GridRow {
+  repeated .TSCH.GridValue value = 1;
+}
+
+message ReferenceLineStyleArchive {
+  optional .TSS.StyleArchive super = 1;
+  extensions 10000 to 536870911;
+}
+
+message ReferenceLineNonStyleArchive {
   optional .TSS.StyleArchive super = 1;
   extensions 10000 to 536870911;
 }

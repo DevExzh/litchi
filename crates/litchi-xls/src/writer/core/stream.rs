@@ -73,7 +73,9 @@ fn stage_pivot_cache_identities(
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)] // TODO: Refactor this function to accept a struct
+// BIFF requires records to be emitted in a strict workbook-stream order. Keep
+// that ordering visible in one coordinator while leaf encoders stay separate.
+#[allow(clippy::cognitive_complexity, clippy::too_many_arguments)]
 pub(crate) fn generate_workbook_stream(
     use_1904_dates: bool,
     calculation_settings: XlsCalculationSettings,

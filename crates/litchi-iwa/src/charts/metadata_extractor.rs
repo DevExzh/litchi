@@ -27,13 +27,21 @@
 
 use crate::Result;
 use crate::bundle::Bundle;
+use crate::charts::options::read_chart_non_style_title;
+use crate::charts::{ChartKind, IWorkChartArchive};
 use crate::object_index::{ObjectIndex, ResolvedObject};
 use crate::protobuf::tsch;
 use prost::Message;
 
+const LEGACY_CHART_MESSAGE_TYPE: u32 = 5_000;
+const CHART_DRAWABLE_MESSAGE_TYPE: u32 = 5_021;
+const CHART_NON_STYLE_MESSAGE_TYPE: u32 = 5_023;
+
 /// Metadata extracted from a chart
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChartMetadata {
+    /// Object identifier of the chart drawable.
+    pub object_id: u64,
     /// Chart title (if present)
     pub title: Option<String>,
     /// Row names from the chart grid
@@ -42,48 +50,25 @@ pub struct ChartMetadata {
     pub column_names: Vec<String>,
     /// Number of data series
     pub series_count: usize,
-    /// Chart type (as string representation)
-    pub chart_type: String,
+    /// Strongly typed native chart kind.
+    pub chart_type: ChartKind,
     /// Whether chart contains default/sample data
     pub contains_default_data: bool,
 }
 
 impl ChartMetadata {
-    /// Create a new empty chart metadata
-    pub fn new() -> Self {
-        Self {
-            title: None,
-            row_names: Vec::new(),
-            column_names: Vec::new(),
-            series_count: 0,
-            chart_type: String::from("unknown"),
-            contains_default_data: false,
-        }
-    }
-
-    /// Get all text content from the chart
-    pub fn all_text(&self) -> Vec<String> {
-        let mut text = Vec::new();
-
-        if let Some(ref title) = self.title {
-            text.push(title.clone());
-        }
-
-        text.extend(self.row_names.clone());
-        text.extend(self.column_names.clone());
-
-        text
+    /// Borrow all text content from the chart without allocating or cloning.
+    pub fn all_text(&self) -> impl Iterator<Item = &str> {
+        self.title
+            .iter()
+            .map(String::as_str)
+            .chain(self.row_names.iter().map(String::as_str))
+            .chain(self.column_names.iter().map(String::as_str))
     }
 
     /// Check if chart has any meaningful content
     pub fn has_content(&self) -> bool {
         self.title.is_some() || !self.row_names.is_empty() || !self.column_names.is_empty()
-    }
-}
-
-impl Default for ChartMetadata {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -106,8 +91,7 @@ impl<'a> ChartMetadataExtractor<'a> {
     pub fn extract_all_charts(&self) -> Result<Vec<ChartMetadata>> {
         let mut charts = Vec::new();
 
-        // Find all ChartArchive objects (message types 5000, 5004, 5021)
-        for chart_type in [5000u32, 5004, 5021] {
+        for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
             let chart_entries = self.object_index.find_objects_by_type(chart_type);
 
             for entry in chart_entries {
@@ -124,11 +108,19 @@ impl<'a> ChartMetadataExtractor<'a> {
 
     /// Extract metadata from a single chart object
     fn extract_chart_metadata(&self, object: &ResolvedObject) -> Result<Option<ChartMetadata>> {
-        for msg in &object.messages {
-            if (msg.type_ == 5000 || msg.type_ == 5004 || msg.type_ == 5021)
-                && let Ok(chart) = tsch::ChartArchive::decode(&*msg.data)
-            {
-                return Ok(Some(self.parse_chart(&chart)?));
+        for message in &object.messages {
+            match message.type_ {
+                CHART_DRAWABLE_MESSAGE_TYPE => {
+                    let drawable = IWorkChartArchive::decode(&message.data)?;
+                    if let Some(chart) = drawable.chart {
+                        return Ok(Some(self.parse_chart(object.id, &chart)?));
+                    }
+                },
+                LEGACY_CHART_MESSAGE_TYPE => {
+                    let chart = tsch::pre_uff::ChartInfoArchive::decode(message.data.as_slice())?;
+                    return Ok(Some(Self::parse_legacy_chart(object.id, &chart)));
+                },
+                _ => {},
             }
         }
 
@@ -136,123 +128,67 @@ impl<'a> ChartMetadataExtractor<'a> {
     }
 
     /// Parse a ChartArchive to extract metadata
-    fn parse_chart(&self, chart: &tsch::ChartArchive) -> Result<ChartMetadata> {
-        let mut metadata = ChartMetadata::new();
-
-        // Extract chart type
-        if let Some(chart_type) = chart.chart_type {
-            metadata.chart_type = self.chart_type_to_string(chart_type);
-        }
-
-        // Check if contains default data
-        metadata.contains_default_data = chart.contains_default_data.unwrap_or(false);
-
-        // Extract grid data (row names, column names)
-        if let Some(ref grid) = chart.grid {
-            metadata.row_names = grid.row_name.clone();
-            metadata.column_names = grid.column_name.clone();
-            metadata.series_count = grid.grid_row.len();
-        }
-
-        // Try to extract chart title from paragraph styles or other sources
-        // Chart titles are typically stored in separate text storage objects
-        // referenced by the chart's style properties
-        if let Some(title) = self.extract_chart_title(chart)? {
-            metadata.title = Some(title);
-        }
-
-        Ok(metadata)
+    fn parse_chart(&self, object_id: u64, chart: &tsch::ChartArchive) -> Result<ChartMetadata> {
+        let grid = chart.grid.as_ref();
+        Ok(ChartMetadata {
+            object_id,
+            title: self.extract_chart_title(chart)?,
+            row_names: grid.map_or_else(Vec::new, |grid| grid.row_name.clone()),
+            column_names: grid.map_or_else(Vec::new, |grid| grid.column_name.clone()),
+            series_count: grid.map_or(0, |grid| grid.grid_row.len()),
+            chart_type: ChartKind::from_raw(
+                chart
+                    .chart_type
+                    .unwrap_or(tsch::ChartType::UndefinedChartType as i32),
+            ),
+            contains_default_data: chart.contains_default_data.unwrap_or(false),
+        })
     }
 
-    /// Convert chart type enum to string
-    fn chart_type_to_string(&self, chart_type: i32) -> String {
-        use crate::protobuf::tsch::ChartType;
-
-        match ChartType::try_from(chart_type) {
-            Ok(ChartType::UndefinedChartType) => "Undefined".to_string(),
-            Ok(ChartType::ColumnChartType2D) => "Column".to_string(),
-            Ok(ChartType::BarChartType2D) => "Bar".to_string(),
-            Ok(ChartType::LineChartType2D) => "Line".to_string(),
-            Ok(ChartType::AreaChartType2D) => "Area".to_string(),
-            Ok(ChartType::PieChartType2D) => "Pie".to_string(),
-            Ok(ChartType::StackedColumnChartType2D) => "Stacked Column".to_string(),
-            Ok(ChartType::StackedBarChartType2D) => "Stacked Bar".to_string(),
-            Ok(ChartType::StackedAreaChartType2D) => "Stacked Area".to_string(),
-            Ok(ChartType::ScatterChartType2D) => "Scatter".to_string(),
-            Ok(ChartType::MixedChartType2D) => "Mixed".to_string(),
-            Ok(ChartType::TwoAxisChartType2D) => "Two Axis".to_string(),
-            Ok(ChartType::ColumnChartType3D) => "Column 3D".to_string(),
-            Ok(ChartType::BarChartType3D) => "Bar 3D".to_string(),
-            Ok(ChartType::LineChartType3D) => "Line 3D".to_string(),
-            Ok(ChartType::AreaChartType3D) => "Area 3D".to_string(),
-            Ok(ChartType::PieChartType3D) => "Pie 3D".to_string(),
-            Ok(ChartType::StackedColumnChartType3D) => "Stacked Column 3D".to_string(),
-            Ok(ChartType::StackedBarChartType3D) => "Stacked Bar 3D".to_string(),
-            Ok(ChartType::StackedAreaChartType3D) => "Stacked Area 3D".to_string(),
-            Ok(ChartType::BubbleChartType2D) => "Bubble".to_string(),
-            _ => format!("Unknown({})", chart_type),
+    fn parse_legacy_chart(
+        object_id: u64,
+        chart: &tsch::pre_uff::ChartInfoArchive,
+    ) -> ChartMetadata {
+        let grid = chart.chart_model.inline_grid.as_ref();
+        ChartMetadata {
+            object_id,
+            title: None,
+            row_names: grid.map_or_else(Vec::new, |grid| grid.row_name.clone()),
+            column_names: grid.map_or_else(Vec::new, |grid| grid.column_name.clone()),
+            series_count: grid.map_or(0, |grid| grid.value_row.len()),
+            chart_type: ChartKind::from_raw(chart.chart_type),
+            contains_default_data: false,
         }
     }
 
-    /// Extract chart title from text storage references
-    ///
-    /// Chart titles are typically stored in TSWP.StorageArchive objects
-    /// that are referenced by the chart or its style properties.
+    /// Extract the title from the chart's native non-style extension.
     fn extract_chart_title(&self, chart: &tsch::ChartArchive) -> Result<Option<String>> {
-        // Check paragraph styles for title text
-        for para_ref in &chart.paragraph_styles {
-            if let Some(text) = self.extract_text_from_style_ref(para_ref.identifier)?
-                && !text.is_empty()
-            {
-                return Ok(Some(text));
-            }
+        let Some(reference) = chart.chart_non_style.as_ref() else {
+            return Ok(None);
+        };
+        let Some(resolved) = self
+            .object_index
+            .resolve_object(self.bundle, reference.identifier)?
+        else {
+            return Ok(None);
+        };
+        let mut messages = resolved
+            .messages
+            .iter()
+            .filter(|message| message.type_ == CHART_NON_STYLE_MESSAGE_TYPE);
+        let Some(message) = messages.next() else {
+            return Err(crate::Error::InvalidFormat(format!(
+                "chart non-style {} must have exactly one payload",
+                reference.identifier
+            )));
+        };
+        if messages.next().is_some() {
+            return Err(crate::Error::InvalidFormat(format!(
+                "chart non-style {} must have exactly one payload",
+                reference.identifier
+            )));
         }
-
-        // Check chart style for title references
-        if let Some(ref chart_style_ref) = chart.chart_style
-            && let Some(text) = self.extract_text_from_style_ref(chart_style_ref.identifier)?
-            && !text.is_empty()
-        {
-            return Ok(Some(text));
-        }
-
-        Ok(None)
-    }
-
-    /// Extract text from a style reference
-    ///
-    /// Styles may reference text storage objects that contain the actual text.
-    fn extract_text_from_style_ref(&self, style_id: u64) -> Result<Option<String>> {
-        if let Some(_resolved) = self.object_index.resolve_object(self.bundle, style_id)? {
-            // Look for associated text storages through dependencies
-            if let Some(deps) = self.object_index.get_dependencies(style_id) {
-                for &dep_id in deps {
-                    if let Some(text) = self.extract_text_from_storage(dep_id)? {
-                        return Ok(Some(text));
-                    }
-                }
-            }
-        }
-
-        Ok(None)
-    }
-
-    /// Extract text from a TSWP.StorageArchive object
-    fn extract_text_from_storage(&self, storage_id: u64) -> Result<Option<String>> {
-        if let Some(resolved) = self.object_index.resolve_object(self.bundle, storage_id)? {
-            for msg in &resolved.messages {
-                // TSWP storage types
-                if msg.type_ >= 2001
-                    && msg.type_ <= 2022
-                    && let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*msg.data)
-                    && !storage.text.is_empty()
-                {
-                    return Ok(Some(storage.text.join(" ")));
-                }
-            }
-        }
-
-        Ok(None)
+        read_chart_non_style_title(message.data.as_slice())
     }
 
     /// Extract metadata from a specific chart by object ID
@@ -274,7 +210,7 @@ impl<'a> ChartMetadataExtractor<'a> {
     pub fn chart_count(&self) -> Result<usize> {
         let mut count = 0;
 
-        for chart_type in [5000u32, 5004, 5021] {
+        for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
             count += self.object_index.find_objects_by_type(chart_type).len();
         }
 
@@ -288,7 +224,15 @@ mod tests {
 
     #[test]
     fn test_chart_metadata_creation() {
-        let metadata = ChartMetadata::new();
+        let metadata = ChartMetadata {
+            object_id: 42,
+            title: None,
+            row_names: Vec::new(),
+            column_names: Vec::new(),
+            series_count: 0,
+            chart_type: ChartKind::Undefined,
+            contains_default_data: false,
+        };
         assert_eq!(metadata.title, None);
         assert_eq!(metadata.series_count, 0);
         assert!(!metadata.has_content());
@@ -296,28 +240,34 @@ mod tests {
 
     #[test]
     fn test_chart_metadata_with_content() {
-        let mut metadata = ChartMetadata::new();
-        metadata.title = Some("Sales Chart".to_string());
-        metadata.row_names = vec!["Q1".to_string(), "Q2".to_string()];
-        metadata.column_names = vec!["Revenue".to_string()];
+        let metadata = ChartMetadata {
+            object_id: 42,
+            title: Some("Sales Chart".to_owned()),
+            row_names: vec!["Q1".to_owned(), "Q2".to_owned()],
+            column_names: vec!["Revenue".to_owned()],
+            series_count: 2,
+            chart_type: ChartKind::Column2d,
+            contains_default_data: false,
+        };
 
         assert!(metadata.has_content());
-        let all_text = metadata.all_text();
+        let all_text = metadata.all_text().collect::<Vec<_>>();
         assert_eq!(all_text.len(), 4);
-        assert!(all_text.contains(&"Sales Chart".to_string()));
+        assert!(all_text.contains(&"Sales Chart"));
     }
 
     #[test]
     fn test_chart_type_display() {
         let metadata = ChartMetadata {
+            object_id: 42,
             title: None,
             row_names: vec![],
             column_names: vec![],
             series_count: 0,
-            chart_type: "Bar".to_string(),
+            chart_type: ChartKind::Bar2d,
             contains_default_data: false,
         };
 
-        assert_eq!(metadata.chart_type, "Bar");
+        assert_eq!(metadata.chart_type, ChartKind::Bar2d);
     }
 }

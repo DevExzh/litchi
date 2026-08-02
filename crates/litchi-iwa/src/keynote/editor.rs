@@ -1,0 +1,5016 @@
+//! Semantic text editing for existing Keynote slides.
+
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
+use std::path::Path;
+
+use prost::Message;
+
+use crate::archive::{Archive, ArchiveObject, RawMessage};
+use crate::comments::{
+    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
+};
+use crate::media::reachable_embedded_assets;
+use crate::package_metadata::{
+    add_component_external_reference, add_component_link, add_component_object_uuids,
+    clone_component_registration, component_identifier_for_entry,
+    component_identifier_for_object_uuid, component_uuid_identifiers, next_object_identifier,
+    release_package_identifier_suffix, remove_component_external_references_to_object,
+    remove_component_object_uuids, remove_component_registration,
+    set_package_last_object_identifier,
+};
+use crate::protobuf::{kn, tsd, tsp, tss, tswp};
+use crate::shapes::{
+    DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
+    reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
+    set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
+};
+use crate::text::{
+    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
+    ParagraphStart, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
+    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
+    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
+    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
+    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+};
+use crate::wire::{
+    append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
+    patch_fixed64_field, patch_length_delimited_field, patch_nested_fixed32_field,
+    patch_nested_fixed64_field, patch_nested_length_delimited_field, patch_nested_varint_field,
+    patch_varint_field, remove_repeated_length_delimited_field_where,
+    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
+    transform_length_delimited_field, transform_length_delimited_fields_at_path,
+};
+use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+
+const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
+const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+const BUILD_MESSAGE_TYPE: u32 = 8;
+const BUILD_CHUNK_MESSAGE_TYPE: u32 = 153;
+const ROTATE_ACTION_EFFECT: &str = "apple:action-rotation";
+const SCALE_ACTION_EFFECT: &str = "apple:action-scale";
+const OPACITY_ACTION_EFFECT: &str = "apple:action-opacity";
+const MOVE_ACTION_EFFECT: &str = "apple:action-motion-path";
+const BLINK_ACTION_EFFECT: &str = "apple:action-blink";
+const BOUNCE_ACTION_EFFECT: &str = "apple:action-bounce";
+const FLIP_ACTION_EFFECT: &str = "apple:action-flip";
+const JIGGLE_ACTION_EFFECT: &str = "apple:action-jiggle";
+const POP_ACTION_EFFECT: &str = "apple:action-pop";
+const PULSE_ACTION_EFFECT: &str = "apple:action-pulse";
+const KEYBOARD_BUILD_EFFECT: &str = "apple:keyboard";
+const DISSOLVE_BUILD_EFFECT: &str = "apple:dissolve character";
+const SHIMMER_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.KLNShimmer";
+const SKID_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.KNBuildSkidByCharacter";
+const SWOOSH_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.BLTSwoosh";
+const TRACE_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.Trace";
+const DRAWABLE_DUPLICATE_OFFSET: f32 = 10.0;
+const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
+
+/// Writable text targets resolved from one slide in presentation order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteSlideInfo {
+    pub index: usize,
+    pub node_id: u64,
+    pub slide_id: u64,
+    pub name: Option<String>,
+    /// Theme layout currently selected for this slide.
+    ///
+    /// Legacy slides without a template relationship report `None`.
+    pub layout: Option<KeynoteSlideLayoutInfo>,
+    pub is_skipped: bool,
+    pub is_slide_number_visible: Option<bool>,
+    /// Whether the layout-provided title placeholder participates in this slide.
+    ///
+    /// `None` means the selected layout has no title placeholder. Hidden
+    /// placeholders retain their storage, so [`Self::title`] remains readable.
+    pub is_title_visible: Option<bool>,
+    /// Whether the layout-provided body placeholder participates in this slide.
+    ///
+    /// `None` means the selected layout has no body placeholder. Hidden
+    /// placeholders retain their storage, so [`Self::body`] remains readable.
+    pub is_body_visible: Option<bool>,
+    pub transition: Option<KeynoteTransitionSettings>,
+    pub title_storage_id: Option<u64>,
+    pub title: Option<String>,
+    pub body_storage_id: Option<u64>,
+    pub body: Option<String>,
+    pub notes_storage_id: Option<u64>,
+    pub notes: Option<String>,
+}
+
+/// Layout-provided text placeholder whose per-slide visibility can be changed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteSlideTextPlaceholder {
+    Title,
+    Body,
+}
+
+/// Stable identity of a slide layout in the presentation theme.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct KeynoteSlideLayoutId(u64);
+
+impl KeynoteSlideLayoutId {
+    pub fn as_u64(self) -> u64 {
+        self.0
+    }
+}
+
+/// A theme-provided Keynote slide layout.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeynoteSlideLayoutInfo {
+    pub id: KeynoteSlideLayoutId,
+    pub name: String,
+    pub is_default: bool,
+}
+
+/// Semantic role of a writable text-bearing drawable owned by a slide.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteSlideTextRole {
+    Title,
+    Body,
+    TextBox,
+    /// Writable text owned by an ordinary non-text-box shape.
+    Shape,
+}
+
+/// A writable text storage owned by a drawable on one Keynote slide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeynoteSlideTextInfo {
+    pub slide_index: usize,
+    pub drawable_object_id: u64,
+    pub role: KeynoteSlideTextRole,
+    pub storage: TextStorageInfo,
+}
+
+/// A Keynote text box removed from a slide with its final text state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemovedKeynoteTextBox {
+    pub text: KeynoteSlideTextInfo,
+}
+
+#[derive(Debug, Clone)]
+struct KeynoteTextBoxGraph {
+    slide_id: u64,
+    archive_name: String,
+    drawable_id: u64,
+    storage_id: u64,
+    object_ids: Vec<u64>,
+    uuid_object_ids: Vec<u64>,
+}
+
+fn optional_length_delimited_payload(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
+    let payloads = repeated_length_delimited_payloads(data, field_number)?;
+    if payloads.len() > 1 {
+        return Err(Error::InvalidFormat(format!(
+            "singular protobuf field {field_number} occurs more than once"
+        )));
+    }
+    Ok(payloads.into_iter().next())
+}
+
+fn required_length_delimited_payload<'a>(
+    data: &'a [u8],
+    field_number: u32,
+    context: &str,
+) -> Result<&'a [u8]> {
+    optional_length_delimited_payload(data, field_number)?.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "{context} is missing protobuf field {field_number}"
+        ))
+    })
+}
+
+/// Native start relationship for one Keynote build event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteBuildStart {
+    /// Advance to this build with a presenter click.
+    OnClick,
+    /// Start automatically after the slide transition.
+    AfterTransition,
+    /// Start concurrently with the preceding build event.
+    WithPrevious,
+    /// Start after the preceding build event completes.
+    AfterPrevious,
+}
+
+/// Speed curve for a Keynote action build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteBuildAcceleration {
+    None,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+    Custom,
+}
+
+/// Rotation direction for a Keynote Rotate action build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteRotationDirection {
+    Clockwise,
+    Counterclockwise,
+}
+
+/// Typed parameters for Keynote's object Rotate action.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeynoteRotationAction {
+    /// Total rotation in degrees. For example, two full turns plus 90° is 810°.
+    pub total_degrees: f64,
+    pub direction: KeynoteRotationDirection,
+    pub acceleration: KeynoteBuildAcceleration,
+}
+
+/// Typed parameters for Keynote's object Scale action.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeynoteScaleAction {
+    /// Final size as a factor of the object's original size (`1.5` is 150%).
+    pub scale_factor: f64,
+    pub acceleration: KeynoteBuildAcceleration,
+}
+
+/// Typed parameters for Keynote's object Opacity action.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeynoteOpacityAction {
+    /// Final opacity in Keynote percentage points (`37.0` is 37%).
+    pub opacity_percent: f64,
+    pub acceleration: KeynoteBuildAcceleration,
+}
+
+/// Node kind used by Keynote's editable Bézier motion paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteMotionPathNodeType {
+    Sharp,
+    Bezier,
+    Smooth,
+}
+
+/// A point in a Keynote motion path, measured in slide points from its origin.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeynoteMotionPathPoint {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl KeynoteMotionPathPoint {
+    pub const fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
+}
+
+/// One editable node and its absolute-in-path Bézier control points.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeynoteMotionPathNode {
+    pub in_control_point: KeynoteMotionPathPoint,
+    pub point: KeynoteMotionPathPoint,
+    pub out_control_point: KeynoteMotionPathPoint,
+    pub node_type: KeynoteMotionPathNodeType,
+}
+
+impl KeynoteMotionPathNode {
+    /// A sharp node whose control points coincide with the node.
+    pub const fn sharp(x: f32, y: f32) -> Self {
+        let point = KeynoteMotionPathPoint::new(x, y);
+        Self {
+            in_control_point: point,
+            point,
+            out_control_point: point,
+            node_type: KeynoteMotionPathNodeType::Sharp,
+        }
+    }
+}
+
+/// One continuous or closed subpath in a Keynote motion path.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteMotionSubpath {
+    pub nodes: Vec<KeynoteMotionPathNode>,
+    pub closed: bool,
+}
+
+/// Editable motion geometry stored inline in a Keynote Move action.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteMotionPath {
+    pub subpaths: Vec<KeynoteMotionSubpath>,
+    pub natural_width: f32,
+    pub natural_height: f32,
+    pub horizontal_flip: bool,
+    pub vertical_flip: bool,
+}
+
+impl KeynoteMotionPath {
+    /// A native-compatible straight path from the object's current position.
+    pub fn straight(delta_x: f32, delta_y: f32) -> Self {
+        Self {
+            subpaths: vec![KeynoteMotionSubpath {
+                nodes: vec![
+                    KeynoteMotionPathNode::sharp(0.0, 0.0),
+                    KeynoteMotionPathNode::sharp(delta_x, delta_y),
+                ],
+                closed: false,
+            }],
+            natural_width: delta_x.abs(),
+            natural_height: delta_y.abs(),
+            horizontal_flip: false,
+            vertical_flip: false,
+        }
+    }
+
+    /// Recompute conservative natural bounds from every node and control point.
+    pub fn recalculate_natural_size(&mut self) {
+        let mut points = self
+            .subpaths
+            .iter()
+            .flat_map(|subpath| &subpath.nodes)
+            .flat_map(|node| [node.in_control_point, node.point, node.out_control_point]);
+        let Some(first) = points.next() else {
+            self.natural_width = 0.0;
+            self.natural_height = 0.0;
+            return;
+        };
+        let (mut min_x, mut max_x, mut min_y, mut max_y) = (first.x, first.x, first.y, first.y);
+        for point in points {
+            min_x = min_x.min(point.x);
+            max_x = max_x.max(point.x);
+            min_y = min_y.min(point.y);
+            max_y = max_y.max(point.y);
+        }
+        self.natural_width = max_x - min_x;
+        self.natural_height = max_y - min_y;
+    }
+}
+
+/// Editable normalized timing curve used by a custom Keynote action acceleration.
+///
+/// The path starts at `(0, 0)` and ends at `(1, 1)`. Its coordinates express
+/// elapsed time on the horizontal axis and animation progress on the vertical
+/// axis, matching Keynote's native custom-curve payload.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteBuildTimingCurve {
+    pub path: KeynoteMotionPath,
+}
+
+impl KeynoteBuildTimingCurve {
+    /// Construct a one-segment cubic Bézier timing curve.
+    ///
+    /// The control points are normalized to the timing-curve coordinate space;
+    /// callers can use [`Self::from_path`] for a multi-segment curve.
+    pub fn cubic(
+        first_control_point: KeynoteMotionPathPoint,
+        second_control_point: KeynoteMotionPathPoint,
+    ) -> Self {
+        let origin = KeynoteMotionPathPoint::new(0.0, 0.0);
+        let destination = KeynoteMotionPathPoint::new(1.0, 1.0);
+        Self {
+            path: KeynoteMotionPath {
+                subpaths: vec![KeynoteMotionSubpath {
+                    nodes: vec![
+                        KeynoteMotionPathNode {
+                            in_control_point: origin,
+                            point: origin,
+                            out_control_point: first_control_point,
+                            node_type: KeynoteMotionPathNodeType::Bezier,
+                        },
+                        KeynoteMotionPathNode {
+                            in_control_point: second_control_point,
+                            point: destination,
+                            out_control_point: destination,
+                            node_type: KeynoteMotionPathNodeType::Bezier,
+                        },
+                    ],
+                    closed: false,
+                }],
+                natural_width: 1.0,
+                natural_height: 1.0,
+                horizontal_flip: false,
+                vertical_flip: false,
+            },
+        }
+    }
+
+    /// Construct a linear timing curve.
+    pub fn linear() -> Self {
+        Self::cubic(
+            KeynoteMotionPathPoint::new(0.0, 0.0),
+            KeynoteMotionPathPoint::new(1.0, 1.0),
+        )
+    }
+
+    /// Wrap an explicitly constructed native-compatible timing path.
+    pub fn from_path(path: KeynoteMotionPath) -> Self {
+        Self { path }
+    }
+}
+
+/// Typed parameters for Keynote's object Move action.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteMoveAction {
+    pub path: KeynoteMotionPath,
+    pub align_to_path: bool,
+    pub acceleration: KeynoteBuildAcceleration,
+}
+
+/// Horizontal direction used by Keynote's Flip emphasis action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteFlipDirection {
+    LeftToRight,
+    RightToLeft,
+}
+
+/// Intensity used by Keynote's Jiggle emphasis action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteJiggleIntensity {
+    Small,
+    Medium,
+    Large,
+}
+
+/// Typed parameters for Keynote's object-emphasis actions.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum KeynoteEmphasisAction {
+    Blink {
+        repeat_count: u32,
+        fade: bool,
+    },
+    Bounce {
+        repeat_count: u32,
+        decay: bool,
+    },
+    Flip {
+        repeat_count: u32,
+        direction: KeynoteFlipDirection,
+    },
+    Jiggle {
+        intensity: KeynoteJiggleIntensity,
+    },
+    Pop {
+        scale_percent: f64,
+    },
+    Pulse {
+        repeat_count: u32,
+        scale_percent: f64,
+    },
+}
+
+/// Text traversal direction used by Keynote's Keyboard build effect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteKeyboardDirection {
+    Forward,
+    Backward,
+}
+
+/// Typed parameters for Keynote's Keyboard build-in/build-out effect.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct KeynoteKeyboardBuild {
+    pub direction: KeynoteKeyboardDirection,
+    pub show_cursor: bool,
+}
+
+/// Horizontal traversal used by Keynote's Skid and Trace builds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteHorizontalBuildDirection {
+    LeftToRight,
+    RightToLeft,
+}
+
+/// Origin used by Keynote's Swoosh build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteSwooshDirection {
+    Center,
+    FromLeft,
+    FromRight,
+}
+
+/// Typed native Build In / Build Out effects with no opaque parameters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum KeynoteObjectBuildEffect {
+    Dissolve,
+    Shimmer,
+    Skid {
+        direction: KeynoteHorizontalBuildDirection,
+    },
+    Swoosh {
+        direction: KeynoteSwooshDirection,
+    },
+    Trace {
+        direction: KeynoteHorizontalBuildDirection,
+    },
+}
+
+/// Raw native parameters shared by Keynote build effects that do not yet have
+/// a dedicated semantic model.
+///
+/// The fields retain their protobuf meaning and presence. This permits
+/// lossless CRUD for newer or effect-specific builds while their user-facing
+/// semantics are still being mapped.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct KeynoteBuildCustomParameters {
+    pub bounce: Option<bool>,
+    pub motion_blur: Option<bool>,
+    pub include_endpoints: Option<bool>,
+    pub shine: Option<bool>,
+    pub scale_amount: Option<f64>,
+    pub travel_distance: Option<f64>,
+}
+
+impl KeynoteBuildCustomParameters {
+    fn is_empty(self) -> bool {
+        self == Self::default()
+    }
+}
+
+/// Editable fields for an all-at-once Keynote object build.
+///
+/// Keynote effect identifiers are database strings such as
+/// `apple:bc-appear` or `apple:dissolve character`. Keeping them as strings
+/// preserves effects introduced by newer Keynote releases.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteBuildSettings {
+    pub delivery: String,
+    pub animation_type: String,
+    pub effect: String,
+    pub duration: f64,
+    /// Delay before an `AfterTransition` or `AfterPrevious` build starts.
+    pub delay: f64,
+    pub start: KeynoteBuildStart,
+    pub direction: Option<u32>,
+    /// Raw `BuildAttributesTextDelivery` value for forward compatibility.
+    pub text_delivery: Option<i32>,
+    /// Raw `BuildAttributesDeliveryOption` value for forward compatibility.
+    pub delivery_option: Option<i32>,
+    pub event_trigger: Option<u32>,
+    /// Present for Keynote's native `apple:action-rotation` action effect.
+    pub rotation: Option<KeynoteRotationAction>,
+    /// Present for Keynote's native `apple:action-scale` action effect.
+    pub scale: Option<KeynoteScaleAction>,
+    /// Present for Keynote's native `apple:action-opacity` action effect.
+    pub opacity: Option<KeynoteOpacityAction>,
+    /// Present for Keynote's native `apple:action-motion-path` action effect.
+    pub move_action: Option<KeynoteMoveAction>,
+    /// Present for Keynote's Blink/Bounce/Flip/Jiggle/Pop/Pulse actions.
+    pub emphasis: Option<KeynoteEmphasisAction>,
+    /// Present for Keynote's native `apple:keyboard` build-in/build-out effect.
+    pub keyboard: Option<KeynoteKeyboardBuild>,
+    /// Present for typed Dissolve, Shimmer, Skid, Swoosh, and Trace builds.
+    pub object_effect: Option<KeynoteObjectBuildEffect>,
+    /// Inline curve for a typed action whose acceleration is
+    /// [`KeynoteBuildAcceleration::Custom`].
+    ///
+    /// `None` preserves an opaque app-native custom curve while updating an
+    /// existing build. New custom-curve actions require `Some`.
+    pub timing_curve: Option<KeynoteBuildTimingCurve>,
+    /// Raw parameters for native effects without a dedicated typed model.
+    pub custom_parameters: KeynoteBuildCustomParameters,
+}
+
+impl KeynoteBuildSettings {
+    /// Native playback trigger attached to a newly inserted audio clip.
+    pub(crate) fn audio_start() -> Self {
+        Self {
+            effect: "apple:audio-start".to_owned(),
+            duration: 0.5,
+            text_delivery: None,
+            delivery_option: None,
+            ..Self::appear_in()
+        }
+    }
+
+    /// Native playback trigger attached to a newly inserted movie.
+    pub(crate) fn movie_start() -> Self {
+        Self {
+            effect: "apple:movie-start".to_owned(),
+            duration: 0.5,
+            text_delivery: None,
+            delivery_option: None,
+            ..Self::appear_in()
+        }
+    }
+
+    /// Native-compatible object-level Appear build-in settings.
+    pub fn appear_in() -> Self {
+        Self {
+            delivery: "All at Once".to_owned(),
+            animation_type: "In".to_owned(),
+            effect: "apple:bc-appear".to_owned(),
+            duration: 1.0,
+            delay: 0.0,
+            start: KeynoteBuildStart::OnClick,
+            direction: None,
+            text_delivery: Some(
+                kn::build_attributes_archive::BuildAttributesTextDelivery::KTextDeliveryByObject
+                    as i32,
+            ),
+            delivery_option: Some(
+                kn::build_attributes_archive::BuildAttributesDeliveryOption::KDeliveryOptionForward
+                    as i32,
+            ),
+            event_trigger: Some(1),
+            rotation: None,
+            scale: None,
+            opacity: None,
+            move_action: None,
+            emphasis: None,
+            keyboard: None,
+            object_effect: None,
+            timing_curve: None,
+            custom_parameters: KeynoteBuildCustomParameters::default(),
+        }
+    }
+
+    /// Native-compatible object-level Appear build-out settings.
+    pub fn appear_out() -> Self {
+        Self {
+            animation_type: "Out".to_owned(),
+            ..Self::appear_in()
+        }
+    }
+
+    fn text_object_build(
+        animation_type: &str,
+        effect: KeynoteObjectBuildEffect,
+        duration: f64,
+    ) -> Self {
+        Self {
+            animation_type: animation_type.to_owned(),
+            effect: object_build_effect_identifier(effect).to_owned(),
+            duration,
+            direction: native_object_build_direction(effect),
+            object_effect: Some(effect),
+            ..Self::appear_in()
+        }
+    }
+
+    fn object_build(animation_type: &str, effect: KeynoteObjectBuildEffect, duration: f64) -> Self {
+        Self {
+            text_delivery: None,
+            delivery_option: None,
+            ..Self::text_object_build(animation_type, effect, duration)
+        }
+    }
+
+    /// Native-compatible Dissolve Build In.
+    pub fn dissolve_in() -> Self {
+        Self::text_object_build("In", KeynoteObjectBuildEffect::Dissolve, 1.0)
+    }
+
+    /// Native-compatible Dissolve Build Out.
+    pub fn dissolve_out() -> Self {
+        Self::text_object_build("Out", KeynoteObjectBuildEffect::Dissolve, 1.0)
+    }
+
+    /// Native-compatible Shimmer Build In.
+    pub fn shimmer_in() -> Self {
+        Self::object_build("In", KeynoteObjectBuildEffect::Shimmer, 1.5)
+    }
+
+    /// Native-compatible Shimmer Build Out.
+    pub fn shimmer_out() -> Self {
+        Self::object_build("Out", KeynoteObjectBuildEffect::Shimmer, 1.5)
+    }
+
+    /// Native-compatible Skid Build In.
+    pub fn skid_in(direction: KeynoteHorizontalBuildDirection) -> Self {
+        Self::object_build("In", KeynoteObjectBuildEffect::Skid { direction }, 1.25)
+    }
+
+    /// Native-compatible Skid Build Out.
+    pub fn skid_out(direction: KeynoteHorizontalBuildDirection) -> Self {
+        Self::object_build("Out", KeynoteObjectBuildEffect::Skid { direction }, 1.25)
+    }
+
+    /// Native-compatible Swoosh Build In.
+    pub fn swoosh_in(direction: KeynoteSwooshDirection) -> Self {
+        Self::object_build("In", KeynoteObjectBuildEffect::Swoosh { direction }, 1.0)
+    }
+
+    /// Native-compatible Swoosh Build Out.
+    pub fn swoosh_out(direction: KeynoteSwooshDirection) -> Self {
+        Self::object_build("Out", KeynoteObjectBuildEffect::Swoosh { direction }, 1.0)
+    }
+
+    /// Native-compatible Trace Build In.
+    pub fn trace_in(direction: KeynoteHorizontalBuildDirection) -> Self {
+        Self::object_build("In", KeynoteObjectBuildEffect::Trace { direction }, 2.0)
+    }
+
+    /// Native-compatible Trace Build Out.
+    pub fn trace_out(direction: KeynoteHorizontalBuildDirection) -> Self {
+        Self::object_build("Out", KeynoteObjectBuildEffect::Trace { direction }, 2.0)
+    }
+
+    /// Native-compatible Rotate action with Keynote's default ease-in/out curve.
+    pub fn rotate_action(total_degrees: f64, direction: KeynoteRotationDirection) -> Self {
+        Self {
+            animation_type: "Action".to_owned(),
+            effect: ROTATE_ACTION_EFFECT.to_owned(),
+            text_delivery: None,
+            delivery_option: None,
+            rotation: Some(KeynoteRotationAction {
+                total_degrees,
+                direction,
+                acceleration: KeynoteBuildAcceleration::EaseInOut,
+            }),
+            scale: None,
+            opacity: None,
+            move_action: None,
+            ..Self::appear_in()
+        }
+    }
+
+    /// Native-compatible Scale action with Keynote's default ease-in/out curve.
+    pub fn scale_action(scale_factor: f64) -> Self {
+        Self {
+            animation_type: "Action".to_owned(),
+            effect: SCALE_ACTION_EFFECT.to_owned(),
+            text_delivery: None,
+            delivery_option: None,
+            rotation: None,
+            scale: Some(KeynoteScaleAction {
+                scale_factor,
+                acceleration: KeynoteBuildAcceleration::EaseInOut,
+            }),
+            opacity: None,
+            move_action: None,
+            ..Self::appear_in()
+        }
+    }
+
+    /// Native-compatible Opacity action with Keynote's default ease-in/out curve.
+    pub fn opacity_action(opacity_percent: f64) -> Self {
+        Self {
+            animation_type: "Action".to_owned(),
+            effect: OPACITY_ACTION_EFFECT.to_owned(),
+            text_delivery: None,
+            delivery_option: None,
+            rotation: None,
+            scale: None,
+            opacity: Some(KeynoteOpacityAction {
+                opacity_percent,
+                acceleration: KeynoteBuildAcceleration::EaseInOut,
+            }),
+            move_action: None,
+            ..Self::appear_in()
+        }
+    }
+
+    /// Native-compatible straight Move action with Keynote's default curve.
+    pub fn move_action(delta_x: f32, delta_y: f32) -> Self {
+        Self::move_along_path(KeynoteMotionPath::straight(delta_x, delta_y))
+    }
+
+    /// Native-compatible Move action along an arbitrary editable Bézier path.
+    pub fn move_along_path(path: KeynoteMotionPath) -> Self {
+        Self {
+            animation_type: "Action".to_owned(),
+            effect: MOVE_ACTION_EFFECT.to_owned(),
+            text_delivery: None,
+            delivery_option: None,
+            rotation: None,
+            scale: None,
+            opacity: None,
+            move_action: Some(KeynoteMoveAction {
+                path,
+                align_to_path: false,
+                acceleration: KeynoteBuildAcceleration::EaseInOut,
+            }),
+            ..Self::appear_in()
+        }
+    }
+
+    /// Attach a custom timing curve to a typed action.
+    ///
+    /// This changes the action's acceleration to
+    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// not a Rotate, Scale, Opacity, or Move action.
+    pub fn with_custom_timing_curve(
+        mut self,
+        timing_curve: KeynoteBuildTimingCurve,
+    ) -> Result<Self> {
+        self.set_custom_timing_curve(timing_curve)?;
+        Ok(self)
+    }
+
+    /// Replace the custom timing curve of a typed action.
+    ///
+    /// This changes the action's acceleration to
+    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// not a Rotate, Scale, Opacity, or Move action.
+    pub fn set_custom_timing_curve(&mut self, timing_curve: KeynoteBuildTimingCurve) -> Result<()> {
+        validate_timing_curve(&timing_curve)?;
+        let acceleration = if let Some(action) = self.rotation.as_mut() {
+            &mut action.acceleration
+        } else if let Some(action) = self.scale.as_mut() {
+            &mut action.acceleration
+        } else if let Some(action) = self.opacity.as_mut() {
+            &mut action.acceleration
+        } else if let Some(action) = self.move_action.as_mut() {
+            &mut action.acceleration
+        } else {
+            return Err(Error::ParseError(
+                "Keynote custom timing curves require a typed action".to_owned(),
+            ));
+        };
+        *acceleration = KeynoteBuildAcceleration::Custom;
+        self.timing_curve = Some(timing_curve);
+        Ok(())
+    }
+
+    /// Native-compatible Blink emphasis action.
+    pub fn blink_action(repeat_count: u32, fade: bool) -> Self {
+        Self::emphasis_action(
+            BLINK_ACTION_EFFECT,
+            KeynoteEmphasisAction::Blink { repeat_count, fade },
+        )
+    }
+
+    /// Native-compatible Bounce emphasis action.
+    pub fn bounce_action(repeat_count: u32, decay: bool) -> Self {
+        Self::emphasis_action(
+            BOUNCE_ACTION_EFFECT,
+            KeynoteEmphasisAction::Bounce {
+                repeat_count,
+                decay,
+            },
+        )
+    }
+
+    /// Native-compatible Flip emphasis action.
+    pub fn flip_action(repeat_count: u32, direction: KeynoteFlipDirection) -> Self {
+        Self::emphasis_action(
+            FLIP_ACTION_EFFECT,
+            KeynoteEmphasisAction::Flip {
+                repeat_count,
+                direction,
+            },
+        )
+    }
+
+    /// Native-compatible Jiggle emphasis action.
+    pub fn jiggle_action(intensity: KeynoteJiggleIntensity) -> Self {
+        Self::emphasis_action(
+            JIGGLE_ACTION_EFFECT,
+            KeynoteEmphasisAction::Jiggle { intensity },
+        )
+    }
+
+    /// Native-compatible Pop emphasis action.
+    pub fn pop_action(scale_percent: f64) -> Self {
+        let mut settings = Self::emphasis_action(
+            POP_ACTION_EFFECT,
+            KeynoteEmphasisAction::Pop { scale_percent },
+        );
+        settings.duration = 0.5;
+        settings
+    }
+
+    /// Native-compatible Pulse emphasis action.
+    pub fn pulse_action(repeat_count: u32, scale_percent: f64) -> Self {
+        Self::emphasis_action(
+            PULSE_ACTION_EFFECT,
+            KeynoteEmphasisAction::Pulse {
+                repeat_count,
+                scale_percent,
+            },
+        )
+    }
+
+    /// Native-compatible Keyboard build-in settings.
+    pub fn keyboard_in(direction: KeynoteKeyboardDirection, show_cursor: bool) -> Self {
+        Self::keyboard_build("In", direction, show_cursor)
+    }
+
+    /// Native-compatible Keyboard build-out settings.
+    pub fn keyboard_out(direction: KeynoteKeyboardDirection, show_cursor: bool) -> Self {
+        Self::keyboard_build("Out", direction, show_cursor)
+    }
+
+    fn keyboard_build(
+        animation_type: &str,
+        direction: KeynoteKeyboardDirection,
+        show_cursor: bool,
+    ) -> Self {
+        Self {
+            animation_type: animation_type.to_owned(),
+            effect: KEYBOARD_BUILD_EFFECT.to_owned(),
+            duration: 3.0,
+            direction: Some(native_keyboard_direction(direction)),
+            text_delivery: None,
+            delivery_option: None,
+            keyboard: Some(KeynoteKeyboardBuild {
+                direction,
+                show_cursor,
+            }),
+            ..Self::appear_in()
+        }
+    }
+
+    fn emphasis_action(effect: &str, emphasis: KeynoteEmphasisAction) -> Self {
+        let direction = match emphasis {
+            KeynoteEmphasisAction::Flip { direction, .. } => Some(native_flip_direction(direction)),
+            _ => None,
+        };
+        Self {
+            animation_type: "Action".to_owned(),
+            effect: effect.to_owned(),
+            direction,
+            text_delivery: None,
+            delivery_option: None,
+            rotation: None,
+            scale: None,
+            opacity: None,
+            move_action: None,
+            emphasis: Some(emphasis),
+            ..Self::appear_in()
+        }
+    }
+}
+
+/// One timing chunk owned by a Keynote build.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteBuildChunkInfo {
+    pub object_id: u64,
+    pub delay: Option<f64>,
+    pub duration: Option<f64>,
+    pub automatic: Option<bool>,
+    pub referent: Option<bool>,
+    pub chunk_id: Option<i32>,
+}
+
+/// A drawable build and its timing chunks in slide build order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeynoteBuildInfo {
+    pub slide_index: usize,
+    pub object_id: u64,
+    pub drawable_object_id: u64,
+    pub settings: KeynoteBuildSettings,
+    pub chunks: Vec<KeynoteBuildChunkInfo>,
+}
+
+/// Transactional editor for a Keynote package.
+#[derive(Debug, Clone)]
+pub struct KeynoteEditor {
+    text: IWorkTextEditor,
+}
+
+impl KeynoteEditor {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_package(IWorkPackage::open(path)?)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+    }
+
+    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+        let editor = Self {
+            text: IWorkTextEditor::from_package(package),
+        };
+        editor.slides()?;
+        Ok(editor)
+    }
+
+    pub fn slides(&self) -> Result<Vec<KeynoteSlideInfo>> {
+        let graph = ObjectGraph::read(self.text.package())?;
+        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
+        let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
+
+        let mut slides = Vec::with_capacity(show.slide_tree.slides.len());
+        let mut layout_catalog = None;
+        for (index, node_reference) in show.slide_tree.slides.into_iter().enumerate() {
+            let node: kn::SlideNodeArchive =
+                graph.decode(node_reference.identifier, "KN.SlideNodeArchive")?;
+            let slide_reference = node.slide.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote slide node {} has no slide reference",
+                    node_reference.identifier
+                ))
+            })?;
+            let slide: kn::SlideArchive =
+                graph.decode(slide_reference.identifier, "KN.SlideArchive")?;
+            let layout = match slide.template_slide.as_ref() {
+                Some(template_slide) => {
+                    let catalog = match layout_catalog.as_ref() {
+                        Some(catalog) => catalog,
+                        None => {
+                            let theme = graph.decode(show.theme.identifier, "KN.ThemeArchive")?;
+                            layout_catalog
+                                .insert(slide_create::layout::LayoutCatalog::read(&graph, &theme)?)
+                        },
+                    };
+                    Some(catalog.current(template_slide.identifier)?)
+                },
+                None => None,
+            };
+            let is_title_visible = slide
+                .title_placeholder
+                .as_ref()
+                .map(|reference| {
+                    placeholder_visibility::validate_placeholder_ownership(
+                        index,
+                        &slide,
+                        reference.identifier,
+                        KeynoteSlideTextPlaceholder::Title,
+                    )
+                })
+                .transpose()?;
+            let is_body_visible = slide
+                .body_placeholder
+                .as_ref()
+                .map(|reference| {
+                    placeholder_visibility::validate_placeholder_ownership(
+                        index,
+                        &slide,
+                        reference.identifier,
+                        KeynoteSlideTextPlaceholder::Body,
+                    )
+                })
+                .transpose()?;
+            let title_storage_id = slide
+                .title_placeholder
+                .map(|reference| graph.drawable_storage(reference.identifier))
+                .transpose()?
+                .flatten();
+            let body_storage_id = slide
+                .body_placeholder
+                .map(|reference| graph.drawable_storage(reference.identifier))
+                .transpose()?
+                .flatten();
+            let title = title_storage_id
+                .map(|identifier| graph.storage_text(identifier))
+                .transpose()?;
+            let body = body_storage_id
+                .map(|identifier| graph.storage_text(identifier))
+                .transpose()?;
+            let notes_storage_id = slide
+                .note
+                .map(|reference| {
+                    graph
+                        .decode::<kn::NoteArchive>(reference.identifier, "KN.NoteArchive")
+                        .map(|note| note.contained_storage.identifier)
+                })
+                .transpose()?;
+            let notes = notes_storage_id
+                .map(|identifier| graph.storage_text(identifier))
+                .transpose()?;
+            let transition = if slide.transition.attributes.animation_attributes.is_some() {
+                let original =
+                    graph.message_data_type(slide_reference.identifier, 5, "KN.SlideArchive")?;
+                let transition =
+                    transition_settings_from_wire(original, &slide.transition.attributes)?;
+                validate_transition_wire(original, &slide.transition.attributes)?;
+                transition
+            } else {
+                None
+            };
+            slides.push(KeynoteSlideInfo {
+                index,
+                node_id: node_reference.identifier,
+                slide_id: slide_reference.identifier,
+                name: slide.name.filter(|name| !name.is_empty()),
+                layout,
+                is_skipped: node.is_skipped,
+                is_slide_number_visible: node.is_slide_number_visible,
+                is_title_visible,
+                is_body_visible,
+                transition,
+                title_storage_id,
+                title,
+                body_storage_id,
+                body,
+                notes_storage_id,
+                notes,
+            });
+        }
+        Ok(slides)
+    }
+
+    /// List every writable text storage owned by a drawable on one slide.
+    ///
+    /// This includes title and body placeholders, ordinary text boxes, and
+    /// text-bearing shapes in slide ownership order. Speaker notes are exposed separately on
+    /// [`KeynoteSlideInfo`] because they are owned by `KN.NoteArchive` rather
+    /// than a drawable.
+    pub fn slide_text_storages(&self, slide_index: usize) -> Result<Vec<KeynoteSlideTextInfo>> {
+        let slides = self.slides()?;
+        slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let graph = ObjectGraph::read(self.package())?;
+        let mut storage_owners = HashMap::<u64, (usize, u64)>::new();
+        let mut result = Vec::new();
+        for (owner_slide_index, owner) in slides.iter().enumerate() {
+            let slide: kn::SlideArchive = graph.decode(owner.slide_id, "KN.SlideArchive")?;
+            let title = slide
+                .title_placeholder
+                .as_ref()
+                .map(|reference| reference.identifier);
+            let body = slide
+                .body_placeholder
+                .as_ref()
+                .map(|reference| reference.identifier);
+            let mut seen_drawables = HashSet::with_capacity(slide.owned_drawables.len());
+            for reference in &slide.owned_drawables {
+                let drawable_id = reference.identifier;
+                if !seen_drawables.insert(drawable_id) {
+                    return Err(Error::InvalidFormat(format!(
+                        "Keynote slide {owner_slide_index} repeats owned drawable {drawable_id}"
+                    )));
+                }
+                let Some(storage_id) = graph.drawable_storage(drawable_id)? else {
+                    continue;
+                };
+                if let Some((previous_slide, previous_drawable)) =
+                    storage_owners.insert(storage_id, (owner_slide_index, drawable_id))
+                {
+                    return Err(Error::InvalidFormat(format!(
+                        "Keynote slide {previous_slide} drawable {previous_drawable} and slide {owner_slide_index} drawable {drawable_id} share owned text storage {storage_id}"
+                    )));
+                }
+                if owner_slide_index != slide_index {
+                    continue;
+                }
+                let storage = self.text.storage(storage_id).map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide {slide_index} drawable {drawable_id} owns invalid text storage {storage_id}: {error}"
+                    ))
+                })?;
+                let role = if title == Some(drawable_id) {
+                    KeynoteSlideTextRole::Title
+                } else if body == Some(drawable_id) {
+                    KeynoteSlideTextRole::Body
+                } else {
+                    let shape: tswp::ShapeInfoArchive = graph.decode_type(
+                        drawable_id,
+                        SHAPE_INFO_MESSAGE_TYPE,
+                        "TSWP.ShapeInfoArchive",
+                    )?;
+                    match shape.is_text_box {
+                        Some(true) => KeynoteSlideTextRole::TextBox,
+                        Some(false) => KeynoteSlideTextRole::Shape,
+                        None => {
+                            return Err(Error::InvalidFormat(format!(
+                                "Keynote shape {drawable_id} has no text-box classification"
+                            )));
+                        },
+                    }
+                };
+                result.push(KeynoteSlideTextInfo {
+                    slide_index,
+                    drawable_object_id: drawable_id,
+                    role,
+                    storage,
+                });
+            }
+        }
+        Ok(result)
+    }
+
+    /// Replace a UTF-16 range in a slide-owned text box, shape, or placeholder.
+    pub fn replace_slide_text_storage(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        range: Range<usize>,
+        replacement: &str,
+    ) -> Result<()> {
+        let storage_id = self.require_slide_text_storage(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.replace_text(storage_id, range, replacement)?;
+        Self::from_package(staged.package().clone())?;
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Replace all text in a slide-owned text box, shape, or placeholder.
+    pub fn set_slide_text_storage(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        replacement: &str,
+    ) -> Result<()> {
+        let storage_id = self.require_slide_text_storage(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text(storage_id, replacement)?;
+        Self::from_package(staged.package().clone())?;
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Clear slide-owned drawable text without deleting its shape or placeholder.
+    pub fn clear_slide_text_storage(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<()> {
+        self.set_slide_text_storage(slide_index, drawable_object_id, "")
+    }
+
+    /// Read the geometry of an ordinary text box owned by one slide.
+    pub fn slide_text_box_geometry(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<DrawableGeometry> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        shape_geometry(self.package(), &graph.archive_name, drawable_object_id)
+    }
+
+    /// Update position, size, flags, and rotation on a slide-owned ordinary text box.
+    pub fn set_slide_text_box_geometry(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        geometry: DrawableGeometry,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_geometry(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            geometry,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_text_box_geometry(slide_index, drawable_object_id)? != geometry {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box geometry update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read shared drawable properties from an ordinary slide-owned text box.
+    pub fn slide_text_box_properties(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<DrawableProperties> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        shape_properties(self.package(), &graph.archive_name, drawable_object_id)
+    }
+
+    /// Update shared drawable properties on an ordinary slide-owned text box.
+    ///
+    /// Keynote may disable aspect-ratio constraints for auto-sized text boxes
+    /// even though the corresponding property is present in the archive.
+    pub fn set_slide_text_box_properties(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        properties: DrawableProperties,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.package().clone();
+        set_shape_properties(
+            &mut staged,
+            &graph.archive_name,
+            drawable_object_id,
+            &properties,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_text_box_properties(slide_index, drawable_object_id)? != properties {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box properties update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read vertical alignment, edge insets, and autosizing for a text box.
+    pub fn slide_text_box_text_layout(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ShapeTextLayout> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        shape_text_layout(self.package(), &graph.archive_name, drawable_object_id)
+    }
+
+    /// Replace text-frame layout while preserving text, columns, and drawing style.
+    pub fn set_slide_text_box_text_layout(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        layout: ShapeTextLayout,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let staged = set_shape_text_layout(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+            layout,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if verified.slide_text_box_text_layout(slide_index, drawable_object_id)? != layout {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box layout update failed validation".into(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove crate-authored text-frame layout overrides.
+    pub fn reset_slide_text_box_text_layout(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_layout(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the uniform column layout of an ordinary slide text box.
+    pub fn slide_text_box_columns(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextColumns> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        shape_text_columns(self.package(), &graph.archive_name, drawable_object_id)
+    }
+
+    /// Replace the uniform column layout of an ordinary slide text box.
+    pub fn set_slide_text_box_columns(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        columns: &TextColumns,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let staged = set_shape_text_columns(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+            columns,
+        )?;
+        let verified = Self::from_package(staged)?;
+        if &verified.slide_text_box_columns(slide_index, drawable_object_id)? != columns {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box column update failed validation".into(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the inherited column layout after a crate-authored override.
+    pub fn reset_slide_text_box_columns(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let (staged, changed) = reset_shape_text_columns(
+            self.package().clone(),
+            &graph.archive_name,
+            drawable_object_id,
+        )?;
+        if changed {
+            *self = Self::from_package(staged)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform font size, bold, and italic formatting.
+    pub fn slide_text_box_text_style(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextStyle> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_style(graph.storage_id)
+    }
+
+    /// Atomically set uniform font size, bold, and italic formatting.
+    pub fn set_slide_text_box_text_style(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        style: TextStyle,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_style(graph.storage_id, style)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_style(slide_index, drawable_object_id)? != style {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box character formatting update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited character formatting while preserving paragraph overrides.
+    pub fn reset_slide_text_box_text_style(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_style(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective PostScript font identity of an ordinary slide text box.
+    pub fn slide_text_box_text_font(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextFont> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_font(graph.storage_id)
+    }
+
+    /// Atomically set a typed font identity across an ordinary slide text box.
+    pub fn set_slide_text_box_text_font(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        font: TextFont,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_font(graph.storage_id, font)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the inherited font while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_font(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_font(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read every explicit language boundary in an ordinary slide text box.
+    pub fn slide_text_box_text_languages(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextLanguageRun>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_languages(graph.storage_id)
+    }
+
+    /// Read the effective language at one UTF-16 text boundary.
+    pub fn slide_text_box_text_language(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        position: TextPosition,
+    ) -> Result<TextLanguage> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_language(graph.storage_id, position)
+    }
+
+    /// Atomically create or update one text-language boundary.
+    pub fn set_slide_text_box_text_language(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        position: TextPosition,
+        language: TextLanguage,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_language(graph.storage_id, position, language)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Delete one nonzero language boundary so it inherits the preceding run.
+    pub fn remove_slide_text_box_text_language_boundary(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        position: TextPosition,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.remove_text_language_boundary(graph.storage_id, position)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Restore automatic language selection across an ordinary slide text box.
+    pub fn reset_slide_text_box_text_languages(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_languages(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read every hyperlink in an ordinary slide text box.
+    pub fn slide_text_box_hyperlinks(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextHyperlink>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_hyperlinks(graph.storage_id)
+    }
+
+    /// Create a hyperlink over a nonempty, unoccupied UTF-16 text range.
+    pub fn add_slide_text_box_hyperlink(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let hyperlink = staged.add_text_hyperlink(graph.storage_id, range, target)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(hyperlink)
+    }
+
+    /// Update a text-box hyperlink's range and target without changing its ID.
+    pub fn update_slide_text_box_hyperlink(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHyperlinkId,
+        range: TextRange,
+        target: TextHyperlinkTarget,
+    ) -> Result<TextHyperlink> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let hyperlink = staged.update_text_hyperlink(graph.storage_id, id, range, target)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(hyperlink)
+    }
+
+    /// Delete a text-box hyperlink and its owned smart-field object.
+    pub fn remove_slide_text_box_hyperlink(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHyperlinkId,
+    ) -> Result<TextHyperlink> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let hyperlink = staged.remove_text_hyperlink(graph.storage_id, id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(hyperlink)
+    }
+
+    /// Read every plain highlight in an ordinary slide text box.
+    pub fn slide_text_box_highlights(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextHighlight>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_highlights(graph.storage_id)
+    }
+
+    /// Create a plain highlight over a nonempty UTF-16 text range.
+    pub fn add_slide_text_box_highlight(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let highlight = staged.add_text_highlight(graph.storage_id, range)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(highlight)
+    }
+
+    /// Move a plain text-box highlight without changing its ID.
+    pub fn update_slide_text_box_highlight(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHighlightId,
+        range: TextRange,
+    ) -> Result<TextHighlight> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let highlight = staged.update_text_highlight(graph.storage_id, id, range)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(highlight)
+    }
+
+    /// Delete a plain text-box highlight and its empty annotation graph.
+    pub fn remove_slide_text_box_highlight(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextHighlightId,
+    ) -> Result<TextHighlight> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let highlight = staged.remove_text_highlight(graph.storage_id, id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(highlight)
+    }
+
+    /// Read every ranged comment in an ordinary slide text box.
+    pub fn slide_text_box_comments(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<TextComment>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_comments(graph.storage_id)
+    }
+
+    /// Create a ranged comment in an ordinary slide text box.
+    pub fn add_slide_text_box_comment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let comment = staged.add_text_comment(graph.storage_id, range, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(comment)
+    }
+
+    /// Update a text-box comment's range and body without changing its ID.
+    pub fn update_slide_text_box_comment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextCommentId,
+        range: TextRange,
+        body: TextCommentBody,
+    ) -> Result<TextComment> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let comment = staged.update_text_comment(graph.storage_id, id, range, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(comment)
+    }
+
+    /// Delete a ranged text-box comment and its owned annotation graph.
+    pub fn remove_slide_text_box_comment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        id: TextCommentId,
+    ) -> Result<TextComment> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let comment = staged.remove_text_comment(graph.storage_id, id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(comment)
+    }
+
+    /// Read every direct reply to a slide text-box comment in stored order.
+    pub fn slide_text_box_comment_replies(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+    ) -> Result<Vec<TextCommentReply>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_comment_replies(graph.storage_id, comment_id)
+    }
+
+    /// Append a direct reply to a slide text-box comment.
+    pub fn add_slide_text_box_comment_reply(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+        body: TextCommentReplyBody,
+    ) -> Result<TextCommentReply> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let reply = staged.add_text_comment_reply(graph.storage_id, comment_id, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(reply)
+    }
+
+    /// Update a direct slide text-box comment reply without changing its ID.
+    pub fn update_slide_text_box_comment_reply(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+        reply_id: TextCommentReplyId,
+        body: TextCommentReplyBody,
+    ) -> Result<TextCommentReply> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let reply =
+            staged.update_text_comment_reply(graph.storage_id, comment_id, reply_id, body)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(reply)
+    }
+
+    /// Delete one direct slide text-box comment reply and its storage.
+    pub fn remove_slide_text_box_comment_reply(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        comment_id: TextCommentId,
+        reply_id: TextCommentReplyId,
+    ) -> Result<TextCommentReply> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let reply = staged.remove_text_comment_reply(graph.storage_id, comment_id, reply_id)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(reply)
+    }
+
+    /// Read the canonical list preset of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_list(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphList> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_list(graph.storage_id)
+    }
+
+    /// Atomically apply a canonical list preset to an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_list(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        list: ParagraphList,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list(graph.storage_id, list)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Remove list formatting from an ordinary slide text box.
+    pub fn reset_slide_text_box_paragraph_list(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read every list-level boundary in an ordinary slide text box.
+    pub fn slide_text_box_paragraph_list_levels(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ParagraphListLevelPlacement>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_list_levels(graph.storage_id)
+    }
+
+    /// Read one paragraph's effective list nesting level.
+    pub fn slide_text_box_paragraph_list_level(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListLevel> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_list_level(graph.storage_id, paragraph)
+    }
+
+    /// Atomically set one paragraph's list nesting level.
+    pub fn set_slide_text_box_paragraph_list_level(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        level: ParagraphListLevel,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_level(graph.storage_id, paragraph, level)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore one paragraph to the top-level list nesting level.
+    pub fn reset_slide_text_box_paragraph_list_level(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_level(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read whether one slide text-box paragraph continues or restarts list numbering.
+    pub fn slide_text_box_paragraph_list_numbering(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumbering> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_numbering(graph.storage_id, paragraph)
+    }
+
+    /// Continue or restart numbered-list sequencing at one slide text-box paragraph.
+    pub fn set_slide_text_box_paragraph_list_numbering(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        numbering: ParagraphListNumbering,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_numbering(graph.storage_id, paragraph, numbering)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Read one numbered slide text-box paragraph's effective label format.
+    pub fn slide_text_box_paragraph_list_number_format(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberFormat> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_number_format(graph.storage_id, paragraph)
+    }
+
+    /// Set one numbered slide text-box paragraph's locale-aware label format.
+    pub fn set_slide_text_box_paragraph_list_number_format(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        format: ParagraphListNumberFormat,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_number_format(graph.storage_id, paragraph, format)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the standard decimal-period label format.
+    pub fn reset_slide_text_box_paragraph_list_number_format(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_number_format(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read whether one numbered slide text-box paragraph displays hierarchical numbering.
+    pub fn slide_text_box_paragraph_list_number_tiering(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberTiering> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_number_tiering(graph.storage_id, paragraph)
+    }
+
+    /// Choose flat or hierarchical numbering for one slide text-box list level.
+    pub fn set_slide_text_box_paragraph_list_number_tiering(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        tiering: ParagraphListNumberTiering,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_number_tiering(graph.storage_id, paragraph, tiering)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore flat numbering for one slide text-box list level.
+    pub fn reset_slide_text_box_paragraph_list_number_tiering(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_number_tiering(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one numbered slide text-box paragraph's number-label size.
+    pub fn slide_text_box_paragraph_list_number_scale(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListNumberScale> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_number_scale(graph.storage_id, paragraph)
+    }
+
+    /// Set one numbered slide text-box paragraph's number-label size.
+    pub fn set_slide_text_box_paragraph_list_number_scale(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        scale: ParagraphListNumberScale,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_number_scale(graph.storage_id, paragraph, scale)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the standard 100% number-label size.
+    pub fn reset_slide_text_box_paragraph_list_number_scale(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_number_scale(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one slide text-box paragraph's effective text-bullet marker.
+    pub fn slide_text_box_paragraph_list_bullet(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListBullet> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_list_bullet(graph.storage_id, paragraph)
+    }
+
+    /// Set one slide text-box paragraph's text-bullet marker.
+    pub fn set_slide_text_box_paragraph_list_bullet(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        bullet: &ParagraphListBullet,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_bullet(graph.storage_id, paragraph, bullet)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore Apple's standard `•` marker for one slide text-box paragraph.
+    pub fn reset_slide_text_box_paragraph_list_bullet(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_bullet(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one slide text-box paragraph's effective bullet size and baseline.
+    pub fn slide_text_box_paragraph_list_bullet_geometry(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListBulletGeometry> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_bullet_geometry(graph.storage_id, paragraph)
+    }
+
+    /// Set one slide text-box paragraph's bullet size and baseline.
+    pub fn set_slide_text_box_paragraph_list_bullet_geometry(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        geometry: ParagraphListBulletGeometry,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_bullet_geometry(graph.storage_id, paragraph, geometry)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore Apple's standard bullet size and baseline for this nesting level.
+    pub fn reset_slide_text_box_paragraph_list_bullet_geometry(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_bullet_geometry(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one slide text-box list paragraph's label and text-gap indentation.
+    pub fn slide_text_box_paragraph_list_indentation(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListIndentation> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_indentation(graph.storage_id, paragraph)
+    }
+
+    /// Set one slide text-box list paragraph's label and text-gap indentation.
+    pub fn set_slide_text_box_paragraph_list_indentation(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        indentation: ParagraphListIndentation,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_indentation(graph.storage_id, paragraph, indentation)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore Apple's standard indentation for this list preset and level.
+    pub fn reset_slide_text_box_paragraph_list_indentation(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_indentation(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one slide text-box list paragraph's effective label color.
+    pub fn slide_text_box_paragraph_list_label_color(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<ParagraphListLabelColor> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_list_label_color(graph.storage_id, paragraph)
+    }
+
+    /// Set one slide text-box list paragraph's bullet or number color.
+    pub fn set_slide_text_box_paragraph_list_label_color(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+        color: ParagraphListLabelColor,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_list_label_color(graph.storage_id, paragraph, color)?;
+        *self = Self::from_package(staged.into_package())?;
+        Ok(())
+    }
+
+    /// Restore the list label to the paragraph's automatic text color.
+    pub fn reset_slide_text_box_paragraph_list_label_color(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_list_label_color(graph.storage_id, paragraph)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform underline and strikethrough formatting.
+    pub fn slide_text_box_text_decorations(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextDecorations> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_decorations(graph.storage_id)
+    }
+
+    /// Atomically set uniform underline and strikethrough formatting.
+    pub fn set_slide_text_box_text_decorations(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        decorations: TextDecorations,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_decorations(graph.storage_id, decorations)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_decorations(slide_index, drawable_object_id)? != decorations
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box decoration update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited decorations while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_decorations(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_decorations(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective uniform text color of an ordinary slide text box.
+    pub fn slide_text_box_text_color(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<RgbaColor> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_color(graph.storage_id)
+    }
+
+    /// Atomically set one text color across an ordinary slide text box.
+    pub fn set_slide_text_box_text_color(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        color: RgbaColor,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_color(graph.storage_id, color)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_color(slide_index, drawable_object_id)? != color {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box color update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited text color while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_color(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_color(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform capitalization from an ordinary slide text box.
+    pub fn slide_text_box_text_capitalization(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextCapitalization> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_capitalization(graph.storage_id)
+    }
+
+    /// Atomically set one capitalization mode across an ordinary slide text box.
+    pub fn set_slide_text_box_text_capitalization(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        capitalization: TextCapitalization,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_capitalization(graph.storage_id, capitalization)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_capitalization(slide_index, drawable_object_id)?
+            != capitalization
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box capitalization update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited capitalization while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_capitalization(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_capitalization(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective uniform baseline script from an ordinary slide text box.
+    pub fn slide_text_box_text_script(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextScript> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_script(graph.storage_id)
+    }
+
+    /// Atomically set normal, superscript, or subscript formatting.
+    pub fn set_slide_text_box_text_script(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        script: TextScript,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_script(graph.storage_id, script)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_script(slide_index, drawable_object_id)? != script {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box script update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited baseline script while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_script(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_script(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective custom baseline displacement of an ordinary slide text box.
+    pub fn slide_text_box_text_baseline_shift(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextBaselineShift> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_baseline_shift(graph.storage_id)
+    }
+
+    /// Atomically set a signed custom baseline displacement.
+    pub fn set_slide_text_box_text_baseline_shift(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        shift: TextBaselineShift,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_baseline_shift(graph.storage_id, shift)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_baseline_shift(slide_index, drawable_object_id)? != shift {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box baseline-shift update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited baseline displacement while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_baseline_shift(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_baseline_shift(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective character spacing of an ordinary slide text box.
+    pub fn slide_text_box_text_character_spacing(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextCharacterSpacing> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_character_spacing(graph.storage_id)
+    }
+
+    /// Atomically set character spacing across an ordinary slide text box.
+    pub fn set_slide_text_box_text_character_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        spacing: TextCharacterSpacing,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_character_spacing(graph.storage_id, spacing)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_character_spacing(slide_index, drawable_object_id)?
+            != spacing
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box character-spacing update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited character spacing while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_character_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_character_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of an ordinary slide text box.
+    pub fn slide_text_box_text_ligatures(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextLigatures> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_ligatures(graph.storage_id)
+    }
+
+    /// Atomically set the ligature policy across an ordinary slide text box.
+    pub fn set_slide_text_box_text_ligatures(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        ligatures: TextLigatures,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_ligatures(graph.storage_id, ligatures)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_ligatures(slide_index, drawable_object_id)? != ligatures {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box ligature update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited ligatures while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_ligatures(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_ligatures(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective outline of an ordinary slide text box.
+    pub fn slide_text_box_text_outline(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextOutline> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_outline(graph.storage_id)
+    }
+
+    /// Atomically set a typed outline across an ordinary slide text box.
+    pub fn set_slide_text_box_text_outline(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        outline: TextOutline,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_outline(graph.storage_id, outline)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_outline(slide_index, drawable_object_id)? != outline {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box outline update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited outline while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_outline(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_outline(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective shadow of an ordinary slide text box.
+    pub fn slide_text_box_text_shadow(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextShadow> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_shadow(graph.storage_id)
+    }
+
+    /// Atomically set a typed drop shadow across an ordinary slide text box.
+    pub fn set_slide_text_box_text_shadow(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        shadow: TextShadow,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_shadow(graph.storage_id, shadow)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_shadow(slide_index, drawable_object_id)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box shadow update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited shadow while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_shadow(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_shadow(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective solid background of an ordinary slide text box.
+    pub fn slide_text_box_text_background(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextBackground> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.text_background(graph.storage_id)
+    }
+
+    /// Atomically set a solid background across an ordinary slide text box.
+    pub fn set_slide_text_box_text_background(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        background: TextBackground,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_text_background(graph.storage_id, background)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_text_background(slide_index, drawable_object_id)? != background {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box background update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited text background while preserving sibling overrides.
+    pub fn reset_slide_text_box_text_background(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_text_background(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective Text → Layout paragraph background.
+    pub fn slide_text_box_paragraph_background(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphBackground> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_background(graph.storage_id)
+    }
+
+    /// Atomically set the paragraph background across a slide text box.
+    pub fn set_slide_text_box_paragraph_background(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        background: ParagraphBackground,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_background(graph.storage_id, background)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_background(slide_index, drawable_object_id)?
+            != background
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph background update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph background.
+    pub fn reset_slide_text_box_paragraph_background(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_background(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective Text → Layout paragraph borders.
+    pub fn slide_text_box_paragraph_borders(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphBorders> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_borders(graph.storage_id)
+    }
+
+    /// Atomically set paragraph borders across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_borders(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        borders: ParagraphBorders,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_borders(graph.storage_id, borders)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_borders(slide_index, drawable_object_id)? != borders {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph border update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph borders.
+    pub fn reset_slide_text_box_paragraph_borders(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_borders(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph pagination and hyphenation controls.
+    pub fn slide_text_box_paragraph_flow(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphFlow> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_flow(graph.storage_id)
+    }
+
+    /// Atomically set paragraph pagination and hyphenation controls.
+    pub fn set_slide_text_box_paragraph_flow(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        flow: ParagraphFlow,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_flow(graph.storage_id, flow)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_flow(slide_index, drawable_object_id)? != flow {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph flow update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited paragraph pagination and hyphenation controls.
+    pub fn reset_slide_text_box_paragraph_flow(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_flow(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective base-writing direction of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_writing_direction(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphWritingDirection> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_writing_direction(graph.storage_id)
+    }
+
+    /// Set one base-writing direction across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_writing_direction(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        direction: ParagraphWritingDirection,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_writing_direction(graph.storage_id, direction)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_writing_direction(slide_index, drawable_object_id)?
+            != direction
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph writing-direction update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited base-writing direction.
+    pub fn reset_slide_text_box_paragraph_writing_direction(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_writing_direction(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph alignment of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_alignment(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<TextAlignment> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_alignment(graph.storage_id)
+    }
+
+    /// Set one paragraph alignment across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_alignment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        alignment: TextAlignment,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_alignment(graph.storage_id, alignment)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_alignment(slide_index, drawable_object_id)?
+            != alignment
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph-alignment update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited paragraph alignment after a private minimal override.
+    pub fn reset_slide_text_box_paragraph_alignment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_alignment(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective line spacing of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_line_spacing(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphLineSpacing> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_line_spacing(graph.storage_id)
+    }
+
+    /// Set one typed line-spacing mode across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_line_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        spacing: ParagraphLineSpacing,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_line_spacing(graph.storage_id, spacing)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_line_spacing(slide_index, drawable_object_id)?
+            != spacing
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph line-spacing update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited line spacing while preserving sibling paragraph overrides.
+    pub fn reset_slide_text_box_paragraph_line_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_line_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective before/after paragraph spacing of an ordinary slide text box.
+    pub fn slide_text_box_paragraph_spacing(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphSpacing> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_spacing(graph.storage_id)
+    }
+
+    /// Atomically set before/after paragraph spacing across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        spacing: ParagraphSpacing,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_spacing(graph.storage_id, spacing)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_spacing(slide_index, drawable_object_id)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph spacing update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited paragraph spacing while preserving sibling overrides.
+    pub fn reset_slide_text_box_paragraph_spacing(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_spacing(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective first-line, left, and right indentation of a slide text box.
+    pub fn slide_text_box_paragraph_indents(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphIndents> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_indents(graph.storage_id)
+    }
+
+    /// Atomically set paragraph indentation across an ordinary slide text box.
+    pub fn set_slide_text_box_paragraph_indents(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        indents: ParagraphIndents,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_indents(graph.storage_id, indents)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_indents(slide_index, drawable_object_id)? != indents {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph indentation update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited indentation while preserving sibling paragraph overrides.
+    pub fn reset_slide_text_box_paragraph_indents(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_indents(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the decimal-tab alignment character of a slide text box.
+    pub fn slide_text_box_paragraph_decimal_tab_character(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphDecimalTabCharacter> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_decimal_tab_character(graph.storage_id)
+    }
+
+    /// Atomically set the decimal-tab alignment character of a slide text box.
+    pub fn set_slide_text_box_paragraph_decimal_tab_character(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        character: ParagraphDecimalTabCharacter,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_decimal_tab_character(graph.storage_id, character)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified
+            .slide_text_box_paragraph_decimal_tab_character(slide_index, drawable_object_id)?
+            != character
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box decimal-tab character update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited decimal-tab alignment character.
+    pub fn reset_slide_text_box_paragraph_decimal_tab_character(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_decimal_tab_character(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the distance between implicit tab stops in a slide text box.
+    pub fn slide_text_box_paragraph_default_tab_interval(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphDefaultTabInterval> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_default_tab_interval(graph.storage_id)
+    }
+
+    /// Atomically set the distance between implicit tab stops in a slide text box.
+    pub fn set_slide_text_box_paragraph_default_tab_interval(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        interval: ParagraphDefaultTabInterval,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_default_tab_interval(graph.storage_id, interval)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified
+            .slide_text_box_paragraph_default_tab_interval(slide_index, drawable_object_id)?
+            != interval
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box default-tab interval update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore the inherited default-tab interval.
+    pub fn reset_slide_text_box_paragraph_default_tab_interval(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_default_tab_interval(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ordered ruler tab stops of a slide text box.
+    pub fn slide_text_box_paragraph_tab_stops(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<ParagraphTabStops> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_tab_stops(graph.storage_id)
+    }
+
+    /// Atomically replace every explicit ruler tab stop of a slide text box.
+    pub fn set_slide_text_box_paragraph_tab_stops(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        stops: ParagraphTabStops,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_tab_stops(graph.storage_id, stops)?;
+        let expected = staged.paragraph_tab_stops(graph.storage_id)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_tab_stops(slide_index, drawable_object_id)? != expected
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box paragraph tab-stop update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Restore inherited tab stops while preserving sibling paragraph overrides.
+    pub fn reset_slide_text_box_paragraph_tab_stops(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.reset_paragraph_tab_stops(graph.storage_id)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// List every Drop Cap in a slide-owned text box.
+    pub fn slide_text_box_paragraph_drop_caps(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text.paragraph_drop_caps(graph.storage_id)
+    }
+
+    /// Read the Drop Cap attached to one text-box paragraph.
+    pub fn slide_text_box_paragraph_drop_cap(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<Option<ParagraphDropCap>> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        self.text
+            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+    }
+
+    /// Atomically create or replace a text-box Drop Cap.
+    pub fn set_slide_text_box_paragraph_drop_cap(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+        drop_cap: ParagraphDropCap,
+    ) -> Result<()> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        staged.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        let verified = Self::from_package(staged.package().clone())?;
+        if verified.slide_text_box_paragraph_drop_cap(
+            slide_index,
+            drawable_object_id,
+            paragraph_start,
+        )? != Some(drop_cap)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box Drop Cap update failed validation".to_owned(),
+            ));
+        }
+        self.text = staged;
+        Ok(())
+    }
+
+    /// Atomically remove a text-box Drop Cap.
+    pub fn remove_slide_text_box_paragraph_drop_cap(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        paragraph_start: ParagraphStart,
+    ) -> Result<bool> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let mut staged = self.text.clone();
+        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
+        if changed {
+            *self = Self::from_package(staged.into_package())?;
+        }
+        Ok(changed)
+    }
+
+    /// Duplicate an ordinary slide-owned text box with independent storage.
+    ///
+    /// The shape, stand-in title and caption, and writable storage are cloned
+    /// into the same slide component with fresh object identifiers and UUIDs.
+    /// The clone is appended to both drawable ownership lists and offset by ten
+    /// points so it remains independently selectable in Keynote.
+    pub fn duplicate_slide_text_box(
+        &mut self,
+        slide_index: usize,
+        source_drawable_object_id: u64,
+        text: &str,
+    ) -> Result<KeynoteSlideTextInfo> {
+        let source = self.text_box_graph(slide_index, source_drawable_object_id)?;
+        let mut staged = self.package().clone();
+        let first_identifier = next_object_identifier(&staged)?;
+        let mut remap = HashMap::with_capacity(source.object_ids.len());
+        for (offset, identifier) in source.object_ids.iter().copied().enumerate() {
+            let offset = u64::try_from(offset)
+                .map_err(|_| Error::ParseError("Keynote text-box graph is too large".to_owned()))?;
+            let replacement = first_identifier
+                .checked_add(offset)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+            remap.insert(identifier, replacement);
+        }
+
+        for identifier in &source.object_ids {
+            let cloned = {
+                let archive = staged.archive(&source.archive_name)?;
+                let source_object = archive.object(*identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("Keynote text-box object {identifier} is missing"))
+                })?;
+                clone_slide_object(source_object, &remap)?
+            };
+            staged.update_archive(&source.archive_name, |archive| {
+                archive.insert_object(cloned)
+            })?;
+        }
+
+        let new_drawable_id = remap[&source.drawable_id];
+        let new_storage_id = remap[&source.storage_id];
+        offset_keynote_drawable_clone(
+            &mut staged,
+            &source.archive_name,
+            new_drawable_id,
+            DRAWABLE_DUPLICATE_OFFSET,
+        )?;
+        let mut text_editor = IWorkTextEditor::from_package(staged);
+        text_editor.set_text(new_storage_id, text)?;
+        staged = text_editor.into_package();
+        patch_slide_drawable_references(
+            &mut staged,
+            &source.archive_name,
+            source.slide_id,
+            None,
+            Some(new_drawable_id),
+        )?;
+        let last_identifier = remap.values().copied().max().ok_or_else(|| {
+            Error::InvalidFormat("Keynote text-box graph has no object identifiers".to_owned())
+        })?;
+        set_package_last_object_identifier(&mut staged, last_identifier)?;
+        let new_uuid_object_ids = source
+            .uuid_object_ids
+            .iter()
+            .map(|identifier| remap[identifier])
+            .collect::<Vec<_>>();
+        add_component_object_uuids(&mut staged, source.slide_id, &new_uuid_object_ids)?;
+
+        let verified = Self::from_package(staged)?;
+        let created = verified
+            .slide_text_storages(slide_index)?
+            .into_iter()
+            .find(|item| item.drawable_object_id == new_drawable_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Keynote text-box duplication failed validation".to_owned())
+            })?;
+        let created_graph = verified.text_box_graph(slide_index, new_drawable_id)?;
+        if created.role != KeynoteSlideTextRole::TextBox
+            || created.storage.object_id != new_storage_id
+            || created.storage.text != text
+            || created_graph.object_ids.len() != source.object_ids.len()
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box duplication produced an inconsistent graph".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(created)
+    }
+
+    /// Remove an ordinary slide-owned text box and its private object graph.
+    pub fn remove_slide_text_box(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<RemovedKeynoteTextBox> {
+        let graph = self.text_box_graph(slide_index, drawable_object_id)?;
+        let text = self
+            .slide_text_storages(slide_index)?
+            .into_iter()
+            .find(|item| item.drawable_object_id == drawable_object_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote text box {drawable_object_id} lost its writable storage"
+                ))
+            })?;
+
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        comments.clear_comment(drawable_object_id)?;
+        let mut staged = comments.into_package();
+        patch_slide_drawable_references(
+            &mut staged,
+            &graph.archive_name,
+            graph.slide_id,
+            Some(drawable_object_id),
+            None,
+        )?;
+        for identifier in &graph.object_ids {
+            remove_object(&mut staged, &graph.archive_name, *identifier)?;
+        }
+        for identifier in &graph.object_ids {
+            if package_references_object(&staged, *identifier)? {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote text-box object {identifier} remains referenced after deletion"
+                )));
+            }
+        }
+        remove_component_object_uuids(&mut staged, graph.slide_id, &graph.uuid_object_ids)?;
+        release_package_identifier_suffix(&mut staged, &graph.object_ids)?;
+
+        let verified = Self::from_package(staged)?;
+        if verified
+            .slide_text_storages(slide_index)?
+            .iter()
+            .any(|item| item.drawable_object_id == drawable_object_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote text-box deletion failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(RemovedKeynoteTextBox { text })
+    }
+
+    /// List supported direct-comment drawables owned by one slide.
+    pub fn slide_drawables(&self, slide_index: usize) -> Result<Vec<IWorkDrawableInfo>> {
+        let owned = self.slide_owned_drawable_ids(slide_index)?;
+        let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
+            .drawables()?
+            .into_iter()
+            .filter(|drawable| owned.contains(&drawable.object_id))
+            .collect::<Vec<_>>();
+        drawables.sort_by_key(|drawable| drawable.object_id);
+        Ok(drawables)
+    }
+
+    /// Read a comment attached directly to a drawable owned by one slide.
+    pub fn slide_drawable_comment(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Option<DrawableCommentInfo>> {
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        IWorkDrawableCommentEditor::from_package(self.package().clone())?
+            .comment(drawable_object_id)
+    }
+
+    /// Create or replace a direct drawable comment on one slide.
+    pub fn set_slide_drawable_comment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        comments.set_comment(drawable_object_id, text)?;
+        let staged = comments.into_package();
+        Self::from_package(staged.clone())?;
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    /// Delete a direct drawable comment on one slide.
+    pub fn clear_slide_drawable_comment(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<()> {
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        comments.clear_comment(drawable_object_id)?;
+        let staged = comments.into_package();
+        Self::from_package(staged.clone())?;
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    /// Read direct replies in a comment thread on one slide drawable.
+    pub fn slide_drawable_comment_replies(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<Vec<DrawableCommentReplyInfo>> {
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        IWorkDrawableCommentEditor::from_package(self.package().clone())?
+            .replies(drawable_object_id)
+    }
+
+    /// Add a reply to a direct comment on one slide drawable.
+    pub fn add_slide_drawable_comment_reply(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let reply_id = comments.add_reply(drawable_object_id, text)?;
+        let staged = comments.into_package();
+        Self::from_package(staged.clone())?;
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(reply_id)
+    }
+
+    /// Update a direct reply, returning its current storage identifier.
+    pub fn set_slide_drawable_comment_reply(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        reply_storage_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
+        let staged = comments.into_package();
+        Self::from_package(staged.clone())?;
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(reply_id)
+    }
+
+    /// Remove a direct reply from a comment on one slide drawable.
+    pub fn remove_slide_drawable_comment_reply(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        reply_storage_object_id: u64,
+    ) -> Result<()> {
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
+        let staged = comments.into_package();
+        Self::from_package(staged.clone())?;
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    pub fn set_slide_skipped(&mut self, slide_index: usize, skipped: bool) -> Result<()> {
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let node_id = slide.node_id;
+        let graph = ObjectGraph::read(self.text.package())?;
+        let archive_name = graph.archive_name(node_id)?.to_owned();
+        let mut staged = self.text.package().clone();
+        staged.update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(node_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote slide node {node_id} is missing"))
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| kn::SlideNodeArchive::decode(message.data.as_slice()).is_ok())
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide node {node_id} has no SlideNodeArchive payload"
+                    ))
+                })?;
+            let message_type = object.messages[message_index].type_;
+            let original = object.messages[message_index].data.as_slice();
+            let data = patch_varint_field(original, 4, true, Some(u64::from(skipped)))?;
+            let node = kn::SlideNodeArchive::decode(data.as_slice())?;
+            if node.is_skipped != skipped {
+                return Err(Error::InvalidFormat(
+                    "Keynote slide skip-state wire patch failed validation".to_owned(),
+                ));
+            }
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .slides()?
+            .get(slide_index)
+            .map(|slide| slide.is_skipped)
+            != Some(skipped)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote slide skip-state update failed validation".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    /// List semantic object builds and their timing chunks for one slide.
+    #[allow(deprecated)]
+    pub fn slide_builds(&self, slide_index: usize) -> Result<Vec<KeynoteBuildInfo>> {
+        let slides = self.slides()?;
+        let slide_info = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let graph = ObjectGraph::read(self.package())?;
+        let slide: kn::SlideArchive = graph.decode(slide_info.slide_id, "KN.SlideArchive")?;
+        let archive_name = graph.archive_name(slide_info.slide_id)?;
+        let owned_drawables = slide
+            .owned_drawables
+            .iter()
+            .map(|reference| reference.identifier)
+            .collect::<HashSet<_>>();
+        if owned_drawables.len() != slide.owned_drawables.len() {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide {slide_index} repeats an owned drawable"
+            )));
+        }
+
+        let mut build_ids = HashSet::with_capacity(slide.builds.len());
+        for reference in &slide.builds {
+            if !build_ids.insert(reference.identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote slide {slide_index} repeats build {}",
+                    reference.identifier
+                )));
+            }
+            if graph.archive_name(reference.identifier)? != archive_name {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build {} is outside slide component {archive_name}",
+                    reference.identifier
+                )));
+            }
+        }
+
+        let mut chunks_by_build = HashMap::<u64, Vec<KeynoteBuildChunkInfo>>::new();
+        let mut chunk_ids = HashSet::with_capacity(slide.build_chunks.len());
+        for reference in &slide.build_chunks {
+            let chunk_id = reference.identifier;
+            if !chunk_ids.insert(chunk_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote slide {slide_index} repeats build chunk {chunk_id}"
+                )));
+            }
+            if graph.archive_name(chunk_id)? != archive_name {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build chunk {chunk_id} is outside slide component {archive_name}"
+                )));
+            }
+            let chunk: kn::BuildChunkArchive =
+                graph.decode_type(chunk_id, BUILD_CHUNK_MESSAGE_TYPE, "KN.BuildChunkArchive")?;
+            let build_id = chunk
+                .build
+                .as_ref()
+                .map(|reference| reference.identifier)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote build chunk {chunk_id} has no build reference"
+                    ))
+                })?;
+            if !build_ids.contains(&build_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build chunk {chunk_id} refers to unowned build {build_id}"
+                )));
+            }
+            let identifier = chunk.build_chunk_identifier.as_ref();
+            if let (Some(build_uuid), Some(identifier_uuid)) = (
+                chunk.build_id.as_ref(),
+                identifier.and_then(|value| value.build_id.as_ref()),
+            ) && build_uuid != identifier_uuid
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build chunk {chunk_id} has inconsistent build UUIDs"
+                )));
+            }
+            chunks_by_build
+                .entry(build_id)
+                .or_default()
+                .push(KeynoteBuildChunkInfo {
+                    object_id: chunk_id,
+                    delay: chunk.delay,
+                    duration: chunk.duration,
+                    automatic: chunk.automatic,
+                    referent: chunk.referent,
+                    chunk_id: identifier.and_then(|value| value.build_chunk_id),
+                });
+        }
+
+        let first_chunk_id = slide
+            .build_chunks
+            .first()
+            .map(|reference| reference.identifier);
+        let mut builds = Vec::with_capacity(slide.builds.len());
+        for reference in &slide.builds {
+            let build_id = reference.identifier;
+            let build: kn::BuildArchive =
+                graph.decode_type(build_id, BUILD_MESSAGE_TYPE, "KN.BuildArchive")?;
+            let drawable_object_id = build
+                .drawable
+                .as_ref()
+                .map(|reference| reference.identifier)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote build {build_id} has no drawable reference"
+                    ))
+                })?;
+            if !owned_drawables.contains(&drawable_object_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build {build_id} targets drawable {drawable_object_id} outside slide {slide_index}"
+                )));
+            }
+            let chunks = chunks_by_build.remove(&build_id).unwrap_or_default();
+            let starts_slide_events = chunks
+                .first()
+                .is_some_and(|chunk| Some(chunk.object_id) == first_chunk_id);
+            let settings = build_settings(&build, &chunks, starts_slide_events);
+            let wire = graph.message_data_type(build_id, BUILD_MESSAGE_TYPE, "KN.BuildArchive")?;
+            if validate_custom_build_parameters_wire(wire, &build).is_err() {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build {build_id} has invalid custom-parameter wire data"
+                )));
+            }
+            let typed_wire_is_valid = match settings.effect.as_str() {
+                effect if is_typed_action_effect(effect) => {
+                    validate_typed_action_wire(wire, &build).is_ok()
+                },
+                KEYBOARD_BUILD_EFFECT => validate_keyboard_build_wire(wire, &build).is_ok(),
+                effect if is_object_build_effect(effect) => {
+                    validate_object_build_wire(wire, &build).is_ok()
+                },
+                _ => true,
+            };
+            if is_typed_build_effect(&settings.effect)
+                && (validate_build_settings(&settings).is_err() || !typed_wire_is_valid)
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build {build_id} has invalid typed parameters"
+                )));
+            }
+            builds.push(KeynoteBuildInfo {
+                slide_index,
+                object_id: build_id,
+                drawable_object_id,
+                settings,
+                chunks,
+            });
+        }
+        if !chunks_by_build.is_empty() {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide {slide_index} contains orphaned build chunks"
+            )));
+        }
+        let chunk_positions = slide
+            .build_chunks
+            .iter()
+            .enumerate()
+            .map(|(index, reference)| (reference.identifier, index))
+            .collect::<HashMap<_, _>>();
+        for build in &builds {
+            let Some(first_chunk) = build.chunks.first() else {
+                continue;
+            };
+            let event_index = chunk_positions[&first_chunk.object_id];
+            if validate_build_start_position(build.settings.start, event_index).is_err() {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build {} has {:?} at invalid event index {event_index}",
+                    build.object_id, build.settings.start
+                )));
+            }
+        }
+        Ok(builds)
+    }
+
+    /// Add a native-compatible, all-at-once object build and timing chunk.
+    pub fn add_slide_build(
+        &mut self,
+        slide_index: usize,
+        drawable_object_id: u64,
+        settings: KeynoteBuildSettings,
+    ) -> Result<KeynoteBuildInfo> {
+        validate_build_settings(&settings)?;
+        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
+            && settings.timing_curve.is_none()
+        {
+            return Err(Error::ParseError(
+                "Creating a custom-curve Keynote action requires a timing curve".to_owned(),
+            ));
+        }
+        if settings.animation_type == "Action" && !is_typed_action_effect(&settings.effect) {
+            return Err(Error::ParseError(
+                "Creating an unsupported Keynote action without its native parameters is not supported"
+                    .to_owned(),
+            ));
+        }
+        self.require_slide_drawable(slide_index, drawable_object_id)?;
+        let slides = self.slides()?;
+        let slide = &slides[slide_index];
+        let existing = self.slide_builds(slide_index)?;
+        let existing_chunk_count = existing
+            .iter()
+            .map(|build| build.chunks.len())
+            .sum::<usize>();
+        validate_build_start_position(settings.start, existing_chunk_count)?;
+        let graph = ObjectGraph::read(self.package())?;
+        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let build_id = next_object_identifier(self.package())?;
+        let chunk_id = build_id
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let (build_uuid, random_number_seed) = new_build_uuid_and_seed();
+        let build = new_build_archive(drawable_object_id, &settings, random_number_seed);
+        let chunk = new_build_chunk(build_id, build_uuid, &settings);
+
+        let mut staged = self.package().clone();
+        staged.update_archive(&archive_name, |archive| {
+            archive.insert_object(ArchiveObject::new(
+                build_id,
+                vec![RawMessage {
+                    type_: BUILD_MESSAGE_TYPE,
+                    data: build.encode_to_vec(),
+                }],
+            )?)?;
+            archive.insert_object(ArchiveObject::new(
+                chunk_id,
+                vec![RawMessage {
+                    type_: BUILD_CHUNK_MESSAGE_TYPE,
+                    data: chunk.encode_to_vec(),
+                }],
+            )?)?;
+            Ok(())
+        })?;
+        patch_slide_build_references(
+            &mut staged,
+            &archive_name,
+            slide.slide_id,
+            &[],
+            &[],
+            &[(build_id, chunk_id)],
+        )?;
+        add_component_object_uuids(&mut staged, slide.slide_id, &[build_id])?;
+        set_package_last_object_identifier(&mut staged, chunk_id)?;
+        patch_slide_build_cache(&mut staged, &graph, slide.node_id, existing_chunk_count + 1)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .slide_builds(slide_index)?
+            .into_iter()
+            .find(|build| build.object_id == build_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Keynote build creation failed validation".to_owned())
+            })?;
+        if created.drawable_object_id != drawable_object_id
+            || created.settings != settings
+            || created.chunks.len() != 1
+            || created.chunks[0].object_id != chunk_id
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote build creation failed round-trip validation".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(created)
+    }
+
+    /// Update an existing build and every timing chunk it owns.
+    pub fn set_slide_build(
+        &mut self,
+        slide_index: usize,
+        build_object_id: u64,
+        settings: KeynoteBuildSettings,
+    ) -> Result<()> {
+        validate_build_settings(&settings)?;
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let build = self
+            .slide_builds(slide_index)?
+            .into_iter()
+            .find(|build| build.object_id == build_object_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Keynote build {build_object_id} is not owned by slide {slide_index}"
+                ))
+            })?;
+        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
+            && typed_action_acceleration(&build.settings) != Some(KeynoteBuildAcceleration::Custom)
+            && settings.timing_curve.is_none()
+        {
+            return Err(Error::ParseError(
+                "Changing a Keynote action to a custom curve requires a timing curve".to_owned(),
+            ));
+        }
+        if build.settings.animation_type == "Action"
+            && !is_typed_action_effect(&build.settings.effect)
+            && (settings.animation_type != build.settings.animation_type
+                || settings.effect != build.settings.effect)
+        {
+            return Err(Error::ParseError(
+                "Changing an unsupported Keynote action could discard opaque native parameters"
+                    .to_owned(),
+            ));
+        }
+        if settings.animation_type == "Action"
+            && !is_typed_action_effect(&settings.effect)
+            && (build.settings.animation_type != settings.animation_type
+                || build.settings.effect != settings.effect)
+        {
+            return Err(Error::ParseError(
+                "Changing to an unsupported Keynote action without its native parameters is not supported"
+                    .to_owned(),
+            ));
+        }
+        if build.chunks.is_empty() {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote build {build_object_id} has no timing chunks"
+            )));
+        }
+        let graph = ObjectGraph::read(self.package())?;
+        let native_slide: kn::SlideArchive = graph.decode(slide.slide_id, "KN.SlideArchive")?;
+        let build_chunk_ids = build
+            .chunks
+            .iter()
+            .map(|chunk| chunk.object_id)
+            .collect::<HashSet<_>>();
+        let event_index = native_slide
+            .build_chunks
+            .iter()
+            .position(|reference| build_chunk_ids.contains(&reference.identifier))
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote build {build_object_id} has no ordered timing chunk"
+                ))
+            })?;
+        validate_build_start_position(settings.start, event_index)?;
+        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let mut staged = self.package().clone();
+        staged.update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(build_object_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote build {build_object_id} is missing"))
+            })?;
+            normalize_and_patch_build_object(object, &settings)?;
+            for chunk in &build.chunks {
+                let object = archive.object_mut(chunk.object_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote build chunk {} is missing",
+                        chunk.object_id
+                    ))
+                })?;
+                patch_build_chunk_object(object, &settings)?;
+            }
+            Ok(())
+        })?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let updated = verified
+            .slide_builds(slide_index)?
+            .into_iter()
+            .find(|candidate| candidate.object_id == build_object_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Keynote build update lost the build".to_owned())
+            })?;
+        if updated.settings != settings {
+            return Err(Error::InvalidFormat(
+                "Keynote build update failed round-trip validation".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    /// Replace the object-build order for a slide with an exact permutation.
+    ///
+    /// Every build currently owned by the slide must appear exactly once. Timing
+    /// chunks belonging to a build move with it while retaining their internal
+    /// order. Slides whose chunks interleave multiple builds are rejected because
+    /// grouping those events would silently change their native timing semantics.
+    pub fn reorder_slide_builds(
+        &mut self,
+        slide_index: usize,
+        build_object_ids: &[u64],
+    ) -> Result<()> {
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let builds = self.slide_builds(slide_index)?;
+        if build_object_ids.len() != builds.len() {
+            return Err(Error::ParseError(format!(
+                "Keynote slide {slide_index} build order contains {} identifiers, expected {}",
+                build_object_ids.len(),
+                builds.len()
+            )));
+        }
+        let expected = builds
+            .iter()
+            .map(|build| build.object_id)
+            .collect::<HashSet<_>>();
+        let requested = build_object_ids.iter().copied().collect::<HashSet<_>>();
+        if requested.len() != build_object_ids.len() || requested != expected {
+            return Err(Error::ParseError(format!(
+                "Keynote slide {slide_index} build order must be an exact permutation of its builds"
+            )));
+        }
+
+        let graph = ObjectGraph::read(self.package())?;
+        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let native_slide: kn::SlideArchive = graph.decode(slide.slide_id, "KN.SlideArchive")?;
+        let chunk_owner = builds
+            .iter()
+            .flat_map(|build| {
+                build
+                    .chunks
+                    .iter()
+                    .map(move |chunk| (chunk.object_id, build.object_id))
+            })
+            .collect::<HashMap<_, _>>();
+        let mut closed_builds = HashSet::new();
+        let mut active_build = None;
+        for reference in &native_slide.build_chunks {
+            let owner = chunk_owner.get(&reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote build chunk {} has no resolved owner",
+                    reference.identifier
+                ))
+            })?;
+            if active_build != Some(*owner) {
+                if closed_builds.contains(owner) {
+                    return Err(Error::InvalidFormat(format!(
+                        "Keynote slide {slide_index} interleaves timing chunks for build {owner}"
+                    )));
+                }
+                if let Some(previous) = active_build.replace(*owner) {
+                    closed_builds.insert(previous);
+                }
+            }
+        }
+
+        let chunks_by_build = builds
+            .iter()
+            .map(|build| {
+                (
+                    build.object_id,
+                    build
+                        .chunks
+                        .iter()
+                        .map(|chunk| chunk.object_id)
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        let ordered_chunk_ids = build_object_ids
+            .iter()
+            .flat_map(|identifier| chunks_by_build[identifier].iter().copied())
+            .collect::<Vec<_>>();
+        let builds_by_identifier = builds
+            .iter()
+            .map(|build| (build.object_id, build))
+            .collect::<HashMap<_, _>>();
+        let mut event_index = 0usize;
+        for identifier in build_object_ids {
+            let build = builds_by_identifier[identifier];
+            if !build.chunks.is_empty() {
+                validate_build_start_position(build.settings.start, event_index)?;
+                event_index = event_index.checked_add(build.chunks.len()).ok_or_else(|| {
+                    Error::InvalidFormat("Keynote build-event count overflow".to_owned())
+                })?;
+            }
+        }
+
+        let mut staged = self.package().clone();
+        patch_slide_build_order_references(
+            &mut staged,
+            &archive_name,
+            slide.slide_id,
+            build_object_ids,
+            &ordered_chunk_ids,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified_ids = verified
+            .slide_builds(slide_index)?
+            .iter()
+            .map(|build| build.object_id)
+            .collect::<Vec<_>>();
+        if verified_ids != build_object_ids {
+            return Err(Error::InvalidFormat(
+                "Keynote build reorder failed round-trip validation".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    /// Move one object build to a zero-based position in the slide build order.
+    pub fn move_slide_build(
+        &mut self,
+        slide_index: usize,
+        build_object_id: u64,
+        target_index: usize,
+    ) -> Result<()> {
+        let builds = self.slide_builds(slide_index)?;
+        if target_index >= builds.len() {
+            return Err(Error::ParseError(format!(
+                "Keynote build target index {target_index} is out of range for {} builds",
+                builds.len()
+            )));
+        }
+        let mut identifiers = builds
+            .iter()
+            .map(|build| build.object_id)
+            .collect::<Vec<_>>();
+        let source_index = identifiers
+            .iter()
+            .position(|identifier| *identifier == build_object_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Keynote build {build_object_id} is not owned by slide {slide_index}"
+                ))
+            })?;
+        let identifier = identifiers.remove(source_index);
+        identifiers.insert(target_index, identifier);
+        self.reorder_slide_builds(slide_index, &identifiers)
+    }
+
+    /// Remove a build, all of its timing chunks, and its component UUID entry.
+    pub fn remove_slide_build(
+        &mut self,
+        slide_index: usize,
+        build_object_id: u64,
+    ) -> Result<KeynoteBuildInfo> {
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let builds = self.slide_builds(slide_index)?;
+        let removed = builds
+            .iter()
+            .find(|build| build.object_id == build_object_id)
+            .cloned()
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "Keynote build {build_object_id} is not owned by slide {slide_index}"
+                ))
+            })?;
+        let remaining_chunk_count = builds
+            .iter()
+            .filter(|build| build.object_id != build_object_id)
+            .map(|build| build.chunks.len())
+            .sum::<usize>();
+        let mut event_index = 0usize;
+        for build in builds
+            .iter()
+            .filter(|build| build.object_id != build_object_id)
+        {
+            if !build.chunks.is_empty() {
+                validate_build_start_position(build.settings.start, event_index)?;
+                event_index = event_index.checked_add(build.chunks.len()).ok_or_else(|| {
+                    Error::InvalidFormat("Keynote build-event count overflow".to_owned())
+                })?;
+            }
+        }
+        let graph = ObjectGraph::read(self.package())?;
+        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let chunk_ids = removed
+            .chunks
+            .iter()
+            .map(|chunk| chunk.object_id)
+            .collect::<Vec<_>>();
+        let mut staged = self.package().clone();
+        patch_slide_build_references(
+            &mut staged,
+            &archive_name,
+            slide.slide_id,
+            &[build_object_id],
+            &chunk_ids,
+            &[],
+        )?;
+        for identifier in &chunk_ids {
+            if package_references_object(&staged, *identifier)? {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote build chunk {identifier} remains referenced outside its slide"
+                )));
+            }
+            remove_object(&mut staged, &archive_name, *identifier)?;
+        }
+        if package_references_object(&staged, build_object_id)? {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote build {build_object_id} remains referenced outside its slide"
+            )));
+        }
+        remove_object(&mut staged, &archive_name, build_object_id)?;
+        if component_uuid_identifiers(&staged, slide.slide_id)?
+            .is_some_and(|identifiers| identifiers.contains(&build_object_id))
+        {
+            remove_component_object_uuids(&mut staged, slide.slide_id, &[build_object_id])?;
+        }
+        patch_slide_build_cache(&mut staged, &graph, slide.node_id, remaining_chunk_count)?;
+        let mut released = chunk_ids;
+        released.push(build_object_id);
+        release_package_identifier_suffix(&mut staged, &released)?;
+
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .slide_builds(slide_index)?
+            .iter()
+            .any(|build| build.object_id == build_object_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote build removal failed round-trip validation".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(removed)
+    }
+
+    pub fn set_slide_title(&mut self, slide_index: usize, replacement: &str) -> Result<()> {
+        let storage_id = self.slide_storage(slide_index, true)?;
+        self.text.set_text(storage_id, replacement)
+    }
+
+    pub fn replace_slide_title(
+        &mut self,
+        slide_index: usize,
+        range: Range<usize>,
+        replacement: &str,
+    ) -> Result<()> {
+        let storage_id = self.slide_storage(slide_index, true)?;
+        self.text.replace_text(storage_id, range, replacement)
+    }
+
+    pub fn clear_slide_title(&mut self, slide_index: usize) -> Result<()> {
+        self.set_slide_title(slide_index, "")
+    }
+
+    pub fn set_slide_body(&mut self, slide_index: usize, replacement: &str) -> Result<()> {
+        let storage_id = self.slide_storage(slide_index, false)?;
+        self.text.set_text(storage_id, replacement)
+    }
+
+    pub fn replace_slide_body(
+        &mut self,
+        slide_index: usize,
+        range: Range<usize>,
+        replacement: &str,
+    ) -> Result<()> {
+        let storage_id = self.slide_storage(slide_index, false)?;
+        self.text.replace_text(storage_id, range, replacement)
+    }
+
+    pub fn clear_slide_body(&mut self, slide_index: usize) -> Result<()> {
+        self.set_slide_body(slide_index, "")
+    }
+
+    pub fn set_slide_notes(&mut self, slide_index: usize, replacement: &str) -> Result<()> {
+        let storage_id = self.slide_notes_storage(slide_index)?;
+        self.text.set_text(storage_id, replacement)
+    }
+
+    pub fn replace_slide_notes(
+        &mut self,
+        slide_index: usize,
+        range: Range<usize>,
+        replacement: &str,
+    ) -> Result<()> {
+        let storage_id = self.slide_notes_storage(slide_index)?;
+        self.text.replace_text(storage_id, range, replacement)
+    }
+
+    pub fn clear_slide_notes(&mut self, slide_index: usize) -> Result<()> {
+        self.set_slide_notes(slide_index, "")
+    }
+
+    /// Set or clear a slide's optional navigator name.
+    pub fn set_slide_name(&mut self, slide_index: usize, name: Option<&str>) -> Result<()> {
+        if name.is_some_and(|name| name.contains('\0')) {
+            return Err(Error::ParseError(
+                "Keynote slide names cannot contain NUL".to_owned(),
+            ));
+        }
+        let normalized = name.filter(|name| !name.is_empty()).map(str::to_owned);
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let graph = ObjectGraph::read(self.text.package())?;
+        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let slide_id = slide.slide_id;
+        let mut staged = self.text.package().clone();
+        staged.update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(slide_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote slide object {slide_id} is missing"))
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| {
+                    message.type_ == 5 && kn::SlideArchive::decode(message.data.as_slice()).is_ok()
+                })
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide object {slide_id} has no SlideArchive payload"
+                    ))
+                })?;
+            let message_type = object.messages[message_index].type_;
+            let original = object.messages[message_index].data.as_slice();
+            let value = kn::SlideArchive::decode(original)?;
+            let data = patch_length_delimited_field(
+                original,
+                10,
+                value.name.is_some(),
+                normalized.as_deref().map(str::as_bytes),
+            )?;
+            let verified = kn::SlideArchive::decode(data.as_slice())?;
+            if verified.name.as_ref() != normalized.as_ref() {
+                return Err(Error::InvalidFormat(
+                    "Keynote slide-name wire patch failed validation".to_owned(),
+                ));
+            }
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .slides()?
+            .get(slide_index)
+            .and_then(|slide| slide.name.as_ref())
+            != normalized.as_ref()
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote slide rename failed validation".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    /// Move a slide to another zero-based position in the presentation.
+    pub fn move_slide(&mut self, from: usize, to: usize) -> Result<()> {
+        let slides = self.slides()?;
+        if from >= slides.len() || to >= slides.len() {
+            return Err(Error::ParseError(format!(
+                "Keynote slide move {from} -> {to} is out of range for {} slides",
+                slides.len()
+            )));
+        }
+        if from == to {
+            return Ok(());
+        }
+
+        let graph = ObjectGraph::read(self.text.package())?;
+        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
+        let show_id = document.show.identifier;
+        let show_archive = graph.archive_name(show_id)?.to_owned();
+        let mut staged = self.text.package().clone();
+        staged.update_archive(&show_archive, |archive| {
+            let object = archive.object_mut(show_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote show object {show_id} is missing"))
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| kn::ShowArchive::decode(message.data.as_slice()).is_ok())
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote show object {show_id} has no ShowArchive payload"
+                    ))
+                })?;
+            let show = kn::ShowArchive::decode(object.messages[message_index].data.as_slice())?;
+            if show.slide_tree.slides.len() != slides.len() {
+                return Err(Error::InvalidFormat(
+                    "Keynote slide tree changed during move".to_owned(),
+                ));
+            }
+            let mut desired = show
+                .slide_tree
+                .slides
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let identifier = desired.remove(from);
+            desired.insert(to, identifier);
+            let message_type = object.messages[message_index].type_;
+            let data = rewrite_show_slide_references(
+                object.messages[message_index].data.as_slice(),
+                &show.slide_tree.slides,
+                &desired,
+            )?;
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+
+        let bytes = staged.to_bytes()?;
+        let verified = KeynoteEditor::from_bytes(&bytes)?;
+        let expected_id = slides[from].slide_id;
+        if verified.slides()?.get(to).map(|slide| slide.slide_id) != Some(expected_id) {
+            return Err(Error::InvalidFormat(
+                "Keynote slide move failed validation".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(())
+    }
+
+    /// Duplicate a slide immediately after its source using a guarded graph clone.
+    ///
+    /// All object IDs internal to the dedicated slide component are remapped.
+    /// External style and media references are shared, while stale thumbnails
+    /// are removed from the new slide node so Keynote can regenerate them.
+    pub fn duplicate_slide(&mut self, slide_index: usize) -> Result<KeynoteSlideInfo> {
+        let slides = self.slides()?;
+        let source = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let graph = ObjectGraph::read(self.text.package())?;
+        let source_archive_name = graph.archive_name(source.slide_id)?.to_owned();
+        let expected_archive_name = format!("Index/Slide-{}.iwa", source.slide_id);
+        if source_archive_name != expected_archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide {} is not stored in its dedicated component {expected_archive_name}",
+                source.slide_id
+            )));
+        }
+        let source_archive = self.text.package().archive(&source_archive_name)?;
+        let mut next_identifier = next_object_identifier(self.package())?;
+        let new_node_id = next_identifier;
+        next_identifier = next_identifier
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let mut remap = HashMap::with_capacity(source_archive.objects.len());
+        for object in &source_archive.objects {
+            let old_identifier = object.archive_info.identifier.ok_or_else(|| {
+                Error::InvalidFormat(format!("Object in {source_archive_name} has no identifier"))
+            })?;
+            remap.insert(old_identifier, next_identifier);
+            next_identifier = next_identifier
+                .checked_add(1)
+                .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        }
+        let new_slide_id = *remap.get(&source.slide_id).ok_or_else(|| {
+            Error::InvalidFormat(
+                "Keynote slide component does not contain its slide object".to_owned(),
+            )
+        })?;
+        let cloned_objects = source_archive
+            .objects
+            .iter()
+            .map(|object| clone_slide_object(object, &remap))
+            .collect::<Result<Vec<_>>>()?;
+        let mut staged = self.text.package().clone();
+        let new_archive_name = format!("Index/Slide-{new_slide_id}.iwa");
+        if staged.contains_entry(&new_archive_name) {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide component {new_archive_name} already exists"
+            )));
+        }
+        staged.replace_archive(
+            &new_archive_name,
+            &Archive {
+                objects: cloned_objects,
+            },
+        )?;
+
+        let node_archive_name = graph.archive_name(source.node_id)?.to_owned();
+        let node_archive = self.text.package().archive(&node_archive_name)?;
+        let source_node = node_archive.object(source.node_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote slide node {} is missing", source.node_id))
+        })?;
+        let new_node = clone_slide_node(source_node, new_node_id, source.slide_id, new_slide_id)?;
+        staged.update_archive(&node_archive_name, |archive| {
+            archive.insert_object(new_node)?;
+            Ok(())
+        })?;
+
+        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
+        let show_id = document.show.identifier;
+        let show_archive_name = graph.archive_name(show_id)?.to_owned();
+        staged.update_archive(&show_archive_name, |archive| {
+            let object = archive.object_mut(show_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Keynote show object {show_id} is missing"))
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| kn::ShowArchive::decode(message.data.as_slice()).is_ok())
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote show object {show_id} has no ShowArchive payload"
+                    ))
+                })?;
+            let show = kn::ShowArchive::decode(object.messages[message_index].data.as_slice())?;
+            let source_position = show
+                .slide_tree
+                .slides
+                .iter()
+                .position(|reference| reference.identifier == source.node_id)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote show does not reference source node {}",
+                        source.node_id
+                    ))
+                })?;
+            let mut desired = show
+                .slide_tree
+                .slides
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            desired.insert(source_position + 1, new_node_id);
+            let message_type = object.messages[message_index].type_;
+            let data = rewrite_show_slide_references(
+                object.messages[message_index].data.as_slice(),
+                &show.slide_tree.slides,
+                &desired,
+            )?;
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            let references =
+                &mut object.archive_info.message_infos[message_index].object_references;
+            if !references.contains(&new_node_id) {
+                references.push(new_node_id);
+            }
+            for field in &mut object.archive_info.message_infos[message_index].field_infos {
+                if field.object_references.contains(&source.node_id)
+                    && !field.object_references.contains(&new_node_id)
+                {
+                    field.object_references.push(new_node_id);
+                }
+            }
+            Ok(())
+        })?;
+
+        if let Some(source_component) =
+            component_identifier_for_entry(&staged, &source_archive_name)?
+        {
+            clone_component_registration(
+                &mut staged,
+                source_component,
+                new_slide_id,
+                &format!("Slide-{new_slide_id}"),
+                &remap,
+            )?;
+            if let Some(document_component) =
+                component_identifier_for_entry(&staged, &node_archive_name)?
+            {
+                add_component_object_uuids(&mut staged, document_component, &[new_node_id])?;
+                add_component_link(&mut staged, document_component, new_slide_id)?;
+            }
+            set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
+        }
+
+        let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .slides()?
+            .into_iter()
+            .find(|slide| slide.slide_id == new_slide_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Keynote slide duplication failed validation".to_owned())
+            })?;
+        if created.index != slide_index + 1 {
+            return Err(Error::InvalidFormat(
+                "Keynote duplicated slide has the wrong order".to_owned(),
+            ));
+        }
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(created)
+    }
+
+    pub fn package(&self) -> &IWorkPackage {
+        self.text.package()
+    }
+
+    /// List metadata-backed media reachable from this presentation package.
+    pub fn media_assets(&self) -> Result<Vec<EmbeddedMediaAsset>> {
+        reachable_embedded_assets(self.package(), [1])
+    }
+
+    /// List media reachable from one slide node and its owned object graph.
+    pub fn slide_media_assets(&self, slide_index: usize) -> Result<Vec<EmbeddedMediaAsset>> {
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        reachable_embedded_assets(self.package(), [slide.node_id, slide.slide_id])
+    }
+
+    pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+        if !self
+            .media_assets()?
+            .iter()
+            .any(|asset| asset.data_identifier == data_identifier)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Data identifier {data_identifier} is not reachable from the Keynote object graph"
+            )));
+        }
+        IWorkMediaEditor::from_package(self.package().clone())?.extract(data_identifier)
+    }
+
+    /// Replace a referenced materialized asset without changing its data identifier.
+    pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+        if !self
+            .media_assets()?
+            .iter()
+            .any(|asset| asset.data_identifier == data_identifier)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Data identifier {data_identifier} is not reachable from the Keynote object graph"
+            )));
+        }
+        let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
+        let old = media.replace(data_identifier, replacement)?;
+        let staged = media.into_package();
+        Self::from_package(staged.clone())?;
+        self.text = IWorkTextEditor::from_package(staged);
+        Ok(old)
+    }
+
+    pub fn into_package(self) -> IWorkPackage {
+        self.text.into_package()
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.text.to_bytes()
+    }
+
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.text.save(path)
+    }
+
+    fn require_slide_text_storage(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<u64> {
+        self.slide_text_storages(slide_index)?
+            .into_iter()
+            .find(|text| text.drawable_object_id == drawable_object_id)
+            .map(|text| text.storage.object_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "drawable object {drawable_object_id} does not own writable text on Keynote slide {slide_index}"
+                ))
+            })
+    }
+
+    #[allow(deprecated)]
+    fn text_box_graph(
+        &self,
+        slide_index: usize,
+        drawable_object_id: u64,
+    ) -> Result<KeynoteTextBoxGraph> {
+        let slides = self.slides()?;
+        let slide_info = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let text = self
+            .slide_text_storages(slide_index)?
+            .into_iter()
+            .find(|item| item.drawable_object_id == drawable_object_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!(
+                    "drawable object {drawable_object_id} does not own writable text on Keynote slide {slide_index}"
+                ))
+            })?;
+        if text.role != KeynoteSlideTextRole::TextBox {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide drawable {drawable_object_id} is a {:?} placeholder, not an ordinary text box",
+                text.role
+            )));
+        }
+
+        let object_graph = ObjectGraph::read(self.package())?;
+        let slide: kn::SlideArchive =
+            object_graph.decode(slide_info.slide_id, "KN.SlideArchive")?;
+        for (name, references) in [
+            ("owned_drawables", &slide.owned_drawables),
+            ("drawables_z_order", &slide.drawables_z_order),
+        ] {
+            let matches = references
+                .iter()
+                .filter(|reference| reference.identifier == drawable_object_id)
+                .count();
+            if matches != 1 {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote slide {} {name} must contain text box {drawable_object_id} exactly once",
+                    slide_info.slide_id
+                )));
+            }
+        }
+
+        let archive_name = object_graph.archive_name(slide_info.slide_id)?.to_owned();
+        if object_graph.archive_name(drawable_object_id)? != archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote text box {drawable_object_id} is outside slide component {archive_name}"
+            )));
+        }
+        let archive = self.package().archive(&archive_name)?;
+        let drawable = archive.object(drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote text box {drawable_object_id} is missing"))
+        })?;
+        let shape_messages = drawable
+            .messages
+            .iter()
+            .filter(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        if shape_messages.len() != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote text box {drawable_object_id} must have exactly one shape payload"
+            )));
+        }
+        let shape = tswp::ShapeInfoArchive::decode(shape_messages[0].data.as_slice())?;
+        if shape.is_text_box != Some(true) {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote drawable {drawable_object_id} is not marked as a text box"
+            )));
+        }
+        let storage_id = shape
+            .owned_storage
+            .as_ref()
+            .map(|reference| reference.identifier)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote text box {drawable_object_id} has no owned storage"
+                ))
+            })?;
+        if shape
+            .deprecated_storage
+            .as_ref()
+            .map(|reference| reference.identifier)
+            != Some(storage_id)
+            || storage_id != text.storage.object_id
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote text box {drawable_object_id} has inconsistent storage ownership"
+            )));
+        }
+        let title_id = shape
+            .super_
+            .super_
+            .title
+            .as_ref()
+            .map(|reference| reference.identifier)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote text box {drawable_object_id} has no title stand-in"
+                ))
+            })?;
+        let caption_id = shape
+            .super_
+            .super_
+            .caption
+            .as_ref()
+            .map(|reference| reference.identifier)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote text box {drawable_object_id} has no caption stand-in"
+                ))
+            })?;
+        let required = [drawable_object_id, caption_id, title_id, storage_id]
+            .into_iter()
+            .collect::<HashSet<_>>();
+        if required.len() != 4 {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote text box {drawable_object_id} has aliased private objects"
+            )));
+        }
+        for (identifier, label) in [(caption_id, "caption"), (title_id, "title")] {
+            if object_graph.archive_name(identifier)? != archive_name {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote text-box {label} object {identifier} is outside {archive_name}"
+                )));
+            }
+            let object = archive.object(identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote text-box {label} object {identifier} is missing"
+                ))
+            })?;
+            if object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == STANDIN_CAPTION_MESSAGE_TYPE)
+                .count()
+                != 1
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote text-box {label} object {identifier} must have exactly one stand-in payload"
+                )));
+            }
+        }
+        if object_graph.archive_name(storage_id)? != archive_name {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote text-box storage {storage_id} is outside {archive_name}"
+            )));
+        }
+        let storage = archive.object(storage_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote text-box storage {storage_id} is missing"))
+        })?;
+        if storage
+            .messages
+            .iter()
+            .filter(|message| STORAGE_MESSAGE_TYPES.contains(&message.type_))
+            .count()
+            != 1
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote text-box storage {storage_id} must have exactly one writable payload"
+            )));
+        }
+        let object_ids = archive
+            .objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .filter(|identifier| required.contains(identifier))
+            .collect::<Vec<_>>();
+        if object_ids.len() != 4 {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote text box {drawable_object_id} has an incomplete private graph"
+            )));
+        }
+        for name in self.package().iwa_entry_names() {
+            for object in self.package().archive(name)?.objects {
+                let owner = object.archive_info.identifier.ok_or_else(|| {
+                    Error::Archive(format!("Object in {name} has no archive identifier"))
+                })?;
+                if required.contains(&owner) || owner == slide_info.slide_id {
+                    continue;
+                }
+                if object.archive_info.message_infos.iter().any(|info| {
+                    info.object_references
+                        .iter()
+                        .chain(
+                            info.field_infos
+                                .iter()
+                                .flat_map(|field| &field.object_references),
+                        )
+                        .any(|identifier| required.contains(identifier))
+                }) {
+                    return Err(Error::InvalidFormat(format!(
+                        "Keynote text-box graph {drawable_object_id} is referenced by external object {owner}"
+                    )));
+                }
+            }
+        }
+        let uuid_object_ids = component_uuid_identifiers(self.package(), slide_info.slide_id)?
+            .map(|mapped| {
+                if required.iter().all(|identifier| mapped.contains(identifier)) {
+                    Ok(object_ids.clone())
+                } else {
+                    Err(Error::InvalidFormat(format!(
+                        "Keynote slide {} UUID map does not cover text-box graph {drawable_object_id}",
+                        slide_info.slide_id
+                    )))
+                }
+            })
+            .transpose()?
+            .unwrap_or_default();
+        Ok(KeynoteTextBoxGraph {
+            slide_id: slide_info.slide_id,
+            archive_name,
+            drawable_id: drawable_object_id,
+            storage_id,
+            object_ids,
+            uuid_object_ids,
+        })
+    }
+
+    fn slide_storage(&self, slide_index: usize, title: bool) -> Result<u64> {
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let (kind, storage) = if title {
+            ("title", slide.title_storage_id)
+        } else {
+            ("body", slide.body_storage_id)
+        };
+        storage.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Keynote slide {slide_index} has no writable {kind} placeholder storage"
+            ))
+        })
+    }
+
+    fn slide_notes_storage(&self, slide_index: usize) -> Result<u64> {
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        slide.notes_storage_id.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Keynote slide {slide_index} has no writable speaker-notes storage"
+            ))
+        })
+    }
+
+    fn slide_owned_drawable_ids(&self, slide_index: usize) -> Result<Vec<u64>> {
+        let slides = self.slides()?;
+        let slide = slides.get(slide_index).ok_or_else(|| {
+            Error::ParseError(format!(
+                "Keynote slide index {slide_index} is out of range for {} slides",
+                slides.len()
+            ))
+        })?;
+        let graph = ObjectGraph::read(self.package())?;
+        let archive: kn::SlideArchive = graph.decode(slide.slide_id, "KN.SlideArchive")?;
+        Ok(archive
+            .owned_drawables
+            .into_iter()
+            .map(|drawable| drawable.identifier)
+            .collect())
+    }
+
+    fn require_slide_drawable(&self, slide_index: usize, drawable_object_id: u64) -> Result<()> {
+        if !self
+            .slide_owned_drawable_ids(slide_index)?
+            .contains(&drawable_object_id)
+        {
+            return Err(Error::ParseError(format!(
+                "drawable object {drawable_object_id} is not owned by Keynote slide {slide_index}"
+            )));
+        }
+        if !self
+            .slide_drawables(slide_index)?
+            .iter()
+            .any(|drawable| drawable.object_id == drawable_object_id)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide drawable {drawable_object_id} has no supported direct drawable payload"
+            )));
+        }
+        Ok(())
+    }
+}
+
+mod builds;
+mod date_time_fields;
+mod drawable_order;
+mod named_paragraph_styles;
+mod placeholder_ownership;
+mod placeholder_visibility;
+mod show_settings;
+mod slide_audio;
+mod slide_background;
+mod slide_background_color;
+mod slide_background_gradient;
+mod slide_background_gradient_wire;
+mod slide_background_reset;
+mod slide_background_wire;
+mod slide_charts;
+mod slide_create;
+mod slide_delete;
+mod slide_graph;
+mod slide_images;
+mod slide_layout_media;
+mod slide_layout_update;
+mod slide_movies;
+mod slide_number;
+mod slide_preview;
+mod slide_shapes;
+mod slide_style_graph;
+mod slide_style_metadata;
+mod slide_style_registry;
+mod slide_tables;
+mod soundtrack;
+mod soundtrack_items;
+mod soundtrack_wire;
+mod text_box_create;
+mod transition;
+mod transition_effect;
+mod transition_lifecycle;
+mod transition_wire;
+
+use builds::*;
+pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
+pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
+pub use slide_background::KeynoteSlideBackground;
+pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
+pub use slide_background_gradient::{
+    KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
+};
+pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
+use slide_graph::*;
+pub use slide_images::{
+    KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions,
+    RemovedKeynoteSlideImage,
+};
+pub use slide_movies::{
+    KeynoteSlideMovieInfo, KeynoteSlideMovieKind, KeynoteSlideMovieOptions,
+    RemovedKeynoteSlideMovie,
+};
+pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
+pub use slide_tables::{
+    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableAxisIndex,
+    KeynoteTableCellCheckboxFormat, KeynoteTableCellComment, KeynoteTableCellCommentInfo,
+    KeynoteTableCellCommentReplyInfo, KeynoteTableCellConditionalHighlightInfo,
+    KeynoteTableCellCurrencyFormat, KeynoteTableCellDataFormat, KeynoteTableCellDateTimeFormat,
+    KeynoteTableCellDecimalPlaces, KeynoteTableCellDurationFormat, KeynoteTableCellDurationStyle,
+    KeynoteTableCellDurationUnit, KeynoteTableCellDurationUnitRange, KeynoteTableCellDurationUnits,
+    KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellFractionFormat, KeynoteTableCellInset,
+    KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle,
+    KeynoteTableCellNumberFormat, KeynoteTableCellNumeralSystemFormat,
+    KeynoteTableCellParagraphIndents, KeynoteTableCellParagraphLineSpacing,
+    KeynoteTableCellParagraphList, KeynoteTableCellParagraphListBullet,
+    KeynoteTableCellParagraphListBulletGeometry, KeynoteTableCellParagraphListIndentation,
+    KeynoteTableCellParagraphListLabelColor, KeynoteTableCellParagraphListLevel,
+    KeynoteTableCellParagraphListLevelPlacement, KeynoteTableCellParagraphListNumberFormat,
+    KeynoteTableCellParagraphListNumberScale, KeynoteTableCellParagraphListNumberTiering,
+    KeynoteTableCellParagraphListNumbering, KeynoteTableCellParagraphListPlacement,
+    KeynoteTableCellParagraphSpacing, KeynoteTableCellParagraphTabStops,
+    KeynoteTableCellPercentageFormat, KeynoteTableCellPopUpMenuFormat,
+    KeynoteTableCellPopUpMenuInitialSelection, KeynoteTableCellPopUpMenuItem,
+    KeynoteTableCellRegion, KeynoteTableCellScientificFormat, KeynoteTableCellSliderDisplayFormat,
+    KeynoteTableCellSliderFormat, KeynoteTableCellSliderRange, KeynoteTableCellStarRatingFormat,
+    KeynoteTableCellStepperDisplayFormat, KeynoteTableCellStepperFormat,
+    KeynoteTableCellStepperRange, KeynoteTableCellTextAlignment, KeynoteTableCellTextBackground,
+    KeynoteTableCellTextBaselineShift, KeynoteTableCellTextCapitalization,
+    KeynoteTableCellTextCharacterSpacing, KeynoteTableCellTextColor,
+    KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextFormat,
+    KeynoteTableCellTextLigatures, KeynoteTableCellTextOutline, KeynoteTableCellTextScript,
+    KeynoteTableCellTextShadow, KeynoteTableCellTextStyle, KeynoteTableCellTextWrap,
+    KeynoteTableCellThousandsSeparator, KeynoteTableCellUpdate, KeynoteTableCellValue,
+    KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
+    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
+    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
+    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
+    KeynoteTableHeaderSettings, KeynoteTableHiddenAxes, KeynoteTablePoints,
+    KeynoteTableRowDeletion, KeynoteTableRowInsertion, KeynoteTableSortColumnIndex,
+    KeynoteTableSortDirection, KeynoteTableSortOrder, KeynoteTableSortRowRange,
+    KeynoteTableSortRule, KeynoteTableSortScope, KeynoteTableTitleSettings,
+    RemovedKeynoteSlideTable,
+};
+pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
+pub use soundtrack_items::KeynoteSoundtrackItemInfo;
+pub use transition::{
+    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
+    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
+    KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
+};
+pub use transition_effect::KeynoteTransitionEffect;
+use transition_wire::{transition_settings_from_wire, validate_transition_wire};
+#[cfg(test)]
+mod tests;

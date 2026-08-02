@@ -164,6 +164,9 @@ impl SheetTextField {
 
 impl OdsParser {
     /// Parse all sheets from ODS content.xml
+    // quick-xml exposes a streaming event source, so the format's nested parser
+    // state is intentionally coordinated here without constructing a DOM.
+    #[allow(clippy::cognitive_complexity)]
     pub fn parse_sheets(xml_content: &str) -> Result<Vec<Sheet>> {
         let mut reader = Reader::from_str(xml_content);
         let mut buf = Vec::new();

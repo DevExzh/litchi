@@ -92,6 +92,8 @@ pub struct ArchiveReader<'data> {
     archive: ZipSliceArchive<&'data [u8]>,
     /// Pre-built index for fast file lookup by name
     index: HashMap<String, EntryInfo>,
+    /// Physical member order, retained for order-sensitive package formats.
+    order: Vec<String>,
 }
 
 /// Information about an archive entry for fast lookup
@@ -119,6 +121,7 @@ impl<'data> ArchiveReader<'data> {
         // Build index for fast lookup
         let mut index = HashMap::new();
         let mut total_uncompressed_size = 0u64;
+        let mut ordered_names = Vec::new();
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
@@ -170,9 +173,10 @@ impl<'data> ArchiveReader<'data> {
                 },
             };
 
+            let local_header_offset = entry.local_header_offset();
             if index
                 .insert(
-                    name,
+                    name.clone(),
                     EntryInfo {
                         wayfinder: entry.wayfinder(),
                         compression_method: entry.compression_method(),
@@ -186,9 +190,17 @@ impl<'data> ArchiveReader<'data> {
                 }
                 .into());
             }
+            ordered_names.push((local_header_offset, name));
         }
 
-        Ok(Self { archive, index })
+        ordered_names.sort_by_key(|(offset, _)| *offset);
+        let order = ordered_names.into_iter().map(|(_, name)| name).collect();
+
+        Ok(Self {
+            archive,
+            index,
+            order,
+        })
     }
 
     /// Get the number of files in the archive (excluding directories).
@@ -217,7 +229,7 @@ impl<'data> ArchiveReader<'data> {
 
     /// Get an iterator over all file names in the archive.
     pub fn file_names(&self) -> impl Iterator<Item = &str> {
-        self.index.keys().map(|s| s.as_str())
+        self.order.iter().map(String::as_str)
     }
 
     /// Whether an archive entry uses the ZIP Store method.

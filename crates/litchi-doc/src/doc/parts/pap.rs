@@ -957,6 +957,9 @@ impl ParagraphProperties {
     ///
     /// * `pap` - The paragraph properties to modify
     /// * `sprm` - The SPRM operation to apply
+    // This is the specification-indexed SPRM dispatch table. Keeping opcode
+    // handling together makes overlap and precedence reviewable.
+    #[allow(clippy::cognitive_complexity)]
     fn apply_sprm(pap: &mut ParagraphProperties, sprm: &Sprm) -> Result<()> {
         match sprm.opcode {
             SPRM_P_DXC_RIGHT => {

@@ -125,19 +125,15 @@ impl Presentation {
                     Box::new(ppt::Package::from_ole_file(ole_file).map_err(Error::from)?);
 
                 // Extract metadata from OLE property streams
-                let cached_metadata =
-                    package
-                        .ole_file()
-                        .get_metadata()
-                        .ok()
-                        .and_then(|ole_metadata| {
-                            let metadata: litchi_core::Metadata = ole_metadata.into();
-                            if metadata.has_data() {
-                                Some(metadata)
-                            } else {
-                                None
-                            }
-                        });
+                let cached_metadata = package
+                    .ole_file()
+                    .get_metadata()
+                    .ok()
+                    .map(|ole_metadata| {
+                        let metadata: litchi_core::Metadata = ole_metadata.into();
+                        metadata
+                    })
+                    .filter(|metadata| metadata.has_data());
 
                 let pres = package.presentation().map_err(Error::from)?;
 
@@ -158,7 +154,6 @@ impl Presentation {
                     crate::ooxml::metadata::extract_metadata(package.opc_package())
                         .ok()
                         .filter(|metadata| metadata.has_data());
-
                 Ok(Self {
                     inner: PresentationImpl::Pptx(package),
                     cached_metadata,

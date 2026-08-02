@@ -2480,6 +2480,9 @@ impl<'a> Parser<'a> {
     /// `#[inline(never)]`: the dispatch table is very large, so leaving it inline
     /// would put its correspondingly large stack frame on the recursive
     /// group-nesting path and blow the stack after only a handful of levels.
+    // The complexity is concentrated here intentionally so every destination
+    // transition remains visible in one auditable protocol dispatch table.
+    #[allow(clippy::cognitive_complexity)]
     #[inline(never)]
     fn dispatch_group_destination(&mut self) -> RtfResult<bool> {
         if let Some(token) = self.tokens.get(self.pos) {
@@ -6001,6 +6004,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Apply a control word to the current state.
+    // This exhaustive state-transition table mirrors the RTF control-word
+    // specification; splitting it would obscure coverage and precedence.
+    #[allow(clippy::too_many_lines)]
     fn apply_control_word(&mut self, control: &ControlWord) -> RtfResult<()> {
         if let ControlWord::Page(parameter) = control {
             require_parameterless(*parameter, "page")?;

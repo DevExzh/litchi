@@ -1,0 +1,500 @@
+//! Native title and caption CRUD for Numbers sheet movies.
+
+use prost::Message;
+
+use super::*;
+use crate::DrawableTitleCaption;
+use crate::image_caption::{
+    CAPTION_INFO_MESSAGE_TYPE, CAPTION_PLACEMENT_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle,
+    DrawableCaptionKind, SHAPE_STYLE_MESSAGE_TYPE, STANDIN_CAPTION_MESSAGE_TYPE,
+    STORAGE_MESSAGE_TYPE, caption_objects, patch_drawable_caption_reference,
+    replace_object_reference, standin_caption_object,
+};
+use crate::wire::transform_length_delimited_field;
+
+const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+
+#[derive(Debug, Clone)]
+pub(super) struct MovieCaptionSlot {
+    pub(super) reference_id: u64,
+    pub(super) storage_id: Option<u64>,
+    pub(super) object_ids: Vec<u64>,
+}
+
+impl NumbersEditor {
+    /// Read the native title and caption attached to one ordinary sheet movie.
+    pub fn sheet_movie_title_caption(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<DrawableTitleCaption> {
+        movie_title_caption(self, sheet_id, drawable_object_id)
+    }
+
+    /// Create or replace one ordinary sheet movie's native title.
+    pub fn set_sheet_movie_title(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        title: &str,
+    ) -> Result<()> {
+        set_sheet_movie_caption(
+            self,
+            sheet_id,
+            drawable_object_id,
+            title,
+            DrawableCaptionKind::Title,
+        )
+    }
+
+    /// Remove one ordinary sheet movie's native title.
+    ///
+    /// Returns whether a title was present. Native iWork removal preserves the
+    /// prior title graph for undo history and attaches a fresh empty stand-in.
+    pub fn remove_sheet_movie_title(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        remove_sheet_movie_caption(
+            self,
+            sheet_id,
+            drawable_object_id,
+            DrawableCaptionKind::Title,
+        )
+    }
+
+    /// Create or replace one ordinary sheet movie's native caption.
+    pub fn set_sheet_movie_caption(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        caption: &str,
+    ) -> Result<()> {
+        set_sheet_movie_caption(
+            self,
+            sheet_id,
+            drawable_object_id,
+            caption,
+            DrawableCaptionKind::Caption,
+        )
+    }
+
+    /// Remove one ordinary sheet movie's native caption.
+    ///
+    /// Returns whether a caption was present. Native iWork removal preserves
+    /// the prior caption graph for undo history and attaches a fresh empty
+    /// stand-in.
+    pub fn remove_sheet_movie_caption(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<bool> {
+        remove_sheet_movie_caption(
+            self,
+            sheet_id,
+            drawable_object_id,
+            DrawableCaptionKind::Caption,
+        )
+    }
+}
+
+pub(super) fn movie_title_caption(
+    editor: &NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+) -> Result<DrawableTitleCaption> {
+    movie_graph(editor, sheet_id, drawable_object_id)?;
+    let movie = movie_archive(editor.package(), drawable_object_id)?;
+    let title = movie_caption_slot_from_reference(
+        editor.package(),
+        movie.super_.title,
+        DrawableCaptionKind::Title,
+    )?;
+    let caption = movie_caption_slot_from_reference(
+        editor.package(),
+        movie.super_.caption,
+        DrawableCaptionKind::Caption,
+    )?;
+    let text_editor = IWorkTextEditor::from_package(editor.package().clone());
+    Ok(DrawableTitleCaption {
+        title: title
+            .storage_id
+            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .transpose()?,
+        caption: caption
+            .storage_id
+            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .transpose()?,
+    })
+}
+
+pub(super) fn movie_caption_slot(
+    editor: &NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<MovieCaptionSlot> {
+    movie_graph(editor, sheet_id, drawable_object_id)?;
+    let movie = movie_archive(editor.package(), drawable_object_id)?;
+    let reference = match kind {
+        DrawableCaptionKind::Caption => movie.super_.caption,
+        DrawableCaptionKind::Title => movie.super_.title,
+    };
+    movie_caption_slot_from_reference(editor.package(), reference, kind)
+}
+
+fn movie_archive(package: &IWorkPackage, identifier: u64) -> Result<tsd::MovieArchive> {
+    let locations = object_locations(package)?;
+    let archive_name = locations
+        .get(&identifier)
+        .ok_or_else(|| Error::InvalidFormat(format!("Numbers movie {identifier} is missing")))?;
+    let archive = package.archive(archive_name)?;
+    let object = archive
+        .object(identifier)
+        .ok_or_else(|| Error::InvalidFormat(format!("Numbers movie {identifier} is missing")))?;
+    let messages = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == MOVIE_MESSAGE_TYPE)
+        .collect::<Vec<_>>();
+    let [message] = messages.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers movie {identifier} must have exactly one movie payload"
+        )));
+    };
+    tsd::MovieArchive::decode(message.data.as_slice()).map_err(Into::into)
+}
+
+pub(super) fn movie_caption_slot_from_reference(
+    package: &IWorkPackage,
+    reference: Option<tsp::Reference>,
+    kind: DrawableCaptionKind,
+) -> Result<MovieCaptionSlot> {
+    let reference_id = reference
+        .ok_or_else(|| {
+            Error::InvalidFormat("Numbers movie has no title/caption reference".to_owned())
+        })?
+        .identifier;
+    let locations = object_locations(package)?;
+    let archive_name = locations.get(&reference_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers movie title/caption object {reference_id} is missing"
+        ))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(reference_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers movie title/caption object {reference_id} is missing"
+        ))
+    })?;
+    if object
+        .messages
+        .iter()
+        .any(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)
+    {
+        let messages = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        let [message] = messages.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers movie title/caption object {reference_id} repeats its caption payload"
+            )));
+        };
+        let info = crate::protobuf::tsa::CaptionInfoArchive::decode(message.data.as_slice())?;
+        if info.child_info_kind != Some(kind.native_kind()) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers movie title/caption object {reference_id} has the wrong native kind"
+            )));
+        }
+        let storage_id = info
+            .super_
+            .owned_storage
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers movie title/caption object {reference_id} has no text storage"
+                ))
+            })?
+            .identifier;
+        let style_id = info
+            .super_
+            .super_
+            .style
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers movie title/caption object {reference_id} has no shape style"
+                ))
+            })?
+            .identifier;
+        let placement_id = info
+            .placement
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers movie title/caption object {reference_id} has no placement"
+                ))
+            })?
+            .identifier;
+        for (identifier, message_type, type_name) in [
+            (style_id, SHAPE_STYLE_MESSAGE_TYPE, "TSWP.ShapeStyleArchive"),
+            (storage_id, STORAGE_MESSAGE_TYPE, "TSWP.StorageArchive"),
+            (
+                placement_id,
+                CAPTION_PLACEMENT_MESSAGE_TYPE,
+                "TSA.CaptionPlacementArchive",
+            ),
+        ] {
+            let Some(object_archive_name) = locations.get(&identifier) else {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers movie title/caption object {reference_id} references missing {type_name} {identifier}"
+                )));
+            };
+            let archive = package.archive(object_archive_name)?;
+            let object = archive.object(identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers movie title/caption object {reference_id} references missing {type_name} {identifier}"
+                ))
+            })?;
+            if object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == message_type)
+                .count()
+                != 1
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers movie title/caption object {reference_id} references malformed {type_name} {identifier}"
+                )));
+            }
+        }
+        let mut object_ids = vec![reference_id];
+        if locations.get(&style_id).map(String::as_str) == Some(archive_name.as_str()) {
+            object_ids.push(style_id);
+        }
+        object_ids.extend([storage_id, placement_id]);
+        return Ok(MovieCaptionSlot {
+            reference_id,
+            storage_id: Some(storage_id),
+            object_ids,
+        });
+    }
+    if object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == STANDIN_CAPTION_MESSAGE_TYPE)
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers movie title/caption stand-in {reference_id} is malformed"
+        )));
+    }
+    Ok(MovieCaptionSlot {
+        reference_id,
+        storage_id: None,
+        object_ids: vec![reference_id],
+    })
+}
+
+fn set_sheet_movie_caption(
+    editor: &mut NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+    text: &str,
+    kind: DrawableCaptionKind,
+) -> Result<()> {
+    let source = movie_graph(editor, sheet_id, drawable_object_id)?;
+    let slot = movie_caption_slot(editor, sheet_id, drawable_object_id, kind)?;
+    let mut expected = movie_title_caption(editor, sheet_id, drawable_object_id)?;
+    match kind {
+        DrawableCaptionKind::Caption => expected.caption = Some(text.to_owned()),
+        DrawableCaptionKind::Title => expected.title = Some(text.to_owned()),
+    }
+    let staged = if let Some(storage_id) = slot.storage_id {
+        let mut text_editor = IWorkTextEditor::from_package(editor.package.clone());
+        text_editor.set_text(storage_id, text)?;
+        text_editor.into_package()
+    } else {
+        let context = movie_creation_context(editor, sheet_id)?;
+        let drawable_width = source
+            .info
+            .geometry
+            .size
+            .ok_or_else(|| Error::InvalidFormat("Numbers movie has no displayed size".to_owned()))?
+            .width;
+        let ids = CaptionObjectIds::allocate(next_object_identifier(&editor.package)?)?;
+        let mut staged = editor.package.clone();
+        insert_sheet_movie_caption(
+            &mut staged,
+            &source.archive_name,
+            drawable_object_id,
+            slot.reference_id,
+            drawable_width,
+            text,
+            kind,
+            context.caption_theme,
+            context.language.as_deref(),
+            ids,
+        )?;
+        add_component_object_uuids(&mut staged, source.component_id, &ids.all())?;
+        set_package_last_object_identifier(&mut staged, ids.last())?;
+        staged
+    };
+    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    if verified.sheet_movie_title_caption(sheet_id, drawable_object_id)? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers movie title/caption update failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(())
+}
+
+fn remove_sheet_movie_caption(
+    editor: &mut NumbersEditor,
+    sheet_id: u64,
+    drawable_object_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<bool> {
+    let source = movie_graph(editor, sheet_id, drawable_object_id)?;
+    let slot = movie_caption_slot(editor, sheet_id, drawable_object_id, kind)?;
+    if slot.storage_id.is_none() {
+        return Ok(false);
+    }
+    let mut expected = movie_title_caption(editor, sheet_id, drawable_object_id)?;
+    match kind {
+        DrawableCaptionKind::Caption => expected.caption = None,
+        DrawableCaptionKind::Title => expected.title = None,
+    }
+    let standin_id = next_object_identifier(&editor.package)?;
+    let mut staged = editor.package.clone();
+    insert_sheet_movie_caption_standin(
+        &mut staged,
+        &source.archive_name,
+        drawable_object_id,
+        slot.reference_id,
+        kind,
+        standin_id,
+    )?;
+    add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
+    set_package_last_object_identifier(&mut staged, standin_id)?;
+    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    if verified.sheet_movie_title_caption(sheet_id, drawable_object_id)? != expected {
+        return Err(Error::InvalidFormat(
+            "Numbers movie title/caption removal failed validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(true)
+}
+
+fn insert_sheet_movie_caption(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    drawable_object_id: u64,
+    old_reference_id: u64,
+    drawable_width: f32,
+    text: &str,
+    kind: DrawableCaptionKind,
+    theme: CaptionThemeStyle,
+    language: Option<&str>,
+    ids: CaptionObjectIds,
+) -> Result<()> {
+    let objects = caption_objects(
+        ids,
+        drawable_object_id,
+        drawable_width,
+        text,
+        kind,
+        theme,
+        language,
+    )?;
+    package.update_archive(archive_name, |archive| {
+        for object in objects {
+            archive.insert_object(object)?;
+        }
+        replace_sheet_movie_caption_reference(
+            archive,
+            drawable_object_id,
+            old_reference_id,
+            ids.info,
+            kind,
+        )
+    })
+}
+
+fn insert_sheet_movie_caption_standin(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    drawable_object_id: u64,
+    old_reference_id: u64,
+    kind: DrawableCaptionKind,
+    standin_id: u64,
+) -> Result<()> {
+    let standin = standin_caption_object(standin_id)?;
+    package.update_archive(archive_name, |archive| {
+        archive.insert_object(standin)?;
+        replace_sheet_movie_caption_reference(
+            archive,
+            drawable_object_id,
+            old_reference_id,
+            standin_id,
+            kind,
+        )
+    })
+}
+
+fn replace_sheet_movie_caption_reference(
+    archive: &mut crate::archive::Archive,
+    drawable_object_id: u64,
+    old_reference_id: u64,
+    replacement_id: u64,
+    kind: DrawableCaptionKind,
+) -> Result<()> {
+    let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers movie object {drawable_object_id} is missing"
+        ))
+    })?;
+    let indexes = object
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| message.type_ == MOVIE_MESSAGE_TYPE)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let [message_index] = indexes.as_slice() else {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers movie {drawable_object_id} must have exactly one MovieArchive payload"
+        )));
+    };
+    let original = object.messages[*message_index].data.as_slice();
+    let current = tsd::MovieArchive::decode(original)?;
+    let current_reference_id = match kind {
+        DrawableCaptionKind::Caption => current.super_.caption,
+        DrawableCaptionKind::Title => current.super_.title,
+    }
+    .map(|reference| reference.identifier);
+    if current_reference_id != Some(old_reference_id) {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers movie {drawable_object_id} title/caption reference changed unexpectedly"
+        )));
+    }
+    let data = transform_length_delimited_field(original, 1, |drawable| {
+        patch_drawable_caption_reference(drawable, kind, replacement_id)
+    })?;
+    object.replace_message(
+        *message_index,
+        RawMessage {
+            type_: MOVIE_MESSAGE_TYPE,
+            data,
+        },
+    )?;
+    replace_object_reference(
+        &mut object.archive_info.message_infos[*message_index].object_references,
+        old_reference_id,
+        replacement_id,
+    );
+    Ok(())
+}
