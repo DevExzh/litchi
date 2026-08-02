@@ -423,19 +423,24 @@ impl ListOverrideTable {
             .position(|entry| lists.get(entry.list_id).is_some());
         let partial_definition_suffix = first_resolved.is_some_and(|first| {
             first > 0
-                && self.overrides.len() - first == lists.lists().len()
-                && self.overrides[..first]
-                    .iter()
-                    .all(|entry| lists.get(entry.list_id).is_none())
-                && self.overrides[first..]
-                    .iter()
-                    .all(|entry| lists.get(entry.list_id).is_some())
+                && self.overrides.len().checked_sub(first) == Some(lists.lists().len())
                 && self
                     .overrides
-                    .windows(2)
-                    .all(|pair| pair[1].index == pair[0].index.saturating_add(1))
+                    .iter()
+                    .take(first)
+                    .all(|entry| lists.get(entry.list_id).is_none())
+                && self
+                    .overrides
+                    .iter()
+                    .skip(first)
+                    .all(|entry| lists.get(entry.list_id).is_some())
+                && self.overrides.windows(2).all(|pair| {
+                    matches!(pair, [previous, current]
+                            if current.index == previous.index.saturating_add(1))
+                })
         });
-        let mut indices = HashSet::with_capacity(self.overrides.len());
+        let mut indices = HashSet::new();
+        crate::error::try_reserve_set(&mut indices, self.overrides.len(), "list override indices")?;
         for entry in &self.overrides {
             if !indices.insert(entry.index)
                 || (lists.get(entry.list_id).is_none() && !partial_definition_suffix)

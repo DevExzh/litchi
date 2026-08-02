@@ -12,6 +12,7 @@
 
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 pub(crate) const MAX_CUSTOM_XML_TAGS: usize = 65_536;
 pub(crate) const MAX_CUSTOM_XML_DEPTH: usize = 64;
@@ -139,12 +140,15 @@ impl<'a> CustomXmlTag<'a> {
                 "RTF custom XML attribute count exceeds the safety limit".to_string(),
             ));
         }
-        for (index, attribute) in self.attributes.iter().enumerate() {
+        let mut names = HashSet::new();
+        crate::error::try_reserve_set(
+            &mut names,
+            self.attributes.len(),
+            "custom XML attribute names",
+        )?;
+        for attribute in &self.attributes {
             attribute.validate()?;
-            if self.attributes[..index]
-                .iter()
-                .any(|existing| existing.name == attribute.name)
-            {
+            if !names.insert(attribute.name.as_ref()) {
                 return Err(RtfError::MalformedDocument(
                     "RTF custom XML attribute names must be unique within a tag".to_string(),
                 ));

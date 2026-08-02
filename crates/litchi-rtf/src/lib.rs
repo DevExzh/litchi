@@ -3,6 +3,7 @@
     not(test),
     deny(
         clippy::expect_used,
+        clippy::indexing_slicing,
         clippy::panic,
         clippy::panic_in_result_fn,
         clippy::todo,

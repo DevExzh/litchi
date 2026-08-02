@@ -6,6 +6,32 @@ use std::borrow::Cow;
 pub(crate) const MAX_INFO_TEXT_BYTES: usize = 1_048_576;
 pub(crate) const PROTECTION_PASSWORD_HASH_BYTES: usize = 8;
 
+fn parse_legacy_timestamp_triplet(
+    value: &str,
+    separator: char,
+    invalid_component: &'static str,
+) -> RtfResult<[i32; 3]> {
+    let mut parts = value.split(separator);
+    let parse = |part: Option<&str>| {
+        part.ok_or_else(|| {
+            RtfError::MalformedDocument("RTF info time must use YYYY-MM-DDTHH:MM:SS".to_string())
+        })?
+        .parse()
+        .map_err(|_| RtfError::MalformedDocument(invalid_component.to_string()))
+    };
+    let components = [
+        parse(parts.next())?,
+        parse(parts.next())?,
+        parse(parts.next())?,
+    ];
+    if parts.next().is_some() {
+        return Err(RtfError::MalformedDocument(
+            "RTF info time must use YYYY-MM-DDTHH:MM:SS".to_string(),
+        ));
+    }
+    Ok(components)
+}
+
 /// A possibly partial timestamp from an RTF information destination.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RtfTimestamp {
@@ -59,28 +85,17 @@ impl RtfTimestamp {
         let (date, time) = value.split_once('T').ok_or_else(|| {
             RtfError::MalformedDocument("RTF info time must contain T".to_string())
         })?;
-        let date: Vec<i32> = date
-            .split('-')
-            .map(str::parse)
-            .collect::<Result<_, _>>()
-            .map_err(|_| RtfError::MalformedDocument("invalid RTF info date".to_string()))?;
-        let time: Vec<i32> = time
-            .split(':')
-            .map(str::parse)
-            .collect::<Result<_, _>>()
-            .map_err(|_| RtfError::MalformedDocument("invalid RTF info time".to_string()))?;
-        if date.len() != 3 || time.len() != 3 {
-            return Err(RtfError::MalformedDocument(
-                "RTF info time must use YYYY-MM-DDTHH:MM:SS".to_string(),
-            ));
-        }
+        let [year, month, day] =
+            parse_legacy_timestamp_triplet(date, '-', "invalid RTF info date")?;
+        let [hour, minute, second] =
+            parse_legacy_timestamp_triplet(time, ':', "invalid RTF info time")?;
         let timestamp = Self {
-            year: Some(date[0]),
-            month: Some(date[1]),
-            day: Some(date[2]),
-            hour: Some(time[0]),
-            minute: Some(time[1]),
-            second: Some(time[2]),
+            year: Some(year),
+            month: Some(month),
+            day: Some(day),
+            hour: Some(hour),
+            minute: Some(minute),
+            second: Some(second),
         };
         timestamp.validate()?;
         Ok(timestamp)

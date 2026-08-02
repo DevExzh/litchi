@@ -598,7 +598,7 @@ impl TabStops {
     /// Stored tab stops in declaration order.
     #[inline]
     pub fn as_slice(&self) -> &[TabStop] {
-        &self.entries[..self.len()]
+        self.entries.get(..self.len()).unwrap_or(&[])
     }
 
     /// Iterate over tab stops in declaration order.
@@ -609,10 +609,11 @@ impl TabStops {
 
     /// Append a tab stop, returning the value when the collection is full.
     pub fn push(&mut self, tab: TabStop) -> Result<(), TabStop> {
-        if self.len() == MAX_PARAGRAPH_TAB_STOPS {
+        let index = self.len();
+        let Some(slot) = self.entries.get_mut(index) else {
             return Err(tab);
-        }
-        self.entries[self.len()] = tab;
+        };
+        *slot = tab;
         self.len += 1;
         Ok(())
     }
@@ -690,5 +691,31 @@ impl TabStop {
             alignment: TabAlignment::Decimal,
             leader: TabLeader::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tab_stops_reject_overflow_without_mutating_contents() {
+        let mut tabs = TabStops::new();
+        for position in 0..MAX_PARAGRAPH_TAB_STOPS {
+            assert_eq!(tabs.push(TabStop::new(position as i32)), Ok(()));
+        }
+        let rejected = TabStop::new(10_000);
+        assert_eq!(tabs.push(rejected), Err(rejected));
+        assert_eq!(tabs.len(), MAX_PARAGRAPH_TAB_STOPS);
+        assert_eq!(tabs.as_slice().last().unwrap().position, 63);
+    }
+
+    #[test]
+    fn tab_stop_access_is_total_for_an_invalid_private_length() {
+        let mut tabs = TabStops::new();
+        tabs.len = u8::MAX;
+        assert!(tabs.as_slice().is_empty());
+        let rejected = TabStop::new(720);
+        assert_eq!(tabs.push(rejected), Err(rejected));
     }
 }

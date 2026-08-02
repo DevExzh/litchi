@@ -256,8 +256,8 @@ impl<'a> Parser<'a> {
     }
 
     fn run(mut self) -> RtfResult<EquationModel<'a>> {
-        while self.position < self.input.len() {
-            if self.input.as_bytes()[self.position] == b'\\' {
+        while let Some(byte) = self.input.as_bytes().get(self.position).copied() {
+            if byte == b'\\' {
                 self.flush_literal();
                 self.parse_group()?;
             } else {
@@ -307,16 +307,18 @@ impl<'a> Parser<'a> {
     /// Read exactly two ASCII letters forming a switch or sub-option name.
     fn read_name(&mut self) -> RtfResult<[u8; 2]> {
         let bytes = self.input.as_bytes();
-        let end = self.position + 2;
-        if end > bytes.len()
-            || !bytes[self.position].is_ascii_alphabetic()
-            || !bytes[self.position + 1].is_ascii_alphabetic()
-        {
+        let end = self
+            .position
+            .checked_add(2)
+            .ok_or_else(|| malformed("RTF EQ switch has a truncated name"))?;
+        let Some(&[first, second]) = bytes.get(self.position..end) else {
+            return Err(malformed("RTF EQ switch has a truncated name"));
+        };
+        if !first.is_ascii_alphabetic() || !second.is_ascii_alphabetic() {
             return Err(malformed("RTF EQ switch has a truncated name"));
         }
-        let name = [bytes[self.position], bytes[self.position + 1]];
         self.position = end;
-        Ok(name)
+        Ok([first, second])
     }
 
     fn read_number(&mut self) -> RtfResult<EquationSpacing> {
@@ -758,6 +760,22 @@ mod tests {
         assert!(EquationModel::parse(r"\b\bc").is_err());
         assert!(EquationModel::parse(r"\f\zz(1)").is_err());
         assert!(EquationModel::parse("\\").is_err());
+        assert!(EquationModel::parse("你\\").is_err());
+    }
+
+    #[test]
+    fn preserves_multibyte_literals_before_groups() {
+        let model = EquationModel::parse("你\\f(甲,乙)").unwrap();
+        assert_eq!(
+            model.segments(),
+            &[
+                EquationSegment::Literal("你"),
+                EquationSegment::Switched(EquationGroup {
+                    switch: EquationSwitch::Fraction,
+                    elements: vec!["甲", "乙"],
+                }),
+            ]
+        );
     }
 
     #[test]

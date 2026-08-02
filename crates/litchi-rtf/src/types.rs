@@ -538,29 +538,61 @@ impl<'a> FontTable<'a> {
         }
     }
 
-    /// Add a font to the table at a specific index.
-    #[inline]
-    pub fn insert(&mut self, index: FontRef, font: Font<'a>) {
-        // Ensure the vector is large enough
-        if index as usize >= self.fonts.len() {
-            self.fonts.resize(
-                (index as usize) + 1,
-                Font::new(Cow::Borrowed(""), FontFamily::Nil),
-            );
-            self.defined.resize((index as usize) + 1, false);
+    /// Add a validated font at a specific index.
+    ///
+    /// The previous definition is returned when the index was already in use.
+    /// Validation and allocation complete before the table's logical contents
+    /// change.
+    pub fn insert(&mut self, index: FontRef, font: Font<'a>) -> RtfResult<Option<Font<'a>>> {
+        font.validate()?;
+        if self.fonts.len() != self.defined.len() {
+            return Err(RtfError::MalformedDocument(
+                "invalid RTF font-table size".to_string(),
+            ));
         }
-        self.fonts[index as usize] = font;
-        self.defined[index as usize] = true;
+
+        let index = usize::from(index);
+        let required_len = index.checked_add(1).ok_or_else(|| {
+            RtfError::MalformedDocument("RTF font-table index overflow".to_string())
+        })?;
+        if required_len > self.fonts.len() {
+            let additional = required_len - self.fonts.len();
+            crate::error::try_reserve_additional(
+                &mut self.fonts,
+                additional,
+                "font table entries",
+            )?;
+            crate::error::try_reserve_additional(
+                &mut self.defined,
+                additional,
+                "font table definition flags",
+            )?;
+            self.fonts
+                .resize(required_len, Font::new(Cow::Borrowed(""), FontFamily::Nil));
+            self.defined.resize(required_len, false);
+        }
+
+        let (fonts, defined) = (&mut self.fonts, &mut self.defined);
+        let font_slot = fonts.get_mut(index).ok_or_else(|| {
+            RtfError::MalformedDocument("invalid RTF font-table index".to_string())
+        })?;
+        let defined_slot = defined.get_mut(index).ok_or_else(|| {
+            RtfError::MalformedDocument("invalid RTF font-table index".to_string())
+        })?;
+        let was_defined = *defined_slot;
+        let previous = std::mem::replace(font_slot, font);
+        *defined_slot = true;
+        Ok(was_defined.then_some(previous))
     }
 
     /// Get a font by reference.
     #[inline]
     pub fn get(&self, font_ref: FontRef) -> Option<&Font<'a>> {
-        self.defined
-            .get(font_ref as usize)
-            .copied()
-            .unwrap_or(false)
-            .then(|| &self.fonts[font_ref as usize])
+        let index = usize::from(font_ref);
+        if !self.defined.get(index).copied().unwrap_or(false) {
+            return None;
+        }
+        self.fonts.get(index)
     }
 
     /// Get all fonts in the table.
@@ -1687,15 +1719,30 @@ mod tests {
     #[test]
     fn test_font_table_insert() {
         let mut table: FontTable = FontTable::new();
-        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss));
-        table.insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman));
+        assert!(
+            table
+                .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            table
+                .insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman))
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(table.fonts().len(), 2);
     }
 
     #[test]
     fn test_font_table_get() {
         let mut table: FontTable = FontTable::new();
-        table.insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss));
+        assert!(
+            table
+                .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
         assert!(table.get(0).is_some());
         assert!(table.get(1).is_none());
     }
@@ -1703,8 +1750,60 @@ mod tests {
     #[test]
     fn test_font_table_sparse() {
         let mut table: FontTable = FontTable::new();
-        table.insert(5, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss));
+        assert!(
+            table
+                .insert(5, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(table.fonts().len(), 6);
+    }
+
+    #[test]
+    fn font_table_insert_returns_replaced_definition() {
+        let mut table: FontTable = FontTable::new();
+        assert!(
+            table
+                .insert(2, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        let previous = table
+            .insert(
+                2,
+                Font::new(Cow::Borrowed("Times New Roman"), FontFamily::Roman),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(previous.name, "Arial");
+        assert_eq!(table.get(2).unwrap().name, "Times New Roman");
+    }
+
+    #[test]
+    fn font_table_insert_rejects_invalid_fonts_atomically() {
+        let mut table: FontTable = FontTable::new();
+        let invalid = Font::new(Cow::Borrowed(""), FontFamily::Nil);
+        assert!(table.insert(4, invalid).is_err());
+        assert!(table.fonts().is_empty());
+        assert!(!table.is_defined(4));
+    }
+
+    #[test]
+    fn font_table_lookup_is_total_for_inconsistent_private_storage() {
+        let mut table: FontTable = FontTable::new();
+        assert!(
+            table
+                .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        table.fonts.clear();
+        assert!(table.get(0).is_none());
+        assert!(
+            table
+                .insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman))
+                .is_err()
+        );
     }
 
     #[test]

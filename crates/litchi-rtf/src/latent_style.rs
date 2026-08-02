@@ -2,6 +2,7 @@
 
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 pub(crate) const MAX_LATENT_STYLE_INDEX: u32 = 65_535;
 pub(crate) const MAX_LATENT_STYLE_EXCEPTIONS: usize = 65_536;
@@ -74,12 +75,15 @@ impl LatentStyles<'_> {
             ));
         }
         let mut total = 0usize;
-        for (index, exception) in self.exceptions.iter().enumerate() {
+        let mut names = HashSet::new();
+        crate::error::try_reserve_set(
+            &mut names,
+            self.exceptions.len(),
+            "latent-style exception names",
+        )?;
+        for exception in &self.exceptions {
             exception.validate()?;
-            if self.exceptions[..index]
-                .iter()
-                .any(|existing| existing.name == exception.name)
-            {
+            if !names.insert(exception.name.as_ref()) {
                 return Err(RtfError::MalformedDocument(
                     "RTF latent-style exception names must be unique".to_string(),
                 ));

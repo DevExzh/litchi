@@ -1,6 +1,7 @@
 //! Error types for RTF parsing.
 
 use std::fmt;
+use std::hash::{BuildHasher, Hash};
 
 /// Result type for RTF operations.
 pub type RtfResult<T> = Result<T, RtfError>;
@@ -27,6 +28,29 @@ pub(crate) fn try_reserve_additional<T>(
 /// as a recoverable model mutation.
 pub(crate) fn try_reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> RtfResult<()> {
     try_reserve_additional(values, 1, resource)
+}
+
+/// Reserve hash-set entries before validation inserts untrusted collection
+/// members.
+pub(crate) fn try_reserve_set<T, S>(
+    values: &mut std::collections::HashSet<T, S>,
+    additional: usize,
+    resource: &'static str,
+) -> RtfResult<()>
+where
+    T: Eq + Hash,
+    S: BuildHasher,
+{
+    let requested = values
+        .len()
+        .saturating_add(additional)
+        .saturating_mul(std::mem::size_of::<T>());
+    values
+        .try_reserve(additional)
+        .map_err(|_| RtfError::AllocationFailed {
+            resource,
+            requested,
+        })
 }
 
 /// RTF parsing errors.

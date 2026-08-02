@@ -361,7 +361,7 @@ pub fn detect_image_type(data: &[u8]) -> ImageType {
     }
 
     // Check JPEG signature (starts with FFD8)
-    if data.len() >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
+    if data.starts_with(&[0xFF, 0xD8]) {
         return ImageType::Jpeg;
     }
 
@@ -371,13 +371,10 @@ pub fn detect_image_type(data: &[u8]) -> ImageType {
     }
 
     // Check EMF signature (0x01 0x00 0x00 0x00)
-    if data.len() >= 44 && data[0..4] == [0x01, 0x00, 0x00, 0x00] {
-        // Check for EMF marker at offset 40
-        if data[40..44] == [0x20, 0x45, 0x4D, 0x46]
-        // " EMF"
-        {
-            return ImageType::Emf;
-        }
+    if data.starts_with(&[0x01, 0x00, 0x00, 0x00])
+        && data.get(40..44) == Some(&[0x20, 0x45, 0x4D, 0x46])
+    {
+        return ImageType::Emf;
     }
 
     // Check WMF signature (0xD7, 0xCD, 0xC6, 0x9A) - Aldus Placeable Metafile
@@ -408,6 +405,28 @@ mod tests {
     fn test_detect_jpeg() {
         let jpeg_sig = vec![0xFF, 0xD8, 0xFF, 0xE0];
         assert_eq!(detect_image_type(&jpeg_sig), ImageType::Jpeg);
+    }
+
+    #[test]
+    fn detects_metafile_and_bitmap_signatures() {
+        let mut emf = [0_u8; 44];
+        emf[..4].copy_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+        emf[40..].copy_from_slice(&[0x20, 0x45, 0x4D, 0x46]);
+        assert_eq!(detect_image_type(&emf), ImageType::Emf);
+        assert_eq!(detect_image_type(&[0xD7, 0xCD, 0xC6, 0x9A]), ImageType::Wmf);
+        assert_eq!(detect_image_type(b"BM"), ImageType::Dib);
+    }
+
+    #[test]
+    fn truncated_and_near_miss_emf_headers_are_unknown() {
+        let mut emf = [0_u8; 44];
+        emf[..4].copy_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+        emf[40..].copy_from_slice(&[0x20, 0x45, 0x4D, 0x46]);
+        for length in 0..emf.len() {
+            assert_eq!(detect_image_type(&emf[..length]), ImageType::Unknown);
+        }
+        emf[43] = 0;
+        assert_eq!(detect_image_type(&emf), ImageType::Unknown);
     }
 
     #[test]

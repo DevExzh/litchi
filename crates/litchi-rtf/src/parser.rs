@@ -16034,7 +16034,16 @@ impl<'a> Parser<'a> {
                 "conflicting duplicate RTF font ID".to_string(),
             ));
         }
-        self.font_table.borrow_mut().insert(font_num, font);
+        if self
+            .font_table
+            .borrow_mut()
+            .insert(font_num, font)?
+            .is_some()
+        {
+            return Err(RtfError::MalformedDocument(
+                "conflicting duplicate RTF font ID".to_string(),
+            ));
+        }
 
         Ok(())
     }

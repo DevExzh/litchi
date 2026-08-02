@@ -13,6 +13,7 @@
 
 use crate::{RtfError, RtfResult};
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 pub(crate) const MAX_MATH_ZONES: usize = 65_536;
 pub(crate) const MAX_MATH_DEPTH: usize = 64;
@@ -100,7 +101,7 @@ pub enum MathElementRole {
 }
 
 /// A named math property from a `\*Pr` destination.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MathPropertyName {
     /// Fraction type (`\mtype`).
     Type,
@@ -322,12 +323,11 @@ impl<'a> MathProperties<'a> {
                 "RTF math property count exceeds the safety limit",
             ));
         }
-        for (index, property) in self.properties.iter().enumerate() {
+        let mut names = HashSet::new();
+        crate::error::try_reserve_set(&mut names, self.properties.len(), "math property names")?;
+        for property in &self.properties {
             property.validate()?;
-            if self.properties[..index]
-                .iter()
-                .any(|existing| existing.name == property.name)
-            {
+            if !names.insert(property.name) {
                 return Err(malformed(
                     "RTF math property names must be unique within a destination",
                 ));
