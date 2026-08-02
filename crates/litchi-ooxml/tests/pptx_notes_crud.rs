@@ -27,9 +27,9 @@ fn reopened_deck_removes_notes_by_name_and_checked_index() {
     );
     assert_eq!(slide_text(&package), before_text);
     assert_eq!(slide_xml(&package), before_slide_xml);
-    let graph = package.notes_graph().unwrap().unwrap();
-    assert_eq!(graph.slides.len(), 1);
-    assert_eq!(graph.slides[0].slide_part_name, "/ppt/slides/slide2.xml");
+    let graph = package.notes().unwrap().unwrap();
+    assert_eq!(graph.slides().len(), 1);
+    assert_eq!(graph.slides()[0].owner(), "/ppt/slides/slide2.xml");
 
     assert!(package.remove_notes(1usize).unwrap());
     assert!(!package.remove_notes(1usize).unwrap());
@@ -70,7 +70,7 @@ fn selector_failures_do_not_mutate_the_notes_graph() {
     let mut package = Package::open(source.path()).unwrap();
     name_slide(&mut package, "/ppt/slides/slide1.xml", "Overview");
     name_slide(&mut package, "/ppt/slides/slide2.xml", "Appendix");
-    let before = package.notes_graph().unwrap().unwrap();
+    let before = package.notes().unwrap().unwrap();
     let before_parts = package.opc_package().part_count();
 
     assert!(matches!(
@@ -85,10 +85,10 @@ fn selector_failures_do_not_mutate_the_notes_graph() {
             if name == "Missing"
     ));
     assert_eq!(package.opc_package().part_count(), before_parts);
-    assert_eq!(package.notes_graph().unwrap().unwrap(), before);
+    assert_eq!(package.notes().unwrap().unwrap(), before);
 
     name_slide(&mut package, "/ppt/slides/slide2.xml", "Overview");
-    let ambiguous_before = package.notes_graph().unwrap().unwrap();
+    let ambiguous_before = package.notes().unwrap().unwrap();
     assert!(matches!(
         package.remove_notes("Overview"),
         Err(OoxmlError::Pptx(litchi_pptx::Error::AmbiguousSlideName {
@@ -96,11 +96,14 @@ fn selector_failures_do_not_mutate_the_notes_graph() {
             matches: 2
         })) if name == "Overview"
     ));
-    assert_eq!(package.notes_graph().unwrap().unwrap(), ambiguous_before);
+    assert_eq!(package.notes().unwrap().unwrap(), ambiguous_before);
 }
 
 #[test]
-fn dirty_legacy_writer_is_rejected_without_clearing_notes() {
+fn dirty_legacy_writer_is_rejected_without_reading_or_editing_notes() {
+    let source = authored_two_slide_deck();
+    let clean = Package::open(source.path()).unwrap();
+    let graph = clean.notes().unwrap().unwrap();
     let mut package = Package::new().unwrap();
     package
         .presentation_mut()
@@ -109,6 +112,30 @@ fn dirty_legacy_writer_is_rejected_without_clearing_notes() {
         .unwrap()
         .set_notes("Keep me");
 
+    assert!(matches!(
+        package.notes(),
+        Err(OoxmlError::UnsafeEdit {
+            format: "PPTX",
+            operation: "notes",
+            reason,
+        }) if reason.contains("reading or editing notes")
+    ));
+    assert!(matches!(
+        package.presentation().unwrap().notes(),
+        Err(OoxmlError::UnsafeEdit {
+            format: "PPTX",
+            operation: "notes",
+            reason,
+        }) if reason.contains("reading or editing notes")
+    ));
+    assert!(matches!(
+        package.put_notes(graph),
+        Err(OoxmlError::UnsafeEdit {
+            format: "PPTX",
+            operation: "put_notes",
+            reason,
+        }) if reason.contains("reading or editing notes")
+    ));
     assert!(matches!(
         package.remove_notes(0usize),
         Err(OoxmlError::UnsafeEdit {
@@ -203,8 +230,8 @@ fn slide_notes(package: &Package) -> Vec<String> {
 }
 
 fn assert_no_speaker_notes(package: &Package) {
-    let graph = package.notes_graph().unwrap().unwrap();
-    assert!(graph.slides.is_empty());
+    let graph = package.notes().unwrap().unwrap();
+    assert!(graph.slides().is_empty());
     assert!(
         package
             .opc_package()

@@ -769,17 +769,20 @@ impl<'a> Slide<'a> {
     /// ```
     pub fn notes(&self) -> Result<Option<String>> {
         match self.notes_resource()? {
-            Some(resource) => resource.text(),
+            Some(resource) => Ok(resource.text()?),
             None => Ok(None),
         }
     }
 
     /// Get the validated inert raw notes-slide resource for this slide.
-    pub fn notes_resource(&self) -> Result<Option<crate::pptx::notes::PptxNotesSlideResource>> {
+    pub fn notes_resource(&self) -> Result<Option<litchi_pptx::notes::Slide>> {
         let Some(package) = self.package else {
             return Ok(None);
         };
-        crate::pptx::notes::load_slide_notes_resource(package, self.part.part().partname())
+        Ok(litchi_pptx::notes::slide(
+            package,
+            self.part.part().partname(),
+        )?)
     }
 
     /// Extract text from notes XML.

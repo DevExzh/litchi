@@ -23,6 +23,8 @@ use litchi_pptx::tag;
 use std::io::{Read, Seek};
 use std::path::Path;
 
+pub(crate) const STALE_NOTES_REASON: &str = "the legacy writer has unflushed changes that could replace slide and notes relationships; save and reopen before reading or editing notes";
+
 /// Default media poster image - a simple 1x1 gray PNG.
 /// This is used as a placeholder for media shapes that don't have a custom poster frame.
 /// It's a valid minimal PNG image (67 bytes).
@@ -359,7 +361,7 @@ impl Package {
             notes_master_partname.clone(),
             "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"
                 .to_string(),
-            template::default_notes_master_xml().as_bytes().to_vec(),
+            litchi_pptx::notes::master_xml().as_bytes().to_vec(),
         );
 
         // Add relationship from notesMaster to theme
@@ -609,6 +611,10 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn presentation(&self) -> Result<Presentation<'_>> {
+        let notes_current = !self
+            .mutable_pres
+            .as_ref()
+            .is_some_and(MutablePresentation::is_modified);
         let main_part = self
             .opc
             .main_document_part()
@@ -618,7 +624,7 @@ impl Package {
         let pres_part = PresentationPart::from_part(main_part)?;
 
         // Create and return Presentation
-        Ok(Presentation::new(pres_part, &self.opc))
+        Ok(Presentation::new(pres_part, &self.opc, notes_current))
     }
 
     /// Discover all native chart parts reachable from presentation slides.
@@ -837,7 +843,7 @@ impl Package {
             return Err(OoxmlError::UnsafeEdit {
                 format: "PPTX",
                 operation,
-                reason: "the legacy writer has unflushed changes that could replace slide and notes relationships; save and reopen before removing notes",
+                reason: STALE_NOTES_REASON,
             });
         }
         Ok(())
@@ -1102,15 +1108,21 @@ impl Package {
     }
 
     /// Load the bounded, inert notes-slide/notes-master graph.
-    pub fn notes_graph(&self) -> Result<Option<crate::pptx::notes::PptxNotesGraph>> {
+    pub fn notes(&self) -> Result<Option<litchi_pptx::notes::Graph>> {
+        self.ensure_notes_graph_current("notes")?;
         let presentation = self.opc.main_document_part()?.partname().clone();
-        crate::pptx::notes::load_notes_graph(&self.opc, &presentation)
+        Ok(litchi_pptx::notes::load(&self.opc, &presentation)?)
     }
 
     /// Deterministically store an already coherent bounded notes graph.
-    pub fn store_notes_graph(&mut self, graph: &crate::pptx::notes::PptxNotesGraph) -> Result<()> {
+    pub fn put_notes(&mut self, graph: litchi_pptx::notes::Graph) -> Result<()> {
+        self.ensure_notes_graph_current("put_notes")?;
         let presentation = self.opc.main_document_part()?.partname().clone();
-        crate::pptx::notes::store_notes_graph(&mut self.opc, &presentation, graph)
+        Ok(litchi_pptx::notes::put(
+            &mut self.opc,
+            &presentation,
+            graph,
+        )?)
     }
 
     /// Remove the speaker notes owned by one selected slide.
@@ -1123,7 +1135,11 @@ impl Package {
         self.ensure_notes_graph_current("remove_notes")?;
         let slide_name = self.resolve_slide(slide.into())?;
         let presentation = self.opc.main_document_part()?.partname().clone();
-        crate::pptx::notes::remove_slide_notes(&mut self.opc, &presentation, &slide_name)
+        Ok(litchi_pptx::notes::remove(
+            &mut self.opc,
+            &presentation,
+            &slide_name,
+        )?)
     }
 
     /// Remove speaker notes from every slide, returning the number removed.
@@ -1134,7 +1150,7 @@ impl Package {
     pub fn clear_notes(&mut self) -> Result<usize> {
         self.ensure_notes_graph_current("clear_notes")?;
         let presentation = self.opc.main_document_part()?.partname().clone();
-        crate::pptx::notes::clear_presentation_notes(&mut self.opc, &presentation)
+        Ok(litchi_pptx::notes::clear(&mut self.opc, &presentation)?)
     }
 
     /// Create a new slide master with default text styles and reference it
@@ -2049,8 +2065,8 @@ impl Package {
             self.opc.add_part(Box::new(temp_slide_part));
 
             // Create notes slide if notes exist
-            if let Some(notes_xml_result) = slide.generate_notes_xml() {
-                let notes_xml = notes_xml_result?;
+            if let Some(notes) = slide.notes() {
+                let notes_xml = litchi_pptx::notes::write_text(notes)?;
                 let notes_uri =
                     PackURI::new(format!("/ppt/notesSlides/notesSlide{}.xml", slide_num)).map_err(
                         |e| OoxmlError::InvalidUri(format!("notesSlide{} URI: {}", slide_num, e)),
@@ -2060,7 +2076,7 @@ impl Package {
                     notes_uri,
                     "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"
                         .to_string(),
-                    notes_xml.into_bytes(),
+                    notes_xml,
                 );
 
                 // Add relationship from notes to slide

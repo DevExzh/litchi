@@ -6,6 +6,7 @@ use crate::pptx::ink::{InkLoadLimits, PptxInkAnnotation, load_slide_ink_annotati
 use crate::pptx::laser::{LaserLoadLimits, PptxLaserTrace, load_slide_laser_traces};
 use crate::pptx::namespace::is_presentationml_name;
 use crate::pptx::ole::{OleLoadLimits, PptxOleObject, load_slide_ole_objects};
+use crate::pptx::package::STALE_NOTES_REASON;
 use crate::pptx::parts::{
     NotesSize, PresentationCustomerDataList, PresentationDefaultTextStyle,
     PresentationKinsokuSettings, PresentationMetadata, PresentationModificationVerifier,
@@ -177,6 +178,8 @@ pub struct Presentation<'a> {
     part: PresentationPart<'a>,
     /// Reference to the OPC package for accessing related parts
     package: &'a OpcPackage,
+    /// Whether package-layer notes match any pending legacy-writer state.
+    notes_current: bool,
 }
 
 impl<'a> Presentation<'a> {
@@ -184,8 +187,16 @@ impl<'a> Presentation<'a> {
     ///
     /// This is typically called internally by `Package::presentation()`.
     #[inline]
-    pub(crate) fn new(part: PresentationPart<'a>, package: &'a OpcPackage) -> Self {
-        Self { part, package }
+    pub(crate) fn new(
+        part: PresentationPart<'a>,
+        package: &'a OpcPackage,
+        notes_current: bool,
+    ) -> Self {
+        Self {
+            part,
+            package,
+            notes_current,
+        }
     }
 
     /// Get the number of slides in the presentation.
@@ -504,8 +515,18 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns None when the presentation has no notes graph. Notes and theme
     /// resources are returned as inert stored data.
-    pub fn notes_graph(&self) -> Result<Option<crate::pptx::PptxNotesGraph>> {
-        crate::pptx::load_notes_graph(self.package, self.part.part().partname())
+    pub fn notes(&self) -> Result<Option<litchi_pptx::notes::Graph>> {
+        if !self.notes_current {
+            return Err(OoxmlError::UnsafeEdit {
+                format: "PPTX",
+                operation: "notes",
+                reason: STALE_NOTES_REASON,
+            });
+        }
+        Ok(litchi_pptx::notes::load(
+            self.package,
+            self.part.part().partname(),
+        )?)
     }
 
     /// Discover attached VBA-project metadata without inspecting its payload.

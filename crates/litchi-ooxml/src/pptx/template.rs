@@ -92,11 +92,6 @@ pub fn all_slide_layouts() -> Vec<&'static str> {
     ]
 }
 
-/// Generate notes master XML
-pub fn default_notes_master_xml() -> &'static str {
-    include_str!("resources/generated/notesMaster.xml")
-}
-
 /// Generate a minimal valid theme.xml content.
 pub fn default_theme_xml() -> &'static str {
     include_str!("resources/generated/theme/theme1.xml")

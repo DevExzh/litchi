@@ -1045,68 +1045,6 @@ impl MutableSlide {
         Ok(xml)
     }
 
-    /// Generate notes slide XML content.
-    pub(crate) fn generate_notes_xml(&self) -> Option<Result<String>> {
-        let notes_text = self.notes.as_ref()?;
-
-        let mut xml = String::with_capacity(2048);
-
-        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
-
-        xml.push_str(
-            r#"<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" "#,
-        );
-        xml.push_str(r#"xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" "#);
-        xml.push_str(
-            r#"xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
-        );
-
-        xml.push_str("<p:cSld>");
-        xml.push_str("<p:spTree>");
-
-        // Group shape properties
-        xml.push_str("<p:nvGrpSpPr>");
-        xml.push_str(r#"<p:cNvPr id="1" name=""/>"#);
-        xml.push_str("<p:cNvGrpSpPr/>");
-        xml.push_str("<p:nvPr/>");
-        xml.push_str("</p:nvGrpSpPr>");
-        xml.push_str("<p:grpSpPr>");
-        xml.push_str("<a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/>");
-        xml.push_str("<a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm>");
-        xml.push_str("</p:grpSpPr>");
-
-        // Notes text shape
-        xml.push_str("<p:sp>");
-        xml.push_str("<p:nvSpPr>");
-        xml.push_str(r#"<p:cNvPr id="2" name="Notes Placeholder"/>"#);
-        xml.push_str("<p:cNvSpPr><a:spLocks noGrp=\"1\"/></p:cNvSpPr>");
-        xml.push_str("<p:nvPr><p:ph type=\"body\" idx=\"1\"/></p:nvPr>");
-        xml.push_str("</p:nvSpPr>");
-
-        xml.push_str("<p:spPr/>");
-
-        xml.push_str("<p:txBody>");
-        xml.push_str("<a:bodyPr/>");
-        xml.push_str("<a:lstStyle/>");
-        xml.push_str("<a:p>");
-        xml.push_str("<a:r>");
-        xml.push_str("<a:rPr lang=\"en-US\" dirty=\"0\"/>");
-        if let Err(e) = write!(xml, "<a:t>{}</a:t>", escape_xml(notes_text)) {
-            return Some(Err(OoxmlError::Xml(e.to_string())));
-        }
-        xml.push_str("</a:r>");
-        xml.push_str("</a:p>");
-        xml.push_str("</p:txBody>");
-        xml.push_str("</p:sp>");
-
-        xml.push_str("</p:spTree>");
-        xml.push_str("</p:cSld>");
-        xml.push_str(r#"<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>"#);
-        xml.push_str("</p:notes>");
-
-        Some(Ok(xml))
-    }
-
     /// Write the title placeholder shape.
     fn write_title_shape(&self, xml: &mut String, title: &str) -> Result<()> {
         xml.push_str("<p:sp>");
@@ -1658,23 +1596,6 @@ mod tests {
     fn test_get_background_image_none() {
         let slide = MutableSlide::new(256);
         assert!(slide.get_background_image().is_none());
-    }
-
-    #[test]
-    fn test_generate_notes_xml_none() {
-        let slide = MutableSlide::new(256);
-        assert!(slide.generate_notes_xml().is_none());
-    }
-
-    #[test]
-    fn test_generate_notes_xml_some() {
-        let mut slide = MutableSlide::new(256);
-        slide.set_notes("Test notes");
-        let result = slide.generate_notes_xml();
-        assert!(result.is_some());
-        let xml = result.unwrap().unwrap();
-        assert!(xml.contains("Test notes"));
-        assert!(xml.contains("<p:notes"));
     }
 
     #[test]

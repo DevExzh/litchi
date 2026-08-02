@@ -12,6 +12,7 @@ use xml_minifier::minified_xml;
 #[derive(Clone, Copy)]
 struct Asset {
     path: &'static str,
+    generated: Option<&'static str>,
     xml: &'static str,
 }
 
@@ -19,6 +20,17 @@ macro_rules! asset {
     ($source:tt, $path:literal) => {
         Asset {
             path: $path,
+            generated: None,
+            xml: minified_xml!($source),
+        }
+    };
+}
+
+macro_rules! asset_at {
+    ($source:tt, $path:literal, $generated:literal) => {
+        Asset {
+            path: $path,
+            generated: Some($generated),
             xml: minified_xml!($source),
         }
     };
@@ -70,9 +82,10 @@ fn assets() -> Vec<Asset> {
             "../../litchi-ooxml/src/pptx/resources/docProps/core.xml",
             "pptx/resources/docProps/core.xml"
         ),
-        asset!(
-            "../../litchi-ooxml/src/pptx/resources/notesMaster.xml",
-            "pptx/resources/notesMaster.xml"
+        asset_at!(
+            "../../litchi-pptx/src/notes/resources/notesMaster.xml",
+            "pptx/resources/notesMaster.xml",
+            "../litchi-pptx/src/notes/resources/generated/notesMaster.xml"
         ),
         asset!(
             "../../litchi-ooxml/src/pptx/resources/presProps.xml",
@@ -186,6 +199,9 @@ fn assets() -> Vec<Asset> {
 }
 
 fn generated_path(asset: Asset) -> PathBuf {
+    if let Some(path) = asset.generated {
+        return PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path);
+    }
     let (owner, relative) = asset.path.split_once("/resources/").unwrap();
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../litchi-ooxml/src")
