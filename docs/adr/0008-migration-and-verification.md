@@ -2906,15 +2906,20 @@ or performance claim is made by this slice.
 
 ## Core-properties reader ownership
 
-The host-neutral OPC core-properties reader moved from `litchi-ooxml` to the
-existing `litchi_ooxml_common::properties` owner. The only public entry is the
-contextual `properties::read(&OpcPackage)`; the migration-host module is
-deleted without a forwarding alias, and the document, presentation, XLSX, and
-XLSB facade adapters call the common owner directly.
+At the ADR 0014 boundary, the host-neutral OPC core-properties reader moved
+from `litchi-ooxml` to the existing `litchi_ooxml_common::properties` owner.
+The only public read entry was the contextual
+`properties::read(&OpcPackage)`; the migration-host module was deleted without
+a forwarding alias, and the document, presentation, XLSX, and XLSB facade
+adapters called the common owner directly. ADR 0015 later adds the common
+write and clear operations and routes DOCX, PPTX, and XLSX through retained
+host caches.
 
-The reader keeps relationship-selected lookup, Transitional and Strict
+That reader kept relationship-selected lookup, Transitional and Strict
 namespaces, OPC M4 restrictions, content-type checks, datetime normalization,
 entity decoding, and bounded retained text behind structured common errors.
+ADR 0015 subsequently replaces normalization with lossless schema-typed
+lexical values.
 Both production `expect` paths were replaced by typed invalid-data results.
 This changes no package bytes and does not claim that the remaining
 umbrella-to-host dependency debt is resolved.
@@ -2925,6 +2930,86 @@ the common owner, host, and isolated facade; workspace lint and the executable
 boundary checks are green at 35 packages, 107 direct internal dependencies,
 and 14 explicit debt items. Per explicit user direction, the full-workspace
 test suite is not repeated.
+
+## Lossless OOXML core-properties CRUD
+
+The common owner now exposes the concise `Props` value and explicit `read`,
+consuming `write`, and idempotent `clear` package operations. DOCX, PPTX, and
+XLSX retain absence and the already validated value in a hidden dirty-tracked
+slot; their public core-properties surface is limited to `props`, `props_mut`,
+`put_props`, and `clear_props`. Untouched saves preserve exact core-property
+bytes and signatures. Non-destructive updates retain noncanonical targets,
+relationship IDs, Strict or Transitional dialects, and legal outbound
+extension relationships. Destructive clear rejects shared inbound ownership,
+then removes the core owner edge and part while leaving extension parts intact.
+
+The schema-faithful semantic model follows the normative OPC schema rather
+than historical facade assumptions: revision remains an arbitrary string,
+`created` and `modified` retain every W3CDTF precision and optional timezone,
+`lastPrinted` retains `xsd:dateTime`, and keyword text and language-bearing
+`cp:value` children remain ordered mixed content. The non-schema
+`cp:contentType` element is not part of the schema model. Text, lexical values,
+package cardinality, and byte budgets fail through typed errors without
+unwinding.
+
+Focused common and host CRUD, malformed-input, no-op, graph-preservation, and
+failure-atomicity tests pass. The `core_props_office` example generated the six
+artifacts under `target/office-core-props`; its reproducible command is
+`cargo +1.89 run -p litchi-ooxml --example core_props_office --all-features`.
+The exact historical invocation and application versions were not recorded.
+Through Computer Use in Microsoft Word, PowerPoint, and Excel on macOS, all
+six opened without repair prompts, displayed the expected metadata before
+clear and blank values afterward, and rendered the document, slide, and
+worksheet content. This supports open-and-inspect compatibility for those
+artifacts and tested desktop applications only; Office-side edit/resave and
+reverse-read were not performed for this slice. Raw mutable OPC access can
+still make the host slot stale, and a later host-save failure can leave the
+in-memory package changed after a successful slot flush; those transaction
+seams remain explicit follow-up work. Per user direction, the previously green
+full-workspace suite is not repeated.
+
+## Checked BIFF8 writer locations beyond ordinary cells
+
+The legacy Excel writer now checks merges, validations, data-table inputs,
+filters, sort keys, pivots, Web publications, RTD cells, and page breaks before
+retaining or mutating location state. Dedicated values migrated in this slice
+use the narrowest representation for the exact 65,536-by-256 BIFF8 cell grid,
+while horizontal page-break column spans retain their distinct `[MS-XLS]`
+range through 16,383. Inclusive public ranges have private fields, fallible
+constructors, and short accessors. WebPub insertion validates its range,
+source, and strings; RTD insertion validates subscriber coordinates and the
+workbook-relative sheet in context.
+
+The touched operations validate all fallible location inputs before changing
+worksheet collections or defined names. Page-break ordering, overlap, and
+count limits follow the relevant record sections, and validation serialization
+consumes a prechecked range instead of inserting provisionally and recovering
+with `unwrap` or `pop`. Three adversarial unit tests and 38 selected integration
+tests pass, including exact maxima, overflow, reversal, overlap, count limits,
+serialization/reopen, typed rejection, and no-unwind failure atomicity.
+Warning-denied Clippy and rustdoc, formatting, and diff validation are green
+for `litchi-xls`; no unmeasured performance or native Office claim is made.
+AutoFilter ranges, sort keys, pivot locations, and data-table anchors retain
+some legacy wide private storage after the checked boundary. `XlsSortData`
+Rw12/Col12 policy and save-time RTD topic encoding also remain open.
+
+## Format-owned deterministic OOXML producer templates
+
+DOCX, PPTX, XLSX, and XLSB now own the exact minified assets they embed under
+format-local `resources/generated` directories. Readable XML sources remain
+beside them, and an `xml-minifier` integration test regenerates every mapped
+asset and requires byte equality. Production `litchi-ooxml` no longer invokes
+or depends on the development minifier, removing that executable dependency
+and its boundary-debt entry.
+
+Fresh core templates are present but semantically empty; they do not fabricate
+an author, revision, or clock history. XLSB creation no longer reads ambient
+time or assumes timestamp formatting is infallible. All 39 assets pass exact
+parity, focused minifier and XLSB regressions pass, and warning-denied Clippy,
+rustdoc, formatting, manifest, dependency, and executable-boundary checks are
+green. The boundary policy records 35 packages, 106 direct internal
+dependencies, and 13 explicit migration debts. Determinism and ownership do
+not imply unmeasured speedups or universal native Office compatibility.
 
 ## Evidence levels
 
