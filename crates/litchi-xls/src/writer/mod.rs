@@ -60,7 +60,7 @@ pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,
     HorizontalAlignment, VerticalAlignment,
 };
-pub use formula::{FormulaTokenizer, Ptg};
+pub use formula::{Area, FormulaTokenizer, Ptg, Ref};
 pub use view::{
     XlsPaneMode, XlsViewScale, XlsWorksheetPaneOptions, XlsWorksheetSelectionOptions,
     XlsWorksheetViewOptions,

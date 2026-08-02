@@ -17,71 +17,194 @@
 //!
 //! ```text
 //! Formula: =A1+B1*2
-//! Tokens: [PtgRef(A1), PtgRef(B1), PtgInt(2), PtgMul, PtgAdd]
+//! Tokens: [Ref(A1), Ref(B1), Int(2), Mul, Add]
 //! ```
 
 use super::super::XlsError;
 use std::collections::HashMap;
 
+const MAX_BIFF8_COLUMN: u16 = 255;
+
+/// A checked BIFF8 cell reference.
+///
+/// Rows and columns are zero-based. The private `u8` column makes references
+/// beyond Excel 97-2003 column IV unrepresentable after construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Ref {
+    row: u16,
+    col: u8,
+    row_rel: bool,
+    col_rel: bool,
+}
+
+impl Ref {
+    /// Construct an absolute reference from zero-based BIFF8 coordinates.
+    pub const fn new(row: u16, col: u8) -> Self {
+        Self {
+            row,
+            col,
+            row_rel: false,
+            col_rel: false,
+        }
+    }
+
+    /// Convert a wider zero-based column after checking the BIFF8 limit.
+    pub fn checked(row: u16, col: u16) -> Result<Self, XlsError> {
+        let col = u8::try_from(col).map_err(|_| {
+            XlsError::InvalidCellReference(format!(
+                "zero-based column {col} exceeds IV ({MAX_BIFF8_COLUMN})"
+            ))
+        })?;
+        Ok(Self::new(row, col))
+    }
+
+    /// Parse an A1-style BIFF8 reference.
+    pub fn parse(value: &str) -> Result<Self, XlsError> {
+        parse_ref(value)
+    }
+
+    /// Set whether the row is relative.
+    pub const fn rel_row(mut self, relative: bool) -> Self {
+        self.row_rel = relative;
+        self
+    }
+
+    /// Set whether the column is relative.
+    pub const fn rel_col(mut self, relative: bool) -> Self {
+        self.col_rel = relative;
+        self
+    }
+
+    /// Return an absolute form of this reference.
+    pub const fn abs(mut self) -> Self {
+        self.row_rel = false;
+        self.col_rel = false;
+        self
+    }
+
+    /// Zero-based row.
+    pub const fn row(self) -> u16 {
+        self.row
+    }
+
+    /// Zero-based column, bounded to 0..=255.
+    pub const fn col(self) -> u8 {
+        self.col
+    }
+
+    /// Whether the row is relative to the formula cell.
+    pub const fn is_row_rel(self) -> bool {
+        self.row_rel
+    }
+
+    /// Whether the column is relative to the formula cell.
+    pub const fn is_col_rel(self) -> bool {
+        self.col_rel
+    }
+
+    const fn col_flags(self) -> u16 {
+        self.col as u16
+            | if self.col_rel { 0x4000 } else { 0 }
+            | if self.row_rel { 0x8000 } else { 0 }
+    }
+}
+
+impl std::str::FromStr for Ref {
+    type Err = XlsError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::parse(value)
+    }
+}
+
+/// A checked, ordered BIFF8 cell area.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Area {
+    first: Ref,
+    last: Ref,
+}
+
+impl Area {
+    /// Construct an ordered area from its upper-left and lower-right cells.
+    pub fn new(first: Ref, last: Ref) -> Result<Self, XlsError> {
+        if first.row > last.row || first.col > last.col {
+            return Err(XlsError::InvalidCellReference(
+                "BIFF8 area endpoints are reversed".to_string(),
+            ));
+        }
+        Ok(Self { first, last })
+    }
+
+    /// Upper-left cell.
+    pub const fn first(self) -> Ref {
+        self.first
+    }
+
+    /// Lower-right cell.
+    pub const fn last(self) -> Ref {
+        self.last
+    }
+}
+
 /// Ptg (Parse Thing) token types
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ptg {
     /// Integer constant
-    PtgInt(u16),
+    Int(u16),
     /// Number constant
-    PtgNum(f64),
+    Num(f64),
     /// String constant
-    PtgStr(String),
+    Str(String),
     /// Boolean constant
-    PtgBool(bool),
-    /// Cell reference (row, col, relative flags)
-    PtgRef(u16, u16, bool, bool),
-    /// Area reference (r1, c1, r2, c2)
-    PtgArea(u16, u16, u16, u16),
-    /// 3D area reference (ixti, r1, r2, c1, c2)
+    Bool(bool),
+    /// Checked cell reference.
+    Ref(Ref),
+    /// Checked area reference.
+    Area(Area),
+    /// 3D area reference (external-sheet index and checked area).
     ///
     /// Used by defined names and other structures that require
     /// NameParsedFormula, which MUST use 3D references instead of
     /// plain 2D PtgArea in BIFF8.
-    PtgArea3d(u16, u16, u16, u16, u16),
+    Area3d(u16, Area),
     /// Addition operator
-    PtgAdd,
+    Add,
     /// Subtraction operator
-    PtgSub,
+    Sub,
     /// Multiplication operator
-    PtgMul,
+    Mul,
     /// Division operator
-    PtgDiv,
+    Div,
     /// Power operator
-    PtgPower,
+    Power,
     /// Concatenation operator
-    PtgConcat,
+    Concat,
     /// Less than
-    PtgLT,
+    Lt,
     /// Less than or equal
-    PtgLE,
+    Le,
     /// Equal
-    PtgEQ,
+    Eq,
     /// Greater than or equal
-    PtgGE,
+    Ge,
     /// Greater than
-    PtgGT,
+    Gt,
     /// Not equal
-    PtgNE,
+    Ne,
     /// Range operator
-    PtgRange,
+    Range,
     /// Unary plus operator
-    PtgUnaryPlus,
+    UnaryPlus,
     /// Unary minus operator
-    PtgUnaryMinus,
+    UnaryMinus,
     /// Percent postfix operator
-    PtgPercent,
+    Percent,
     /// Function call (function index, arg count)
-    PtgFunc(u16, u8),
+    Func(u16, u8),
     /// Parentheses
-    PtgParen,
+    Paren,
     /// Missing argument
-    PtgMissArg,
+    MissArg,
 }
 
 /// Operator precedence
@@ -98,64 +221,78 @@ fn get_precedence(op: &str) -> u8 {
     }
 }
 
-/// Parse a cell reference like "A1" or "$B$2" into a `PtgRef` token.
+/// Parse a cell reference like "A1" or "$B$2" into a [`Ptg::Ref`] token.
 ///
 /// This is exposed as `pub(crate)` so that other writer components
 /// (for example, named range handling) can reuse the same parsing
 /// logic and stay consistent with formula tokenization.
 pub(crate) fn parse_cell_ref(s: &str) -> Result<Ptg, XlsError> {
-    let s = s.trim();
-    let mut col_abs = false;
-    let mut row_abs = false;
-    let mut chars = s.chars().peekable();
+    Ref::parse(s).map(Ptg::Ref)
+}
 
-    // Check for absolute column
-    if chars.peek() == Some(&'$') {
-        col_abs = true;
-        chars.next();
-    }
+fn parse_ref(value: &str) -> Result<Ref, XlsError> {
+    let value = value.trim();
+    let bytes = value.as_bytes();
+    let invalid = || XlsError::InvalidCellReference(value.to_string());
+    let mut position = 0;
 
-    // Parse column (A-Z, AA-ZZ, etc.)
-    let mut col_str = String::new();
-    while let Some(&c) = chars.peek() {
-        if c.is_ascii_alphabetic() {
-            col_str.push(chars.next().unwrap());
-        } else {
+    let column_relative = if bytes.get(position) == Some(&b'$') {
+        position += 1;
+        false
+    } else {
+        true
+    };
+
+    let column_start = position;
+    let mut column = 0u16;
+    while let Some(byte) = bytes.get(position).copied() {
+        if !byte.is_ascii_alphabetic() {
             break;
         }
+        let digit = u16::from(byte.to_ascii_uppercase() - b'A' + 1);
+        column = column
+            .checked_mul(26)
+            .and_then(|current| current.checked_add(digit))
+            .ok_or_else(invalid)?;
+        if column > MAX_BIFF8_COLUMN + 1 {
+            return Err(invalid());
+        }
+        position += 1;
+    }
+    if position == column_start {
+        return Err(invalid());
     }
 
-    if col_str.is_empty() {
-        return Err(XlsError::InvalidData(format!(
-            "Invalid cell reference: {}",
-            s
-        )));
+    let row_relative = if bytes.get(position) == Some(&b'$') {
+        position += 1;
+        false
+    } else {
+        true
+    };
+
+    let row_start = position;
+    let mut row = 0u32;
+    while let Some(byte) = bytes.get(position).copied() {
+        if !byte.is_ascii_digit() {
+            return Err(invalid());
+        }
+        row = row
+            .checked_mul(10)
+            .and_then(|current| current.checked_add(u32::from(byte - b'0')))
+            .ok_or_else(invalid)?;
+        if row > 65_536 {
+            return Err(invalid());
+        }
+        position += 1;
+    }
+    if position == row_start || row == 0 {
+        return Err(invalid());
     }
 
-    // Convert column letters to number (A=0, B=1, ..., Z=25, AA=26, etc.)
-    let mut col = 0u16;
-    for c in col_str.chars() {
-        col = col * 26 + (c.to_ascii_uppercase() as u16 - 'A' as u16 + 1);
-    }
-    col -= 1; // Convert to 0-based
-
-    // Check for absolute row
-    if chars.peek() == Some(&'$') {
-        row_abs = true;
-        chars.next();
-    }
-
-    // Parse row number
-    let row_str: String = chars.collect();
-    let row = row_str
-        .parse::<u16>()
-        .map_err(|_| XlsError::InvalidData(format!("Invalid row number: {}", row_str)))?;
-
-    if row == 0 {
-        return Err(XlsError::InvalidData("Row must be >= 1".to_string()));
-    }
-
-    Ok(Ptg::PtgRef(row - 1, col, !row_abs, !col_abs))
+    let column = u8::try_from(column - 1).map_err(|_| invalid())?;
+    Ok(Ref::new((row - 1) as u16, column)
+        .rel_row(row_relative)
+        .rel_col(column_relative))
 }
 
 /// Formula tokenizer - converts infix formula to RPN tokens
@@ -230,12 +367,12 @@ impl FormulaTokenizer {
                     let num = num_str.parse::<f64>().map_err(|_| {
                         XlsError::InvalidData(format!("Invalid number: {}", num_str))
                     })?;
-                    output.push(Ptg::PtgNum(num));
+                    output.push(Ptg::Num(num));
                 } else {
                     let num = num_str.parse::<u16>().map_err(|_| {
                         XlsError::InvalidData(format!("Invalid integer: {}", num_str))
                     })?;
-                    output.push(Ptg::PtgInt(num));
+                    output.push(Ptg::Int(num));
                 }
                 expect_operand = false;
                 continue;
@@ -265,7 +402,7 @@ impl FormulaTokenizer {
                         "Unterminated string literal".to_string(),
                     ));
                 }
-                output.push(Ptg::PtgStr(value));
+                output.push(Ptg::Str(value));
                 expect_operand = false;
                 continue;
             }
@@ -295,22 +432,16 @@ impl FormulaTokenizer {
                     expect_operand = true;
                 } else {
                     if token.eq_ignore_ascii_case("TRUE") {
-                        output.push(Ptg::PtgBool(true));
+                        output.push(Ptg::Bool(true));
                         expect_operand = false;
                         continue;
                     }
                     if token.eq_ignore_ascii_case("FALSE") {
-                        output.push(Ptg::PtgBool(false));
+                        output.push(Ptg::Bool(false));
                         expect_operand = false;
                         continue;
                     }
-                    // Try to parse as cell reference
-                    match parse_cell_ref(&token) {
-                        Ok(ptg) => output.push(ptg),
-                        Err(_) => {
-                            return Err(XlsError::InvalidData(format!("Unknown token: {}", token)));
-                        },
-                    }
+                    output.push(parse_cell_ref(&token)?);
                     expect_operand = false;
                 }
                 continue;
@@ -345,21 +476,25 @@ impl FormulaTokenizer {
                             .get(operators.len().saturating_sub(2))
                             .is_some_and(|(op, _, argc)| *op == "FUNC" && *argc == 0);
                     if expect_operand && !zero_arg_function {
-                        output.push(Ptg::PtgMissArg);
+                        output.push(Ptg::MissArg);
                     }
                     while let Some((op, func_idx, argc)) = operators.pop() {
                         if op == "(" {
                             break;
                         }
                         if op == "FUNC" {
-                            output.push(Ptg::PtgFunc(func_idx, argc));
+                            output.push(Ptg::Func(func_idx, argc));
                         } else {
                             self.push_operator(&mut output, op)?;
                         }
                     }
                     if operators.last().is_some_and(|(op, _, _)| *op == "FUNC") {
-                        let (_, func_idx, argc) = operators.pop().unwrap();
-                        output.push(Ptg::PtgFunc(func_idx, argc));
+                        let (_, func_idx, argc) = operators.pop().ok_or_else(|| {
+                            XlsError::InvalidFormula(
+                                "function operator stack became inconsistent".to_string(),
+                            )
+                        })?;
+                        output.push(Ptg::Func(func_idx, argc));
                     }
                     expect_operand = false;
                 },
@@ -385,20 +520,24 @@ impl FormulaTokenizer {
                             "Percent operator is missing its operand".to_string(),
                         ));
                     }
-                    output.push(Ptg::PtgPercent);
+                    output.push(Ptg::Percent);
                 },
                 "," => {
                     if expect_operand {
-                        output.push(Ptg::PtgMissArg);
+                        output.push(Ptg::MissArg);
                     }
                     // Argument separator - pop operators until '('
                     while let Some(&(top_op, _, _)) = operators.last() {
                         if top_op == "(" {
                             break;
                         }
-                        let (op, func_idx, argc) = operators.pop().unwrap();
+                        let (op, func_idx, argc) = operators.pop().ok_or_else(|| {
+                            XlsError::InvalidFormula(
+                                "argument operator stack became inconsistent".to_string(),
+                            )
+                        })?;
                         if op == "FUNC" {
-                            output.push(Ptg::PtgFunc(func_idx, argc));
+                            output.push(Ptg::Func(func_idx, argc));
                         } else {
                             self.push_operator(&mut output, op)?;
                         }
@@ -412,7 +551,11 @@ impl FormulaTokenizer {
                     let function = open_paren.checked_sub(1).ok_or_else(|| {
                         XlsError::InvalidData("Argument separator outside function".to_string())
                     })?;
-                    let (op, _, argc) = &mut operators[function];
+                    let (op, _, argc) = operators.get_mut(function).ok_or_else(|| {
+                        XlsError::InvalidFormula(
+                            "argument operator stack became inconsistent".to_string(),
+                        )
+                    })?;
                     if *op != "FUNC" {
                         return Err(XlsError::InvalidData(
                             "Argument separator outside function".to_string(),
@@ -447,7 +590,7 @@ impl FormulaTokenizer {
                 return Err(XlsError::InvalidData("Mismatched parentheses".to_string()));
             }
             if op == "FUNC" {
-                output.push(Ptg::PtgFunc(func_idx, argc));
+                output.push(Ptg::Func(func_idx, argc));
             } else {
                 self.push_operator(&mut output, op)?;
             }
@@ -458,21 +601,21 @@ impl FormulaTokenizer {
 
     fn push_operator(&self, output: &mut Vec<Ptg>, op: &str) -> Result<(), XlsError> {
         let ptg = match op {
-            "+" => Ptg::PtgAdd,
-            "-" => Ptg::PtgSub,
-            "*" => Ptg::PtgMul,
-            "/" => Ptg::PtgDiv,
-            "^" => Ptg::PtgPower,
-            "&" => Ptg::PtgConcat,
-            "=" => Ptg::PtgEQ,
-            "<>" => Ptg::PtgNE,
-            "<" => Ptg::PtgLT,
-            "<=" => Ptg::PtgLE,
-            ">" => Ptg::PtgGT,
-            ">=" => Ptg::PtgGE,
-            ":" => Ptg::PtgRange,
-            "u+" => Ptg::PtgUnaryPlus,
-            "u-" => Ptg::PtgUnaryMinus,
+            "+" => Ptg::Add,
+            "-" => Ptg::Sub,
+            "*" => Ptg::Mul,
+            "/" => Ptg::Div,
+            "^" => Ptg::Power,
+            "&" => Ptg::Concat,
+            "=" => Ptg::Eq,
+            "<>" => Ptg::Ne,
+            "<" => Ptg::Lt,
+            "<=" => Ptg::Le,
+            ">" => Ptg::Gt,
+            ">=" => Ptg::Ge,
+            ":" => Ptg::Range,
+            "u+" => Ptg::UnaryPlus,
+            "u-" => Ptg::UnaryMinus,
             _ => return Err(XlsError::InvalidData(format!("Unknown operator: {}", op))),
         };
         output.push(ptg);
@@ -513,9 +656,11 @@ impl FormulaTokenizer {
             let left_associative = !matches!(op, "u+" | "u-" | "^");
             if get_precedence(top_op) > prec || (left_associative && get_precedence(top_op) == prec)
             {
-                let (op, func_idx, argc) = operators.pop().unwrap();
+                let (op, func_idx, argc) = operators.pop().ok_or_else(|| {
+                    XlsError::InvalidFormula("operator stack became inconsistent".to_string())
+                })?;
                 if op == "FUNC" {
-                    output.push(Ptg::PtgFunc(func_idx, argc));
+                    output.push(Ptg::Func(func_idx, argc));
                 } else {
                     self.push_operator(output, op)?;
                 }
@@ -540,15 +685,15 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
 
     for token in tokens {
         match token {
-            Ptg::PtgInt(val) => {
+            Ptg::Int(val) => {
                 bytes.push(0x1E); // PtgInt
                 bytes.extend_from_slice(&val.to_le_bytes());
             },
-            Ptg::PtgNum(val) => {
+            Ptg::Num(val) => {
                 bytes.push(0x1F); // PtgNum
                 bytes.extend_from_slice(&val.to_le_bytes());
             },
-            Ptg::PtgStr(s) => {
+            Ptg::Str(s) => {
                 bytes.push(0x17); // PtgStr
                 let mut utf16: Vec<u16> = s.encode_utf16().take(255).collect();
                 if utf16
@@ -568,71 +713,61 @@ pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
                     }
                 }
             },
-            Ptg::PtgBool(value) => {
+            Ptg::Bool(value) => {
                 bytes.extend_from_slice(&[0x1d, u8::from(*value)]);
             },
-            Ptg::PtgRef(row, col, row_rel, col_rel) => {
+            Ptg::Ref(reference) => {
                 bytes.push(0x24); // PtgRef
-                bytes.extend_from_slice(&row.to_le_bytes());
-                let mut col_flags = *col;
-                if *col_rel {
-                    col_flags |= 0x4000;
-                }
-                if *row_rel {
-                    col_flags |= 0x8000;
-                }
-                bytes.extend_from_slice(&col_flags.to_le_bytes());
+                bytes.extend_from_slice(&reference.row().to_le_bytes());
+                bytes.extend_from_slice(&reference.col_flags().to_le_bytes());
             },
-            Ptg::PtgArea(r1, r2, c1, c2) => {
+            Ptg::Area(area) => {
                 // BIFF8 PtgArea (2D area reference)
-                // Rows are stored as 0-based indices; columns are stored
-                // with relative/absolute flags in the upper bits. For the
-                // initial implementation we always emit absolute area
-                // references, so the flag bits remain clear.
+                let first = area.first();
+                let last = area.last();
                 bytes.push(0x25); // PtgArea
-                bytes.extend_from_slice(&r1.to_le_bytes());
-                bytes.extend_from_slice(&r2.to_le_bytes());
-                bytes.extend_from_slice(&c1.to_le_bytes());
-                bytes.extend_from_slice(&c2.to_le_bytes());
+                bytes.extend_from_slice(&first.row().to_le_bytes());
+                bytes.extend_from_slice(&last.row().to_le_bytes());
+                bytes.extend_from_slice(&first.col_flags().to_le_bytes());
+                bytes.extend_from_slice(&last.col_flags().to_le_bytes());
             },
-            Ptg::PtgArea3d(ixti, r1, r2, c1, c2) => {
+            Ptg::Area3d(ixti, area) => {
                 // BIFF8 PtgArea3d (3D area reference)
                 //
                 // Layout: opcode (1 byte) + ixti (2 bytes) + r1 (2) +
                 // r2 (2) + c1 (2) + c2 (2).
-                //
-                // For now we always emit absolute references, so the
-                // relative bits in the column fields remain clear.
+                let first = area.first();
+                let last = area.last();
                 bytes.push(0x3B); // PtgArea3d
                 bytes.extend_from_slice(&ixti.to_le_bytes());
-                bytes.extend_from_slice(&r1.to_le_bytes());
-                bytes.extend_from_slice(&r2.to_le_bytes());
-                bytes.extend_from_slice(&c1.to_le_bytes());
-                bytes.extend_from_slice(&c2.to_le_bytes());
+                bytes.extend_from_slice(&first.row().to_le_bytes());
+                bytes.extend_from_slice(&last.row().to_le_bytes());
+                bytes.extend_from_slice(&first.col_flags().to_le_bytes());
+                bytes.extend_from_slice(&last.col_flags().to_le_bytes());
             },
-            Ptg::PtgAdd => bytes.push(0x03),
-            Ptg::PtgSub => bytes.push(0x04),
-            Ptg::PtgMul => bytes.push(0x05),
-            Ptg::PtgDiv => bytes.push(0x06),
-            Ptg::PtgPower => bytes.push(0x07),
-            Ptg::PtgConcat => bytes.push(0x08),
-            Ptg::PtgLT => bytes.push(0x09),
-            Ptg::PtgLE => bytes.push(0x0A),
-            Ptg::PtgEQ => bytes.push(0x0B),
-            Ptg::PtgGE => bytes.push(0x0C),
-            Ptg::PtgGT => bytes.push(0x0D),
-            Ptg::PtgNE => bytes.push(0x0E),
-            Ptg::PtgRange => bytes.push(0x11),
-            Ptg::PtgUnaryPlus => bytes.push(0x12),
-            Ptg::PtgUnaryMinus => bytes.push(0x13),
-            Ptg::PtgPercent => bytes.push(0x14),
-            Ptg::PtgFunc(func_idx, argc) => {
+            Ptg::Add => bytes.push(0x03),
+            Ptg::Sub => bytes.push(0x04),
+            Ptg::Mul => bytes.push(0x05),
+            Ptg::Div => bytes.push(0x06),
+            Ptg::Power => bytes.push(0x07),
+            Ptg::Concat => bytes.push(0x08),
+            Ptg::Lt => bytes.push(0x09),
+            Ptg::Le => bytes.push(0x0A),
+            Ptg::Eq => bytes.push(0x0B),
+            Ptg::Ge => bytes.push(0x0C),
+            Ptg::Gt => bytes.push(0x0D),
+            Ptg::Ne => bytes.push(0x0E),
+            Ptg::Range => bytes.push(0x11),
+            Ptg::UnaryPlus => bytes.push(0x12),
+            Ptg::UnaryMinus => bytes.push(0x13),
+            Ptg::Percent => bytes.push(0x14),
+            Ptg::Func(func_idx, argc) => {
                 bytes.push(0x42); // PtgFuncVar, value operand class
                 bytes.push(*argc);
                 bytes.extend_from_slice(&func_idx.to_le_bytes());
             },
-            Ptg::PtgParen => bytes.push(0x15),
-            Ptg::PtgMissArg => bytes.push(0x16),
+            Ptg::Paren => bytes.push(0x15),
+            Ptg::MissArg => bytes.push(0x16),
         }
     }
 
@@ -646,39 +781,86 @@ mod tests {
     #[test]
     fn test_parse_cell_ref() {
         let ref_a1 = parse_cell_ref("A1").unwrap();
-        assert!(matches!(ref_a1, Ptg::PtgRef(0, 0, true, true)));
+        assert_eq!(ref_a1, Ptg::Ref(Ref::new(0, 0).rel_row(true).rel_col(true)));
 
         let ref_abs = parse_cell_ref("$B$2").unwrap();
-        assert!(matches!(ref_abs, Ptg::PtgRef(1, 1, false, false)));
+        assert_eq!(ref_abs, Ptg::Ref(Ref::new(1, 1)));
     }
 
     #[test]
     fn test_parse_cell_ref_row_abs() {
         let ref_row_abs = parse_cell_ref("A$5").unwrap();
-        assert!(matches!(ref_row_abs, Ptg::PtgRef(4, 0, false, true)));
+        assert_eq!(ref_row_abs, Ptg::Ref(Ref::new(4, 0).rel_col(true)));
     }
 
     #[test]
     fn test_parse_cell_ref_col_abs() {
         let ref_col_abs = parse_cell_ref("$C10").unwrap();
-        assert!(matches!(ref_col_abs, Ptg::PtgRef(9, 2, true, false)));
+        assert_eq!(ref_col_abs, Ptg::Ref(Ref::new(9, 2).rel_row(true)));
     }
 
     #[test]
-    fn test_parse_cell_ref_multiletter_col() {
+    fn test_parse_cell_ref_biff8_edges() {
         let ref_aa1 = parse_cell_ref("AA1").unwrap();
-        assert!(matches!(ref_aa1, Ptg::PtgRef(0, 26, true, true)));
+        assert_eq!(
+            ref_aa1,
+            Ptg::Ref(Ref::new(0, 26).rel_row(true).rel_col(true))
+        );
 
-        let ref_zz5 = parse_cell_ref("ZZ5").unwrap();
-        assert!(matches!(ref_zz5, Ptg::PtgRef(4, 701, true, true)));
+        let last = parse_cell_ref("IV65536").unwrap();
+        assert_eq!(
+            last,
+            Ptg::Ref(Ref::new(u16::MAX, u8::MAX).rel_row(true).rel_col(true))
+        );
     }
 
     #[test]
     fn test_parse_cell_ref_invalid() {
-        assert!(parse_cell_ref("").is_err());
-        assert!(parse_cell_ref("123").is_err());
-        assert!(parse_cell_ref("ABC").is_err());
-        assert!(parse_cell_ref("A0").is_err()); // Row 0 is invalid
+        for value in ["", "123", "ABC", "A0", "A65537", "IW1", "ZZZZ1"] {
+            assert!(
+                matches!(
+                    parse_cell_ref(value),
+                    Err(XlsError::InvalidCellReference(reference)) if reference == value
+                ),
+                "unexpected result for {value:?}"
+            );
+        }
+
+        let oversized = format!("{}1", "Z".repeat(4_096));
+        assert!(matches!(
+            parse_cell_ref(&oversized),
+            Err(XlsError::InvalidCellReference(reference)) if reference == oversized
+        ));
+    }
+
+    #[test]
+    fn checked_reference_and_area_construction_rejects_invalid_bounds() {
+        assert_eq!(Ref::checked(0, 255).unwrap(), Ref::new(0, 255));
+        assert!(matches!(
+            Ref::checked(0, 256),
+            Err(XlsError::InvalidCellReference(_))
+        ));
+        assert!(matches!(
+            Area::new(Ref::new(1, 0), Ref::new(0, 0)),
+            Err(XlsError::InvalidCellReference(_))
+        ));
+        assert!(matches!(
+            Area::new(Ref::new(0, 1), Ref::new(0, 0)),
+            Err(XlsError::InvalidCellReference(_))
+        ));
+    }
+
+    #[test]
+    fn tokenizer_preserves_invalid_reference_errors_without_unwinding() {
+        let outcome = std::panic::catch_unwind(|| FormulaTokenizer::new().tokenize("ZZZZ1"));
+        assert!(matches!(
+            outcome,
+            Ok(Err(XlsError::InvalidCellReference(reference))) if reference == "ZZZZ1"
+        ));
+        assert!(matches!(
+            FormulaTokenizer::new().tokenize("IW1"),
+            Err(XlsError::InvalidCellReference(reference)) if reference == "IW1"
+        ));
     }
 
     #[test]
@@ -715,9 +897,9 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("123+456.78").unwrap();
         assert_eq!(tokens.len(), 3);
-        assert!(matches!(tokens[0], Ptg::PtgInt(123)));
-        assert!(matches!(tokens[1], Ptg::PtgNum(456.78)));
-        assert!(matches!(tokens[2], Ptg::PtgAdd));
+        assert!(matches!(tokens[0], Ptg::Int(123)));
+        assert!(matches!(tokens[1], Ptg::Num(456.78)));
+        assert!(matches!(tokens[2], Ptg::Add));
     }
 
     #[test]
@@ -725,17 +907,17 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("\"Hello World\"").unwrap();
         assert_eq!(tokens.len(), 1);
-        assert!(matches!(&tokens[0], Ptg::PtgStr(s) if s == "Hello World"));
+        assert!(matches!(&tokens[0], Ptg::Str(s) if s == "Hello World"));
     }
 
     #[test]
     fn test_tokenize_escaped_string_and_booleans() {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("IF(TRUE,\"a\"\"b\",FALSE)").unwrap();
-        assert!(matches!(tokens[0], Ptg::PtgBool(true)));
-        assert!(matches!(&tokens[1], Ptg::PtgStr(value) if value == "a\"b"));
-        assert!(matches!(tokens[2], Ptg::PtgBool(false)));
-        assert!(matches!(tokens[3], Ptg::PtgFunc(1, 3)));
+        assert!(matches!(tokens[0], Ptg::Bool(true)));
+        assert!(matches!(&tokens[1], Ptg::Str(value) if value == "a\"b"));
+        assert!(matches!(tokens[2], Ptg::Bool(false)));
+        assert!(matches!(tokens[3], Ptg::Func(1, 3)));
         assert!(tokenizer.tokenize("\"unterminated").is_err());
     }
 
@@ -743,18 +925,18 @@ mod tests {
     fn test_tokenize_unary_percent_and_missing_arguments() {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("--A1+50%").unwrap();
-        assert!(matches!(tokens[0], Ptg::PtgRef(..)));
-        assert!(matches!(tokens[1], Ptg::PtgUnaryMinus));
-        assert!(matches!(tokens[2], Ptg::PtgUnaryMinus));
-        assert!(matches!(tokens[3], Ptg::PtgInt(50)));
-        assert!(matches!(tokens[4], Ptg::PtgPercent));
-        assert!(matches!(tokens[5], Ptg::PtgAdd));
+        assert!(matches!(tokens[0], Ptg::Ref(_)));
+        assert!(matches!(tokens[1], Ptg::UnaryMinus));
+        assert!(matches!(tokens[2], Ptg::UnaryMinus));
+        assert!(matches!(tokens[3], Ptg::Int(50)));
+        assert!(matches!(tokens[4], Ptg::Percent));
+        assert!(matches!(tokens[5], Ptg::Add));
 
         let tokens = tokenizer.tokenize("IF(,A1,)").unwrap();
-        assert!(matches!(tokens[0], Ptg::PtgMissArg));
-        assert!(matches!(tokens[1], Ptg::PtgRef(..)));
-        assert!(matches!(tokens[2], Ptg::PtgMissArg));
-        assert!(matches!(tokens[3], Ptg::PtgFunc(1, 3)));
+        assert!(matches!(tokens[0], Ptg::MissArg));
+        assert!(matches!(tokens[1], Ptg::Ref(_)));
+        assert!(matches!(tokens[2], Ptg::MissArg));
+        assert!(matches!(tokens[3], Ptg::Func(1, 3)));
         assert!(tokenizer.tokenize("A1+").is_err());
         assert!(tokenizer.tokenize("*A1").is_err());
     }
@@ -764,7 +946,7 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("A1-B1").unwrap();
         assert_eq!(tokens.len(), 3);
-        assert!(matches!(tokens[2], Ptg::PtgSub));
+        assert!(matches!(tokens[2], Ptg::Sub));
     }
 
     #[test]
@@ -772,7 +954,7 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("A1*B1").unwrap();
         assert_eq!(tokens.len(), 3);
-        assert!(matches!(tokens[2], Ptg::PtgMul));
+        assert!(matches!(tokens[2], Ptg::Mul));
     }
 
     #[test]
@@ -780,7 +962,7 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("A1/B1").unwrap();
         assert_eq!(tokens.len(), 3);
-        assert!(matches!(tokens[2], Ptg::PtgDiv));
+        assert!(matches!(tokens[2], Ptg::Div));
     }
 
     #[test]
@@ -788,7 +970,7 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("A1^2").unwrap();
         assert_eq!(tokens.len(), 3);
-        assert!(matches!(tokens[2], Ptg::PtgPower));
+        assert!(matches!(tokens[2], Ptg::Power));
     }
 
     #[test]
@@ -796,7 +978,7 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("A1&B1").unwrap();
         assert_eq!(tokens.len(), 3);
-        assert!(matches!(tokens[2], Ptg::PtgConcat));
+        assert!(matches!(tokens[2], Ptg::Concat));
     }
 
     #[test]
@@ -804,22 +986,22 @@ mod tests {
         let tokenizer = FormulaTokenizer::new();
 
         let tokens_eq = tokenizer.tokenize("A1=B1").unwrap();
-        assert!(matches!(tokens_eq[2], Ptg::PtgEQ));
+        assert!(matches!(tokens_eq[2], Ptg::Eq));
 
         let tokens_ne = tokenizer.tokenize("A1<>B1").unwrap();
-        assert!(matches!(tokens_ne[2], Ptg::PtgNE));
+        assert!(matches!(tokens_ne[2], Ptg::Ne));
 
         let tokens_lt = tokenizer.tokenize("A1<B1").unwrap();
-        assert!(matches!(tokens_lt[2], Ptg::PtgLT));
+        assert!(matches!(tokens_lt[2], Ptg::Lt));
 
         let tokens_le = tokenizer.tokenize("A1<=B1").unwrap();
-        assert!(matches!(tokens_le[2], Ptg::PtgLE));
+        assert!(matches!(tokens_le[2], Ptg::Le));
 
         let tokens_gt = tokenizer.tokenize("A1>B1").unwrap();
-        assert!(matches!(tokens_gt[2], Ptg::PtgGT));
+        assert!(matches!(tokens_gt[2], Ptg::Gt));
 
         let tokens_ge = tokenizer.tokenize("A1>=B1").unwrap();
-        assert!(matches!(tokens_ge[2], Ptg::PtgGE));
+        assert!(matches!(tokens_ge[2], Ptg::Ge));
     }
 
     #[test]
@@ -828,24 +1010,24 @@ mod tests {
         let tokens = tokenizer.tokenize("(A1+B1)*C1").unwrap();
         // Should be: A1, B1, +, C1, * (RPN)
         assert_eq!(tokens.len(), 5);
-        assert!(matches!(tokens[2], Ptg::PtgAdd));
-        assert!(matches!(tokens[4], Ptg::PtgMul));
+        assert!(matches!(tokens[2], Ptg::Add));
+        assert!(matches!(tokens[4], Ptg::Mul));
     }
 
     #[test]
     fn test_tokenize_function() {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("SUM(A1)").unwrap();
-        assert!(tokens.iter().any(|t| matches!(t, Ptg::PtgFunc(4, 1))));
+        assert!(tokens.iter().any(|t| matches!(t, Ptg::Func(4, 1))));
     }
 
     #[test]
     fn test_tokenize_function_arguments_and_following_operator() {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("ROUND(A1,2)+SUM()").unwrap();
-        assert!(matches!(tokens[2], Ptg::PtgFunc(27, 2)));
-        assert!(matches!(tokens[3], Ptg::PtgFunc(4, 0)));
-        assert!(matches!(tokens[4], Ptg::PtgAdd));
+        assert!(matches!(tokens[2], Ptg::Func(27, 2)));
+        assert!(matches!(tokens[3], Ptg::Func(4, 0)));
+        assert!(matches!(tokens[4], Ptg::Add));
     }
 
     #[test]
@@ -861,60 +1043,62 @@ mod tests {
         let tokens = tokenizer.tokenize("A1+B1*C1").unwrap();
         // Should be: A1, B1, C1, *, + (RPN)
         assert_eq!(tokens.len(), 5);
-        assert!(matches!(tokens[3], Ptg::PtgMul));
-        assert!(matches!(tokens[4], Ptg::PtgAdd));
+        assert!(matches!(tokens[3], Ptg::Mul));
+        assert!(matches!(tokens[4], Ptg::Add));
     }
 
     #[test]
     fn test_ptg_enum_variants() {
         // Test that all Ptg variants can be created
-        let _ = Ptg::PtgInt(42);
-        let _ = Ptg::PtgNum(std::f64::consts::PI);
-        let _ = Ptg::PtgStr("test".to_string());
-        let _ = Ptg::PtgBool(true);
-        let _ = Ptg::PtgRef(0, 0, true, true);
-        let _ = Ptg::PtgArea(0, 0, 1, 1);
-        let _ = Ptg::PtgArea3d(0, 0, 1, 0, 1);
-        let _ = Ptg::PtgAdd;
-        let _ = Ptg::PtgSub;
-        let _ = Ptg::PtgMul;
-        let _ = Ptg::PtgDiv;
-        let _ = Ptg::PtgPower;
-        let _ = Ptg::PtgConcat;
-        let _ = Ptg::PtgLT;
-        let _ = Ptg::PtgLE;
-        let _ = Ptg::PtgEQ;
-        let _ = Ptg::PtgGE;
-        let _ = Ptg::PtgGT;
-        let _ = Ptg::PtgNE;
-        let _ = Ptg::PtgRange;
-        let _ = Ptg::PtgUnaryPlus;
-        let _ = Ptg::PtgUnaryMinus;
-        let _ = Ptg::PtgPercent;
-        let _ = Ptg::PtgFunc(0, 1);
-        let _ = Ptg::PtgParen;
-        let _ = Ptg::PtgMissArg;
+        let reference = Ref::new(0, 0);
+        let area = Area::new(reference, Ref::new(1, 1)).unwrap();
+        let _ = Ptg::Int(42);
+        let _ = Ptg::Num(std::f64::consts::PI);
+        let _ = Ptg::Str("test".to_string());
+        let _ = Ptg::Bool(true);
+        let _ = Ptg::Ref(reference);
+        let _ = Ptg::Area(area);
+        let _ = Ptg::Area3d(0, area);
+        let _ = Ptg::Add;
+        let _ = Ptg::Sub;
+        let _ = Ptg::Mul;
+        let _ = Ptg::Div;
+        let _ = Ptg::Power;
+        let _ = Ptg::Concat;
+        let _ = Ptg::Lt;
+        let _ = Ptg::Le;
+        let _ = Ptg::Eq;
+        let _ = Ptg::Ge;
+        let _ = Ptg::Gt;
+        let _ = Ptg::Ne;
+        let _ = Ptg::Range;
+        let _ = Ptg::UnaryPlus;
+        let _ = Ptg::UnaryMinus;
+        let _ = Ptg::Percent;
+        let _ = Ptg::Func(0, 1);
+        let _ = Ptg::Paren;
+        let _ = Ptg::MissArg;
     }
 
     #[test]
     fn test_ptg_clone() {
-        let ptg = Ptg::PtgRef(1, 2, true, false);
+        let ptg = Ptg::Ref(Ref::new(1, 2).rel_row(true));
         let cloned = ptg.clone();
         assert_eq!(ptg, cloned);
     }
 
     #[test]
     fn test_ptg_partial_eq() {
-        assert_eq!(Ptg::PtgAdd, Ptg::PtgAdd);
-        assert_eq!(Ptg::PtgInt(42), Ptg::PtgInt(42));
-        assert_ne!(Ptg::PtgInt(42), Ptg::PtgInt(43));
+        assert_eq!(Ptg::Add, Ptg::Add);
+        assert_eq!(Ptg::Int(42), Ptg::Int(42));
+        assert_ne!(Ptg::Int(42), Ptg::Int(43));
     }
 
     #[test]
     fn test_ptg_debug() {
-        let ptg = Ptg::PtgRef(0, 0, true, true);
+        let ptg = Ptg::Ref(Ref::new(0, 0).rel_row(true).rel_col(true));
         let debug_str = format!("{:?}", ptg);
-        assert!(debug_str.contains("PtgRef"));
+        assert!(debug_str.contains("Ref"));
     }
 
     #[test]
@@ -926,11 +1110,7 @@ mod tests {
 
     #[test]
     fn test_encode_ptg_tokens() {
-        let tokens = vec![
-            Ptg::PtgInt(42),
-            Ptg::PtgAdd,
-            Ptg::PtgNum(std::f64::consts::PI),
-        ];
+        let tokens = vec![Ptg::Int(42), Ptg::Add, Ptg::Num(std::f64::consts::PI)];
         let bytes = encode_ptg_tokens(&tokens);
         assert!(!bytes.is_empty());
         assert_eq!(bytes[0], 0x1E); // PtgInt opcode
@@ -938,15 +1118,36 @@ mod tests {
 
     #[test]
     fn test_encode_ptg_ref() {
-        let tokens = vec![Ptg::PtgRef(5, 3, true, false)];
-        let bytes = encode_ptg_tokens(&tokens);
-        assert_eq!(bytes[0], 0x24); // PtgRef opcode
-        assert_eq!(bytes.len(), 5); // 1 (opcode) + 2 (row) + 2 (col with flags)
+        let absolute = Ref::new(5, 3);
+        let row_relative = absolute.rel_row(true);
+        let column_relative = absolute.rel_col(true);
+        let relative = row_relative.rel_col(true);
+
+        assert_eq!(
+            encode_ptg_tokens(&[Ptg::Ref(absolute)]),
+            [0x24, 0x05, 0x00, 0x03, 0x00]
+        );
+        assert_eq!(
+            encode_ptg_tokens(&[Ptg::Ref(row_relative)]),
+            [0x24, 0x05, 0x00, 0x03, 0x80]
+        );
+        assert_eq!(
+            encode_ptg_tokens(&[Ptg::Ref(column_relative)]),
+            [0x24, 0x05, 0x00, 0x03, 0x40]
+        );
+        assert_eq!(
+            encode_ptg_tokens(&[Ptg::Ref(relative)]),
+            [0x24, 0x05, 0x00, 0x03, 0xc0]
+        );
+        assert_eq!(
+            encode_ptg_tokens(&[Ptg::Ref(Ref::new(u16::MAX, u8::MAX))]),
+            [0x24, 0xff, 0xff, 0xff, 0x00]
+        );
     }
 
     #[test]
     fn test_encode_ptg_str() {
-        let tokens = vec![Ptg::PtgStr("Test".to_string())];
+        let tokens = vec![Ptg::Str("Test".to_string())];
         let bytes = encode_ptg_tokens(&tokens);
         assert_eq!(bytes[0], 0x17); // PtgStr opcode
         assert_eq!(bytes[1], 4); // String length
@@ -954,43 +1155,47 @@ mod tests {
 
     #[test]
     fn test_encode_ptg_str_as_utf16_when_required() {
-        let bytes = encode_ptg_tokens(&[Ptg::PtgStr("你好".to_string())]);
+        let bytes = encode_ptg_tokens(&[Ptg::Str("你好".to_string())]);
         assert_eq!(bytes, [0x17, 2, 1, 0x60, 0x4f, 0x7d, 0x59]);
     }
 
     #[test]
     fn test_encode_ptg_bool() {
-        assert_eq!(encode_ptg_tokens(&[Ptg::PtgBool(true)]), [0x1d, 1]);
-        assert_eq!(encode_ptg_tokens(&[Ptg::PtgBool(false)]), [0x1d, 0]);
+        assert_eq!(encode_ptg_tokens(&[Ptg::Bool(true)]), [0x1d, 1]);
+        assert_eq!(encode_ptg_tokens(&[Ptg::Bool(false)]), [0x1d, 0]);
     }
 
     #[test]
     fn test_encode_ptg_str_does_not_split_surrogate_pair_at_limit() {
         let value = format!("{}😀", "a".repeat(254));
-        let bytes = encode_ptg_tokens(&[Ptg::PtgStr(value)]);
+        let bytes = encode_ptg_tokens(&[Ptg::Str(value)]);
         assert_eq!(bytes[1], 254);
         assert_eq!(bytes.len(), 257);
     }
 
     #[test]
     fn test_encode_ptg_area() {
-        let tokens = vec![Ptg::PtgArea(0, 5, 0, 3)];
-        let bytes = encode_ptg_tokens(&tokens);
-        assert_eq!(bytes[0], 0x25); // PtgArea opcode
-        assert_eq!(bytes.len(), 9); // 1 + 2*4 bytes for coordinates
+        let area = Area::new(Ref::new(0, 0), Ref::new(5, 3)).unwrap();
+        assert_eq!(
+            encode_ptg_tokens(&[Ptg::Area(area)]),
+            [0x25, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x03, 0x00]
+        );
     }
 
     #[test]
     fn test_encode_ptg_area3d() {
-        let tokens = vec![Ptg::PtgArea3d(0, 0, 5, 0, 3)];
-        let bytes = encode_ptg_tokens(&tokens);
-        assert_eq!(bytes[0], 0x3B); // PtgArea3d opcode
-        assert_eq!(bytes.len(), 11); // 1 + 2 (ixti) + 2*4 bytes for coordinates
+        let area = Area::new(Ref::new(0, 0), Ref::new(5, 3)).unwrap();
+        assert_eq!(
+            encode_ptg_tokens(&[Ptg::Area3d(2, area)]),
+            [
+                0x3b, 0x02, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x03, 0x00,
+            ]
+        );
     }
 
     #[test]
     fn test_encode_ptg_func() {
-        let tokens = vec![Ptg::PtgFunc(4, 1)]; // SUM with 1 arg
+        let tokens = vec![Ptg::Func(4, 1)]; // SUM with 1 arg
         let bytes = encode_ptg_tokens(&tokens);
         assert_eq!(bytes[0], 0x42); // PtgFuncVar opcode, value operand class
         assert_eq!(bytes[1], 1); // Arg count
@@ -999,24 +1204,24 @@ mod tests {
     #[test]
     fn test_encode_all_operators() {
         let operators = vec![
-            (Ptg::PtgAdd, 0x03),
-            (Ptg::PtgSub, 0x04),
-            (Ptg::PtgMul, 0x05),
-            (Ptg::PtgDiv, 0x06),
-            (Ptg::PtgPower, 0x07),
-            (Ptg::PtgConcat, 0x08),
-            (Ptg::PtgLT, 0x09),
-            (Ptg::PtgLE, 0x0A),
-            (Ptg::PtgEQ, 0x0B),
-            (Ptg::PtgGE, 0x0C),
-            (Ptg::PtgGT, 0x0D),
-            (Ptg::PtgNE, 0x0E),
-            (Ptg::PtgRange, 0x11),
-            (Ptg::PtgUnaryPlus, 0x12),
-            (Ptg::PtgUnaryMinus, 0x13),
-            (Ptg::PtgPercent, 0x14),
-            (Ptg::PtgParen, 0x15),
-            (Ptg::PtgMissArg, 0x16),
+            (Ptg::Add, 0x03),
+            (Ptg::Sub, 0x04),
+            (Ptg::Mul, 0x05),
+            (Ptg::Div, 0x06),
+            (Ptg::Power, 0x07),
+            (Ptg::Concat, 0x08),
+            (Ptg::Lt, 0x09),
+            (Ptg::Le, 0x0A),
+            (Ptg::Eq, 0x0B),
+            (Ptg::Ge, 0x0C),
+            (Ptg::Gt, 0x0D),
+            (Ptg::Ne, 0x0E),
+            (Ptg::Range, 0x11),
+            (Ptg::UnaryPlus, 0x12),
+            (Ptg::UnaryMinus, 0x13),
+            (Ptg::Percent, 0x14),
+            (Ptg::Paren, 0x15),
+            (Ptg::MissArg, 0x16),
         ];
 
         for (ptg, expected_opcode) in operators {
@@ -1029,9 +1234,15 @@ mod tests {
     fn test_tokenize_cell_range() {
         let tokenizer = FormulaTokenizer::new();
         let tokens = tokenizer.tokenize("SUM(A1:B1)").unwrap();
-        assert!(matches!(tokens[0], Ptg::PtgRef(0, 0, true, true)));
-        assert!(matches!(tokens[1], Ptg::PtgRef(0, 1, true, true)));
-        assert!(matches!(tokens[2], Ptg::PtgRange));
-        assert!(matches!(tokens[3], Ptg::PtgFunc(4, 1)));
+        assert_eq!(
+            tokens[0],
+            Ptg::Ref(Ref::new(0, 0).rel_row(true).rel_col(true))
+        );
+        assert_eq!(
+            tokens[1],
+            Ptg::Ref(Ref::new(0, 1).rel_row(true).rel_col(true))
+        );
+        assert!(matches!(tokens[2], Ptg::Range));
+        assert!(matches!(tokens[3], Ptg::Func(4, 1)));
     }
 }

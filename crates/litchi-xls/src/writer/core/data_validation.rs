@@ -217,11 +217,11 @@ impl XlsDataValidationType {
                 let op = operator.to_biff_code();
 
                 // Encode numeric bounds as simple PtgNum tokens.
-                let f1_tokens = vec![Ptg::PtgNum(*value1 as f64)];
+                let f1_tokens = vec![Ptg::Num(*value1 as f64)];
                 let formula1 = Some(encode_ptg_tokens(&f1_tokens));
 
                 let formula2 = if let Some(v2) = value2 {
-                    let f2_tokens = vec![Ptg::PtgNum(*v2 as f64)];
+                    let f2_tokens = vec![Ptg::Num(*v2 as f64)];
                     Some(encode_ptg_tokens(&f2_tokens))
                 } else {
                     // Between / NotBetween require a second bound.
@@ -266,7 +266,7 @@ impl XlsDataValidationType {
                     ));
                 }
 
-                let tokens = vec![Ptg::PtgStr(joined)];
+                let tokens = vec![Ptg::Str(joined)];
                 let formula1 = Some(encode_ptg_tokens(&tokens));
 
                 // LIST uses operator IGNORED (0) and marks explicit list formula.
@@ -351,8 +351,8 @@ fn numeric_payload(
     value1: f64,
     value2: Option<f64>,
 ) -> XlsResult<XlsDataValidationBiffPayload> {
-    let formula1 = Some(encode_ptg_tokens(&[Ptg::PtgNum(value1)]));
-    let formula2 = value2.map(|value| encode_ptg_tokens(&[Ptg::PtgNum(value)]));
+    let formula1 = Some(encode_ptg_tokens(&[Ptg::Num(value1)]));
+    let formula2 = value2.map(|value| encode_ptg_tokens(&[Ptg::Num(value)]));
     let needs_two = matches!(
         operator,
         XlsDataValidationOperator::Between | XlsDataValidationOperator::NotBetween

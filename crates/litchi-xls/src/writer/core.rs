@@ -4287,6 +4287,21 @@ mod tests {
     }
 
     #[test]
+    fn invalid_formula_reference_returns_error_without_unwinding() {
+        let outcome = std::panic::catch_unwind(|| -> XlsResult<()> {
+            let mut writer = XlsWriter::new();
+            let sheet = writer.add_worksheet("Sheet1")?;
+            writer.write_formula(sheet, 0, 0, "ZZZZ1")?;
+            writer.write_to(&mut Cursor::new(Vec::new()))
+        });
+
+        assert!(matches!(
+            outcome,
+            Ok(Err(XlsError::InvalidCellReference(reference))) if reference == "ZZZZ1"
+        ));
+    }
+
+    #[test]
     fn test_formula_round_trips_through_xls_reader() {
         let mut writer = XlsWriter::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
@@ -4586,6 +4601,31 @@ mod tests {
         };
         let formula = name.to_biff_formula().unwrap();
         assert!(!formula.is_empty());
+    }
+
+    #[test]
+    fn test_xls_defined_name_normalizes_reversed_area_corners() {
+        let forward = XlsDefinedName {
+            name: "Forward".to_string(),
+            reference: "A1:B10".to_string(),
+            comment: None,
+            local_sheet: None,
+            target_sheet: Some(0),
+            hidden: false,
+            is_function: false,
+            is_built_in: false,
+            built_in_code: None,
+        };
+        let reversed = XlsDefinedName {
+            name: "Reversed".to_string(),
+            reference: "B10:A1".to_string(),
+            ..forward.clone()
+        };
+
+        assert_eq!(
+            reversed.to_biff_formula().unwrap(),
+            forward.to_biff_formula().unwrap()
+        );
     }
 
     #[test]

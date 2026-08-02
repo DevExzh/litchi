@@ -7,7 +7,7 @@
 
 use crate::XlsDefinedNameFutureRecords;
 use crate::XlsResult;
-use crate::writer::formula::{Ptg, encode_ptg_tokens, parse_cell_ref};
+use crate::writer::formula::{Area, Ptg, Ref, encode_ptg_tokens};
 use crate::{XlsBuiltInName, XlsDefinedNameKind, XlsError, XlsNameScope};
 
 /// Complete inert BIFF8 `Lbl` metadata for names beyond simple ranges.
@@ -218,23 +218,11 @@ impl XlsDefinedName {
             let first_ref = trimmed[..colon_pos].trim();
             let second_ref = trimmed[colon_pos + 1..].trim();
 
-            let start = parse_cell_ref(first_ref)?;
-            let end = parse_cell_ref(second_ref)?;
-
-            let (row_first, row_last, col_first, col_last) = match (start, end) {
-                (Ptg::PtgRef(r1, c1, ..), Ptg::PtgRef(r2, c2, ..)) => {
-                    let row_first = r1.min(r2);
-                    let row_last = r1.max(r2);
-                    let col_first = c1.min(c2);
-                    let col_last = c1.max(c2);
-                    (row_first, row_last, col_first, col_last)
-                },
-                _ => {
-                    return Err(crate::XlsError::InvalidData(
-                        "Named range must reference cell addresses (A1-style)".to_string(),
-                    ));
-                },
-            };
+            let first = Ref::parse(first_ref)?.abs();
+            let last = Ref::parse(second_ref)?.abs();
+            let upper_left = Ref::new(first.row().min(last.row()), first.col().min(last.col()));
+            let lower_right = Ref::new(first.row().max(last.row()), first.col().max(last.col()));
+            let area = Area::new(upper_left, lower_right)?;
 
             // Prefer a 3D area reference when we know the target sheet,
             // since NameParsedFormula forbids plain PtgArea/PtgRef in
@@ -242,46 +230,22 @@ impl XlsDefinedName {
             // (future enhancement: support multi-sheet / external refs
             // via SupBook/ExternSheet).
             if let Some(sheet_index) = self.target_sheet {
-                let tokens = [Ptg::PtgArea3d(
-                    sheet_index,
-                    row_first,
-                    row_last,
-                    col_first,
-                    col_last,
-                )];
+                let tokens = [Ptg::Area3d(sheet_index, area)];
                 Ok(encode_ptg_tokens(&tokens))
             } else {
-                let tokens = [Ptg::PtgArea(row_first, row_last, col_first, col_last)];
+                let tokens = [Ptg::Area(area)];
                 Ok(encode_ptg_tokens(&tokens))
             }
         } else {
             // Single-cell reference like "A1".
-            let token = parse_cell_ref(trimmed)?;
-            match token {
-                Ptg::PtgRef(row, col, ..) => {
-                    let row_first = row;
-                    let row_last = row;
-                    let col_first = col;
-                    let col_last = col;
+            let reference = Ref::parse(trimmed)?.abs();
+            let area = Area::new(reference, reference)?;
 
-                    if let Some(sheet_index) = self.target_sheet {
-                        let tokens = [Ptg::PtgArea3d(
-                            sheet_index,
-                            row_first,
-                            row_last,
-                            col_first,
-                            col_last,
-                        )];
-                        Ok(encode_ptg_tokens(&tokens))
-                    } else {
-                        Ok(encode_ptg_tokens(&[Ptg::PtgArea(
-                            row_first, row_last, col_first, col_last,
-                        )]))
-                    }
-                },
-                _ => Err(crate::XlsError::InvalidData(
-                    "Named range must reference a cell or cell area".to_string(),
-                )),
+            if let Some(sheet_index) = self.target_sheet {
+                let tokens = [Ptg::Area3d(sheet_index, area)];
+                Ok(encode_ptg_tokens(&tokens))
+            } else {
+                Ok(encode_ptg_tokens(&[Ptg::Area(area)]))
             }
         }
     }
