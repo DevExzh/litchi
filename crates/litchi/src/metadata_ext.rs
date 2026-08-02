@@ -66,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ole")]
+    #[cfg(feature = "doc")]
     fn test_ole_metadata_conversion() {
         let ole_metadata = litchi_cfb::OleMetadata {
             title: Some("OLE Document".to_string()),

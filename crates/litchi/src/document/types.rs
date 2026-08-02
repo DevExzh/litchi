@@ -5,8 +5,8 @@ use litchi_core::detection::FileFormat;
 use litchi_core::{Error, Result};
 use std::io::{Read, Seek};
 
-#[cfg(feature = "ole")]
-use crate::ole;
+#[cfg(feature = "doc")]
+use crate::doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -19,8 +19,8 @@ use crate::ooxml;
 #[allow(clippy::large_enum_variant)]
 pub(super) enum DocumentImpl {
     /// Legacy .doc format
-    #[cfg(feature = "ole")]
-    Doc(ole::doc::Document, litchi_core::Metadata),
+    #[cfg(feature = "doc")]
+    Doc(doc::Document, litchi_core::Metadata),
     /// Modern .docx format
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Package>, litchi_core::Metadata),

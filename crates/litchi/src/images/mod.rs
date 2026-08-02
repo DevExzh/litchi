@@ -59,9 +59,9 @@ pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 ///
 /// Returned records own their OfficeArt framing because the compound file is
 /// closed before this function returns. Native image data is not decoded.
-#[cfg(feature = "ole")]
+#[cfg(feature = "doc")]
 pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
-    let mut package = litchi_ole::doc::Package::open(path).map_err(Error::from)?;
+    let mut package = litchi_doc::Package::open(path).map_err(Error::from)?;
     let document = package.document().map_err(Error::from)?;
     let mut seen = std::collections::HashSet::new();
     let mut images = Vec::new();

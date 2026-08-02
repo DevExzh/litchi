@@ -1,11 +1,11 @@
 //! Text run implementation for Word documents.
 
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf"))]
 use litchi_core::Error;
 use litchi_core::Result;
 
-#[cfg(feature = "ole")]
-use crate::ole;
+#[cfg(feature = "doc")]
+use crate::doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -14,8 +14,8 @@ use crate::ooxml;
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
 pub enum Run {
-    #[cfg(feature = "ole")]
-    Doc(ole::doc::Run),
+    #[cfg(feature = "doc")]
+    Doc(doc::Run),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Run),
     #[cfg(feature = "iwa")]
@@ -30,7 +30,7 @@ impl Run {
     /// Get the text content of the run.
     pub fn text(&self) -> Result<String> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Run::Doc(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.text().map(|s| s.to_string()).map_err(Error::from),
@@ -48,7 +48,7 @@ impl Run {
     /// Check if the run is bold.
     pub fn bold(&self) -> Result<Option<bool>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Run::Doc(r) => Ok(r.bold()),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.bold().map_err(Error::from),
@@ -64,7 +64,7 @@ impl Run {
     /// Check if the run is italic.
     pub fn italic(&self) -> Result<Option<bool>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Run::Doc(r) => Ok(r.italic()),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.italic().map_err(Error::from),
@@ -80,7 +80,7 @@ impl Run {
     /// Check if the run is strikethrough.
     pub fn strikethrough(&self) -> Result<Option<bool>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Run::Doc(r) => Ok(r.strikethrough()),
             #[cfg(feature = "ooxml")]
             Run::Docx(r) => r.strikethrough().map_err(Error::from),
@@ -97,13 +97,13 @@ impl Run {
     ///
     /// Returns the vertical positioning if specified, None if normal.
     ///
-    /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
-    #[cfg(any(feature = "ole", feature = "ooxml", feature = "iwa"))]
+    /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
+    #[cfg(any(feature = "doc", feature = "ooxml", feature = "iwa"))]
     pub fn vertical_position(&self) -> Result<Option<litchi_core::VerticalPosition>> {
         use litchi_core::VerticalPosition;
 
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Run::Doc(r) => {
                 let pos = match r.properties().vertical_position {
                     VerticalPosition::Normal => None,
@@ -130,7 +130,7 @@ impl Run {
     }
 }
 
-#[cfg(all(test, any(all(feature = "ooxml", feature = "ole"), feature = "rtf")))]
+#[cfg(all(test, any(all(feature = "ooxml", feature = "doc"), feature = "rtf")))]
 mod tests {
     use super::super::Document;
     use std::path::PathBuf;
@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_run_text_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_run_formatting_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_run_formatting_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");
@@ -193,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_run_text_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");

@@ -27,6 +27,8 @@ COMMON_FAMILY_GUARDS = {
     "litchi-ole-common": OLE_FORMATS,
     "litchi-opc": OOXML_FORMATS,
 }
+RETIRED_MONOLITHS = frozenset({"litchi-ole"})
+RETIRED_FACADE_FEATURES = frozenset({"ole"})
 
 
 @dataclass(frozen=True, order=True)
@@ -149,6 +151,12 @@ def parse_policy(raw: Any) -> Policy:
     package_map = raw.get("packages")
     if not isinstance(package_map, dict):
         raise PolicyError("packages must be an object")
+    retired = RETIRED_MONOLITHS & package_map.keys()
+    if retired:
+        raise PolicyError(
+            "retired monoliths cannot return as workspace packages: "
+            + ", ".join(sorted(retired))
+        )
     package_names = list(package_map)
     if package_names != sorted(package_names):
         raise PolicyError("packages must be sorted by package name")
@@ -405,6 +413,15 @@ def audit_snapshot(snapshot: Snapshot, policy: Policy) -> list[str]:
         violations.append(
             "topology policy names absent workspace packages: "
             + ", ".join(sorted(stale_policy))
+        )
+
+    retired_facade_features = (
+        snapshot.features.get("litchi", frozenset()) & RETIRED_FACADE_FEATURES
+    )
+    if retired_facade_features:
+        violations.append(
+            "retired litchi facade features returned: "
+            + ", ".join(sorted(retired_facade_features))
         )
 
     actual_edges = frozenset(snapshot.edges)

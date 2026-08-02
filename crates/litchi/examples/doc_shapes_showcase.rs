@@ -24,8 +24,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("However, the DOC reader CAN extract shapes using the shared Escher module:");
     println!();
     println!("Example of reading DOC shapes:");
-    println!("  use litchi::ole::doc::Package;");
-    println!("  use litchi::ole::doc::shapes::extract_shapes;");
+    println!("  use litchi::doc::Package;");
+    println!("  use litchi::doc::shapes::extract_shapes;");
     println!();
     println!("  let mut pkg = Package::open(\"document.doc\")?;");
     println!("  let mut ole = pkg.ole_file_mut();");
@@ -39,9 +39,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("  }}");
     println!();
     println!("To add shape writing support to DOC, the following would be needed:");
-    println!("  1. Shape builder in src/ole/doc/writer/");
+    println!("  1. Shape builder in crates/litchi-doc/src/writer/");
     println!("  2. Integration with Data stream");
-    println!("  3. Escher record generation using shared ole/escher/writer.rs");
+    println!("  3. OfficeArt record generation using litchi-odraw");
     println!("  4. Drawing object references in text");
 
     Ok(())

@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 
 # The main litchi library
 litchi = { path = "../litchi", default-features = false, features = [
-    "ole",
+    "doc",
     "ooxml",
     "odf",
     "iwa",

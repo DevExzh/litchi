@@ -75,6 +75,7 @@ jobs:
           -p litchi-codepage
           -p litchi-core
           -p litchi-crypto
+          -p litchi-doc
           -p litchi-drawingml
           -p litchi-odraw
           -p litchi-ograph

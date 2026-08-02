@@ -1,6 +1,6 @@
 //! Minimal DOC file test - single paragraph only
 
-use litchi::ole::doc::writer::DocWriter;
+use litchi::doc::writer::DocWriter;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

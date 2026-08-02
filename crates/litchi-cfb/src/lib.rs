@@ -1,8 +1,8 @@
 //! Microsoft Compound File Binary (CFB / OLE2) container parser and writer.
 //!
 //! This crate provides the CFB substrate consumed by the legacy Office binary
-//! format crates (`litchi-ole` for `.doc`/`.xls`/`.ppt`) and by encrypted
-//! OOXML packages (`litchi-ooxml` under its `crypto` feature).
+//! format crates (`litchi-doc`, `litchi-ppt`, and `litchi-xls`) and by
+//! encrypted OOXML package support.
 //!
 //! See `[MS-CFB]: Compound File Binary File Format` for the format spec.
 

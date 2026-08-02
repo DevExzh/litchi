@@ -4,7 +4,7 @@ High-performance Rust library for parsing Microsoft Office, OpenDocument, and Ap
 
 ## Overview
 
-`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to format-specific crates carved out of this workspace (`litchi-ppt`, `litchi-xls`, `litchi-ole`, `litchi-ooxml`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. The canonical low-level legacy-format entries are `litchi::ppt` and `litchi::xls`; `litchi::ole` is the remaining DOC migration facade and intentionally contains neither `ppt` nor `xls` compatibility aliases.
+`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to independently owned format crates (`litchi-doc`, `litchi-ppt`, `litchi-xls`, `litchi-ooxml`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. Canonical low-level legacy-format entry points are `litchi::doc`, `litchi::ppt`, and `litchi::xls`; there is no compatibility facade nesting them under an OLE module.
 
 ## Usage
 
@@ -38,11 +38,11 @@ fn main() -> Result<(), litchi::Error> {
 
 ## Feature Flags
 
-Default: `ole`, `ppt`, `xls`, `ooxml`, `ooxml_encryption`, `eval_engine`.
+Default: `doc`, `ppt`, `xls`, `ooxml`, `ooxml_encryption`, `eval_engine`.
 
 | Flag | Adds support for |
 |------|------------------|
-| `ole` | Legacy Word `.doc` |
+| `doc` | Legacy Word `.doc` |
 | `ppt` | Legacy PowerPoint `.ppt` |
 | `xls` | Legacy Excel BIFF `.xls` |
 | `ooxml` | `.docx`, `.xlsx`, `.xlsb`, `.pptx` |

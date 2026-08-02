@@ -36,7 +36,7 @@ class BoundaryPolicyTests(unittest.TestCase):
 
     def test_unclassified_optional_dev_edge_is_rejected(self) -> None:
         snapshot = valid_snapshot(self.policy)
-        edge = boundaries.Edge("litchi-xlsx", "litchi-ole")
+        edge = boundaries.Edge("litchi-xlsx", "litchi-doc")
         edges = dict(snapshot.edges)
         edges[edge] = ("kind=dev, optional=true, target=cfg(unix), rename=legacy",)
         dependencies = dict(snapshot.dependencies)
@@ -46,7 +46,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         violations = boundaries.audit_snapshot(snapshot, self.policy)
 
         self.assertIn(
-            "unclassified internal edge litchi-xlsx -> litchi-ole "
+            "unclassified internal edge litchi-xlsx -> litchi-doc "
             "(kind=dev, optional=true, target=cfg(unix), rename=legacy)",
             violations,
         )
@@ -97,21 +97,41 @@ class BoundaryPolicyTests(unittest.TestCase):
 
     def test_migration_host_edge_cannot_be_marked_canonical(self) -> None:
         raw = copy.deepcopy(self.raw_policy)
-        raw["packages"]["litchi-ole"] = ["litchi-core"]
+        raw["packages"]["litchi-ooxml"] = ["litchi-core"]
         raw["migration_debt"] = [
             item
             for item in raw["migration_debt"]
             if not (
-                item["dependent"] == "litchi-ole"
+                item["dependent"] == "litchi-ooxml"
                 and item["dependency"] == "litchi-core"
             )
         ]
 
         with self.assertRaisesRegex(
             boundaries.PolicyError,
-            "migration-host edges must be debt, not canonical: litchi-ole -> litchi-core",
+            "migration-host edges must be debt, not canonical: litchi-ooxml -> litchi-core",
         ):
             boundaries.parse_policy(raw)
+
+    def test_retired_monolith_cannot_return_as_a_policy_package(self) -> None:
+        raw = copy.deepcopy(self.raw_policy)
+        raw["packages"]["litchi-ole"] = []
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "retired monoliths cannot return as workspace packages: litchi-ole",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_retired_umbrella_feature_cannot_return(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        features = dict(snapshot.features)
+        features["litchi"] |= frozenset({"ole"})
+        snapshot = replace(snapshot, features=features)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn("retired litchi facade features returned: ole", violations)
 
     def test_violations_have_deterministic_order(self) -> None:
         snapshot = valid_snapshot(self.policy)

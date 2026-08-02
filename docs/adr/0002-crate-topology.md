@@ -162,10 +162,13 @@ the lower-level directory and compression codecs needed by focused tooling.
 The crate has no async-runtime edge, public lock wrapper, compatibility facade,
 or public type carrying a redundant `Vba` prefix.
 
-The current `litchi-ooxml` and `litchi-ole` monoliths are removed after their
-contents migrate. They do not remain as compatibility crates. The umbrella
-`litchi` contains no format implementation logic and re-exports canonical types
-without creating aliases with redundant prefixes.
+The `litchi-ole` monolith is removed after DOC, PPT, and XLS migrate into their
+concrete crates. It does not remain as a compatibility crate, feature, or
+module. The current `litchi-ooxml` monolith is likewise removed after its
+contents migrate. The umbrella `litchi` contains no format implementation logic
+and re-exports canonical types without creating aliases with redundant
+prefixes. Legacy Word, PowerPoint, and Excel are independently gated as `doc`,
+`ppt`, and `xls`, with concise low-level facades at `litchi::{doc,ppt,xls}`.
 
 ## Enforcement
 

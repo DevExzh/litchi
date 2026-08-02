@@ -3,9 +3,9 @@
 //! Demonstrates paragraph alignment, indents, and spacing.
 //!
 //! Run with:
-//!   cargo run --example doc_paragraph_format --features ole --no-default-features -- <output.doc>
+//!   cargo run --example doc_paragraph_format --features doc --no-default-features -- <output.doc>
 
-use litchi::ole::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

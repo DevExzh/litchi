@@ -9,8 +9,8 @@ use std::io::{Read, Seek};
 /// Uses proper OLE file parsing to identify the format.
 ///
 /// # Note
-/// This function requires `ole`, `ppt`, or `xls` to be enabled.
-#[cfg(any(feature = "ole", feature = "ppt", feature = "xls"))]
+/// This function requires `doc`, `ppt`, or `xls` to be enabled.
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
 pub fn detect_ole2_format(bytes: &[u8]) -> Option<FileFormat> {
     // First check if it's a valid OLE file using the standard function
     if !litchi_cfb::is_ole_file(bytes) {
@@ -22,9 +22,9 @@ pub fn detect_ole2_format(bytes: &[u8]) -> Option<FileFormat> {
     detect_ole2_format_from_reader(&mut cursor.clone())
 }
 
-/// Stub implementation when both OLE2-backed format features are disabled.
+/// Stub implementation when all CFB-backed format features are disabled.
 /// Always returns None since OLE2 parsing is not available.
-#[cfg(not(any(feature = "ole", feature = "ppt", feature = "xls")))]
+#[cfg(not(any(feature = "doc", feature = "ppt", feature = "xls")))]
 pub fn detect_ole2_format(_bytes: &[u8]) -> Option<FileFormat> {
     None
 }
@@ -33,8 +33,8 @@ pub fn detect_ole2_format(_bytes: &[u8]) -> Option<FileFormat> {
 /// Uses OleFile to parse the OLE structure and identify format.
 ///
 /// # Note
-/// This function requires `ole`, `ppt`, or `xls` to be enabled.
-#[cfg(any(feature = "ole", feature = "ppt", feature = "xls"))]
+/// This function requires `doc`, `ppt`, or `xls` to be enabled.
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
 pub fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
     // Try to open as OLE file - this will validate the format and parse structure
     let ole_file = match litchi_cfb::OleFile::open(reader) {
@@ -46,7 +46,7 @@ pub fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<
     // These checks follow the OLE2 specification and known stream names
 
     // Word document: check for "WordDocument" stream
-    #[cfg(feature = "ole")]
+    #[cfg(feature = "doc")]
     if ole_file.exists(&["WordDocument"]) {
         return Some(FileFormat::Doc);
     }
@@ -65,16 +65,16 @@ pub fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<
 
     // If we can open it as OLE but don't recognize specific streams,
     // preserve the historical DOC fallback only when DOC support is enabled.
-    #[cfg(feature = "ole")]
+    #[cfg(feature = "doc")]
     return Some(FileFormat::Doc);
 
-    #[cfg(not(feature = "ole"))]
+    #[cfg(not(feature = "doc"))]
     None
 }
 
-/// Stub implementation when both OLE2-backed format features are disabled.
+/// Stub implementation when all CFB-backed format features are disabled.
 /// Always returns None since OLE2 parsing is not available.
-#[cfg(not(any(feature = "ole", feature = "ppt", feature = "xls")))]
+#[cfg(not(any(feature = "doc", feature = "ppt", feature = "xls")))]
 pub fn detect_ole2_format_from_reader<R: Read + Seek>(_reader: &mut R) -> Option<FileFormat> {
     None
 }

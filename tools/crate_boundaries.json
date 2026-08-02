@@ -4,6 +4,7 @@
     "litchi": [
       "litchi-cfb",
       "litchi-core",
+      "litchi-doc",
       "litchi-eval",
       "litchi-fonts",
       "litchi-formula",
@@ -26,6 +27,17 @@
     "litchi-crypto": [
       "litchi-cfb",
       "litchi-ole-common"
+    ],
+    "litchi-doc": [
+      "litchi-cfb",
+      "litchi-codepage",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-formula",
+      "litchi-odraw",
+      "litchi-ole-common",
+      "litchi-sign",
+      "litchi-vba"
     ],
     "litchi-drawingml": [
       "litchi-core",
@@ -63,7 +75,6 @@
       "litchi-cfb",
       "litchi-core"
     ],
-    "litchi-ole": [],
     "litchi-ole-common": [
       "litchi-cfb",
       "litchi-codepage"
@@ -136,7 +147,6 @@
     "xml-minifier": []
   },
   "migration_hosts": [
-    "litchi-ole",
     "litchi-ooxml"
   ],
   "migration_debt": [
@@ -146,69 +156,6 @@
       "dependency": "soapberry-zip",
       "reason": "The pre-ADR core still owns ZIP-backed extraction code.",
       "exit": "Move archive and package handling behind format/container crates, then remove this edge."
-    },
-    {
-      "order": 19,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-codepage",
-      "reason": "The DOC-only migration host temporarily consumes the extracted typed code-page capability.",
-      "exit": "Move DOC into litchi-doc with a direct litchi-codepage edge, then delete the host; PPT and XLS have already moved."
-    },
-    {
-      "order": 20,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-cfb",
-      "reason": "The DOC-only OLE migration host still performs CFB-facing format work.",
-      "exit": "Move the remaining DOC CFB integration into litchi-doc, then delete the host."
-    },
-    {
-      "order": 21,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-core",
-      "reason": "The DOC-only migration host still consumes pre-extraction core contracts.",
-      "exit": "Move remaining neutral contracts into focused foundations and DOC behavior into litchi-doc, then delete the host."
-    },
-    {
-      "order": 22,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-formula",
-      "reason": "The DOC-only migration host still owns optional MathType equation integration.",
-      "exit": "Move the DOC equation adapter to litchi-doc after litchi-formula becomes litchi-math, then delete the host."
-    },
-    {
-      "order": 24,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-ole-common",
-      "reason": "The DOC-only host consumes shared binary-Office records while DOC remains in migration.",
-      "exit": "Move the remaining DOC implementation into litchi-doc and delete the host; PPT and XLS already consume litchi-ole-common from concrete crates."
-    },
-    {
-      "order": 25,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-odraw",
-      "reason": "The DOC-only host consumes the extracted OfficeArt substrate for Word drawings and images.",
-      "exit": "Move the remaining DOC drawing integration into litchi-doc, then delete the host; PPT and XLS already use litchi-odraw directly."
-    },
-    {
-      "order": 27,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-crypto",
-      "reason": "The DOC-only host consumes the extracted shared Office cryptography capability.",
-      "exit": "Move DOC cryptography integration into litchi-doc, then delete the host; PPT and XLS already use litchi-crypto directly."
-    },
-    {
-      "order": 28,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-vba",
-      "reason": "The DOC-only host consumes the extracted inert VBA capability.",
-      "exit": "Move DOC VBA integration into litchi-doc, then delete the host; PPT and XLS already use litchi-vba directly."
-    },
-    {
-      "order": 29,
-      "dependent": "litchi-ole",
-      "dependency": "litchi-sign",
-      "reason": "The DOC-only host consumes the extracted trust-neutral signing capability.",
-      "exit": "Move DOC signature integration into litchi-doc, then delete the host; PPT and XLS already use litchi-sign directly."
     },
     {
       "order": 31,
@@ -293,13 +240,6 @@
       "dependency": "xml-minifier",
       "reason": "The OOXML monolith still performs XML implementation work directly.",
       "exit": "Move the remaining XML consumers into common or concrete crates and delete the host."
-    },
-    {
-      "order": 43,
-      "dependent": "litchi",
-      "dependency": "litchi-ole",
-      "reason": "The facade still exposes the DOC-only OLE migration host.",
-      "exit": "Re-export concrete litchi-doc and remove the host dependency; PPT and XLS are already exported from their concrete crates."
     },
     {
       "order": 44,

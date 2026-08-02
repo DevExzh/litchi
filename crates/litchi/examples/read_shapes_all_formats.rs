@@ -5,7 +5,7 @@
 //!
 //! Run with: cargo run --example read_shapes_all_formats <file.doc|file.ppt|file.xls>
 
-use litchi::ole::doc::Package as DocPackage;
+use litchi::doc::Package as DocPackage;
 use litchi::ppt::Package as PptPackage;
 use litchi::sheet::WorkbookTrait;
 use litchi::xls::XlsWorkbook;
@@ -57,7 +57,7 @@ fn read_doc_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     let ole = pkg.ole_file();
 
     // Use the DOC shapes module
-    use litchi::ole::doc::shapes;
+    use litchi::doc::shapes;
 
     let shape_count = shapes::count_shapes(ole)?;
     println!("Total shapes: {}", shape_count);

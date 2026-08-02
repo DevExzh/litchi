@@ -5,7 +5,7 @@ use crate::document::{Document, Paragraph, Run, Table};
 /// This module implements the `ToMarkdown` trait for Word document types,
 /// including Document, Paragraph, Run, and Table.
 ///
-/// **Note**: This module is only available when the `ole` or `ooxml` feature is enabled.
+/// **Note**: This module is only available when a document-format feature is enabled.
 use litchi_core::Result;
 use litchi_markdown::{MarkdownOptions, ToMarkdown};
 use rayon::prelude::*;

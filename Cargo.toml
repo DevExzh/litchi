@@ -41,6 +41,7 @@ litchi-codepage  = { version = "0.0.1", path = "crates/litchi-codepage" }
 # Path deps to internal crates.
 litchi-core      = { version = "0.0.1", path = "crates/litchi-core" }
 litchi-crypto    = { version = "0.0.1", path = "crates/litchi-crypto" }
+litchi-doc       = { version = "0.0.1", path = "crates/litchi-doc" }
 litchi-drawingml = { version = "0.0.1", path = "crates/litchi-drawingml" }
 litchi-eval      = { version = "0.0.1", path = "crates/litchi-eval" }
 litchi-fonts     = { version = "0.0.1", path = "crates/litchi-fonts" }
@@ -51,7 +52,6 @@ litchi-markdown  = { version = "0.0.1", path = "crates/litchi-markdown" }
 litchi-odf       = { version = "0.0.1", path = "crates/litchi-odf" }
 litchi-odraw     = { version = "0.0.1", path = "crates/litchi-odraw" }
 litchi-ograph    = { version = "0.0.1", path = "crates/litchi-ograph" }
-litchi-ole       = { version = "0.0.1", path = "crates/litchi-ole" }
 litchi-ole-common = { version = "0.0.1", path = "crates/litchi-ole-common" }
 litchi-ooxml     = { version = "0.0.1", path = "crates/litchi-ooxml" }
 litchi-ooxml-common = { version = "0.0.1", path = "crates/litchi-ooxml-common" }

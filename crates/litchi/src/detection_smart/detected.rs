@@ -36,7 +36,7 @@ pub enum DetectedFormat {
     Xlsb(crate::ooxml::OpcPackage),
 
     // OLE2 formats with parsed OleFile
-    #[cfg(feature = "ole")]
+    #[cfg(feature = "doc")]
     Doc(litchi_cfb::OleFile<std::io::Cursor<Vec<u8>>>),
     #[cfg(feature = "ppt")]
     Ppt(litchi_cfb::OleFile<std::io::Cursor<Vec<u8>>>),
@@ -134,12 +134,12 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     }
 
     // Check OLE2 signature (DOC, PPT, XLS) - parse OleFile once
-    #[cfg(any(feature = "ole", feature = "ppt", feature = "xls"))]
+    #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
         if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor) {
             // Use existing OLE2 detection logic by checking streams
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             if ole_file.exists(&["WordDocument"]) {
                 return Some(DetectedFormat::Doc(ole_file));
             }

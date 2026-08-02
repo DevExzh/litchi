@@ -4,9 +4,9 @@
 //! Useful to verify whether the produced OLE/DOC structure is valid in Microsoft Word.
 //!
 //! Run with:
-//!   cargo run --example minimal_doc_mre --features ole --no-default-features
+//!   cargo run --example minimal_doc_mre --features doc --no-default-features
 
-use litchi::ole::doc::DocWriter;
+use litchi::doc::DocWriter;
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

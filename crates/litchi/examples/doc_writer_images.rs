@@ -8,7 +8,7 @@
 //!
 //! Run with: cargo run --example doc_writer_images
 
-use litchi::ole::doc::writer::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi::doc::writer::{CharacterFormatting, DocWriter, ParagraphFormatting};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

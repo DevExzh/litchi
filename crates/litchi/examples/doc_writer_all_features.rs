@@ -11,7 +11,7 @@
 //!
 //! Run with: cargo run --example doc_writer_all_features
 
-use litchi::ole::doc::writer::{
+use litchi::doc::writer::{
     CharacterFormatting, DocWriter, FootnoteEntry, ListFormatOverride, ListLevel, ListStructure,
     NumberFormat, ParagraphFormatting,
 };

@@ -100,7 +100,7 @@
 /// ```
 // Module declarations
 #[cfg(any(
-    feature = "ole",
+    feature = "doc",
     feature = "ooxml",
     feature = "odf",
     feature = "rtf",
@@ -110,7 +110,7 @@ mod writer;
 
 // Document and presentation markdown implementations are only available when their respective features are enabled
 #[cfg(any(
-    feature = "ole",
+    feature = "doc",
     feature = "ooxml",
     feature = "odf",
     feature = "rtf",

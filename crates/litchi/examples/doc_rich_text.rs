@@ -3,9 +3,9 @@
 //! Demonstrates multiple runs with character formatting and a custom font table.
 //!
 //! Run with:
-//!   cargo run --example doc_rich_text --features ole --no-default-features -- <output.doc>
+//!   cargo run --example doc_rich_text --features doc --no-default-features -- <output.doc>
 
-use litchi::ole::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

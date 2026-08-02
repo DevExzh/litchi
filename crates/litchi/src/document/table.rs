@@ -1,11 +1,11 @@
 //! Table implementation for Word documents.
 
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf"))]
 use litchi_core::Error;
 use litchi_core::Result;
 
-#[cfg(feature = "ole")]
-use crate::ole;
+#[cfg(feature = "doc")]
+use crate::doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -18,8 +18,8 @@ const UNMERGED_SPAN: usize = 1;
 /// A table in a Word document.
 #[derive(Debug, Clone)]
 pub enum Table {
-    #[cfg(feature = "ole")]
-    Doc(Box<ole::doc::Table>),
+    #[cfg(feature = "doc")]
+    Doc(Box<doc::Table>),
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Table>),
     #[cfg(feature = "rtf")]
@@ -32,7 +32,7 @@ impl Table {
     /// Get the number of rows in the table.
     pub fn row_count(&self) -> Result<usize> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Table::Doc(t) => t.row_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => t.row_count().map_err(Error::from),
@@ -51,7 +51,7 @@ impl Table {
     /// For better performance when iterating, consider using `row_count()` and `row_at(index)`.
     pub fn rows(&self) -> Result<Vec<Row>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Table::Doc(t) => {
                 let rows = t.rows().map_err(Error::from)?;
                 Ok(rows
@@ -94,7 +94,7 @@ impl Table {
     /// Returns `None` if the index is out of bounds.
     pub fn row_at(&self, index: usize) -> Result<Option<Row>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Table::Doc(t) => {
                 let rows = t.rows().map_err(Error::from)?;
                 Ok(rows.get(index).cloned().map(|row| Row::Doc(Box::new(row))))
@@ -123,8 +123,8 @@ impl Table {
 /// A table row in a Word document.
 #[derive(Debug, Clone)]
 pub enum Row {
-    #[cfg(feature = "ole")]
-    Doc(Box<ole::doc::Row>),
+    #[cfg(feature = "doc")]
+    Doc(Box<doc::Row>),
     #[cfg(feature = "ooxml")]
     Docx(Box<ooxml::docx::Row>),
     #[cfg(feature = "rtf")]
@@ -137,7 +137,7 @@ impl Row {
     /// Get the number of cells in this row.
     pub fn cell_count(&self) -> Result<usize> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Row::Doc(r) => r.cell_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Row::Docx(r) => r.cell_count().map_err(Error::from),
@@ -156,7 +156,7 @@ impl Row {
     /// For better performance when iterating, consider using `cell_count()` and `cell_at(index)`.
     pub fn cells(&self) -> Result<Vec<Cell>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Row::Doc(r) => {
                 let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.into_iter().map(Cell::Doc).collect())
@@ -189,7 +189,7 @@ impl Row {
     /// Returns `None` if the index is out of bounds.
     pub fn cell_at(&self, index: usize) -> Result<Option<Cell>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Row::Doc(r) => {
                 let cells = r.cells().map_err(Error::from)?;
                 Ok(cells.get(index).cloned().map(Cell::Doc))
@@ -256,8 +256,8 @@ impl Row {
 /// A table cell in a Word document.
 #[derive(Debug, Clone)]
 pub enum Cell {
-    #[cfg(feature = "ole")]
-    Doc(ole::doc::Cell),
+    #[cfg(feature = "doc")]
+    Doc(doc::Cell),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Cell),
     #[cfg(feature = "rtf")]
@@ -270,7 +270,7 @@ impl Cell {
     /// Get the text content of the cell.
     pub fn text(&self) -> Result<String> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Cell::Doc(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Cell::Docx(c) => c.text().map(|s| s.to_string()).map_err(Error::from),
@@ -298,7 +298,7 @@ impl Cell {
         match self {
             // DOC records merge roles per cell, not a span count; the width of
             // the range is only recoverable from the surrounding row.
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Cell::Doc(_) => Ok(1),
             #[cfg(feature = "ooxml")]
             Cell::Docx(c) => c.grid_span().map_err(Error::from),
@@ -318,7 +318,7 @@ impl Cell {
     /// `table:number-rows-spanned` directly and always yields `Some`.
     pub fn row_span(&self) -> Result<Option<usize>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Cell::Doc(_) => Ok(None),
             // `w:vMerge` marks participation only; the count is not stored.
             #[cfg(feature = "ooxml")]
@@ -336,7 +336,7 @@ impl Cell {
     /// every supported format, including the role-based DOC and RTF encodings.
     pub fn horizontal_merge(&self) -> Result<CellMerge> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Cell::Doc(c) => Ok(c
                 .properties()
                 .map(|p| doc_merge(p.merge_status))
@@ -356,11 +356,11 @@ impl Cell {
 
     /// Get the vertical merge state of this cell.
     ///
-    /// Unlike [`Cell::v_merge`], this is available regardless of which format
+    /// Unlike the format-specific `Cell::v_merge` accessor, this is available regardless of which format
     /// features are enabled and is resolved for every supported format.
     pub fn vertical_merge(&self) -> Result<CellMerge> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Cell::Doc(c) => Ok(c
                 .vertical_merge_status()
                 .map(vertical_doc_merge)
@@ -386,7 +386,7 @@ impl Cell {
     #[cfg(feature = "ooxml")]
     pub fn v_merge(&self) -> Result<Option<crate::ooxml::docx::VMergeState>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Cell::Doc(_) => Ok(None),
             Cell::Docx(c) => c.v_merge().map_err(Error::from),
             #[cfg(feature = "rtf")]
@@ -412,10 +412,10 @@ fn span_merge(span: usize) -> CellMerge {
 }
 
 /// Map a binary-DOC horizontal `TC80` merge role onto the facade enum.
-#[cfg(feature = "ole")]
+#[cfg(feature = "doc")]
 #[inline]
-fn doc_merge(status: litchi_ole::doc::parts::tap::CellMergeStatus) -> CellMerge {
-    use litchi_ole::doc::parts::tap::CellMergeStatus;
+fn doc_merge(status: litchi_doc::parts::tap::CellMergeStatus) -> CellMerge {
+    use litchi_doc::parts::tap::CellMergeStatus;
     match status {
         CellMergeStatus::None => CellMerge::None,
         CellMergeStatus::First => CellMerge::Start,
@@ -424,10 +424,10 @@ fn doc_merge(status: litchi_ole::doc::parts::tap::CellMergeStatus) -> CellMerge 
 }
 
 /// Map a binary-DOC vertical `TC80` merge role onto the facade enum.
-#[cfg(feature = "ole")]
+#[cfg(feature = "doc")]
 #[inline]
-fn vertical_doc_merge(status: litchi_ole::doc::parts::tap::VerticalMergeStatus) -> CellMerge {
-    use litchi_ole::doc::parts::tap::VerticalMergeStatus;
+fn vertical_doc_merge(status: litchi_doc::parts::tap::VerticalMergeStatus) -> CellMerge {
+    use litchi_doc::parts::tap::VerticalMergeStatus;
     match status {
         VerticalMergeStatus::None => CellMerge::None,
         VerticalMergeStatus::First => CellMerge::Start,
@@ -456,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_table_row_count_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -469,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_table_rows_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -487,7 +487,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_table_row_at_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -505,7 +505,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_table_cells_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -526,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_table_cell_at_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -548,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_table_cell_grid_span_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -569,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_table_document_with_tables() {
         let test_files = [
             "ooxml/docx/table_footnotes.docx",
@@ -703,7 +703,7 @@ mod tests {
     /// Binary DOC records `TC80` merge roles per cell; the span is only
     /// recoverable with row context, which `grid_span_at` supplies.
     #[test]
-    #[cfg(feature = "ole")]
+    #[cfg(feature = "doc")]
     fn doc_merge_roles_resolve_through_row_context() {
         let path = test_data_path().join("ole/doc/table-merged-cells.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");

@@ -5,7 +5,7 @@
 
 use std::{error::Error, fs, path::PathBuf};
 
-use litchi::ole::doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition};
+use litchi::doc::writer::{DocDrawingShape, DocShapeKind, DocWriter, FloatingPosition};
 use litchi::ppt::writer::{
     FillStyle, LineStyleConfig, PptWriter, ShapeColor, ShapeStyle, ShapeType, Table,
 };

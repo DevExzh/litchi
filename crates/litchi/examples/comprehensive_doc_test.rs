@@ -5,7 +5,7 @@
 //!
 //! Run with: cargo run --example comprehensive_doc_test
 
-use litchi::ole::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi::doc::{CharacterFormatting, DocWriter, ParagraphFormatting};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive DOC Writer Test ===\n");

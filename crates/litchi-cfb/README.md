@@ -8,8 +8,8 @@ CFB is the storage substrate underneath the legacy Microsoft Office binary
 documents (`.doc`, `.xls`, `.ppt`) and is also used to wrap encrypted OOXML
 packages. This crate implements `[MS-CFB]` reading and writing, exposes the
 directory tree, stream I/O, and standard property-set metadata, and is consumed
-directly by `litchi-xls`, `litchi-ppt`, the remaining DOC-only `litchi-ole`
-migration host, umbrella format detection, and OOXML encryption.
+directly by `litchi-doc`, `litchi-ppt`, `litchi-xls`, umbrella format
+detection, and OOXML encryption.
 
 ## Usage
 

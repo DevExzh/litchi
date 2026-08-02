@@ -243,6 +243,10 @@ conversion, fonts, and image conversion are optional.
 
 ## Word binary documents (DOC)
 
+The canonical implementation owner is `litchi-doc`, exposed independently as
+`litchi::doc` by the umbrella crate's `doc` feature. The former `litchi-ole`
+host and `ole` feature/module are removed rather than retained as aliases.
+
 ### Document and internal structures
 
 | Feature | Status | Read | Write | Notes |
@@ -746,7 +750,7 @@ The implementation and its tests are the source of truth for this matrix. Princi
 - Shared inert VBA codec and project model: `crates/litchi-vba/src/`
 - XLS: `crates/litchi-xls/src/`
 - PPT: `crates/litchi-ppt/src/`
-- DOC migration host: `crates/litchi-ole/src/doc/`
+- DOC: `crates/litchi-doc/src/`
 - OpenDocument: `crates/litchi-odf/src/`
 - Rich Text Format: `crates/litchi-rtf/src/`
 - Apple iWork: `crates/litchi-iwa/src/`

@@ -18,15 +18,15 @@
 //!
 //! Run with:
 //! ```bash
-//! # Recommended: Use with default features (includes ole/ooxml which are default)
+//! # Recommended: Use with default features (includes doc/ooxml)
 //! cargo run --example rtf_comprehensive_test --features rtf
 //!
 //! # Or explicitly:
-//! cargo run --example rtf_comprehensive_test --features rtf,ole,ooxml
+//! cargo run --example rtf_comprehensive_test --features rtf,doc,ooxml
 //! ```
 //!
 //! Note: The --no-default-features flag will cause compilation errors in the markdown
-//! module which depends on document types from ole/ooxml features. This is a known
+//! module which depends on document types from doc/ooxml features. This is a known
 //! issue with feature gating in the markdown module and doesn't affect RTF functionality.
 
 #[cfg(feature = "rtf")]

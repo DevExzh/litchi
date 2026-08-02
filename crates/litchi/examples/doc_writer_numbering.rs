@@ -7,7 +7,7 @@
 //!
 //! Run with: cargo run --example doc_writer_numbering
 
-use litchi::ole::doc::writer::{
+use litchi::doc::writer::{
     DocWriter, ListFormatOverride, ListLevel, ListStructure, NumberFormat, ParagraphFormatting,
 };
 use std::error::Error;

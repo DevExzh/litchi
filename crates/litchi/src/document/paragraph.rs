@@ -1,12 +1,12 @@
 //! Paragraph implementation for Word documents.
 
 use super::Run;
-#[cfg(any(feature = "ole", feature = "ooxml", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf"))]
 use litchi_core::Error;
 use litchi_core::Result;
 
-#[cfg(feature = "ole")]
-use crate::ole;
+#[cfg(feature = "doc")]
+use crate::doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -15,8 +15,8 @@ use crate::ooxml;
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
 pub enum Paragraph {
-    #[cfg(feature = "ole")]
-    Doc(ole::doc::Paragraph),
+    #[cfg(feature = "doc")]
+    Doc(doc::Paragraph),
     #[cfg(feature = "ooxml")]
     Docx(ooxml::docx::Paragraph),
     #[cfg(feature = "iwa")]
@@ -31,7 +31,7 @@ impl Paragraph {
     /// Get the text content of the paragraph.
     pub fn text(&self) -> Result<String> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Paragraph::Doc(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
             #[cfg(feature = "ooxml")]
             Paragraph::Docx(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
@@ -49,7 +49,7 @@ impl Paragraph {
     /// Get the runs in this paragraph.
     pub fn runs(&self) -> Result<Vec<Run>> {
         match self {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             Paragraph::Doc(p) => {
                 let runs = p.runs().map_err(Error::from)?;
                 Ok(runs.into_iter().map(Run::Doc).collect())
@@ -78,7 +78,7 @@ impl Paragraph {
     }
 }
 
-#[cfg(all(test, any(all(feature = "ooxml", feature = "ole"), feature = "rtf")))]
+#[cfg(all(test, any(all(feature = "ooxml", feature = "doc"), feature = "rtf")))]
 mod tests {
     use super::super::Document;
     use std::path::PathBuf;
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_paragraph_text_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_paragraph_text_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");
@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_paragraph_runs_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(all(feature = "ooxml", feature = "doc"))]
     fn test_paragraph_runs_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");

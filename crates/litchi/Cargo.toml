@@ -43,11 +43,11 @@ exclude = [
 ]
 
 [features]
-default = ["ole", "ppt", "xls", "ooxml", "ooxml_encryption", "eval_engine"]
+default = ["doc", "ppt", "xls", "ooxml", "ooxml_encryption", "eval_engine"]
 full = [
     "iwa",
     "odf",
-    "ole",
+    "doc",
     "ppt",
     "xls",
     "ooxml",
@@ -62,14 +62,14 @@ full = [
 # Format support features
 iwa = ["dep:litchi-iwa", "dep:soapberry-zip"]
 odf = ["dep:litchi-odf", "litchi-core/odf", "dep:soapberry-zip"]
-ole = ["dep:litchi-cfb", "dep:litchi-ole", "sign"]
+doc = ["dep:litchi-cfb", "dep:litchi-doc", "sign"]
 ppt = ["dep:litchi-cfb", "dep:litchi-ppt", "sign"]
 xls = ["dep:litchi-cfb", "dep:litchi-xls", "sign"]
 ooxml = ["dep:litchi-ooxml", "dep:soapberry-zip", "sign"]
 ooxml_encryption = ["ooxml", "dep:litchi-cfb", "litchi-ooxml/encryption"]
 rtf = ["dep:litchi-rtf"]
 # Additional functionality features
-formula = ["dep:litchi-formula", "litchi-ole?/formula", "litchi-ppt?/formula"]
+formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
 imgconv = ["dep:litchi-imgconv", "dep:litchi-odraw"]
 fonts = ["dep:allsorts", "dep:litchi-fonts"]
 sign = ["dep:litchi-sign"]
@@ -98,7 +98,7 @@ litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbe
 litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpers (carved out in workspace split)
 litchi-odf = { workspace = true, optional = true } # OpenDocument Format (.odt, .ods, .odp) parser (carved out in workspace split, gated by odf feature)
 litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt image grammar exposed by the image facade
-litchi-ole = { workspace = true, optional = true } # Migration host for legacy Word documents (.doc), gated by `ole`
+litchi-doc = { workspace = true, optional = true } # Legacy Word binary parser/writer (.doc), independently gated by `doc`
 litchi-ooxml = { workspace = true, optional = true } # Modern Office Open XML formats (.docx, .xlsx, .xlsb, .pptx) parser/writer (carved out in workspace split, gated by `ooxml` feature)
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary parser/writer (.ppt), independently gated by `ppt`
 litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
@@ -170,11 +170,11 @@ required-features = ["odf"]
 
 [[example]]
 name = "odraw_native_smoke"
-required-features = ["ole", "ppt", "xls"]
+required-features = ["doc", "ppt", "xls"]
 
 [[example]]
 name = "read_shapes_all_formats"
-required-features = ["ole", "ppt", "xls"]
+required-features = ["doc", "ppt", "xls"]
 
 [[example]]
 name = "rtf_comprehensive_test"

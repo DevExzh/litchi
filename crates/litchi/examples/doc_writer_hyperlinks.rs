@@ -6,7 +6,7 @@
 //!
 //! Run with: cargo run --example doc_writer_hyperlinks
 
-use litchi::ole::doc::writer::{DocWriter, ParagraphFormatting};
+use litchi::doc::writer::{DocWriter, ParagraphFormatting};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

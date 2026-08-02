@@ -1,0 +1,39 @@
+[package]
+name        = "litchi-doc"
+description = "Strictly typed reader and writer for legacy Microsoft Word (.doc) documents."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+formula = ["dep:litchi-formula"]
+
+[dependencies]
+bitflags          = { workspace = true }
+bumpalo           = { workspace = true }
+encoding_rs       = { workspace = true }
+litchi-cfb        = { workspace = true }
+litchi-codepage   = { workspace = true }
+litchi-core       = { workspace = true }
+litchi-crypto     = { workspace = true }
+litchi-formula    = { workspace = true, optional = true }
+litchi-odraw      = { workspace = true }
+litchi-ole-common = { workspace = true }
+litchi-sign       = { workspace = true }
+litchi-vba        = { workspace = true }
+md-5              = { workspace = true }
+rand              = { workspace = true }
+rc4               = { workspace = true }
+smallvec          = { workspace = true }
+subtle            = { workspace = true }
+thiserror          = { workspace = true }
+zerocopy           = { workspace = true }
+zerocopy-derive    = { workspace = true }
+zeroize            = { workspace = true }
+
+[dev-dependencies]
+flate2 = { workspace = true }

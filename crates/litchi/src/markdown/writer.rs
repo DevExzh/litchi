@@ -5,7 +5,7 @@ use crate::document::{Cell, Paragraph, Run, Table};
 /// This module provides the `MarkdownWriter` struct which handles the actual
 /// conversion of document elements to Markdown format.
 ///
-/// **Note**: Some functionality requires the `ole` or `ooxml` feature to be enabled.
+/// **Note**: Some functionality requires the `doc` or `ooxml` feature to be enabled.
 use litchi_core::{Error, Metadata, Result};
 use litchi_markdown::{MarkdownOptions, TableStyle};
 use memchr::memchr;
@@ -109,7 +109,7 @@ struct CellData {
 /// **Performance**: Optimized to extract all cell data in a single pass, avoiding repeated
 /// parsing. For large tables, uses parallel processing to extract cell data concurrently.
 #[cfg(any(
-    feature = "ole",
+    feature = "doc",
     feature = "ooxml",
     feature = "odf",
     feature = "rtf",
@@ -254,7 +254,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
 /// **Performance**: For large tables, uses parallel processing to extract cell data concurrently.
 /// This avoids repeated XML parsing during table rendering.
 #[cfg(any(
-    feature = "ole",
+    feature = "doc",
     feature = "ooxml",
     feature = "odf",
     feature = "rtf",
@@ -303,12 +303,12 @@ impl MarkdownWriter {
 
     /// Write a paragraph to the buffer.
     ///
-    /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
+    /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
     ///
     /// **Performance**: Optimized to avoid redundant XML parsing by extracting runs
     /// once and deriving text from them when needed.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -565,12 +565,12 @@ impl MarkdownWriter {
 
     /// Write a run with formatting.
     ///
-    /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
+    /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
     ///
     /// **Performance**: For OOXML runs, this uses a single XML parse to extract both
     /// text and properties simultaneously, providing 2x speedup over separate calls.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -615,7 +615,7 @@ impl MarkdownWriter {
                 )
             };
 
-        #[cfg(all(feature = "ole", not(feature = "ooxml")))]
+        #[cfg(all(feature = "doc", not(feature = "ooxml")))]
         let (text, bold, italic, strikethrough, vertical_pos) = {
             let text = run.text()?;
             if text.is_empty() {
@@ -630,9 +630,9 @@ impl MarkdownWriter {
             )
         };
 
-        // For rtf, odf features (without ole/ooxml)
+        // For rtf, odf features (without doc/ooxml)
         #[cfg(all(
-            not(any(feature = "ole", feature = "ooxml")),
+            not(any(feature = "doc", feature = "ooxml")),
             any(feature = "rtf", feature = "odf", feature = "iwa")
         ))]
         let (text, bold, italic, strikethrough) = {
@@ -649,8 +649,8 @@ impl MarkdownWriter {
         };
 
         // Handle vertical position (superscript/subscript)
-        // Note: vertical_position() is available when ole or ooxml features are enabled
-        #[cfg(any(feature = "ole", feature = "ooxml"))]
+        // Note: vertical_position() is available when doc or ooxml features are enabled
+        #[cfg(any(feature = "doc", feature = "ooxml"))]
         {
             use litchi_core::VerticalPosition;
 
@@ -730,7 +730,7 @@ impl MarkdownWriter {
         }
 
         // Pre-calculate buffer size for non-vertical-position formatting
-        #[cfg(not(any(feature = "ole", feature = "ooxml")))]
+        #[cfg(not(any(feature = "doc", feature = "ooxml")))]
         {
             let mut needed_capacity = text.len();
             if strikethrough {
@@ -788,9 +788,9 @@ impl MarkdownWriter {
 
     /// Write a table to the buffer.
     ///
-    /// **Note**: This method requires the `ole` or `ooxml` feature to be enabled.
+    /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -825,7 +825,7 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Efficient analysis that reuses existing span computation.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -865,7 +865,7 @@ impl MarkdownWriter {
     /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
     /// Pre-extracts all cell data in a single optimized pass to avoid repeated parsing.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -947,7 +947,7 @@ impl MarkdownWriter {
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -964,7 +964,7 @@ impl MarkdownWriter {
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -1023,7 +1023,7 @@ impl MarkdownWriter {
     /// - Styled tables (`styled = true`): Include indentation, line feeds, and CSS class
     /// - Minimal tables (`styled = false`): No indentation, no line feeds for compact output
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -1240,7 +1240,7 @@ impl MarkdownWriter {
     /// avoiding the 4 intermediate string allocations from chained `replace()` calls.
     /// Uses SIMD-accelerated memchr for fast searching.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -1423,7 +1423,7 @@ impl MarkdownWriter {
     ///
     /// Returns the markdown representation of the formula if one is found, None otherwise.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -1454,11 +1454,11 @@ impl MarkdownWriter {
         }
 
         // Try OLE MTEF formulas
-        #[cfg(feature = "ole")]
+        #[cfg(feature = "doc")]
         {
             // `Run` carries one variant per enabled format feature, so this
             // pattern is refutable in most builds and irrefutable in an
-            // `ole`-only build; `if let` covers both without a wildcard arm that
+            // `doc`-only build; `if let` covers both without a wildcard arm that
             // would be unreachable in the latter.
             #[allow(irrefutable_let_patterns)]
             if let crate::document::Run::Doc(ole_run) = _run
@@ -1543,7 +1543,7 @@ impl MarkdownWriter {
     /// Write a list item with proper formatting.
     #[allow(dead_code)] // Used in fallback paths
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -1601,7 +1601,7 @@ impl MarkdownWriter {
     ///
     /// For OOXML runs, this method is optimized to extract only text efficiently.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",
@@ -1625,7 +1625,7 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Takes pre-parsed runs to avoid re-parsing XML.
     #[cfg(any(
-        feature = "ole",
+        feature = "doc",
         feature = "ooxml",
         feature = "odf",
         feature = "rtf",

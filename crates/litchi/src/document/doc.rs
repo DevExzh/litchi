@@ -4,8 +4,8 @@ use super::types::DocumentImpl;
 use super::{Paragraph, Table};
 use litchi_core::{Error, Result};
 
-#[cfg(feature = "ole")]
-use crate::ole;
+#[cfg(feature = "doc")]
+use crate::doc;
 
 #[cfg(feature = "ooxml")]
 use crate::ooxml;
@@ -169,11 +169,10 @@ impl Document {
         let detected = detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
 
         match detected {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             DetectedFormat::Doc(ole_file) => {
                 // OLE file already parsed - reuse it!
-                let mut package =
-                    ole::doc::Package::from_ole_file(ole_file).map_err(Error::from)?;
+                let mut package = doc::Package::from_ole_file(ole_file).map_err(Error::from)?;
                 let doc = package.document().map_err(Error::from)?;
 
                 // Extract metadata from the OLE file
@@ -262,7 +261,7 @@ impl Document {
     /// ```
     pub fn text(&self) -> Result<String> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => doc.text().map_err(Error::from),
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(package, _) => package
@@ -296,7 +295,7 @@ impl Document {
     /// ```
     pub fn paragraph_count(&self) -> Result<usize> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => doc.paragraph_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(package, _) => package
@@ -335,7 +334,7 @@ impl Document {
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => {
                 let paras = doc.paragraphs().map_err(Error::from)?;
                 Ok(paras.into_iter().map(Paragraph::Doc).collect())
@@ -413,7 +412,7 @@ impl Document {
     /// ```
     pub fn tables(&self) -> Result<Vec<Table>> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => {
                 let tables = doc.tables().map_err(Error::from)?;
                 Ok(tables
@@ -497,10 +496,10 @@ impl Document {
     /// - This is 2x faster than calling `paragraphs()` and `tables()` separately
     pub fn elements(&self) -> Result<Vec<super::DocumentElement>> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => {
                 use super::DocumentElement;
-                use litchi_ole::doc::DocElement;
+                use litchi_doc::DocElement;
                 let raw = doc.elements().map_err(Error::from)?;
                 Ok(raw
                     .into_iter()
@@ -667,7 +666,7 @@ impl Document {
     /// ```
     pub fn metadata(&self) -> Result<litchi_core::Metadata> {
         match &self.inner {
-            #[cfg(feature = "ole")]
+            #[cfg(feature = "doc")]
             DocumentImpl::Doc(_, metadata) => Ok(metadata.clone()),
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(_, metadata) => Ok(metadata.clone()),
@@ -714,7 +713,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_open_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path);
@@ -722,7 +721,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_open_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path);
@@ -738,7 +737,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_from_bytes_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -775,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_from_bytes_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -866,7 +865,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_text_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -875,7 +874,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_text_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");
@@ -894,7 +893,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_paragraph_count_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -905,7 +904,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_paragraph_count_doc() {
         // Use a file that definitely has paragraphs
         // Avoid files with metadata parsing issues
@@ -918,7 +917,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_paragraphs_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -932,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_paragraphs_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");
@@ -945,7 +944,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_tables_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -959,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_elements_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -980,7 +979,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_metadata_docx() {
         let path = test_data_path().join("ooxml/docx/documentProperties.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -991,7 +990,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_metadata_doc() {
         // Note: documentProperties.doc has a metadata parsing issue causing overflow
         // Use FancyFoot.doc instead which has working metadata
@@ -1003,7 +1002,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_open_nonexistent_file() {
         let path = test_data_path().join("nonexistent_file.docx");
         let result = Document::open(&path);
@@ -1011,7 +1010,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "doc")]
     fn test_document_from_bytes_invalid_data() {
         let bytes = b"This is not a valid document file".to_vec();
         let result = Document::from_bytes(bytes);
@@ -1019,7 +1018,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_complex_lists_docx() {
         let path = test_data_path().join("ooxml/docx/ComplexNumberedLists.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1034,7 +1033,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_footnotes_docx() {
         let path = test_data_path().join("ooxml/docx/footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1043,7 +1042,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_endnotes_docx() {
         let path = test_data_path().join("ooxml/docx/endnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1052,7 +1051,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_headers_docx() {
         let path = test_data_path().join("ooxml/docx/Headers.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1062,7 +1061,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_header_footer_docx() {
         let path = test_data_path().join("ooxml/docx/headerFooter.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1071,7 +1070,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_comment_docx() {
         let path = test_data_path().join("ooxml/docx/comment.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1079,7 +1078,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ole"))]
+    #[cfg(feature = "ooxml")]
     fn test_document_drawing_docx() {
         let path = test_data_path().join("ooxml/docx/drawing.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");

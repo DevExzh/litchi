@@ -1846,6 +1846,62 @@ gate and Computer Use/native Microsoft Office reruns are skipped: the
 previously green workspace and native Office baselines remain the applicable
 evidence for unchanged wire semantics.
 
+The thirty-sixth implementation slice completes the atomic DOC ownership
+extraction and retires the final legacy-binary migration host. The complete Word
+binary reader, writer, record model, integration tests, examples, and fuzz
+target move from `litchi-ole` into `litchi-doc`. DOC package, encryption,
+OfficeArt, embedded-object, signature, equation, and inert VBA integration now
+have one concrete owner. With XLS and PPT already extracted, the empty
+`litchi-ole` monolith is deleted instead of being preserved as a dependency
+tunnel.
+
+This is intentionally breaking at both the package and feature boundaries. The
+canonical direct entry is `litchi_doc`, and the concise umbrella entry is the
+independent `doc` feature and `litchi::doc` module. The umbrella default and
+`full` sets enable `doc`; DOC detection and the high-level document facade
+follow that feature directly. There is deliberately no `litchi_ole::doc`,
+`litchi::ole::doc`, `litchi::ole`, or `ole` feature compatibility alias. DOC,
+PPT, and XLS may therefore be enabled independently without compiling a peer
+format or a compatibility monolith.
+
+The canonical internal dependency ceiling for `litchi-doc` is `litchi-cfb`,
+`litchi-codepage`, `litchi-core`, `litchi-crypto`, optional `litchi-formula`,
+`litchi-odraw`, `litchi-ole-common`, `litchi-sign`, and `litchi-vba`. The crate
+has no dependency on a peer concrete format, the removed host, or an async
+runtime. The topology ledger converts those relationships from temporary host
+debt into canonical concrete-format edges, removes every `litchi-ole` package
+and facade debt entry, and permanently rejects reintroducing the retired
+monolith. The boundary checker accepts 32 workspace packages and 98 direct
+internal dependency declarations with 18 explicit debt items, and all nine
+checker regressions pass.
+
+The extraction also closes three unsafe-by-default edges found during the
+ownership audit. `sprm::parse_sprms` is now an exact fallible parser: its short
+`sprm::Error` reports the malformed opcode, length, extent, or operand offset,
+and a valid-looking prefix is never returned as success. Every DOC parser
+caller propagates that typed failure as document corruption. Equation Native
+streams use checked header-plus-payload extents, reject truncated declared
+payloads, propagate those failures through aggregate extraction, and truncate
+the already-owned stream buffer instead of copying it. Public header, footer,
+footnote, and endnote CP builders return `Result`, validate cumulative UTF-16
+positions and byte extents, and use fallible reservation instead of panicking
+on user-controlled sizes.
+
+The ownership move does not intentionally change valid DOC wire output or CFB
+topology, so it creates no new native Microsoft Office artifact claim. The
+extracted package passes 956 warning-denied unit and integration tests with two
+ignored fixture tests; its rustdoc surface adds 14 passing compile tests with
+12 intentionally ignored examples. All-feature/all-target checks and Clippy
+pass for `litchi-doc`; all-feature/all-target Clippy passes for the umbrella;
+warning-denied rustdoc passes for both the direct crate and isolated
+`doc,imgconv` facade. The isolated `doc`, `doc,imgconv`, and `doc,ooxml`
+combinations compile, `ooxml_encryption` does not activate `litchi-doc`, and
+the Python binding resolves the renamed feature. Formatting, diff validation,
+the 32-package boundary inventory, and all nine boundary regressions are green.
+Per the explicit review direction, the full-workspace and Computer Use/native
+Office reruns are skipped; the previously green baselines remain the applicable
+evidence for unchanged wire semantics.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection
