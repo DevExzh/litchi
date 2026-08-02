@@ -4,10 +4,6 @@
 //! for Excel (.xlsx) files using the Office Open XML format.
 
 use crate::pivot::PivotTable;
-use crate::ribbonx::{
-    RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
-    load_ribbon_customizations, store_ribbon_customization,
-};
 use crate::web_extensions::{
     OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
     remove_web_extension_task_panes, store_web_extension_task_panes,
@@ -73,6 +69,7 @@ use litchi_core::sheet::{
 };
 use litchi_ooxml_common::DocumentProperties;
 use litchi_ooxml_common::embedded;
+use litchi_ooxml_common::ribbon;
 use litchi_opc::{OpcPackage, PackURI};
 use std::collections::{HashMap, HashSet};
 
@@ -503,25 +500,24 @@ impl Workbook {
         remove_web_extension_task_panes(&mut self.package)
     }
 
-    /// Load all package-level RibbonX customizations without invoking callbacks.
-    pub fn ribbon_customizations(&self) -> crate::error::Result<Vec<RibbonCustomization>> {
-        load_ribbon_customizations(&self.package)
+    /// Read the bounded, inert package-level Ribbon customizations.
+    pub fn ribbon(&self) -> crate::error::Result<ribbon::Set<'_>> {
+        Ok(ribbon::load(&self.package)?)
     }
 
-    /// Load the effective package-level RibbonX customization without invoking callbacks.
-    pub fn ribbon_customization(&self) -> crate::error::Result<Option<RibbonCustomization>> {
-        load_ribbon_customization(&self.package)
-    }
-
-    /// Store opaque RibbonX XML without interpreting or invoking callbacks.
-    pub fn set_ribbon_customization(
+    /// Create or replace one Ribbon customization family.
+    pub fn put_ribbon(
         &mut self,
-        version: RibbonCustomizationVersion,
-        xml: &[u8],
-    ) -> crate::error::Result<RibbonCustomization> {
-        let customization = store_ribbon_customization(&mut self.package, version, xml)?;
-        self.package.unsign();
-        Ok(customization)
+        version: ribbon::Version,
+        xml: Vec<u8>,
+    ) -> crate::error::Result<&mut Self> {
+        ribbon::put(&mut self.package, version, xml)?;
+        Ok(self)
+    }
+
+    /// Remove one Ribbon relationship family and its unreferenced part.
+    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> crate::error::Result<bool> {
+        Ok(ribbon::remove(&mut self.package, family)?)
     }
 
     /// Create a new empty workbook.

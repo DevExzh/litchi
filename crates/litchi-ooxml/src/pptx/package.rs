@@ -7,10 +7,6 @@ use crate::pptx::vba_project::{
     store_vba_project as store_presentation_vba_project,
 };
 use crate::pptx::writer::MutablePresentation;
-use crate::ribbonx::{
-    RibbonCustomization, RibbonCustomizationVersion, load_ribbon_customization,
-    load_ribbon_customizations, store_ribbon_customization,
-};
 use crate::web_extensions::{
     OoxmlConformance, WebExtensionTaskPanes, load_web_extension_task_panes,
     remove_web_extension_task_panes, store_web_extension_task_panes,
@@ -18,6 +14,7 @@ use crate::web_extensions::{
 /// Package implementation for PowerPoint presentations.
 use litchi_ooxml_common::DocumentProperties;
 use litchi_ooxml_common::embedded;
+use litchi_ooxml_common::ribbon;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::packuri::PackURI;
@@ -810,25 +807,23 @@ impl Package {
         remove_web_extension_task_panes(&mut self.opc)
     }
 
-    /// Load all package-level RibbonX customizations without invoking callbacks.
-    pub fn ribbon_customizations(&self) -> Result<Vec<RibbonCustomization>> {
-        load_ribbon_customizations(&self.opc)
+    /// Read the fixed legacy and modern package-level Ribbon slots.
+    ///
+    /// [`ribbon::Set::effective`] applies modern-first precedence. XML remains
+    /// inert; callbacks and commands are never invoked.
+    pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
+        Ok(ribbon::load(&self.opc)?)
     }
 
-    /// Load the effective package-level RibbonX customization without invoking callbacks.
-    pub fn ribbon_customization(&self) -> Result<Option<RibbonCustomization>> {
-        load_ribbon_customization(&self.opc)
+    /// Store opaque Ribbon XML by moving its `Vec` into package ownership.
+    pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> Result<&mut Self> {
+        ribbon::put(&mut self.opc, version, xml)?;
+        Ok(self)
     }
 
-    /// Store opaque RibbonX XML without interpreting or invoking callbacks.
-    pub fn set_ribbon_customization(
-        &mut self,
-        version: RibbonCustomizationVersion,
-        xml: &[u8],
-    ) -> Result<RibbonCustomization> {
-        let customization = store_ribbon_customization(&mut self.opc, version, xml)?;
-        self.opc.unsign();
-        Ok(customization)
+    /// Remove one package-level Ribbon relationship family and its orphaned part.
+    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
+        Ok(ribbon::remove(&mut self.opc, family)?)
     }
 
     /// Get the underlying OPC package.

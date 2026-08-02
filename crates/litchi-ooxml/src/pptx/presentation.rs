@@ -15,6 +15,7 @@ use crate::pptx::show_events::{PptxSlideShowEvent, ShowEventLoadLimits, load_sli
 use crate::pptx::slide::{Slide, SlideMaster};
 use crate::pptx::tags::{SlideTagList, TagList};
 /// Main presentation object - the high-level API for working with presentations.
+use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -574,20 +575,13 @@ impl<'a> Presentation<'a> {
         crate::web_extensions::load_web_extension_task_panes(self.package)
     }
 
-    /// Load all package-level RibbonX customizations for this presentation.
+    /// Read the fixed legacy and modern Ribbon slots for this presentation.
     ///
     /// Custom UI XML remains opaque inert data. Callback names, macros,
-    /// commands, and linked content are never invoked or resolved.
-    pub fn ribbon_customizations(&self) -> Result<Vec<crate::ribbonx::RibbonCustomization>> {
-        crate::ribbonx::load_ribbon_customizations(self.package)
-    }
-
-    /// Load the effective package-level RibbonX customization, if present.
-    ///
-    /// When both supported relationship families are present, the newer
-    /// customization takes precedence.
-    pub fn ribbon_customization(&self) -> Result<Option<crate::ribbonx::RibbonCustomization>> {
-        crate::ribbonx::load_ribbon_customization(self.package)
+    /// commands, and linked content are never invoked or resolved. Use
+    /// [`ribbon::Set::effective`] for modern-first precedence.
+    pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
+        Ok(ribbon::load(self.package)?)
     }
 
     // ========================================================================

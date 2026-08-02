@@ -2070,6 +2070,72 @@ facades; it emits no new Office artifact, so the previously green full-workspace
 and native Office baselines are relied upon instead of repeating those gates.
 The next dependency-safe extraction is `ribbon`, followed by `web`.
 
+The fortieth implementation slice completes that second dependency by moving
+Ribbon customization ownership into the sole canonical
+`litchi-ooxml-common::ribbon` module. The migration host's former `ribbonx`
+module and its owned `RibbonCustomization*` vocabulary are deleted without
+compatibility aliases. The contextual public surface is
+`Version::{V2007, V2010, Ui2}`, `Family::{Legacy, Modern}`, borrowed `Ui`, a
+fixed two-slot `Set`, configurable `Limits`, and the semantic verbs `load`,
+`load_with`, `put`, `put_with`, and `remove`. `Set::effective` selects the
+modern slot without allocating a temporary vector, while explicit family
+accessors keep coexistence visible. DOCX, PPTX, XLSX, and XLSB expose only
+`ribbon`, move-owning `put_ribbon`, and `remove_ribbon`; PowerPoint's immutable
+presentation view exposes `ribbon`. The common module is re-exported for direct
+host and umbrella users, so naming `Version` or `Family` does not require a
+second dependency.
+
+Loaded XML remains owned by its OPC part. `Ui::xml` lends that allocation and
+cannot outlive the package; the read path no longer clones each payload.
+Authoring accepts a `Vec<u8>` by value. Part-name probing validates candidate
+URIs against one bounded, case-folded name snapshot before constructing one
+XML part, so collisions do not repeatedly copy the payload or rescan the
+package for every suffix. Byte-identical `put` is a true no-op that preserves
+package signatures. Replacing a part that has another inbound relationship
+forks it together with its validated image relationships before the package
+relationship is retargeted, preserving unrelated consumers; otherwise
+replacement updates in place. Successful updates, creates, and removals
+invalidate signatures inside the common transaction. These are ownership and
+algorithm-topology properties, not measured latency, CPU, cache, or concurrency
+claims; ADR 0005 profiling remains required before making those claims.
+
+The validator follows local `[MS-OE376]` section 3.4.1.3: Ribbon parts use
+`application/xml`, are reached by an internal package relationship, have the
+matching `customUI` root namespace, and may relate only to image parts. It also
+applies the newer relationship and namespace family documented by the local
+Office specifications. Both family cardinality and XML bytes, depth, nodes,
+aggregate image relationships, package graph scans, allocation-name snapshots,
+and deletion traversal are bounded. XML declarations, qualified names,
+namespace bindings, expanded attribute identities, numeric references, and XML
+1.0 characters are validated. Declarations may identify only the UTF-8
+encoding that the zero-copy parser actually consumes; inert processing
+instructions remain accepted.
+Package and image targets with queries or fragments, external targets, missing
+parts, mismatched namespaces or content types, duplicate families, Ribbon
+relationships sourced by parts, and non-image outbound relationships fail with
+typed errors. Image payloads stay inert and are never fetched or decoded.
+
+`remove(Family)` validates and stages the graph before mutation. It removes the
+selected package relationship, collects the selected Ribbon part only when no
+other internal relationship still targets it, and similarly collects its image
+parts only when they are no longer shared. Absence is `Ok(false)` and does not
+drop signatures. This gives direct safe deletion without exposing raw
+relationship IDs or leaving the caller to hand-edit a partially valid OPC
+graph.
+
+Focused verification passes with warnings denied: all 76
+`litchi-ooxml-common` library tests, including 14 Ribbon tests, and ten host
+integration tests across PPTX, DOCX/general OOXML, XLSX, and XLSB are green.
+Common and host all-target checks, Clippy, and rustdoc pass, including the
+all-feature/all-target host build. Formatting and diff validation are green.
+The isolated `ooxml` umbrella library and rustdoc, manifest ordering, the
+32-package boundary inventory, and all nine boundary regressions are green;
+the inventory remains at 102 internal dependency edges and 18 explicit
+migration-debt entries. Per explicit direction, the already-green
+full-workspace gate and native Microsoft Office baseline are not rerun because
+this ownership and validation slice emits no new Office artifact. The next
+dependency-safe extraction is `web`.
+
 These slices do not yet shrink or synthesize absent worksheet `dimension`
 hints or implement mixed deletion disposition, non-worksheet tab deletion,
 recursive garbage collection, grouped-tab selection CRUD, workbook-protection

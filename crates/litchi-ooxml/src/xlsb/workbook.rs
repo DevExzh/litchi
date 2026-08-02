@@ -30,6 +30,7 @@ use litchi_core::binary;
 use litchi_core::sheet::{Result, Worksheet as SheetTrait, WorksheetIterator};
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
+use litchi_ooxml_common::ribbon;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::relationship_type;
 use std::cmp::Reverse;
@@ -102,6 +103,22 @@ impl std::fmt::Debug for XlsbWorkbook {
 }
 
 impl XlsbWorkbook {
+    /// Read the bounded, inert package-level Ribbon customizations.
+    pub fn ribbon(&self) -> XlsbResult<ribbon::Set<'_>> {
+        Ok(ribbon::load(&self.package)?)
+    }
+
+    /// Create or replace one Ribbon customization family.
+    pub fn put_ribbon(&mut self, version: ribbon::Version, xml: Vec<u8>) -> XlsbResult<&mut Self> {
+        ribbon::put(&mut self.package, version, xml)?;
+        Ok(self)
+    }
+
+    /// Remove one Ribbon relationship family and its unreferenced part.
+    pub fn remove_ribbon(&mut self, family: ribbon::Family) -> XlsbResult<bool> {
+        Ok(ribbon::remove(&mut self.package, family)?)
+    }
+
     /// Discover inert embedded-object and embedded-package relationships
     /// using the shared safe default resource limits.
     ///

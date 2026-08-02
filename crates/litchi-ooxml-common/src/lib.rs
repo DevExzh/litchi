@@ -10,6 +10,7 @@ pub mod embedded;
 pub mod external_link;
 pub mod mce;
 pub mod properties;
+pub mod ribbon;
 pub mod xml;
 
 pub use error::{Error, Result};
